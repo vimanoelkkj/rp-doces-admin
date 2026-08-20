@@ -1,15 +1,15 @@
-import { requireAdmin } from "../../lib/auth.js";
+import { requireUser } from "../../lib/auth.js";
 
 export async function onRequestGet({ env, request }) {
-  const auth = await requireAdmin(request, env);
-  if (auth.response) return auth.response;
+  const auth = await requireUser(env, request);
+  if (auth.error) return auth.error;
   const rows = await env.DB.prepare("SELECT chave, valor FROM configuracoes_loja").all();
   return Response.json(Object.fromEntries((rows.results || []).map(r => [r.chave, r.valor])));
 }
 
 export async function onRequestPut({ env, request }) {
-  const auth = await requireAdmin(request, env);
-  if (auth.response) return auth.response;
+  const auth = await requireUser(env, request);
+  if (auth.error) return auth.error;
   const data = await request.json();
   const allowed = ["whatsapp","local_retirada","entregas_status","horario_atendimento","mensagem_whatsapp"];
   const stmts = [];

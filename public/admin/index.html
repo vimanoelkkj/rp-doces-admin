@@ -31,6 +31,307 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 
 <link rel="icon" type="image/png" href="/admin-favicon.png">
 <link rel="apple-touch-icon" href="/admin-apple-touch-icon.png">
+
+<style id="rp-config-style">
+#tab-config .toolbar{
+  align-items:flex-end;
+  margin-bottom:18px;
+}
+.config-subtitle{
+  margin:5px 0 0;
+}
+.config-card{
+  max-width:860px;
+}
+.config-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px 18px;
+}
+.config-grid .field{
+  margin:0;
+}
+.config-grid .field label{
+  margin-bottom:7px;
+}
+.config-grid input,
+.config-grid select,
+.config-grid textarea{
+  width:100%;
+  min-height:44px;
+}
+.config-grid textarea{
+  min-height:110px;
+}
+.config-span-2{
+  grid-column:1 / -1;
+}
+.config-footer{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-top:20px;
+  padding-top:18px;
+  border-top:1px solid #ffe8f0;
+}
+#configStatus{
+  min-height:20px;
+}
+@media(max-width:720px){
+  .config-grid{
+    grid-template-columns:1fr;
+  }
+  .config-span-2{
+    grid-column:auto;
+  }
+  .config-card{
+    padding:18px;
+  }
+  .config-footer{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  #salvarConfig{
+    width:100%;
+  }
+}
+</style>
+
+
+<style id="rp-select-style">
+.rp-select{
+  position:relative;
+  width:100%;
+}
+.rp-select-trigger{
+  width:100%;
+  min-height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 13px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  color:var(--text);
+  font-weight:500;
+  cursor:pointer;
+  outline:none;
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+.rp-select-trigger:hover{
+  border-color:#ffb3cf;
+  background:#fffdfd;
+}
+.rp-select.open .rp-select-trigger,
+.rp-select-trigger:focus-visible{
+  border-color:var(--pink);
+  box-shadow:0 0 0 3px rgba(255,107,157,.12);
+}
+.rp-select-trigger svg{
+  width:18px;
+  height:18px;
+  fill:currentColor;
+  color:var(--pink2);
+  flex:0 0 auto;
+  transition:transform .18s ease;
+}
+.rp-select.open .rp-select-trigger svg{
+  transform:rotate(180deg);
+}
+.rp-select-menu{
+  position:absolute;
+  left:0;
+  right:0;
+  top:calc(100% + 8px);
+  z-index:60;
+  padding:7px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:rgba(255,255,255,.98);
+  box-shadow:0 18px 45px rgba(106,61,77,.16);
+  backdrop-filter:blur(12px);
+  opacity:0;
+  transform:translateY(-6px) scale(.985);
+  pointer-events:none;
+  transition:opacity .16s ease,transform .16s ease;
+}
+.rp-select.open .rp-select-menu{
+  opacity:1;
+  transform:none;
+  pointer-events:auto;
+}
+.rp-select-menu button{
+  width:100%;
+  display:grid;
+  grid-template-columns:12px 1fr 20px;
+  align-items:center;
+  gap:11px;
+  padding:10px 11px;
+  border:0;
+  border-radius:11px;
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+}
+.rp-select-menu button:hover,
+.rp-select-menu button[aria-selected="true"]{
+  background:var(--soft);
+}
+.rp-select-menu strong{
+  display:block;
+  color:var(--brown);
+  font-size:.86rem;
+}
+.rp-select-menu small{
+  display:block;
+  margin-top:2px;
+  color:var(--muted);
+  font-size:.72rem;
+  font-weight:400;
+}
+.rp-select-dot{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  box-shadow:0 0 0 3px rgba(0,0,0,.035);
+}
+.rp-select-dot.em-breve{background:#f0b34a}
+.rp-select-dot.disponivel{background:#48a96a}
+.rp-select-dot.indisponivel{background:#d96a79}
+.rp-select-check{
+  color:var(--pink2);
+  font-weight:700;
+  opacity:0;
+}
+.rp-select-menu button[aria-selected="true"] .rp-select-check{
+  opacity:1;
+}
+@media(max-width:720px){
+  .rp-select-menu{
+    position:fixed;
+    left:16px;
+    right:16px;
+    top:auto;
+    bottom:calc(16px + env(safe-area-inset-bottom));
+    border-radius:20px;
+  }
+}
+</style>
+
+
+<style id="rp-password-modal-style">
+.password-modal{
+  width:min(460px,100%);
+}
+.password-modal h2{
+  margin-bottom:6px;
+}
+.password-modal .muted{
+  margin:0 0 18px;
+}
+.password-input-wrap{
+  position:relative;
+}
+.password-input-wrap input{
+  padding-right:48px;
+}
+.password-eye{
+  position:absolute;
+  right:9px;
+  top:50%;
+  transform:translateY(-50%);
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--pink2);
+  cursor:pointer;
+  font-size:16px;
+}
+.password-eye:hover{
+  background:var(--soft);
+}
+</style>
+
+
+<style id="rp-schedule-style">
+.schedule-box{
+  padding:14px;
+  border:1px solid #ffe1eb;
+  border-radius:16px;
+  background:#fffdfd;
+}
+.schedule-days{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:14px;
+}
+.schedule-days button{
+  min-width:48px;
+  height:38px;
+  padding:0 12px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:#fff;
+  color:var(--brown);
+  font-weight:600;
+  cursor:pointer;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease;
+}
+.schedule-days button:hover{
+  border-color:#ffb3cf;
+  background:#fff7fa;
+}
+.schedule-days button.active{
+  background:var(--pink);
+  border-color:var(--pink);
+  color:#fff;
+  box-shadow:0 6px 18px rgba(255,107,157,.18);
+}
+.schedule-days button:active{
+  transform:scale(.96);
+}
+.schedule-times{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,180px));
+  gap:14px;
+}
+.schedule-label{
+  display:block;
+  margin-bottom:6px;
+  font-size:.78rem;
+  font-weight:600;
+  color:var(--brown);
+}
+.time-select .rp-select-menu{
+  max-height:260px;
+  overflow:auto;
+}
+.time-menu button{
+  grid-template-columns:1fr 20px;
+}
+.schedule-preview{
+  margin:12px 0 0;
+  font-size:.82rem;
+}
+@media(max-width:720px){
+  .schedule-times{
+    grid-template-columns:1fr 1fr;
+  }
+  .schedule-days button{
+    min-width:44px;
+    padding:0 10px;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="shell">
@@ -85,34 +386,112 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
       <div class="card" id="usersList"></div>
     </section>
   
-<section id="configPanel" class="panel" style="display:none">
-  <div class="toolbar"><h2>Configurações da loja</h2></div>
-  <div class="form-grid" style="max-width:760px">
-    <label>WhatsApp para pedidos
-      <input id="cfgWhatsapp" inputmode="tel" placeholder="(33) 99128-5907">
-    </label>
-    <label>Local de retirada
-      <input id="cfgLocal" placeholder="Temponi Concept">
-    </label>
-    <label>Status das entregas
-      <select id="cfgEntregas">
-        <option value="EM_BREVE">Em breve</option>
-        <option value="DISPONIVEL">Disponíveis</option>
-        <option value="INDISPONIVEL">Indisponíveis</option>
-      </select>
-    </label>
-    <label>Horário de atendimento
-      <input id="cfgHorario" placeholder="Ex.: Seg a sáb, 10h às 19h">
-    </label>
-    <label style="grid-column:1/-1">Mensagem inicial do WhatsApp
-      <textarea id="cfgMensagem" rows="3" placeholder="Olá! Gostaria de fazer um pedido..."></textarea>
-    </label>
+
+<section id="tab-config" class="hidden">
+  <div class="toolbar">
+    <div>
+      <h2>Configurações da loja</h2>
+      <p class="muted config-subtitle">Dados usados pelo site público e pelo fluxo de pedidos.</p>
+    </div>
   </div>
-  <div class="actions" style="margin-top:18px">
-    <button class="btn" id="salvarConfig">Salvar alterações</button>
-    <span id="configStatus" class="muted"></span>
+
+  <div class="card config-card">
+    <div class="config-grid">
+      <div class="field">
+        <label for="cfgWhatsapp">WhatsApp para pedidos</label>
+        <input id="cfgWhatsapp" inputmode="tel" placeholder="(33) 99128-5907">
+      </div>
+
+      <div class="field">
+        <label for="cfgLocal">Local de retirada</label>
+        <input id="cfgLocal" placeholder="Temponi Concept">
+      </div>
+
+      <div class="field">
+        <label for="cfgEntregas">Status das entregas</label>
+        <div class="rp-select" id="cfgEntregasSelect" data-value="EM_BREVE">
+          <button class="rp-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span class="rp-select-value">Em breve</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"/>
+            </svg>
+          </button>
+          <div class="rp-select-menu" role="listbox">
+            <button type="button" role="option" data-value="EM_BREVE" aria-selected="true">
+              <span class="rp-select-dot em-breve"></span>
+              <span><strong>Em breve</strong><small>Entrega ainda não disponível</small></span>
+              <span class="rp-select-check">✓</span>
+            </button>
+            <button type="button" role="option" data-value="DISPONIVEL" aria-selected="false">
+              <span class="rp-select-dot disponivel"></span>
+              <span><strong>Disponíveis</strong><small>Clientes podem pedir entrega</small></span>
+              <span class="rp-select-check">✓</span>
+            </button>
+            <button type="button" role="option" data-value="INDISPONIVEL" aria-selected="false">
+              <span class="rp-select-dot indisponivel"></span>
+              <span><strong>Indisponíveis</strong><small>Entrega temporariamente pausada</small></span>
+              <span class="rp-select-check">✓</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field config-span-2">
+        <label>Horário de atendimento</label>
+
+        <div class="schedule-box">
+          <div class="schedule-days" id="cfgDias">
+            <button type="button" data-day="seg">Seg</button>
+            <button type="button" data-day="ter">Ter</button>
+            <button type="button" data-day="qua">Qua</button>
+            <button type="button" data-day="qui">Qui</button>
+            <button type="button" data-day="sex">Sex</button>
+            <button type="button" data-day="sab">Sáb</button>
+            <button type="button" data-day="dom">Dom</button>
+          </div>
+
+          <div class="schedule-times">
+            <div>
+              <span class="schedule-label">Abre</span>
+              <div class="rp-select time-select" id="cfgAbreSelect" data-value="10:00">
+                <button class="rp-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="rp-select-value">10:00</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"/></svg>
+                </button>
+                <div class="rp-select-menu time-menu" role="listbox"></div>
+              </div>
+            </div>
+
+            <div>
+              <span class="schedule-label">Fecha</span>
+              <div class="rp-select time-select" id="cfgFechaSelect" data-value="19:00">
+                <button class="rp-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="rp-select-value">19:00</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"/></svg>
+                </button>
+                <div class="rp-select-menu time-menu" role="listbox"></div>
+              </div>
+            </div>
+          </div>
+
+          <input id="cfgHorario" type="hidden">
+          <p class="schedule-preview muted" id="cfgHorarioPreview">Seg a sáb, 10h às 19h</p>
+        </div>
+      </div>
+
+      <div class="field config-span-2">
+        <label for="cfgMensagem">Mensagem inicial do WhatsApp</label>
+        <textarea id="cfgMensagem" rows="4" placeholder="Olá! Gostaria de fazer um pedido na R&P Doces."></textarea>
+      </div>
+    </div>
+
+    <div class="config-footer">
+      <button class="btn" id="salvarConfig">Salvar alterações</button>
+      <span id="configStatus" class="muted"></span>
+    </div>
   </div>
 </section>
+
 
 </main>
 </div>
@@ -146,6 +525,37 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
   </div>
 </div>
 
+
+<div class="modal-bg hidden" id="passwordModal">
+  <div class="modal password-modal">
+    <h2>Definir nova senha</h2>
+    <p class="muted">A nova senha precisa ter pelo menos 8 caracteres, com letra e número.</p>
+
+    <div class="field">
+      <label for="newPassword">Nova senha</label>
+      <div class="password-input-wrap">
+        <input id="newPassword" type="password" minlength="8" autocomplete="new-password">
+        <button type="button" class="password-eye" id="toggleNewPassword" aria-label="Mostrar senha">👁</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="confirmNewPassword">Confirmar nova senha</label>
+      <div class="password-input-wrap">
+        <input id="confirmNewPassword" type="password" minlength="8" autocomplete="new-password">
+        <button type="button" class="password-eye" id="toggleConfirmPassword" aria-label="Mostrar senha">👁</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="saveNewPassword">Salvar nova senha</button>
+      <button class="btn secondary closeModal" type="button">Cancelar</button>
+    </div>
+
+    <div id="passwordMsg" class="msg"></div>
+  </div>
+</div>
+
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let me=null, produtos=[], usuarios=[];
@@ -172,17 +582,30 @@ async function init(){
   catch{show('loginView')}
 }
 
-$('#setupBtn').onclick=async()=>{try{
+const el_setupBtn = $('#setupBtn');
+if (el_setupBtn) el_setupBtn.onclick = async()=>{try{
   await api('/api/setup',{method:'POST',body:JSON.stringify({nome:$('#setupNome').value,username:$('#setupUsername').value,email:$('#setupEmail').value,senha:$('#setupSenha').value,setupKey:$('#setupKey').value})});
   location.reload();
 }catch(e){$('#setupMsg').textContent=e.message}};
-$('#loginBtn').onclick=async()=>{try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:$('#loginUsername').value,senha:$('#loginSenha').value})});location.reload()}catch(e){$('#loginMsg').textContent=e.message}};
+const el_loginBtn = $('#loginBtn');
+if (el_loginBtn) el_loginBtn.onclick = async()=>{try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:$('#loginUsername').value,senha:$('#loginSenha').value})});location.reload()}catch(e){$('#loginMsg').textContent=e.message}};
 ['loginUsername','loginSenha'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#loginBtn').click()}}));
-$('#logoutBtn').onclick=async()=>{await api('/api/auth/logout',{method:'POST',body:'{}'});location.reload()};
-$('#forgotBtn').onclick=async()=>{const email=prompt('Digite o e-mail da sua conta para recuperar a senha:')?.trim();if(!email)return;try{const r=await api('/api/auth/forgot',{method:'POST',body:JSON.stringify({email})});$('#loginMsg').style.color='#5d8a63';$('#loginMsg').textContent=r.mensagem}catch(e){$('#loginMsg').textContent=e.message}};
-$('#resetBtn').onclick=async()=>{try{const token=new URLSearchParams(location.search).get('reset');await api('/api/auth/reset',{method:'POST',body:JSON.stringify({token,senha:$('#resetSenha').value})});history.replaceState({},'', '/admin/');alert('Senha alterada. Faça login novamente.');location.reload()}catch(e){$('#resetMsg').textContent=e.message}};
+const el_logoutBtn = $('#logoutBtn');
+if (el_logoutBtn) el_logoutBtn.onclick = async()=>{await api('/api/auth/logout',{method:'POST',body:'{}'});location.reload()};
+const el_forgotBtn = $('#forgotBtn');
+if (el_forgotBtn) el_forgotBtn.onclick = async()=>{const email=prompt('Digite o e-mail da sua conta para recuperar a senha:')?.trim();if(!email)return;try{const r=await api('/api/auth/forgot',{method:'POST',body:JSON.stringify({email})});$('#loginMsg').style.color='#5d8a63';$('#loginMsg').textContent=r.mensagem}catch(e){$('#loginMsg').textContent=e.message}};
+const el_resetBtn = $('#resetBtn');
+if (el_resetBtn) el_resetBtn.onclick = async()=>{try{const token=new URLSearchParams(location.search).get('reset');await api('/api/auth/reset',{method:'POST',body:JSON.stringify({token,senha:$('#resetSenha').value})});history.replaceState({},'', '/admin/');alert('Senha alterada. Faça login novamente.');location.reload()}catch(e){$('#resetMsg').textContent=e.message}};
 
-$$('.tab').forEach(b=>b.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#tab-produtos').classList.toggle('hidden',b.dataset.tab!=='produtos');$('#tab-usuarios').classList.toggle('hidden',b.dataset.tab!=='usuarios')});
+$$('.tab').forEach(b=>b.onclick=()=>{
+  $$('.tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+
+  ['produtos','usuarios','config'].forEach(tab=>{
+    const sec=$('#tab-'+tab);
+    if(sec) sec.classList.toggle('hidden', b.dataset.tab!==tab);
+  });
+});
 
 async function loadProducts(){const r=await api('/api/admin/products');produtos=r.produtos;renderProducts()}
 let mostrarArquivados=false;
@@ -196,7 +619,8 @@ function renderProducts(){
     <div class="actions">${p.ativo?`<button class="btn secondary" onclick="editProduct(${p.id})">Editar</button><button class="btn danger" onclick="delProduct(${p.id})">Arquivar</button>`:`<button class="btn" onclick="restoreProduct(${p.id})">Restaurar</button><button class="btn danger" onclick="deleteForever(${p.id})">Excluir definitivamente</button>`}</div>
   </article>`).join('')||`<p class="muted">${mostrarArquivados?'Nenhum produto arquivado.':'Nenhum produto cadastrado ainda.'}</p>`;
 }
-$('#toggleArquivados').onclick=()=>{mostrarArquivados=!mostrarArquivados;renderProducts()};
+const el_toggleArquivados = $('#toggleArquivados');
+if (el_toggleArquivados) el_toggleArquivados.onclick = ()=>{mostrarArquivados=!mostrarArquivados;renderProducts()};
 window.deleteForever=async id=>{
   const p=produtos.find(x=>x.id===id);
   if(!p)return;
@@ -214,7 +638,8 @@ window.restoreProduct=async id=>{
   await loadProducts();
 };
 
-$('#novoProduto').onclick=()=>openProduct();
+const el_novoProduto = $('#novoProduto');
+if (el_novoProduto) el_novoProduto.onclick = ()=>openProduct();
 function openProduct(p=null){
   $('#pId').value=p?.id||'';$('#pNome').value=p?.nome||'';$('#pCategoria').value=p?.categoria||'BOLO_NO_POTE';$('#pDescricao').value=p?.descricao||'';$('#pPreco').value=p?precoInput(p.preco_centavos):'';$('#pEmoji').value=p?.emoji||(p?.categoria==='MINI_PUDIM'?'🍮':'🍰');$('#pDisponivel').checked=p?!!p.disponivel:true;$('#pAtivo').checked=p?!!p.ativo:true;$('#pDestaque').checked=p?!!p.destaque:false;$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productMsg').textContent='';$('#productModal').classList.remove('hidden')
 }
@@ -222,7 +647,8 @@ window.editProduct=id=>openProduct(produtos.find(p=>p.id===id));
 window.delProduct=async id=>{if(!confirm('Arquivar este produto? Ele sairá do site, mas poderá ser restaurado.'))return;await api('/api/admin/products/'+id,{method:'DELETE'});await loadProducts()};
 $('#pPreco').addEventListener('input',formatPrecoField);
 $('#pPreco').addEventListener('focus',()=>{const el=$('#pPreco');if(!el.value)el.value=money(0);requestAnimationFrame(()=>el.setSelectionRange(el.value.length,el.value.length))});
-$('#saveProduct').onclick=async()=>{try{
+const el_saveProduct = $('#saveProduct');
+if (el_saveProduct) el_saveProduct.onclick = async()=>{try{
  const preco=precoCentavos($('#pPreco').value);const payload={nome:$('#pNome').value,categoria:$('#pCategoria').value,descricao:$('#pDescricao').value,preco_centavos:preco,emoji:$('#pEmoji').value,disponivel:$('#pDisponivel').checked,ativo:$('#pAtivo').checked,destaque:$('#pDestaque').checked};
  const id=$('#pId').value;await api(id?'/api/admin/products/'+id:'/api/admin/products',{method:id?'PUT':'POST',body:JSON.stringify(payload)});$('#productModal').classList.add('hidden');await loadProducts()
 }catch(e){$('#productMsg').textContent=e.message}};
@@ -231,9 +657,70 @@ async function loadUsers(){const r=await api('/api/admin/users');usuarios=r.usua
 function renderUsers(){
  $('#usersList').innerHTML=usuarios.map(u=>`<div class="user"><div><strong>${esc(u.nome)} ${u.id===me.id?'(você)':''}</strong><small>@${esc(u.username)} • ${esc(u.email)} • ${u.ativo?'Ativo':'Desativado'}</small></div><div class="actions"><button class="btn secondary" onclick="resetUser(${u.id})">Nova senha</button>${u.id!==me.id?`<button class="btn ${u.ativo?'danger':'secondary'}" onclick="toggleUser(${u.id},${u.ativo?0:1})">${u.ativo?'Desativar':'Ativar'}</button>`:''}</div></div>`).join('');
 }
-$('#novoUsuario').onclick=()=>{$('#uNome').value=$('#uUsername').value=$('#uEmail').value=$('#uSenha').value='';$('#userMsg').textContent='';$('#userModal').classList.remove('hidden')};
-$('#saveUser').onclick=async()=>{try{await api('/api/admin/users',{method:'POST',body:JSON.stringify({nome:$('#uNome').value,username:$('#uUsername').value,email:$('#uEmail').value,senha:$('#uSenha').value})});$('#userModal').classList.add('hidden');await loadUsers()}catch(e){$('#userMsg').textContent=e.message}};
-window.resetUser=async id=>{const senha=prompt('Digite a nova senha (mínimo 8 caracteres, com letra e número):');if(!senha)return;try{await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'resetar_senha',senha})});alert('Senha redefinida.')}catch(e){alert(e.message)}};
+const el_novoUsuario = $('#novoUsuario');
+if (el_novoUsuario) el_novoUsuario.onclick = ()=>{$('#uNome').value=$('#uUsername').value=$('#uEmail').value=$('#uSenha').value='';$('#userMsg').textContent='';$('#userModal').classList.remove('hidden')};
+const el_saveUser = $('#saveUser');
+if (el_saveUser) el_saveUser.onclick = async()=>{try{await api('/api/admin/users',{method:'POST',body:JSON.stringify({nome:$('#uNome').value,username:$('#uUsername').value,email:$('#uEmail').value,senha:$('#uSenha').value})});$('#userModal').classList.add('hidden');await loadUsers()}catch(e){$('#userMsg').textContent=e.message}};
+let passwordUserId=null;
+
+window.resetUser=id=>{
+  passwordUserId=id;
+  $('#newPassword').value='';
+  $('#confirmNewPassword').value='';
+  $('#passwordMsg').textContent='';
+  $('#passwordModal').classList.remove('hidden');
+  setTimeout(()=>$('#newPassword').focus(),50);
+};
+
+$('#saveNewPassword').onclick=async()=>{
+  const senha=$('#newPassword').value;
+  const confirmar=$('#confirmNewPassword').value;
+  const msg=$('#passwordMsg');
+
+  msg.textContent='';
+
+  if(senha.length<8){
+    msg.textContent='A senha precisa ter pelo menos 8 caracteres.';
+    return;
+  }
+  if(!/[A-Za-z]/.test(senha) || !/\d/.test(senha)){
+    msg.textContent='Use pelo menos uma letra e um número.';
+    return;
+  }
+  if(senha!==confirmar){
+    msg.textContent='As senhas não coincidem.';
+    return;
+  }
+
+  try{
+    await api('/api/admin/users/'+passwordUserId,{
+      method:'PUT',
+      body:JSON.stringify({acao:'resetar_senha',senha})
+    });
+    $('#passwordModal').classList.add('hidden');
+  }catch(e){
+    msg.textContent=e.message;
+  }
+};
+
+function bindPasswordToggle(buttonId,inputId){
+  const btn=$(buttonId);
+  const input=$(inputId);
+  if(!btn || !input) return;
+  btn.onclick=()=>{
+    const show=input.type==='password';
+    input.type=show?'text':'password';
+    btn.setAttribute('aria-label',show?'Ocultar senha':'Mostrar senha');
+  };
+}
+bindPasswordToggle('#toggleNewPassword','#newPassword');
+bindPasswordToggle('#toggleConfirmPassword','#confirmNewPassword');
+
+['#newPassword','#confirmNewPassword'].forEach(sel=>{
+  $(sel).addEventListener('keydown',e=>{
+    if(e.key==='Enter') $('#saveNewPassword').click();
+  });
+});
 window.toggleUser=async(id,ativo)=>{if(!confirm(ativo?'Reativar esta conta?':'Desativar esta conta?'))return;await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'toggle_ativo',ativo:!!ativo})});await loadUsers()};
 
 $$('.closeModal').forEach(b=>b.onclick=()=>b.closest('.modal-bg').classList.add('hidden'));
@@ -267,8 +754,178 @@ init();
 <script id="rp-admin-config">
 (() => {
   const $id = id => document.getElementById(id);
-  const panel = $id('configPanel');
+  const panel = $id('tab-config');
   if (!panel) return;
+
+  const cfgSelect = document.getElementById('cfgEntregasSelect');
+  const cfgLabels = {
+    EM_BREVE:'Em breve',
+    DISPONIVEL:'Disponíveis',
+    INDISPONIVEL:'Indisponíveis'
+  };
+
+  function getCfgEntregas(){
+    return cfgSelect?.dataset.value || 'EM_BREVE';
+  }
+
+  function setCfgEntregas(value){
+    if(!cfgSelect) return;
+    cfgSelect.dataset.value = value;
+    const label = cfgLabels[value] || cfgLabels.EM_BREVE;
+    cfgSelect.querySelector('.rp-select-value').textContent = label;
+    cfgSelect.querySelectorAll('[role="option"]').forEach(opt=>{
+      opt.setAttribute('aria-selected', String(opt.dataset.value === value));
+    });
+  }
+
+  if(cfgSelect){
+    const trigger = cfgSelect.querySelector('.rp-select-trigger');
+    trigger.addEventListener('click',()=>{
+      const open = cfgSelect.classList.toggle('open');
+      trigger.setAttribute('aria-expanded', String(open));
+    });
+
+    cfgSelect.querySelectorAll('[role="option"]').forEach(opt=>{
+      opt.addEventListener('click',()=>{
+        setCfgEntregas(opt.dataset.value);
+        cfgSelect.classList.remove('open');
+        trigger.setAttribute('aria-expanded','false');
+      });
+    });
+
+    document.addEventListener('click',e=>{
+      if(!cfgSelect.contains(e.target)){
+        cfgSelect.classList.remove('open');
+        trigger.setAttribute('aria-expanded','false');
+      }
+    });
+
+    document.addEventListener('keydown',e=>{
+      if(e.key === 'Escape'){
+        cfgSelect.classList.remove('open');
+        trigger.setAttribute('aria-expanded','false');
+      }
+    });
+  }
+
+  const diaLabels = {
+    seg:'Seg', ter:'Ter', qua:'Qua', qui:'Qui', sex:'Sex', sab:'Sáb', dom:'Dom'
+  };
+  const ordemDias = ['seg','ter','qua','qui','sex','sab','dom'];
+
+  function formatarHoraHumana(h){
+    const [hh,mm] = h.split(':');
+    return mm === '00' ? `${Number(hh)}h` : `${Number(hh)}h${mm}`;
+  }
+
+  function montarResumoHorario(){
+    const ativos = [...document.querySelectorAll('#cfgDias button.active')].map(b=>b.dataset.day);
+    const abre = document.getElementById('cfgAbreSelect')?.dataset.value || '10:00';
+    const fecha = document.getElementById('cfgFechaSelect')?.dataset.value || '19:00';
+
+    let diasTexto = 'Nenhum dia selecionado';
+    if(ativos.length){
+      const indices = ativos.map(d=>ordemDias.indexOf(d)).sort((a,b)=>a-b);
+      const consecutivos = indices.every((v,i)=>i===0 || v===indices[i-1]+1);
+      if(consecutivos && indices.length>2){
+        diasTexto = `${diaLabels[ordemDias[indices[0]]]} a ${diaLabels[ordemDias[indices.at(-1)]].toLowerCase()}`;
+      }else{
+        diasTexto = indices.map(i=>diaLabels[ordemDias[i]]).join(', ');
+      }
+    }
+
+    const texto = `${diasTexto}, ${formatarHoraHumana(abre)} às ${formatarHoraHumana(fecha)}`;
+    const hidden = document.getElementById('cfgHorario');
+    const preview = document.getElementById('cfgHorarioPreview');
+    if(hidden) hidden.value = texto;
+    if(preview) preview.textContent = texto;
+    return texto;
+  }
+
+  function setDiasFromTexto(texto){
+    document.querySelectorAll('#cfgDias button').forEach(b=>b.classList.remove('active'));
+    const t = String(texto||'').toLowerCase();
+
+    const ranges = [
+      {keys:['seg','ter','qua','qui','sex','sab','dom'], tests:['seg a dom','seg a domingo']},
+      {keys:['seg','ter','qua','qui','sex','sab'], tests:['seg a sáb','seg a sab']},
+      {keys:['seg','ter','qua','qui','sex'], tests:['seg a sex']},
+    ];
+    let matched = false;
+    for(const r of ranges){
+      if(r.tests.some(x=>t.includes(x))){
+        r.keys.forEach(k=>document.querySelector(`#cfgDias button[data-day="${k}"]`)?.classList.add('active'));
+        matched = true;
+        break;
+      }
+    }
+    if(!matched){
+      const aliases = {seg:['seg'],ter:['ter'],qua:['qua'],qui:['qui'],sex:['sex'],sab:['sáb','sab'],dom:['dom']};
+      for(const [k,als] of Object.entries(aliases)){
+        if(als.some(a=>t.includes(a))) document.querySelector(`#cfgDias button[data-day="${k}"]`)?.classList.add('active');
+      }
+    }
+
+    const horas = [...String(texto||'').matchAll(/(\d{1,2})h(?:(\d{2}))?/g)];
+    if(horas[0]) setTimeSelect('cfgAbreSelect', `${String(horas[0][1]).padStart(2,'0')}:${horas[0][2]||'00'}`);
+    if(horas[1]) setTimeSelect('cfgFechaSelect', `${String(horas[1][1]).padStart(2,'0')}:${horas[1][2]||'00'}`);
+    montarResumoHorario();
+  }
+
+  function setTimeSelect(id,value){
+    const sel=document.getElementById(id);
+    if(!sel)return;
+    sel.dataset.value=value;
+    sel.querySelector('.rp-select-value').textContent=value;
+    sel.querySelectorAll('[role="option"]').forEach(opt=>{
+      opt.setAttribute('aria-selected', String(opt.dataset.value===value));
+    });
+  }
+
+  function initTimeSelect(id){
+    const sel=document.getElementById(id);
+    if(!sel)return;
+    const menu=sel.querySelector('.rp-select-menu');
+    const trigger=sel.querySelector('.rp-select-trigger');
+
+    const opts=[];
+    for(let h=6;h<=23;h++){
+      for(const m of [0,30]){
+        if(h===23 && m===30) continue;
+        const value=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        opts.push(`<button type="button" role="option" data-value="${value}" aria-selected="${value===sel.dataset.value}">
+          <span><strong>${value}</strong></span><span class="rp-select-check">✓</span>
+        </button>`);
+      }
+    }
+    menu.innerHTML=opts.join('');
+
+    trigger.addEventListener('click',e=>{
+      e.stopPropagation();
+      document.querySelectorAll('.rp-select.open').forEach(x=>{ if(x!==sel) x.classList.remove('open'); });
+      const open=sel.classList.toggle('open');
+      trigger.setAttribute('aria-expanded',String(open));
+    });
+
+    menu.querySelectorAll('[role="option"]').forEach(opt=>{
+      opt.addEventListener('click',()=>{
+        setTimeSelect(id,opt.dataset.value);
+        sel.classList.remove('open');
+        trigger.setAttribute('aria-expanded','false');
+        montarResumoHorario();
+      });
+    });
+  }
+
+  document.querySelectorAll('#cfgDias button').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      btn.classList.toggle('active');
+      montarResumoHorario();
+    });
+  });
+
+  initTimeSelect('cfgAbreSelect');
+  initTimeSelect('cfgFechaSelect');
 
   function formatarTelefone(v){
     const d=String(v||'').replace(/\D/g,'').replace(/^55/,'').slice(0,11);
@@ -283,16 +940,15 @@ init();
       const c=await r.json();
       $id('cfgWhatsapp').value=formatarTelefone(c.whatsapp||'');
       $id('cfgLocal').value=c.local_retirada||'';
-      $id('cfgEntregas').value=c.entregas_status||'EM_BREVE';
-      $id('cfgHorario').value=c.horario_atendimento||'';
+      setCfgEntregas(c.entregas_status||'EM_BREVE');
+      setDiasFromTexto(c.horario_atendimento||'Seg a sáb, 10h às 19h');
       $id('cfgMensagem').value=c.mensagem_whatsapp||'';
     }catch(_){}
   }
-  document.querySelectorAll('[data-tab="config"]').forEach(b=>b.addEventListener('click',()=>{
-    document.querySelectorAll('.panel').forEach(p=>p.style.display='none');
-    panel.style.display='';
-    carregarConfig();
-  }));
+  
+  document.querySelectorAll('[data-tab="config"]').forEach(b =>
+    b.addEventListener('click', carregarConfig)
+  );
   $id('cfgWhatsapp').addEventListener('input',e=>{
     const caret=e.target.selectionStart;
     e.target.value=formatarTelefone(e.target.value);
@@ -303,8 +959,8 @@ init();
     const body={
       whatsapp:'55'+$id('cfgWhatsapp').value.replace(/\D/g,''),
       local_retirada:$id('cfgLocal').value.trim(),
-      entregas_status:$id('cfgEntregas').value,
-      horario_atendimento:$id('cfgHorario').value.trim(),
+      entregas_status:getCfgEntregas(),
+      horario_atendimento:montarResumoHorario(),
       mensagem_whatsapp:$id('cfgMensagem').value.trim()
     };
     try{
@@ -321,4 +977,7 @@ init();
 })();
 </script>
 
-</body></html>
+
+
+
+    </body></html>

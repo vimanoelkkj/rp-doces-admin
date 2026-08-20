@@ -1303,18 +1303,45 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     const quantidade = Math.max(1, parseInt(qtd.value, 10) || 1);
     const valorTotal = produtoAtual.preco * quantidade;
     const linhas = [
-      'Olá! 💗 Vim pelo site da R&P Doces.',
-      '',
+      'Olá! Vim pelo site da R&P Doces.',
       'Gostaria de reservar para retirada no salão:',
       `• ${quantidade}x ${produtoAtual.nome}`,
       produtoAtual.preco ? `• Total estimado: ${moeda(valorTotal)}` : ''
     ].filter(Boolean);
 
     if(obs.value.trim()) linhas.push(`• Observação: ${obs.value.trim()}`);
-    linhas.push('', 'Gostaria de confirmar se está disponível. 🍰');
+    linhas.push('', 'Gostaria de confirmar se está disponível. \u{1F497}');
 
-    const url = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(linhas.join('\\n'))}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const textoEncoded = encodeURIComponent(linhas.join('\n'));
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      const url = `https://wa.me/${CONFIG.whatsapp}?text=${textoEncoded}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // Desktop: tenta abrir o aplicativo do WhatsApp instalado.
+    // Se o protocolo não for atendido, cai para o WhatsApp Web.
+    const appUrl = `whatsapp://send?phone=${CONFIG.whatsapp}&text=${textoEncoded}`;
+    const webUrl = `https://web.whatsapp.com/send?phone=${CONFIG.whatsapp}&text=${textoEncoded}`;
+
+    let appOpened = false;
+    const markOpened = () => { appOpened = true; };
+    window.addEventListener('blur', markOpened, { once: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) appOpened = true;
+    }, { once: true });
+
+    window.location.href = appUrl;
+
+    setTimeout(() => {
+      if (!appOpened && !document.hidden) {
+        window.open(webUrl, '_blank', 'noopener,noreferrer');
+      }
+    }, 1400);
+
+    return;
   });
 })();
 </script>
