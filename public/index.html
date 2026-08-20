@@ -849,6 +849,9 @@ window.RP_CONFIG = {
       const numero = String(cfg.whatsapp).replace(/\D/g,'');
       window.RP_WHATSAPP_NUMBER = numero;
       try { WHATSAPP_NUMBER = numero; } catch (_) {}
+      if (typeof window.atualizarFooterWhatsapp === 'function') {
+        window.atualizarFooterWhatsapp(numero);
+      }
 
       const footerWhatsapp = document.getElementById('footerWhatsapp');
       if (footerWhatsapp) {
@@ -878,6 +881,32 @@ window.RP_CONFIG = {
   white-space:nowrap;
 }
 </style>
+
+
+<script id="rp-footer-whatsapp-sync">
+window.atualizarFooterWhatsapp = function(numeroBruto){
+  const aplicar = () => {
+    const el = document.getElementById('footerWhatsapp');
+    if (!el) return;
+
+    const numero = String(numeroBruto || '5533991285907').replace(/\D/g,'');
+    const br = numero.startsWith('55') ? numero.slice(2) : numero;
+
+    if (br.length >= 10) {
+      const ddd = br.slice(0,2);
+      const parte1 = br.length === 11 ? br.slice(2,7) : br.slice(2,6);
+      const parte2 = br.length === 11 ? br.slice(7) : br.slice(6);
+      el.textContent = `(${ddd}) ${parte1}-${parte2}`;
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', aplicar, {once:true});
+  } else {
+    aplicar();
+  }
+};
+</script>
 
 </head>
 <body>
@@ -1032,7 +1061,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <div>
 <h4>Contato</h4>
 <ul>
-<li>📱 WhatsApp: (11) 99999-9999*</li>
+<li>📱 WhatsApp: <span id="footerWhatsapp">(33) 99128-5907</span></li>
 <li>📷 Instagram: @r.e.p*</li>
 <li>📍 Encomendas combinadas por WhatsApp</li>
 </ul>
@@ -1588,6 +1617,13 @@ carregarCardapioDinamico();
   // Alguns navegadores mobile restauram a página do bfcache sem disparar timers.
   window.addEventListener('online', forceStockRefresh);
 })();
+</script>
+
+
+<script>
+if (typeof window.atualizarFooterWhatsapp === 'function') {
+  window.atualizarFooterWhatsapp(window.RP_WHATSAPP_NUMBER || '5533991285907');
+}
 </script>
 
 </body>
