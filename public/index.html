@@ -1054,6 +1054,13 @@ window.atualizarFooterWhatsapp = function(numeroBruto){
 @media(max-width:720px){.rp-location-section{padding:32px 0 14px}.rp-location-card{grid-template-columns:1fr;padding:22px 18px}.rp-location-icon{display:none}.rp-location-actions .btn{flex:1 1 150px;justify-content:center}}
 </style>
 
+
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#ff6b9d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="R&P Doces">
+
 </head>
 <body>
 
@@ -1934,6 +1941,34 @@ if (typeof window.atualizarFooterWhatsapp === 'function') {
 
   setInterval(() => { if (window.RP_CONFIG) atualizarLocalizacao(window.RP_CONFIG); }, 60000);
 })();
+</script>
+
+
+<script id="rp-pwa-register">
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+</script>
+
+
+<script id="rp-pwa-diagnostic">
+window.rpPwaStatus = async function(){
+  const result = {
+    secureContext: window.isSecureContext,
+    standalone: window.matchMedia('(display-mode: standalone)').matches,
+    manifest: null,
+    serviceWorker: null
+  };
+  try{
+    const r = await fetch('/manifest.webmanifest', {cache:'no-store'});
+    result.manifest = {ok:r.ok, status:r.status, type:r.headers.get('content-type')};
+  }catch(e){ result.manifest = {error:String(e)}; }
+  try{
+    result.serviceWorker = await navigator.serviceWorker.getRegistration('/');
+  }catch(e){ result.serviceWorker = {error:String(e)}; }
+  console.table(result);
+  return result;
+};
 </script>
 
 </body>

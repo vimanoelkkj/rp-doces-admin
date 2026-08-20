@@ -379,8 +379,28 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 }
 </style>
 
+
+<style id="rp-toast-style">
+#toastStack{position:fixed;right:18px;bottom:18px;z-index:99999;display:grid;gap:10px;width:min(360px,calc(100vw - 36px));pointer-events:none}
+.rp-toast{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #eadde2;border-radius:14px;background:rgba(255,255,255,.96);box-shadow:0 16px 40px rgba(74,43,55,.14);color:#5d4650;font-weight:700;transform:translateY(12px);opacity:0;animation:toastIn .2s ease forwards}
+.rp-toast::before{content:'✓';display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#edf8f0;color:#3e8b59;font-size:13px;flex:0 0 auto}
+.rp-toast.error::before{content:'!';background:#fff0f2;color:#b85062}
+.rp-toast.info::before{content:'•';background:#fff3f7;color:#b85b7a;font-size:20px}
+.rp-toast.out{animation:toastOut .18s ease forwards}
+@keyframes toastIn{to{transform:none;opacity:1}}
+@keyframes toastOut{to{transform:translateY(8px);opacity:0}}
+</style>
+
+
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#ff6b9d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="R&P Doces">
+
 </head>
 <body>
+<div id="toastStack" aria-live="polite"></div>
 <div class="shell">
   <section id="setupView" class="auth card hidden">
     <h1>Primeira configuração 🍰</h1>
@@ -630,6 +650,17 @@ function precoCentavos(v){const digits=String(v||'').replace(/\D/g,'');return di
 function formatPrecoField(){const el=$('#pPreco');el.value=money(precoCentavos(el.value))}
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 
+function toast(message,type='success'){
+  const stack=document.getElementById('toastStack');
+  if(!stack)return;
+  const el=document.createElement('div');
+  el.className='rp-toast '+type;
+  el.textContent=message;
+  stack.appendChild(el);
+  setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),220)},2800);
+}
+
+
 async function init(){
   const reset=new URLSearchParams(location.search).get('reset');
   if(reset){show('resetView');return}
@@ -717,6 +748,7 @@ window.toggleProductAvailability=async(id,btn)=>{
     p.disponivel=novoStatus;
     renderProducts();
     notifyStockUpdate();
+    toast(novoStatus ? 'Produto disponível novamente' : 'Produto marcado como esgotado', novoStatus ? 'success' : 'info');
   }catch(e){
     if(btn) btn.disabled=false;
     alert(e.message||'Não foi possível alterar a disponibilidade.');
@@ -993,9 +1025,8 @@ init();
     const trigger=sel.querySelector('.rp-select-trigger');
 
     const opts=[];
-    for(let h=6;h<=23;h++){
+    for(let h=0;h<=23;h++){
       for(const m of [0,30]){
-        if(h===23 && m===30) continue;
         const value=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
         opts.push(`<button type="button" role="option" data-value="${value}" aria-selected="${value===sel.dataset.value}">
           <span><strong>${value}</strong></span><span class="rp-select-check">✓</span>
@@ -1095,14 +1126,16 @@ init();
         body:JSON.stringify(body)
       });
 
-      status.textContent='Configurações salvas ✓';
+      status.textContent='';
+      toast('Configurações salvas');
 
       // Atualiza também a cópia pública em memória, se existir.
       if(window.RP_CONFIG) Object.assign(window.RP_CONFIG, body);
 
-      setTimeout(()=>status.textContent='',2500);
+      
     }catch(e){
       status.textContent=e?.message || 'Não foi possível salvar.';
+      toast(status.textContent,'error');
     }
     });
   }
@@ -1112,4 +1145,11 @@ init();
 
 
 
-    </body></html>
+    
+<script id="rp-pwa-register">
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+</script>
+
+</body></html>
