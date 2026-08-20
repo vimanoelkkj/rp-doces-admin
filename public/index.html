@@ -1454,5 +1454,24 @@ carregarCardapioDinamico();
 })();
 </script>
 
+
+<script id="rp-pedido-delegation-fix">
+(() => {
+  document.addEventListener('click', (event) => {
+    const botao = event.target.closest(
+      '.order-btn, .order-button, .btn-order, .flavor-order, [data-order], [data-pedir]'
+    );
+    if (!botao) return;
+
+    const card = botao.closest('.flavor-card');
+    if (!card || typeof window.abrirPedido !== 'function') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    window.abrirPedido(card);
+  });
+})();
+</script>
+
 </body>
 </html>
