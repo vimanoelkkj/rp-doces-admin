@@ -775,6 +775,75 @@ button, a, .flavor-card { -webkit-tap-highlight-color: transparent; }
 }
 </style>
 
+
+<style id="rp-mobile-modal-polish">
+.pedido-product-head{
+  display:flex; align-items:center; gap:14px; padding-right:36px; margin-bottom:18px;
+}
+.pedido-product-emoji{
+  flex:0 0 58px; width:58px; height:58px; border-radius:18px;
+  display:grid; place-items:center; font-size:30px;
+  background:linear-gradient(145deg,var(--pink-50),#fff);
+  border:1px solid var(--pink-200);
+  box-shadow:0 8px 24px rgba(174,76,110,.10);
+}
+.pedido-product-head h3{margin-right:0!important}
+.pedido-resumo{
+  margin:20px 0 16px; padding:15px 16px;
+  border-radius:16px; background:rgba(255,255,255,.72);
+  border:1px solid var(--pink-200);
+}
+.pedido-resumo-linha{
+  display:flex; justify-content:space-between; gap:14px;
+  color:var(--text-soft); font-size:.86rem; padding-bottom:11px;
+  border-bottom:1px dashed var(--pink-200);
+}
+.pedido-resumo .pedido-total{margin:12px 0 0}
+.pedido-confirmar{
+  min-height:52px; box-shadow:0 10px 28px rgba(192,80,119,.18);
+}
+.pedido-confirmar:active{transform:scale(.985)}
+.pedido-qty button{transition:transform .15s ease,background .15s ease}
+.pedido-qty button:active{transform:scale(.92);background:var(--pink-50)}
+.pedido-qty input{-moz-appearance:textfield}
+.pedido-qty input::-webkit-inner-spin-button,
+.pedido-qty input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+.rp-mobile-cta{
+  display:none; position:fixed; left:16px; right:16px; bottom:max(14px,env(safe-area-inset-bottom));
+  z-index:850; min-height:52px; border:0; border-radius:999px;
+  align-items:center; justify-content:center; gap:8px;
+  background:var(--pink-600); color:#fff; font:700 .94rem 'Poppins',sans-serif;
+  box-shadow:0 12px 34px rgba(112,45,69,.28); cursor:pointer;
+  transform:translateY(90px); opacity:0; pointer-events:none;
+  transition:transform .28s ease,opacity .28s ease;
+}
+.rp-mobile-cta.show{transform:none;opacity:1;pointer-events:auto}
+body.rp-modal-open .rp-mobile-cta{opacity:0!important;pointer-events:none!important}
+
+@media(max-width:720px){
+  .pedido-overlay{padding:0;align-items:flex-end}
+  .pedido-modal{
+    width:100%; max-height:min(88dvh,760px); overflow:auto;
+    border-radius:26px 26px 0 0; border-bottom:0;
+    padding:22px 18px calc(20px + env(safe-area-inset-bottom));
+    transform:translateY(18px); opacity:0;
+    transition:transform .25s cubic-bezier(.2,.75,.2,1),opacity .2s ease;
+  }
+  .pedido-overlay.open .pedido-modal{transform:none;opacity:1}
+  .pedido-modal::before{
+    content:"";display:block;width:42px;height:4px;border-radius:999px;
+    background:var(--pink-200);margin:-9px auto 14px;
+  }
+  .pedido-product-emoji{width:52px;height:52px;flex-basis:52px;font-size:27px}
+  .pedido-modal h3{font-size:1.3rem}
+  .pedido-field textarea{min-height:72px}
+  .pedido-atendimento{font-size:.8rem}
+  .rp-mobile-cta{display:flex}
+  body{padding-bottom:76px}
+}
+</style>
+
 </head>
 <body>
 <!-- ===== Header ===== -->
@@ -1076,9 +1145,14 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <div class="pedido-overlay" id="pedidoOverlay" aria-hidden="true">
   <div class="pedido-modal" role="dialog" aria-modal="true" aria-labelledby="pedidoTitulo">
     <button class="pedido-close" id="pedidoClose" aria-label="Fechar">×</button>
-    <span class="eyebrow">Seu pedido</span>
-    <h3 id="pedidoTitulo">Produto</h3>
-    <div class="pedido-preco" id="pedidoPreco"></div>
+    <div class="pedido-product-head">
+      <div class="pedido-product-emoji" id="pedidoEmoji" aria-hidden="true">🍰</div>
+      <div>
+        <span class="eyebrow">Seu pedido</span>
+        <h3 id="pedidoTitulo">Produto</h3>
+        <div class="pedido-preco" id="pedidoPreco"></div>
+      </div>
+    </div>
 
     <div class="pedido-field">
       <label for="pedidoQuantidade">Quantidade</label>
@@ -1099,9 +1173,15 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
       A estrutura já está preparada para receber a opção de entrega futuramente.
     </div>
 
-    <div class="pedido-total">
-      <span>Total estimado</span>
-      <strong id="pedidoTotal">R$ 0,00</strong>
+    <div class="pedido-resumo">
+      <div class="pedido-resumo-linha">
+        <span id="pedidoResumoQtd">1 × produto</span>
+        <span id="pedidoResumoUnitario">R$ 0,00</span>
+      </div>
+      <div class="pedido-total">
+        <span>Total estimado</span>
+        <strong id="pedidoTotal">R$ 0,00</strong>
+      </div>
     </div>
 
     <button class="btn btn-primary pedido-confirmar" id="pedidoConfirmar" type="button">
@@ -1126,6 +1206,9 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
   const closeBtn = document.getElementById('pedidoClose');
   const titulo = document.getElementById('pedidoTitulo');
   const precoEl = document.getElementById('pedidoPreco');
+  const emojiEl = document.getElementById('pedidoEmoji');
+  const resumoQtd = document.getElementById('pedidoResumoQtd');
+  const resumoUnitario = document.getElementById('pedidoResumoUnitario');
   const qtd = document.getElementById('pedidoQuantidade');
   const obs = document.getElementById('pedidoObs');
   const total = document.getElementById('pedidoTotal');
@@ -1141,9 +1224,11 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     const quantidade = Math.max(1, parseInt(qtd.value, 10) || 1);
     qtd.value = quantidade;
     total.textContent = moeda(produtoAtual.preco * quantidade);
+    resumoQtd.textContent = `${quantidade} × ${produtoAtual.nome}`;
+    resumoUnitario.textContent = produtoAtual.preco ? moeda(produtoAtual.preco) + ' cada' : 'A consultar';
   }
 
-  function abrirPedido(card){
+  window.abrirPedido = function abrirPedido(card){
     const nome = card.querySelector('h3')?.textContent.trim() || 'Doce R&P';
     const precoTexto = card.querySelector('.flavor-price')?.textContent || '';
     const numero = precoTexto.match(/[\d]+(?:[.,]\d{1,2})?/);
@@ -1151,6 +1236,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 
     produtoAtual = { nome, preco };
     titulo.textContent = nome;
+    emojiEl.textContent = card.querySelector('.flavor-emoji')?.textContent.trim() || '🍰';
     precoEl.textContent = preco ? moeda(preco) + ' cada' : 'Consulte o valor';
     qtd.value = 1;
     obs.value = '';
@@ -1158,12 +1244,14 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
+    document.body.classList.add('rp-modal-open');
   }
 
   function fecharPedido(){
     overlay.classList.remove('open');
     overlay.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
+    document.body.classList.remove('rp-modal-open');
   }
 
   // Os botões dos cards agora abrem o fluxo interno do site.
@@ -1335,6 +1423,34 @@ carregarCardapioDinamico();
       if (precisa) prepararReveals();
     }).observe(alvo, { childList:true, subtree:true });
   });
+})();
+</script>
+
+
+<button class="rp-mobile-cta" id="rpMobileCta" type="button" aria-label="Ir para o cardápio">
+  🍰 Ver cardápio
+</button>
+
+
+<script id="rp-mobile-cta-js">
+(() => {
+  const cta = document.getElementById('rpMobileCta');
+  if (!cta) return;
+  const destino = document.getElementById('menu-grid-bolo')?.closest('section') ||
+                  document.getElementById('menu-grid-bolo');
+  if (!destino) { cta.remove(); return; }
+
+  function atualizar(){
+    if (innerWidth > 720) return cta.classList.remove('show');
+    const r = destino.getBoundingClientRect();
+    const passouHero = scrollY > Math.min(innerHeight * .55, 420);
+    const estaNoCardapio = r.top < innerHeight * .72 && r.bottom > 90;
+    cta.classList.toggle('show', passouHero && !estaNoCardapio);
+  }
+  cta.addEventListener('click', () => destino.scrollIntoView({behavior:'smooth',block:'start'}));
+  addEventListener('scroll', atualizar, {passive:true});
+  addEventListener('resize', atualizar);
+  atualizar();
 })();
 </script>
 
