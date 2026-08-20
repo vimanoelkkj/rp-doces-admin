@@ -851,6 +851,7 @@ window.RP_CONFIG = {
       try { WHATSAPP_NUMBER = numero; } catch (_) {}
       if (typeof window.atualizarFooterWhatsapp === 'function') {
         window.atualizarFooterWhatsapp(numero);
+    if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
       }
 
       const footerWhatsapp = document.getElementById('footerWhatsapp');
@@ -908,8 +909,145 @@ window.atualizarFooterWhatsapp = function(numeroBruto){
 };
 </script>
 
+
+<style id="rp-menu-skeleton-style">
+.menu-grid.is-loading{
+  min-height:230px;
+}
+.flavor-card-skeleton{
+  pointer-events:none;
+  min-height:220px;
+}
+.skeleton-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:16px;
+}
+.skeleton-box{
+  display:block;
+  border-radius:10px;
+  background:linear-gradient(
+    90deg,
+    rgba(255,233,240,.62) 0%,
+    rgba(255,247,250,.98) 50%,
+    rgba(255,233,240,.62) 100%
+  );
+  background-size:220% 100%;
+  animation:rpSkeleton 1.25s ease-in-out infinite;
+}
+.skeleton-icon{width:52px;height:52px;border-radius:15px}
+.skeleton-price{width:72px;height:28px;border-radius:999px}
+.skeleton-title{width:34%;height:20px;margin-bottom:13px}
+.skeleton-line{width:72%;height:13px;margin-bottom:9px}
+.skeleton-line.short{width:48%}
+.skeleton-button{width:100%;height:38px;margin-top:18px;border-radius:11px}
+
+@keyframes rpSkeleton{
+  0%{background-position:100% 0}
+  100%{background-position:-120% 0}
+}
+
+@media(max-width:720px){
+  .menu-grid.is-loading{min-height:220px}
+  .flavor-card-skeleton{min-height:210px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .skeleton-box{animation:none}
+}
+</style>
+
+
+<style id="rp-loading-style">
+.rp-loading-screen{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  display:grid;
+  place-items:center;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,221,232,.38), transparent 32%),
+    radial-gradient(circle at 80% 80%, rgba(255,214,226,.28), transparent 34%),
+    #fff9f6;
+  opacity:1;
+  visibility:visible;
+  transition:opacity .28s ease, visibility .28s ease;
+}
+.rp-loading-screen.is-hidden{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
+.rp-loading-card{
+  width:min(360px,calc(100vw - 40px));
+  text-align:center;
+  padding:28px 24px;
+}
+.rp-loading-logo-wrap{
+  display:flex;
+  justify-content:center;
+  margin-bottom:16px;
+}
+.rp-loading-logo{
+  width:150px;
+  max-width:60vw;
+  height:auto;
+  object-fit:contain;
+  filter:drop-shadow(0 10px 24px rgba(107,60,77,.10));
+}
+.rp-loading-title{
+  font-weight:800;
+  font-size:1.08rem;
+  color:#6f4a3a;
+  margin-bottom:6px;
+}
+.rp-loading-subtitle{
+  color:#a67584;
+  font-size:.9rem;
+}
+.rp-loading-dots{
+  display:flex;
+  justify-content:center;
+  gap:7px;
+  margin-top:18px;
+}
+.rp-loading-dots span{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#ff6b9d;
+  animation:rpLoadDot 1s ease-in-out infinite;
+}
+.rp-loading-dots span:nth-child(2){animation-delay:.12s}
+.rp-loading-dots span:nth-child(3){animation-delay:.24s}
+
+@keyframes rpLoadDot{
+  0%,100%{transform:translateY(0);opacity:.4}
+  50%{transform:translateY(-5px);opacity:1}
+}
+@media(prefers-reduced-motion:reduce){
+  .rp-loading-screen{transition:none}
+  .rp-loading-dots span{animation:none;opacity:1}
+}
+</style>
+
 </head>
 <body>
+
+<div id="rpLoadingScreen" class="rp-loading-screen" aria-live="polite" aria-busy="true">
+  <div class="rp-loading-card">
+    <div class="rp-loading-logo-wrap">
+      <img src="/assets/images/rp-image-07.webp" alt="R&P Doces" class="rp-loading-logo">
+    </div>
+    <div class="rp-loading-title">Preparando seu cardápio...</div>
+    <div class="rp-loading-subtitle">Só um instante 💗</div>
+    <div class="rp-loading-dots" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Header ===== -->
 <header>
 <nav class="nav container">
@@ -988,7 +1126,18 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <div class="photo-card"><img alt="Bolo no pote R&amp;P Doces" src="/assets/images/rp-image-03.webp"/ decoding="async" loading="lazy"></div>
 <div class="photo-card"><img alt="Bolo no pote R&amp;P Doces" src="/assets/images/rp-image-04.webp"/ decoding="async" loading="lazy"></div>
 </div>
-<div class="menu-grid" id="menu-grid-bolo"></div>
+<div class="menu-grid is-loading" id="menu-grid-bolo">
+      <div class="flavor-card flavor-card-skeleton" aria-hidden="true">
+        <div class="skeleton-top">
+          <span class="skeleton-box skeleton-icon"></span>
+          <span class="skeleton-box skeleton-price"></span>
+        </div>
+        <span class="skeleton-box skeleton-title"></span>
+        <span class="skeleton-box skeleton-line"></span>
+        <span class="skeleton-box skeleton-line short"></span>
+        <span class="skeleton-box skeleton-button"></span>
+      </div>
+    </div>
 </div>
 <div class="menu-category">
 <h3 class="menu-category-title">🍮 Mini Pudim</h3>
@@ -996,7 +1145,18 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <div class="photo-card"><img alt="Mini pudim R&amp;P Doces" src="/assets/images/rp-image-05.webp"/ decoding="async" loading="lazy"></div>
 <div class="photo-card"><img alt="Mini pudim R&amp;P Doces" src="/assets/images/rp-image-06.webp"/ decoding="async" loading="lazy"></div>
 </div>
-<div class="menu-grid" id="menu-grid-pudim"></div>
+<div class="menu-grid is-loading" id="menu-grid-pudim">
+      <div class="flavor-card flavor-card-skeleton" aria-hidden="true">
+        <div class="skeleton-top">
+          <span class="skeleton-box skeleton-icon"></span>
+          <span class="skeleton-box skeleton-price"></span>
+        </div>
+        <span class="skeleton-box skeleton-title"></span>
+        <span class="skeleton-box skeleton-line"></span>
+        <span class="skeleton-box skeleton-line short"></span>
+        <span class="skeleton-box skeleton-button"></span>
+      </div>
+    </div>
 </div>
 <p class="menu-note">✨ Sabores e disponibilidade podem variar. Fale com a gente para conferir opções da semana!</p>
 </div>
@@ -1386,8 +1546,11 @@ async function carregarCardapioDinamico(){
     if (!boloGrid || !pudimGrid) return;
 
     if (!produtos.length) {
-      boloGrid.replaceChildren();
-      pudimGrid.replaceChildren();
+      boloGrid.classList.remove('is-loading');
+      pudimGrid.classList.remove('is-loading');
+      boloGrid.innerHTML = '<p class="muted">Nenhum sabor disponível no momento.</p>';
+      pudimGrid.innerHTML = '<p class="muted">Nenhum sabor disponível no momento.</p>';
+      if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
       return;
     }
 
@@ -1424,8 +1587,11 @@ async function carregarCardapioDinamico(){
       return div;
     }
 
+    boloGrid.classList.remove('is-loading');
     boloGrid.replaceChildren(...produtos.filter(p => p.categoria === 'BOLO_NO_POTE').map(card));
+    pudimGrid.classList.remove('is-loading');
     pudimGrid.replaceChildren(...produtos.filter(p => p.categoria === 'MINI_PUDIM').map(card));
+    if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
   } catch (err) {
     console.info('Cardápio usando fallback local.');
   }
@@ -1454,8 +1620,8 @@ carregarCardapioDinamico();
     ultimoSyncCardapio = agora;
     try { await carregarCardapioDinamico(); } catch (_) {}
   }
-  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) sincronizarCardapio(); });
-  window.addEventListener('focus', sincronizarCardapio);
+  
+  
   setInterval(() => {
   if (!document.hidden) sincronizarCardapio();
 }, 1000);
@@ -1589,15 +1755,13 @@ carregarCardapioDinamico();
     } catch (_) {}
   }
 
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) forceStockRefresh();
-  });
+  
 
-  window.addEventListener('pageshow', forceStockRefresh);
-  window.addEventListener('focus', forceStockRefresh);
+  
+  
 
   // Alguns navegadores mobile restauram a página do bfcache sem disparar timers.
-  window.addEventListener('online', forceStockRefresh);
+  
 })();
 </script>
 
@@ -1606,6 +1770,53 @@ carregarCardapioDinamico();
 if (typeof window.atualizarFooterWhatsapp === 'function') {
   window.atualizarFooterWhatsapp(window.RP_WHATSAPP_NUMBER || '5533991285907');
 }
+</script>
+
+
+<script id="rp-loading-script">
+(() => {
+  const loading = document.getElementById('rpLoadingScreen');
+  const minDuration = 750;
+  const startedAt = performance.now();
+  let menuReady = false;
+  let pageReady = document.readyState === 'complete';
+
+  function hideLoading(){
+    if (!loading || !menuReady || !pageReady) return;
+    const elapsed = performance.now() - startedAt;
+    const wait = Math.max(0, minDuration - elapsed);
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        loading.classList.add('is-hidden');
+        loading.setAttribute('aria-busy','false');
+        setTimeout(() => loading.remove(), 320);
+      });
+    }, wait);
+  }
+
+  window.rpMarkMenuReady = function(){
+    menuReady = true;
+    hideLoading();
+  };
+
+  if (pageReady) {
+    hideLoading();
+  } else {
+    window.addEventListener('load', () => {
+      pageReady = true;
+      hideLoading();
+    }, { once:true });
+  }
+
+  // Safety net: never trap the user behind the loader.
+  setTimeout(() => {
+    if (loading && !loading.classList.contains('is-hidden')) {
+      loading.classList.add('is-hidden');
+      loading.setAttribute('aria-busy','false');
+      setTimeout(() => loading.remove(), 320);
+    }
+  }, 2500);
+})();
 </script>
 
 </body>
