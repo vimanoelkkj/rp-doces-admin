@@ -11,7 +11,7 @@ export async function onRequestPut({ env, request }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
   const data = await request.json();
-  const allowed = ["whatsapp","local_retirada","entregas_status","horario_atendimento","mensagem_whatsapp"];
+  const allowed = ["whatsapp","local_retirada","endereco","maps_url","entregas_status","horario_atendimento","horario_dias","horario_abre","horario_fecha","mensagem_whatsapp"];
   const stmts = [];
   for (const chave of allowed) {
     if (!(chave in data)) continue;

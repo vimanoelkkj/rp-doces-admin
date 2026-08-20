@@ -835,6 +835,11 @@ body.rp-modal-open .rp-mobile-cta{opacity:0!important;pointer-events:none!import
 window.RP_CONFIG = {
   whatsapp: (window.RP_WHATSAPP_NUMBER || "5533991285907"),
   local_retirada: "Temponi Concept",
+  endereco: "",
+  maps_url: "",
+  horario_dias: "",
+  horario_abre: "",
+  horario_fecha: "",
   entregas_status: "EM_BREVE",
   horario_atendimento: "",
   mensagem_whatsapp: "Olá! Gostaria de fazer um pedido na R&P Doces."
@@ -1032,6 +1037,23 @@ window.atualizarFooterWhatsapp = function(numeroBruto){
 }
 </style>
 
+
+<style id="rp-location-style">
+.rp-location-section{padding:44px 0 22px}
+.rp-location-card{display:grid;grid-template-columns:minmax(0,1fr) 150px;align-items:center;gap:26px;padding:28px 30px;border:1px solid var(--pink-200);border-radius:26px;background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(255,244,248,.92));box-shadow:0 16px 44px rgba(111,74,58,.07)}
+.rp-location-copy h2{margin:4px 0 12px;color:var(--brown-700)}
+.rp-open-row{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.rp-open-dot{width:10px;height:10px;border-radius:50%;background:#d0a74b;box-shadow:0 0 0 4px rgba(208,167,75,.10)}
+.rp-open-dot.is-open{background:#48a96a;box-shadow:0 0 0 4px rgba(72,169,106,.10)}
+.rp-open-dot.is-closed{background:#d96a79;box-shadow:0 0 0 4px rgba(217,106,121,.10)}
+.rp-location-hours,.rp-location-address{margin:4px 0;color:var(--text-soft)}
+.rp-location-address{margin-top:8px}
+.rp-location-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.rp-location-icon{width:120px;height:120px;margin-left:auto;display:grid;place-items:center;border-radius:30px;background:linear-gradient(145deg,var(--pink-50),#fff);border:1px solid var(--pink-200);box-shadow:0 12px 30px rgba(232,84,138,.10);font-size:50px}
+.rp-location-section .hidden{display:none!important}
+@media(max-width:720px){.rp-location-section{padding:32px 0 14px}.rp-location-card{grid-template-columns:1fr;padding:22px 18px}.rp-location-icon{display:none}.rp-location-actions .btn{flex:1 1 150px;justify-content:center}}
+</style>
+
 </head>
 <body>
 
@@ -1199,6 +1221,29 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 </div>
 </section>
 <!-- ===== Footer ===== -->
+
+<section id="onde-encontrar" class="rp-location-section">
+  <div class="container">
+    <div class="rp-location-card">
+      <div class="rp-location-copy">
+        <span class="eyebrow">Onde encontrar</span>
+        <h2>R&P Doces na <span id="rpLocalNome">Temponi Concept</span></h2>
+        <div class="rp-open-row">
+          <span class="rp-open-dot" id="rpOpenDot"></span>
+          <strong id="rpOpenStatus">Horário de atendimento</strong>
+        </div>
+        <p class="rp-location-hours" id="rpHorarioTexto">Consulte nossos horários</p>
+        <p class="rp-location-address hidden" id="rpEnderecoTexto"></p>
+        <div class="rp-location-actions">
+          <a id="rpMapsLink" class="btn btn-primary hidden" href="#" target="_blank" rel="noopener noreferrer">Como chegar</a>
+          <a class="btn btn-secondary" href="#sabores">Ver cardápio</a>
+        </div>
+      </div>
+      <div class="rp-location-icon" aria-hidden="true"><span>📍</span></div>
+    </div>
+  </div>
+</section>
+
 <footer>
 <div class="container">
 <div class="footer-grid">
@@ -1816,6 +1861,78 @@ if (typeof window.atualizarFooterWhatsapp === 'function') {
       setTimeout(() => loading.remove(), 320);
     }
   }, 2500);
+})();
+</script>
+
+
+<script id="rp-location-script">
+(() => {
+  const diaMap = ['dom','seg','ter','qua','qui','sex','sab'];
+
+  function minutos(hora){
+    const [h,m] = String(hora||'').split(':').map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    return h*60+m;
+  }
+
+  function atualizarLocalizacao(cfg){
+    if (!cfg) return;
+    const localNome = document.getElementById('rpLocalNome');
+    const horario = document.getElementById('rpHorarioTexto');
+    const endereco = document.getElementById('rpEnderecoTexto');
+    const maps = document.getElementById('rpMapsLink');
+    const status = document.getElementById('rpOpenStatus');
+    const dot = document.getElementById('rpOpenDot');
+
+    if (localNome && cfg.local_retirada) localNome.textContent = cfg.local_retirada;
+    if (horario) horario.textContent = cfg.horario_atendimento || 'Consulte nossos horários';
+
+    if (endereco) {
+      if (cfg.endereco) { endereco.textContent = cfg.endereco; endereco.classList.remove('hidden'); }
+      else endereco.classList.add('hidden');
+    }
+
+    if (maps) {
+      if (cfg.maps_url) { maps.href = cfg.maps_url; maps.classList.remove('hidden'); }
+      else maps.classList.add('hidden');
+    }
+
+    const dias = String(cfg.horario_dias||'').split(',').filter(Boolean);
+    const abre = minutos(cfg.horario_abre);
+    const fecha = minutos(cfg.horario_fecha);
+    let aberto = null;
+
+    if (dias.length && abre !== null && fecha !== null) {
+      const agora = new Date();
+      const dia = diaMap[agora.getDay()];
+      const minAgora = agora.getHours()*60 + agora.getMinutes();
+      aberto = dias.includes(dia) && minAgora >= abre && minAgora < fecha;
+    }
+
+    if (status && dot) {
+      dot.classList.remove('is-open','is-closed');
+      if (aberto === true) { status.textContent = 'Aberto agora'; dot.classList.add('is-open'); }
+      else if (aberto === false) { status.textContent = 'Fechado agora'; dot.classList.add('is-closed'); }
+      else status.textContent = 'Horário de atendimento';
+    }
+  }
+
+  window.rpAtualizarLocalizacao = atualizarLocalizacao;
+
+  async function carregar(){
+    try{
+      const r = await fetch(`/api/config?_=${Date.now()}`, {cache:'no-store'});
+      if(!r.ok) return;
+      const cfg = await r.json();
+      Object.assign(window.RP_CONFIG || {}, cfg);
+      atualizarLocalizacao(cfg);
+    }catch(_){}
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', carregar, {once:true});
+  else carregar();
+
+  setInterval(() => { if (window.RP_CONFIG) atualizarLocalizacao(window.RP_CONFIG); }, 60000);
 })();
 </script>
 

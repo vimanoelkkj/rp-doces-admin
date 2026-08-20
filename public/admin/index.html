@@ -455,6 +455,16 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
       </div>
 
       <div class="field">
+        <label for="cfgEndereco">Endereço</label>
+        <input id="cfgEndereco" placeholder="Ex.: Rua..., nº..., bairro...">
+      </div>
+
+      <div class="field">
+        <label for="cfgMapsUrl">Link do Google Maps</label>
+        <input id="cfgMapsUrl" type="url" placeholder="https://maps.google.com/...">
+      </div>
+
+      <div class="field">
         <label for="cfgEntregas">Status das entregas</label>
         <div class="rp-select" id="cfgEntregasSelect" data-value="EM_BREVE">
           <button class="rp-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
@@ -533,7 +543,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     </div>
 
     <div class="config-footer">
-      <button class="btn" id="salvarConfig">Salvar alterações</button>
+      <button class="btn" id="salvarConfig" type="button">Salvar alterações</button>
       <span id="configStatus" class="muted"></span>
     </div>
   </div>
@@ -1034,8 +1044,22 @@ init();
       const c=await r.json();
       $id('cfgWhatsapp').value=formatarTelefone(c.whatsapp||'');
       $id('cfgLocal').value=c.local_retirada||'';
+      $id('cfgEndereco').value=c.endereco||'';
+      $id('cfgMapsUrl').value=c.maps_url||'';
       setCfgEntregas(c.entregas_status||'EM_BREVE');
-      setDiasFromTexto(c.horario_atendimento||'Seg a sáb, 10h às 19h');
+
+      if(c.horario_dias){
+        document.querySelectorAll('#cfgDias button').forEach(b=>b.classList.remove('active'));
+        String(c.horario_dias).split(',').filter(Boolean).forEach(d=>{
+          document.querySelector(`#cfgDias button[data-day="${d}"]`)?.classList.add('active');
+        });
+        setTimeSelect('cfgAbreSelect', c.horario_abre||'10:00');
+        setTimeSelect('cfgFechaSelect', c.horario_fecha||'19:00');
+        montarResumoHorario();
+      }else{
+        setDiasFromTexto(c.horario_atendimento||'Seg a sáb, 10h às 19h');
+      }
+
       $id('cfgMensagem').value=c.mensagem_whatsapp||'';
     }catch(_){}
   }
@@ -1047,27 +1071,41 @@ init();
     const caret=e.target.selectionStart;
     e.target.value=formatarTelefone(e.target.value);
   });
-  $id('salvarConfig').addEventListener('click',async()=>{
+  const salvarConfigBtn=$id('salvarConfig');
+  if(salvarConfigBtn && !salvarConfigBtn.dataset.bound){
+    salvarConfigBtn.dataset.bound='1';
+    salvarConfigBtn.addEventListener('click',async()=>{
     const status=$id('configStatus');
     status.textContent='Salvando...';
     const body={
       whatsapp:'55'+$id('cfgWhatsapp').value.replace(/\D/g,''),
       local_retirada:$id('cfgLocal').value.trim(),
+      endereco:$id('cfgEndereco').value.trim(),
+      maps_url:$id('cfgMapsUrl').value.trim(),
       entregas_status:getCfgEntregas(),
       horario_atendimento:montarResumoHorario(),
+      horario_dias:[...document.querySelectorAll('#cfgDias button.active')].map(b=>b.dataset.day).join(','),
+      horario_abre:document.getElementById('cfgAbreSelect')?.dataset.value||'10:00',
+      horario_fecha:document.getElementById('cfgFechaSelect')?.dataset.value||'19:00',
       mensagem_whatsapp:$id('cfgMensagem').value.trim()
     };
     try{
-      const r=await fetch('/api/admin/config',{
-        method:'PUT',credentials:'same-origin',
-        headers:{'Content-Type':'application/json'},
+      await api('/api/admin/config',{
+        method:'PUT',
         body:JSON.stringify(body)
       });
-      if(!r.ok)throw new Error();
+
       status.textContent='Configurações salvas ✓';
+
+      // Atualiza também a cópia pública em memória, se existir.
+      if(window.RP_CONFIG) Object.assign(window.RP_CONFIG, body);
+
       setTimeout(()=>status.textContent='',2500);
-    }catch(_){status.textContent='Não foi possível salvar.'}
-  });
+    }catch(e){
+      status.textContent=e?.message || 'Não foi possível salvar.';
+    }
+    });
+  }
 })();
 </script>
 
