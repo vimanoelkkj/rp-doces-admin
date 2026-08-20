@@ -1077,25 +1077,6 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <script>
   // ⚠️ MOCKUP: troque pelo número real da sua marca (com DDI 55 + DDD, sem espaços/traços)
   let WHATSAPP_NUMBER = "5533991285907";
-
-  const bolos = [
-    { emoji:"🌰", nome:"Ninho com Nutella", desc:"Camadas de bolo de leite ninho, recheio cremoso de Nutella e cobertura de leite ninho.", preco:"R$ 15,00" },
-    { emoji:"🥥", nome:"Prestígio", desc:"Bolo de chocolate fofinho com recheio cremoso de coco e cobertura de chocolate.", preco:"R$ 14,00" },
-    { emoji:"🍓", nome:"Morango com Chocolate", desc:"Bolo de chocolate, morangos fresquinhos e chantilly na medida certa.", preco:"R$ 15,00" },
-    { emoji:"🍫", nome:"Doce de Leite com Chocolate", desc:"Bolo de chocolate intenso com camadas generosas de doce de leite cremoso.", preco:"R$ 14,00" },
-    { emoji:"❤️", nome:"Red Velvet", desc:"Bolo aveludado vermelho com recheio de cream cheese, um clássico apaixonante.", preco:"R$ 16,00" },
-    { emoji:"🎉", nome:"Chocolate com Confete", desc:"Bolo de chocolate fofinho com confetes coloridos, para alegrar qualquer dia.", preco:"R$ 13,00" },
-    { emoji:"🍋", nome:"Limão com Chocolate Branco", desc:"Bolo de limão siciliano com recheio cremoso de chocolate branco.", preco:"R$ 15,00" },
-    { emoji:"🥜", nome:"Paçoca", desc:"Bolo amanteigado com creme de paçoca e amendoim crocante por cima.", preco:"R$ 14,00" }
-  ];
-
-  const pudins = [
-    { emoji:"🍮", nome:"Pudim de Leite Ninho", desc:"Pudim cremoso de leite ninho com calda de caramelo na medida certa.", preco:"R$ 8,00" },
-    { emoji:"🍯", nome:"Pudim de Doce de Leite", desc:"O clássico pudim de doce de leite, macio e derretendo na boca.", preco:"R$ 8,00" },
-    { emoji:"🍫", nome:"Pudim de Chocolate", desc:"Pudim aveludado de chocolate com calda cremosa por cima.", preco:"R$ 8,00" },
-    { emoji:"🥥", nome:"Pudim de Coco", desc:"Pudim de coco fresquinho com toque de leite condensado.", preco:"R$ 8,00" }
-  ];
-
   const menuToggle = document.getElementById('menuToggle');
   const navLinks = document.getElementById('navLinks');
   menuToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
@@ -1127,11 +1108,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
       pedirSabor(btn.getAttribute('data-sabor'), btn.getAttribute('data-tipo'));
     });
   }
-
-  renderFlavors(bolos, document.getElementById('menu-grid-bolo'), 'Bolo no Pote');
-  renderFlavors(pudins, document.getElementById('menu-grid-pudim'), 'Mini Pudim');
-
-  function pedirSabor(sabor, tipo){
+function pedirSabor(sabor, tipo){
     const texto = `Olá! 🍰 Vim pelo site da R&P Doces e gostaria de fazer um pedido do(a) ${tipo} sabor *${sabor}*. Poderia me passar mais informações?`;
     abrirWhatsApp(texto);
   }
@@ -1397,17 +1374,22 @@ let ultimoSnapshotCardapio = '';
 async function carregarCardapioDinamico(){
   try {
     const res = await fetch('/api/products', { headers: { 'Accept': 'application/json' } });
-    if (!res.ok) return;
+    if (!res.ok) throw new Error('Falha ao carregar cardápio');
     const payload = await res.json();
     const snapshotAtual = JSON.stringify(payload);
     if (snapshotAtual === ultimoSnapshotCardapio) return;
     ultimoSnapshotCardapio = snapshotAtual;
     const produtos = Array.isArray(payload.produtos) ? payload.produtos : [];
-    if (!produtos.length) return;
 
     const boloGrid = document.getElementById('menu-grid-bolo');
     const pudimGrid = document.getElementById('menu-grid-pudim');
     if (!boloGrid || !pudimGrid) return;
+
+    if (!produtos.length) {
+      boloGrid.replaceChildren();
+      pudimGrid.replaceChildren();
+      return;
+    }
 
     const formatar = centavos =>
       (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
