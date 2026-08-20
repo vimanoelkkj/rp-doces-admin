@@ -844,6 +844,30 @@ body.rp-modal-open .rp-mobile-cta{opacity:0!important;pointer-events:none!import
 }
 </style>
 
+
+<script id="rp-config-loja">
+window.RP_CONFIG = {
+  whatsapp: (window.RP_WHATSAPP_NUMBER || "5533991285907"),
+  local_retirada: "Temponi Concept",
+  entregas_status: "EM_BREVE",
+  horario_atendimento: "",
+  mensagem_whatsapp: "Olá! Gostaria de fazer um pedido na R&P Doces."
+};
+(async () => {
+  try {
+    const r = await fetch('/api/config', {cache:'no-store'});
+    if (!r.ok) return;
+    const cfg = await r.json();
+    Object.assign(window.RP_CONFIG, cfg);
+    if (cfg.whatsapp) {
+      const numero = String(cfg.whatsapp).replace(/\D/g,'');
+      window.RP_WHATSAPP_NUMBER = numero;
+      try { WHATSAPP_NUMBER = numero; } catch (_) {}
+    }
+  } catch (_) {}
+})();
+</script>
+
 </head>
 <body>
 <!-- ===== Header ===== -->
@@ -1011,7 +1035,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 </div>
 <script>
   // ⚠️ MOCKUP: troque pelo número real da sua marca (com DDI 55 + DDD, sem espaços/traços)
-  const WHATSAPP_NUMBER = "5511999999999";
+  let WHATSAPP_NUMBER = "5533991285907";
 
   const bolos = [
     { emoji:"🌰", nome:"Ninho com Nutella", desc:"Camadas de bolo de leite ninho, recheio cremoso de Nutella e cobertura de leite ninho.", preco:"R$ 15,00" },
@@ -1195,7 +1219,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
   // Configuração central. Quando a entrega for ativada, basta habilitar aqui
   // e acrescentar os campos/regras de endereço e taxa.
   const CONFIG = {
-    whatsapp: '5533991285907',
+    whatsapp: (window.RP_WHATSAPP_NUMBER || '5533991285907'),
     atendimento: {
       retirada: true,
       entrega: false

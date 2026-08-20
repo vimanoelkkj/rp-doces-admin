@@ -72,7 +72,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="produtos">Cardápio</button>
-      <button class="tab" data-tab="usuarios">Administradores</button>
+      <button class="tab" data-tab="usuarios">Administradores</button><button class="tab" data-tab="config">Configurações da loja</button>
     </div>
 
     <section id="tab-produtos">
@@ -84,7 +84,37 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
       <div class="toolbar"><h2>Administradores</h2><button class="btn" id="novoUsuario">+ Adicionar administrador</button></div>
       <div class="card" id="usersList"></div>
     </section>
-  </main>
+  
+<section id="configPanel" class="panel" style="display:none">
+  <div class="toolbar"><h2>Configurações da loja</h2></div>
+  <div class="form-grid" style="max-width:760px">
+    <label>WhatsApp para pedidos
+      <input id="cfgWhatsapp" inputmode="tel" placeholder="(33) 99128-5907">
+    </label>
+    <label>Local de retirada
+      <input id="cfgLocal" placeholder="Temponi Concept">
+    </label>
+    <label>Status das entregas
+      <select id="cfgEntregas">
+        <option value="EM_BREVE">Em breve</option>
+        <option value="DISPONIVEL">Disponíveis</option>
+        <option value="INDISPONIVEL">Indisponíveis</option>
+      </select>
+    </label>
+    <label>Horário de atendimento
+      <input id="cfgHorario" placeholder="Ex.: Seg a sáb, 10h às 19h">
+    </label>
+    <label style="grid-column:1/-1">Mensagem inicial do WhatsApp
+      <textarea id="cfgMensagem" rows="3" placeholder="Olá! Gostaria de fazer um pedido..."></textarea>
+    </label>
+  </div>
+  <div class="actions" style="margin-top:18px">
+    <button class="btn" id="salvarConfig">Salvar alterações</button>
+    <span id="configStatus" class="muted"></span>
+  </div>
+</section>
+
+</main>
 </div>
 
 <div class="modal-bg hidden" id="productModal">
@@ -230,6 +260,64 @@ init();
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden) sincronizarAdmin(); });
   window.addEventListener('focus', sincronizarAdmin);
   setInterval(sincronizarAdmin, 30000);
+})();
+</script>
+
+
+<script id="rp-admin-config">
+(() => {
+  const $id = id => document.getElementById(id);
+  const panel = $id('configPanel');
+  if (!panel) return;
+
+  function formatarTelefone(v){
+    const d=String(v||'').replace(/\D/g,'').replace(/^55/,'').slice(0,11);
+    if(d.length<=2)return d;
+    if(d.length<=7)return `(${d.slice(0,2)}) ${d.slice(2)}`;
+    return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  }
+  async function carregarConfig(){
+    try{
+      const r=await fetch('/api/admin/config',{credentials:'same-origin'});
+      if(!r.ok)return;
+      const c=await r.json();
+      $id('cfgWhatsapp').value=formatarTelefone(c.whatsapp||'');
+      $id('cfgLocal').value=c.local_retirada||'';
+      $id('cfgEntregas').value=c.entregas_status||'EM_BREVE';
+      $id('cfgHorario').value=c.horario_atendimento||'';
+      $id('cfgMensagem').value=c.mensagem_whatsapp||'';
+    }catch(_){}
+  }
+  document.querySelectorAll('[data-tab="config"]').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.panel').forEach(p=>p.style.display='none');
+    panel.style.display='';
+    carregarConfig();
+  }));
+  $id('cfgWhatsapp').addEventListener('input',e=>{
+    const caret=e.target.selectionStart;
+    e.target.value=formatarTelefone(e.target.value);
+  });
+  $id('salvarConfig').addEventListener('click',async()=>{
+    const status=$id('configStatus');
+    status.textContent='Salvando...';
+    const body={
+      whatsapp:'55'+$id('cfgWhatsapp').value.replace(/\D/g,''),
+      local_retirada:$id('cfgLocal').value.trim(),
+      entregas_status:$id('cfgEntregas').value,
+      horario_atendimento:$id('cfgHorario').value.trim(),
+      mensagem_whatsapp:$id('cfgMensagem').value.trim()
+    };
+    try{
+      const r=await fetch('/api/admin/config',{
+        method:'PUT',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body)
+      });
+      if(!r.ok)throw new Error();
+      status.textContent='Configurações salvas ✓';
+      setTimeout(()=>status.textContent='',2500);
+    }catch(_){status.textContent='Não foi possível salvar.'}
+  });
 })();
 </script>
 
