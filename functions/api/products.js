@@ -15,8 +15,8 @@ export async function onRequestGet({ env }) {
         disponivel: Boolean(p.disponivel),
         destaque: Boolean(p.destaque),
       }))
-    }, 200, { "cache-control": "public, max-age=30" });
+    }, 200, { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" });
   } catch (e) {
-    return json({ produtos: [], erro: "Cardápio temporariamente indisponível." }, 500);
+    return json({ produtos: [], erro: "Cardápio temporariamente indisponível." }, 500, {"cache-control":"no-store"});
   }
 }

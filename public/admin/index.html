@@ -332,6 +332,53 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 }
 </style>
 
+
+<style id="rp-availability-quick-style">
+.availability-toggle{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:38px;
+  padding:0 12px;
+  border:1px solid #cfe8d6;
+  border-radius:12px;
+  background:#f4fbf6;
+  color:#34784b;
+  font-weight:700;
+  cursor:pointer;
+  transition:background .16s ease,border-color .16s ease,transform .16s ease,opacity .16s ease;
+}
+.availability-toggle::before{
+  content:'';
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#48a96a;
+  box-shadow:0 0 0 3px rgba(72,169,106,.10);
+}
+.availability-toggle:hover{
+  background:#ebf8ef;
+  border-color:#a9d8b6;
+}
+.availability-toggle.is-soldout{
+  border-color:#f0c7ce;
+  background:#fff5f6;
+  color:#a94f5e;
+}
+.availability-toggle.is-soldout::before{
+  background:#d96a79;
+  box-shadow:0 0 0 3px rgba(217,106,121,.10);
+}
+.availability-toggle:active{
+  transform:scale(.97);
+}
+.availability-toggle:disabled{
+  opacity:.55;
+  cursor:wait;
+  transform:none;
+}
+</style>
+
 </head>
 <body>
 <div class="shell">
@@ -616,11 +663,56 @@ function renderProducts(){
     <div class="product-head"><span>${esc(p.emoji||(p.categoria==='MINI_PUDIM'?'🍮':'🍰'))}</span><span class="price">${money(p.preco_centavos)}</span></div>
     <h3>${esc(p.nome)}</h3><p>${esc(p.descricao||'')}</p>
     <div class="badges"><span class="badge">${p.categoria==='MINI_PUDIM'?'Mini Pudim':'Bolo no Pote'}</span><span class="badge ${p.disponivel?'':'off'}">${p.disponivel?'Disponível':'Esgotado'}</span><span class="badge ${p.ativo?'':'off'}">${p.ativo?'Visível':'Arquivado'}</span></div>
-    <div class="actions">${p.ativo?`<button class="btn secondary" onclick="editProduct(${p.id})">Editar</button><button class="btn danger" onclick="delProduct(${p.id})">Arquivar</button>`:`<button class="btn" onclick="restoreProduct(${p.id})">Restaurar</button><button class="btn danger" onclick="deleteForever(${p.id})">Excluir definitivamente</button>`}</div>
+    <div class="actions">${p.ativo?`<button class="availability-toggle ${p.disponivel?'':'is-soldout'}" onclick="toggleProductAvailability(${p.id}, this)">${p.disponivel?'Disponível':'Esgotado'}</button><button class="btn secondary" onclick="editProduct(${p.id})">Editar</button><button class="btn danger" onclick="delProduct(${p.id})">Arquivar</button>`:`<button class="btn" onclick="restoreProduct(${p.id})">Restaurar</button><button class="btn danger" onclick="deleteForever(${p.id})">Excluir definitivamente</button>`}</div>
   </article>`).join('')||`<p class="muted">${mostrarArquivados?'Nenhum produto arquivado.':'Nenhum produto cadastrado ainda.'}</p>`;
 }
 const el_toggleArquivados = $('#toggleArquivados');
 if (el_toggleArquivados) el_toggleArquivados.onclick = ()=>{mostrarArquivados=!mostrarArquivados;renderProducts()};
+
+
+function notifyStockUpdate(){
+  try {
+    if ('BroadcastChannel' in window) {
+      const channel = new BroadcastChannel('rp-doces-stock');
+      channel.postMessage({type:'stock-updated', at:Date.now()});
+      channel.close();
+    }
+    localStorage.setItem('rp-doces-stock-updated', String(Date.now()));
+  } catch (_) {}
+}
+
+window.toggleProductAvailability=async(id,btn)=>{
+  const p=produtos.find(x=>x.id===id);
+  if(!p || !p.ativo || btn?.disabled)return;
+
+  const novoStatus=!p.disponivel;
+  if(btn) btn.disabled=true;
+
+  try{
+    await api('/api/admin/products/'+id,{
+      method:'PUT',
+      body:JSON.stringify({
+        nome:p.nome,
+        categoria:p.categoria,
+        descricao:p.descricao||'',
+        preco_centavos:Number(p.preco_centavos)||0,
+        emoji:p.emoji||'',
+        ordem:Number(p.ordem)||0,
+        disponivel:novoStatus,
+        ativo:true,
+        destaque:!!p.destaque
+      })
+    });
+
+    p.disponivel=novoStatus;
+    renderProducts();
+    notifyStockUpdate();
+  }catch(e){
+    if(btn) btn.disabled=false;
+    alert(e.message||'Não foi possível alterar a disponibilidade.');
+  }
+};
+
 window.deleteForever=async id=>{
   const p=produtos.find(x=>x.id===id);
   if(!p)return;
@@ -734,7 +826,7 @@ init();
   async function sincronizarAdmin(){
     if (document.hidden || !window.me) return;
     const agora = Date.now();
-    if (agora - ultimoSyncAdmin < 3000) return;
+    if (agora - ultimoSyncAdmin < 700) return;
     ultimoSyncAdmin = agora;
     try {
       if (typeof loadProducts === 'function') await loadProducts();
@@ -746,7 +838,9 @@ init();
   }
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden) sincronizarAdmin(); });
   window.addEventListener('focus', sincronizarAdmin);
-  setInterval(sincronizarAdmin, 30000);
+  setInterval(() => {
+  if (!document.hidden) sincronizarAdmin();
+}, 3000);
 })();
 </script>
 
