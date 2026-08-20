@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>R&P Doces Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--pink:#ff6b9d;--pink2:#e8548a;--soft:#fff2f6;--cream:#fffaf5;--brown:#6b4a3a;--text:#4a3a3f;--muted:#8a7378;--line:#ffd0e0;--danger:#c83d55}
+*{box-sizing:border-box}body{margin:0;font-family:Poppins,sans-serif;background:linear-gradient(180deg,#fffaf5,#fff5f8);color:var(--text);min-height:100vh}
+button,input,textarea,select{font:inherit}.hidden{display:none!important}
+.shell{max-width:1180px;margin:auto;padding:28px 20px 60px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;gap:16px}.brand{font-weight:700;color:var(--pink2);font-size:1.25rem}.brand small{display:block;color:var(--muted);font-weight:500;font-size:.72rem}
+.btn{border:0;border-radius:14px;padding:11px 16px;font-weight:600;cursor:pointer;background:var(--pink);color:white}.btn.secondary{background:white;color:var(--pink2);border:1px solid var(--line)}.btn.danger{background:#fff0f2;color:var(--danger);border:1px solid #ffd0d8}
+.card{background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 14px 40px rgba(232,84,138,.08)}
+.auth{max-width:440px;margin:8vh auto 0}.auth h1{color:var(--brown);margin:0 0 8px}.auth p{color:var(--muted);margin:0 0 22px}
+.field{margin:13px 0}.field label{display:block;font-size:.84rem;font-weight:600;margin-bottom:6px;color:var(--brown)}
+.field input,.field textarea,.field select{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:12px;background:#fff;outline:none;color:var(--text)}.field textarea{min-height:92px;resize:vertical}.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--pink)}
+.msg{margin-top:12px;font-size:.86rem;color:var(--danger)}.muted{color:var(--muted);font-size:.85rem}
+.tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}.tab{padding:10px 14px;border:1px solid var(--line);background:white;border-radius:12px;color:var(--brown);cursor:pointer;font-weight:600}.tab.active{background:var(--soft);color:var(--pink2);border-color:#ffb3cf}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:14px 0 18px}.toolbar h2{margin:0;color:var(--brown)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.product{background:#fff;border:1px solid var(--line);border-radius:18px;padding:17px}.product-head{display:flex;justify-content:space-between;gap:12px}.price{color:var(--pink2);font-weight:700}.product h3{margin:6px 0;color:var(--brown)}.product p{color:var(--muted);font-size:.86rem;min-height:42px}.badges{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.badge{font-size:.72rem;padding:5px 8px;border-radius:999px;background:var(--soft);color:var(--pink2);font-weight:600}.badge.off{background:#f3f1f1;color:#8b8585}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions .btn{padding:8px 11px;font-size:.8rem}
+.modal-bg{position:fixed;inset:0;background:rgba(74,58,63,.35);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}.modal{width:min(520px,100%);max-height:92vh;overflow:auto;background:var(--cream);border:1px solid var(--line);border-radius:22px;padding:22px}.modal h2{margin:0;color:var(--brown)}
+.switchrow{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0}.switchrow label{display:flex;gap:7px;align-items:center;font-size:.86rem}
+.user{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 0;border-bottom:1px solid #ffe8f0}.user:last-child{border:0}.user strong{display:block;color:var(--brown)}.user small{color:var(--muted)}
+@media(max-width:620px){.top{align-items:flex-start}.toolbar{align-items:flex-start;flex-direction:column}.user{align-items:flex-start;flex-direction:column}}
+</style>
+
+<link rel="icon" type="image/png" href="/admin-favicon.png">
+<link rel="apple-touch-icon" href="/admin-apple-touch-icon.png">
+</head>
+<body>
+<div class="shell">
+  <section id="setupView" class="auth card hidden">
+    <h1>Primeira configuração 🍰</h1>
+    <p>Crie a primeira conta administrativa da R&P.</p>
+    <div class="field"><label>Nome</label><input id="setupNome"></div>
+    <div class="field"><label>Usuário</label><input id="setupUsername" autocomplete="username" placeholder="ex.: vitor"></div>
+    <div class="field"><label>E-mail</label><input id="setupEmail" type="email"></div>
+    <div class="field"><label>Senha</label><input id="setupSenha" type="password" minlength="8"></div>
+    <div class="field"><label>Chave de configuração</label><input id="setupKey" type="password"></div>
+    <button class="btn" id="setupBtn">Criar primeira conta</button>
+    <div id="setupMsg" class="msg"></div>
+  </section>
+
+  <section id="loginView" class="auth card hidden">
+    <h1>R&P Doces Admin</h1>
+    <p>Entre para gerenciar cardápio e disponibilidade.</p>
+    <div class="field"><label>Usuário</label><input id="loginUsername" autocomplete="username" placeholder="Seu usuário"></div>
+    <div class="field"><label>Senha</label><input id="loginSenha" type="password" autocomplete="current-password"></div>
+    <button class="btn" id="loginBtn">Entrar</button>
+    <button class="btn secondary" id="forgotBtn" style="margin-left:6px">Esqueci a senha</button>
+    <div id="loginMsg" class="msg"></div>
+    <p class="muted" style="margin-top:16px">Enquanto o envio por e-mail não estiver configurado, outro administrador também poderá redefinir sua senha pelo painel.</p>
+  </section>
+
+  <section id="resetView" class="auth card hidden">
+    <h1>Nova senha</h1>
+    <p>Crie uma nova senha para sua conta.</p>
+    <div class="field"><label>Nova senha</label><input id="resetSenha" type="password" minlength="8"></div>
+    <button class="btn" id="resetBtn">Salvar nova senha</button>
+    <div id="resetMsg" class="msg"></div>
+  </section>
+
+  <main id="appView" class="hidden">
+    <div class="top">
+      <div class="brand">R&P Doces <small id="who"></small></div>
+      <div><a class="btn secondary" href="/" style="text-decoration:none">Ver site</a> <button class="btn secondary" id="logoutBtn">Sair</button></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="produtos">Cardápio</button>
+      <button class="tab" data-tab="usuarios">Administradores</button>
+    </div>
+
+    <section id="tab-produtos">
+      <div class="toolbar"><h2>Cardápio</h2><div class="actions"><button class="btn secondary" id="toggleArquivados">Ver arquivados</button><button class="btn" id="novoProduto">+ Adicionar sabor</button></div></div>
+      <div id="productsGrid" class="grid"></div>
+    </section>
+
+    <section id="tab-usuarios" class="hidden">
+      <div class="toolbar"><h2>Administradores</h2><button class="btn" id="novoUsuario">+ Adicionar administrador</button></div>
+      <div class="card" id="usersList"></div>
+    </section>
+  </main>
+</div>
+
+<div class="modal-bg hidden" id="productModal">
+  <div class="modal">
+    <h2 id="productModalTitle">Produto</h2>
+    <input id="pId" type="hidden">
+    <div class="field"><label>Nome</label><input id="pNome"></div>
+    <div class="field"><label>Categoria</label><select id="pCategoria"><option value="BOLO_NO_POTE">Bolo no Pote</option><option value="MINI_PUDIM">Mini Pudim</option></select></div>
+    <div class="field"><label>Descrição</label><textarea id="pDescricao"></textarea></div>
+    <div class="field"><label>Preço</label><input id="pPreco" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off"></div>
+    <div class="field"><label>Emoji</label><select id="pEmoji">
+      <option value="🍰">🍰 Bolo</option><option value="🍮">🍮 Pudim</option><option value="🍓">🍓 Morango</option><option value="🍫">🍫 Chocolate</option><option value="🌰">🌰 Avelã / castanha</option><option value="🥥">🥥 Coco</option><option value="🥜">🥜 Amendoim / paçoca</option><option value="🍋">🍋 Limão</option><option value="🍯">🍯 Doce de leite / mel</option><option value="❤️">❤️ Coração</option><option value="🎉">🎉 Confete</option><option value="🧁">🧁 Cupcake</option><option value="🍪">🍪 Biscoito</option><option value="🍒">🍒 Cereja</option><option value="✨">✨ Especial</option>
+    </select></div>
+    <div class="switchrow"><label><input id="pDisponivel" type="checkbox" checked> Disponível</label><label><input id="pAtivo" type="checkbox" checked> Visível no site</label><label><input id="pDestaque" type="checkbox"> Destaque</label></div>
+    <div class="actions"><button class="btn" id="saveProduct">Salvar</button><button class="btn secondary closeModal">Cancelar</button></div>
+    <div id="productMsg" class="msg"></div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="userModal">
+  <div class="modal">
+    <h2>Novo administrador</h2>
+    <div class="field"><label>Nome</label><input id="uNome"></div>
+    <div class="field"><label>Usuário</label><input id="uUsername" autocomplete="off" placeholder="ex.: patricia"></div>
+    <div class="field"><label>E-mail</label><input id="uEmail" type="email"></div>
+    <div class="field"><label>Senha inicial</label><input id="uSenha" type="password"></div>
+    <div class="actions"><button class="btn" id="saveUser">Criar conta</button><button class="btn secondary closeModal">Cancelar</button></div>
+    <div id="userMsg" class="msg"></div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+let me=null, produtos=[], usuarios=[];
+
+async function api(url, options={}){
+  const res=await fetch(url,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.erro||data.mensagem||'Erro inesperado.');
+  return data;
+}
+function show(id){['setupView','loginView','resetView','appView'].forEach(x=>$('#'+x).classList.add('hidden'));$('#'+id).classList.remove('hidden')}
+function money(c){return(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function precoInput(c){return money(Number(c)||0)}
+function precoCentavos(v){const digits=String(v||'').replace(/\D/g,'');return digits?Number(digits):0}
+function formatPrecoField(){const el=$('#pPreco');el.value=money(precoCentavos(el.value))}
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
+async function init(){
+  const reset=new URLSearchParams(location.search).get('reset');
+  if(reset){show('resetView');return}
+  const setup=await api('/api/setup');
+  if(setup.needsSetup){show('setupView');return}
+  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}`;show('appView');await Promise.all([loadProducts(),loadUsers()])}
+  catch{show('loginView')}
+}
+
+$('#setupBtn').onclick=async()=>{try{
+  await api('/api/setup',{method:'POST',body:JSON.stringify({nome:$('#setupNome').value,username:$('#setupUsername').value,email:$('#setupEmail').value,senha:$('#setupSenha').value,setupKey:$('#setupKey').value})});
+  location.reload();
+}catch(e){$('#setupMsg').textContent=e.message}};
+$('#loginBtn').onclick=async()=>{try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:$('#loginUsername').value,senha:$('#loginSenha').value})});location.reload()}catch(e){$('#loginMsg').textContent=e.message}};
+['loginUsername','loginSenha'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#loginBtn').click()}}));
+$('#logoutBtn').onclick=async()=>{await api('/api/auth/logout',{method:'POST',body:'{}'});location.reload()};
+$('#forgotBtn').onclick=async()=>{const email=prompt('Digite o e-mail da sua conta para recuperar a senha:')?.trim();if(!email)return;try{const r=await api('/api/auth/forgot',{method:'POST',body:JSON.stringify({email})});$('#loginMsg').style.color='#5d8a63';$('#loginMsg').textContent=r.mensagem}catch(e){$('#loginMsg').textContent=e.message}};
+$('#resetBtn').onclick=async()=>{try{const token=new URLSearchParams(location.search).get('reset');await api('/api/auth/reset',{method:'POST',body:JSON.stringify({token,senha:$('#resetSenha').value})});history.replaceState({},'', '/admin/');alert('Senha alterada. Faça login novamente.');location.reload()}catch(e){$('#resetMsg').textContent=e.message}};
+
+$$('.tab').forEach(b=>b.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#tab-produtos').classList.toggle('hidden',b.dataset.tab!=='produtos');$('#tab-usuarios').classList.toggle('hidden',b.dataset.tab!=='usuarios')});
+
+async function loadProducts(){const r=await api('/api/admin/products');produtos=r.produtos;renderProducts()}
+let mostrarArquivados=false;
+function renderProducts(){
+  const lista=produtos.filter(p=>mostrarArquivados ? !p.ativo : p.ativo);
+  $('#toggleArquivados').textContent=mostrarArquivados?'Ver cardápio':'Ver arquivados';
+  $('#productsGrid').innerHTML=lista.map(p=>`<article class="product">
+    <div class="product-head"><span>${esc(p.emoji||(p.categoria==='MINI_PUDIM'?'🍮':'🍰'))}</span><span class="price">${money(p.preco_centavos)}</span></div>
+    <h3>${esc(p.nome)}</h3><p>${esc(p.descricao||'')}</p>
+    <div class="badges"><span class="badge">${p.categoria==='MINI_PUDIM'?'Mini Pudim':'Bolo no Pote'}</span><span class="badge ${p.disponivel?'':'off'}">${p.disponivel?'Disponível':'Esgotado'}</span><span class="badge ${p.ativo?'':'off'}">${p.ativo?'Visível':'Arquivado'}</span></div>
+    <div class="actions">${p.ativo?`<button class="btn secondary" onclick="editProduct(${p.id})">Editar</button><button class="btn danger" onclick="delProduct(${p.id})">Arquivar</button>`:`<button class="btn" onclick="restoreProduct(${p.id})">Restaurar</button><button class="btn danger" onclick="deleteForever(${p.id})">Excluir definitivamente</button>`}</div>
+  </article>`).join('')||`<p class="muted">${mostrarArquivados?'Nenhum produto arquivado.':'Nenhum produto cadastrado ainda.'}</p>`;
+}
+$('#toggleArquivados').onclick=()=>{mostrarArquivados=!mostrarArquivados;renderProducts()};
+window.deleteForever=async id=>{
+  const p=produtos.find(x=>x.id===id);
+  if(!p)return;
+  const ok=confirm(`Excluir "${p.nome}" definitivamente?\n\nEssa ação não poderá ser desfeita.`);
+  if(!ok)return;
+  await api('/api/admin/products/'+id+'?permanent=1',{method:'DELETE'});
+  await loadProducts();
+};
+window.restoreProduct=async id=>{
+  const p=produtos.find(x=>x.id===id); if(!p)return;
+  await api('/api/admin/products/'+id,{method:'PUT',body:JSON.stringify({
+    nome:p.nome,categoria:p.categoria,descricao:p.descricao,preco_centavos:p.preco_centavos,
+    emoji:p.emoji||'',ordem:Number(p.ordem)||0,disponivel:true,ativo:true,destaque:!!p.destaque
+  })});
+  await loadProducts();
+};
+
+$('#novoProduto').onclick=()=>openProduct();
+function openProduct(p=null){
+  $('#pId').value=p?.id||'';$('#pNome').value=p?.nome||'';$('#pCategoria').value=p?.categoria||'BOLO_NO_POTE';$('#pDescricao').value=p?.descricao||'';$('#pPreco').value=p?precoInput(p.preco_centavos):'';$('#pEmoji').value=p?.emoji||(p?.categoria==='MINI_PUDIM'?'🍮':'🍰');$('#pDisponivel').checked=p?!!p.disponivel:true;$('#pAtivo').checked=p?!!p.ativo:true;$('#pDestaque').checked=p?!!p.destaque:false;$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productMsg').textContent='';$('#productModal').classList.remove('hidden')
+}
+window.editProduct=id=>openProduct(produtos.find(p=>p.id===id));
+window.delProduct=async id=>{if(!confirm('Arquivar este produto? Ele sairá do site, mas poderá ser restaurado.'))return;await api('/api/admin/products/'+id,{method:'DELETE'});await loadProducts()};
+$('#pPreco').addEventListener('input',formatPrecoField);
+$('#pPreco').addEventListener('focus',()=>{const el=$('#pPreco');if(!el.value)el.value=money(0);requestAnimationFrame(()=>el.setSelectionRange(el.value.length,el.value.length))});
+$('#saveProduct').onclick=async()=>{try{
+ const preco=precoCentavos($('#pPreco').value);const payload={nome:$('#pNome').value,categoria:$('#pCategoria').value,descricao:$('#pDescricao').value,preco_centavos:preco,emoji:$('#pEmoji').value,disponivel:$('#pDisponivel').checked,ativo:$('#pAtivo').checked,destaque:$('#pDestaque').checked};
+ const id=$('#pId').value;await api(id?'/api/admin/products/'+id:'/api/admin/products',{method:id?'PUT':'POST',body:JSON.stringify(payload)});$('#productModal').classList.add('hidden');await loadProducts()
+}catch(e){$('#productMsg').textContent=e.message}};
+
+async function loadUsers(){const r=await api('/api/admin/users');usuarios=r.usuarios;renderUsers()}
+function renderUsers(){
+ $('#usersList').innerHTML=usuarios.map(u=>`<div class="user"><div><strong>${esc(u.nome)} ${u.id===me.id?'(você)':''}</strong><small>@${esc(u.username)} • ${esc(u.email)} • ${u.ativo?'Ativo':'Desativado'}</small></div><div class="actions"><button class="btn secondary" onclick="resetUser(${u.id})">Nova senha</button>${u.id!==me.id?`<button class="btn ${u.ativo?'danger':'secondary'}" onclick="toggleUser(${u.id},${u.ativo?0:1})">${u.ativo?'Desativar':'Ativar'}</button>`:''}</div></div>`).join('');
+}
+$('#novoUsuario').onclick=()=>{$('#uNome').value=$('#uUsername').value=$('#uEmail').value=$('#uSenha').value='';$('#userMsg').textContent='';$('#userModal').classList.remove('hidden')};
+$('#saveUser').onclick=async()=>{try{await api('/api/admin/users',{method:'POST',body:JSON.stringify({nome:$('#uNome').value,username:$('#uUsername').value,email:$('#uEmail').value,senha:$('#uSenha').value})});$('#userModal').classList.add('hidden');await loadUsers()}catch(e){$('#userMsg').textContent=e.message}};
+window.resetUser=async id=>{const senha=prompt('Digite a nova senha (mínimo 8 caracteres, com letra e número):');if(!senha)return;try{await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'resetar_senha',senha})});alert('Senha redefinida.')}catch(e){alert(e.message)}};
+window.toggleUser=async(id,ativo)=>{if(!confirm(ativo?'Reativar esta conta?':'Desativar esta conta?'))return;await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'toggle_ativo',ativo:!!ativo})});await loadUsers()};
+
+$$('.closeModal').forEach(b=>b.onclick=()=>b.closest('.modal-bg').classList.add('hidden'));
+$$('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.add('hidden')}));
+init();
+</script>
+
+<script>
+(function(){
+  let ultimoSyncAdmin = 0;
+  async function sincronizarAdmin(){
+    if (document.hidden || !window.me) return;
+    const agora = Date.now();
+    if (agora - ultimoSyncAdmin < 3000) return;
+    ultimoSyncAdmin = agora;
+    try {
+      if (typeof loadProducts === 'function') await loadProducts();
+      const tabUsuarios = document.querySelector('[data-tab="usuarios"]');
+      if (tabUsuarios && tabUsuarios.classList.contains('active') && typeof loadUsers === 'function') {
+        await loadUsers();
+      }
+    } catch (_) {}
+  }
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) sincronizarAdmin(); });
+  window.addEventListener('focus', sincronizarAdmin);
+  setInterval(sincronizarAdmin, 30000);
+})();
+</script>
+
+</body></html>

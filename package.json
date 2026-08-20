@@ -1,0 +1,11 @@
+{
+  "name": "rp-doces",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public --project-name=rp-doces"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
