@@ -1,5 +1,6 @@
 import { json } from "../../lib/http.js";
 import { mpRequest, mpOrderToLocalStatus, paymentFromOrder, validateMpWebhook } from "../../lib/mercadoPago.js";
+import { baixarEstoquePedido } from "../../lib/stock.js";
 
 function getBodyDataId(body) {
   const value = body?.data?.id ?? body?.data_id ?? body?.id ?? null;
@@ -118,6 +119,11 @@ export async function onRequestPost({ request, env }) {
       localStatus,
       local.id
     ).run();
+
+    if (localStatus === "PAGO") {
+      const estoque = await baixarEstoquePedido(env, local.id);
+      if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", local.id);
+    }
 
     return json({ ok: true });
   } catch (err) {

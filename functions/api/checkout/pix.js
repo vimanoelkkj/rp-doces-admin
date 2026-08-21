@@ -41,12 +41,15 @@ export async function onRequestPost({ request, env }) {
   if (!validWhatsapp(whatsapp)) return json({ erro: "Informe um WhatsApp válido com DDD." }, 400);
 
   const produto = await env.DB.prepare(`
-    SELECT id, nome, preco_centavos, disponivel, ativo
+    SELECT id, nome, preco_centavos, disponivel, ativo, estoque
     FROM produtos WHERE id = ? LIMIT 1
   `).bind(produtoId).first();
 
   if (!produto || !produto.ativo) return json({ erro: "Produto não encontrado." }, 404);
   if (!produto.disponivel) return json({ erro: "Este produto está indisponível no momento." }, 409);
+  if (Number(produto.estoque) < quantidade) {
+    return json({ erro: produto.estoque > 0 ? `Restam apenas ${produto.estoque} unidade(s) deste produto.` : "Este produto está esgotado." }, 409);
+  }
 
   const unitario = Number(produto.preco_centavos);
   const total = unitario * quantidade;

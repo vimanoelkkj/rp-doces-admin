@@ -780,9 +780,18 @@ window.openOrderDetail=id=>{
     <div class="order-detail-box"><small>Pago em</small><strong>${esc(p.pago_em||'Ainda não confirmado')}</strong></div>
   </div>${p.observacao?`<div class="order-detail-note"><strong>Observação:</strong> ${esc(p.observacao)}</div>`:''}`;
   const digits=String(p.cliente_whatsapp||'').replace(/\D/g,'');
-  const textoWhats=op==='PRONTO'?`Olá, ${p.cliente_nome}! 💗 Seu pedido #${p.id} da R&P Doces está pronto para retirada.`:`Olá, ${p.cliente_nome}! 💗 Estamos entrando em contato sobre o seu pedido #${p.id} da R&P Doces.`;
+  // Emojis escritos como escapes Unicode para o arquivo continuar seguro mesmo em ambientes
+  // que alterem a codificação durante copia/deploy. encodeURIComponent cuida da URL do WhatsApp.
+  const mensagensWhatsApp={
+    NOVO:`Olá, ${p.cliente_nome}! \u2764 Recebemos o pagamento do seu pedido #${p.id} da R&P Doces. Em breve começaremos a preparação. \u2728`,
+    PREPARANDO:`Olá, ${p.cliente_nome}! \u2764 Seu pedido #${p.id} da R&P Doces já está sendo preparado com carinho. Avisaremos assim que estiver pronto para retirada. \u2728`,
+    PRONTO:`Olá, ${p.cliente_nome}! \u2728 Seu pedido #${p.id} da R&P Doces está pronto para retirada. Pode vir buscar! \u2764`,
+    ENTREGUE:`Olá, ${p.cliente_nome}! \u2764 Obrigado pelo pedido #${p.id} na R&P Doces. Esperamos que você aproveite cada colherada! \u2728`,
+    CANCELADO:`Olá, ${p.cliente_nome}! Estamos entrando em contato sobre o cancelamento do seu pedido #${p.id} da R&P Doces.`
+  };
+  const textoWhats=mensagensWhatsApp[op]||`Olá, ${p.cliente_nome}! \u2764 Estamos entrando em contato sobre o seu pedido #${p.id} da R&P Doces.`;
   const msg=encodeURIComponent(textoWhats);
-  $('#orderDetailActions').innerHTML=(digits?`<a class="btn" href="https://wa.me/${digits}?text=${msg}" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>`:'')+`<button class="btn secondary" type="button" onclick="closeOrderDetail()">Fechar</button>`;
+  $('#orderDetailActions').innerHTML=(digits?`<a class="btn" href="https://api.whatsapp.com/send?phone=${digits}&text=${msg}" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>`:'')+`<button class="btn secondary" type="button" onclick="closeOrderDetail()">Fechar</button>`;
   const o=$('#orderDetailOverlay');o.classList.add('open');o.setAttribute('aria-hidden','false');
 };
 window.closeOrderDetail=closeOrderDetail;

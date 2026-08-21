@@ -1,7 +1,7 @@
 const CATEGORIAS = new Set(["BOLO_NO_POTE", "MINI_PUDIM"]);
 const CAMPOS_PERMITIDOS = new Set([
   "nome", "categoria", "descricao", "preco_centavos",
-  "disponivel", "ativo", "destaque", "emoji"
+  "disponivel", "ativo", "destaque", "emoji", "estoque"
 ]);
 
 function isPlainObject(value) {
@@ -27,12 +27,14 @@ export function validarProduto(payload) {
   const descricao = (payload.descricao ?? "").trim();
   const emoji = (payload.emoji ?? "").trim();
   const preco = payload.preco_centavos;
+  const estoque = payload.estoque ?? 0;
 
   if (nome.length < 1 || nome.length > 100) return { ok: false };
   if (!CATEGORIAS.has(categoria)) return { ok: false };
   if (descricao.length > 500) return { ok: false };
   if ([...emoji].length > 16) return { ok: false };
   if (typeof preco !== "number" || !Number.isSafeInteger(preco) || preco < 1 || preco > 10_000_000) return { ok: false };
+  if (typeof estoque !== "number" || !Number.isSafeInteger(estoque) || estoque < 0 || estoque > 100000) return { ok: false };
 
   for (const campo of ["disponivel", "ativo", "destaque"]) {
     if (payload[campo] !== undefined && typeof payload[campo] !== "boolean") return { ok: false };
@@ -49,6 +51,7 @@ export function validarProduto(payload) {
       ativo: payload.ativo ?? true,
       destaque: payload.destaque ?? false,
       emoji,
+      estoque,
     }
   };
 }
