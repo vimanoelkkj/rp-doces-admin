@@ -5,7 +5,7 @@
   "pages_build_output_dir": "public",
 
   "vars": {
-    "MP_TEST_MODE": "true"
+    "MP_TEST_MODE": "false"
   },
 
   "d1_databases": [
