@@ -1879,9 +1879,19 @@ function pedirSabor(sabor, tipo){
     }
 
     const nome = card.querySelector('h3')?.textContent.trim() || 'Doce R&P';
-    const precoTexto = card.querySelector('.flavor-price')?.textContent || '';
-    const numero = precoTexto.match(/[\d]+(?:[.,]\d{1,2})?/);
-    const preco = numero ? Number(numero[0].replace('.', '').replace(',', '.')) : 0;
+    const centavosDataset = Number(card.dataset.precoCentavos);
+    let preco = Number.isFinite(centavosDataset) && centavosDataset >= 0
+      ? centavosDataset / 100
+      : 0;
+
+    // Fallback apenas para cards legados/estáticos sem data-preco-centavos.
+    if (!preco) {
+      const precoTexto = card.querySelector('.flavor-price')?.textContent || '';
+      const valorBR = precoTexto.match(/\d{1,3}(?:\.\d{3})*(?:,\d{2})|\d+(?:,\d{2})?/);
+      if (valorBR) {
+        preco = Number(valorBR[0].replace(/\./g, '').replace(',', '.')) || 0;
+      }
+    }
 
     produtoAtual = { nome, preco };
     titulo.textContent = nome;
@@ -2016,6 +2026,7 @@ async function carregarCardapioDinamico(){
       const div = document.createElement('div');
       div.className = 'flavor-card' + (indisponivel ? ' flavor-card--indisponivel' : '');
       div.dataset.productId = produto.id;
+      div.dataset.precoCentavos = String(produto.preco_centavos ?? 0);
       div.dataset.categoria = produto.categoria || '';
       div.dataset.disponivel = produto.disponivel ? 'true' : 'false';
       div.dataset.destaque = produto.destaque ? 'true' : 'false';
