@@ -16,13 +16,13 @@ export async function onRequestPut({ request, env, params }) {
 
   await env.DB.prepare(`
     UPDATE produtos
-    SET nome=?, categoria=?, descricao=?, preco_centavos=?, disponivel=?, ativo=?, destaque=?, emoji=?, estoque=?,
+    SET nome=?, categoria=?, descricao=?, preco_centavos=?, disponivel=?, ativo=?, destaque=?, emoji=?, estoque=?, promocao_ativa=?, preco_promocional_centavos=?, promocao_inicio=?, promocao_fim=?,
         atualizado_em=CURRENT_TIMESTAMP
     WHERE id=?
   `).bind(
     p.nome, p.categoria, p.descricao, p.preco_centavos,
     p.disponivel ? 1 : 0, p.ativo ? 1 : 0, p.destaque ? 1 : 0,
-    p.emoji, p.estoque, id
+    p.emoji, p.estoque, p.promocao_ativa ? 1 : 0, p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim, id
   ).run();
 
   return json({ ok: true });

@@ -400,6 +400,9 @@
     border-radius:20px;
     white-space:nowrap;
   }
+  .rp-promo-price{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+  .rp-promo-price s{font-size:.72rem;color:var(--text-soft);font-weight:500;opacity:.75}
+  .rp-promo-badge{display:inline-flex;align-items:center;background:#fff0f5;color:var(--pink-700);font-size:.68rem;font-weight:800;padding:4px 7px;border-radius:999px;margin-left:6px;vertical-align:middle}
   .flavor-card h3{
     font-size:1.15rem;
     color:var(--brown-700);
@@ -2283,6 +2286,8 @@ async function carregarCardapioDinamico(){
       div.className = 'flavor-card' + (indisponivel ? ' flavor-card--indisponivel' : '');
       div.dataset.productId = produto.id;
       div.dataset.precoCentavos = String(produto.preco_centavos ?? 0);
+      div.dataset.precoOriginalCentavos = String(produto.preco_original_centavos ?? produto.preco_centavos ?? 0);
+      div.dataset.promocaoVigente = produto.promocao_vigente ? 'true' : 'false';
       div.dataset.categoria = produto.categoria || '';
       div.dataset.disponivel = produto.disponivel ? 'true' : 'false';
       div.dataset.destaque = produto.destaque ? 'true' : 'false';
@@ -2290,9 +2295,9 @@ async function carregarCardapioDinamico(){
       div.innerHTML = `
         <div class="flavor-top">
           <div class="flavor-emoji">${rpEscHtml(produto.emoji || (produto.categoria === 'MINI_PUDIM' ? '🍮' : '🍰'))}</div>
-          <div class="flavor-price">${formatar(produto.preco_centavos)}</div>
+          <div class="flavor-price${produto.promocao_vigente?' rp-promo-price':''}">${produto.promocao_vigente?`<s>${formatar(produto.preco_original_centavos)}</s><span>${formatar(produto.preco_centavos)}</span>`:formatar(produto.preco_centavos)}</div>
         </div>
-        <h3>${rpEscHtml(produto.nome)}${produto.destaque ? ' <span class="rp-featured-badge">Queridinho 💗</span>' : ''}</h3>
+        <h3>${rpEscHtml(produto.nome)}${produto.destaque ? ' <span class="rp-featured-badge">Queridinho 💗</span>' : ''}${produto.promocao_vigente ? ' <span class="rp-promo-badge">Promo 💗</span>' : ''}</h3>
         <p>${rpEscHtml(produto.descricao || '')}</p>
         <span class="rp-stock-status ${Number(produto.estoque) <= 0 ? 'rp-stock-status--out' : Number(produto.estoque) <= 5 ? 'rp-stock-status--low' : ''}">${Number(produto.estoque) <= 0 ? 'Esgotado' : Number(produto.estoque) === 1 ? 'Última unidade' : Number(produto.estoque) <= 5 ? `Restam ${Number(produto.estoque)}` : 'Disponível'}</span>
         <button class="btn-flavor" type="button" ${indisponivel ? 'disabled' : ''}>

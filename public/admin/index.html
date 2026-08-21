@@ -604,6 +604,13 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     <div class="field"><label>Categoria</label><select id="pCategoria"><option value="BOLO_NO_POTE">Bolo no Pote</option><option value="MINI_PUDIM">Mini Pudim</option></select></div>
     <div class="field"><label>Descrição</label><textarea id="pDescricao"></textarea></div>
     <div class="field"><label>Preço</label><input id="pPreco" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off"></div>
+    <div class="switchrow"><label><input id="pPromocaoAtiva" type="checkbox"> Ativar promoção</label></div>
+    <div id="promoFields" style="display:none">
+      <div class="field"><label>Preço promocional</label><input id="pPrecoPromo" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off"><small class="muted">Deve ser menor que o preço normal.</small></div>
+      <div class="field"><label>Início da promoção <span class="muted">(opcional)</span></label><input id="pPromoInicio" type="datetime-local"></div>
+      <div class="field"><label>Fim da promoção <span class="muted">(opcional)</span></label><input id="pPromoFim" type="datetime-local"></div>
+    </div>
+    <div class="field"><label>Estoque</label><input id="pEstoque" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="0"><small class="muted">Ao chegar a zero, o produto fica esgotado automaticamente.</small></div>
     <div class="field"><label>Emoji</label><select id="pEmoji">
       <option value="🍰">🍰 Bolo</option><option value="🍮">🍮 Pudim</option><option value="🍓">🍓 Morango</option><option value="🍫">🍫 Chocolate</option><option value="🌰">🌰 Avelã / castanha</option><option value="🥥">🥥 Coco</option><option value="🥜">🥜 Amendoim / paçoca</option><option value="🍋">🍋 Limão</option><option value="🍯">🍯 Doce de leite / mel</option><option value="❤️">❤️ Coração</option><option value="🎉">🎉 Confete</option><option value="🧁">🧁 Cupcake</option><option value="🍪">🍪 Biscoito</option><option value="🍒">🍒 Cereja</option><option value="✨">✨ Especial</option>
     </select></div>
@@ -805,9 +812,9 @@ function renderProducts(){
   const lista=produtos.filter(p=>mostrarArquivados ? !p.ativo : p.ativo);
   $('#toggleArquivados').textContent=mostrarArquivados?'Ver cardápio':'Ver arquivados';
   $('#productsGrid').innerHTML=lista.map(p=>`<article class="product">
-    <div class="product-head"><span>${esc(p.emoji||(p.categoria==='MINI_PUDIM'?'🍮':'🍰'))}</span><span class="price">${money(p.preco_centavos)}</span></div>
+    <div class="product-head"><span>${esc(p.emoji||(p.categoria==='MINI_PUDIM'?'🍮':'🍰'))}</span><span class="price">${p.promocao_ativa&&p.preco_promocional_centavos?`<s style="opacity:.55;font-weight:500">${money(p.preco_centavos)}</s> ${money(p.preco_promocional_centavos)}`:money(p.preco_centavos)}</span></div>
     <h3>${esc(p.nome)}</h3><p>${esc(p.descricao||'')}</p>
-    <div class="badges"><span class="badge">${p.categoria==='MINI_PUDIM'?'Mini Pudim':'Bolo no Pote'}</span><span class="badge ${p.disponivel?'':'off'}">${p.disponivel?'Disponível':'Esgotado'}</span><span class="badge ${p.ativo?'':'off'}">${p.ativo?'Visível':'Arquivado'}</span></div>
+    <div class="badges"><span class="badge">${p.categoria==='MINI_PUDIM'?'Mini Pudim':'Bolo no Pote'}</span>${p.promocao_ativa?`<span class="badge">Promo 🏷️</span>`:''}<span class="badge">Estoque: ${Number(p.estoque)||0}</span><span class="badge ${p.disponivel?'':'off'}">${p.disponivel?'Disponível':'Esgotado'}</span><span class="badge ${p.ativo?'':'off'}">${p.ativo?'Visível':'Arquivado'}</span></div>
     <div class="actions">${p.ativo?`<button class="availability-toggle ${p.disponivel?'':'is-soldout'}" onclick="toggleProductAvailability(${p.id}, this)">${p.disponivel?'Disponível':'Esgotado'}</button><button class="btn secondary" onclick="editProduct(${p.id})">Editar</button><button class="btn danger" onclick="delProduct(${p.id})">Arquivar</button>`:`<button class="btn" onclick="restoreProduct(${p.id})">Restaurar</button><button class="btn danger" onclick="deleteForever(${p.id})">Excluir definitivamente</button>`}</div>
   </article>`).join('')||`<p class="muted">${mostrarArquivados?'Nenhum produto arquivado.':'Nenhum produto cadastrado ainda.'}</p>`;
 }
@@ -842,10 +849,12 @@ window.toggleProductAvailability=async(id,btn)=>{
         descricao:p.descricao||'',
         preco_centavos:Number(p.preco_centavos)||0,
         emoji:p.emoji||'',
-        ordem:Number(p.ordem)||0,
         disponivel:novoStatus,
         ativo:true,
-        destaque:!!p.destaque
+        destaque:!!p.destaque,
+        estoque:Number(p.estoque)||0,
+        promocao_ativa:!!p.promocao_ativa, preco_promocional_centavos:p.preco_promocional_centavos?Number(p.preco_promocional_centavos):null,
+        promocao_inicio:p.promocao_inicio||null, promocao_fim:p.promocao_fim||null
       })
     });
 
@@ -871,23 +880,32 @@ window.restoreProduct=async id=>{
   const p=produtos.find(x=>x.id===id); if(!p)return;
   await api('/api/admin/products/'+id,{method:'PUT',body:JSON.stringify({
     nome:p.nome,categoria:p.categoria,descricao:p.descricao,preco_centavos:p.preco_centavos,
-    emoji:p.emoji||'',ordem:Number(p.ordem)||0,disponivel:true,ativo:true,destaque:!!p.destaque
+    emoji:p.emoji||'',disponivel:true,ativo:true,destaque:!!p.destaque,estoque:Number(p.estoque)||0,
+    promocao_ativa:!!p.promocao_ativa,preco_promocional_centavos:p.preco_promocional_centavos?Number(p.preco_promocional_centavos):null,
+    promocao_inicio:p.promocao_inicio||null,promocao_fim:p.promocao_fim||null
   })});
   await loadProducts();
 };
 
 const el_novoProduto = $('#novoProduto');
 if (el_novoProduto) el_novoProduto.onclick = ()=>openProduct();
+function promoLocalValue(v){if(!v)return '';const d=new Date(v);if(!Number.isFinite(d.getTime()))return '';const pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function promoIsoValue(v){if(!v)return null;const d=new Date(v);return Number.isFinite(d.getTime())?d.toISOString():null}
+function togglePromoFields(){const on=$('#pPromocaoAtiva').checked;$('#promoFields').style.display=on?'block':'none'}
 function openProduct(p=null){
-  $('#pId').value=p?.id||'';$('#pNome').value=p?.nome||'';$('#pCategoria').value=p?.categoria||'BOLO_NO_POTE';$('#pDescricao').value=p?.descricao||'';$('#pPreco').value=p?precoInput(p.preco_centavos):'';$('#pEmoji').value=p?.emoji||(p?.categoria==='MINI_PUDIM'?'🍮':'🍰');$('#pDisponivel').checked=p?!!p.disponivel:true;$('#pAtivo').checked=p?!!p.ativo:true;$('#pDestaque').checked=p?!!p.destaque:false;$('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productMsg').textContent='';$('#productModal').classList.remove('hidden')
+  $('#pId').value=p?.id||'';$('#pNome').value=p?.nome||'';$('#pCategoria').value=p?.categoria||'BOLO_NO_POTE';$('#pDescricao').value=p?.descricao||'';$('#pPreco').value=p?precoInput(p.preco_centavos):'';$('#pEstoque').value=p?Number(p.estoque)||0:0;$('#pEmoji').value=p?.emoji||(p?.categoria==='MINI_PUDIM'?'🍮':'🍰');$('#pDisponivel').checked=p?!!p.disponivel:true;$('#pAtivo').checked=p?!!p.ativo:true;$('#pDestaque').checked=p?!!p.destaque:false;
+  $('#pPromocaoAtiva').checked=p?!!p.promocao_ativa:false;$('#pPrecoPromo').value=p?.preco_promocional_centavos?precoInput(p.preco_promocional_centavos):'';$('#pPromoInicio').value=promoLocalValue(p?.promocao_inicio);$('#pPromoFim').value=promoLocalValue(p?.promocao_fim);togglePromoFields();
+  $('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productMsg').textContent='';$('#productModal').classList.remove('hidden')
 }
 window.editProduct=id=>openProduct(produtos.find(p=>p.id===id));
 window.delProduct=async id=>{if(!confirm('Arquivar este produto? Ele sairá do site, mas poderá ser restaurado.'))return;await api('/api/admin/products/'+id,{method:'DELETE'});await loadProducts()};
 $('#pPreco').addEventListener('input',formatPrecoField);
+$('#pPrecoPromo').addEventListener('input',()=>{const el=$('#pPrecoPromo');el.value=money(precoCentavos(el.value))});
+$('#pPromocaoAtiva').addEventListener('change',togglePromoFields);
 $('#pPreco').addEventListener('focus',()=>{const el=$('#pPreco');if(!el.value)el.value=money(0);requestAnimationFrame(()=>el.setSelectionRange(el.value.length,el.value.length))});
 const el_saveProduct = $('#saveProduct');
 if (el_saveProduct) el_saveProduct.onclick = async()=>{try{
- const preco=precoCentavos($('#pPreco').value);const payload={nome:$('#pNome').value,categoria:$('#pCategoria').value,descricao:$('#pDescricao').value,preco_centavos:preco,emoji:$('#pEmoji').value,disponivel:$('#pDisponivel').checked,ativo:$('#pAtivo').checked,destaque:$('#pDestaque').checked};
+ const preco=precoCentavos($('#pPreco').value);const estoque=Math.max(0,Math.trunc(Number($('#pEstoque').value)||0));const promoAtiva=$('#pPromocaoAtiva').checked;const precoPromo=precoCentavos($('#pPrecoPromo').value);const payload={nome:$('#pNome').value,categoria:$('#pCategoria').value,descricao:$('#pDescricao').value,preco_centavos:preco,emoji:$('#pEmoji').value,estoque,disponivel:$('#pDisponivel').checked&&estoque>0,ativo:$('#pAtivo').checked,destaque:$('#pDestaque').checked,promocao_ativa:promoAtiva,preco_promocional_centavos:promoAtiva?precoPromo:null,promocao_inicio:promoAtiva?promoIsoValue($('#pPromoInicio').value):null,promocao_fim:promoAtiva?promoIsoValue($('#pPromoFim').value):null};
  const id=$('#pId').value;await api(id?'/api/admin/products/'+id:'/api/admin/products',{method:id?'PUT':'POST',body:JSON.stringify(payload)});$('#productModal').classList.add('hidden');await loadProducts()
 }catch(e){$('#productMsg').textContent=e.message}};
 

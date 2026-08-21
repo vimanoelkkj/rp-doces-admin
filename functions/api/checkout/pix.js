@@ -41,7 +41,7 @@ export async function onRequestPost({ request, env }) {
   if (!validWhatsapp(whatsapp)) return json({ erro: "Informe um WhatsApp válido com DDD." }, 400);
 
   const produto = await env.DB.prepare(`
-    SELECT id, nome, preco_centavos, disponivel, ativo, estoque
+    SELECT id, nome, preco_centavos, disponivel, ativo, estoque, promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim
     FROM produtos WHERE id = ? LIMIT 1
   `).bind(produtoId).first();
 
@@ -51,7 +51,11 @@ export async function onRequestPost({ request, env }) {
     return json({ erro: produto.estoque > 0 ? `Restam apenas ${produto.estoque} unidade(s) deste produto.` : "Este produto está esgotado." }, 409);
   }
 
-  const unitario = Number(produto.preco_centavos);
+  const agora = Date.now();
+  const promoVigente = Boolean(produto.promocao_ativa) && Number(produto.preco_promocional_centavos) > 0 &&
+    (!produto.promocao_inicio || Date.parse(produto.promocao_inicio) <= agora) &&
+    (!produto.promocao_fim || Date.parse(produto.promocao_fim) > agora);
+  const unitario = promoVigente ? Number(produto.preco_promocional_centavos) : Number(produto.preco_centavos);
   const total = unitario * quantidade;
   if (!Number.isSafeInteger(total) || total <= 0) return json({ erro: "Valor do pedido inválido." }, 400);
 

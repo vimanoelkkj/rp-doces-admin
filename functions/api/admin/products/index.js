@@ -6,7 +6,7 @@ export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
   const { results } = await env.DB.prepare(`
-    SELECT id, nome, categoria, descricao, preco_centavos, disponivel, ativo, destaque, ordem, emoji, estoque, criado_em, atualizado_em
+    SELECT id, nome, categoria, descricao, preco_centavos, disponivel, ativo, destaque, ordem, emoji, estoque, promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim, criado_em, atualizado_em
     FROM produtos ORDER BY categoria, ordem, nome
   `).all();
   return json({ produtos: results || [] });
@@ -24,8 +24,8 @@ export async function onRequestPost({ request, env }) {
   const ordemRow = await env.DB.prepare("SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM produtos WHERE categoria = ?").bind(p.categoria).first();
   const ordem = Number(ordemRow?.proxima ?? 0);
   const result = await env.DB.prepare(`
-    INSERT INTO produtos (nome, categoria, descricao, preco_centavos, disponivel, ativo, destaque, ordem, emoji, estoque)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO produtos (nome, categoria, descricao, preco_centavos, disponivel, ativo, destaque, ordem, emoji, estoque, promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     p.nome, p.categoria, p.descricao, p.preco_centavos,
     p.disponivel ? 1 : 0,
@@ -33,7 +33,8 @@ export async function onRequestPost({ request, env }) {
     p.destaque ? 1 : 0,
     ordem,
     p.emoji,
-    p.estoque
+    p.estoque,
+    p.promocao_ativa ? 1 : 0, p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim
   ).run();
 
   return json({ ok: true, id: result.meta?.last_row_id }, 201);
