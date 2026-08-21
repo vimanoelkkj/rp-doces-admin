@@ -4,6 +4,10 @@
   "compatibility_date": "2026-08-20",
   "pages_build_output_dir": "public",
 
+  "vars": {
+    "MP_TEST_MODE": "true"
+  },
+
   "d1_databases": [
     {
       "binding": "DB",

@@ -1750,6 +1750,30 @@ function pedirSabor(sabor, tipo){
   .pedido-modal .pedido-preco{color:var(--pink-600);font-weight:700;margin-bottom:20px}
   .pedido-field{margin-top:16px}
   .pedido-field label{display:block;font-weight:600;color:var(--brown-700);font-size:.9rem;margin-bottom:7px}
+  .pedido-field input[type="text"],
+  .pedido-field input[type="email"],
+  .pedido-field input[type="tel"]{
+    width:100%;height:48px;padding:0 14px;box-sizing:border-box;
+    border:1.5px solid var(--pink-200);border-radius:14px;background:#fff;
+    font:500 .95rem 'Poppins',sans-serif;color:var(--text);outline:none;
+    transition:border-color .16s ease,box-shadow .16s ease,background .16s ease;
+  }
+  .pedido-field input[type="text"]::placeholder,
+  .pedido-field input[type="email"]::placeholder,
+  .pedido-field input[type="tel"]::placeholder,
+  .pedido-field textarea::placeholder{color:#b9a7ac;opacity:1}
+  .pedido-field input[type="text"]:hover,
+  .pedido-field input[type="email"]:hover,
+  .pedido-field input[type="tel"]:hover,
+  .pedido-field textarea:hover{border-color:var(--pink-300)}
+  .pedido-field input[type="text"]:focus,
+  .pedido-field input[type="email"]:focus,
+  .pedido-field input[type="tel"]:focus,
+  .pedido-field textarea:focus{
+    border-color:var(--pink-500);
+    box-shadow:0 0 0 4px rgba(255,91,145,.10);
+    background:#fff;
+  }
   .pedido-qty{display:flex;align-items:center;gap:12px}
   .pedido-qty button{
     width:40px;height:40px;border-radius:12px;border:1.5px solid var(--pink-200);
@@ -1760,11 +1784,11 @@ function pedirSabor(sabor, tipo){
     border-radius:12px;background:#fff;font:600 1rem 'Poppins',sans-serif;color:var(--text)
   }
   .pedido-field textarea{
-    width:100%;min-height:82px;resize:vertical;padding:12px 14px;
+    width:100%;min-height:96px;resize:vertical;padding:13px 14px;box-sizing:border-box;
     border:1.5px solid var(--pink-200);border-radius:14px;background:#fff;
-    font:inherit;color:var(--text);outline:none
+    font:500 .94rem/1.5 'Poppins',sans-serif;color:var(--text);outline:none;
+    transition:border-color .16s ease,box-shadow .16s ease,background .16s ease;
   }
-  .pedido-field textarea:focus{border-color:var(--pink-400)}
   .pedido-atendimento{
     margin-top:18px;padding:13px 14px;border-radius:14px;
     background:var(--pink-50);color:var(--text-soft);font-size:.86rem
@@ -1801,6 +1825,23 @@ function pedirSabor(sabor, tipo){
     </div>
 
     <div class="pedido-field">
+      <label for="pedidoNome">Seu nome</label>
+      <input id="pedidoNome" type="text" maxlength="100" autocomplete="name" placeholder="Como podemos te chamar?">
+    </div>
+
+    <div class="pedido-field">
+      <label for="pedidoEmail">E-mail</label>
+      <input id="pedidoEmail" type="email" maxlength="160" autocomplete="email" placeholder="voce@exemplo.com">
+      <small style="display:block;margin-top:6px;color:var(--text-soft)">Usado somente para identificar o pagamento no Mercado Pago.</small>
+    </div>
+
+    <div class="pedido-field">
+      <label for="pedidoWhatsapp">WhatsApp</label>
+      <input id="pedidoWhatsapp" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="(31) 99999-9999">
+      <small style="display:block;margin-top:6px;color:var(--text-soft)">Usaremos este número para avisar quando seu pedido estiver pronto para retirada.</small>
+    </div>
+
+    <div class="pedido-field">
       <label for="pedidoObs">Observação <span style="font-weight:400;color:var(--text-soft)">(opcional)</span></label>
       <textarea id="pedidoObs" placeholder="Ex.: separar em uma sacolinha, reservar até mais tarde..."></textarea>
     </div>
@@ -1821,9 +1862,15 @@ function pedirSabor(sabor, tipo){
       </div>
     </div>
 
-    <button class="btn btn-primary pedido-confirmar" id="pedidoConfirmar" type="button">
-      Confirmar pelo WhatsApp
-    </button>
+    <div style="display:grid;gap:10px">
+      <button class="btn btn-primary pedido-confirmar" id="pedidoPagarPix" type="button">
+        Pagar com Pix
+      </button>
+      <button class="btn btn-outline pedido-confirmar" id="pedidoConfirmar" type="button">
+        Confirmar pelo WhatsApp
+      </button>
+      <div id="pedidoErro" role="alert" style="display:none;color:#9b2c2c;font-size:.88rem;text-align:center"></div>
+    </div>
   </div>
 </div>
 
@@ -1847,13 +1894,18 @@ function pedirSabor(sabor, tipo){
   const resumoQtd = document.getElementById('pedidoResumoQtd');
   const resumoUnitario = document.getElementById('pedidoResumoUnitario');
   const qtd = document.getElementById('pedidoQuantidade');
+  const nomeCliente = document.getElementById('pedidoNome');
+  const emailCliente = document.getElementById('pedidoEmail');
+  const whatsappCliente = document.getElementById('pedidoWhatsapp');
   const obs = document.getElementById('pedidoObs');
   const total = document.getElementById('pedidoTotal');
   const menos = document.getElementById('qtyMenos');
   const mais = document.getElementById('qtyMais');
   const confirmar = document.getElementById('pedidoConfirmar');
+  const pagarPix = document.getElementById('pedidoPagarPix');
+  const pedidoErro = document.getElementById('pedidoErro');
 
-  let produtoAtual = { nome: '', preco: 0 };
+  let produtoAtual = { id: null, nome: '', preco: 0 };
 
   const moeda = valor => valor.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 
@@ -1900,12 +1952,14 @@ function pedirSabor(sabor, tipo){
       }
     }
 
-    produtoAtual = { nome, preco };
+    produtoAtual = { id: Number(card.dataset.productId) || null, nome, preco };
     titulo.textContent = nome;
     emojiEl.textContent = card.querySelector('.flavor-emoji')?.textContent.trim() || '🍰';
     precoEl.textContent = preco ? moeda(preco) + ' cada' : 'Consulte o valor';
     qtd.value = 1;
     obs.value = '';
+    pedidoErro.style.display = 'none';
+    pedidoErro.textContent = '';
     atualizarTotal();
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
@@ -1946,6 +2000,52 @@ function pedirSabor(sabor, tipo){
   closeBtn.addEventListener('click', fecharPedido);
   overlay.addEventListener('click', e => { if(e.target === overlay) fecharPedido(); });
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && overlay.classList.contains('open')) fecharPedido(); });
+
+  function mostrarErroPedido(msg){
+    pedidoErro.textContent = msg || 'Não foi possível continuar.';
+    pedidoErro.style.display = 'block';
+  }
+
+  async function criarPix(){
+    pedidoErro.style.display = 'none';
+    if (!produtoAtual.id) return mostrarErroPedido('Produto inválido. Atualize a página e tente novamente.');
+    const nome = nomeCliente.value.trim();
+    const email = emailCliente.value.trim();
+    if (nome.length < 2) return mostrarErroPedido('Informe seu nome.');
+    if (!emailCliente.checkValidity() || !email) return mostrarErroPedido('Informe um e-mail válido.');
+    const whatsapp = whatsappCliente.value.replace(/\D/g, '');
+    if (whatsapp.length < 10 || whatsapp.length > 13) return mostrarErroPedido('Informe um WhatsApp válido com DDD.');
+
+    const quantidade = Math.max(1, parseInt(qtd.value, 10) || 1);
+    const labelOriginal = pagarPix.textContent;
+    pagarPix.disabled = true;
+    pagarPix.textContent = 'Gerando Pix...';
+    try {
+      const r = await fetch('/api/checkout/pix', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          produto_id: produtoAtual.id,
+          quantidade,
+          nome,
+          email,
+          whatsapp,
+          observacao: obs.value.trim()
+        })
+      });
+      const data = await r.json().catch(()=>({}));
+      if (!r.ok) throw new Error(data.erro || 'Não foi possível gerar o Pix.');
+      fecharPedido();
+      window.RPPix?.abrir(data);
+    } catch (e) {
+      mostrarErroPedido(e.message);
+    } finally {
+      pagarPix.disabled = false;
+      pagarPix.textContent = labelOriginal;
+    }
+  }
+
+  pagarPix.addEventListener('click', criarPix);
 
   confirmar.addEventListener('click', () => {
     const quantidade = Math.max(1, parseInt(qtd.value, 10) || 1);
@@ -1994,6 +2094,113 @@ function pedirSabor(sabor, tipo){
 })();
 </script>
 
+
+<style id="rp-pix-style">
+#pixOverlay{position:fixed;inset:0;background:rgba(55,30,34,.48);z-index:10030;display:none;align-items:center;justify-content:center;padding:20px}
+#pixOverlay.open{display:flex}
+.pix-modal{width:min(440px,100%);max-height:92vh;overflow:auto;background:#fffaf7;border:1px solid var(--pink-200);border-radius:24px;padding:24px;box-shadow:0 24px 80px rgba(64,31,38,.22);text-align:center;position:relative}
+.pix-close{position:absolute;right:14px;top:12px;border:0;background:transparent;font-size:28px;cursor:pointer;color:var(--brown-700)}
+.pix-qr{width:min(280px,80vw);aspect-ratio:1;margin:16px auto;border-radius:16px;background:white;padding:10px;object-fit:contain;border:1px solid var(--pink-100)}
+.pix-code{width:100%;min-height:96px;box-sizing:border-box;border:1.5px solid var(--pink-200);border-radius:14px;padding:12px 13px;font:11.5px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:none;background:var(--pink-50);color:var(--brown-700);outline:none;overflow-wrap:anywhere;box-shadow:inset 0 1px 0 rgba(255,255,255,.75)}
+.pix-code:focus{border-color:var(--pink-400);box-shadow:0 0 0 4px rgba(255,91,145,.08)}
+.pix-status{margin:14px 0 4px;font-weight:700;color:var(--brown-700)}
+.pix-actions{display:grid;gap:10px;margin-top:12px}
+.pix-success{display:none;padding:20px 2px 4px}
+.pix-success.show{display:block}
+.pix-success-icon{width:76px;height:76px;margin:4px auto 18px;border-radius:50%;display:grid;place-items:center;background:#eaf8ee;color:#238647;font-size:38px;font-weight:800}
+.pix-success h3{margin:0 0 8px;color:var(--brown-700);font-size:26px}
+.pix-success-text{margin:0 auto 18px;max-width:330px;color:var(--brown-500);line-height:1.55}
+.pix-success-card{margin:18px 0;padding:16px;border:1px solid var(--pink-200);border-radius:16px;background:#fff;text-align:left}
+.pix-success-card strong{display:block;color:var(--brown-700);font-size:16px;margin-bottom:5px}
+.pix-success-card span{color:var(--brown-500);font-size:14px}
+.pix-success .btn{width:100%;justify-content:center;margin-top:4px}
+</style>
+<div id="pixOverlay" aria-hidden="true">
+  <div class="pix-modal" role="dialog" aria-modal="true" aria-labelledby="pixTitulo">
+    <button class="pix-close" id="pixClose" aria-label="Fechar">×</button>
+    <div id="pixPaymentView">
+      <span class="eyebrow">Pagamento seguro</span>
+      <h3 id="pixTitulo" style="margin:5px 36px 4px;color:var(--brown-700)">Pague com Pix</h3>
+      <p id="pixResumo" class="muted"></p>
+      <img id="pixQr" class="pix-qr" alt="QR Code Pix" style="display:none">
+      <textarea id="pixCode" class="pix-code" readonly placeholder="Código Pix copia e cola"></textarea>
+      <div class="pix-actions">
+        <button id="pixCopy" class="btn btn-primary" type="button">Copiar código Pix</button>
+        <a id="pixTicket" class="btn btn-outline" target="_blank" rel="noopener noreferrer" style="display:none">Abrir pagamento no Mercado Pago</a>
+      </div>
+      <div id="pixStatus" class="pix-status">Aguardando pagamento…</div>
+      <small class="muted">A confirmação é consultada diretamente no Mercado Pago.</small>
+    </div>
+    <div id="pixSuccessView" class="pix-success" aria-live="polite">
+      <div class="pix-success-icon">✓</div>
+      <span class="eyebrow">Tudo certo</span>
+      <h3>Pagamento confirmado!</h3>
+      <p id="pixSuccessText" class="pix-success-text">Recebemos seu pagamento. Seu pedido já foi enviado para preparação. 💗</p>
+      <div class="pix-success-card">
+        <strong id="pixSuccessOrder">Pedido confirmado</strong>
+        <span id="pixSuccessSummary"></span>
+      </div>
+      <button id="pixDone" class="btn btn-primary" type="button">Concluir</button>
+    </div>
+  </div>
+</div>
+<script id="rp-pix-flow">
+(() => {
+  const overlay=document.getElementById('pixOverlay');
+  const close=document.getElementById('pixClose');
+  const paymentView=document.getElementById('pixPaymentView');
+  const successView=document.getElementById('pixSuccessView');
+  const qr=document.getElementById('pixQr');
+  const code=document.getElementById('pixCode');
+  const copy=document.getElementById('pixCopy');
+  const ticket=document.getElementById('pixTicket');
+  const status=document.getElementById('pixStatus');
+  const resumo=document.getElementById('pixResumo');
+  const done=document.getElementById('pixDone');
+  const successOrder=document.getElementById('pixSuccessOrder');
+  const successSummary=document.getElementById('pixSuccessSummary');
+  let timer=null, token=null, pedidoAtual=null;
+  const moeda=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  function reset(){paymentView.style.display='block';successView.classList.remove('show');copy.textContent='Copiar código Pix';}
+  function fechar(){overlay.classList.remove('open');overlay.setAttribute('aria-hidden','true');if(timer)clearInterval(timer);timer=null;token=null;pedidoAtual=null;document.body.style.overflow='';setTimeout(reset,180);}
+  function mostrarSucesso(pedido){
+    if(timer)clearInterval(timer);timer=null;
+    const p={...(pedidoAtual||{}),...(pedido||{})};
+    paymentView.style.display='none';
+    successOrder.textContent=p.referencia?`Pedido ${p.referencia}`:'Pedido confirmado';
+    successSummary.textContent=`${p.quantidade||1}× ${p.produto||'Pedido'} • ${moeda(p.valor_total_centavos||0)}`;
+    successView.classList.add('show');
+  }
+  async function consultar(){
+    if(!token)return;
+    try{
+      const r=await fetch('/api/orders/'+encodeURIComponent(token),{headers:{Accept:'application/json'},cache:'no-store'});
+      if(!r.ok)return;
+      const d=await r.json();
+      const st=d?.pedido?.status;
+      if(st==='PAGO')mostrarSucesso(d.pedido);
+      else if(['EXPIRADO','CANCELADO','FALHOU'].includes(st)){status.textContent='Pagamento '+st.toLowerCase()+'.';if(timer)clearInterval(timer);timer=null;}
+      else if(st==='REEMBOLSADO'){status.textContent='Pagamento reembolsado.';if(timer)clearInterval(timer);timer=null;}
+    }catch(_){}
+  }
+  window.RPPix={abrir(data){
+    reset();
+    pedidoAtual=data?.pedido||{};
+    token=pedidoAtual?.token||null;
+    resumo.textContent=`${pedidoAtual?.quantidade||1}× ${pedidoAtual?.produto||'Pedido'} • ${moeda(pedidoAtual?.valor_total_centavos||0)}`;
+    code.value=data?.pix?.qr_code||'';
+    const b64=data?.pix?.qr_code_base64||'';
+    if(b64){qr.src=b64.startsWith('data:')?b64:'data:image/png;base64,'+b64;qr.style.display='block';}else{qr.style.display='none';qr.removeAttribute('src');}
+    if(data?.pix?.ticket_url){ticket.href=data.pix.ticket_url;ticket.style.display='inline-flex';}else{ticket.style.display='none';}
+    status.textContent='Aguardando pagamento…';
+    overlay.classList.add('open');overlay.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';
+    if(pedidoAtual?.status==='PAGO'){mostrarSucesso(pedidoAtual);return;}
+    if(timer)clearInterval(timer);consultar();timer=setInterval(consultar,4000);
+  }};
+  copy.addEventListener('click',async()=>{if(!code.value)return;try{await navigator.clipboard.writeText(code.value);copy.textContent='Código copiado!';setTimeout(()=>copy.textContent='Copiar código Pix',1600);}catch{code.select();document.execCommand('copy');}});
+  done.addEventListener('click',fechar);close.addEventListener('click',fechar);overlay.addEventListener('click',e=>{if(e.target===overlay)fechar();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&overlay.classList.contains('open'))fechar();});
+})();
+</script>
 
 <script>
 /* ===== Cardápio dinâmico R&P =====

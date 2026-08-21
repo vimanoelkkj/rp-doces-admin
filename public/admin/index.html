@@ -26,6 +26,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 .modal-bg{position:fixed;inset:0;background:rgba(74,58,63,.35);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}.modal{width:min(520px,100%);max-height:92vh;overflow:auto;background:var(--cream);border:1px solid var(--line);border-radius:22px;padding:22px}.modal h2{margin:0;color:var(--brown)}
 .switchrow{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0}.switchrow label{display:flex;gap:7px;align-items:center;font-size:.86rem}
 .user{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 0;border-bottom:1px solid #ffe8f0}.user:last-child{border:0}.user strong{display:block;color:var(--brown)}.user small{color:var(--muted)}
+.orders-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}.orders-summary .card{padding:16px}.orders-summary small{display:block;color:var(--muted);font-weight:700}.orders-summary strong{display:block;font-size:1.55rem;color:var(--brown);margin-top:4px}.orders-list{display:grid;gap:10px}.order-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:14px;align-items:center;padding:15px 0;border-bottom:1px solid #ffe8f0}.order-row:last-child{border:0}.order-main strong,.order-total strong{color:var(--brown)}.order-main small,.order-total small{display:block;color:var(--muted);margin-top:4px}.order-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.order-status{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;color:var(--brown);font:inherit}.pay-ok{background:#eaf8ee;color:#26723b}.pay-pending{background:#fff5d9;color:#8a6510}.pay-error{background:#fff0f2;color:#a33a4a}.orders-view-toggle{display:flex;gap:8px;margin:0 0 12px}.orders-view-toggle .btn.active{background:var(--pink);color:#fff;border-color:var(--pink)}.order-row.order-new{background:#fff8fb;border:1px solid #ffd7e6;border-radius:14px;padding:15px 12px}.order-row.order-new+.order-row{border-top:0}.operational-badge{background:#f6f1ff;color:#6b4aa0}.order-detail-overlay{position:fixed;inset:0;background:rgba(55,30,34,.48);z-index:10020;display:none;align-items:center;justify-content:center;padding:20px}.order-detail-overlay.open{display:flex}.order-detail-modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 24px 80px rgba(64,31,38,.2);position:relative}.order-detail-close{position:absolute;right:14px;top:10px;border:0;background:transparent;font-size:28px;color:var(--brown);cursor:pointer}.order-detail-modal h3{margin:0 38px 5px 0;color:var(--brown)}.order-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.order-detail-box{padding:12px;border:1px solid #ffe2ec;border-radius:12px;background:#fffafb}.order-detail-box small{display:block;color:var(--muted);font-weight:700;margin-bottom:4px}.order-detail-box strong{color:var(--brown);overflow-wrap:anywhere}.order-detail-note{padding:12px;border-radius:12px;background:#fff8fb;color:var(--brown);margin:12px 0}.order-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}@media(max-width:560px){.order-detail-grid{grid-template-columns:1fr}}@media(max-width:720px){.orders-summary{grid-template-columns:1fr}.order-row{grid-template-columns:1fr}.order-actions{display:flex;justify-content:flex-start}}
 @media(max-width:620px){.top{align-items:flex-start}.toolbar{align-items:flex-start;flex-direction:column}.user{align-items:flex-start;flex-direction:column}}
 </style>
 
@@ -440,6 +441,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="produtos">Cardápio</button>
+      <button class="tab" data-tab="pedidos">Pedidos <span id="pedidosBadge"></span></button>
       <button class="tab" data-tab="usuarios">Administradores</button><button class="tab" data-tab="config">Configurações da loja</button>
     </div>
 
@@ -447,6 +449,27 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
       <div class="toolbar"><h2>Cardápio</h2><div class="actions"><button class="btn secondary" id="toggleArquivados">Ver arquivados</button><button class="btn" id="novoProduto">+ Adicionar sabor</button></div></div>
       <div id="productsGrid" class="grid"></div>
     </section>
+
+    <section id="tab-pedidos" class="hidden">
+      <div class="toolbar"><div><h2>Pedidos</h2><p class="muted">Pagamento e andamento dos pedidos em um só lugar.</p></div><button class="btn secondary" id="atualizarPedidos">Atualizar</button></div>
+      <div class="orders-summary">
+        <div class="card"><small>Pedidos hoje</small><strong id="pedidosHoje">0</strong></div>
+        <div class="card"><small>Faturamento pago hoje</small><strong id="faturamentoHoje">R$ 0,00</strong></div>
+        <div class="card"><small>Aguardando pagamento</small><strong id="pedidosPendentes">0</strong></div>
+      </div>
+      <div class="orders-view-toggle"><button class="btn secondary active" id="verFilaPedidos">Fila atual</button><button class="btn secondary" id="verHistoricoPedidos">Histórico</button></div>
+      <div class="card"><div id="ordersList" class="orders-list"></div></div>
+    </section>
+
+    <div id="orderDetailOverlay" class="order-detail-overlay" aria-hidden="true">
+      <div class="order-detail-modal" role="dialog" aria-modal="true" aria-labelledby="orderDetailTitle">
+        <button class="order-detail-close" id="orderDetailClose" aria-label="Fechar">×</button>
+        <h3 id="orderDetailTitle">Detalhes do pedido</h3>
+        <p class="muted" id="orderDetailSubtitle"></p>
+        <div id="orderDetailBody"></div>
+        <div class="order-detail-actions" id="orderDetailActions"></div>
+      </div>
+    </div>
 
     <section id="tab-usuarios" class="hidden">
       <div class="toolbar"><h2>Administradores</h2><button class="btn" id="novoUsuario">+ Adicionar administrador</button></div>
@@ -636,7 +659,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-let me=null, produtos=[], usuarios=[];
+let me=null, produtos=[], usuarios=[], pedidos=[];
 
 async function api(url, options={}){
   const res=await fetch(url,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});
@@ -667,7 +690,7 @@ async function init(){
   if(reset){show('resetView');return}
   const setup=await api('/api/setup');
   if(setup.needsSetup){show('setupView');return}
-  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}${me.papel==='OWNER'?' • Mestre':''}`;show('appView');await Promise.all([loadProducts(),loadUsers()])}
+  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}${me.papel==='OWNER'?' • Mestre':''}`;show('appView');await Promise.all([loadProducts(),loadUsers(),loadOrders()])}
   catch{show('loginView')}
 }
 
@@ -690,13 +713,84 @@ $$('.tab').forEach(b=>b.onclick=()=>{
   $$('.tab').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');
 
-  ['produtos','usuarios','config'].forEach(tab=>{
+  ['produtos','pedidos','usuarios','config'].forEach(tab=>{
     const sec=$('#tab-'+tab);
     if(sec) sec.classList.toggle('hidden', b.dataset.tab!==tab);
   });
 });
 
 async function loadProducts(){const r=await api('/api/admin/products');produtos=r.produtos;renderProducts()}
+async function loadOrders(){
+  const r=await api('/api/admin/orders'); pedidos=r.pedidos||[]; renderOrders();
+}
+let visualizarHistoricoPedidos=false;
+function renderOrders(){
+  const hoje=new Date().toISOString().slice(0,10);
+  const deHoje=pedidos.filter(p=>String(p.criado_em||'').slice(0,10)===hoje);
+  const pagosHoje=deHoje.filter(p=>p.status_pagamento==='PAGO');
+  $('#pedidosHoje').textContent=deHoje.length;
+  $('#faturamentoHoje').textContent=money(pagosHoje.reduce((a,p)=>a+Number(p.valor_total_centavos||0),0));
+  $('#pedidosPendentes').textContent=pedidos.filter(p=>p.status_pagamento==='PENDENTE').length;
+  const novos=pedidos.filter(p=>p.status_pagamento==='PAGO' && p.status_pedido==='NOVO').length;
+  $('#pedidosBadge').textContent=novos?`(${novos})`:'';
+
+  const encerrado=p=>['ENTREGUE','CANCELADO'].includes(p.status_pedido);
+  let lista=pedidos.filter(p=>visualizarHistoricoPedidos?encerrado(p):!encerrado(p));
+  if(!visualizarHistoricoPedidos){
+    const prioridade=p=>p.status_pagamento==='PAGO'&&p.status_pedido==='NOVO'?0:p.status_pagamento==='PAGO'&&p.status_pedido==='PREPARANDO'?1:p.status_pagamento==='PAGO'&&p.status_pedido==='PRONTO'?2:p.status_pagamento==='PENDENTE'?3:4;
+    lista=[...lista].sort((a,b)=>prioridade(a)-prioridade(b)||b.id-a.id);
+  }
+
+  const fila=$('#verFilaPedidos'), hist=$('#verHistoricoPedidos');
+  if(fila) fila.classList.toggle('active',!visualizarHistoricoPedidos);
+  if(hist) hist.classList.toggle('active',visualizarHistoricoPedidos);
+
+  $('#ordersList').innerHTML=lista.map(p=>{
+    const pay=p.status_pagamento==='PAGO'?'Pago':p.status_pagamento==='PENDENTE'?'Aguardando':'Erro';
+    const payClass=p.status_pagamento==='PAGO'?'pay-ok':p.status_pagamento==='PENDENTE'?'pay-pending':'pay-error';
+    const when=p.criado_em?new Date(String(p.criado_em).replace(' ','T')+'Z').toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
+    const op=(p.status_pedido||'NOVO');
+    const isNew=p.status_pagamento==='PAGO'&&op==='NOVO';
+    return `<div class="order-row ${isNew?'order-new':''}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${esc(p.produto_nome)} · ${p.quantidade}x · ${esc(p.cliente_email)}${p.cliente_whatsapp?' · '+esc(formatPhone(p.cliente_whatsapp)):''}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento==='PAGO'?`<span class="badge operational-badge">${op[0]+op.slice(1).toLowerCase()}</span>`:''}<span class="badge">${when}</span></div>${p.observacao?`<small>Obs.: ${esc(p.observacao)}</small>`:''}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em?'Pago em '+esc(p.pago_em):esc(p.mp_status_detail||'')}</small></div><div class="order-actions"><select class="order-status" onchange="setOrderStatus(${p.id},this.value)" ${p.status_pagamento==='PAGO'?'':'disabled title="Aguardando confirmação do pagamento"'}>${['NOVO','PREPARANDO','PRONTO','ENTREGUE','CANCELADO'].map(x=>`<option value="${x}" ${op===x?'selected':''}>${x[0]+x.slice(1).toLowerCase()}</option>`).join('')}</select><button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
+  }).join('')||`<p class="muted">${visualizarHistoricoPedidos?'Nenhum pedido concluído ou cancelado ainda.':'Nenhum pedido na fila atual.'}</p>`;
+}
+const verFilaPedidos=$('#verFilaPedidos'); if(verFilaPedidos) verFilaPedidos.onclick=()=>{visualizarHistoricoPedidos=false;renderOrders()};
+const verHistoricoPedidos=$('#verHistoricoPedidos'); if(verHistoricoPedidos) verHistoricoPedidos.onclick=()=>{visualizarHistoricoPedidos=true;renderOrders()};
+function formatPhone(value){
+  let d=String(value||'').replace(/\D/g,'');
+  if(d.startsWith('55')&&d.length>=12)d=d.slice(2);
+  if(d.length===11)return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if(d.length===10)return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return value||'Não informado';
+}
+function closeOrderDetail(){const o=$('#orderDetailOverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true')}}
+window.openOrderDetail=id=>{
+  const p=pedidos.find(x=>Number(x.id)===Number(id)); if(!p)return;
+  const op=p.status_pedido||'NOVO';
+  $('#orderDetailTitle').textContent=`Pedido #${p.id} · ${p.cliente_nome}`;
+  $('#orderDetailSubtitle').textContent=`${p.tipo_entrega==='RETIRADA'||!p.tipo_entrega?'Retirada':'Entrega'} · ${p.status_pagamento==='PAGO'?'Pagamento confirmado':p.status_pagamento==='PENDENTE'?'Aguardando pagamento':'Erro no pagamento'}`;
+  $('#orderDetailBody').innerHTML=`<div class="order-detail-grid">
+    <div class="order-detail-box"><small>WhatsApp</small><strong>${esc(formatPhone(p.cliente_whatsapp))}</strong></div>
+    <div class="order-detail-box"><small>E-mail</small><strong>${esc(p.cliente_email)}</strong></div>
+    <div class="order-detail-box"><small>Pedido</small><strong>${p.quantidade}× ${esc(p.produto_nome)}</strong></div>
+    <div class="order-detail-box"><small>Total</small><strong>${money(p.valor_total_centavos)}</strong></div>
+    <div class="order-detail-box"><small>Pagamento</small><strong>${esc(p.status_pagamento)} · ${esc(p.metodo_pagamento)}</strong></div>
+    <div class="order-detail-box"><small>Andamento</small><strong>${esc(op[0]+op.slice(1).toLowerCase())}</strong></div>
+    <div class="order-detail-box"><small>Recebimento</small><strong>Retirada</strong></div>
+    <div class="order-detail-box"><small>Pago em</small><strong>${esc(p.pago_em||'Ainda não confirmado')}</strong></div>
+  </div>${p.observacao?`<div class="order-detail-note"><strong>Observação:</strong> ${esc(p.observacao)}</div>`:''}`;
+  const digits=String(p.cliente_whatsapp||'').replace(/\D/g,'');
+  const textoWhats=op==='PRONTO'?`Olá, ${p.cliente_nome}! 💗 Seu pedido #${p.id} da R&P Doces está pronto para retirada.`:`Olá, ${p.cliente_nome}! 💗 Estamos entrando em contato sobre o seu pedido #${p.id} da R&P Doces.`;
+  const msg=encodeURIComponent(textoWhats);
+  $('#orderDetailActions').innerHTML=(digits?`<a class="btn" href="https://wa.me/${digits}?text=${msg}" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>`:'')+`<button class="btn secondary" type="button" onclick="closeOrderDetail()">Fechar</button>`;
+  const o=$('#orderDetailOverlay');o.classList.add('open');o.setAttribute('aria-hidden','false');
+};
+window.closeOrderDetail=closeOrderDetail;
+const orderDetailClose=$('#orderDetailClose');if(orderDetailClose)orderDetailClose.onclick=closeOrderDetail;
+const orderDetailOverlay=$('#orderDetailOverlay');if(orderDetailOverlay)orderDetailOverlay.onclick=e=>{if(e.target===orderDetailOverlay)closeOrderDetail()};
+
+window.setOrderStatus=async(id,status)=>{try{await api('/api/admin/orders/'+id,{method:'PUT',body:JSON.stringify({status_pedido:status})});toast('Status do pedido atualizado');await loadOrders()}catch(e){alert(e.message)}};
+const atualizarPedidos=$('#atualizarPedidos'); if(atualizarPedidos) atualizarPedidos.onclick=loadOrders;
 let mostrarArquivados=false;
 function renderProducts(){
   const lista=produtos.filter(p=>mostrarArquivados ? !p.ativo : p.ativo);
@@ -875,12 +969,15 @@ init();
 (function(){
   let ultimoSyncAdmin = 0;
   async function sincronizarAdmin(){
-    if (document.hidden || !window.me) return;
+    if (document.hidden || typeof me === 'undefined' || !me) return;
     const agora = Date.now();
     if (agora - ultimoSyncAdmin < 700) return;
     ultimoSyncAdmin = agora;
     try {
       if (typeof loadProducts === 'function') await loadProducts();
+      // Pedidos ficam sincronizados mesmo quando outra aba do admin está aberta.
+      // Assim o badge de novos pedidos muda sozinho sem depender do botão Atualizar.
+      if (typeof loadOrders === 'function') await loadOrders();
       const tabUsuarios = document.querySelector('[data-tab="usuarios"]');
       if (tabUsuarios && tabUsuarios.classList.contains('active') && typeof loadUsers === 'function') {
         await loadUsers();
