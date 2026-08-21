@@ -831,6 +831,7 @@ button, a, .flavor-card { -webkit-tap-highlight-color: transparent; }
 }
 .rp-mobile-cta.show{transform:none;opacity:1;pointer-events:auto}
 body.rp-modal-open .rp-mobile-cta{opacity:0!important;pointer-events:none!important}
+body.rp-mobile-cta-visible .whats-float{bottom:calc(80px + env(safe-area-inset-bottom));transition:bottom .25s ease}
 
 @media(max-width:720px){
   .pedido-overlay{padding:0;align-items:flex-end}
@@ -2420,11 +2421,17 @@ carregarCardapioDinamico();
   if (!destino) { cta.remove(); return; }
 
   function atualizar(){
-    if (innerWidth > 720) return cta.classList.remove('show');
+    if (innerWidth > 720) {
+      cta.classList.remove('show');
+      document.body.classList.remove('rp-mobile-cta-visible');
+      return;
+    }
     const r = destino.getBoundingClientRect();
     const passouHero = scrollY > Math.min(innerHeight * .55, 420);
     const estaNoCardapio = r.top < innerHeight * .72 && r.bottom > 90;
-    cta.classList.toggle('show', passouHero && !estaNoCardapio);
+    const mostrar = passouHero && !estaNoCardapio;
+    cta.classList.toggle('show', mostrar);
+    document.body.classList.toggle('rp-mobile-cta-visible', mostrar);
   }
   cta.addEventListener('click', () => destino.scrollIntoView({behavior:'smooth',block:'start'}));
   addEventListener('scroll', atualizar, {passive:true});
