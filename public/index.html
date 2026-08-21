@@ -1520,7 +1520,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <h2>Escolha seu sabor favorito</h2>
 <p>Clique em um sabor para conversar com a gente no WhatsApp e fazer seu pedido.</p>
 </div>
-<div class="menu-category" id="menu-category-bolo">
+<div class="menu-category">
 <h3 class="menu-category-title">🍰 Bolo no Pote</h3>
 <div class="category-photos">
 <div class="photo-card"><img alt="Bolo no pote R&amp;P Doces" src="/assets/images/rp-image-03.webp"/ decoding="async" loading="lazy"></div>
@@ -1539,7 +1539,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
       </div>
     </div>
 </div>
-<div class="menu-category" id="menu-category-pudim">
+<div class="menu-category">
 <h3 class="menu-category-title">🍮 Mini Pudim</h3>
 <div class="category-photos">
 <div class="photo-card"><img alt="Mini pudim R&amp;P Doces" src="/assets/images/rp-image-05.webp"/ decoding="async" loading="lazy"></div>
@@ -2019,12 +2019,8 @@ async function carregarCardapioDinamico(){
     if (!produtos.length) {
       boloGrid.classList.remove('is-loading');
       pudimGrid.classList.remove('is-loading');
-      boloGrid.replaceChildren();
-      pudimGrid.replaceChildren();
-      const boloCategory = document.getElementById('menu-category-bolo');
-      const pudimCategory = document.getElementById('menu-category-pudim');
-      if (boloCategory) boloCategory.hidden = true;
-      if (pudimCategory) pudimCategory.hidden = true;
+      boloGrid.innerHTML = '<p class="muted">Nenhum sabor disponível no momento.</p>';
+      pudimGrid.innerHTML = '<p class="muted">Nenhum sabor disponível no momento.</p>';
       if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
       return;
     }
@@ -2068,22 +2064,10 @@ async function carregarCardapioDinamico(){
 
     window.rpCriarCardProduto = card;
 
-    // Separa as categorias de forma explícita. Nunca reutiliza produtos de bolo
-    // como fallback visual da seção de mini pudim.
-    const bolos = produtos.filter(p => p.categoria === 'BOLO_NO_POTE');
-    const pudins = produtos.filter(p => p.categoria === 'MINI_PUDIM');
-
-    const boloCategory = document.getElementById('menu-category-bolo');
-    const pudimCategory = document.getElementById('menu-category-pudim');
-
     boloGrid.classList.remove('is-loading');
-    boloGrid.replaceChildren(...bolos.map(card));
-    if (boloCategory) boloCategory.hidden = bolos.length === 0;
-
+    boloGrid.replaceChildren(...produtos.filter(p => p.categoria === 'BOLO_NO_POTE').map(card));
     pudimGrid.classList.remove('is-loading');
-    pudimGrid.replaceChildren(...pudins.map(card));
-    if (pudimCategory) pudimCategory.hidden = pudins.length === 0;
-
+    pudimGrid.replaceChildren(...produtos.filter(p => p.categoria === 'MINI_PUDIM').map(card));
     if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
   } catch (err) {
     console.info('Cardápio usando fallback local.');
@@ -2600,43 +2584,11 @@ window.rpPwaStatus = async function(){
         makeHeader(track,cat==='pudins'?'Mini Pudins':'Bolos no Pote',cat);
       });
 
-      // Queridinhos: clones visuais dos destaques, sem retirar o card de sua categoria.
-      const produtosApi=Array.isArray(window.RP_PRODUTOS) ? window.RP_PRODUTOS : [];
-      const featuredProdutos=produtosApi.filter(p=>!!p.destaque);
-      const featured=typeof window.rpCriarCardProduto==='function'
-        ? featuredProdutos.map(p=>window.rpCriarCardProduto(p))
-        : [];
-      let sec=document.getElementById('queridinhosSection');
-      if(featured.length){
-        if(!sec){
-          sec=document.createElement('section');sec.id='queridinhosSection';sec.className='rp-vitrine-section has-items';
-          sec.innerHTML='<div class="rp-vitrine-head"><h3>Queridinhos 💗</h3><button class="rp-see-all" type="button">Ver todos →</button></div><div class="rp-track-wrap"><div id="queridinhosTrack" class="rp-product-track"></div></div>';
-          const cardapioHeading = [...document.querySelectorAll('section')].find(s =>
-            /CARDÁPIO/i.test(s.textContent || '') && /Escolha seu sabor favorito/i.test(s.textContent || '')
-          );
-
-          const firstMenuSection = document.getElementById('menu-grid-bolo')?.closest('section');
-
-          if (cardapioHeading && cardapioHeading.parentNode) {
-            // Queridinhos entra DEPOIS do bloco introdutório do cardápio.
-            cardapioHeading.parentNode.insertBefore(sec, cardapioHeading.nextSibling);
-          } else if (firstMenuSection?.parentNode) {
-            firstMenuSection.parentNode.insertBefore(sec, firstMenuSection);
-          } else {
-            document.body.appendChild(sec);
-          }
-          sec.querySelector('.rp-see-all').onclick=()=>openAll('Queridinhos 💗','todos');
-        }
-        sec.classList.add('has-items');
-        const tr=sec.querySelector('#queridinhosTrack');
-        const featuredCards=featured.slice(0,8);
-        featuredCards.forEach(card=>{
-          card.classList.remove('rp-reveal');
-          card.classList.add('rp-visible');
-          card.style.transitionDelay='';
-        });
-        tr.replaceChildren(...featuredCards);
-      } else if(sec) sec.classList.remove('has-items');
+      // A vitrine de "Queridinhos" foi removida da home.
+      // Ela criava uma segunda faixa de cards abaixo do cardápio, duplicando
+      // produtos já exibidos e gerando os "cards de baixo" sem contexto.
+      const sec = document.getElementById('queridinhosSection');
+      if (sec) sec.remove();
     }
     observerBusy=false;
   }
