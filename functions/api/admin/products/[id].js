@@ -12,9 +12,12 @@ export async function onRequestPut({ request, env, params }) {
   const descricao = String(p?.descricao || "").trim();
   const preco = Number(p?.preco_centavos);
   const emoji = String(p?.emoji || "").trim().slice(0, 8);
+  const nomeValido = nome.length >= 1 && nome.length <= 100;
+  const descricaoValida = descricao.length <= 500;
+  const precoValido = Number.isInteger(preco) && preco >= 0 && preco <= 10000000; // até R$ 100.000,00
 
-  if (!Number.isInteger(id) || !nome || !["BOLO_NO_POTE","MINI_PUDIM"].includes(categoria) ||
-      !Number.isInteger(preco) || preco < 0)
+  if (!Number.isInteger(id) || !nomeValido || !descricaoValida ||
+      !["BOLO_NO_POTE","MINI_PUDIM"].includes(categoria) || !precoValido)
     return json({ erro: "Dados inválidos." }, 400);
 
   await env.DB.prepare(`

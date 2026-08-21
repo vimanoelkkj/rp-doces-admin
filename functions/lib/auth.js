@@ -2,7 +2,7 @@ import { json } from "./http.js";
 
 const COOKIE = "rp_admin_session";
 const SESSION_DAYS = 7;
-const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_ITERATIONS = 310000;
 
 function bytesToHex(bytes) {
   return [...new Uint8Array(bytes)]

@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rp-doces",
+  "compatibility_date": "2026-08-20",
+  "pages_build_output_dir": "public",
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rp-doces-db",
+      "database_id": "c2e15599-3d68-4801-9a1c-96a84977dd7c",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
