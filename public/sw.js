@@ -1,5 +1,5 @@
-const CACHE='rp-doces-shell-v3';
-const SHELL=['/','/manifest.webmanifest','/pwa-192.png','/pwa-512.png'];
+const CACHE='rp-doces-shell-v4';
+const SHELL=['/','/manifest.webmanifest','/pwa-192.png','/pwa-512.png','/notification-badge.png'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
@@ -39,7 +39,7 @@ self.addEventListener('push', event => {
   event.waitUntil(self.registration.showNotification(data.title || 'R&P Doces', {
     body:data.body || 'Você recebeu uma nova atualização.',
     icon:'/pwa-192.png',
-    badge:'/admin-favicon.png',
+    badge:'/notification-badge.png',
     tag:data.tag || 'rp-doces',
     renotify:true,
     data:{url:data.url || '/admin/'}
