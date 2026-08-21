@@ -1,0 +1,19 @@
+CREATE TABLE IF NOT EXISTS push_inscricoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usuario_id INTEGER NOT NULL,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (usuario_id) REFERENCES usuarios_admin(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_inscricoes_usuario ON push_inscricoes(usuario_id);
+
+CREATE TABLE IF NOT EXISTS push_eventos (
+  pedido_id INTEGER PRIMARY KEY,
+  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE
+);

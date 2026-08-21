@@ -1,6 +1,7 @@
 import { json } from "../../lib/http.js";
 import { mpRequest, mpOrderToLocalStatus } from "../../lib/mercadoPago.js";
 import { baixarEstoquePedido } from "../../lib/stock.js";
+import { notifyPaidOrder } from "../../lib/push.js";
 
 export async function onRequestGet({ params, env }) {
   const token = String(params.token || "");
@@ -31,6 +32,7 @@ export async function onRequestGet({ params, env }) {
       if (statusLocal === "PAGO") {
         const estoque = await baixarEstoquePedido(env, pedido.id);
         if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", pedido.id);
+        await notifyPaidOrder(env, pedido.id);
       }
     } catch (err) {
       console.error("Mercado Pago get order:", err?.status, err?.message);

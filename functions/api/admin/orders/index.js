@@ -1,6 +1,7 @@
 import { json } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
 import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../../lib/mercadoPago.js";
+import { notifyPaidOrder } from "../../../lib/push.js";
 
 const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
@@ -47,6 +48,7 @@ async function reconcilePendingOrders(env) {
         localStatus,
         pedido.id
       ).run();
+      if (localStatus === 'PAGO') await notifyPaidOrder(env, pedido.id);
     } catch (err) {
       // A reconciliação é uma rede de segurança. Falha ao consultar o MP não
       // deve derrubar a tela administrativa nem gerar uma tempestade de retries.

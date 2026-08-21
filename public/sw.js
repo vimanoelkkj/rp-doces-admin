@@ -1,4 +1,4 @@
-const CACHE='rp-doces-shell-v2';
+const CACHE='rp-doces-shell-v3';
 const SHELL=['/','/manifest.webmanifest','/pwa-192.png','/pwa-512.png'];
 
 self.addEventListener('install',event=>{
@@ -31,4 +31,29 @@ self.addEventListener('fetch',event=>{
       return res;
     }).catch(()=>caches.match(req).then(r=>r || caches.match('/')))
   );
+});
+
+self.addEventListener('push', event => {
+  let data={};
+  try { data=event.data ? event.data.json() : {}; } catch { data={body:event.data?.text?.()||''}; }
+  event.waitUntil(self.registration.showNotification(data.title || 'R&P Doces', {
+    body:data.body || 'Você recebeu uma nova atualização.',
+    icon:'/pwa-192.png',
+    badge:'/admin-favicon.png',
+    tag:data.tag || 'rp-doces',
+    renotify:true,
+    data:{url:data.url || '/admin/'}
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target=new URL(event.notification.data?.url || '/admin/', self.location.origin).href;
+  event.waitUntil((async()=>{
+    const windows=await clients.matchAll({type:'window',includeUncontrolled:true});
+    for(const client of windows){
+      if(new URL(client.url).origin===self.location.origin){ await client.navigate(target); return client.focus(); }
+    }
+    return clients.openWindow(target);
+  })());
 });

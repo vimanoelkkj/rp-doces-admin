@@ -462,6 +462,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 .order-status-option[aria-selected="true"]{background:#fff4f8;color:#b83f69;font-weight:700}
 .order-status-option[aria-selected="true"]::after{content:'✓';color:var(--pink2);font-weight:800}
 @media(max-width:720px){.order-status-menu{left:0;right:auto;min-width:210px}}
+.top-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.push-active{background:#effaf3!important;border-color:#bfe7cb!important;color:#237a43!important}@media(max-width:640px){.top-actions{justify-content:flex-end}.top-actions .btn{white-space:nowrap}}
 </style>
 </head>
 <body>
@@ -501,7 +502,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
   <main id="appView" class="hidden">
     <div class="top">
       <div class="brand">R&P Doces <small id="who"></small></div>
-      <div><a class="btn secondary" href="/" style="text-decoration:none">Ver site</a> <button class="btn secondary" id="logoutBtn">Sair</button></div>
+      <div class="top-actions"><button class="btn secondary" id="pushBtn" type="button">🔔 Notificações</button> <a class="btn secondary" href="/" style="text-decoration:none">Ver site</a> <button class="btn secondary" id="logoutBtn">Sair</button></div>
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="produtos">Cardápio</button>
@@ -814,7 +815,7 @@ async function init(){
   if(reset){show('resetView');return}
   const setup=await api('/api/setup');
   if(setup.needsSetup){show('setupView');return}
-  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}${me.papel==='OWNER'?' • Mestre':''}`;show('appView');await Promise.all([loadProducts(),loadUsers(),loadOrders()])}
+  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}${me.papel==='OWNER'?' • Mestre':''}`;show('appView');await Promise.all([loadProducts(),loadUsers(),loadOrders()]);await getPushState()}
   catch{show('loginView')}
 }
 
@@ -826,6 +827,46 @@ if (el_setupBtn) el_setupBtn.onclick = async()=>{try{
 const el_loginBtn = $('#loginBtn');
 if (el_loginBtn) el_loginBtn.onclick = async()=>{try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:$('#loginUsername').value,senha:$('#loginSenha').value})});location.reload()}catch(e){$('#loginMsg').textContent=e.message}};
 ['loginUsername','loginSenha'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#loginBtn').click()}}));
+
+function urlB64ToUint8Array(value){
+  const padding='='.repeat((4-value.length%4)%4);
+  const base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64); return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+async function getPushState(){
+  const btn=$('#pushBtn'); if(!btn)return;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){
+    btn.textContent='🔕 Push indisponível'; btn.disabled=true; return;
+  }
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    btn.textContent=sub?'🔔 Notificações ativas':'🔔 Ativar notificações';
+    btn.classList.toggle('push-active',!!sub);
+  }catch{btn.textContent='🔔 Ativar notificações'}
+}
+const el_pushBtn=$('#pushBtn');
+if(el_pushBtn) el_pushBtn.onclick=async()=>{
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window))throw new Error('Este navegador não oferece notificações push.');
+    const cfg=await api('/api/admin/push/config');
+    if(!cfg.supported||!cfg.publicKey)throw new Error('As notificações ainda não foram configuradas no servidor.');
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(sub){
+      await api('/api/admin/push/subscribe',{method:'DELETE',body:JSON.stringify({endpoint:sub.endpoint})});
+      await sub.unsubscribe(); toast('Notificações desativadas neste dispositivo.');
+    }else{
+      const permission=await Notification.requestPermission();
+      if(permission!=='granted')throw new Error('Permissão de notificações não concedida.');
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8Array(cfg.publicKey)});
+      await api('/api/admin/push/subscribe',{method:'POST',body:JSON.stringify(sub.toJSON())});
+      toast('Notificações ativadas neste dispositivo. 🔔');
+    }
+    await getPushState();
+  }catch(e){toast(e.message||'Não foi possível configurar as notificações.','error')}
+};
+
 const el_logoutBtn = $('#logoutBtn');
 if (el_logoutBtn) el_logoutBtn.onclick = async()=>{await api('/api/auth/logout',{method:'POST',body:'{}'});location.reload()};
 const el_forgotBtn = $('#forgotBtn');
