@@ -28,6 +28,8 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 .user{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 0;border-bottom:1px solid #ffe8f0}.user:last-child{border:0}.user strong{display:block;color:var(--brown)}.user small{color:var(--muted)}
 .orders-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}.orders-summary .card{padding:16px}.orders-summary small{display:block;color:var(--muted);font-weight:700}.orders-summary strong{display:block;font-size:1.55rem;color:var(--brown);margin-top:4px}.orders-list{display:grid;gap:10px}.order-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:14px;align-items:center;padding:15px 0;border-bottom:1px solid #ffe8f0}.order-row:last-child{border:0}.order-main strong,.order-total strong{color:var(--brown)}.order-main small,.order-total small{display:block;color:var(--muted);margin-top:4px}.order-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.order-status{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;color:var(--brown);font:inherit}.pay-ok{background:#eaf8ee;color:#26723b}.pay-pending{background:#fff5d9;color:#8a6510}.pay-error{background:#fff0f2;color:#a33a4a}.orders-view-toggle{display:flex;gap:8px;margin:0 0 12px}.orders-view-toggle .btn.active{background:var(--pink);color:#fff;border-color:var(--pink)}.order-row.order-new{background:#fff8fb;border:1px solid #ffd7e6;border-radius:14px;padding:15px 12px}.order-row.order-new+.order-row{border-top:0}.operational-badge{background:#f6f1ff;color:#6b4aa0}.order-detail-overlay{position:fixed;inset:0;background:rgba(55,30,34,.48);z-index:10020;display:none;align-items:center;justify-content:center;padding:20px}.order-detail-overlay.open{display:flex}.order-detail-modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 24px 80px rgba(64,31,38,.2);position:relative}.order-detail-close{position:absolute;right:14px;top:10px;border:0;background:transparent;font-size:28px;color:var(--brown);cursor:pointer}.order-detail-modal h3{margin:0 38px 5px 0;color:var(--brown)}.order-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.order-detail-box{padding:12px;border:1px solid #ffe2ec;border-radius:12px;background:#fffafb}.order-detail-box small{display:block;color:var(--muted);font-weight:700;margin-bottom:4px}.order-detail-box strong{color:var(--brown);overflow-wrap:anywhere}.order-detail-note{padding:12px;border-radius:12px;background:#fff8fb;color:var(--brown);margin:12px 0}.order-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}@media(max-width:560px){.order-detail-grid{grid-template-columns:1fr}}@media(max-width:720px){.orders-summary{grid-template-columns:1fr}.order-row{grid-template-columns:1fr}.order-actions{display:flex;justify-content:flex-start}}
 @media(max-width:620px){.top{align-items:flex-start}.toolbar{align-items:flex-start;flex-direction:column}.user{align-items:flex-start;flex-direction:column}}
+
+.promo-schedule{display:grid;gap:12px;margin:14px 0}.promo-schedule-block{border:1px solid #ffe0eb;border-radius:16px;background:#fffafb;padding:14px}.promo-schedule-title{display:block;color:var(--brown);font-size:.86rem;font-weight:700;margin-bottom:9px}.promo-choice{display:flex!important;align-items:flex-start;gap:9px;padding:9px 10px;margin:4px 0!important;border-radius:11px;cursor:pointer}.promo-choice:hover{background:#fff2f6}.promo-choice input{width:auto!important;margin:3px 0 0;accent-color:var(--pink2)}.promo-choice span{display:block}.promo-choice strong{display:block;color:var(--brown);font-size:.84rem}.promo-choice small{display:block;color:var(--muted);font-size:.74rem;font-weight:400;margin-top:2px}.promo-date-time{display:grid;grid-template-columns:1.35fr .8fr;gap:10px;padding:5px 10px 2px}.promo-date-time .field{margin:5px 0}.promo-summary{border:1px solid #ffd5e4;background:#fff3f7;border-radius:14px;padding:12px 14px;color:var(--brown);font-size:.82rem;line-height:1.55}.promo-summary strong{color:var(--pink2)}@media(max-width:520px){.promo-date-time{grid-template-columns:1fr}}
 </style>
 
 <link rel="icon" type="image/png" href="/admin-favicon.png">
@@ -607,8 +609,27 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     <div class="switchrow"><label><input id="pPromocaoAtiva" type="checkbox"> Ativar promoção</label></div>
     <div id="promoFields" style="display:none">
       <div class="field"><label>Preço promocional</label><input id="pPrecoPromo" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off"><small class="muted">Deve ser menor que o preço normal.</small></div>
-      <div class="field"><label>Início da promoção <span class="muted">(opcional)</span></label><input id="pPromoInicio" type="datetime-local"></div>
-      <div class="field"><label>Fim da promoção <span class="muted">(opcional)</span></label><input id="pPromoFim" type="datetime-local"></div>
+      <div class="promo-schedule">
+        <div class="promo-schedule-block">
+          <span class="promo-schedule-title">Início da promoção</span>
+          <label class="promo-choice"><input type="radio" name="pPromoInicioModo" value="agora" checked> <span><strong>Começar agora</strong><small>A promoção entra em vigor assim que você salvar.</small></span></label>
+          <label class="promo-choice"><input type="radio" name="pPromoInicioModo" value="agendar"> <span><strong>Agendar início</strong><small>Escolha o dia e o horário.</small></span></label>
+          <div class="promo-date-time hidden" id="pPromoInicioAgenda">
+            <div class="field"><label>Data</label><input id="pPromoInicioData" type="date"></div>
+            <div class="field"><label>Hora</label><input id="pPromoInicioHora" type="time" value="09:00"></div>
+          </div>
+        </div>
+        <div class="promo-schedule-block">
+          <span class="promo-schedule-title">Fim da promoção</span>
+          <label class="promo-choice"><input type="radio" name="pPromoFimModo" value="sem_fim" checked> <span><strong>Sem data para terminar</strong><small>Você pode desativar a promoção quando quiser.</small></span></label>
+          <label class="promo-choice"><input type="radio" name="pPromoFimModo" value="agendar"> <span><strong>Definir término</strong><small>Escolha quando o preço promocional deve acabar.</small></span></label>
+          <div class="promo-date-time hidden" id="pPromoFimAgenda">
+            <div class="field"><label>Data</label><input id="pPromoFimData" type="date"></div>
+            <div class="field"><label>Hora</label><input id="pPromoFimHora" type="time" value="23:59"></div>
+          </div>
+        </div>
+        <div class="promo-summary" id="pPromoResumo"></div>
+      </div>
     </div>
     <div class="field"><label>Estoque</label><input id="pEstoque" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="0"><small class="muted">Ao chegar a zero, o produto fica esgotado automaticamente.</small></div>
     <div class="field"><label>Emoji</label><select id="pEmoji">
@@ -889,12 +910,16 @@ window.restoreProduct=async id=>{
 
 const el_novoProduto = $('#novoProduto');
 if (el_novoProduto) el_novoProduto.onclick = ()=>openProduct();
-function promoLocalValue(v){if(!v)return '';const d=new Date(v);if(!Number.isFinite(d.getTime()))return '';const pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
-function promoIsoValue(v){if(!v)return null;const d=new Date(v);return Number.isFinite(d.getTime())?d.toISOString():null}
-function togglePromoFields(){const on=$('#pPromocaoAtiva').checked;$('#promoFields').style.display=on?'block':'none'}
+function promoParts(v){if(!v)return {data:'',hora:''};const d=new Date(v);if(!Number.isFinite(d.getTime()))return {data:'',hora:''};const pad=n=>String(n).padStart(2,'0');return {data:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,hora:`${pad(d.getHours())}:${pad(d.getMinutes())}`}}
+function promoIsoFromParts(data,hora){if(!data)return null;const d=new Date(`${data}T${hora||'00:00'}`);return Number.isFinite(d.getTime())?d.toISOString():null}
+function promoRadio(name){return document.querySelector(`input[name="${name}"]:checked`)?.value}
+function setPromoRadio(name,value){const el=document.querySelector(`input[name="${name}"][value="${value}"]`);if(el)el.checked=true}
+function promoPretty(data,hora){if(!data)return '';const [a,m,d]=data.split('-');return `${d}/${m}/${a} às ${hora||'00:00'}`}
+function updatePromoSchedule(){const inicioAgendado=promoRadio('pPromoInicioModo')==='agendar';const fimAgendado=promoRadio('pPromoFimModo')==='agendar';$('#pPromoInicioAgenda').classList.toggle('hidden',!inicioAgendado);$('#pPromoFimAgenda').classList.toggle('hidden',!fimAgendado);const inicio=inicioAgendado?promoPretty($('#pPromoInicioData').value,$('#pPromoInicioHora').value):'agora';const fim=fimAgendado?promoPretty($('#pPromoFimData').value,$('#pPromoFimHora').value):'sem data para terminar';$('#pPromoResumo').innerHTML=`💗 <strong>Promoção programada</strong><br>${inicioAgendado?'Começa em '+inicio:'Começa agora'} • ${fimAgendado?'termina em '+fim:fim}.`}
+function togglePromoFields(){const on=$('#pPromocaoAtiva').checked;$('#promoFields').style.display=on?'block':'none';if(on)updatePromoSchedule()}
 function openProduct(p=null){
   $('#pId').value=p?.id||'';$('#pNome').value=p?.nome||'';$('#pCategoria').value=p?.categoria||'BOLO_NO_POTE';$('#pDescricao').value=p?.descricao||'';$('#pPreco').value=p?precoInput(p.preco_centavos):'';$('#pEstoque').value=p?Number(p.estoque)||0:0;$('#pEmoji').value=p?.emoji||(p?.categoria==='MINI_PUDIM'?'🍮':'🍰');$('#pDisponivel').checked=p?!!p.disponivel:true;$('#pAtivo').checked=p?!!p.ativo:true;$('#pDestaque').checked=p?!!p.destaque:false;
-  $('#pPromocaoAtiva').checked=p?!!p.promocao_ativa:false;$('#pPrecoPromo').value=p?.preco_promocional_centavos?precoInput(p.preco_promocional_centavos):'';$('#pPromoInicio').value=promoLocalValue(p?.promocao_inicio);$('#pPromoFim').value=promoLocalValue(p?.promocao_fim);togglePromoFields();
+  $('#pPromocaoAtiva').checked=p?!!p.promocao_ativa:false;$('#pPrecoPromo').value=p?.preco_promocional_centavos?precoInput(p.preco_promocional_centavos):'';const inicio=promoParts(p?.promocao_inicio),fim=promoParts(p?.promocao_fim);setPromoRadio('pPromoInicioModo',p?.promocao_inicio?'agendar':'agora');setPromoRadio('pPromoFimModo',p?.promocao_fim?'agendar':'sem_fim');$('#pPromoInicioData').value=inicio.data;$('#pPromoInicioHora').value=inicio.hora||'09:00';$('#pPromoFimData').value=fim.data;$('#pPromoFimHora').value=fim.hora||'23:59';togglePromoFields();
   $('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productMsg').textContent='';$('#productModal').classList.remove('hidden')
 }
 window.editProduct=id=>openProduct(produtos.find(p=>p.id===id));
@@ -902,10 +927,12 @@ window.delProduct=async id=>{if(!confirm('Arquivar este produto? Ele sairá do s
 $('#pPreco').addEventListener('input',formatPrecoField);
 $('#pPrecoPromo').addEventListener('input',()=>{const el=$('#pPrecoPromo');el.value=money(precoCentavos(el.value))});
 $('#pPromocaoAtiva').addEventListener('change',togglePromoFields);
+document.querySelectorAll('input[name="pPromoInicioModo"],input[name="pPromoFimModo"]').forEach(el=>el.addEventListener('change',updatePromoSchedule));
+['pPromoInicioData','pPromoInicioHora','pPromoFimData','pPromoFimHora'].forEach(id=>$('#'+id).addEventListener('input',updatePromoSchedule));
 $('#pPreco').addEventListener('focus',()=>{const el=$('#pPreco');if(!el.value)el.value=money(0);requestAnimationFrame(()=>el.setSelectionRange(el.value.length,el.value.length))});
 const el_saveProduct = $('#saveProduct');
 if (el_saveProduct) el_saveProduct.onclick = async()=>{try{
- const preco=precoCentavos($('#pPreco').value);const estoque=Math.max(0,Math.trunc(Number($('#pEstoque').value)||0));const promoAtiva=$('#pPromocaoAtiva').checked;const precoPromo=precoCentavos($('#pPrecoPromo').value);const payload={nome:$('#pNome').value,categoria:$('#pCategoria').value,descricao:$('#pDescricao').value,preco_centavos:preco,emoji:$('#pEmoji').value,estoque,disponivel:$('#pDisponivel').checked&&estoque>0,ativo:$('#pAtivo').checked,destaque:$('#pDestaque').checked,promocao_ativa:promoAtiva,preco_promocional_centavos:promoAtiva?precoPromo:null,promocao_inicio:promoAtiva?promoIsoValue($('#pPromoInicio').value):null,promocao_fim:promoAtiva?promoIsoValue($('#pPromoFim').value):null};
+ const preco=precoCentavos($('#pPreco').value);const estoque=Math.max(0,Math.trunc(Number($('#pEstoque').value)||0));const promoAtiva=$('#pPromocaoAtiva').checked;const precoPromo=precoCentavos($('#pPrecoPromo').value);const inicioAgendado=promoRadio('pPromoInicioModo')==='agendar';const fimAgendado=promoRadio('pPromoFimModo')==='agendar';if(promoAtiva&&inicioAgendado&&!$('#pPromoInicioData').value)throw new Error('Escolha a data de início da promoção.');if(promoAtiva&&fimAgendado&&!$('#pPromoFimData').value)throw new Error('Escolha a data de término da promoção.');const promoInicio=promoAtiva&&inicioAgendado?promoIsoFromParts($('#pPromoInicioData').value,$('#pPromoInicioHora').value):null;const promoFim=promoAtiva&&fimAgendado?promoIsoFromParts($('#pPromoFimData').value,$('#pPromoFimHora').value):null;if(promoInicio&&promoFim&&Date.parse(promoFim)<=Date.parse(promoInicio))throw new Error('O término da promoção precisa ser depois do início.');const payload={nome:$('#pNome').value,categoria:$('#pCategoria').value,descricao:$('#pDescricao').value,preco_centavos:preco,emoji:$('#pEmoji').value,estoque,disponivel:$('#pDisponivel').checked&&estoque>0,ativo:$('#pAtivo').checked,destaque:$('#pDestaque').checked,promocao_ativa:promoAtiva,preco_promocional_centavos:promoAtiva?precoPromo:null,promocao_inicio:promoInicio,promocao_fim:promoFim};
  const id=$('#pId').value;await api(id?'/api/admin/products/'+id:'/api/admin/products',{method:id?'PUT':'POST',body:JSON.stringify(payload)});$('#productModal').classList.add('hidden');await loadProducts()
 }catch(e){$('#productMsg').textContent=e.message}};
 
