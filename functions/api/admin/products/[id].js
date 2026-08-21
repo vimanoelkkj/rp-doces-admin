@@ -36,7 +36,16 @@ export async function onRequestDelete({ request, env, params }) {
   if (!Number.isSafeInteger(id) || id < 1) return json({ erro: "ID inválido." }, 400);
   const permanent = new URL(request.url).searchParams.get("permanent") === "1";
   if (permanent) {
+    const vinculos = await env.DB.prepare(
+      "SELECT COUNT(*) AS total FROM pedidos WHERE produto_id = ?"
+    ).bind(id).first();
+
     await env.DB.prepare("DELETE FROM produtos WHERE id = ?").bind(id).run();
+
+    return json({
+      ok: true,
+      pedidos_preservados: Number(vinculos?.total || 0)
+    });
   } else {
     await env.DB.prepare("UPDATE produtos SET ativo = 0, disponivel = 0, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?").bind(id).run();
   }

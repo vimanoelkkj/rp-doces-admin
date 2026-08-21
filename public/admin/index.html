@@ -401,6 +401,51 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="R&P Doces">
 
+
+<style id="rp-delete-modal-style">
+.rp-delete-overlay{position:fixed;inset:0;z-index:10050;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(55,30,34,.48);backdrop-filter:blur(6px)}
+.rp-delete-overlay.open{display:flex}
+.rp-delete-modal{width:min(440px,100%);background:#fff;border:1px solid #ffd9e5;border-radius:24px;padding:24px;box-shadow:0 28px 90px rgba(77,35,47,.24);text-align:left;animation:rpDeleteIn .18s ease-out}
+@keyframes rpDeleteIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+.rp-delete-icon{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;background:#fff0f4;color:#c43f63;font-size:24px;margin-bottom:16px}
+.rp-delete-modal h3{margin:0;color:var(--brown);font-size:1.18rem}
+.rp-delete-modal p{margin:9px 0 0;color:var(--muted);line-height:1.55}
+.rp-delete-product{margin:18px 0 0;padding:13px 14px;border:1px solid #ffe0e9;border-radius:14px;background:#fff9fb}
+.rp-delete-product small{display:block;color:var(--muted);font-size:.75rem;font-weight:700;margin-bottom:3px}
+.rp-delete-product strong{display:block;color:var(--brown);overflow-wrap:anywhere}
+.rp-delete-warning{display:flex;gap:9px;align-items:flex-start;margin:14px 0 0;padding:11px 12px;border-radius:12px;background:#fff5f6;color:#8f4052;font-size:.84rem;line-height:1.4}
+.rp-delete-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
+.rp-delete-actions .btn{min-width:112px}
+.rp-delete-confirm{background:#c94a68!important;border-color:#c94a68!important;color:#fff!important}
+.rp-delete-confirm:hover{filter:brightness(.96)}
+@media(max-width:520px){.rp-delete-modal{padding:20px}.rp-delete-actions{display:grid;grid-template-columns:1fr 1fr}.rp-delete-actions .btn{min-width:0}}
+
+.rp-confirm-icon.info{background:#fff4f8;color:#c04a6e}
+.rp-confirm-icon.warning{background:#fff4e8;color:#a9691f}
+.rp-confirm-icon.danger{background:#fff0f4;color:#c43f63}
+.rp-confirm-detail{margin:16px 0 0;padding:13px 14px;border:1px solid #ffe0e9;border-radius:14px;background:#fff9fb}
+.rp-confirm-detail small{display:block;color:var(--muted);font-size:.75rem;font-weight:700;margin-bottom:3px}
+.rp-confirm-detail strong{display:block;color:var(--brown);overflow-wrap:anywhere}
+.rp-confirm-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
+.rp-confirm-actions .btn{min-width:112px}
+@media(max-width:520px){.rp-confirm-actions{display:grid;grid-template-columns:1fr 1fr}.rp-confirm-actions .btn{min-width:0}}
+
+.order-status-select{position:relative;min-width:138px}
+.order-status-trigger{width:100%;min-height:40px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 11px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--brown);font:inherit;cursor:pointer;transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}
+.order-status-trigger:hover{border-color:#ffb3cf;background:#fff8fb}
+.order-status-select.open .order-status-trigger,.order-status-trigger:focus-visible{border-color:var(--pink);box-shadow:0 0 0 3px rgba(255,107,157,.12);outline:none}
+.order-status-trigger::after{content:'⌄';font-size:18px;line-height:1;color:#b85b7a;transition:transform .16s ease}
+.order-status-select.open .order-status-trigger::after{transform:rotate(180deg)}
+.order-status-trigger:disabled{opacity:.52;cursor:not-allowed;background:#fffafb}
+.order-status-menu{position:absolute;right:0;top:calc(100% + 7px);z-index:120;min-width:190px;padding:7px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:0 18px 45px rgba(106,61,77,.18);opacity:0;transform:translateY(-5px) scale(.985);pointer-events:none;transition:opacity .14s ease,transform .14s ease}
+.order-status-select.open .order-status-menu{opacity:1;transform:none;pointer-events:auto}
+.order-status-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 11px;border:0;border-radius:10px;background:transparent;color:var(--brown);font:inherit;text-align:left;cursor:pointer;transition:background .14s ease,color .14s ease,transform .14s ease}
+.order-status-option:hover{background:#fff0f6;color:#b83f69}
+.order-status-option:active{transform:scale(.985)}
+.order-status-option[aria-selected="true"]{background:#fff4f8;color:#b83f69;font-weight:700}
+.order-status-option[aria-selected="true"]::after{content:'✓';color:var(--pink2);font-weight:800}
+@media(max-width:720px){.order-status-menu{left:0;right:auto;min-width:210px}}
+</style>
 </head>
 <body>
 <div id="toastStack" aria-live="polite"></div>
@@ -459,7 +504,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
         <div class="card"><small>Faturamento pago hoje</small><strong id="faturamentoHoje">R$ 0,00</strong></div>
         <div class="card"><small>Aguardando pagamento</small><strong id="pedidosPendentes">0</strong></div>
       </div>
-      <div class="orders-view-toggle"><button class="btn secondary active" id="verFilaPedidos">Fila atual</button><button class="btn secondary" id="verHistoricoPedidos">Histórico</button></div>
+      <div class="orders-view-toggle"><button class="btn secondary active" id="verFilaPedidos">Fila atual</button><button class="btn secondary" id="verHistoricoPedidos">Histórico</button><button class="btn secondary" id="verArquivadosPedidos">Arquivados</button></div>
       <div class="card"><div id="ordersList" class="orders-list"></div></div>
     </section>
 
@@ -596,6 +641,40 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 
 
 </main>
+</div>
+
+
+<div class="rp-delete-overlay" id="deleteProductOverlay" aria-hidden="true">
+  <div class="rp-delete-modal" role="dialog" aria-modal="true" aria-labelledby="deleteProductTitle">
+    <div class="rp-delete-icon">🗑️</div>
+    <h3 id="deleteProductTitle">Excluir produto definitivamente?</h3>
+    <p>O produto será removido do cardápio e não poderá ser restaurado.</p>
+    <div class="rp-delete-product">
+      <small>Produto</small>
+      <strong id="deleteProductName">—</strong>
+    </div>
+    <div class="rp-delete-warning"><span>⚠️</span><span>Os pedidos antigos continuarão preservados no histórico, mesmo após a exclusão do produto.</span></div>
+    <div class="rp-delete-actions">
+      <button class="btn secondary" type="button" id="deleteProductCancel">Cancelar</button>
+      <button class="btn danger rp-delete-confirm" type="button" id="deleteProductConfirm">Excluir definitivamente</button>
+    </div>
+  </div>
+</div>
+
+<div class="rp-delete-overlay" id="genericConfirmOverlay" aria-hidden="true">
+  <div class="rp-delete-modal" role="dialog" aria-modal="true" aria-labelledby="genericConfirmTitle">
+    <div class="rp-delete-icon rp-confirm-icon warning" id="genericConfirmIcon">⚠️</div>
+    <h3 id="genericConfirmTitle">Confirmar ação?</h3>
+    <p id="genericConfirmText">Esta ação precisa da sua confirmação.</p>
+    <div class="rp-confirm-detail hidden" id="genericConfirmDetail">
+      <small id="genericConfirmDetailLabel">Item</small>
+      <strong id="genericConfirmDetailValue">—</strong>
+    </div>
+    <div class="rp-confirm-actions">
+      <button class="btn secondary" type="button" id="genericConfirmCancel">Cancelar</button>
+      <button class="btn" type="button" id="genericConfirmOk">Confirmar</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-bg hidden" id="productModal">
@@ -751,27 +830,57 @@ async function loadProducts(){const r=await api('/api/admin/products');produtos=
 async function loadOrders(){
   const r=await api('/api/admin/orders'); pedidos=r.pedidos||[]; renderOrders();
 }
-let visualizarHistoricoPedidos=false;
+let visualizacaoPedidos="fila";
+const ORDER_STATUSES=['NOVO','PREPARANDO','PRONTO','ENTREGUE','CANCELADO'];
+const orderStatusLabel=v=>v[0]+v.slice(1).toLowerCase();
+function renderOrderStatusSelect(p,op){
+  const disabled=p.status_pagamento!=='PAGO';
+  return `<div class="order-status-select ${disabled?'is-disabled':''}" data-order-id="${p.id}">
+    <button class="order-status-trigger" type="button" ${disabled?'disabled title="Aguardando confirmação do pagamento"':''} onclick="toggleOrderStatusMenu(event,${p.id})">${orderStatusLabel(op)}</button>
+    <div class="order-status-menu" role="listbox">
+      ${ORDER_STATUSES.map(x=>`<button class="order-status-option" type="button" role="option" aria-selected="${op===x}" onclick="chooseOrderStatus(event,${p.id},'${x}')">${orderStatusLabel(x)}</button>`).join('')}
+    </div>
+  </div>`;
+}
+window.toggleOrderStatusMenu=(event,id)=>{
+  event.stopPropagation();
+  const root=event.currentTarget.closest('.order-status-select');
+  if(!root || event.currentTarget.disabled)return;
+  document.querySelectorAll('.order-status-select.open').forEach(x=>{if(x!==root)x.classList.remove('open')});
+  root.classList.toggle('open');
+};
+window.chooseOrderStatus=async(event,id,status)=>{
+  event.stopPropagation();
+  const root=event.currentTarget.closest('.order-status-select');
+  if(root)root.classList.remove('open');
+  await setOrderStatus(id,status);
+};
+document.addEventListener('click',()=>document.querySelectorAll('.order-status-select.open').forEach(x=>x.classList.remove('open')));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.order-status-select.open').forEach(x=>x.classList.remove('open'))});
 function renderOrders(){
   const hoje=new Date().toISOString().slice(0,10);
-  const deHoje=pedidos.filter(p=>String(p.criado_em||'').slice(0,10)===hoje);
+  const ativos=pedidos.filter(p=>!Number(p.arquivado));
+  const deHoje=ativos.filter(p=>String(p.criado_em||'').slice(0,10)===hoje);
   const pagosHoje=deHoje.filter(p=>p.status_pagamento==='PAGO');
   $('#pedidosHoje').textContent=deHoje.length;
   $('#faturamentoHoje').textContent=money(pagosHoje.reduce((a,p)=>a+Number(p.valor_total_centavos||0),0));
-  $('#pedidosPendentes').textContent=pedidos.filter(p=>p.status_pagamento==='PENDENTE').length;
-  const novos=pedidos.filter(p=>p.status_pagamento==='PAGO' && p.status_pedido==='NOVO').length;
+  $('#pedidosPendentes').textContent=ativos.filter(p=>p.status_pagamento==='PENDENTE').length;
+  const novos=ativos.filter(p=>p.status_pagamento==='PAGO' && p.status_pedido==='NOVO').length;
   $('#pedidosBadge').textContent=novos?`(${novos})`:'';
 
   const encerrado=p=>['ENTREGUE','CANCELADO'].includes(p.status_pedido);
-  let lista=pedidos.filter(p=>visualizarHistoricoPedidos?encerrado(p):!encerrado(p));
-  if(!visualizarHistoricoPedidos){
+  let lista=visualizacaoPedidos==='arquivados'
+    ? pedidos.filter(p=>Number(p.arquivado))
+    : ativos.filter(p=>visualizacaoPedidos==='historico'?encerrado(p):!encerrado(p));
+  if(visualizacaoPedidos==='fila'){
     const prioridade=p=>p.status_pagamento==='PAGO'&&p.status_pedido==='NOVO'?0:p.status_pagamento==='PAGO'&&p.status_pedido==='PREPARANDO'?1:p.status_pagamento==='PAGO'&&p.status_pedido==='PRONTO'?2:p.status_pagamento==='PENDENTE'?3:4;
     lista=[...lista].sort((a,b)=>prioridade(a)-prioridade(b)||b.id-a.id);
   }
 
-  const fila=$('#verFilaPedidos'), hist=$('#verHistoricoPedidos');
-  if(fila) fila.classList.toggle('active',!visualizarHistoricoPedidos);
-  if(hist) hist.classList.toggle('active',visualizarHistoricoPedidos);
+  const fila=$('#verFilaPedidos'), hist=$('#verHistoricoPedidos'), arq=$('#verArquivadosPedidos');
+  if(fila) fila.classList.toggle('active',visualizacaoPedidos==='fila');
+  if(hist) hist.classList.toggle('active',visualizacaoPedidos==='historico');
+  if(arq) arq.classList.toggle('active',visualizacaoPedidos==='arquivados');
 
   $('#ordersList').innerHTML=lista.map(p=>{
     const pay=p.status_pagamento==='PAGO'?'Pago':p.status_pagamento==='PENDENTE'?'Aguardando':'Erro';
@@ -779,11 +888,12 @@ function renderOrders(){
     const when=p.criado_em?new Date(String(p.criado_em).replace(' ','T')+'Z').toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
     const op=(p.status_pedido||'NOVO');
     const isNew=p.status_pagamento==='PAGO'&&op==='NOVO';
-    return `<div class="order-row ${isNew?'order-new':''}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${esc(p.produto_nome)} · ${p.quantidade}x · ${esc(p.cliente_email)}${p.cliente_whatsapp?' · '+esc(formatPhone(p.cliente_whatsapp)):''}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento==='PAGO'?`<span class="badge operational-badge">${op[0]+op.slice(1).toLowerCase()}</span>`:''}<span class="badge">${when}</span></div>${p.observacao?`<small>Obs.: ${esc(p.observacao)}</small>`:''}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em?'Pago em '+esc(p.pago_em):esc(p.mp_status_detail||'')}</small></div><div class="order-actions"><select class="order-status" onchange="setOrderStatus(${p.id},this.value)" ${p.status_pagamento==='PAGO'?'':'disabled title="Aguardando confirmação do pagamento"'}>${['NOVO','PREPARANDO','PRONTO','ENTREGUE','CANCELADO'].map(x=>`<option value="${x}" ${op===x?'selected':''}>${x[0]+x.slice(1).toLowerCase()}</option>`).join('')}</select><button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
-  }).join('')||`<p class="muted">${visualizarHistoricoPedidos?'Nenhum pedido concluído ou cancelado ainda.':'Nenhum pedido na fila atual.'}</p>`;
+    return `<div class="order-row ${isNew?'order-new':''}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${esc(p.produto_nome)} · ${p.quantidade}x · ${esc(p.cliente_email)}${p.cliente_whatsapp?' · '+esc(formatPhone(p.cliente_whatsapp)):''}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento==='PAGO'?`<span class="badge operational-badge">${op[0]+op.slice(1).toLowerCase()}</span>`:''}<span class="badge">${when}</span></div>${p.observacao?`<small>Obs.: ${esc(p.observacao)}</small>`:''}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em?'Pago em '+esc(p.pago_em):esc(p.mp_status_detail||'')}</small></div><div class="order-actions">${renderOrderStatusSelect(p,op)}<button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
+  }).join('')||`<p class="muted">${visualizacaoPedidos==='arquivados'?'Nenhum pedido arquivado.':visualizacaoPedidos==='historico'?'Nenhum pedido concluído ou cancelado ainda.':'Nenhum pedido na fila atual.'}</p>`;
 }
-const verFilaPedidos=$('#verFilaPedidos'); if(verFilaPedidos) verFilaPedidos.onclick=()=>{visualizarHistoricoPedidos=false;renderOrders()};
-const verHistoricoPedidos=$('#verHistoricoPedidos'); if(verHistoricoPedidos) verHistoricoPedidos.onclick=()=>{visualizarHistoricoPedidos=true;renderOrders()};
+const verFilaPedidos=$('#verFilaPedidos'); if(verFilaPedidos) verFilaPedidos.onclick=()=>{visualizacaoPedidos='fila';renderOrders()};
+const verHistoricoPedidos=$('#verHistoricoPedidos'); if(verHistoricoPedidos) verHistoricoPedidos.onclick=()=>{visualizacaoPedidos='historico';renderOrders()};
+const verArquivadosPedidos=$('#verArquivadosPedidos'); if(verArquivadosPedidos) verArquivadosPedidos.onclick=()=>{visualizacaoPedidos='arquivados';renderOrders()};
 function formatPhone(value){
   let d=String(value||'').replace(/\D/g,'');
   if(d.startsWith('55')&&d.length>=12)d=d.slice(2);
@@ -819,7 +929,11 @@ window.openOrderDetail=id=>{
   };
   const textoWhats=mensagensWhatsApp[op]||`Olá, ${p.cliente_nome}! \u2764 Estamos entrando em contato sobre o seu pedido #${p.id} da R&P Doces.`;
   const msg=encodeURIComponent(textoWhats);
-  $('#orderDetailActions').innerHTML=(digits?`<a class="btn" href="https://api.whatsapp.com/send?phone=${digits}&text=${msg}" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>`:'')+`<button class="btn secondary" type="button" onclick="closeOrderDetail()">Fechar</button>`;
+  $('#orderDetailActions').innerHTML=
+    (digits?`<a class="btn" href="https://api.whatsapp.com/send?phone=${digits}&text=${msg}" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>`:'')+
+    (Number(p.arquivado)?`<button class="btn secondary" type="button" onclick="archiveOrder(${p.id},false)">Restaurar</button>`:`<button class="btn secondary" type="button" onclick="archiveOrder(${p.id},true)">Arquivar</button>`)+
+    (me?.papel==='OWNER'?`<button class="btn danger" type="button" onclick="deleteOrder(${p.id})">Excluir definitivamente</button>`:'')+
+    `<button class="btn secondary" type="button" onclick="closeOrderDetail()">Fechar</button>`;
   const o=$('#orderDetailOverlay');o.classList.add('open');o.setAttribute('aria-hidden','false');
 };
 window.closeOrderDetail=closeOrderDetail;
@@ -827,6 +941,40 @@ const orderDetailClose=$('#orderDetailClose');if(orderDetailClose)orderDetailClo
 const orderDetailOverlay=$('#orderDetailOverlay');if(orderDetailOverlay)orderDetailOverlay.onclick=e=>{if(e.target===orderDetailOverlay)closeOrderDetail()};
 
 window.setOrderStatus=async(id,status)=>{try{await api('/api/admin/orders/'+id,{method:'PUT',body:JSON.stringify({status_pedido:status})});toast('Status do pedido atualizado');await loadOrders()}catch(e){alert(e.message)}};
+window.archiveOrder=async(id,arquivado)=>{
+  try{
+    await api('/api/admin/orders/'+id,{method:'PUT',body:JSON.stringify({arquivado})});
+    closeOrderDetail();
+    toast(arquivado?'Pedido arquivado':'Pedido restaurado');
+    await loadOrders();
+  }catch(e){alert(e.message)}
+};
+window.deleteOrder=async id=>{
+  const p=pedidos.find(x=>Number(x.id)===Number(id)); if(!p)return;
+  const pago=p.status_pagamento==='PAGO';
+  if(pago){
+    const digitado=prompt(`ATENÇÃO: o pedido #${id} está PAGO. Excluir aqui NÃO estorna o Pix no Mercado Pago.\n\nPara excluir definitivamente do R&P Doces, digite EXCLUIR #${id}`);
+    if(digitado!==`EXCLUIR #${id}`)return;
+  }else{
+    const ok=await appConfirm({
+      title:`Excluir pedido #${id}?`,
+      text:'O pedido será removido definitivamente do R&P Doces e esta ação não poderá ser desfeita.',
+      confirmLabel:'Excluir definitivamente',
+      detailLabel:'Pedido',
+      detailValue:`#${id} · ${p.cliente_nome}`,
+      tone:'danger',
+      icon:'🗑️',
+      danger:true
+    });
+    if(!ok)return;
+  }
+  try{
+    await api('/api/admin/orders/'+id,{method:'DELETE'});
+    closeOrderDetail();
+    toast(`Pedido #${id} excluído definitivamente`);
+    await loadOrders();
+  }catch(e){alert(e.message)}
+};
 const atualizarPedidos=$('#atualizarPedidos'); if(atualizarPedidos) atualizarPedidos.onclick=loadOrders;
 let mostrarArquivados=false;
 function renderProducts(){
@@ -889,13 +1037,92 @@ window.toggleProductAvailability=async(id,btn)=>{
   }
 };
 
+function appConfirm({
+  title='Confirmar ação?',
+  text='Esta ação precisa da sua confirmação.',
+  confirmLabel='Confirmar',
+  cancelLabel='Cancelar',
+  detailLabel='',
+  detailValue='',
+  tone='warning',
+  icon='⚠️',
+  danger=false
+}={}){
+  return new Promise(resolve=>{
+    const overlay=$('#genericConfirmOverlay');
+    const titleEl=$('#genericConfirmTitle'), textEl=$('#genericConfirmText');
+    const iconEl=$('#genericConfirmIcon'), detail=$('#genericConfirmDetail');
+    const detailLabelEl=$('#genericConfirmDetailLabel'), detailValueEl=$('#genericConfirmDetailValue');
+    const cancel=$('#genericConfirmCancel'), ok=$('#genericConfirmOk');
+    if(!overlay||!titleEl||!textEl||!cancel||!ok){resolve(false);return}
+    titleEl.textContent=title;
+    textEl.textContent=text;
+    iconEl.textContent=icon;
+    iconEl.className=`rp-delete-icon rp-confirm-icon ${tone}`;
+    cancel.textContent=cancelLabel;
+    ok.textContent=confirmLabel;
+    ok.className=`btn ${danger?'danger rp-delete-confirm':''}`.trim();
+    if(detailValue){
+      detail.classList.remove('hidden');
+      detailLabelEl.textContent=detailLabel||'Item';
+      detailValueEl.textContent=detailValue;
+    }else{
+      detail.classList.add('hidden');
+    }
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden','false');
+    const fechar=result=>{
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden','true');
+      cancel.onclick=null;ok.onclick=null;overlay.onclick=null;
+      document.removeEventListener('keydown',onKey);
+      resolve(result);
+    };
+    const onKey=e=>{if(e.key==='Escape')fechar(false);if(e.key==='Enter'&&!e.repeat)fechar(true)};
+    cancel.onclick=()=>fechar(false);
+    ok.onclick=()=>fechar(true);
+    overlay.onclick=e=>{if(e.target===overlay)fechar(false)};
+    document.addEventListener('keydown',onKey);
+    setTimeout(()=>ok.focus(),0);
+  });
+}
+function confirmarExclusaoProduto(p){
+  return new Promise(resolve=>{
+    const overlay=$('#deleteProductOverlay');
+    const nome=$('#deleteProductName');
+    const cancel=$('#deleteProductCancel');
+    const confirmBtn=$('#deleteProductConfirm');
+    if(!overlay||!nome||!cancel||!confirmBtn){resolve(confirm(`Excluir "${p.nome}" definitivamente?`));return}
+    nome.textContent=p.nome||'Produto';
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden','false');
+    const fechar=resultado=>{
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden','true');
+      cancel.onclick=null; confirmBtn.onclick=null; overlay.onclick=null;
+      document.removeEventListener('keydown',onKey);
+      resolve(resultado);
+    };
+    const onKey=e=>{if(e.key==='Escape')fechar(false)};
+    cancel.onclick=()=>fechar(false);
+    confirmBtn.onclick=()=>fechar(true);
+    overlay.onclick=e=>{if(e.target===overlay)fechar(false)};
+    document.addEventListener('keydown',onKey);
+    setTimeout(()=>confirmBtn.focus(),0);
+  });
+}
 window.deleteForever=async id=>{
   const p=produtos.find(x=>x.id===id);
   if(!p)return;
-  const ok=confirm(`Excluir "${p.nome}" definitivamente?\n\nEssa ação não poderá ser desfeita.`);
+  const ok=await confirmarExclusaoProduto(p);
   if(!ok)return;
-  await api('/api/admin/products/'+id+'?permanent=1',{method:'DELETE'});
-  await loadProducts();
+  try{
+    await api('/api/admin/products/'+id+'?permanent=1',{method:'DELETE'});
+    await loadProducts();
+    toast('Produto excluído definitivamente','success');
+  }catch(e){
+    alert(e.message||'Não foi possível excluir o produto.');
+  }
 };
 window.restoreProduct=async id=>{
   const p=produtos.find(x=>x.id===id); if(!p)return;
@@ -923,7 +1150,22 @@ function openProduct(p=null){
   $('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productMsg').textContent='';$('#productModal').classList.remove('hidden')
 }
 window.editProduct=id=>openProduct(produtos.find(p=>p.id===id));
-window.delProduct=async id=>{if(!confirm('Arquivar este produto? Ele sairá do site, mas poderá ser restaurado.'))return;await api('/api/admin/products/'+id,{method:'DELETE'});await loadProducts()};
+window.delProduct=async id=>{
+  const p=produtos.find(x=>Number(x.id)===Number(id));if(!p)return;
+  const ok=await appConfirm({
+    title:'Arquivar produto?',
+    text:'Ele sairá do site e do cardápio ativo, mas poderá ser restaurado quando você quiser.',
+    confirmLabel:'Arquivar',
+    detailLabel:'Produto',
+    detailValue:p.nome,
+    tone:'warning',
+    icon:'📦'
+  });
+  if(!ok)return;
+  await api('/api/admin/products/'+id,{method:'DELETE'});
+  await loadProducts();
+  toast('Produto arquivado');
+};
 $('#pPreco').addEventListener('input',formatPrecoField);
 $('#pPrecoPromo').addEventListener('input',()=>{const el=$('#pPrecoPromo');el.value=money(precoCentavos(el.value))});
 $('#pPromocaoAtiva').addEventListener('change',togglePromoFields);
@@ -1011,8 +1253,41 @@ bindPasswordToggle('#toggleConfirmPassword','#confirmNewPassword');
     if(e.key==='Enter') $('#saveNewPassword').click();
   });
 });
-window.toggleUser=async(id,ativo)=>{if(!confirm(ativo?'Reativar esta conta?':'Desativar esta conta?'))return;await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'toggle_ativo',ativo:!!ativo})});await loadUsers()};
-window.changeUserRole=async(id,papel)=>{if(!confirm(papel==='OWNER'?'Promover esta conta a administrador mestre?':'Rebaixar esta conta para administrador?'))return;await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'alterar_papel',papel})});await loadUsers()};
+window.toggleUser=async(id,ativo)=>{
+  const u=usuarios.find(x=>Number(x.id)===Number(id));if(!u)return;
+  const reativar=!!ativo;
+  const ok=await appConfirm({
+    title:reativar?'Reativar conta?':'Desativar conta?',
+    text:reativar?'O administrador voltará a conseguir acessar o painel.':'O administrador perderá o acesso ao painel até que a conta seja reativada.',
+    confirmLabel:reativar?'Reativar':'Desativar',
+    detailLabel:'Administrador',
+    detailValue:`${u.nome} · @${u.username}`,
+    tone:reativar?'info':'danger',
+    icon:reativar?'👤':'⛔',
+    danger:!reativar
+  });
+  if(!ok)return;
+  await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'toggle_ativo',ativo:reativar})});
+  await loadUsers();
+  toast(reativar?'Conta reativada':'Conta desativada');
+};
+window.changeUserRole=async(id,papel)=>{
+  const u=usuarios.find(x=>Number(x.id)===Number(id));if(!u)return;
+  const promover=papel==='OWNER';
+  const ok=await appConfirm({
+    title:promover?'Promover a mestre?':'Rebaixar para administrador?',
+    text:promover?'Esta conta passará a ter acesso às ações reservadas ao Mestre.':'Esta conta deixará de ter permissões exclusivas de Mestre.',
+    confirmLabel:promover?'Promover':'Rebaixar',
+    detailLabel:'Administrador',
+    detailValue:`${u.nome} · @${u.username}`,
+    tone:promover?'info':'warning',
+    icon:promover?'👑':'↘️'
+  });
+  if(!ok)return;
+  await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'alterar_papel',papel})});
+  await loadUsers();
+  toast(promover?'Administrador promovido a mestre':'Conta rebaixada para administrador');
+};
 
 $$('.closeModal').forEach(b=>b.onclick=()=>b.closest('.modal-bg').classList.add('hidden'));
 $$('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.add('hidden')}));
