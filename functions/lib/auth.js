@@ -2,7 +2,9 @@ import { json } from "./http.js";
 
 const COOKIE = "rp_admin_session";
 const SESSION_DAYS = 7;
-const PBKDF2_ITERATIONS = 310000;
+// Cloudflare Workers Web Crypto rejects PBKDF2 iteration counts above 100000.
+const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_MAX_ITERATIONS = 100000;
 
 function bytesToHex(bytes) {
   return [...new Uint8Array(bytes)]
@@ -50,6 +52,14 @@ export async function verifyPassword(password, stored) {
   try {
     const [algo, iterationsText, saltHex, hashHex] = stored.split("$");
     if (algo !== "pbkdf2_sha256") return false;
+
+    const iterations = Number(iterationsText);
+    if (
+      !Number.isSafeInteger(iterations) ||
+      iterations < 1 ||
+      iterations > PBKDF2_MAX_ITERATIONS
+    ) return false;
+
     const key = await crypto.subtle.importKey(
       "raw",
       new TextEncoder().encode(password),
@@ -62,7 +72,7 @@ export async function verifyPassword(password, stored) {
         name: "PBKDF2",
         hash: "SHA-256",
         salt: hexToBytes(saltHex),
-        iterations: Number(iterationsText),
+        iterations,
       },
       key,
       256,
@@ -118,7 +128,7 @@ export async function currentUser(env, request) {
   const now = new Date().toISOString();
   const user = await env.DB.prepare(
     `
-    SELECT u.id, u.nome, u.username, u.email, u.ativo
+    SELECT u.id, u.nome, u.username, u.email, u.ativo, u.papel
     FROM admin_sessoes s
     JOIN usuarios_admin u ON u.id = s.usuario_id
     WHERE s.token_hash = ? AND s.expira_em > ? AND u.ativo = 1

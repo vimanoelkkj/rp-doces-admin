@@ -26,8 +26,8 @@ export async function onRequestPost({ request, env }) {
 
   const hash = await hashPassword(data.senha);
   await env.DB.prepare(`
-    INSERT INTO usuarios_admin (nome, username, email, senha_hash, ativo)
-    VALUES (?, ?, ?, ?, 1)
+    INSERT INTO usuarios_admin (nome, username, email, senha_hash, ativo, papel)
+    VALUES (?, ?, ?, ?, 1, 'OWNER')
   `).bind(nome, username, email, hash).run();
 
   return json({ ok: true });

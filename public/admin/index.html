@@ -597,6 +597,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     <div class="field"><label>Usuário</label><input id="uUsername" autocomplete="off" placeholder="ex.: patricia"></div>
     <div class="field"><label>E-mail</label><input id="uEmail" type="email"></div>
     <div class="field"><label>Senha inicial</label><input id="uSenha" type="password"></div>
+    <div class="field"><label>Nível de acesso</label><select id="uPapel"><option value="ADMIN">Administrador</option><option value="OWNER">Administrador mestre</option></select></div>
     <div class="actions"><button class="btn" id="saveUser">Criar conta</button><button class="btn secondary closeModal">Cancelar</button></div>
     <div id="userMsg" class="msg"></div>
   </div>
@@ -666,7 +667,7 @@ async function init(){
   if(reset){show('resetView');return}
   const setup=await api('/api/setup');
   if(setup.needsSetup){show('setupView');return}
-  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}`;show('appView');await Promise.all([loadProducts(),loadUsers()])}
+  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}${me.papel==='OWNER'?' • Mestre':''}`;show('appView');await Promise.all([loadProducts(),loadUsers()])}
   catch{show('loginView')}
 }
 
@@ -789,12 +790,19 @@ if (el_saveProduct) el_saveProduct.onclick = async()=>{try{
 
 async function loadUsers(){const r=await api('/api/admin/users');usuarios=r.usuarios;renderUsers()}
 function renderUsers(){
- $('#usersList').innerHTML=usuarios.map(u=>`<div class="user"><div><strong>${esc(u.nome)} ${u.id===me.id?'(você)':''}</strong><small>@${esc(u.username)} • ${esc(u.email)} • ${u.ativo?'Ativo':'Desativado'}</small></div><div class="actions"><button class="btn secondary" onclick="resetUser(${u.id})">Nova senha</button>${u.id!==me.id?`<button class="btn ${u.ativo?'danger':'secondary'}" onclick="toggleUser(${u.id},${u.ativo?0:1})">${u.ativo?'Desativar':'Ativar'}</button>`:''}</div></div>`).join('');
+ const owner=me?.papel==='OWNER';
+ if(el_novoUsuario) el_novoUsuario.classList.toggle('hidden',!owner);
+ $('#usersList').innerHTML=usuarios.map(u=>{
+   const papel=u.papel==='OWNER'?'Mestre':'Administrador';
+   const roleAction=owner && u.id!==me.id ? `<button class="btn secondary" onclick="changeUserRole(${u.id},'${u.papel==='OWNER'?'ADMIN':'OWNER'}')">${u.papel==='OWNER'?'Rebaixar para admin':'Promover a mestre'}</button>` : '';
+   const toggleAction=owner && u.id!==me.id ? `<button class="btn ${u.ativo?'danger':'secondary'}" onclick="toggleUser(${u.id},${u.ativo?0:1})">${u.ativo?'Desativar':'Ativar'}</button>` : '';
+   return `<div class="user"><div><strong>${esc(u.nome)} ${u.id===me.id?'(você)':''}</strong><small>@${esc(u.username)} • ${esc(u.email)} • ${papel} • ${u.ativo?'Ativo':'Desativado'}</small></div><div class="actions"><button class="btn secondary" onclick="resetUser(${u.id})">Nova senha</button>${roleAction}${toggleAction}</div></div>`;
+ }).join('');
 }
 const el_novoUsuario = $('#novoUsuario');
-if (el_novoUsuario) el_novoUsuario.onclick = ()=>{$('#uNome').value=$('#uUsername').value=$('#uEmail').value=$('#uSenha').value='';$('#userMsg').textContent='';$('#userModal').classList.remove('hidden')};
+if (el_novoUsuario) el_novoUsuario.onclick = ()=>{if(me?.papel!=='OWNER')return;$('#uNome').value=$('#uUsername').value=$('#uEmail').value=$('#uSenha').value='';$('#uPapel').value='ADMIN';$('#userMsg').textContent='';$('#userModal').classList.remove('hidden')};
 const el_saveUser = $('#saveUser');
-if (el_saveUser) el_saveUser.onclick = async()=>{try{await api('/api/admin/users',{method:'POST',body:JSON.stringify({nome:$('#uNome').value,username:$('#uUsername').value,email:$('#uEmail').value,senha:$('#uSenha').value})});$('#userModal').classList.add('hidden');await loadUsers()}catch(e){$('#userMsg').textContent=e.message}};
+if (el_saveUser) el_saveUser.onclick = async()=>{try{await api('/api/admin/users',{method:'POST',body:JSON.stringify({nome:$('#uNome').value,username:$('#uUsername').value,email:$('#uEmail').value,senha:$('#uSenha').value,papel:$('#uPapel').value})});$('#userModal').classList.add('hidden');await loadUsers()}catch(e){$('#userMsg').textContent=e.message}};
 let passwordUserId=null;
 
 window.resetUser=id=>{
@@ -856,6 +864,7 @@ bindPasswordToggle('#toggleConfirmPassword','#confirmNewPassword');
   });
 });
 window.toggleUser=async(id,ativo)=>{if(!confirm(ativo?'Reativar esta conta?':'Desativar esta conta?'))return;await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'toggle_ativo',ativo:!!ativo})});await loadUsers()};
+window.changeUserRole=async(id,papel)=>{if(!confirm(papel==='OWNER'?'Promover esta conta a administrador mestre?':'Rebaixar esta conta para administrador?'))return;await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'alterar_papel',papel})});await loadUsers()};
 
 $$('.closeModal').forEach(b=>b.onclick=()=>b.closest('.modal-bg').classList.add('hidden'));
 $$('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.add('hidden')}));

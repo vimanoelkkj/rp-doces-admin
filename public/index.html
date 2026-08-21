@@ -1520,7 +1520,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <h2>Escolha seu sabor favorito</h2>
 <p>Clique em um sabor para conversar com a gente no WhatsApp e fazer seu pedido.</p>
 </div>
-<div class="menu-category">
+<div class="menu-category" id="menu-category-bolo">
 <h3 class="menu-category-title">🍰 Bolo no Pote</h3>
 <div class="category-photos">
 <div class="photo-card"><img alt="Bolo no pote R&amp;P Doces" src="/assets/images/rp-image-03.webp"/ decoding="async" loading="lazy"></div>
@@ -1539,7 +1539,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
       </div>
     </div>
 </div>
-<div class="menu-category">
+<div class="menu-category" id="menu-category-pudim">
 <h3 class="menu-category-title">🍮 Mini Pudim</h3>
 <div class="category-photos">
 <div class="photo-card"><img alt="Mini pudim R&amp;P Doces" src="/assets/images/rp-image-05.webp"/ decoding="async" loading="lazy"></div>
@@ -2019,8 +2019,12 @@ async function carregarCardapioDinamico(){
     if (!produtos.length) {
       boloGrid.classList.remove('is-loading');
       pudimGrid.classList.remove('is-loading');
-      boloGrid.innerHTML = '<p class="muted">Nenhum sabor disponível no momento.</p>';
-      pudimGrid.innerHTML = '<p class="muted">Nenhum sabor disponível no momento.</p>';
+      boloGrid.replaceChildren();
+      pudimGrid.replaceChildren();
+      const boloCategory = document.getElementById('menu-category-bolo');
+      const pudimCategory = document.getElementById('menu-category-pudim');
+      if (boloCategory) boloCategory.hidden = true;
+      if (pudimCategory) pudimCategory.hidden = true;
       if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
       return;
     }
@@ -2064,10 +2068,22 @@ async function carregarCardapioDinamico(){
 
     window.rpCriarCardProduto = card;
 
+    // Separa as categorias de forma explícita. Nunca reutiliza produtos de bolo
+    // como fallback visual da seção de mini pudim.
+    const bolos = produtos.filter(p => p.categoria === 'BOLO_NO_POTE');
+    const pudins = produtos.filter(p => p.categoria === 'MINI_PUDIM');
+
+    const boloCategory = document.getElementById('menu-category-bolo');
+    const pudimCategory = document.getElementById('menu-category-pudim');
+
     boloGrid.classList.remove('is-loading');
-    boloGrid.replaceChildren(...produtos.filter(p => p.categoria === 'BOLO_NO_POTE').map(card));
+    boloGrid.replaceChildren(...bolos.map(card));
+    if (boloCategory) boloCategory.hidden = bolos.length === 0;
+
     pudimGrid.classList.remove('is-loading');
-    pudimGrid.replaceChildren(...produtos.filter(p => p.categoria === 'MINI_PUDIM').map(card));
+    pudimGrid.replaceChildren(...pudins.map(card));
+    if (pudimCategory) pudimCategory.hidden = pudins.length === 0;
+
     if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
   } catch (err) {
     console.info('Cardápio usando fallback local.');
