@@ -915,6 +915,10 @@ window.chooseOrderStatus=async(event,id,status)=>{
 };
 document.addEventListener('click',()=>document.querySelectorAll('.order-status-select.open').forEach(x=>x.classList.remove('open')));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.order-status-select.open').forEach(x=>x.classList.remove('open'))});
+function orderItems(p){
+  return Array.isArray(p.itens)&&p.itens.length?p.itens:[{produto_nome:p.produto_nome,quantidade:p.quantidade,valor_unitario_centavos:p.valor_unitario_centavos,valor_total_centavos:p.valor_total_centavos}];
+}
+function orderItemsText(p){return orderItems(p).map(i=>`${i.quantidade}× ${i.produto_nome}`).join(' · ')}
 function renderOrders(){
   const hoje=new Date().toISOString().slice(0,10);
   const ativos=pedidos.filter(p=>!Number(p.arquivado));
@@ -946,7 +950,7 @@ function renderOrders(){
     const when=p.criado_em?new Date(String(p.criado_em).replace(' ','T')+'Z').toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
     const op=(p.status_pedido||'NOVO');
     const isNew=p.status_pagamento==='PAGO'&&op==='NOVO';
-    return `<div class="order-row ${isNew?'order-new':''}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${esc(p.produto_nome)} · ${p.quantidade}x · ${esc(p.cliente_email)}${p.cliente_whatsapp?' · '+esc(formatPhone(p.cliente_whatsapp)):''}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento==='PAGO'?`<span class="badge operational-badge">${op[0]+op.slice(1).toLowerCase()}</span>`:''}<span class="badge">${when}</span></div>${p.observacao?`<small>Obs.: ${esc(p.observacao)}</small>`:''}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em?'Pago em '+esc(p.pago_em):esc(p.mp_status_detail||'')}</small></div><div class="order-actions">${renderOrderStatusSelect(p,op)}<button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
+    return `<div class="order-row ${isNew?'order-new':''}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${esc(orderItemsText(p))} · ${esc(p.cliente_email)}${p.cliente_whatsapp?' · '+esc(formatPhone(p.cliente_whatsapp)):''}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento==='PAGO'?`<span class="badge operational-badge">${op[0]+op.slice(1).toLowerCase()}</span>`:''}<span class="badge">${when}</span></div>${p.observacao?`<small>Obs.: ${esc(p.observacao)}</small>`:''}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em?'Pago em '+esc(p.pago_em):esc(p.mp_status_detail||'')}</small></div><div class="order-actions">${renderOrderStatusSelect(p,op)}<button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
   }).join('')||`<p class="muted">${visualizacaoPedidos==='arquivados'?'Nenhum pedido arquivado.':visualizacaoPedidos==='historico'?'Nenhum pedido concluído ou cancelado ainda.':'Nenhum pedido na fila atual.'}</p>`;
 }
 const verFilaPedidos=$('#verFilaPedidos'); if(verFilaPedidos) verFilaPedidos.onclick=()=>{visualizacaoPedidos='fila';renderOrders()};
@@ -963,12 +967,13 @@ function closeOrderDetail(){const o=$('#orderDetailOverlay');if(o){o.classList.r
 window.openOrderDetail=id=>{
   const p=pedidos.find(x=>Number(x.id)===Number(id)); if(!p)return;
   const op=p.status_pedido||'NOVO';
+  const itensHtml=orderItems(p).map(i=>`<div class="order-detail-box"><small>${i.quantidade}× ${esc(i.produto_nome)}</small><strong>${money(i.valor_total_centavos)}</strong><span class="muted">${money(i.valor_unitario_centavos)} cada</span></div>`).join('');
   $('#orderDetailTitle').textContent=`Pedido #${p.id} · ${p.cliente_nome}`;
   $('#orderDetailSubtitle').textContent=`${p.tipo_entrega==='RETIRADA'||!p.tipo_entrega?'Retirada':'Entrega'} · ${p.status_pagamento==='PAGO'?'Pagamento confirmado':p.status_pagamento==='PENDENTE'?'Aguardando pagamento':'Erro no pagamento'}`;
   $('#orderDetailBody').innerHTML=`<div class="order-detail-grid">
     <div class="order-detail-box"><small>WhatsApp</small><strong>${esc(formatPhone(p.cliente_whatsapp))}</strong></div>
     <div class="order-detail-box"><small>E-mail</small><strong>${esc(p.cliente_email)}</strong></div>
-    <div class="order-detail-box"><small>Pedido</small><strong>${p.quantidade}× ${esc(p.produto_nome)}</strong></div>
+    ${itensHtml}
     <div class="order-detail-box"><small>Total</small><strong>${money(p.valor_total_centavos)}</strong></div>
     <div class="order-detail-box"><small>Pagamento</small><strong>${esc(p.status_pagamento)} · ${esc(p.metodo_pagamento)}</strong></div>
     <div class="order-detail-box"><small>Andamento</small><strong>${esc(op[0]+op.slice(1).toLowerCase())}</strong></div>

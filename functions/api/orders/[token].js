@@ -14,6 +14,12 @@ export async function onRequestGet({ params, env }) {
   `).bind(token).first();
   if (!pedido) return json({ erro: "Pedido não encontrado." }, 404);
 
+  const { results: itens } = await env.DB.prepare(`
+    SELECT produto_id, produto_nome AS produto, quantidade,
+           valor_unitario_centavos, valor_total_centavos
+    FROM pedido_itens WHERE pedido_id = ? ORDER BY id
+  `).bind(pedido.id).all();
+
   // Enquanto estiver pendente, confirma o estado diretamente no Mercado Pago.
   // Assim o fluxo continua confiável mesmo se um webhook atrasar.
   if (pedido.mp_order_id && pedido.status_pagamento === "PENDENTE" && env.MP_ACCESS_TOKEN) {
@@ -44,6 +50,8 @@ export async function onRequestGet({ params, env }) {
       token: pedido.token_publico,
       produto: pedido.produto_nome,
       quantidade: pedido.quantidade,
+      quantidade_total: pedido.quantidade,
+      itens: itens || [],
       valor_total_centavos: pedido.valor_total_centavos,
       status: pedido.status_pagamento,
       mp_status: pedido.mp_status,

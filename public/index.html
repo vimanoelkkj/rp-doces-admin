@@ -565,7 +565,7 @@
   .whats-float{
     position:fixed;
     bottom:24px;
-    right:24px;
+    left:24px;
     width:60px;
     height:60px;
     background:#25D366;
@@ -576,6 +576,7 @@
     box-shadow:0 10px 24px rgba(37,211,102,0.5);
     z-index:200;
     animation:pulse 2.4s infinite;
+    transition:bottom .28s cubic-bezier(.2,.75,.2,1);
     cursor:pointer;
   }
   .whats-float svg{ width:30px; height:30px; fill:#fff; }
@@ -831,7 +832,8 @@ button, a, .flavor-card { -webkit-tap-highlight-color: transparent; }
 }
 .rp-mobile-cta.show{transform:none;opacity:1;pointer-events:auto}
 body.rp-modal-open .rp-mobile-cta{opacity:0!important;pointer-events:none!important}
-body.rp-mobile-cta-visible .whats-float{bottom:calc(80px + env(safe-area-inset-bottom));transition:bottom .25s ease}
+body.rp-mobile-cta-visible .whats-float{bottom:calc(80px + env(safe-area-inset-bottom))}
+body.rp-mobile-cta-visible .rp-cart-trigger{bottom:calc(80px + env(safe-area-inset-bottom))}
 
 @media(max-width:720px){
   .pedido-overlay{padding:0;align-items:flex-end}
@@ -1758,21 +1760,25 @@ function pedirSabor(sabor, tipo){
   .pedido-overlay.open{display:flex}
   .pedido-modal{
     width:min(460px,100%);
-    max-height:calc(100dvh - 40px);
-    overflow-y:auto;
-    overscroll-behavior:contain;
-    scrollbar-gutter:stable;
     box-sizing:border-box;
     background:#fffaf5;
     border:1px solid var(--pink-200);
     border-radius:24px;
     box-shadow:0 24px 70px rgba(74,58,63,.22);
-    padding:26px 26px 32px;
+    padding:0;
     position:relative;
+    overflow:hidden;
   }
-  .pedido-modal::-webkit-scrollbar{width:9px}
-  .pedido-modal::-webkit-scrollbar-track{background:transparent}
-  .pedido-modal::-webkit-scrollbar-thumb{background:var(--pink-200);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
+  .pedido-modal-scroll{
+    max-height:calc(100dvh - 40px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    box-sizing:border-box;
+    padding:26px 26px 32px;
+  }
+  .pedido-modal-scroll::-webkit-scrollbar{width:9px}
+  .pedido-modal-scroll::-webkit-scrollbar-track{background:transparent}
+  .pedido-modal-scroll::-webkit-scrollbar-thumb{background:var(--pink-200);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
   .pedido-close{
     position:absolute; top:14px; right:16px;
     width:36px; height:36px; border:0; border-radius:50%;
@@ -1834,13 +1840,74 @@ function pedirSabor(sabor, tipo){
   }
   .pedido-total strong{font-size:1.2rem;color:var(--pink-600)}
   .pedido-confirmar{width:100%;justify-content:center}
-  @media(max-width:520px){.pedido-modal{padding:22px 18px}}
+  .rp-cart-trigger{position:fixed;right:20px;bottom:20px;z-index:10010;border:0;border-radius:999px;background:var(--pink-600);color:#fff;padding:13px 18px;box-shadow:0 10px 30px rgba(111,45,64,.28);font:700 .92rem 'Poppins',sans-serif;cursor:pointer;display:flex;align-items:center;gap:9px;transition:bottom .28s cubic-bezier(.2,.75,.2,1),transform .2s ease,box-shadow .2s ease}
+  .rp-cart-count{min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:#fff;color:var(--pink-700);display:grid;place-items:center;font-size:.78rem}
+  .rp-cart-value{max-width:0;opacity:0;overflow:hidden;white-space:nowrap;transition:max-width .25s ease,opacity .2s ease}
+  .rp-cart-trigger:hover .rp-cart-value,.rp-cart-trigger:focus-visible .rp-cart-value{max-width:120px;opacity:1}
+  .rp-cart-trigger.rp-cart-pop{animation:rpCartPop .48s cubic-bezier(.2,.8,.25,1)}
+  .rp-cart-fly{position:fixed;z-index:200300;width:18px;height:18px;border-radius:50%;background:linear-gradient(145deg,#ff7aa6,var(--pink-600));box-shadow:0 5px 16px rgba(192,80,119,.32);pointer-events:none;animation:rpCartFly .58s cubic-bezier(.3,.65,.45,1) forwards}
+  @keyframes rpCartPop{0%,100%{transform:scale(1)}45%{transform:scale(1.12)}70%{transform:scale(.97)}}
+  @keyframes rpCartFly{to{left:var(--cart-x);top:var(--cart-y);transform:scale(.3);opacity:.25}}
+  .rp-cart-list{display:grid;gap:10px;margin:16px 0}
+  .rp-cart-empty{padding:22px;text-align:center;border:1px dashed var(--pink-200);border-radius:16px;color:var(--text-soft)}
+  .rp-cart-item{display:grid;grid-template-columns:1fr auto;gap:8px 12px;padding:13px;border:1px solid var(--pink-100);border-radius:16px;background:#fff}
+  .rp-cart-item strong{color:var(--brown-700);font-size:.94rem}.rp-cart-item small{display:block;color:var(--text-soft);margin-top:3px}
+  .rp-cart-controls{display:flex;align-items:center;gap:7px}.rp-cart-controls button{width:31px;height:31px;border:1px solid var(--pink-200);border-radius:9px;background:#fff;color:var(--pink-700);cursor:pointer}.rp-cart-controls .rp-cart-remove{width:auto;padding:0 8px;color:#9b2c2c}
+  .rp-cart-note{font-size:.8rem;color:var(--text-soft);margin:-4px 0 12px}
+  .rp-cart-legacy{display:none!important}
+  .rp-add-overlay{position:fixed;inset:0;z-index:200100;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(74,58,63,.38);backdrop-filter:blur(5px)}
+  .rp-add-overlay.open{display:flex}
+  .rp-add-modal{width:min(380px,100%);box-sizing:border-box;padding:24px;background:#fffaf5;border:1px solid var(--pink-200);border-radius:24px;box-shadow:0 24px 70px rgba(74,58,63,.22);position:relative}
+  .rp-add-modal h3{margin:5px 42px 6px 0;color:var(--brown-700);font-size:1.45rem}.rp-add-price{color:var(--pink-600);font-weight:700;margin-bottom:18px}
+  .rp-add-qty{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0}.rp-add-qty button{width:42px;height:42px;border:1.5px solid var(--pink-200);border-radius:12px;background:#fff;color:var(--pink-700);font-size:20px;cursor:pointer}.rp-add-qty strong{min-width:42px;text-align:center;font-size:1.1rem;color:var(--brown-700)}
+  .rp-add-submit{width:100%;justify-content:center}.rp-add-stock{display:block;text-align:center;color:var(--text-soft);font-size:.82rem;margin-bottom:16px}
+  @media(hover:none),(pointer:coarse){.rp-cart-value{max-width:120px;opacity:1}}
+  @media(max-width:520px){
+    .pedido-overlay{
+      padding:16px;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .pedido-modal{
+      width:100%;
+      max-width:460px;
+      min-width:0;
+      margin-inline:auto;
+      padding:0;
+      overflow:hidden;
+    }
+    .pedido-modal-scroll{max-height:calc(100dvh - 32px);padding:22px 18px;overflow-x:hidden}
+    .rp-cart-item{grid-template-columns:minmax(0,1fr) auto;min-width:0}
+    .rp-cart-item>div:first-child{min-width:0}
+  }
 </style>
+
+<button class="rp-cart-trigger" id="rpCartTrigger" type="button" aria-label="Abrir carrinho">
+  <span aria-hidden="true">🛒</span> Carrinho <span class="rp-cart-value" id="rpCartValue">R$ 0,00</span> <span class="rp-cart-count" id="rpCartCount">0</span>
+</button>
+
+<div class="rp-add-overlay" id="rpAddOverlay" aria-hidden="true">
+  <div class="rp-add-modal" role="dialog" aria-modal="true" aria-labelledby="rpAddTitle">
+    <button class="pedido-close" id="rpAddClose" type="button" aria-label="Fechar">×</button>
+    <span class="eyebrow">Adicionar ao carrinho</span>
+    <h3 id="rpAddTitle">Produto</h3>
+    <div class="rp-add-price" id="rpAddPrice"></div>
+    <div class="rp-add-qty">
+      <button id="rpAddMinus" type="button" aria-label="Diminuir quantidade">−</button>
+      <strong id="rpAddQuantity">1</strong>
+      <button id="rpAddPlus" type="button" aria-label="Aumentar quantidade">+</button>
+    </div>
+    <small class="rp-add-stock" id="rpAddStock"></small>
+    <button class="btn btn-primary rp-add-submit" id="rpAddSubmit" type="button">Adicionar ao carrinho</button>
+  </div>
+</div>
 
 <div class="pedido-overlay" id="pedidoOverlay" aria-hidden="true">
   <div class="pedido-modal" role="dialog" aria-modal="true" aria-labelledby="pedidoTitulo">
+   <div class="pedido-modal-scroll">
     <button class="pedido-close" id="pedidoClose" aria-label="Fechar">×</button>
-    <div class="pedido-product-head">
+    <div class="pedido-product-head rp-cart-legacy">
       <div class="pedido-product-emoji" id="pedidoEmoji" aria-hidden="true">🍰</div>
       <div>
         <span class="eyebrow">Seu pedido</span>
@@ -1849,7 +1916,7 @@ function pedirSabor(sabor, tipo){
       </div>
     </div>
 
-    <div class="pedido-field">
+    <div class="pedido-field rp-cart-legacy">
       <label for="pedidoQuantidade">Quantidade</label>
       <div class="pedido-qty">
         <button type="button" id="qtyMenos" aria-label="Diminuir quantidade">−</button>
@@ -1858,6 +1925,11 @@ function pedirSabor(sabor, tipo){
       </div>
       <small class="pedido-stock-hint" id="pedidoEstoque"></small>
     </div>
+
+    <span class="eyebrow">Seu pedido</span>
+    <h3 style="margin:5px 36px 4px;color:var(--brown-700)">Carrinho</h3>
+    <div class="rp-cart-list" id="rpCartList"></div>
+    <p class="rp-cart-note">O carrinho não reserva estoque. Preços, promoções e disponibilidade serão confirmados ao gerar o Pix.</p>
 
     <div class="pedido-field">
       <label for="pedidoNome">Seu nome</label>
@@ -1886,7 +1958,7 @@ function pedirSabor(sabor, tipo){
       A estrutura já está preparada para receber a opção de entrega futuramente.
     </div>
 
-    <div class="pedido-resumo">
+    <div class="pedido-resumo rp-cart-legacy">
       <div class="pedido-resumo-linha">
         <span id="pedidoResumoQtd">1 × produto</span>
         <span id="pedidoResumoUnitario">R$ 0,00</span>
@@ -1906,11 +1978,13 @@ function pedirSabor(sabor, tipo){
       </button>
       <div id="pedidoErro" role="alert" style="display:none;color:#9b2c2c;font-size:.88rem;text-align:center"></div>
     </div>
+   </div>
   </div>
 </div>
 
 <script>
 (() => {
+  return; // Fluxo legado de item único substituído pelo carrinho abaixo.
   // Configuração central. Quando a entrega for ativada, basta habilitar aqui
   // e acrescentar os campos/regras de endereço e taxa.
   const CONFIG = {
@@ -2141,6 +2215,159 @@ function pedirSabor(sabor, tipo){
 </script>
 
 
+<script id="rp-cart-flow">
+(() => {
+  const STORAGE_KEY='rp_doces_carrinho_v1';
+  const MAX_UNIDADES=50;
+  const overlay=document.getElementById('pedidoOverlay');
+  const list=document.getElementById('rpCartList');
+  const count=document.getElementById('rpCartCount');
+  const cartValue=document.getElementById('rpCartValue');
+  const trigger=document.getElementById('rpCartTrigger');
+  const close=document.getElementById('pedidoClose');
+  const nome=document.getElementById('pedidoNome');
+  const email=document.getElementById('pedidoEmail');
+  const whatsapp=document.getElementById('pedidoWhatsapp');
+  const obs=document.getElementById('pedidoObs');
+  const pagar=document.getElementById('pedidoPagarPix');
+  const confirmar=document.getElementById('pedidoConfirmar');
+  const erro=document.getElementById('pedidoErro');
+  const addOverlay=document.getElementById('rpAddOverlay');
+  const addClose=document.getElementById('rpAddClose');
+  const addTitle=document.getElementById('rpAddTitle');
+  const addPrice=document.getElementById('rpAddPrice');
+  const addQuantity=document.getElementById('rpAddQuantity');
+  const addMinus=document.getElementById('rpAddMinus');
+  const addPlus=document.getElementById('rpAddPlus');
+  const addStock=document.getElementById('rpAddStock');
+  const addSubmit=document.getElementById('rpAddSubmit');
+  const moedaCentavos=c=>(Number(c||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+
+  function carregar(){
+    try{
+      const parsed=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{"itens":[]}');
+      if(!Array.isArray(parsed.itens))return [];
+      return parsed.itens.filter(i=>Number.isInteger(Number(i.produto_id))&&Number(i.produto_id)>0&&Number(i.quantidade)>0)
+        .slice(0,20).map(i=>({produto_id:Number(i.produto_id),quantidade:Math.min(50,Math.trunc(Number(i.quantidade))),
+          nome:String(i.nome||'Produto'),preco_centavos:Math.max(0,Number(i.preco_centavos)||0),estoque:Math.max(0,Number(i.estoque)||0)}));
+    }catch{return []}
+  }
+  let carrinho=carregar();
+  let produtoSelecionado=null,quantidadeSelecionada=1;
+  function salvar(){
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify({versao:1,itens:carrinho}))}catch{}
+    render();
+  }
+  function unidades(){return carrinho.reduce((s,i)=>s+i.quantidade,0)}
+  function total(){return carrinho.reduce((s,i)=>s+i.quantidade*i.preco_centavos,0)}
+  function escCart(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+  function render(){
+    count.textContent=String(unidades());
+    cartValue.textContent=moedaCentavos(total());
+    if(!carrinho.length){
+      list.innerHTML='<div class="rp-cart-empty">Seu carrinho está vazio.<br><small>Escolha seus doces no cardápio.</small></div>';
+      pagar.disabled=true; confirmar.disabled=true; return;
+    }
+    pagar.disabled=false; confirmar.disabled=false;
+    list.innerHTML=carrinho.map(i=>`<div class="rp-cart-item">
+      <div><strong>${escCart(i.nome)}</strong><small>${moedaCentavos(i.preco_centavos)} cada · subtotal ${moedaCentavos(i.preco_centavos*i.quantidade)}</small></div>
+      <div class="rp-cart-controls">
+        <button type="button" data-cart-action="menos" data-id="${i.produto_id}" aria-label="Diminuir ${escCart(i.nome)}">−</button>
+        <strong>${i.quantidade}</strong>
+        <button type="button" data-cart-action="mais" data-id="${i.produto_id}" aria-label="Aumentar ${escCart(i.nome)}" ${i.quantidade>=i.estoque||unidades()>=MAX_UNIDADES?'disabled':''}>+</button>
+        <button type="button" class="rp-cart-remove" data-cart-action="remover" data-id="${i.produto_id}">Remover</button>
+      </div></div>`).join('')+
+      `<div class="pedido-total"><span>Total estimado</span><strong>${moedaCentavos(total())}</strong></div>`;
+  }
+  function abrir(){erro.style.display='none';overlay.classList.add('open');overlay.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';document.body.classList.add('rp-modal-open')}
+  function fechar(){overlay.classList.remove('open');overlay.setAttribute('aria-hidden','true');document.body.style.overflow='';document.body.classList.remove('rp-modal-open')}
+  function avisar(msg){erro.textContent=msg;erro.style.display='block'}
+  function produtoDoCard(card){
+    const id=Number(card?.dataset?.productId);
+    const estoque=Number(card?.dataset?.estoque);
+    const preco=Number(card?.dataset?.precoCentavos);
+    return {produto_id:id,nome:card?.querySelector('h3')?.childNodes?.[0]?.textContent?.trim()||card?.querySelector('h3')?.textContent?.trim()||'Produto',
+      preco_centavos:Number.isFinite(preco)?preco:0,estoque:Number.isFinite(estoque)?Math.max(0,estoque):0};
+  }
+  function fecharSeletor(){addOverlay.classList.remove('open');addOverlay.setAttribute('aria-hidden','true');produtoSelecionado=null;document.body.style.overflow=''}
+  function limiteSelecionado(){
+    if(!produtoSelecionado)return 0;
+    const atual=carrinho.find(i=>i.produto_id===produtoSelecionado.produto_id)?.quantidade||0;
+    return Math.max(0,Math.min(produtoSelecionado.estoque-atual,MAX_UNIDADES-unidades()));
+  }
+  function renderSeletor(){
+    const limite=limiteSelecionado();quantidadeSelecionada=Math.min(Math.max(1,quantidadeSelecionada),Math.max(1,limite));
+    addQuantity.textContent=String(quantidadeSelecionada);addMinus.disabled=quantidadeSelecionada<=1;addPlus.disabled=quantidadeSelecionada>=limite;
+    addSubmit.disabled=limite<1;addStock.textContent=limite>0?`Você pode adicionar até ${limite} unidade(s).`:'Quantidade máxima já adicionada ao carrinho.';
+  }
+  window.abrirPedido=function(card){
+    const p=produtoDoCard(card);
+    if(!Number.isInteger(p.produto_id)||p.produto_id<1||p.estoque<1)return;
+    produtoSelecionado=p;quantidadeSelecionada=1;addTitle.textContent=p.nome;addPrice.textContent=moedaCentavos(p.preco_centavos)+' cada';renderSeletor();
+    addOverlay.classList.add('open');addOverlay.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';
+  };
+  addMinus.addEventListener('click',()=>{quantidadeSelecionada--;renderSeletor()});
+  addPlus.addEventListener('click',()=>{quantidadeSelecionada++;renderSeletor()});
+  addSubmit.addEventListener('click',()=>{
+    if(!produtoSelecionado||limiteSelecionado()<quantidadeSelecionada)return renderSeletor();
+    const origem=addSubmit.getBoundingClientRect(),destino=trigger.getBoundingClientRect();
+    const atual=carrinho.find(i=>i.produto_id===produtoSelecionado.produto_id);
+    if(atual){atual.quantidade+=quantidadeSelecionada;Object.assign(atual,produtoSelecionado,{quantidade:atual.quantidade})}
+    else carrinho.push({...produtoSelecionado,quantidade:quantidadeSelecionada});
+    salvar();fecharSeletor();
+    const fly=document.createElement('span');fly.className='rp-cart-fly';fly.style.left=(origem.left+origem.width/2-9)+'px';fly.style.top=(origem.top+origem.height/2-9)+'px';fly.style.setProperty('--cart-x',(destino.left+destino.width/2-9)+'px');fly.style.setProperty('--cart-y',(destino.top+destino.height/2-9)+'px');document.body.appendChild(fly);fly.addEventListener('animationend',()=>fly.remove(),{once:true});
+    trigger.classList.remove('rp-cart-pop');requestAnimationFrame(()=>{trigger.classList.add('rp-cart-pop');setTimeout(()=>trigger.classList.remove('rp-cart-pop'),520)});
+  });
+  addClose.addEventListener('click',fecharSeletor);addOverlay.addEventListener('click',e=>{if(e.target===addOverlay)fecharSeletor()});
+  window.rpCarrinhoSincronizar=function(produtos){
+    if(!Array.isArray(produtos))return;
+    const mapa=new Map(produtos.map(p=>[Number(p.id),p]));
+    carrinho=carrinho.flatMap(item=>{
+      const p=mapa.get(item.produto_id);
+      if(!p||!p.ativo||!p.disponivel||Number(p.estoque)<1)return [];
+      return [{...item,nome:p.nome,preco_centavos:Number(p.preco_centavos)||0,estoque:Number(p.estoque)||0,
+        quantidade:Math.min(item.quantidade,Number(p.estoque)||0)}];
+    });
+    salvar();
+  };
+  list.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-cart-action]');if(!btn)return;
+    const id=Number(btn.dataset.id),item=carrinho.find(i=>i.produto_id===id);if(!item)return;
+    if(btn.dataset.cartAction==='remover'||(btn.dataset.cartAction==='menos'&&item.quantidade===1))carrinho=carrinho.filter(i=>i!==item);
+    else if(btn.dataset.cartAction==='menos')item.quantidade--;
+    else if(btn.dataset.cartAction==='mais'&&item.quantidade<item.estoque&&unidades()<MAX_UNIDADES)item.quantidade++;
+    salvar();
+  });
+  async function criarPix(){
+    erro.style.display='none';if(!carrinho.length)return avisar('Seu carrinho está vazio.');
+    const cliente=nome.value.trim(),mail=email.value.trim(),fone=whatsapp.value.replace(/\D/g,'');
+    if(cliente.length<2)return avisar('Informe seu nome.');
+    if(!email.checkValidity()||!mail)return avisar('Informe um e-mail válido.');
+    if(fone.length<10||fone.length>13)return avisar('Informe um WhatsApp válido com DDD.');
+    const original=pagar.textContent;pagar.disabled=true;pagar.textContent='Gerando Pix...';
+    try{
+      const r=await fetch('/api/checkout/pix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        itens:carrinho.map(i=>({produto_id:i.produto_id,quantidade:i.quantidade})),nome:cliente,email:mail,whatsapp:fone,observacao:obs.value.trim()})});
+      const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.erro||'Não foi possível gerar o Pix.');
+      carrinho=[];salvar();fechar();window.RPPix?.abrir(data);
+    }catch(e){avisar(e.message)}finally{pagar.disabled=!carrinho.length;pagar.textContent=original}
+  }
+  function abrirWhatsApp(){
+    if(!carrinho.length)return avisar('Seu carrinho está vazio.');
+    const linhas=['Olá! Vim pelo site da R&P Doces.','Gostaria de reservar para retirada no salão:',
+      ...carrinho.map(i=>`• ${i.quantidade}x ${i.nome}`),`• Total estimado: ${moedaCentavos(total())}`];
+    if(obs.value.trim())linhas.push(`• Observação: ${obs.value.trim()}`);
+    linhas.push('','Gostaria de confirmar preço e disponibilidade. 💗');
+    const texto=encodeURIComponent(linhas.join('\n')),numero=String(window.RP_WHATSAPP_NUMBER||'5533991285907').replace(/\D/g,'');
+    window.open(`https://wa.me/${numero}?text=${texto}`,'_blank','noopener,noreferrer');
+  }
+  trigger.addEventListener('click',abrir);close.addEventListener('click',fechar);pagar.addEventListener('click',criarPix);confirmar.addEventListener('click',abrirWhatsApp);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)fechar()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(addOverlay.classList.contains('open'))fecharSeletor();else if(overlay.classList.contains('open'))fechar()}});
+  render();
+})();
+</script>
+
+
 <style id="rp-pix-style">
 #pixOverlay{position:fixed;inset:0;background:rgba(55,30,34,.48);z-index:10030;display:none;align-items:center;justify-content:center;padding:20px}
 #pixOverlay.open{display:flex}
@@ -2264,6 +2491,7 @@ async function carregarCardapioDinamico(){
     ultimoSnapshotCardapio = snapshotAtual;
     const produtos = Array.isArray(payload.produtos) ? payload.produtos : [];
     window.RP_PRODUTOS = produtos;
+    if (typeof window.rpCarrinhoSincronizar === 'function') window.rpCarrinhoSincronizar(produtos);
 
     const boloGrid = document.getElementById('menu-grid-bolo');
     const pudimGrid = document.getElementById('menu-grid-pudim');
@@ -2304,7 +2532,7 @@ async function carregarCardapioDinamico(){
         <button class="btn-flavor" type="button" ${indisponivel ? 'disabled' : ''}>
           ${indisponivel ? 'Esgotado no momento' : `
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.71.45 3.38 1.3 4.85L2 22l5.35-1.4a9.9 9.9 0 0 0 4.69 1.19h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2m0 1.67c2.2 0 4.27.86 5.82 2.42a8.2 8.2 0 0 1 2.42 5.82c0 4.54-3.7 8.24-8.25 8.24a8.3 8.3 0 0 1-4.2-1.15l-.3-.18-3.17.83.85-3.1-.2-.32a8.2 8.2 0 0 1-1.26-4.37c0-4.55 3.7-8.19 8.29-8.19Z"/></svg>
-          Pedir esse sabor`}
+          Adicionar ao carrinho`}
         </button>
       `;
 

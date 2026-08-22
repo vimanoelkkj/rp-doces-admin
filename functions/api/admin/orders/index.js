@@ -2,6 +2,7 @@ import { json } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
 import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../../lib/mercadoPago.js";
 import { notifyPaidOrder } from "../../../lib/push.js";
+import { baixarEstoquePedido } from "../../../lib/stock.js";
 
 const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
@@ -48,7 +49,11 @@ async function reconcilePendingOrders(env) {
         localStatus,
         pedido.id
       ).run();
-      if (localStatus === 'PAGO') await notifyPaidOrder(env, pedido.id);
+      if (localStatus === 'PAGO') {
+        const estoque = await baixarEstoquePedido(env, pedido.id);
+        if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", pedido.id);
+        await notifyPaidOrder(env, pedido.id);
+      }
     } catch (err) {
       // A reconciliação é uma rede de segurança. Falha ao consultar o MP não
       // deve derrubar a tela administrativa nem gerar uma tempestade de retries.
@@ -74,8 +79,24 @@ export async function onRequestGet({ request, env }) {
       valor_unitario_centavos, valor_total_centavos, cliente_nome, cliente_email,
       cliente_whatsapp, tipo_entrega, observacao, metodo_pagamento, status_pagamento, status_pedido,
       mp_order_id, mp_payment_id, mp_status, mp_status_detail,
-      criado_em, atualizado_em, pago_em
+      criado_em, atualizado_em, pago_em, estoque_baixado_em
     FROM pedidos ORDER BY id DESC LIMIT 250
   `).all();
-  return json({ pedidos: results || [] });
+  const pedidos = results || [];
+  if (!pedidos.length) return json({ pedidos: [] });
+
+  const { results: itemRows } = await env.DB.prepare(`
+    SELECT pedido_id, produto_id, produto_nome, quantidade,
+           valor_unitario_centavos, valor_total_centavos, estoque_baixado_em
+    FROM pedido_itens
+    WHERE pedido_id IN (SELECT id FROM pedidos ORDER BY id DESC LIMIT 250)
+    ORDER BY pedido_id DESC, id
+  `).all();
+  const porPedido = new Map();
+  for (const item of itemRows || []) {
+    if (!porPedido.has(Number(item.pedido_id))) porPedido.set(Number(item.pedido_id), []);
+    porPedido.get(Number(item.pedido_id)).push(item);
+  }
+  for (const pedido of pedidos) pedido.itens = porPedido.get(Number(pedido.id)) || [];
+  return json({ pedidos });
 }

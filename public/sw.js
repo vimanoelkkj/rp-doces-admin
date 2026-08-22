@@ -1,4 +1,4 @@
-const CACHE='rp-doces-shell-v4';
+const CACHE='rp-doces-shell-v5';
 const SHELL=['/','/manifest.webmanifest','/pwa-192.png','/pwa-512.png','/notification-badge.png'];
 
 self.addEventListener('install',event=>{
