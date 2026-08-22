@@ -1545,11 +1545,22 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <div class="container">
 <div class="section-head">
 <span class="eyebrow">Cardápio</span>
-<h2>Escolha seu sabor favorito</h2>
-<p>Clique em um sabor para conversar com a gente no WhatsApp e fazer seu pedido.</p>
+<h2>Escolha seu sabor</h2>
+<p>Bolos no pote e mini pudins feitos com muito carinho para adoçar o seu dia.</p>
 </div>
-<div class="menu-category">
-<h3 class="menu-category-title">🍰 Bolo no Pote</h3>
+<div class="rp-menu-filters" id="rpMenuFilters" aria-label="Filtrar cardápio">
+  <button class="active" type="button" data-menu-filter="TODOS">Todos</button>
+  <button type="button" data-menu-filter="BOLO_NO_POTE">Bolos no pote</button>
+  <button type="button" data-menu-filter="MINI_PUDIM">Mini pudins</button>
+  <button type="button" data-menu-filter="PROMOCOES">Promoções</button>
+</div>
+<section class="rp-menu-featured" id="rpMenuFeatured" hidden>
+  <div class="rp-menu-category-head"><h3 class="menu-category-title">💗 Mais pedidos</h3><button type="button" data-menu-view="DESTAQUES">Ver todos ›</button></div>
+  <div class="menu-grid" id="rp-menu-grid-featured"></div>
+</section>
+<p class="rp-menu-empty" id="rpMenuEmpty" hidden>Nenhum produto disponível neste filtro no momento.</p>
+<div class="menu-category" data-menu-category="BOLO_NO_POTE">
+<div class="rp-menu-category-head"><h3 class="menu-category-title">🍰 Bolos no pote</h3><button type="button" data-menu-view="BOLO_NO_POTE">Ver todos ›</button></div>
 <div class="category-photos">
 <div class="photo-card"><img alt="Bolo no pote R&amp;P Doces" src="/assets/images/rp-image-03.webp"/ decoding="async" loading="lazy"></div>
 <div class="photo-card"><img alt="Bolo no pote R&amp;P Doces" src="/assets/images/rp-image-04.webp"/ decoding="async" loading="lazy"></div>
@@ -1567,8 +1578,8 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
       </div>
     </div>
 </div>
-<div class="menu-category">
-<h3 class="menu-category-title">🍮 Mini Pudim</h3>
+<div class="menu-category" data-menu-category="MINI_PUDIM">
+<div class="rp-menu-category-head"><h3 class="menu-category-title">🍮 Mini pudins</h3><button type="button" data-menu-view="MINI_PUDIM">Ver todos ›</button></div>
 <div class="category-photos">
 <div class="photo-card"><img alt="Mini pudim R&amp;P Doces" src="/assets/images/rp-image-05.webp"/ decoding="async" loading="lazy"></div>
 <div class="photo-card"><img alt="Mini pudim R&amp;P Doces" src="/assets/images/rp-image-06.webp"/ decoding="async" loading="lazy"></div>
@@ -1686,10 +1697,6 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 
 </div>
 </footer>
-<!-- ===== Floating WhatsApp ===== -->
-<div class="whats-float" onclick="pedirGeral()" title="Falar no WhatsApp">
-<svg viewbox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.71.45 3.38 1.3 4.85L2 22l5.35-1.4a9.9 9.9 0 0 0 4.69 1.19h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2m0 1.67c2.2 0 4.27.86 5.82 2.42a8.2 8.2 0 0 1 2.42 5.82c0 4.54-3.7 8.24-8.25 8.24a8.3 8.3 0 0 1-4.2-1.15l-.3-.18-3.17.83.85-3.1-.2-.32a8.2 8.2 0 0 1-1.26-4.37c0-4.55 3.7-8.19 8.29-8.19Z"></path></svg>
-</div>
 <script>
   // ⚠️ MOCKUP: troque pelo número real da sua marca (com DDI 55 + DDD, sem espaços/traços)
   let WHATSAPP_NUMBER = "5533991285907";
@@ -1850,6 +1857,7 @@ function pedirSabor(sabor, tipo){
   @keyframes rpCartFly{to{left:var(--cart-x);top:var(--cart-y);transform:scale(.3);opacity:.25}}
   .rp-cart-list{display:grid;gap:10px;margin:16px 0}
   .rp-cart-empty{padding:22px;text-align:center;border:1px dashed var(--pink-200);border-radius:16px;color:var(--text-soft)}
+  .rp-cart-step{display:contents}.rp-cart-sheet-handle,.rp-cart-mobile-head,.rp-cart-mobile-actions,.rp-cart-checkout-head{display:none}
   .rp-cart-item{display:grid;grid-template-columns:1fr auto;gap:8px 12px;padding:13px;border:1px solid var(--pink-100);border-radius:16px;background:#fff}
   .rp-cart-item strong{color:var(--brown-700);font-size:.94rem}.rp-cart-item small{display:block;color:var(--text-soft);margin-top:3px}
   .rp-cart-controls{display:flex;align-items:center;gap:7px}.rp-cart-controls button{width:31px;height:31px;border:1px solid var(--pink-200);border-radius:9px;background:#fff;color:var(--pink-700);cursor:pointer}.rp-cart-controls .rp-cart-remove{width:auto;padding:0 8px;color:#9b2c2c}
@@ -1862,6 +1870,7 @@ function pedirSabor(sabor, tipo){
   .rp-add-qty{display:flex;align-items:center;justify-content:center;gap:12px;margin:16px 0}.rp-add-qty button{width:42px;height:42px;border:1.5px solid var(--pink-200);border-radius:12px;background:#fff;color:var(--pink-700);font-size:20px;cursor:pointer}.rp-add-qty strong{min-width:42px;text-align:center;font-size:1.1rem;color:var(--brown-700)}
   .rp-add-submit{width:100%;justify-content:center}.rp-add-stock{display:block;text-align:center;color:var(--text-soft);font-size:.82rem;margin-bottom:16px}
   @media(hover:none),(pointer:coarse){.rp-cart-value{max-width:120px;opacity:1}}
+  .rp-mobile-nav,.rp-mobile-menu-overlay{display:none}
   @media(max-width:520px){
     .pedido-overlay{
       padding:16px;
@@ -1881,7 +1890,88 @@ function pedirSabor(sabor, tipo){
     .rp-cart-item{grid-template-columns:minmax(0,1fr) auto;min-width:0}
     .rp-cart-item>div:first-child{min-width:0}
   }
+  @media(max-width:700px){
+    body{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+    .menu-toggle,.rp-cart-trigger,.rp-mobile-cta{display:none!important}
+    .rp-mobile-nav{position:fixed;left:12px;right:12px;bottom:max(8px,env(safe-area-inset-bottom));z-index:10025;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));min-height:61px;padding:5px;border:1px solid var(--pink-100);border-radius:20px;background:rgba(255,250,247,.96);box-shadow:0 14px 38px rgba(85,43,56,.2);backdrop-filter:blur(14px);transition:opacity .2s ease,transform .2s ease}
+    .rp-mobile-nav-item{position:relative;display:flex;min-width:0;min-height:49px;padding:3px 2px;border:0;border-radius:14px;background:transparent;color:var(--text-soft);font:600 .68rem 'Poppins',sans-serif;align-items:center;justify-content:center;flex-direction:column;gap:2px;cursor:pointer}
+    .rp-mobile-nav-item svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .rp-mobile-nav-item.active{color:var(--pink-600);font-weight:700}
+    .rp-mobile-cart-badge{position:absolute;top:2px;left:calc(50% + 8px);display:grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--pink-600);color:#fff;font-size:.62rem;line-height:1}
+    .rp-mobile-cart-total{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pink-600);font-size:.6rem}
+    .rp-mobile-cart-total[hidden]{display:none}
+    .rp-mobile-menu-overlay{position:fixed;inset:0;z-index:10020;display:flex;align-items:flex-end;background:rgba(57,38,45,.42);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);opacity:0;visibility:hidden;transition:opacity .22s ease,visibility .22s ease}
+    .rp-mobile-menu-overlay.open{opacity:1;visibility:visible}
+    .rp-mobile-menu-sheet{width:100%;max-height:calc(100dvh - 78px);overflow:auto;padding:10px 20px calc(84px + env(safe-area-inset-bottom));border-radius:28px 28px 0 0;background:#fffaf7;box-shadow:0 -18px 50px rgba(69,35,45,.2);transform:translateY(104%);transition:transform .27s cubic-bezier(.2,.75,.2,1);touch-action:pan-y}
+    .rp-mobile-menu-overlay.open .rp-mobile-menu-sheet{transform:none}
+    .rp-mobile-menu-handle{position:relative;width:42px;height:4px;margin:0 auto 12px;border-radius:999px;background:var(--pink-200);touch-action:none;cursor:grab}.rp-mobile-menu-handle::before{content:"";position:absolute;inset:-12px -28px}.rp-mobile-menu-handle:active{cursor:grabbing}
+    .rp-mobile-menu-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.rp-mobile-menu-head h2{margin:0;color:var(--brown-700);font-size:1.2rem}.rp-mobile-menu-close{width:42px;height:42px;border:0;border-radius:50%;background:var(--pink-50);color:var(--pink-600);font-size:25px;cursor:pointer}
+    .rp-mobile-menu-list{display:grid}.rp-mobile-menu-link{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:center;padding:13px 0;border:0;border-bottom:1px solid var(--pink-100);background:transparent;color:var(--brown-700);text-align:left;text-decoration:none;cursor:pointer}.rp-mobile-menu-link:last-child{border-bottom:0}.rp-mobile-menu-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:var(--pink-50);color:var(--pink-600);font-size:19px}.rp-mobile-menu-copy strong{display:block;font-size:.86rem}.rp-mobile-menu-copy small{display:block;margin-top:2px;color:var(--text-soft);font-size:.68rem}.rp-mobile-menu-arrow{color:var(--pink-500);font-size:20px}.rp-mobile-menu-badge{display:inline-block;margin-left:5px;padding:2px 6px;border-radius:999px;background:var(--pink-100);color:var(--pink-700);font-size:.6rem;vertical-align:middle}
+    .rp-party-hero{margin:8px 0 14px;padding:16px;border:1px solid var(--pink-100);border-radius:18px;background:linear-gradient(145deg,var(--pink-50),#fff)}.rp-party-hero strong{display:block;color:var(--brown-700);font-size:1.02rem}.rp-party-hero span{display:block;margin-top:4px;color:var(--text-soft);font-size:.78rem}.rp-party-leadtime{margin:0 0 14px;color:var(--pink-700);font-size:.8rem;font-weight:700}.rp-party-label{display:block;margin:14px 0 8px;color:var(--brown-700);font-size:.78rem}.rp-party-options{display:flex;flex-wrap:wrap;gap:7px}.rp-party-option{min-height:38px;padding:8px 11px;border:1px solid var(--pink-100);border-radius:999px;background:#fff;color:var(--text-soft);font:600 .72rem 'Poppins',sans-serif;cursor:pointer}.rp-party-option.active{border-color:var(--pink-300);background:var(--pink-50);color:var(--pink-700)}.rp-party-products{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.rp-party-product{padding:11px 5px;border:1px solid var(--pink-100);border-radius:14px;background:#fff;text-align:center;color:var(--brown-700);font-size:.68rem;font-weight:600}.rp-party-product span{display:block;margin-bottom:4px;font-size:20px}.rp-party-actions{display:grid;gap:8px;margin-top:18px}.rp-party-actions .btn{width:100%;justify-content:center}.rp-party-actions .btn-secondary{background:transparent}
+    body.rp-mobile-menu-open{overflow:hidden}
+    body.rp-modal-open .rp-mobile-nav{opacity:0;transform:translateY(18px);pointer-events:none}
+    .pedido-overlay{z-index:10020;display:flex;align-items:flex-end;justify-content:center;padding:0;opacity:0;visibility:hidden;transition:opacity .22s ease,visibility .22s ease}
+    .pedido-overlay.open{opacity:1;visibility:visible}
+    .pedido-modal{width:100%;max-width:none;margin:0;border-radius:28px 28px 0 0;border-bottom:0;transform:translateY(104%);transition:transform .27s cubic-bezier(.2,.75,.2,1)}
+    .pedido-overlay.open .pedido-modal{transform:none}
+    .pedido-modal-scroll{max-height:calc(100dvh - 78px);padding:10px 20px calc(84px + env(safe-area-inset-bottom));overflow-x:hidden}
+    .rp-cart-sheet-handle{position:relative;display:block;width:42px;height:4px;margin:0 auto 12px;border-radius:999px;background:var(--pink-200);touch-action:none;cursor:grab}.rp-cart-sheet-handle::before{content:"";position:absolute;inset:-12px -28px}.rp-cart-sheet-handle:active{cursor:grabbing}
+    .pedido-close{top:12px;right:18px;z-index:2}
+    .rp-cart-step{display:block}.rp-cart-step--checkout{display:none}.pedido-modal.rp-cart-checkout-active .rp-cart-step--items{display:none}.pedido-modal.rp-cart-checkout-active .rp-cart-step--checkout{display:block}
+    .rp-cart-desktop-title{display:none!important}.rp-cart-mobile-head{display:block;padding-right:48px}.rp-cart-mobile-head h3{margin:0!important;font-size:1.25rem}.rp-cart-mobile-head p{margin:3px 0 0;color:var(--text-soft);font-size:.76rem}.rp-cart-mobile-actions{display:grid;gap:8px;margin-top:16px}.rp-cart-mobile-actions .btn{width:100%;justify-content:center}.rp-cart-mobile-actions .btn-secondary{background:transparent}.rp-cart-mobile-actions .btn[hidden]{display:none}
+    .rp-cart-checkout-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}.rp-cart-checkout-head>button{width:40px;height:40px;border:1px solid var(--pink-200);border-radius:12px;background:#fff;color:var(--pink-700);font-size:20px;cursor:pointer}.rp-cart-checkout-head .eyebrow{margin:0}.rp-cart-checkout-head h3{margin:2px 0 0!important;font-size:1.2rem}
+    .rp-cart-empty{padding:28px 16px}.rp-cart-item{padding:11px}.rp-cart-note{margin-top:2px}
+    body.rp-cart-sheet-open{overflow:hidden}
+  }
 </style>
+
+<div class="rp-mobile-menu-overlay" id="rpMobileMenuOverlay" aria-hidden="true">
+  <section class="rp-mobile-menu-sheet" id="rpMobileMenuSheet" role="dialog" aria-modal="true" aria-labelledby="rpMobileMenuTitle">
+    <div class="rp-mobile-menu-handle" aria-hidden="true"></div>
+    <div class="rp-mobile-menu-head"><h2 id="rpMobileMenuTitle">Menu</h2><button class="rp-mobile-menu-close" id="rpMobileMenuClose" type="button" aria-label="Fechar menu">×</button></div>
+    <nav class="rp-mobile-menu-list" aria-label="Outras opções">
+      <a class="rp-mobile-menu-link" href="#sabores" data-mobile-menu-link><span class="rp-mobile-menu-icon">🛍️</span><span class="rp-mobile-menu-copy"><strong>Como pedir</strong><small>Escolha os doces e adicione ao carrinho</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+      <button class="rp-mobile-menu-link" type="button" data-mobile-party><span class="rp-mobile-menu-icon">🎂</span><span class="rp-mobile-menu-copy"><strong>Pedidos para festa <span class="rp-mobile-menu-badge">7 dias</span></strong><small>Informações para encomendas especiais</small></span><span class="rp-mobile-menu-arrow">›</span></button>
+      <a class="rp-mobile-menu-link" href="#sobre" data-mobile-menu-link><span class="rp-mobile-menu-icon">♡</span><span class="rp-mobile-menu-copy"><strong>Sobre nós</strong><small>Nossa história e nossos valores</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+      <a class="rp-mobile-menu-link" href="#onde-encontrar" data-mobile-menu-link><span class="rp-mobile-menu-icon">⌖</span><span class="rp-mobile-menu-copy"><strong>Localização</strong><small>Veja onde estamos</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+      <a class="rp-mobile-menu-link" href="#contato" data-mobile-menu-link><span class="rp-mobile-menu-icon">☎</span><span class="rp-mobile-menu-copy"><strong>Contato</strong><small>Fale com a gente pelo WhatsApp</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+      <a class="rp-mobile-menu-link" href="/admin/"><span class="rp-mobile-menu-icon">⚙</span><span class="rp-mobile-menu-copy"><strong>Painel Admin</strong><small>Acesso administrativo</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+    </nav>
+  </section>
+</div>
+
+<div class="rp-mobile-menu-overlay" id="rpPartyOverlay" aria-hidden="true">
+  <section class="rp-mobile-menu-sheet" id="rpPartySheet" role="dialog" aria-modal="true" aria-labelledby="rpPartyTitle">
+    <div class="rp-mobile-menu-handle" aria-hidden="true"></div>
+    <div class="rp-mobile-menu-head"><h2 id="rpPartyTitle">🎂 Pedidos para festa</h2><button class="rp-mobile-menu-close" id="rpPartyClose" type="button" aria-label="Fechar pedidos para festa">×</button></div>
+    <div class="rp-party-hero"><strong>Vai comemorar?</strong><span>Monte uma encomenda especial para sua ocasião.</span></div>
+    <p class="rp-party-leadtime">📅 Antecedência mínima: 7 dias</p>
+    <strong class="rp-party-label">Qual é a ocasião?</strong>
+    <div class="rp-party-options" id="rpPartyOptions">
+      <button class="rp-party-option active" type="button" data-party-occasion="Aniversário">Aniversário</button>
+      <button class="rp-party-option" type="button" data-party-occasion="Casamento">Casamento</button>
+      <button class="rp-party-option" type="button" data-party-occasion="Festa">Festa</button>
+      <button class="rp-party-option" type="button" data-party-occasion="Outro">Outro</button>
+    </div>
+    <strong class="rp-party-label">Opções para encomenda</strong>
+    <div class="rp-party-products">
+      <div class="rp-party-product"><span>🍰</span>Bolos no pote</div>
+      <div class="rp-party-product"><span>🍮</span>Mini pudins</div>
+      <div class="rp-party-product"><span>💗</span>Combinações</div>
+    </div>
+    <div class="rp-party-actions">
+      <button class="btn btn-primary" id="rpPartyPlan" type="button">Planejar minha festa</button>
+      <button class="btn btn-secondary" id="rpPartyWhatsapp" type="button">Falar pelo WhatsApp</button>
+    </div>
+  </section>
+</div>
+
+<nav class="rp-mobile-nav" aria-label="Navegação principal mobile">
+  <button class="rp-mobile-nav-item" type="button" data-mobile-target="sabores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14l-1 11H6L5 9Z"/><path d="M8 9a4 4 0 0 1 8 0M9 13h6"/></svg><span>Sabores</span></button>
+  <button class="rp-mobile-nav-item" id="rpMobileParty" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13h14v7H5zM7 9h10v4H7zM9 5h6v4H9zM12 2v3"/></svg><span>Festas</span></button>
+  <button class="rp-mobile-nav-item" id="rpMobileCart" type="button"><span class="rp-mobile-cart-badge" id="rpMobileCartCount">0</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2 11h10l2-8H6M9 20h.01M17 20h.01"/></svg><span>Carrinho</span><small class="rp-mobile-cart-total" id="rpMobileCartValue" hidden></small></button>
+  <button class="rp-mobile-nav-item" id="rpMobileMenu" type="button" aria-expanded="false" aria-controls="rpMobileMenuOverlay"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg><span>Menu</span></button>
+</nav>
 
 <button class="rp-cart-trigger" id="rpCartTrigger" type="button" aria-label="Abrir carrinho">
   <span aria-hidden="true">🛒</span> Carrinho <span class="rp-cart-value" id="rpCartValue">R$ 0,00</span> <span class="rp-cart-count" id="rpCartCount">0</span>
@@ -1906,6 +1996,7 @@ function pedirSabor(sabor, tipo){
 <div class="pedido-overlay" id="pedidoOverlay" aria-hidden="true">
   <div class="pedido-modal" role="dialog" aria-modal="true" aria-labelledby="pedidoTitulo">
    <div class="pedido-modal-scroll">
+    <div class="rp-cart-sheet-handle" aria-hidden="true"></div>
     <button class="pedido-close" id="pedidoClose" aria-label="Fechar">×</button>
     <div class="pedido-product-head rp-cart-legacy">
       <div class="pedido-product-emoji" id="pedidoEmoji" aria-hidden="true">🍰</div>
@@ -1926,31 +2017,40 @@ function pedirSabor(sabor, tipo){
       <small class="pedido-stock-hint" id="pedidoEstoque"></small>
     </div>
 
-    <span class="eyebrow">Seu pedido</span>
-    <h3 style="margin:5px 36px 4px;color:var(--brown-700)">Carrinho</h3>
-    <div class="rp-cart-list" id="rpCartList"></div>
-    <p class="rp-cart-note">O carrinho não reserva estoque. Preços, promoções e disponibilidade serão confirmados ao gerar o Pix.</p>
+    <section class="rp-cart-step rp-cart-step--items" id="rpCartItemsStep">
+      <span class="eyebrow rp-cart-desktop-title">Seu pedido</span>
+      <h3 class="rp-cart-desktop-title" style="margin:5px 36px 4px;color:var(--brown-700)">Carrinho</h3>
+      <div class="rp-cart-mobile-head"><h3>🛒 Seu carrinho</h3><p id="rpCartItemsCount">0 itens</p></div>
+      <div class="rp-cart-list" id="rpCartList"></div>
+      <p class="rp-cart-note">O carrinho não reserva estoque. Preços, promoções e disponibilidade serão confirmados ao gerar o Pix.</p>
+      <div class="rp-cart-mobile-actions">
+        <button class="btn btn-primary" id="rpCartContinue" type="button">Continuar para pagamento</button>
+        <button class="btn btn-secondary" id="rpCartShop" type="button">Continuar comprando</button>
+      </div>
+    </section>
 
+    <section class="rp-cart-step rp-cart-step--checkout" id="rpCartCheckoutStep">
+    <div class="rp-cart-checkout-head"><button type="button" id="rpCartBack" aria-label="Voltar ao carrinho">←</button><div><span class="eyebrow">Finalizar pedido</span><h3>Seus dados</h3></div></div>
     <div class="pedido-field">
       <label for="pedidoNome">Seu nome</label>
-      <input id="pedidoNome" type="text" maxlength="100" autocomplete="name" placeholder="Como podemos te chamar?">
+      <input id="pedidoNome" type="text" maxlength="100" autocomplete="off" placeholder="Como podemos te chamar?">
     </div>
 
     <div class="pedido-field">
       <label for="pedidoEmail">E-mail</label>
-      <input id="pedidoEmail" type="email" maxlength="160" autocomplete="email" placeholder="voce@exemplo.com">
+      <input id="pedidoEmail" type="email" maxlength="160" autocomplete="off" placeholder="voce@exemplo.com">
       <small style="display:block;margin-top:6px;color:var(--text-soft)">Usado somente para identificar o pagamento no Mercado Pago.</small>
     </div>
 
     <div class="pedido-field">
       <label for="pedidoWhatsapp">WhatsApp</label>
-      <input id="pedidoWhatsapp" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="(31) 99999-9999">
+      <input id="pedidoWhatsapp" type="tel" maxlength="20" autocomplete="off" inputmode="tel" placeholder="(31) 99999-9999">
       <small style="display:block;margin-top:6px;color:var(--text-soft)">Usaremos este número para avisar quando seu pedido estiver pronto para retirada.</small>
     </div>
 
     <div class="pedido-field">
       <label for="pedidoObs">Observação <span style="font-weight:400;color:var(--text-soft)">(opcional)</span></label>
-      <textarea id="pedidoObs" placeholder="Ex.: separar em uma sacolinha, reservar até mais tarde..."></textarea>
+      <textarea id="pedidoObs" autocomplete="off" placeholder="Ex.: separar em uma sacolinha, reservar até mais tarde..."></textarea>
     </div>
 
     <div class="pedido-atendimento">
@@ -1978,6 +2078,7 @@ function pedirSabor(sabor, tipo){
       </button>
       <div id="pedidoErro" role="alert" style="display:none;color:#9b2c2c;font-size:.88rem;text-align:center"></div>
     </div>
+    </section>
    </div>
   </div>
 </div>
@@ -2220,10 +2321,14 @@ function pedirSabor(sabor, tipo){
   const STORAGE_KEY='rp_doces_carrinho_v1';
   const MAX_UNIDADES=50;
   const overlay=document.getElementById('pedidoOverlay');
+  const modal=overlay.querySelector('.pedido-modal');
   const list=document.getElementById('rpCartList');
   const count=document.getElementById('rpCartCount');
   const cartValue=document.getElementById('rpCartValue');
   const trigger=document.getElementById('rpCartTrigger');
+  const mobileCart=document.getElementById('rpMobileCart');
+  const mobileCount=document.getElementById('rpMobileCartCount');
+  const mobileValue=document.getElementById('rpMobileCartValue');
   const close=document.getElementById('pedidoClose');
   const nome=document.getElementById('pedidoNome');
   const email=document.getElementById('pedidoEmail');
@@ -2232,6 +2337,10 @@ function pedirSabor(sabor, tipo){
   const pagar=document.getElementById('pedidoPagarPix');
   const confirmar=document.getElementById('pedidoConfirmar');
   const erro=document.getElementById('pedidoErro');
+  const itemsCount=document.getElementById('rpCartItemsCount');
+  const continueButton=document.getElementById('rpCartContinue');
+  const shopButton=document.getElementById('rpCartShop');
+  const backButton=document.getElementById('rpCartBack');
   const addOverlay=document.getElementById('rpAddOverlay');
   const addClose=document.getElementById('rpAddClose');
   const addTitle=document.getElementById('rpAddTitle');
@@ -2262,10 +2371,19 @@ function pedirSabor(sabor, tipo){
   function total(){return carrinho.reduce((s,i)=>s+i.quantidade*i.preco_centavos,0)}
   function escCart(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
   function render(){
-    count.textContent=String(unidades());
-    cartValue.textContent=moedaCentavos(total());
+    const numeroUnidades=unidades(),valorTotal=total(),quantidade=String(numeroUnidades),valor=moedaCentavos(valorTotal);
+    count.textContent=quantidade;
+    cartValue.textContent=valor;
+    if(mobileCount)mobileCount.textContent=quantidade;
+    if(mobileValue){mobileValue.textContent=valor;mobileValue.hidden=numeroUnidades===0}
+    if(itemsCount)itemsCount.textContent=`${numeroUnidades} ${numeroUnidades===1?'item':'itens'}`;
+    if(continueButton){continueButton.hidden=numeroUnidades===0;continueButton.disabled=numeroUnidades===0}
+    if(shopButton)shopButton.textContent=numeroUnidades===0?'Ver sabores':'Continuar comprando';
+    window.RP_CARRINHO_ITENS=carrinho.map(item=>({...item}));
+    dispatchEvent(new CustomEvent('rp-cart-updated',{detail:{itens:window.RP_CARRINHO_ITENS,quantidade:numeroUnidades,total_centavos:valorTotal}}));
     if(!carrinho.length){
-      list.innerHTML='<div class="rp-cart-empty">Seu carrinho está vazio.<br><small>Escolha seus doces no cardápio.</small></div>';
+      modal.classList.remove('rp-cart-checkout-active');
+      list.innerHTML='<div class="rp-cart-empty">Seu carrinho está vazio</div>';
       pagar.disabled=true; confirmar.disabled=true; return;
     }
     pagar.disabled=false; confirmar.disabled=false;
@@ -2279,8 +2397,15 @@ function pedirSabor(sabor, tipo){
       </div></div>`).join('')+
       `<div class="pedido-total"><span>Total estimado</span><strong>${moedaCentavos(total())}</strong></div>`;
   }
-  function abrir(){erro.style.display='none';overlay.classList.add('open');overlay.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';document.body.classList.add('rp-modal-open')}
-  function fechar(){overlay.classList.remove('open');overlay.setAttribute('aria-hidden','true');document.body.style.overflow='';document.body.classList.remove('rp-modal-open')}
+  function mostrarItens(){modal.classList.remove('rp-cart-checkout-active');modal.querySelector('.pedido-modal-scroll')?.scrollTo({top:0,behavior:'smooth'})}
+  function mostrarCheckout(){if(!carrinho.length)return;modal.classList.add('rp-cart-checkout-active');modal.querySelector('.pedido-modal-scroll')?.scrollTo({top:0,behavior:'smooth'})}
+  function abrir(){
+    erro.style.display='none';
+    if(innerWidth<=700){dispatchEvent(new Event('rp-close-mobile-sheets'));mostrarItens();document.body.classList.add('rp-cart-sheet-open')}
+    else document.body.classList.add('rp-modal-open');
+    overlay.classList.add('open');overlay.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';mobileCart?.classList.add('active');
+  }
+  function fechar(){overlay.classList.remove('open');overlay.setAttribute('aria-hidden','true');document.body.style.overflow='';document.body.classList.remove('rp-modal-open','rp-cart-sheet-open');modal.classList.remove('rp-cart-checkout-active');modal.style.transform='';mobileCart?.classList.remove('active');dispatchEvent(new Event('rp-mobile-nav-refresh'))}
   function avisar(msg){erro.textContent=msg;erro.style.display='block'}
   function produtoDoCard(card){
     const id=Number(card?.dataset?.productId);
@@ -2289,6 +2414,20 @@ function pedirSabor(sabor, tipo){
     return {produto_id:id,nome:card?.querySelector('h3')?.childNodes?.[0]?.textContent?.trim()||card?.querySelector('h3')?.textContent?.trim()||'Produto',
       preco_centavos:Number.isFinite(preco)?preco:0,estoque:Number.isFinite(estoque)?Math.max(0,estoque):0};
   }
+  window.rpCarrinhoQuantidade=id=>carrinho.find(item=>item.produto_id===Number(id))?.quantidade||0;
+  window.rpCarrinhoAlterar=function(card,delta){
+    const produto=produtoDoCard(card),atual=carrinho.find(item=>item.produto_id===produto.produto_id);
+    if(!Number.isInteger(produto.produto_id)||produto.produto_id<1||!Number.isInteger(delta)||!delta)return false;
+    if(delta>0){
+      if(produto.estoque<1||(atual?.quantidade||0)>=produto.estoque||unidades()>=MAX_UNIDADES)return false;
+      if(atual){atual.quantidade++;Object.assign(atual,produto,{quantidade:atual.quantidade})}
+      else carrinho.push({...produto,quantidade:1});
+    }else{
+      if(!atual)return false;
+      if(atual.quantidade<=1)carrinho=carrinho.filter(item=>item!==atual);else atual.quantidade--;
+    }
+    salvar();return true;
+  };
   function fecharSeletor(){addOverlay.classList.remove('open');addOverlay.setAttribute('aria-hidden','true');produtoSelecionado=null;document.body.style.overflow=''}
   function limiteSelecionado(){
     if(!produtoSelecionado)return 0;
@@ -2310,7 +2449,7 @@ function pedirSabor(sabor, tipo){
   addPlus.addEventListener('click',()=>{quantidadeSelecionada++;renderSeletor()});
   addSubmit.addEventListener('click',()=>{
     if(!produtoSelecionado||limiteSelecionado()<quantidadeSelecionada)return renderSeletor();
-    const origem=addSubmit.getBoundingClientRect(),destino=trigger.getBoundingClientRect();
+    const origem=addSubmit.getBoundingClientRect(),destino=(innerWidth<=700&&mobileCart?mobileCart:trigger).getBoundingClientRect();
     const atual=carrinho.find(i=>i.produto_id===produtoSelecionado.produto_id);
     if(atual){atual.quantidade+=quantidadeSelecionada;Object.assign(atual,produtoSelecionado,{quantidade:atual.quantidade})}
     else carrinho.push({...produtoSelecionado,quantidade:quantidadeSelecionada});
@@ -2338,6 +2477,9 @@ function pedirSabor(sabor, tipo){
     else if(btn.dataset.cartAction==='mais'&&item.quantidade<item.estoque&&unidades()<MAX_UNIDADES)item.quantidade++;
     salvar();
   });
+  continueButton?.addEventListener('click',mostrarCheckout);
+  backButton?.addEventListener('click',mostrarItens);
+  shopButton?.addEventListener('click',()=>{fechar();document.getElementById('sabores')?.scrollIntoView({behavior:'smooth'})});
   async function criarPix(){
     erro.style.display='none';if(!carrinho.length)return avisar('Seu carrinho está vazio.');
     const cliente=nome.value.trim(),mail=email.value.trim(),fone=whatsapp.value.replace(/\D/g,'');
@@ -2361,9 +2503,157 @@ function pedirSabor(sabor, tipo){
     const texto=encodeURIComponent(linhas.join('\n')),numero=String(window.RP_WHATSAPP_NUMBER||'5533991285907').replace(/\D/g,'');
     window.open(`https://wa.me/${numero}?text=${texto}`,'_blank','noopener,noreferrer');
   }
-  trigger.addEventListener('click',abrir);close.addEventListener('click',fechar);pagar.addEventListener('click',criarPix);confirmar.addEventListener('click',abrirWhatsApp);
+  trigger.addEventListener('click',abrir);if(mobileCart)mobileCart.addEventListener('click',abrir);close.addEventListener('click',fechar);pagar.addEventListener('click',criarPix);confirmar.addEventListener('click',abrirWhatsApp);
   overlay.addEventListener('click',e=>{if(e.target===overlay)fechar()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(addOverlay.classList.contains('open'))fecharSeletor();else if(overlay.classList.contains('open'))fechar()}});
+  addEventListener('rp-close-cart-sheet',()=>{if(innerWidth<=700&&overlay.classList.contains('open'))fechar()});
+  const cartHandle=modal.querySelector('.rp-cart-sheet-handle');let cartTouchStart=0,cartTouchDistance=0,cartPointer=null;
+  cartHandle?.addEventListener('pointerdown',event=>{
+    cartPointer=event.pointerId;cartTouchStart=event.clientY;cartTouchDistance=0;
+    cartHandle.setPointerCapture?.(cartPointer);modal.style.transition='none';
+  });
+  cartHandle?.addEventListener('pointermove',event=>{
+    if(event.pointerId!==cartPointer)return;
+    cartTouchDistance=Math.max(0,event.clientY-cartTouchStart);
+    modal.style.transform=`translateY(${cartTouchDistance}px)`;
+  });
+  const terminarArrasteCarrinho=event=>{
+    if(event.pointerId!==cartPointer)return;
+    cartHandle.releasePointerCapture?.(cartPointer);cartPointer=null;modal.style.transition='';
+    if(cartTouchDistance>70)fechar();else modal.style.transform='';
+    cartTouchDistance=0;
+  };
+  cartHandle?.addEventListener('pointerup',terminarArrasteCarrinho);
+  cartHandle?.addEventListener('pointercancel',terminarArrasteCarrinho);
   render();
+})();
+</script>
+
+<script id="rp-mobile-bottom-nav">
+(() => {
+  const menuOverlay=document.getElementById('rpMobileMenuOverlay');
+  const menuSheet=document.getElementById('rpMobileMenuSheet');
+  const partyOverlay=document.getElementById('rpPartyOverlay');
+  const partySheet=document.getElementById('rpPartySheet');
+  const menuButton=document.getElementById('rpMobileMenu');
+  const partyButton=document.getElementById('rpMobileParty');
+  const flavorsButton=document.querySelector('[data-mobile-target="sabores"]');
+  const cartButton=document.getElementById('rpMobileCart');
+  const menuClose=document.getElementById('rpMobileMenuClose');
+  const partyClose=document.getElementById('rpPartyClose');
+  const partyOptions=document.getElementById('rpPartyOptions');
+  const partyPlan=document.getElementById('rpPartyPlan');
+  const partyWhatsapp=document.getElementById('rpPartyWhatsapp');
+  if(!menuOverlay||!menuSheet||!partyOverlay||!partySheet||!menuButton||!menuClose||!partyClose)return;
+
+  const navItems=[flavorsButton,partyButton,cartButton,menuButton].filter(Boolean);
+  function limparAtivos(){navItems.forEach(item=>item.classList.remove('active'))}
+  function atualizarSecaoAtiva(){
+    if(innerWidth>700||menuOverlay.classList.contains('open')||partyOverlay.classList.contains('open')||document.body.classList.contains('rp-modal-open'))return;
+    const ponto=innerHeight*.45;
+    const sabores=document.getElementById('sabores')?.getBoundingClientRect();
+    const secoesMenu=['sobre','onde-encontrar','contato'].map(id=>document.getElementById(id)?.getBoundingClientRect()).filter(Boolean);
+    limparAtivos();
+    if(sabores&&sabores.top<=ponto&&sabores.bottom>=ponto)flavorsButton?.classList.add('active');
+    else if(secoesMenu.some(secao=>secao.top<=ponto&&secao.bottom>=ponto))menuButton.classList.add('active');
+  }
+
+  function bloquearPagina(){document.body.classList.add('rp-mobile-menu-open')}
+  function liberarPagina(){
+    if(!menuOverlay.classList.contains('open')&&!partyOverlay.classList.contains('open'))document.body.classList.remove('rp-mobile-menu-open');
+  }
+  let trocaTimer=0;
+  function trocarPainel(abrirProximo){
+    const cartOverlay=document.getElementById('pedidoOverlay');
+    const haviaPainel=menuOverlay.classList.contains('open')||partyOverlay.classList.contains('open')||cartOverlay?.classList.contains('open');
+    clearTimeout(trocaTimer);
+    if(menuOverlay.classList.contains('open'))fecharMenu();
+    if(partyOverlay.classList.contains('open'))fecharFestas();
+    if(cartOverlay?.classList.contains('open'))dispatchEvent(new Event('rp-close-cart-sheet'));
+    if(haviaPainel)trocaTimer=setTimeout(abrirProximo,230);
+    else abrirProximo();
+  }
+  function abrirMenu(){
+    if(innerWidth>700)return;
+    dispatchEvent(new Event('rp-close-cart-sheet'));
+    menuOverlay.classList.add('open');
+    menuOverlay.setAttribute('aria-hidden','false');
+    limparAtivos();menuButton.classList.add('active');
+    menuButton.setAttribute('aria-expanded','true');
+    bloquearPagina();menuClose.focus({preventScroll:true});
+  }
+  function fecharMenu(){
+    menuOverlay.classList.remove('open');
+    menuOverlay.setAttribute('aria-hidden','true');
+    limparAtivos();
+    menuButton.setAttribute('aria-expanded','false');
+    menuSheet.style.transform='';liberarPagina();atualizarSecaoAtiva();
+  }
+  function abrirFestas(){
+    if(innerWidth>700)return;
+    dispatchEvent(new Event('rp-close-cart-sheet'));
+    if(menuOverlay.classList.contains('open'))fecharMenu();
+    partyOverlay.classList.add('open');
+    partyOverlay.setAttribute('aria-hidden','false');
+    limparAtivos();partyButton?.classList.add('active');
+    bloquearPagina();partyClose.focus({preventScroll:true});
+  }
+  function fecharFestas(){
+    partyOverlay.classList.remove('open');
+    partyOverlay.setAttribute('aria-hidden','true');
+    limparAtivos();partySheet.style.transform='';liberarPagina();atualizarSecaoAtiva();
+  }
+
+  menuButton.addEventListener('click',()=>menuOverlay.classList.contains('open')?fecharMenu():trocarPainel(abrirMenu));
+  partyButton?.addEventListener('click',()=>partyOverlay.classList.contains('open')?fecharFestas():trocarPainel(abrirFestas));
+  cartButton?.addEventListener('click',event=>{
+    if(!menuOverlay.classList.contains('open')&&!partyOverlay.classList.contains('open'))return;
+    event.preventDefault();event.stopImmediatePropagation();
+    trocarPainel(()=>cartButton.click());
+  },true);
+  menuClose.addEventListener('click',fecharMenu);partyClose.addEventListener('click',fecharFestas);
+  menuOverlay.addEventListener('click',event=>{if(event.target===menuOverlay)fecharMenu()});
+  partyOverlay.addEventListener('click',event=>{if(event.target===partyOverlay)fecharFestas()});
+  document.querySelectorAll('[data-mobile-menu-link]').forEach(link=>link.addEventListener('click',fecharMenu));
+  document.querySelector('[data-mobile-party]')?.addEventListener('click',()=>trocarPainel(abrirFestas));
+  flavorsButton?.addEventListener('click',()=>trocarPainel(()=>{document.getElementById('sabores')?.scrollIntoView({behavior:'smooth'});limparAtivos();flavorsButton.classList.add('active')}));
+  document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(partyOverlay.classList.contains('open'))fecharFestas();else if(menuOverlay.classList.contains('open'))fecharMenu()});
+  addEventListener('scroll',atualizarSecaoAtiva,{passive:true});
+  addEventListener('rp-mobile-nav-refresh',atualizarSecaoAtiva);
+  addEventListener('rp-close-mobile-sheets',()=>{if(menuOverlay.classList.contains('open'))fecharMenu();if(partyOverlay.classList.contains('open'))fecharFestas()});
+  addEventListener('resize',()=>{if(innerWidth>700){if(menuOverlay.classList.contains('open'))fecharMenu();if(partyOverlay.classList.contains('open'))fecharFestas()}else atualizarSecaoAtiva()});
+
+  function habilitarArraste(sheet,fechar){
+    const handle=sheet.querySelector('.rp-mobile-menu-handle');let inicio=0,distancia=0,ponteiro=null;
+    if(!handle)return;
+    handle.addEventListener('pointerdown',event=>{
+      ponteiro=event.pointerId;inicio=event.clientY;distancia=0;
+      handle.setPointerCapture?.(ponteiro);sheet.style.transition='none';
+    });
+    handle.addEventListener('pointermove',event=>{
+      if(event.pointerId!==ponteiro)return;
+      distancia=Math.max(0,event.clientY-inicio);
+      sheet.style.transform=`translateY(${distancia}px)`;
+    });
+    const terminar=event=>{
+      if(event.pointerId!==ponteiro)return;
+      handle.releasePointerCapture?.(ponteiro);ponteiro=null;sheet.style.transition='';
+      if(distancia>70)fechar();else sheet.style.transform='';
+      distancia=0;
+    };
+    handle.addEventListener('pointerup',terminar);
+    handle.addEventListener('pointercancel',terminar);
+  }
+  habilitarArraste(menuSheet,fecharMenu);habilitarArraste(partySheet,fecharFestas);
+
+  let ocasiao='Aniversário';
+  partyOptions?.addEventListener('click',event=>{const option=event.target.closest('[data-party-occasion]');if(!option)return;ocasiao=option.dataset.partyOccasion;partyOptions.querySelectorAll('.rp-party-option').forEach(item=>item.classList.toggle('active',item===option))});
+  function falarSobreFesta(){
+    const texto=`Olá! 🎂 Vim pelo site da R&P Doces e gostaria de planejar uma encomenda para festa.\n\nOcasião: ${ocasiao}\nAntecedência mínima: 7 dias.\n\nGostaria de conhecer as opções de bolos no pote, mini pudins e combinações.`;
+    if(typeof window.abrirWhatsApp==='function')window.abrirWhatsApp(texto);
+    else window.open(`https://wa.me/${String(window.RP_WHATSAPP_NUMBER||'5533991285907').replace(/\D/g,'')}?text=${encodeURIComponent(texto)}`,'_blank','noopener,noreferrer');
+  }
+  partyPlan?.addEventListener('click',falarSobreFesta);partyWhatsapp?.addEventListener('click',falarSobreFesta);
+  atualizarSecaoAtiva();
 })();
 </script>
 
@@ -2475,6 +2765,18 @@ function pedirSabor(sabor, tipo){
 })();
 </script>
 
+<style id="rp-menu-showcase-style">
+.rp-menu-filters{display:flex;gap:8px;margin:0 0 30px;overflow-x:auto;scrollbar-width:none}.rp-menu-filters::-webkit-scrollbar{display:none}.rp-menu-filters button{flex:0 0 auto;min-height:40px;padding:9px 14px;border:1px solid var(--pink-200);border-radius:999px;background:#fff;color:var(--text-soft);font:600 .78rem 'Poppins',sans-serif;cursor:pointer}.rp-menu-filters button.active{border-color:var(--pink-500);background:var(--pink-600);color:#fff}.rp-menu-featured{margin-bottom:42px}.rp-menu-featured[hidden],.menu-category[hidden]{display:none!important}
+.rp-menu-category-head button{display:none;border:0;background:transparent;color:var(--pink-600);font:600 .7rem 'Poppins',sans-serif;cursor:pointer}.rp-menu-category-head button[hidden]{display:none}
+.rp-menu-empty{margin:4px 0 28px;padding:18px;border:1px dashed var(--pink-200);border-radius:16px;background:var(--pink-50);color:var(--text-soft);text-align:center;font-size:.82rem}.rp-menu-empty[hidden]{display:none}
+.rp-card-reveal{animation:rpCardReveal .24s ease both}@keyframes rpCardReveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.rp-card-reveal{animation:none}}
+.rp-card-visual{position:relative;display:grid;place-items:center;min-height:112px;margin:-26px -22px 18px;border-radius:21px 21px 16px 16px;background:linear-gradient(145deg,var(--pink-50),#fff)}.rp-card-visual .flavor-emoji{width:68px;height:68px;font-size:2rem}.rp-card-badges{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:5px;flex-wrap:wrap}.rp-card-badge{display:inline-flex;padding:4px 7px;border-radius:999px;background:#fff;color:var(--pink-700);box-shadow:0 3px 10px rgba(91,47,60,.08);font-size:.62rem;font-weight:800}.rp-card-badge--stock{color:#9b5d22}.rp-card-badge--soldout{background:#f8eef1;color:#8a5966}.rp-card-body{display:flex;flex:1;flex-direction:column}.rp-card-footer{margin-top:auto}.rp-card-price{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin:2px 0 13px;color:var(--pink-700);font-size:1rem;font-weight:800}.rp-card-price s{color:var(--text-soft);font-size:.72rem;font-weight:500}.rp-card-cart{margin-top:auto}.rp-card-qty{display:flex;align-items:center;justify-content:center;gap:8px}.rp-card-qty button,.rp-card-add{min-width:38px;min-height:38px;border:1px solid var(--pink-200);border-radius:11px;background:var(--pink-600);color:#fff;font-weight:800;cursor:pointer}.rp-card-qty button{background:#fff;color:var(--pink-700)}.rp-card-qty strong{min-width:22px;text-align:center;color:var(--brown-700)}.rp-card-add{display:flex;width:100%;align-items:center;justify-content:center;gap:7px}.rp-card-add strong{font-size:1.2rem;line-height:1}.rp-card-soldout{display:block;padding:9px;text-align:center;color:var(--text-soft);font-size:.72rem;font-weight:700}
+@media(max-width:700px){
+  .menu .section-head{margin-bottom:20px}.menu .section-head h2{font-size:1.75rem}.menu .section-head p{font-size:.88rem}.rp-menu-filters{margin:0 -20px 24px;padding:0 20px}.category-photos{display:none}.menu-category{margin-bottom:38px}.menu-category-title{font-size:1.08rem}.rp-menu-category-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}.rp-menu-category-head .menu-category-title{margin-bottom:0}.rp-menu-category-head button{display:block;flex:0 0 auto}.menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flavor-card{min-width:0;height:100%;padding:0 10px 9px;border-radius:16px}.rp-card-visual{box-sizing:border-box;min-height:88px;margin:0 -10px 8px;padding-top:16px;border-radius:15px 15px 12px 12px}.rp-card-visual .flavor-emoji{width:52px;height:52px;font-size:1.7rem}.rp-card-badges{top:6px;left:7px;right:7px;min-height:15px;max-height:29px;gap:3px;align-content:flex-start;overflow:hidden}.rp-card-badge{padding:2px 4px;font-size:.49rem;line-height:1.2;white-space:nowrap}.rp-card-body{min-height:0}.flavor-card h3{display:-webkit-box;min-height:2.45em;margin:0 0 3px;overflow:hidden;font-size:.83rem;line-height:1.22;-webkit-box-orient:vertical;-webkit-line-clamp:2}.flavor-card p{display:-webkit-box;min-height:2.55em;margin:0 0 6px;overflow:hidden;font-size:.67rem;line-height:1.28;-webkit-box-orient:vertical;-webkit-line-clamp:2}.rp-card-footer{display:flex;min-width:0;align-items:flex-end;justify-content:space-between;gap:5px;margin-top:auto}.rp-card-price{min-width:0;gap:3px;margin:0;font-size:.84rem;line-height:1.15}.rp-card-price s{font-size:.57rem}.rp-card-cart{flex:0 0 auto;margin:0}.rp-stock-status{display:none}.rp-card-add{width:34px;min-width:34px;min-height:34px;margin-left:auto;border-radius:10px}.rp-card-add span{display:none}.rp-card-qty{justify-content:flex-end;gap:3px}.rp-card-qty button{min-width:29px;min-height:29px}.rp-card-qty strong{min-width:14px;font-size:.75rem}.rp-card-soldout{max-width:58px;padding:3px 0;font-size:.58rem;line-height:1.15}.rp-menu-featured{margin-bottom:34px}
+}
+@media(max-width:360px){.menu-grid{gap:7px}.flavor-card{padding-inline:8px}.rp-card-visual{margin-inline:-8px}.rp-card-badge{padding-inline:3px;font-size:.46rem}.flavor-card h3{font-size:.78rem}.flavor-card p{font-size:.64rem}.rp-card-price{font-size:.78rem}.rp-card-qty{gap:2px}.rp-card-qty button{min-width:27px;min-height:28px}.rp-menu-filters{padding-inline:16px}}
+</style>
+
 <script>
 /* ===== Cardápio dinâmico R&P =====
    Se houver produtos no D1, eles substituem os dados locais.
@@ -2495,7 +2797,12 @@ async function carregarCardapioDinamico(){
 
     const boloGrid = document.getElementById('menu-grid-bolo');
     const pudimGrid = document.getElementById('menu-grid-pudim');
-    if (!boloGrid || !pudimGrid) return;
+    const featuredGrid = document.getElementById('rp-menu-grid-featured');
+    const featuredSection = document.getElementById('rpMenuFeatured');
+    const emptyState = document.getElementById('rpMenuEmpty');
+    const filters = document.getElementById('rpMenuFilters');
+    const menuSection = document.getElementById('sabores');
+    if (!boloGrid || !pudimGrid || !featuredGrid || !featuredSection || !emptyState || !filters || !menuSection) return;
 
     if (!produtos.length) {
       boloGrid.classList.remove('is-loading');
@@ -2509,10 +2816,20 @@ async function carregarCardapioDinamico(){
     const formatar = centavos =>
       (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    function card(produto){
-      const indisponivel = !produto.disponivel;
+    function controleCarrinho(produto){
+      const quantidade=typeof window.rpCarrinhoQuantidade==='function'?window.rpCarrinhoQuantidade(produto.id):0;
+      const esgotado=!produto.disponivel||Number(produto.estoque)<=0;
+      if(esgotado)return '<span class="rp-card-soldout">Esgotado</span>';
+      if(quantidade>0)return `<div class="rp-card-qty"><button type="button" data-card-cart-action="-1" aria-label="Remover uma unidade">−</button><strong>${quantidade}</strong><button type="button" data-card-cart-action="1" aria-label="Adicionar uma unidade" ${quantidade>=Number(produto.estoque)?'disabled':''}>+</button></div>`;
+      return '<button class="rp-card-add btn-flavor" type="button" data-card-cart-action="1" aria-label="Adicionar uma unidade ao carrinho"><strong>+</strong><span>Adicionar ao carrinho</span></button>';
+    }
+
+    function card(produto, revelar=false){
+      const estoque=Number(produto.estoque)||0;
+      const indisponivel = !produto.disponivel || estoque<=0;
       const div = document.createElement('div');
       div.className = 'flavor-card' + (indisponivel ? ' flavor-card--indisponivel' : '');
+      if(revelar)div.classList.add('rp-card-reveal');
       div.dataset.productId = produto.id;
       div.dataset.precoCentavos = String(produto.preco_centavos ?? 0);
       div.dataset.precoOriginalCentavos = String(produto.preco_original_centavos ?? produto.preco_centavos ?? 0);
@@ -2520,39 +2837,69 @@ async function carregarCardapioDinamico(){
       div.dataset.categoria = produto.categoria || '';
       div.dataset.disponivel = produto.disponivel ? 'true' : 'false';
       div.dataset.destaque = produto.destaque ? 'true' : 'false';
-      div.dataset.estoque = String(Number(produto.estoque) || 0);
+      div.dataset.estoque = String(estoque);
+      div._rpProduto=produto;
+      const badges=[produto.promocao_vigente?'<span class="rp-card-badge">Promo</span>':'',produto.destaque?'<span class="rp-card-badge">Destaque</span>':'',estoque===1?'<span class="rp-card-badge rp-card-badge--stock">Última unidade</span>':'',indisponivel?'<span class="rp-card-badge rp-card-badge--soldout">Esgotado</span>':''].join('');
       div.innerHTML = `
-        <div class="flavor-top">
+        <div class="rp-card-visual">
+          <div class="rp-card-badges">${badges}</div>
           <div class="flavor-emoji">${rpEscHtml(produto.emoji || (produto.categoria === 'MINI_PUDIM' ? '🍮' : '🍰'))}</div>
-          <div class="flavor-price${produto.promocao_vigente?' rp-promo-price':''}">${produto.promocao_vigente?`<s>${formatar(produto.preco_original_centavos)}</s><span>${formatar(produto.preco_centavos)}</span>`:formatar(produto.preco_centavos)}</div>
         </div>
-        <h3>${rpEscHtml(produto.nome)}${produto.destaque ? ' <span class="rp-featured-badge">Queridinho 💗</span>' : ''}${produto.promocao_vigente ? ' <span class="rp-promo-badge">Promo 💗</span>' : ''}</h3>
-        <p>${rpEscHtml(produto.descricao || '')}</p>
-        <span class="rp-stock-status ${Number(produto.estoque) <= 0 ? 'rp-stock-status--out' : Number(produto.estoque) <= 5 ? 'rp-stock-status--low' : ''}">${Number(produto.estoque) <= 0 ? 'Esgotado' : Number(produto.estoque) === 1 ? 'Última unidade' : Number(produto.estoque) <= 5 ? `Restam ${Number(produto.estoque)}` : 'Disponível'}</span>
-        <button class="btn-flavor" type="button" ${indisponivel ? 'disabled' : ''}>
-          ${indisponivel ? 'Esgotado no momento' : `
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.71.45 3.38 1.3 4.85L2 22l5.35-1.4a9.9 9.9 0 0 0 4.69 1.19h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2m0 1.67c2.2 0 4.27.86 5.82 2.42a8.2 8.2 0 0 1 2.42 5.82c0 4.54-3.7 8.24-8.25 8.24a8.3 8.3 0 0 1-4.2-1.15l-.3-.18-3.17.83.85-3.1-.2-.32a8.2 8.2 0 0 1-1.26-4.37c0-4.55 3.7-8.19 8.29-8.19Z"/></svg>
-          Adicionar ao carrinho`}
-        </button>
+        <div class="rp-card-body">
+          <h3>${rpEscHtml(produto.nome)}</h3>
+          <p>${rpEscHtml(produto.descricao || '')}</p>
+          <div class="rp-card-footer">
+            <div class="rp-card-price">${produto.promocao_vigente?`<s>${formatar(produto.preco_original_centavos)}</s><span>${formatar(produto.preco_centavos)}</span>`:`<span>${formatar(produto.preco_centavos)}</span>`}</div>
+            <div class="rp-card-cart">${controleCarrinho(produto)}</div>
+          </div>
+        </div>
       `;
-
-      const btn = div.querySelector('.btn-flavor');
-      if (!indisponivel) {
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (typeof abrirPedido === 'function') abrirPedido(div);
-        });
-      }
       return div;
     }
 
     window.rpCriarCardProduto = card;
-
-    boloGrid.classList.remove('is-loading');
-    boloGrid.replaceChildren(...produtos.filter(p => p.categoria === 'BOLO_NO_POTE').map(card));
-    pudimGrid.classList.remove('is-loading');
-    pudimGrid.replaceChildren(...produtos.filter(p => p.categoria === 'MINI_PUDIM').map(card));
+    function atualizarControlesCarrinho(){menuSection.querySelectorAll('.flavor-card').forEach(item=>{if(item._rpProduto){const target=item.querySelector('.rp-card-cart');if(target)target.innerHTML=controleCarrinho(item._rpProduto)}})}
+    const limiteInicial=2;
+    const secoesExpandidas=new Set();
+    let filtroAtual='TODOS';
+    function preencherSecao(grid,lista,chave,botao){
+      const mobile=matchMedia('(max-width:700px)').matches;
+      const estado=`${filtroAtual}:${chave}`;
+      const expandida=mobile&&secoesExpandidas.has(estado);
+      const visiveis=mobile&&!expandida?lista.slice(0,limiteInicial):lista;
+      grid.replaceChildren(...visiveis.map((produto,indice)=>card(produto,expandida&&indice>=limiteInicial)));
+      if(botao){
+        botao.hidden=!mobile||lista.length<=limiteInicial;
+        botao.textContent=expandida?'Mostrar menos':'Ver todos ›';
+        botao.setAttribute('aria-expanded',String(expandida));
+      }
+    }
+    function renderizar(filtro='TODOS'){
+      filtroAtual=filtro;
+      const todosDestaques=produtos.filter(produto=>produto.destaque);
+      const filtrados=produtos.filter(produto=>filtro==='TODOS'||produto.categoria===filtro||(filtro==='PROMOCOES'&&produto.promocao_vigente));
+      const bolos=filtrados.filter(produto=>produto.categoria==='BOLO_NO_POTE');
+      const pudins=filtrados.filter(produto=>produto.categoria==='MINI_PUDIM');
+      const destaques=filtro==='TODOS'?todosDestaques:[];
+      const boloCategory=boloGrid.closest('[data-menu-category]'),pudimCategory=pudimGrid.closest('[data-menu-category]');
+      const featuredButton=featuredSection.querySelector('[data-menu-view]');
+      const boloButton=boloCategory.querySelector('[data-menu-view]');
+      const pudimButton=pudimCategory.querySelector('[data-menu-view]');
+      boloGrid.classList.remove('is-loading');preencherSecao(boloGrid,bolos,'BOLO_NO_POTE',boloButton);boloCategory.hidden=!bolos.length;
+      pudimGrid.classList.remove('is-loading');preencherSecao(pudimGrid,pudins,'MINI_PUDIM',pudimButton);pudimCategory.hidden=!pudins.length;
+      preencherSecao(featuredGrid,destaques,'DESTAQUES',featuredButton);featuredSection.hidden=!destaques.length;
+      emptyState.hidden=filtrados.length>0;
+      emptyState.textContent=filtro==='PROMOCOES'?'Nenhuma promoção disponível no momento.':'Nenhum produto disponível neste filtro no momento.';
+      filters.querySelectorAll('[data-menu-filter]').forEach(button=>button.classList.toggle('active',button.dataset.menuFilter===filtro));
+    }
+    filters.onclick=event=>{const button=event.target.closest('[data-menu-filter]');if(button)renderizar(button.dataset.menuFilter)};
+    menuSection.querySelectorAll('[data-menu-view]').forEach(button=>button.onclick=()=>{const estado=`${filtroAtual}:${button.dataset.menuView}`;if(secoesExpandidas.has(estado))secoesExpandidas.delete(estado);else secoesExpandidas.add(estado);renderizar(filtroAtual)});
+    if(!menuSection.dataset.cartControlsReady){
+      menuSection.dataset.cartControlsReady='true';
+      menuSection.addEventListener('click',event=>{const action=event.target.closest('[data-card-cart-action]');if(!action)return;event.preventDefault();event.stopPropagation();const item=action.closest('.flavor-card');window.rpCarrinhoAlterar?.(item,Number(action.dataset.cardCartAction))});
+      addEventListener('rp-cart-updated',atualizarControlesCarrinho);
+    }
+    renderizar();
     if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
   } catch (err) {
     console.info('Cardápio usando fallback local.');
@@ -2927,7 +3274,7 @@ window.rpPwaStatus = async function(){
     return out;
   }
   function enhanceTrack(track){
-    if(!track || track.dataset.rpTrack==='1') return;
+    if(!track || track.dataset.rpTrack==='1' || track.closest('#sabores')) return;
     track.dataset.rpTrack='1';
     track.classList.add('rp-product-track');
     const wrap=document.createElement('div'); wrap.className='rp-track-wrap';
@@ -2943,6 +3290,7 @@ window.rpPwaStatus = async function(){
     track.addEventListener('scroll',state,{passive:true}); new ResizeObserver(state).observe(track); setTimeout(state,50);
   }
   function makeHeader(track,title,filter){
+    if(track.closest('#sabores')) return;
     let section=track.closest('section')||track.parentElement;
     if(section?.dataset.rpVitrine==='1') return;
     if(section) section.dataset.rpVitrine='1';

@@ -15,7 +15,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;gap:16px}.brand{font-weight:700;color:var(--pink2);font-size:1.25rem}.brand small{display:block;color:var(--muted);font-weight:500;font-size:.72rem}
 .btn{border:0;border-radius:14px;padding:11px 16px;font-weight:600;cursor:pointer;background:var(--pink);color:white}.btn.secondary{background:white;color:var(--pink2);border:1px solid var(--line)}.btn.danger{background:#fff0f2;color:var(--danger);border:1px solid #ffd0d8}
 .card{background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 14px 40px rgba(232,84,138,.08)}
-.auth{max-width:440px;margin:8vh auto 0}.auth h1{color:var(--brown);margin:0 0 8px}.auth p{color:var(--muted);margin:0 0 22px}
+.auth{max-width:440px;margin:8vh auto 0}.auth h1{color:var(--brown);margin:0 0 8px}.auth p{color:var(--muted);margin:0 0 22px}.login-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
 .field{margin:13px 0}.field label{display:block;font-size:.84rem;font-weight:600;margin-bottom:6px;color:var(--brown)}
 .field input,.field textarea,.field select{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:12px;background:#fff;outline:none;color:var(--text)}.field textarea{min-height:92px;resize:vertical}.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--pink)}
 .msg{margin-top:12px;font-size:.86rem;color:var(--danger)}.muted{color:var(--muted);font-size:.85rem}
@@ -26,7 +26,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 .modal-bg{position:fixed;inset:0;background:rgba(74,58,63,.35);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}.modal{width:min(520px,100%);max-height:92vh;overflow:auto;background:var(--cream);border:1px solid var(--line);border-radius:22px;padding:22px}.modal h2{margin:0;color:var(--brown)}
 .switchrow{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0}.switchrow label{display:flex;gap:7px;align-items:center;font-size:.86rem}
 .user{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 0;border-bottom:1px solid #ffe8f0}.user:last-child{border:0}.user strong{display:block;color:var(--brown)}.user small{color:var(--muted)}
-.orders-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}.orders-summary .card{padding:16px}.orders-summary small{display:block;color:var(--muted);font-weight:700}.orders-summary strong{display:block;font-size:1.55rem;color:var(--brown);margin-top:4px}.orders-list{display:grid;gap:10px}.order-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:14px;align-items:center;padding:15px 0;border-bottom:1px solid #ffe8f0}.order-row:last-child{border:0}.order-main strong,.order-total strong{color:var(--brown)}.order-main small,.order-total small{display:block;color:var(--muted);margin-top:4px}.order-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.order-status{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;color:var(--brown);font:inherit}.pay-ok{background:#eaf8ee;color:#26723b}.pay-pending{background:#fff5d9;color:#8a6510}.pay-error{background:#fff0f2;color:#a33a4a}.orders-view-toggle{display:flex;gap:8px;margin:0 0 12px}.orders-view-toggle .btn.active{background:var(--pink);color:#fff;border-color:var(--pink)}.order-row.order-new{background:#fff8fb;border:1px solid #ffd7e6;border-radius:14px;padding:15px 12px}.order-row.order-new+.order-row{border-top:0}.operational-badge{background:#f6f1ff;color:#6b4aa0}.order-detail-overlay{position:fixed;inset:0;background:rgba(55,30,34,.48);z-index:10020;display:none;align-items:center;justify-content:center;padding:20px}.order-detail-overlay.open{display:flex}.order-detail-modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 24px 80px rgba(64,31,38,.2);position:relative}.order-detail-close{position:absolute;right:14px;top:10px;border:0;background:transparent;font-size:28px;color:var(--brown);cursor:pointer}.order-detail-modal h3{margin:0 38px 5px 0;color:var(--brown)}.order-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.order-detail-box{padding:12px;border:1px solid #ffe2ec;border-radius:12px;background:#fffafb}.order-detail-box small{display:block;color:var(--muted);font-weight:700;margin-bottom:4px}.order-detail-box strong{color:var(--brown);overflow-wrap:anywhere}.order-detail-note{padding:12px;border-radius:12px;background:#fff8fb;color:var(--brown);margin:12px 0}.order-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}@media(max-width:560px){.order-detail-grid{grid-template-columns:1fr}}@media(max-width:720px){.orders-summary{grid-template-columns:1fr}.order-row{grid-template-columns:1fr}.order-actions{display:flex;justify-content:flex-start}}
+.orders-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}.orders-summary .card{padding:16px}.orders-summary small{display:block;color:var(--muted);font-weight:700}.orders-summary strong{display:block;font-size:1.55rem;color:var(--brown);margin-top:4px}.orders-list{display:grid;gap:10px}.order-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:14px;align-items:center;padding:15px 0;border-bottom:1px solid #ffe8f0}.order-row:last-child{border:0}.order-main strong,.order-total strong{color:var(--brown)}.order-main small,.order-total small{display:block;color:var(--muted);margin-top:4px}.order-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.order-status{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;color:var(--brown);font:inherit}.pay-ok{background:#eaf8ee;color:#26723b}.pay-pending{background:#fff5d9;color:#8a6510}.pay-error{background:#fff0f2;color:#a33a4a}.orders-view-toggle{display:flex;gap:8px;margin:0 0 12px}.orders-view-toggle .btn.active{background:var(--pink);color:#fff;border-color:var(--pink)}.order-row.order-new{background:#fff8fb;border:1px solid #ffd7e6;border-radius:14px;padding:15px 12px}.order-row.order-new+.order-row{border-top:0}.operational-badge{background:#f6f1ff;color:#6b4aa0}.order-detail-overlay{position:fixed;inset:0;background:rgba(55,30,34,.48);z-index:10020;display:none;align-items:center;justify-content:center;padding:20px}.order-detail-overlay.open{display:flex}.order-detail-modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 24px 80px rgba(64,31,38,.2);position:relative}.order-detail-close{position:absolute;right:14px;top:10px;border:0;background:transparent;font-size:28px;color:var(--brown);cursor:pointer}.order-detail-modal h3{margin:0 38px 5px 0;color:var(--brown)}.order-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.order-detail-box{padding:12px;border:1px solid #ffe2ec;border-radius:12px;background:#fffafb}.order-detail-box small{display:block;color:var(--muted);font-weight:700;margin-bottom:4px}.order-detail-box strong{color:var(--brown);overflow-wrap:anywhere}.order-detail-box>span{display:block;margin-top:3px}.order-detail-note{padding:12px;border-radius:12px;background:#fff8fb;color:var(--brown);margin:12px 0}.order-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}@media(max-width:560px){.order-detail-grid{grid-template-columns:1fr}}@media(max-width:720px){.orders-summary{grid-template-columns:1fr}.order-row{grid-template-columns:1fr}.order-actions{display:flex;justify-content:flex-start}}
 @media(max-width:620px){
   .shell{padding:18px 14px 48px}
   .top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:10px;margin-bottom:18px}
@@ -412,11 +412,11 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 </style>
 
 
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="manifest" href="/admin/manifest.webmanifest">
 <meta name="theme-color" content="#ff6b9d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="R&P Doces">
+<meta name="apple-mobile-web-app-title" content="R&P Admin">
 
 
 <style id="rp-delete-modal-style">
@@ -472,7 +472,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     <h1>Primeira configuração 🍰</h1>
     <p>Crie a primeira conta administrativa da R&P.</p>
     <div class="field"><label>Nome</label><input id="setupNome"></div>
-    <div class="field"><label>Usuário</label><input id="setupUsername" autocomplete="username" placeholder="ex.: vitor"></div>
+    <div class="field"><label>Usuário</label><input id="setupUsername" autocomplete="off" placeholder="ex.: vitor"></div>
     <div class="field"><label>E-mail</label><input id="setupEmail" type="email"></div>
     <div class="field"><label>Senha</label><input id="setupSenha" type="password" minlength="8"></div>
     <div class="field"><label>Chave de configuração</label><input id="setupKey" type="password"></div>
@@ -483,10 +483,13 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
   <section id="loginView" class="auth card hidden">
     <h1>R&P Doces Admin</h1>
     <p>Entre para gerenciar cardápio e disponibilidade.</p>
-    <div class="field"><label>Usuário</label><input id="loginUsername" autocomplete="username" placeholder="Seu usuário"></div>
-    <div class="field"><label>Senha</label><input id="loginSenha" type="password" autocomplete="current-password"></div>
-    <button class="btn" id="loginBtn">Entrar</button>
-    <button class="btn secondary" id="forgotBtn" style="margin-left:6px">Esqueci a senha</button>
+    <div class="field"><label>Usuário</label><input id="loginUsername" autocomplete="off" placeholder="Seu usuário"></div>
+    <div class="field"><label>Senha</label><input id="loginSenha" type="password" autocomplete="off"></div>
+    <div class="login-actions">
+      <button class="btn" id="loginBtn">Entrar</button>
+      <button class="btn secondary" id="passkeyLoginBtn" type="button">Entrar com biometria</button>
+      <button class="btn secondary" id="forgotBtn">Esqueci a senha</button>
+    </div>
     <div id="loginMsg" class="msg"></div>
     <p class="muted" style="margin-top:16px">Enquanto o envio por e-mail não estiver configurado, outro administrador também poderá redefinir sua senha pelo painel.</p>
   </section>
@@ -538,6 +541,10 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 
     <section id="tab-usuarios" class="hidden">
       <div class="toolbar"><h2>Administradores</h2><button class="btn" id="novoUsuario">+ Adicionar administrador</button></div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="toolbar" style="margin-bottom:10px"><div><h3 style="margin:0;color:var(--brown)">Biometria e passkeys</h3><p class="muted" style="margin:4px 0 0">Cadastre este aparelho para entrar sem preencher a senha.</p></div><button class="btn secondary" id="registerPasskeyBtn" type="button">Cadastrar biometria</button></div>
+        <div id="passkeysList" class="users-list"><p class="muted">Carregando...</p></div>
+      </div>
       <div class="card" id="usersList"></div>
     </section>
   
@@ -760,7 +767,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     <div class="field">
       <label for="newPassword">Nova senha</label>
       <div class="password-input-wrap">
-        <input id="newPassword" type="password" minlength="8" autocomplete="new-password">
+        <input id="newPassword" type="password" minlength="8" autocomplete="off">
         <button type="button" class="password-eye" id="toggleNewPassword" aria-label="Mostrar senha">👁</button>
       </div>
     </div>
@@ -768,7 +775,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
     <div class="field">
       <label for="confirmNewPassword">Confirmar nova senha</label>
       <div class="password-input-wrap">
-        <input id="confirmNewPassword" type="password" minlength="8" autocomplete="new-password">
+        <input id="confirmNewPassword" type="password" minlength="8" autocomplete="off">
         <button type="button" class="password-eye" id="toggleConfirmPassword" aria-label="Mostrar senha">👁</button>
       </div>
     </div>
@@ -785,6 +792,7 @@ button,input,textarea,select{font:inherit}.hidden{display:none!important}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let me=null, produtos=[], usuarios=[], pedidos=[];
+$$('input:not([type="hidden"]),textarea').forEach(el=>el.setAttribute('autocomplete','off'));
 
 async function api(url, options={}){
   const res=await fetch(url,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});
@@ -815,8 +823,8 @@ async function init(){
   if(reset){show('resetView');return}
   const setup=await api('/api/setup');
   if(setup.needsSetup){show('setupView');return}
-  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}${me.papel==='OWNER'?' • Mestre':''}`;show('appView');await Promise.all([loadProducts(),loadUsers(),loadOrders()]);await getPushState()}
-  catch{show('loginView')}
+  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}${me.papel==='OWNER'?' • Mestre':''}`;show('appView');await Promise.all([loadProducts(),loadUsers(),loadOrders(),loadPasskeys()]);await getPushState()}
+  catch{show('loginView');setTimeout(()=>startPasskeyLogin(true),250)}
 }
 
 const el_setupBtn = $('#setupBtn');
@@ -833,6 +841,78 @@ function urlB64ToUint8Array(value){
   const base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/');
   const raw=atob(base64); return Uint8Array.from(raw,c=>c.charCodeAt(0));
 }
+function arrayBufferToUrlB64(value){
+  const bytes=new Uint8Array(value);let binary='';
+  for(const byte of bytes)binary+=String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
+}
+function creationOptionsFromJSON(options){
+  return {...options,challenge:urlB64ToUint8Array(options.challenge),user:{...options.user,id:urlB64ToUint8Array(options.user.id)},excludeCredentials:(options.excludeCredentials||[]).map(c=>({...c,id:urlB64ToUint8Array(c.id)}))};
+}
+function requestOptionsFromJSON(options){
+  const converted={...options,challenge:urlB64ToUint8Array(options.challenge)};
+  if(Array.isArray(options.allowCredentials))converted.allowCredentials=options.allowCredentials.map(c=>({...c,id:urlB64ToUint8Array(c.id)}));
+  else delete converted.allowCredentials;
+  return converted;
+}
+function registrationToJSON(credential){
+  const response=credential.response;
+  return {id:credential.id,rawId:arrayBufferToUrlB64(credential.rawId),type:credential.type,authenticatorAttachment:credential.authenticatorAttachment||undefined,clientExtensionResults:credential.getClientExtensionResults(),response:{clientDataJSON:arrayBufferToUrlB64(response.clientDataJSON),attestationObject:arrayBufferToUrlB64(response.attestationObject),transports:typeof response.getTransports==='function'?response.getTransports():[]}};
+}
+function authenticationToJSON(credential){
+  const response=credential.response;
+  return {id:credential.id,rawId:arrayBufferToUrlB64(credential.rawId),type:credential.type,authenticatorAttachment:credential.authenticatorAttachment||undefined,clientExtensionResults:credential.getClientExtensionResults(),response:{clientDataJSON:arrayBufferToUrlB64(response.clientDataJSON),authenticatorData:arrayBufferToUrlB64(response.authenticatorData),signature:arrayBufferToUrlB64(response.signature),userHandle:response.userHandle?arrayBufferToUrlB64(response.userHandle):undefined}};
+}
+function passkeysSupported(){return !!(window.PublicKeyCredential&&navigator.credentials)}
+
+const passkeyLoginBtn=$('#passkeyLoginBtn');
+if(passkeyLoginBtn){
+  if(!passkeysSupported()){passkeyLoginBtn.disabled=true;passkeyLoginBtn.title='Biometria indisponível neste navegador'}
+  passkeyLoginBtn.onclick=()=>startPasskeyLogin(false);
+}
+let passkeyLoginEmAndamento=false;
+async function startPasskeyLogin(automatico=false){
+  if(!passkeysSupported()||passkeyLoginEmAndamento)return;
+  const msg=$('#loginMsg');
+  const username=$('#loginUsername').value.trim();
+  passkeyLoginEmAndamento=true;passkeyLoginBtn.disabled=true;
+  if(!automatico)msg.textContent='';
+  try{
+    const begin=await api('/api/auth/passkey',{method:'POST',body:JSON.stringify({acao:'opcoes',username})});
+    const credential=await navigator.credentials.get({publicKey:requestOptionsFromJSON(begin.options),mediation:'optional'});
+    if(!credential)throw new Error('A biometria não foi concluída.');
+    await api('/api/auth/passkey',{method:'POST',body:JSON.stringify({acao:'verificar',challenge_id:begin.challenge_id,response:authenticationToJSON(credential)})});
+    location.reload();
+  }catch(e){
+    const cancelado=e.name==='NotAllowedError'||e.name==='AbortError';
+    if(!automatico||!cancelado)msg.textContent=cancelado?'Biometria cancelada ou não reconhecida.':e.message;
+  }finally{passkeyLoginEmAndamento=false;passkeyLoginBtn.disabled=!passkeysSupported()}
+}
+
+async function loadPasskeys(){
+  const list=$('#passkeysList');if(!list)return;
+  if(!passkeysSupported()){list.innerHTML='<p class="muted">Este navegador não oferece biometria/passkeys.</p>';$('#registerPasskeyBtn').disabled=true;return}
+  try{
+    const data=await api('/api/admin/passkeys');
+    list.innerHTML=data.passkeys.length?data.passkeys.map(p=>`<div class="user"><div><strong>${esc(p.nome)}</strong><small>${p.backed_up?'Passkey sincronizada':'Este aparelho'}${p.ultimo_uso_em?' • último uso '+esc(p.ultimo_uso_em):''}</small></div><button class="btn secondary" type="button" onclick="removePasskey(${p.id})">Remover</button></div>`).join(''):'<p class="muted">Nenhuma biometria cadastrada.</p>';
+  }catch(e){list.innerHTML=`<p class="muted">${esc(e.message)}</p>`}
+}
+const registerPasskeyBtn=$('#registerPasskeyBtn');
+if(registerPasskeyBtn)registerPasskeyBtn.onclick=async()=>{
+  registerPasskeyBtn.disabled=true;
+  try{
+    const begin=await api('/api/admin/passkeys',{method:'POST',body:JSON.stringify({acao:'opcoes'})});
+    const credential=await navigator.credentials.create({publicKey:creationOptionsFromJSON(begin.options)});
+    if(!credential)throw new Error('O cadastro não foi concluído.');
+    await api('/api/admin/passkeys',{method:'POST',body:JSON.stringify({acao:'verificar',challenge_id:begin.challenge_id,response:registrationToJSON(credential)})});
+    toast('Biometria cadastrada com segurança.');await loadPasskeys();
+  }catch(e){toast(e.name==='NotAllowedError'?'Cadastro biométrico cancelado.':e.message,'error')}
+  finally{registerPasskeyBtn.disabled=!passkeysSupported()}
+};
+window.removePasskey=async id=>{
+  if(!confirm('Remover esta biometria? O login por senha continuará disponível.'))return;
+  try{await api('/api/admin/passkeys',{method:'DELETE',body:JSON.stringify({id})});toast('Biometria removida.');await loadPasskeys()}catch(e){toast(e.message,'error')}
+};
 async function getPushState(){
   const btn=$('#pushBtn'); if(!btn)return;
   if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){
@@ -889,7 +969,7 @@ async function loadOrders(){
   const r=await api('/api/admin/orders'); pedidos=r.pedidos||[]; renderOrders();
 }
 let visualizacaoPedidos="fila";
-const ORDER_STATUSES=['NOVO','PREPARANDO','PRONTO','ENTREGUE','CANCELADO'];
+const ORDER_STATUSES=['NOVO','PRONTO','ENTREGUE','CANCELADO'];
 const orderStatusLabel=v=>v[0]+v.slice(1).toLowerCase();
 function renderOrderStatusSelect(p,op){
   const disabled=p.status_pagamento!=='PAGO';
@@ -918,7 +998,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 function orderItems(p){
   return Array.isArray(p.itens)&&p.itens.length?p.itens:[{produto_nome:p.produto_nome,quantidade:p.quantidade,valor_unitario_centavos:p.valor_unitario_centavos,valor_total_centavos:p.valor_total_centavos}];
 }
-function orderItemsText(p){return orderItems(p).map(i=>`${i.quantidade}× ${i.produto_nome}`).join(' · ')}
+function orderItemsHtml(p){return orderItems(p).map(i=>`${esc(i.quantidade)}× ${esc(i.produto_nome)}`).join('<br>')}
 function renderOrders(){
   const hoje=new Date().toISOString().slice(0,10);
   const ativos=pedidos.filter(p=>!Number(p.arquivado));
@@ -934,10 +1014,7 @@ function renderOrders(){
   let lista=visualizacaoPedidos==='arquivados'
     ? pedidos.filter(p=>Number(p.arquivado))
     : ativos.filter(p=>visualizacaoPedidos==='historico'?encerrado(p):!encerrado(p));
-  if(visualizacaoPedidos==='fila'){
-    const prioridade=p=>p.status_pagamento==='PAGO'&&p.status_pedido==='NOVO'?0:p.status_pagamento==='PAGO'&&p.status_pedido==='PREPARANDO'?1:p.status_pagamento==='PAGO'&&p.status_pedido==='PRONTO'?2:p.status_pagamento==='PENDENTE'?3:4;
-    lista=[...lista].sort((a,b)=>prioridade(a)-prioridade(b)||b.id-a.id);
-  }
+  if(visualizacaoPedidos==='fila')lista=[...lista].sort((a,b)=>b.id-a.id);
 
   const fila=$('#verFilaPedidos'), hist=$('#verHistoricoPedidos'), arq=$('#verArquivadosPedidos');
   if(fila) fila.classList.toggle('active',visualizacaoPedidos==='fila');
@@ -950,7 +1027,7 @@ function renderOrders(){
     const when=p.criado_em?new Date(String(p.criado_em).replace(' ','T')+'Z').toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
     const op=(p.status_pedido||'NOVO');
     const isNew=p.status_pagamento==='PAGO'&&op==='NOVO';
-    return `<div class="order-row ${isNew?'order-new':''}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${esc(orderItemsText(p))} · ${esc(p.cliente_email)}${p.cliente_whatsapp?' · '+esc(formatPhone(p.cliente_whatsapp)):''}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento==='PAGO'?`<span class="badge operational-badge">${op[0]+op.slice(1).toLowerCase()}</span>`:''}<span class="badge">${when}</span></div>${p.observacao?`<small>Obs.: ${esc(p.observacao)}</small>`:''}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em?'Pago em '+esc(p.pago_em):esc(p.mp_status_detail||'')}</small></div><div class="order-actions">${renderOrderStatusSelect(p,op)}<button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
+    return `<div class="order-row ${isNew?'order-new':''}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${orderItemsHtml(p)}</small><small>${esc(p.cliente_email)}${p.cliente_whatsapp?' · '+esc(formatPhone(p.cliente_whatsapp)):''}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento==='PAGO'?`<span class="badge operational-badge">${op[0]+op.slice(1).toLowerCase()}</span>`:''}<span class="badge">${when}</span></div>${p.observacao?`<small>Obs.: ${esc(p.observacao)}</small>`:''}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em?'Pago em '+esc(p.pago_em):esc(p.mp_status_detail||'')}</small></div><div class="order-actions">${renderOrderStatusSelect(p,op)}<button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
   }).join('')||`<p class="muted">${visualizacaoPedidos==='arquivados'?'Nenhum pedido arquivado.':visualizacaoPedidos==='historico'?'Nenhum pedido concluído ou cancelado ainda.':'Nenhum pedido na fila atual.'}</p>`;
 }
 const verFilaPedidos=$('#verFilaPedidos'); if(verFilaPedidos) verFilaPedidos.onclick=()=>{visualizacaoPedidos='fila';renderOrders()};
@@ -1369,7 +1446,7 @@ init();
       if (typeof loadProducts === 'function') await loadProducts();
       // Pedidos ficam sincronizados mesmo quando outra aba do admin está aberta.
       // Assim o badge de novos pedidos muda sozinho sem depender do botão Atualizar.
-      if (typeof loadOrders === 'function') await loadOrders();
+      if (typeof loadOrders === 'function' && !document.querySelector('.order-status-select.open')) await loadOrders();
       const tabUsuarios = document.querySelector('[data-tab="usuarios"]');
       if (tabUsuarios && tabUsuarios.classList.contains('active') && typeof loadUsers === 'function') {
         await loadUsers();
