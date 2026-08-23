@@ -5,3 +5,6 @@ node_modules/
 .env.*
 .DS_Store
 Thumbs.db
+/.private-backups/
+/backup-*.sql
+/rp-doces-backup-*.sql
