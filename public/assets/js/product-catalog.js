@@ -36,6 +36,36 @@ async function carregarCardapioDinamico(){
     const formatar = centavos =>
       (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+    const detailOverlay=document.getElementById('rpProductDetailOverlay');
+    const detailTitle=document.getElementById('rpProductDetailTitle');
+    const detailEmoji=document.getElementById('rpProductDetailEmoji');
+    const detailDescription=document.getElementById('rpProductDetailDescription');
+    const detailPrice=document.getElementById('rpProductDetailPrice');
+    const detailAdd=document.getElementById('rpProductDetailAdd');
+    let detailCard=null;
+    function fecharDetalhe(){
+      if(!detailOverlay?.classList.contains('open'))return;
+      detailOverlay.classList.remove('open');
+      detailOverlay.setAttribute('aria-hidden','true');
+      document.body.classList.remove('rp-mobile-menu-open');
+      detailCard=null;
+    }
+    function abrirDetalhe(item){
+      if(innerWidth>700||!detailOverlay||!item?._rpProduto)return;
+      const produto=item._rpProduto;
+      const esgotado=!produto.disponivel||Number(produto.estoque)<=0;
+      detailCard=item;
+      detailTitle.textContent=produto.nome||'Produto';
+      detailEmoji.textContent=produto.emoji||(produto.categoria==='MINI_PUDIM'?'🍮':'🍰');
+      detailDescription.textContent=produto.descricao||'Sem descrição.';
+      detailPrice.textContent=esgotado?'Esgotado':formatar(produto.preco_centavos);
+      detailAdd.hidden=esgotado;
+      dispatchEvent(new Event('rp-close-mobile-sheets'));
+      detailOverlay.classList.add('open');
+      detailOverlay.setAttribute('aria-hidden','false');
+      document.body.classList.add('rp-mobile-menu-open');
+    }
+
     function controleCarrinho(produto){
       const quantidade=typeof window.rpCarrinhoQuantidade==='function'?window.rpCarrinhoQuantidade(produto.id):0;
       const esgotado=!produto.disponivel||Number(produto.estoque)<=0;
@@ -117,8 +147,16 @@ async function carregarCardapioDinamico(){
     menuSection.querySelectorAll('[data-menu-view]').forEach(button=>button.onclick=()=>{const estado=`${filtroAtual}:${button.dataset.menuView}`;if(secoesExpandidas.has(estado))secoesExpandidas.delete(estado);else secoesExpandidas.add(estado);renderizar(filtroAtual)});
     if(!menuSection.dataset.cartControlsReady){
       menuSection.dataset.cartControlsReady='true';
-      menuSection.addEventListener('click',event=>{const action=event.target.closest('[data-card-cart-action]');if(!action)return;event.preventDefault();event.stopPropagation();const item=action.closest('.flavor-card');window.rpCarrinhoAlterar?.(item,Number(action.dataset.cardCartAction))});
+      menuSection.addEventListener('click',event=>{const action=event.target.closest('[data-card-cart-action]');if(action){event.preventDefault();event.stopPropagation();const item=action.closest('.flavor-card');window.rpCarrinhoAlterar?.(item,Number(action.dataset.cardCartAction));return}const item=event.target.closest('.flavor-card');if(item)abrirDetalhe(item)});
       addEventListener('rp-cart-updated',atualizarControlesCarrinho);
+    }
+    if(detailOverlay&&!detailOverlay.dataset.ready){
+      detailOverlay.dataset.ready='true';
+      document.getElementById('rpProductDetailClose')?.addEventListener('click',fecharDetalhe);
+      detailOverlay.addEventListener('click',event=>{if(event.target===detailOverlay)fecharDetalhe()});
+      detailAdd?.addEventListener('click',()=>{if(detailCard){window.rpCarrinhoAlterar?.(detailCard,1);fecharDetalhe()}});
+      addEventListener('rp-close-mobile-sheets',fecharDetalhe);
+      document.addEventListener('keydown',event=>{if(event.key==='Escape')fecharDetalhe()});
     }
     renderizar();
     if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();

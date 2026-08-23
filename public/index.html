@@ -376,6 +376,24 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
   </section>
 </div>
 
+<div class="rp-mobile-menu-overlay rp-product-detail-overlay" id="rpProductDetailOverlay" aria-hidden="true">
+  <section class="rp-mobile-menu-sheet rp-product-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="rpProductDetailTitle">
+    <div class="rp-mobile-menu-handle" aria-hidden="true"></div>
+    <div class="rp-mobile-menu-head">
+      <h2 id="rpProductDetailTitle">Produto</h2>
+      <button class="rp-mobile-menu-close" id="rpProductDetailClose" type="button" aria-label="Fechar detalhes do produto">×</button>
+    </div>
+    <div class="rp-product-detail-visual">
+      <span id="rpProductDetailEmoji" aria-hidden="true"></span>
+    </div>
+    <p class="rp-product-detail-description" id="rpProductDetailDescription"></p>
+    <div class="rp-product-detail-footer">
+      <div class="rp-product-detail-price" id="rpProductDetailPrice"></div>
+      <button class="btn btn-primary" id="rpProductDetailAdd" type="button">Adicionar ao carrinho</button>
+    </div>
+  </section>
+</div>
+
 <nav class="rp-mobile-nav" aria-label="Navegação principal mobile">
   <button class="rp-mobile-nav-item" type="button" data-mobile-target="sabores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14l-1 11H6L5 9Z"/><path d="M8 9a4 4 0 0 1 8 0M9 13h6"/></svg><span>Sabores</span></button>
   <button class="rp-mobile-nav-item" id="rpMobileParty" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13h14v7H5zM7 9h10v4H7zM9 5h6v4H9zM12 2v3"/></svg><span>Festas</span></button>
