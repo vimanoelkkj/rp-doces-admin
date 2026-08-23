@@ -1120,11 +1120,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 <script id="rp-location-script" src="/assets/js/location.js"></script>
 
 
-<script id="rp-pwa-register">
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-}
-</script>
+<script id="rp-pwa-register" src="/assets/js/pwa-register.js"></script>
 
 
 <script id="rp-pwa-diagnostic" src="/assets/js/pwa-diagnostic.js"></script>

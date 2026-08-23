@@ -1443,11 +1443,7 @@ init();
 
 
     
-<script id="rp-pwa-register">
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-}
-</script>
+<script id="rp-pwa-register" src="/assets/js/pwa-register.js"></script>
 
 
 <script id="rp-admin-modal-scroll-lock" src="/admin/assets/js/modal-scroll-lock.js"></script>
