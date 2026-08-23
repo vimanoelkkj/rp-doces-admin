@@ -19,8 +19,7 @@ if (!process.argv.includes(CONFIRM_FLAG)) {
   );
 }
 
-const wranglerName = process.platform === "win32" ? "wrangler.cmd" : "wrangler";
-const wrangler = path.join(process.cwd(), "node_modules", ".bin", wranglerName);
+const wrangler = path.join(process.cwd(), "node_modules", "wrangler", "bin", "wrangler.js");
 if (!existsSync(wrangler)) {
   cancel("Backup cancelado: Wrangler local não encontrado. Execute npm install.");
 }
@@ -40,13 +39,12 @@ if (checkOnly) {
 }
 
 const result = spawnSync(
-  wrangler,
-  ["d1", "export", DATABASE_NAME, "--remote", "--output", output],
+  process.execPath,
+  [wrangler, "d1", "export", DATABASE_NAME, "--remote", "--output", output],
   {
     cwd: process.cwd(),
     encoding: "utf8",
     stdio: "inherit",
-    shell: process.platform === "win32",
   },
 );
 
