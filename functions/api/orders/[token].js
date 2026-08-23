@@ -27,15 +27,38 @@ export async function onRequestGet({ params, env }) {
       const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(pedido.mp_order_id)}`);
       const statusLocal = mpOrderToLocalStatus(order);
       await env.DB.prepare(`
-        UPDATE pedidos SET status_pagamento = ?, mp_status = ?, mp_status_detail = ?,
+        UPDATE pedidos SET
+          status_pagamento = CASE
+            WHEN status_pagamento = 'REEMBOLSADO' THEN status_pagamento
+            WHEN status_pagamento = 'PAGO' AND ? NOT IN ('PAGO', 'REEMBOLSADO') THEN status_pagamento
+            ELSE ?
+          END,
+          mp_status = ?,
+          mp_status_detail = ?,
           atualizado_em = CURRENT_TIMESTAMP,
           pago_em = CASE WHEN ? = 'PAGO' AND pago_em IS NULL THEN CURRENT_TIMESTAMP ELSE pago_em END
         WHERE id = ?
-      `).bind(statusLocal, order.status || null, order.status_detail || null, statusLocal, pedido.id).run();
-      pedido.status_pagamento = statusLocal;
-      pedido.mp_status = order.status || null;
-      pedido.mp_status_detail = order.status_detail || null;
-      if (statusLocal === "PAGO") {
+      `).bind(
+        statusLocal,
+        statusLocal,
+        order.status || null,
+        order.status_detail || null,
+        statusLocal,
+        pedido.id
+      ).run();
+
+      const atualizado = await env.DB.prepare(`
+        SELECT status_pagamento, mp_status, mp_status_detail, pago_em
+        FROM pedidos WHERE id = ? LIMIT 1
+      `).bind(pedido.id).first();
+      if (atualizado) {
+        pedido.status_pagamento = atualizado.status_pagamento;
+        pedido.mp_status = atualizado.mp_status;
+        pedido.mp_status_detail = atualizado.mp_status_detail;
+        pedido.pago_em = atualizado.pago_em;
+      }
+
+      if (pedido.status_pagamento === "PAGO") {
         const estoque = await baixarEstoquePedido(env, pedido.id);
         if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", pedido.id);
         await notifyPaidOrder(env, pedido.id);

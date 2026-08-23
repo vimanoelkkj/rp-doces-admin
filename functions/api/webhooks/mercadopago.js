@@ -101,7 +101,11 @@ export async function onRequestPost({ request, env }) {
     await env.DB.prepare(`
       UPDATE pedidos SET
         mp_order_id = COALESCE(?, mp_order_id),
-        status_pagamento = ?,
+        status_pagamento = CASE
+          WHEN status_pagamento = 'REEMBOLSADO' THEN status_pagamento
+          WHEN status_pagamento = 'PAGO' AND ? NOT IN ('PAGO', 'REEMBOLSADO') THEN status_pagamento
+          ELSE ?
+        END,
         mp_status = ?,
         mp_status_detail = ?,
         mp_payment_id = COALESCE(?, mp_payment_id),
@@ -113,6 +117,7 @@ export async function onRequestPost({ request, env }) {
       WHERE id = ?
     `).bind(
       order?.id ? String(order.id) : orderId,
+      localStatus,
       localStatus,
       order?.status || null,
       order?.status_detail || null,

@@ -62,7 +62,11 @@ async function reconcilePendingOrders(env) {
 
       await env.DB.prepare(`
         UPDATE pedidos SET
-          status_pagamento = ?,
+          status_pagamento = CASE
+            WHEN status_pagamento = 'REEMBOLSADO' THEN status_pagamento
+            WHEN status_pagamento = 'PAGO' AND ? NOT IN ('PAGO', 'REEMBOLSADO') THEN status_pagamento
+            ELSE ?
+          END,
           mp_status = ?,
           mp_status_detail = ?,
           mp_payment_id = COALESCE(?, mp_payment_id),
@@ -73,6 +77,7 @@ async function reconcilePendingOrders(env) {
           END
         WHERE id = ?
       `).bind(
+        localStatus,
         localStatus,
         order?.status || null,
         order?.status_detail || null,

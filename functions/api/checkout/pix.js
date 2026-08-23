@@ -141,7 +141,12 @@ export async function onRequestPost({ request, env }) {
       valor_total_centavos: total, status: localStatus },
       pix: { qr_code: payment.qrCode, qr_code_base64: payment.qrCodeBase64, ticket_url: payment.ticketUrl } }, 201);
   } catch (err) {
-    await env.DB.prepare("UPDATE pedidos SET status_pagamento = 'ERRO', atualizado_em = CURRENT_TIMESTAMP WHERE id = ?").bind(pedidoId).run();
+    await env.DB.prepare(`
+      UPDATE pedidos SET
+        status_pagamento = 'ERRO',
+        atualizado_em = CURRENT_TIMESTAMP
+      WHERE id = ? AND status_pagamento NOT IN ('PAGO', 'REEMBOLSADO')
+    `).bind(pedidoId).run();
     console.error("Mercado Pago create order:", err?.status, err?.data || err?.message);
     return json({ erro: "Não foi possível gerar o Pix agora. Tente novamente em instantes." }, 502);
   }
