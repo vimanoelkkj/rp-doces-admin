@@ -7,6 +7,37 @@ import { baixarEstoquePedido } from "../../../lib/stock.js";
 const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
 
+async function reconcilePaidOrdersWithoutStock(env) {
+  const { results } = await env.DB.prepare(`
+    SELECT id
+    FROM pedidos
+    WHERE status_pagamento = 'PAGO'
+      AND estoque_baixado_em IS NULL
+      AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
+    ORDER BY atualizado_em ASC, id ASC
+    LIMIT ?
+  `).bind(RECONCILE_AFTER_SECONDS, RECONCILE_BATCH_SIZE).all();
+
+  await Promise.allSettled((results || []).map(async ({ id }) => {
+    try {
+      const estoque = await baixarEstoquePedido(env, id);
+      if (!estoque.ok) {
+        console.error("Reconciliação de estoque pendente:", estoque.erro, "pedido", id);
+        await env.DB.prepare(`
+          UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP
+          WHERE id = ? AND estoque_baixado_em IS NULL
+        `).bind(id).run();
+      }
+    } catch (err) {
+      console.error("Reconciliação de estoque pendente:", err?.message, "pedido", id);
+      await env.DB.prepare(`
+        UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = ? AND estoque_baixado_em IS NULL
+      `).bind(id).run();
+    }
+  }));
+}
+
 async function reconcilePendingOrders(env) {
   if (!env.MP_ACCESS_TOKEN) return;
 
@@ -73,6 +104,7 @@ export async function onRequestGet({ request, env }) {
   // em que o evento final do Mercado Pago não chega (especialmente sandbox),
   // sem depender da aba do cliente permanecer aberta.
   await reconcilePendingOrders(env);
+  await reconcilePaidOrdersWithoutStock(env);
 
   const { results } = await env.DB.prepare(`
     SELECT id, token_publico, produto_id, produto_nome, quantidade,
