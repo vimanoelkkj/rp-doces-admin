@@ -1457,7 +1457,7 @@ body.rp-mobile-cta-visible .rp-cart-trigger{bottom:calc(80px + env(safe-area-ins
     .pedido-overlay.open{opacity:1;visibility:visible}
     .pedido-modal{width:100%;max-width:none;margin:0;border-radius:28px 28px 0 0;border-bottom:0;transform:translateY(104%);transition:transform .27s cubic-bezier(.2,.75,.2,1)}
     .pedido-overlay.open .pedido-modal{transform:none}
-    .pedido-modal-scroll{max-height:calc(100dvh - 78px);padding:10px 20px calc(84px + env(safe-area-inset-bottom));overflow-x:hidden}
+    .pedido-modal-scroll{max-height:calc(100dvh - 78px);padding:10px 20px calc(120px + env(safe-area-inset-bottom));overflow-x:hidden}
     .rp-cart-sheet-handle{position:relative;display:block;width:42px;height:4px;margin:0 auto 12px;border-radius:999px;background:var(--pink-200);touch-action:none;cursor:grab}.rp-cart-sheet-handle::before{content:"";position:absolute;inset:-12px -28px}.rp-cart-sheet-handle:active{cursor:grabbing}
     .pedido-close{top:12px;right:18px;z-index:2}
     .rp-cart-step{display:block}.rp-cart-step--checkout{display:none}.pedido-modal.rp-cart-checkout-active .rp-cart-step--items{display:none}.pedido-modal.rp-cart-checkout-active .rp-cart-step--checkout{display:block}
