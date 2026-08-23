@@ -650,6 +650,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     overlay.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     document.body.classList.remove('rp-modal-open');
+    singleAttempt = null;
 
     const voltar = window.RP_CATALOG_RETURN_STATE;
     if (voltar?.active && typeof window.rpReopenCatalog === 'function') {
@@ -684,6 +685,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     pedidoErro.style.display = 'block';
   }
 
+  let singleAttempt = null;
   async function criarPix(){
     pedidoErro.style.display = 'none';
     if (!produtoAtual.id) return mostrarErroPedido('Produto inválido. Atualize a página e tente novamente.');
@@ -695,6 +697,11 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     if (whatsapp.length < 10 || whatsapp.length > 13) return mostrarErroPedido('Informe um WhatsApp válido com DDD.');
 
     const quantidade = Math.max(1, parseInt(qtd.value, 10) || 1);
+    const fp = `${produtoAtual.id}:${quantidade}:${email.toLowerCase()}:${whatsapp}:${obs.value.trim()}`;
+    if (!singleAttempt || singleAttempt.fp !== fp) {
+      singleAttempt = { id: crypto.randomUUID(), fp };
+    }
+
     const labelOriginal = pagarPix.textContent;
     pagarPix.disabled = true;
     pagarPix.textContent = 'Gerando Pix...';
@@ -703,6 +710,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
+          client_request_id: singleAttempt.id,
           produto_id: produtoAtual.id,
           quantidade,
           nome,
@@ -713,6 +721,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
       });
       const data = await r.json().catch(()=>({}));
       if (!r.ok) throw new Error(data.erro || 'Não foi possível gerar o Pix.');
+      singleAttempt = null;
       fecharPedido();
       window.RPPix?.abrir(data);
     } catch (e) {
@@ -827,6 +836,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
   let produtoSelecionado=null,quantidadeSelecionada=1;
   function salvar(){
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify({versao:1,itens:carrinho}))}catch{}
+    try{sessionStorage.removeItem('rp_cart_attempt')}catch{}
     render();
   }
   function unidades(){return carrinho.reduce((s,i)=>s+i.quantidade,0)}
@@ -898,21 +908,25 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     }
     salvar();return true;
   };
-  function fecharSeletor(){addOverlay.classList.remove('open');addOverlay.setAttribute('aria-hidden','true');produtoSelecionado=null;document.body.style.overflow=''}
   function limiteSelecionado(){
     if(!produtoSelecionado)return 0;
-    const atual=carrinho.find(i=>i.produto_id===produtoSelecionado.produto_id)?.quantidade||0;
-    return Math.max(0,Math.min(produtoSelecionado.estoque-atual,MAX_UNIDADES-unidades()));
+    const noCarrinho=carrinho.find(item=>item.produto_id===produtoSelecionado.produto_id)?.quantidade||0;
+    return Math.min(MAX_UNIDADES-unidades(),produtoSelecionado.estoque-noCarrinho);
   }
+  function fecharSeletor(){addOverlay.classList.remove('open');addOverlay.setAttribute('aria-hidden','true');document.body.style.overflow='';document.body.classList.remove('rp-modal-open');produtoSelecionado=null}
   function renderSeletor(){
-    const limite=limiteSelecionado();quantidadeSelecionada=Math.min(Math.max(1,quantidadeSelecionada),Math.max(1,limite));
-    addQuantity.textContent=String(quantidadeSelecionada);addMinus.disabled=quantidadeSelecionada<=1;addPlus.disabled=quantidadeSelecionada>=limite;
+    const limite=limiteSelecionado();
+    quantidadeSelecionada=Math.max(1,Math.min(quantidadeSelecionada,limite||1));
+    addQuantity.textContent=String(quantidadeSelecionada);
+    addPrice.textContent=moedaCentavos(produtoSelecionado?produtoSelecionado.preco_centavos*quantidadeSelecionada:0);
+    addMinus.disabled=quantidadeSelecionada<=1;
+    addPlus.disabled=quantidadeSelecionada>=limite;
     addSubmit.disabled=limite<1;addStock.textContent=limite>0?`Você pode adicionar até ${limite} unidade(s).`:'Quantidade máxima já adicionada ao carrinho.';
   }
   window.abrirPedido=function(card){
     const p=produtoDoCard(card);
     if(!Number.isInteger(p.produto_id)||p.produto_id<1||p.estoque<1)return;
-    produtoSelecionado=p;quantidadeSelecionada=1;addTitle.textContent=p.nome;addPrice.textContent=moedaCentavos(p.preco_centavos)+' cada';renderSeletor();
+    produtoSelecionado=p;quantidadeSelecionada=1;addTitle.textContent=p.nome;renderSeletor();
     addOverlay.classList.add('open');addOverlay.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';
   };
   addMinus.addEventListener('click',()=>{quantidadeSelecionada--;renderSeletor()});
@@ -956,11 +970,20 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     if(cliente.length<2)return avisar('Informe seu nome.');
     if(!email.checkValidity()||!mail)return avisar('Informe um e-mail válido.');
     if(fone.length<10||fone.length>13)return avisar('Informe um WhatsApp válido com DDD.');
+    const fp=carrinho.map(i=>`${i.produto_id}:${i.quantidade}`).sort().join('|')+`:${mail.toLowerCase()}:${fone}:${obs.value.trim()}`;
+    let cartAttempt=null;
+    try{cartAttempt=JSON.parse(sessionStorage.getItem('rp_cart_attempt')||'null');}catch(_){}
+    if(!cartAttempt||cartAttempt.fp!==fp||!cartAttempt.id){
+      cartAttempt={id:crypto.randomUUID(),fp};
+      try{sessionStorage.setItem('rp_cart_attempt',JSON.stringify(cartAttempt));}catch(_){}
+    }
     const original=pagar.innerHTML;pagar.disabled=true;pagar.textContent='Gerando Pix...';
     try{
       const r=await fetch('/api/checkout/pix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        client_request_id:cartAttempt.id,
         itens:carrinho.map(i=>({produto_id:i.produto_id,quantidade:i.quantidade})),nome:cliente,email:mail,whatsapp:fone,observacao:obs.value.trim()})});
       const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.erro||'Não foi possível gerar o Pix.');
+      try{sessionStorage.removeItem('rp_cart_attempt');}catch(_){}
       carrinho=[];salvar();fechar();window.RPPix?.abrir(data);
     }catch(e){avisar(e.message)}finally{pagar.disabled=!carrinho.length;pagar.innerHTML=original}
   }
@@ -1051,7 +1074,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
   let timer=null, token=null, pedidoAtual=null;
   const moeda=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
   function reset(){paymentView.style.display='block';successView.classList.remove('show');copy.textContent='Copiar código Pix';}
-  function fechar(){overlay.classList.remove('open');overlay.setAttribute('aria-hidden','true');if(timer)clearInterval(timer);timer=null;token=null;pedidoAtual=null;document.body.style.overflow='';setTimeout(reset,180);}
+  function fechar(){overlay.classList.remove('open');overlay.setAttribute('aria-hidden','true');if(timer)clearInterval(timer);timer=null;token=null;pedidoAtual=null;try{sessionStorage.removeItem('rp_cart_attempt');}catch(_){}document.body.style.overflow='';setTimeout(reset,180);}
   function mostrarSucesso(pedido){
     if(timer)clearInterval(timer);timer=null;
     const p={...(pedidoAtual||{}),...(pedido||{})};
@@ -1068,7 +1091,11 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
       const d=await r.json();
       const st=d?.pedido?.status;
       if(st==='PAGO')mostrarSucesso(d.pedido);
-      else if(['EXPIRADO','CANCELADO','FALHOU'].includes(st)){status.textContent='Pagamento '+st.toLowerCase()+'.';if(timer)clearInterval(timer);timer=null;}
+      else if(['EXPIRADO','CANCELADO','FALHOU'].includes(st)){
+        status.textContent='Pagamento '+st.toLowerCase()+'.';
+        try{sessionStorage.removeItem('rp_cart_attempt');}catch(_){}
+        if(timer)clearInterval(timer);timer=null;
+      }
       else if(st==='REEMBOLSADO'){status.textContent='Pagamento reembolsado.';if(timer)clearInterval(timer);timer=null;}
     }catch(_){}
   }
