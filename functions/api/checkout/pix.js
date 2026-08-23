@@ -2,6 +2,7 @@ import { json, bodyJson, sameOrigin } from "../../lib/http.js";
 import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../lib/mercadoPago.js";
 import { baixarEstoquePedido } from "../../lib/stock.js";
 import { notifyPaidOrder } from "../../lib/push.js";
+import { checkCheckoutRateLimit } from "../../lib/checkoutRateLimit.js";
 
 const MAX_ITENS_DISTINTOS = 20;
 const MAX_UNIDADES = 50;
@@ -181,6 +182,23 @@ export async function onRequestPost({ request, env }) {
         }
       }, 200);
     }
+  }
+
+  // 2. Rate limit de negócio aplicado apenas para novas criações / retries incompletos
+  const rateLimit = await checkCheckoutRateLimit(env, request);
+  if (rateLimit.misconfigured) {
+    return json({ erro: "Serviço temporariamente indisponível." }, 503);
+  }
+  if (!rateLimit.allowed) {
+    console.warn("Checkout rate limit excedido:", { retryAfter: rateLimit.retryAfter, count: rateLimit.count });
+    return json(
+      {
+        erro: "Muitas tentativas de pedido em pouco tempo. Por favor, aguarde alguns instantes antes de tentar novamente.",
+        retry_after: rateLimit.retryAfter,
+      },
+      429,
+      { "Retry-After": String(rateLimit.retryAfter) }
+    );
   }
 
   let pedidoId = pedidoExistente?.id;
