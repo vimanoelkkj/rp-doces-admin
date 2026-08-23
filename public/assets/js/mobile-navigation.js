@@ -11,7 +11,6 @@
   const partyClose=document.getElementById('rpPartyClose');
   const partyOptions=document.getElementById('rpPartyOptions');
   const partyPlan=document.getElementById('rpPartyPlan');
-  const partyWhatsapp=document.getElementById('rpPartyWhatsapp');
   if(!menuOverlay||!menuSheet||!partyOverlay||!partySheet||!menuButton||!menuClose||!partyClose)return;
 
   const navItems=[flavorsButton,partyButton,cartButton,menuButton].filter(Boolean);
@@ -64,12 +63,13 @@
     partyOverlay.classList.add('open');
     partyOverlay.setAttribute('aria-hidden','false');
     limparAtivos();partyButton?.classList.add('active');
+    document.body.classList.add('rp-party-open');
     bloquearPagina();partyClose.focus({preventScroll:true});
   }
   function fecharFestas(){
     partyOverlay.classList.remove('open');
     partyOverlay.setAttribute('aria-hidden','true');
-    limparAtivos();partySheet.style.transform='';liberarPagina();atualizarSecaoAtiva();
+    limparAtivos();document.body.classList.remove('rp-party-open');partySheet.style.transform='';liberarPagina();atualizarSecaoAtiva();
   }
 
   menuButton.addEventListener('click',()=>menuOverlay.classList.contains('open')?fecharMenu():trocarPainel(abrirMenu));
@@ -121,6 +121,6 @@
     if(typeof window.abrirWhatsApp==='function')window.abrirWhatsApp(texto);
     else window.open(`https://wa.me/${String(window.RP_WHATSAPP_NUMBER||'5533991285907').replace(/\D/g,'')}?text=${encodeURIComponent(texto)}`,'_blank','noopener,noreferrer');
   }
-  partyPlan?.addEventListener('click',falarSobreFesta);partyWhatsapp?.addEventListener('click',falarSobreFesta);
+  partyPlan?.addEventListener('click',falarSobreFesta);
   atualizarSecaoAtiva();
 })();
