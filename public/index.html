@@ -909,9 +909,11 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     const linhas=['Olá! Vim pelo site da R&P Doces.','Gostaria de reservar para retirada no salão:',
       ...carrinho.map(i=>`• ${i.quantidade}x ${i.nome}`),`• Total estimado: ${moedaCentavos(total())}`];
     if(obs.value.trim())linhas.push(`• Observação: ${obs.value.trim()}`);
-    linhas.push('','Gostaria de confirmar preço e disponibilidade. 💗');
+    linhas.push('','Gostaria de confirmar preço e disponibilidade. \uD83D\uDC97');
     const texto=encodeURIComponent(linhas.join('\n')),numero=String(window.RP_WHATSAPP_NUMBER||'5533991285907').replace(/\D/g,'');
-    window.open(`https://wa.me/${numero}?text=${texto}`,'_blank','noopener,noreferrer');
+    const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const url=isMobile?`https://wa.me/${numero}?text=${texto}`:`https://web.whatsapp.com/send?phone=${numero}&text=${texto}`;
+    window.open(url,'_blank','noopener,noreferrer');
   }
   trigger.addEventListener('click',abrir);if(mobileCart)mobileCart.addEventListener('click',abrir);close.addEventListener('click',fechar);pagar.addEventListener('click',criarPix);confirmar.addEventListener('click',abrirWhatsApp);
   overlay.addEventListener('click',e=>{if(e.target===overlay)fechar()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(addOverlay.classList.contains('open'))fecharSeletor();else if(overlay.classList.contains('open'))fechar()}});

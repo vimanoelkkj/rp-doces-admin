@@ -39,18 +39,22 @@
     });
   }
 function pedirSabor(sabor, tipo){
-    const texto = `Olá! 🍰 Vim pelo site da R&P Doces e gostaria de fazer um pedido do(a) ${tipo} sabor *${sabor}*. Poderia me passar mais informações?`;
+    const texto = `Olá! \uD83C\uDF70 Vim pelo site da R&P Doces e gostaria de fazer um pedido do(a) ${tipo} sabor *${sabor}*. Poderia me passar mais informações?`;
     abrirWhatsApp(texto);
   }
 
   function pedirGeral(e){
     if(e) e.preventDefault();
-    const texto = `Olá! 🍰 Vim pelo site da R&P Doces e gostaria de saber mais sobre os bolos no pote e mini pudins disponíveis.`;
+    const texto = `Olá! \uD83C\uDF70 Vim pelo site da R&P Doces e gostaria de saber mais sobre os bolos no pote e mini pudins disponíveis.`;
     abrirWhatsApp(texto);
     return false;
   }
 
   function abrirWhatsApp(texto){
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(texto)}`;
-    window.open(url, '_blank');
+    const textoEncoded = encodeURIComponent(texto);
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const url = isMobile
+      ? `https://wa.me/${WHATSAPP_NUMBER}?text=${textoEncoded}`
+      : `https://web.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${textoEncoded}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   }

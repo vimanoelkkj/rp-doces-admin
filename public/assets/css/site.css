@@ -1497,7 +1497,12 @@ body.rp-mobile-cta-visible .rp-cart-trigger{bottom:calc(80px + env(safe-area-ins
 }
 @media(max-width:360px){.menu-grid{gap:7px}.flavor-card{padding-inline:8px}.rp-card-visual{margin-inline:-8px}.rp-card-badge{padding-inline:3px;font-size:.46rem}.flavor-card h3{font-size:.78rem}.flavor-card p{font-size:.64rem}.rp-card-price{font-size:.78rem}.rp-card-qty{gap:2px}.rp-card-qty button{min-width:27px;min-height:28px}.rp-menu-filters{padding-inline:16px}}
 
-.flavor-card--indisponivel{opacity:.68}
+.flavor-card--indisponivel{
+  opacity:.78;
+  border-color:#ddd7d9;
+  background:#f3f1f2;
+  filter:grayscale(.82);
+}
 .flavor-card--indisponivel .btn-flavor{
   background:var(--pink-100)!important;
   border-color:var(--pink-200)!important;

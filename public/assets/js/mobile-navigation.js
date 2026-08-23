@@ -117,7 +117,7 @@
   let ocasiao='Aniversário';
   partyOptions?.addEventListener('click',event=>{const option=event.target.closest('[data-party-occasion]');if(!option)return;ocasiao=option.dataset.partyOccasion;partyOptions.querySelectorAll('.rp-party-option').forEach(item=>item.classList.toggle('active',item===option))});
   function falarSobreFesta(){
-    const texto=`Olá! 🎂 Vim pelo site da R&P Doces e gostaria de planejar uma encomenda para festa.\n\nOcasião: ${ocasiao}\nAntecedência mínima: 7 dias.\n\nGostaria de conhecer as opções de bolos no pote, mini pudins e combinações.`;
+    const texto=`Olá! \uD83C\uDF82 Vim pelo site da R&P Doces e gostaria de planejar uma encomenda para festa.\n\nOcasião: ${ocasiao}\nAntecedência mínima: 7 dias.\n\nGostaria de conhecer as opções de bolos no pote, mini pudins e combinações.`;
     if(typeof window.abrirWhatsApp==='function')window.abrirWhatsApp(texto);
     else window.open(`https://wa.me/${String(window.RP_WHATSAPP_NUMBER||'5533991285907').replace(/\D/g,'')}?text=${encodeURIComponent(texto)}`,'_blank','noopener,noreferrer');
   }
