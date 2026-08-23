@@ -470,32 +470,36 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     </section>
 
     <section class="rp-cart-step rp-cart-step--checkout" id="rpCartCheckoutStep">
-    <div class="rp-cart-checkout-head"><button type="button" id="rpCartBack" aria-label="Voltar ao carrinho">←</button><div><span class="eyebrow">Finalizar pedido</span><h3>Seus dados</h3></div></div>
+    <div class="rp-cart-checkout-head">
+      <button type="button" id="rpCartBack" aria-label="Voltar ao carrinho">←</button>
+      <div class="rp-cart-checkout-title"><span class="eyebrow">Finalizar pedido</span><h3>Seus dados</h3></div>
+      <p>Preencha seus dados para gerarmos seu Pix e confirmarmos seu pedido.</p>
+    </div>
     <div class="pedido-field">
-      <label for="pedidoNome">Seu nome</label>
+      <label class="rp-field-label" for="pedidoNome"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"></path></svg><span>Seu nome</span></label>
       <input id="pedidoNome" type="text" maxlength="100" autocomplete="off" placeholder="Como podemos te chamar?">
     </div>
 
     <div class="pedido-field">
-      <label for="pedidoEmail">E-mail</label>
+      <label class="rp-field-label" for="pedidoEmail"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg><span>E-mail</span></label>
       <input id="pedidoEmail" type="email" maxlength="160" autocomplete="off" placeholder="voce@exemplo.com">
-      <small style="display:block;margin-top:6px;color:var(--text-soft)">Usado somente para identificar o pagamento no Mercado Pago.</small>
+      <small class="rp-field-helper">Usado somente para identificar o pagamento no Mercado Pago.</small>
     </div>
 
     <div class="pedido-field">
-      <label for="pedidoWhatsapp">WhatsApp</label>
+      <label class="rp-field-label" for="pedidoWhatsapp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.6a8 8 0 0 1-11.8 7L4 20l1.4-4.1A8 8 0 1 1 20 11.6Z"></path><path d="M9 8.5c.4 2.4 2.1 4.1 4.5 4.5"></path></svg><span>WhatsApp</span></label>
       <input id="pedidoWhatsapp" type="tel" maxlength="20" autocomplete="off" inputmode="tel" placeholder="(31) 99999-9999">
-      <small style="display:block;margin-top:6px;color:var(--text-soft)">Usaremos este número para avisar quando seu pedido estiver pronto para retirada.</small>
+      <small class="rp-field-helper">Usaremos este número para avisar quando seu pedido estiver pronto para retirada.</small>
     </div>
 
     <div class="pedido-field">
-      <label for="pedidoObs">Observação <span style="font-weight:400;color:var(--text-soft)">(opcional)</span></label>
-      <textarea id="pedidoObs" autocomplete="off" placeholder="Ex.: separar em uma sacolinha, reservar até mais tarde..."></textarea>
+      <label class="rp-field-label" for="pedidoObs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-9"></path><path d="m13 11 7-7 2 2-7 7-4 1 2-3Z"></path></svg><span>Observação <i>(opcional)</i></span></label>
+      <div class="rp-observation-wrap"><textarea id="pedidoObs" maxlength="500" autocomplete="off" placeholder="Ex.: separar em uma sacolinha, reservar até mais tarde..."></textarea><small id="rpObsCount">0/500</small></div>
     </div>
 
     <div class="pedido-atendimento">
-      <strong>🏪 Atendimento atual:</strong> retirada/compra no salão.<br>
-      A estrutura já está preparada para receber a opção de entrega futuramente.
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h6"></path></svg>
+      <div><strong>Atendimento atual:</strong> retirada/compra no salão.<span>A estrutura já está preparada para receber a opção de entrega futuramente.</span></div>
     </div>
 
     <div class="pedido-resumo rp-cart-legacy">
@@ -509,14 +513,15 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
       </div>
     </div>
 
-    <div style="display:grid;gap:10px">
+    <div class="rp-checkout-actions">
       <button class="btn btn-primary pedido-confirmar" id="pedidoPagarPix" type="button">
-        Pagar com Pix
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="10" width="12" height="10" rx="2"></rect><path d="M9 10V7a3 3 0 0 1 6 0v3M12 14v2"></path></svg><span>Pagar com Pix</span><b aria-hidden="true">›</b>
       </button>
       <button class="btn btn-outline pedido-confirmar" id="pedidoConfirmar" type="button">
-        Confirmar pelo WhatsApp
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.6a8 8 0 0 1-11.8 7L4 20l1.4-4.1A8 8 0 1 1 20 11.6Z"></path><path d="M9 8.5c.4 2.4 2.1 4.1 4.5 4.5"></path></svg><span>Confirmar pelo WhatsApp</span>
       </button>
       <div id="pedidoErro" role="alert" style="display:none;color:#9b2c2c;font-size:.88rem;text-align:center"></div>
+      <p class="rp-checkout-security"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="10" width="12" height="10" rx="2"></rect><path d="M9 10V7a3 3 0 0 1 6 0v3"></path></svg> Seus dados estão protegidos e seguros.</p>
     </div>
     </section>
    </div>
@@ -774,6 +779,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
   const email=document.getElementById('pedidoEmail');
   const whatsapp=document.getElementById('pedidoWhatsapp');
   const obs=document.getElementById('pedidoObs');
+  const obsCount=document.getElementById('rpObsCount');
   const pagar=document.getElementById('pedidoPagarPix');
   const confirmar=document.getElementById('pedidoConfirmar');
   const erro=document.getElementById('pedidoErro');
@@ -793,6 +799,8 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
   const addStock=document.getElementById('rpAddStock');
   const addSubmit=document.getElementById('rpAddSubmit');
   const moedaCentavos=c=>(Number(c||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  function atualizarContadorObs(){if(obsCount)obsCount.textContent=`${obs.value.length}/500`}
+  obs.addEventListener('input',atualizarContadorObs);atualizarContadorObs();
 
   function carregar(){
     try{
@@ -936,13 +944,13 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
     if(cliente.length<2)return avisar('Informe seu nome.');
     if(!email.checkValidity()||!mail)return avisar('Informe um e-mail válido.');
     if(fone.length<10||fone.length>13)return avisar('Informe um WhatsApp válido com DDD.');
-    const original=pagar.textContent;pagar.disabled=true;pagar.textContent='Gerando Pix...';
+    const original=pagar.innerHTML;pagar.disabled=true;pagar.textContent='Gerando Pix...';
     try{
       const r=await fetch('/api/checkout/pix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         itens:carrinho.map(i=>({produto_id:i.produto_id,quantidade:i.quantidade})),nome:cliente,email:mail,whatsapp:fone,observacao:obs.value.trim()})});
       const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.erro||'Não foi possível gerar o Pix.');
       carrinho=[];salvar();fechar();window.RPPix?.abrir(data);
-    }catch(e){avisar(e.message)}finally{pagar.disabled=!carrinho.length;pagar.textContent=original}
+    }catch(e){avisar(e.message)}finally{pagar.disabled=!carrinho.length;pagar.innerHTML=original}
   }
   function abrirWhatsApp(){
     if(!carrinho.length)return avisar('Seu carrinho está vazio.');
