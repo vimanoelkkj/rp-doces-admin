@@ -1035,23 +1035,7 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 
 
 
-<script>
-(function(){
-  let ultimoSyncCardapio = 0;
-  async function sincronizarCardapio(){
-    if (document.hidden || typeof carregarCardapioDinamico !== 'function') return;
-    const agora = Date.now();
-    if (agora - ultimoSyncCardapio < 700) return;
-    ultimoSyncCardapio = agora;
-    try { await carregarCardapioDinamico(); } catch (_) {}
-  }
-  
-  
-  setInterval(() => {
-  if (!document.hidden) sincronizarCardapio();
-}, 1000);
-})();
-</script>
+<script src="/assets/js/catalog-auto-sync.js"></script>
 
 
 <script id="rp-polimento-js" src="/assets/js/visual-effects.js"></script>
