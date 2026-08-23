@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "wrangler pages dev public",
     "test": "node --test tests/*.test.mjs",
+    "backup:production": "node scripts/backup-production.mjs",
     "deploy:preview": "wrangler pages deploy public --project-name=rp-doces",
     "deploy:production": "node scripts/deploy-production.mjs"
   },
