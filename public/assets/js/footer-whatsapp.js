@@ -20,3 +20,7 @@ window.atualizarFooterWhatsapp = function(numeroBruto){
     aplicar();
   }
 };
+
+if (typeof window.atualizarFooterWhatsapp === 'function') {
+  window.atualizarFooterWhatsapp(window.RP_WHATSAPP_NUMBER || '5533991285907');
+}
