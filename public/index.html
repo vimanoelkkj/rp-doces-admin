@@ -336,17 +336,29 @@ A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado e car
 
 
 <div class="rp-mobile-menu-overlay" id="rpMobileMenuOverlay" aria-hidden="true">
-  <section class="rp-mobile-menu-sheet" id="rpMobileMenuSheet" role="dialog" aria-modal="true" aria-labelledby="rpMobileMenuTitle">
-    <div class="rp-mobile-menu-handle" aria-hidden="true"></div>
-    <div class="rp-mobile-menu-head"><h2 id="rpMobileMenuTitle">Menu</h2><button class="rp-mobile-menu-close" id="rpMobileMenuClose" type="button" aria-label="Fechar menu">×</button></div>
+  <section class="rp-mobile-menu-sheet rp-site-menu-sheet" id="rpMobileMenuSheet" role="dialog" aria-modal="true" aria-labelledby="rpMobileMenuTitle">
+    <div class="rp-site-menu-top">
+      <div class="rp-mobile-menu-handle" aria-hidden="true"></div>
+      <div class="rp-mobile-menu-head rp-site-menu-head"><div><h2 id="rpMobileMenuTitle">Menu</h2><p>Tudo do R&amp;P em um só lugar.</p></div><button class="rp-mobile-menu-close" id="rpMobileMenuClose" type="button" aria-label="Fechar menu">×</button></div>
+    </div>
     <nav class="rp-mobile-menu-list" aria-label="Outras opções">
-      <a class="rp-mobile-menu-link" href="#sabores" data-mobile-menu-link><span class="rp-mobile-menu-icon">🛍️</span><span class="rp-mobile-menu-copy"><strong>Como pedir</strong><small>Escolha os doces e adicione ao carrinho</small></span><span class="rp-mobile-menu-arrow">›</span></a>
-      <button class="rp-mobile-menu-link" type="button" data-mobile-party><span class="rp-mobile-menu-icon">🎂</span><span class="rp-mobile-menu-copy"><strong>Pedidos para festa <span class="rp-mobile-menu-badge">7 dias</span></strong><small>Informações para encomendas especiais</small></span><span class="rp-mobile-menu-arrow">›</span></button>
-      <a class="rp-mobile-menu-link" href="#sobre" data-mobile-menu-link><span class="rp-mobile-menu-icon">♡</span><span class="rp-mobile-menu-copy"><strong>Sobre nós</strong><small>Nossa história e nossos valores</small></span><span class="rp-mobile-menu-arrow">›</span></a>
-      <a class="rp-mobile-menu-link" href="#onde-encontrar" data-mobile-menu-link><span class="rp-mobile-menu-icon">⌖</span><span class="rp-mobile-menu-copy"><strong>Localização</strong><small>Veja onde estamos</small></span><span class="rp-mobile-menu-arrow">›</span></a>
-      <a class="rp-mobile-menu-link" href="#contato" data-mobile-menu-link><span class="rp-mobile-menu-icon">☎</span><span class="rp-mobile-menu-copy"><strong>Contato</strong><small>Fale com a gente pelo WhatsApp</small></span><span class="rp-mobile-menu-arrow">›</span></a>
-      <a class="rp-mobile-menu-link" href="/admin/"><span class="rp-mobile-menu-icon">⚙</span><span class="rp-mobile-menu-copy"><strong>Painel Admin</strong><small>Acesso administrativo</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+      <section class="rp-site-menu-group" aria-labelledby="rpMenuOrdersTitle">
+        <h3 id="rpMenuOrdersTitle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14l-1 11H6L5 9Z"></path><path d="M8 9a4 4 0 0 1 8 0"></path></svg> Pedidos</h3>
+        <a class="rp-mobile-menu-link" href="#sabores" data-mobile-menu-link><span class="rp-mobile-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14l-1 11H6L5 9Z"></path><path d="M8 9a4 4 0 0 1 8 0"></path><path d="M13 13h7l-1 8h-6l-.7-6"></path></svg></span><span class="rp-mobile-menu-copy"><strong>Como pedir</strong><small>Escolha seus doces e finalize seu pedido</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+        <button class="rp-mobile-menu-link" type="button" data-mobile-party><span class="rp-mobile-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16v8H4Z"></path><path d="M6 8h12v4H6ZM8 5h8v3"></path><path d="M9 5V3M12 5V3M15 5V3"></path></svg></span><span class="rp-mobile-menu-copy"><strong>Pedidos para festa <span class="rp-mobile-menu-badge">7 dias</span></strong><small>Encomendas especiais para comemorações</small></span><span class="rp-mobile-menu-arrow">›</span></button>
+      </section>
+      <section class="rp-site-menu-group" aria-labelledby="rpMenuBrandTitle">
+        <h3 id="rpMenuBrandTitle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.5a5.5 5.5 0 0 0 0-7.8Z"></path></svg> Conheça a R&amp;P</h3>
+        <a class="rp-mobile-menu-link" href="#sobre" data-mobile-menu-link><span class="rp-mobile-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.5a5.5 5.5 0 0 0 0-7.8Z"></path></svg></span><span class="rp-mobile-menu-copy"><strong>Sobre nós</strong><small>Nossa história e nossos valores</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+        <a class="rp-mobile-menu-link" href="#onde-encontrar" data-mobile-menu-link><span class="rp-mobile-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></span><span class="rp-mobile-menu-copy"><strong>Localização</strong><small>Veja onde estamos</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+        <a class="rp-mobile-menu-link" href="#contato" data-mobile-menu-link><span class="rp-mobile-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.6a8 8 0 0 1-11.8 7L4 20l1.4-4.1A8 8 0 1 1 20 11.6Z"></path><path d="M9 8.5c.4 2.4 2.1 4.1 4.5 4.5"></path></svg></span><span class="rp-mobile-menu-copy"><strong>Contato</strong><small>Fale com a gente pelo WhatsApp</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+      </section>
+      <section class="rp-site-menu-group" aria-labelledby="rpMenuAdminTitle">
+        <h3 id="rpMenuAdminTitle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.8 8.1 7 10 4.2-1.9 7-5.5 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg> Administração</h3>
+        <a class="rp-mobile-menu-link" href="/admin/"><span class="rp-mobile-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path></svg></span><span class="rp-mobile-menu-copy"><strong>Painel Admin</strong><small>Acesso administrativo</small></span><span class="rp-mobile-menu-arrow">›</span></a>
+      </section>
     </nav>
+    <p class="rp-site-menu-security"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.8 8.1 7 10 4.2-1.9 7-5.5 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg> Seus dados estão protegidos e seguros.</p>
   </section>
 </div>
 
