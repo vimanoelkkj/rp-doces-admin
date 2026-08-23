@@ -1,8 +1,8 @@
 import { json } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
-import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../../lib/mercadoPago.js";
-import { notifyPaidOrder } from "../../../lib/push.js";
+import { mpRequest } from "../../../lib/mercadoPago.js";
 import { baixarEstoquePedido } from "../../../lib/stock.js";
+import { syncOrderPayment } from "../../../lib/paymentSync.js";
 
 const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
@@ -57,39 +57,7 @@ async function reconcilePendingOrders(env) {
   await Promise.allSettled(pending.map(async (pedido) => {
     try {
       const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(pedido.mp_order_id)}`);
-      const localStatus = mpOrderToLocalStatus(order);
-      const payment = paymentFromOrder(order);
-
-      await env.DB.prepare(`
-        UPDATE pedidos SET
-          status_pagamento = CASE
-            WHEN status_pagamento = 'REEMBOLSADO' THEN status_pagamento
-            WHEN status_pagamento = 'PAGO' AND ? NOT IN ('PAGO', 'REEMBOLSADO') THEN status_pagamento
-            ELSE ?
-          END,
-          mp_status = ?,
-          mp_status_detail = ?,
-          mp_payment_id = COALESCE(?, mp_payment_id),
-          atualizado_em = CURRENT_TIMESTAMP,
-          pago_em = CASE
-            WHEN ? = 'PAGO' AND pago_em IS NULL THEN CURRENT_TIMESTAMP
-            ELSE pago_em
-          END
-        WHERE id = ?
-      `).bind(
-        localStatus,
-        localStatus,
-        order?.status || null,
-        order?.status_detail || null,
-        payment.paymentId,
-        localStatus,
-        pedido.id
-      ).run();
-      if (localStatus === 'PAGO') {
-        const estoque = await baixarEstoquePedido(env, pedido.id);
-        if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", pedido.id);
-        await notifyPaidOrder(env, pedido.id);
-      }
+      await syncOrderPayment(env, { pedidoId: pedido.id, order, mpOrderId: pedido.mp_order_id });
     } catch (err) {
       // A reconciliação é uma rede de segurança. Falha ao consultar o MP não
       // deve derrubar a tela administrativa nem gerar uma tempestade de retries.

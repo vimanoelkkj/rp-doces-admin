@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { onRequestPost as webhook } from "../functions/api/webhooks/mercadopago.js";
 import { onRequestGet as adminOrders } from "../functions/api/admin/orders/index.js";
 import { onRequestGet as getPublicOrder } from "../functions/api/orders/[token].js";
+import { syncOrderPayment } from "../functions/lib/paymentSync.js";
 import { fakeDb, responseJson } from "./helpers/fake-db.mjs";
 
 const SECRET = "segredo-de-teste";
@@ -507,3 +508,127 @@ test("Caso 7: Reembolso legítimo: PAGO -> REEMBOLSADO transiciona corretamente"
   assert.equal(row.mp_status, "refunded");
   assert.equal(row.pago_em, "2026-08-23 14:00:00"); // pago_em preservado
 });
+
+// =========================================================================
+// TESTES UNITÁRIOS DO SERVIÇO CENTRALIZADO (functions/lib/paymentSync.js)
+// =========================================================================
+
+test("syncOrderPayment: transiciona PENDENTE para PAGO, baixa estoque e preenche pago_em", async (t) => {
+  const DB = createRealSqliteDb();
+  seedPedido(DB, { id: 201, status_pagamento: "PENDENTE", estoque: 5, quantidade: 2 });
+
+  const result = await syncOrderPayment({ DB }, {
+    pedidoId: 201,
+    order: {
+      id: "order-201",
+      status: "processed",
+      status_detail: "accredited",
+      transactions: { payments: [{ id: "pay-201" }] },
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status_pagamento, "PAGO");
+  assert.equal(result.mp_status, "processed");
+  assert.equal(result.mp_status_detail, "accredited");
+  assert.ok(result.pago_em);
+
+  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, mp_payment_id, estoque_baixado_em FROM pedidos WHERE id = 201").get();
+  assert.equal(row.status_pagamento, "PAGO");
+  assert.equal(row.mp_status, "processed");
+  assert.equal(row.mp_payment_id, "pay-201");
+  assert.ok(row.estoque_baixado_em);
+
+  const prod = DB.raw.prepare("SELECT estoque FROM produtos WHERE id = 1").get();
+  assert.equal(prod.estoque, 3); // 5 - 2 = 3
+});
+
+test("syncOrderPayment: protege PAGO contra regressão para CANCELADO/EXPIRADO e NÃO aciona pipeline pós-pagamento", async (t) => {
+  const DB = createRealSqliteDb();
+  // Pedido já pago, estoque inicial do produto = 5 (com estoque_baixado_em ainda NULL para provar que a baixa não é disparada)
+  seedPedido(DB, { id: 202, status_pagamento: "PAGO", mp_status: "processed", pago_em: "2026-08-23 10:00:00", estoque: 5, quantidade: 2 });
+
+  const oldFetch = globalThis.fetch;
+  let pushCalls = 0;
+  globalThis.fetch = async () => { pushCalls++; return new Response("", { status: 200 }); };
+  t.after(() => { globalThis.fetch = oldFetch; });
+
+  const result = await syncOrderPayment({
+    DB,
+    VAPID_PUBLIC_KEY: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-Skv6_yViEuiBIa-Ib9-Skv6_yViEuiBIa-Ib9-Skv6_yViEuiBIa8",
+    VAPID_PRIVATE_KEY: "segredo-vapid",
+  }, {
+    pedidoId: 202,
+    order: {
+      id: "order-202",
+      status: "expired",
+      status_detail: "expired_by_time",
+      transactions: { payments: [] },
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status_pagamento, "PAGO");
+  assert.equal(result.mp_status, "expired");
+  assert.equal(result.mp_status_detail, "expired_by_time");
+  assert.equal(result.pago_em, "2026-08-23 10:00:00");
+
+  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, mp_status_detail, pago_em, estoque_baixado_em FROM pedidos WHERE id = 202").get();
+  assert.equal(row.status_pagamento, "PAGO");
+  assert.equal(row.mp_status, "expired");
+  assert.equal(row.mp_status_detail, "expired_by_time");
+  assert.equal(row.pago_em, "2026-08-23 10:00:00");
+  assert.equal(row.estoque_baixado_em, null); // NÃO acionou baixa de estoque
+
+  const prod = DB.raw.prepare("SELECT estoque FROM produtos WHERE id = 1").get();
+  assert.equal(prod.estoque, 5); // Estoque permaneceu inalterado (5)
+  assert.equal(pushCalls, 0); // Push NÃO foi disparado
+});
+
+test("syncOrderPayment: transiciona PAGO para REEMBOLSADO", async (t) => {
+  const DB = createRealSqliteDb();
+  seedPedido(DB, { id: 203, status_pagamento: "PAGO", mp_status: "processed", pago_em: "2026-08-23 10:00:00", estoque_baixado_em: "2026-08-23 10:00:01" });
+
+  const result = await syncOrderPayment({ DB }, {
+    pedidoId: 203,
+    order: {
+      id: "order-203",
+      status: "refunded",
+      status_detail: "refunded",
+      transactions: { payments: [{ id: "pay-203" }] },
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status_pagamento, "REEMBOLSADO");
+  assert.equal(result.mp_status, "refunded");
+  assert.equal(result.pago_em, "2026-08-23 10:00:00");
+
+  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, pago_em FROM pedidos WHERE id = 203").get();
+  assert.equal(row.status_pagamento, "REEMBOLSADO");
+  assert.equal(row.mp_status, "refunded");
+  assert.equal(row.pago_em, "2026-08-23 10:00:00");
+});
+
+test("syncOrderPayment: utiliza fallback mpOrderId quando order.id está ausente no objeto", async (t) => {
+  const DB = createRealSqliteDb();
+  seedPedido(DB, { id: 204, status_pagamento: "PENDENTE" });
+
+  const result = await syncOrderPayment({ DB }, {
+    pedidoId: 204,
+    order: {
+      status: "processed",
+      status_detail: "accredited",
+      transactions: { payments: [{ id: "pay-204" }] },
+    },
+    mpOrderId: "order-fallback-204",
+  });
+
+  assert.equal(result.ok, true);
+  const row = DB.raw.prepare("SELECT mp_order_id, status_pagamento FROM pedidos WHERE id = 204").get();
+  assert.equal(row.mp_order_id, "order-fallback-204");
+  assert.equal(row.status_pagamento, "PAGO");
+});
+
+
+

@@ -1,7 +1,6 @@
 import { json } from "../../lib/http.js";
-import { mpRequest, mpOrderToLocalStatus, paymentFromOrder, validateMpWebhook } from "../../lib/mercadoPago.js";
-import { baixarEstoquePedido } from "../../lib/stock.js";
-import { notifyPaidOrder } from "../../lib/push.js";
+import { mpRequest, validateMpWebhook } from "../../lib/mercadoPago.js";
+import { syncOrderPayment } from "../../lib/paymentSync.js";
 
 function getBodyDataId(body) {
   const value = body?.data?.id ?? body?.data_id ?? body?.id ?? null;
@@ -95,42 +94,7 @@ export async function onRequestPost({ request, env }) {
       order = await mpRequest(env, `/v1/orders/${encodeURIComponent(orderId)}`);
     }
 
-    const localStatus = mpOrderToLocalStatus(order);
-    const payment = paymentFromOrder(order);
-
-    await env.DB.prepare(`
-      UPDATE pedidos SET
-        mp_order_id = COALESCE(?, mp_order_id),
-        status_pagamento = CASE
-          WHEN status_pagamento = 'REEMBOLSADO' THEN status_pagamento
-          WHEN status_pagamento = 'PAGO' AND ? NOT IN ('PAGO', 'REEMBOLSADO') THEN status_pagamento
-          ELSE ?
-        END,
-        mp_status = ?,
-        mp_status_detail = ?,
-        mp_payment_id = COALESCE(?, mp_payment_id),
-        atualizado_em = CURRENT_TIMESTAMP,
-        pago_em = CASE
-          WHEN ? = 'PAGO' AND pago_em IS NULL THEN CURRENT_TIMESTAMP
-          ELSE pago_em
-        END
-      WHERE id = ?
-    `).bind(
-      order?.id ? String(order.id) : orderId,
-      localStatus,
-      localStatus,
-      order?.status || null,
-      order?.status_detail || null,
-      payment.paymentId,
-      localStatus,
-      local.id
-    ).run();
-
-    if (localStatus === "PAGO") {
-      const estoque = await baixarEstoquePedido(env, local.id);
-      if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", local.id);
-      await notifyPaidOrder(env, local.id);
-    }
+    await syncOrderPayment(env, { pedidoId: local.id, order, mpOrderId: orderId });
 
     return json({ ok: true });
   } catch (err) {
