@@ -59,7 +59,8 @@ async function carregarCardapioDinamico(){
       div.dataset.destaque = produto.destaque ? 'true' : 'false';
       div.dataset.estoque = String(estoque);
       div._rpProduto=produto;
-      const badges=[produto.promocao_vigente?'<span class="rp-card-badge">Promo</span>':'',produto.destaque?'<span class="rp-card-badge">Destaque</span>':'',estoque===1?'<span class="rp-card-badge rp-card-badge--stock">Última unidade</span>':'',indisponivel?'<span class="rp-card-badge rp-card-badge--soldout">Esgotado</span>':''].join('');
+      const badges=[produto.promocao_vigente?'<span class="rp-card-badge">Promo</span>':'',produto.destaque?'<span class="rp-card-badge">Destaque</span>':'',indisponivel?'<span class="rp-card-badge rp-card-badge--soldout">Esgotado</span>':''].join('');
+      const stockBadge=estoque===1?'<span class="rp-card-badge rp-card-badge--stock">Última unidade</span>':'';
       div.innerHTML = `
         <div class="rp-card-visual">
           <div class="rp-card-badges">${badges}</div>
@@ -69,7 +70,7 @@ async function carregarCardapioDinamico(){
           <h3>${rpEscHtml(produto.nome)}</h3>
           <p>${rpEscHtml(produto.descricao || '')}</p>
           <div class="rp-card-footer">
-            <div class="rp-card-price">${produto.promocao_vigente?`<s>${formatar(produto.preco_original_centavos)}</s><span>${formatar(produto.preco_centavos)}</span>`:`<span>${formatar(produto.preco_centavos)}</span>`}</div>
+            <div class="rp-card-price">${produto.promocao_vigente?`<s>${formatar(produto.preco_original_centavos)}</s><span>${formatar(produto.preco_centavos)}</span>`:`<span>${formatar(produto.preco_centavos)}</span>`}${stockBadge}</div>
             <div class="rp-card-cart">${controleCarrinho(produto)}</div>
           </div>
         </div>
