@@ -124,7 +124,7 @@ function createRealSqliteDb() {
           },
           async all() {
             return { results: stmt.all(...params) };
-          },
+          }
         };
       },
       async run() {
@@ -136,7 +136,7 @@ function createRealSqliteDb() {
       },
       async all() {
         return { results: stmt.all() };
-      },
+      }
     };
   }
 
@@ -144,7 +144,9 @@ function createRealSqliteDb() {
   async function batch(statements) {
     const previous = batchQueue;
     let release;
-    batchQueue = new Promise(resolve => { release = resolve; });
+    batchQueue = new Promise(resolve => {
+      release = resolve;
+    });
     await previous;
     try {
       db.exec("BEGIN");
@@ -156,7 +158,9 @@ function createRealSqliteDb() {
       db.exec("COMMIT");
       return results;
     } catch (err) {
-      try { db.exec("ROLLBACK"); } catch {}
+      try {
+        db.exec("ROLLBACK");
+      } catch {}
       throw err;
     } finally {
       release();
@@ -171,7 +175,9 @@ function mockFetch(handler) {
   globalThis.fetch = async (url, opts) => {
     return handler(url, opts);
   };
-  return () => { globalThis.fetch = original; };
+  return () => {
+    globalThis.fetch = original;
+  };
 }
 
 test("Cenário A: PAGO confirmado, falha antes da conversão de estoque -> pedido fica PAGO + ATIVA, cleanup não libera, reconciliação posterior converte para CONVERTIDA", async () => {
@@ -187,19 +193,31 @@ test("Cenário A: PAGO confirmado, falha antes da conversão de estoque -> pedid
   `);
 
   // 1. Simula recebimento de PAGO via syncOrderPayment
-  const restore = mockFetch(async () => new Response(JSON.stringify({ id: "mp-order-1", status: "processed" })));
+  const restore = mockFetch(
+    async () => new Response(JSON.stringify({ id: "mp-order-1", status: "processed" }))
+  );
   try {
     await syncOrderPayment(env, {
       pedidoId: 1,
-      order: { id: "mp-order-1", status: "processed", transactions: { payments: [{ id: "pay-1", status: "approved" }] } }
+      order: {
+        id: "mp-order-1",
+        status: "processed",
+        transactions: { payments: [{ id: "pay-1", status: "approved" }] }
+      }
     });
 
-    const pAposPago = env.DB.raw.prepare("SELECT status_pagamento, reserva_status, estoque_baixado_em FROM pedidos WHERE id = 1").get();
+    const pAposPago = env.DB.raw
+      .prepare(
+        "SELECT status_pagamento, reserva_status, estoque_baixado_em FROM pedidos WHERE id = 1"
+      )
+      .get();
     assert.equal(pAposPago.status_pagamento, "PAGO");
     assert.equal(pAposPago.reserva_status, "CONVERTIDA");
     assert.ok(pAposPago.estoque_baixado_em);
 
-    const prodAposPago = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+    const prodAposPago = env.DB.raw
+      .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+      .get();
     assert.equal(prodAposPago.estoque, 8); // 10 - 2 = 8
     assert.equal(prodAposPago.estoque_reservado, 0); // 2 - 2 = 0
   } finally {
@@ -231,7 +249,9 @@ test("Cenário B: Liberação multi-item com falha no meio executa rollback tota
   const prod2 = env.DB.raw.prepare("SELECT estoque_reservado FROM produtos WHERE id = 2").get();
   assert.equal(prod2.estoque_reservado, 1);
 
-  const pedido = env.DB.raw.prepare("SELECT reserva_status, status_pagamento FROM pedidos WHERE id = 1").get();
+  const pedido = env.DB.raw
+    .prepare("SELECT reserva_status, status_pagamento FROM pedidos WHERE id = 1")
+    .get();
   assert.equal(pedido.reserva_status, "ATIVA");
   assert.equal(pedido.status_pagamento, "PENDENTE");
 });
@@ -248,24 +268,31 @@ test("Cenário C: Retry POST idempotente após mudança de preço no catálogo u
   let mpRequestBody = null;
   const restore = mockFetch(async (url, opts) => {
     mpRequestBody = JSON.parse(opts.body);
-    return new Response(JSON.stringify({
-      id: "mp-order-snapshot",
-      status: "pending",
-      transactions: {
-        payments: [
-          {
-            id: "pay-1",
-            payment_method: { id: "pix", qr_code: "pix-code", qr_code_base64: "base64" }
-          }
-        ]
-      }
-    }), { status: 201 });
+    return new Response(
+      JSON.stringify({
+        id: "mp-order-snapshot",
+        status: "pending",
+        transactions: {
+          payments: [
+            {
+              id: "pay-1",
+              payment_method: { id: "pix", qr_code: "pix-code", qr_code_base64: "base64" }
+            }
+          ]
+        }
+      }),
+      { status: 201 }
+    );
   });
 
   try {
     const req1 = new Request("https://loja.test/api/checkout/pix", {
       method: "POST",
-      headers: { "content-type": "application/json", Origin: "https://loja.test", "CF-Connecting-IP": "1.1.1.1" },
+      headers: {
+        "content-type": "application/json",
+        Origin: "https://loja.test",
+        "CF-Connecting-IP": "1.1.1.1"
+      },
       body: JSON.stringify({
         client_request_id: "550e8400-e29b-41d4-a716-446655440000",
         nome: "Bruna Lima",
@@ -285,7 +312,11 @@ test("Cenário C: Retry POST idempotente após mudança de preço no catálogo u
     // 3. Retry com a mesma client_request_id
     const req2 = new Request("https://loja.test/api/checkout/pix", {
       method: "POST",
-      headers: { "content-type": "application/json", Origin: "https://loja.test", "CF-Connecting-IP": "1.1.1.1" },
+      headers: {
+        "content-type": "application/json",
+        Origin: "https://loja.test",
+        "CF-Connecting-IP": "1.1.1.1"
+      },
       body: JSON.stringify({
         client_request_id: "550e8400-e29b-41d4-a716-446655440000",
         nome: "Bruna Lima",
@@ -316,18 +347,27 @@ test("Cenário D: Dois clientes disputam a última unidade (estoque = 1) -> exat
   let mpCalls = 0;
   const restore = mockFetch(async () => {
     mpCalls++;
-    return new Response(JSON.stringify({
-      id: `mp-order-${mpCalls}`,
-      status: "pending",
-      transactions: { payments: [{ id: `pay-${mpCalls}`, qr_code: "pix", qr_code_base64: "base64" }] }
-    }), { status: 201 });
+    return new Response(
+      JSON.stringify({
+        id: `mp-order-${mpCalls}`,
+        status: "pending",
+        transactions: {
+          payments: [{ id: `pay-${mpCalls}`, qr_code: "pix", qr_code_base64: "base64" }]
+        }
+      }),
+      { status: 201 }
+    );
   });
 
   try {
     // Cliente 1 faz pedido
     const req1 = new Request("https://loja.test/api/checkout/pix", {
       method: "POST",
-      headers: { "content-type": "application/json", Origin: "https://loja.test", "CF-Connecting-IP": "1.1.1.1" },
+      headers: {
+        "content-type": "application/json",
+        Origin: "https://loja.test",
+        "CF-Connecting-IP": "1.1.1.1"
+      },
       body: JSON.stringify({
         client_request_id: "550e8400-e29b-41d4-a716-446655440001",
         nome: "Cliente Um",
@@ -339,14 +379,20 @@ test("Cenário D: Dois clientes disputam a última unidade (estoque = 1) -> exat
     const res1 = await checkoutPix({ request: req1, env });
     assert.equal(res1.status, 201);
 
-    const prodApos1 = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+    const prodApos1 = env.DB.raw
+      .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+      .get();
     assert.equal(prodApos1.estoque, 1);
     assert.equal(prodApos1.estoque_reservado, 1); // Unidade reservada!
 
     // Cliente 2 tenta pedir o mesmo produto
     const req2 = new Request("https://loja.test/api/checkout/pix", {
       method: "POST",
-      headers: { "content-type": "application/json", Origin: "https://loja.test", "CF-Connecting-IP": "1.1.1.2" },
+      headers: {
+        "content-type": "application/json",
+        Origin: "https://loja.test",
+        "CF-Connecting-IP": "1.1.1.2"
+      },
       body: JSON.stringify({
         client_request_id: "550e8400-e29b-41d4-a716-446655440002",
         nome: "Cliente Dois",
@@ -383,7 +429,11 @@ test("Cenário E: Timeout após Order possivelmente criada no MP -> reserva perm
   try {
     const req = new Request("https://loja.test/api/checkout/pix", {
       method: "POST",
-      headers: { "content-type": "application/json", Origin: "https://loja.test", "CF-Connecting-IP": "1.1.1.1" },
+      headers: {
+        "content-type": "application/json",
+        Origin: "https://loja.test",
+        "CF-Connecting-IP": "1.1.1.1"
+      },
       body: JSON.stringify({
         client_request_id: "550e8400-e29b-41d4-a716-446655440005",
         nome: "Eduardo",
@@ -397,7 +447,11 @@ test("Cenário E: Timeout após Order possivelmente criada no MP -> reserva perm
     assert.equal(res.status, 502);
 
     // Reserva deve permanecer ATIVA (política conservadora fail-safe)
-    const pedido = env.DB.raw.prepare("SELECT status_pagamento, reserva_status FROM pedidos WHERE idempotency_key = '550e8400-e29b-41d4-a716-446655440005'").get();
+    const pedido = env.DB.raw
+      .prepare(
+        "SELECT status_pagamento, reserva_status FROM pedidos WHERE idempotency_key = '550e8400-e29b-41d4-a716-446655440005'"
+      )
+      .get();
     assert.equal(pedido.status_pagamento, "ERRO");
     assert.equal(pedido.reserva_status, "ATIVA");
 
@@ -420,23 +474,34 @@ test("Cenário F: MP retorna expired confirmado na reconciliação -> reserva é
     VALUES (1, 1, 1, 'Palha Italiana', 2, 800, 1600);
   `);
 
-  const restore = mockFetch(async () => new Response(JSON.stringify({
-    id: "mp-order-exp",
-    status: "expired",
-    status_detail: "expired_by_time"
-  })));
+  const restore = mockFetch(
+    async () =>
+      new Response(
+        JSON.stringify({
+          id: "mp-order-exp",
+          status: "expired",
+          status_detail: "expired_by_time"
+        })
+      )
+  );
 
   try {
     const res = await reconciliarReservaExpirada(env, 1);
     assert.equal(res.reconciliado, true);
     assert.equal(res.status, "LIBERADA");
 
-    const pedido = env.DB.raw.prepare("SELECT status_pagamento, reserva_status, reserva_liberada_em FROM pedidos WHERE id = 1").get();
+    const pedido = env.DB.raw
+      .prepare(
+        "SELECT status_pagamento, reserva_status, reserva_liberada_em FROM pedidos WHERE id = 1"
+      )
+      .get();
     assert.equal(pedido.status_pagamento, "EXPIRADO");
     assert.equal(pedido.reserva_status, "LIBERADA");
     assert.ok(pedido.reserva_liberada_em);
 
-    const prod = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+    const prod = env.DB.raw
+      .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+      .get();
     assert.equal(prod.estoque, 10);
     assert.equal(prod.estoque_reservado, 0); // Liberou!
   } finally {
@@ -462,7 +527,9 @@ test("Cenário G: Falha 503 na reconciliação de reserva expirada -> reserva pe
     const res = await reconciliarReservaExpirada(env, 1);
     assert.equal(res.reconciliado, false);
 
-    const pedido = env.DB.raw.prepare("SELECT status_pagamento, reserva_status FROM pedidos WHERE id = 1").get();
+    const pedido = env.DB.raw
+      .prepare("SELECT status_pagamento, reserva_status FROM pedidos WHERE id = 1")
+      .get();
     assert.equal(pedido.status_pagamento, "PENDENTE");
     assert.equal(pedido.reserva_status, "ATIVA");
 
@@ -485,17 +552,25 @@ test("Cenário H: Webhook PAGO duplicado não altera estoque físico nem reserva
     VALUES (1, 1, 1, 'Brownie', 2, 1200, 2400);
   `);
 
-  const orderPago = { id: "mp-order-dup", status: "processed", transactions: { payments: [{ id: "pay-dup", status: "approved" }] } };
+  const orderPago = {
+    id: "mp-order-dup",
+    status: "processed",
+    transactions: { payments: [{ id: "pay-dup", status: "approved" }] }
+  };
 
   // 1ª execução
   await syncOrderPayment(env, { pedidoId: 1, order: orderPago });
-  const prod1 = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prod1 = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prod1.estoque, 8);
   assert.equal(prod1.estoque_reservado, 0);
 
   // 2ª execução duplicada
   await syncOrderPayment(env, { pedidoId: 1, order: orderPago });
-  const prod2 = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prod2 = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prod2.estoque, 8); // Não baixou de novo!
   assert.equal(prod2.estoque_reservado, 0);
 });
@@ -515,9 +590,15 @@ test("Cenário I: PAGO -> REEMBOLSADO não repõe estoque físico automaticament
   // 1. Paga
   await syncOrderPayment(env, {
     pedidoId: 1,
-    order: { id: "mp-order-reemb", status: "processed", transactions: { payments: [{ id: "pay-1", status: "approved" }] } }
+    order: {
+      id: "mp-order-reemb",
+      status: "processed",
+      transactions: { payments: [{ id: "pay-1", status: "approved" }] }
+    }
   });
-  const prodAposPago = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prodAposPago = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prodAposPago.estoque, 9);
   assert.equal(prodAposPago.estoque_reservado, 0);
 
@@ -530,7 +611,9 @@ test("Cenário I: PAGO -> REEMBOLSADO não repõe estoque físico automaticament
   const pedidoReemb = env.DB.raw.prepare("SELECT status_pagamento FROM pedidos WHERE id = 1").get();
   assert.equal(pedidoReemb.status_pagamento, "REEMBOLSADO");
 
-  const prodAposReemb = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prodAposReemb = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prodAposReemb.estoque, 9); // Estoque físico NÃO voltou automaticamente
   assert.equal(prodAposReemb.estoque_reservado, 0);
 });
@@ -541,14 +624,18 @@ test("Cenário J: Edição Admin não permite reduzir estoque físico abaixo de 
 
   const token = "admin-token-123";
   const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  const tokenHash = [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, "0")).join("");
+  const tokenHash = [...new Uint8Array(hashBuffer)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 
   const expiraEm = new Date(Date.now() + 3600000).toISOString();
   env.DB.raw.exec(`
     INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Quindim', 600, 5, 3);
     INSERT INTO usuarios_admin (id, nome, username, email, ativo, papel, senha_hash) VALUES (1, 'Admin', 'admin', 'admin@test.com', 1, 'admin', 'hash');
   `);
-  env.DB.raw.prepare("INSERT INTO admin_sessoes (token_hash, usuario_id, expira_em) VALUES (?, 1, ?)").run(tokenHash, expiraEm);
+  env.DB.raw
+    .prepare("INSERT INTO admin_sessoes (token_hash, usuario_id, expira_em) VALUES (?, 1, ?)")
+    .run(tokenHash, expiraEm);
 
   const req = new Request("https://loja.test/api/admin/products/1", {
     method: "PUT",
@@ -590,11 +677,16 @@ test("Cenário K: GET /api/products reflete disponibilidade real (estoque - esto
     VALUES (1, 1, 1, 'Bolo Vencido', 2, 1500, 3000);
   `);
 
-  const restore = mockFetch(async () => new Response(JSON.stringify({
-    id: "mp-order-venc",
-    status: "expired",
-    status_detail: "expired_by_time"
-  })));
+  const restore = mockFetch(
+    async () =>
+      new Response(
+        JSON.stringify({
+          id: "mp-order-venc",
+          status: "expired",
+          status_detail: "expired_by_time"
+        })
+      )
+  );
 
   try {
     const res = await getProducts({ env });
@@ -636,11 +728,15 @@ test("Concorrência A: duas liberarReservaPedido() simultâneas no mesmo pedido 
   assert.equal(Number(res1.liberado) + Number(res2.liberado), 1);
 
   // Resultado obrigatório: estoque_reservado = 4 (NUNCA 3!)
-  const prod = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prod = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prod.estoque, 10);
   assert.equal(prod.estoque_reservado, 4);
 
-  const pedido = env.DB.raw.prepare("SELECT reserva_status, status_pagamento FROM pedidos WHERE id = 1").get();
+  const pedido = env.DB.raw
+    .prepare("SELECT reserva_status, status_pagamento FROM pedidos WHERE id = 1")
+    .get();
   assert.equal(pedido.reserva_status, "LIBERADA");
   assert.equal(pedido.status_pagamento, "EXPIRADO");
 });
@@ -668,11 +764,17 @@ test("Concorrência B: duas baixarEstoquePedido() simultâneas no mesmo pedido n
   assert.equal(Number(res1.baixado) + Number(res2.baixado), 1);
 
   // Resultado obrigatório: estoque = 9 (nunca 8!), estoque_reservado = 4 (nunca 3!)
-  const prod = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prod = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prod.estoque, 9);
   assert.equal(prod.estoque_reservado, 4);
 
-  const pedido = env.DB.raw.prepare("SELECT reserva_status, status_pagamento, estoque_baixado_em FROM pedidos WHERE id = 1").get();
+  const pedido = env.DB.raw
+    .prepare(
+      "SELECT reserva_status, status_pagamento, estoque_baixado_em FROM pedidos WHERE id = 1"
+    )
+    .get();
   assert.equal(pedido.reserva_status, "CONVERTIDA");
   assert.equal(pedido.status_pagamento, "PAGO");
   assert.ok(pedido.estoque_baixado_em);
@@ -697,17 +799,23 @@ test("Concorrência C: Multi-item com erro no 2º item executa rollback total (p
   assert.equal(res.ok, false);
 
   // Produto 1 NÃO teve estoque alterado
-  const prod1 = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prod1 = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prod1.estoque, 10);
   assert.equal(prod1.estoque_reservado, 2);
 
   // Produto 2 NÃO teve estoque alterado
-  const prod2 = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 2").get();
+  const prod2 = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 2")
+    .get();
   assert.equal(prod2.estoque, 10);
   assert.equal(prod2.estoque_reservado, 1);
 
   // Pedido permanece ATIVA
-  const pedido = env.DB.raw.prepare("SELECT reserva_status, estoque_baixado_em FROM pedidos WHERE id = 1").get();
+  const pedido = env.DB.raw
+    .prepare("SELECT reserva_status, estoque_baixado_em FROM pedidos WHERE id = 1")
+    .get();
   assert.equal(pedido.reserva_status, "ATIVA");
   assert.equal(pedido.estoque_baixado_em, null);
 });
@@ -754,7 +862,9 @@ test("Concorrência E: Retry de baixarEstoquePedido() depois de já CONVERTIDA n
   assert.equal(res2.ok, true);
   assert.equal(res2.baixado, false); // Idempotente!
 
-  const prod = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prod = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prod.estoque, 8);
   assert.equal(prod.estoque_reservado, 0);
 });
@@ -818,11 +928,15 @@ test("Concorrência G: Corrida liberarReservaPedido() vence baixarEstoquePedido(
 
   // Resultado obrigatório:
   // estoque = 10 (intacto), estoque_reservado = 4 (apenas a cota do pedido 1 foi liberada; as outras 4 de terceiros estão intactas!)
-  const prod = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prod = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prod.estoque, 10);
   assert.equal(prod.estoque_reservado, 4);
 
-  const pedido = env.DB.raw.prepare("SELECT reserva_status, estoque_baixado_em FROM pedidos WHERE id = 1").get();
+  const pedido = env.DB.raw
+    .prepare("SELECT reserva_status, estoque_baixado_em FROM pedidos WHERE id = 1")
+    .get();
   assert.equal(pedido.reserva_status, "LIBERADA");
   assert.equal(pedido.estoque_baixado_em, null);
 });
@@ -851,14 +965,18 @@ test("Concorrência H: Corrida baixarEstoquePedido() vence liberarReservaPedido(
 
   // Resultado obrigatório:
   // estoque = 9, estoque_reservado = 4
-  const prod = env.DB.raw.prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1").get();
+  const prod = env.DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
   assert.equal(prod.estoque, 9);
   assert.equal(prod.estoque_reservado, 4);
 
-  const pedido = env.DB.raw.prepare("SELECT reserva_status, status_pagamento, estoque_baixado_em FROM pedidos WHERE id = 1").get();
+  const pedido = env.DB.raw
+    .prepare(
+      "SELECT reserva_status, status_pagamento, estoque_baixado_em FROM pedidos WHERE id = 1"
+    )
+    .get();
   assert.equal(pedido.reserva_status, "CONVERTIDA");
   assert.equal(pedido.status_pagamento, "PAGO");
   assert.ok(pedido.estoque_baixado_em);
 });
-
-

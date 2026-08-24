@@ -12,7 +12,8 @@ export async function onRequestGet({ request, env }) {
   if (auth.error) return auth.error;
 
   try {
-    const row = await env.DB.prepare(`
+    const row = await env.DB.prepare(
+      `
       SELECT
         COALESCE(SUM(CASE
           WHEN status_pagamento = 'PAGO'
@@ -35,7 +36,8 @@ export async function onRequestGet({ request, env }) {
             AND reserva_expira_em <= datetime('now', '-5 minutes')
           THEN 1 ELSE 0 END), 0) AS erros_com_reserva_vencida
       FROM pedidos
-    `).first();
+    `
+    ).first();
 
     const metricas = {
       pagos_sem_baixa_estoque: Number(row?.pagos_sem_baixa_estoque || 0),
@@ -57,12 +59,15 @@ export async function onRequestGet({ request, env }) {
       status = "warning";
     }
 
-    return json({
-      status,
-      alertas_ativos: alertasAtivos,
-      metricas,
-      timestamp: new Date().toISOString()
-    }, 200);
+    return json(
+      {
+        status,
+        alertas_ativos: alertasAtivos,
+        metricas,
+        timestamp: new Date().toISOString()
+      },
+      200
+    );
   } catch (err) {
     return json({ erro: "Erro ao consultar saúde dos pagamentos." }, 500);
   }

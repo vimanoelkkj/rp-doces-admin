@@ -4,12 +4,19 @@ import { randomToken, sha256 } from "../../lib/auth.js";
 export async function onRequestPost({ request, env }) {
   if (!sameOrigin(request)) return json({ erro: "Origem inválida." }, 403);
   const data = await bodyJson(request);
-  const email = String(data?.email || "").trim().toLowerCase();
+  const email = String(data?.email || "")
+    .trim()
+    .toLowerCase();
 
-  const generic = { ok: true, mensagem: "Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação." };
+  const generic = {
+    ok: true,
+    mensagem: "Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação."
+  };
   const user = await env.DB.prepare(
     "SELECT id, nome, email FROM usuarios_admin WHERE email = ? AND ativo = 1 LIMIT 1"
-  ).bind(email).first();
+  )
+    .bind(email)
+    .first();
 
   if (!user) return json(generic);
 
@@ -18,11 +25,16 @@ export async function onRequestPost({ request, env }) {
   const expira = new Date(Date.now() + 30 * 60000).toISOString();
 
   await env.DB.prepare("DELETE FROM tokens_recuperacao WHERE usuario_id = ? OR expira_em <= ?")
-    .bind(user.id, new Date().toISOString()).run();
-  await env.DB.prepare(`
+    .bind(user.id, new Date().toISOString())
+    .run();
+  await env.DB.prepare(
+    `
     INSERT INTO tokens_recuperacao (usuario_id, token_hash, expira_em)
     VALUES (?, ?, ?)
-  `).bind(user.id, tokenHash, expira).run();
+  `
+  )
+    .bind(user.id, tokenHash, expira)
+    .run();
 
   if (env.EMAIL && env.EMAIL_FROM) {
     const url = `${new URL(request.url).origin}/admin/?reset=${encodeURIComponent(token)}`;

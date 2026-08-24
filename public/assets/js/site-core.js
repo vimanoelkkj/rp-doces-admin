@@ -1,24 +1,32 @@
 // ⚠️ MOCKUP: troque pelo número real da sua marca (com DDI 55 + DDD, sem espaços/traços)
-  let WHATSAPP_NUMBER = "5533991285907";
+let WHATSAPP_NUMBER = "5533991285907";
 
-  function rpEscHtml(value){
-    return String(value ?? '').replace(/[&<>"']/g, ch => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[ch]));
-  }
+function rpEscHtml(value) {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    ch =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[ch]
+  );
+}
 
-  const menuToggle = document.getElementById('menuToggle');
-  const navLinks = document.getElementById('navLinks');
-  menuToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
-  navLinks.addEventListener('click', (e) => {
-    if(e.target.tagName === 'A') navLinks.classList.remove('open');
-  });
+const menuToggle = document.getElementById("menuToggle");
+const navLinks = document.getElementById("navLinks");
+menuToggle.addEventListener("click", () => navLinks.classList.toggle("open"));
+navLinks.addEventListener("click", e => {
+  if (e.target.tagName === "A") navLinks.classList.remove("open");
+});
 
-  function renderFlavors(items, grid, tipo){
-    items.forEach(s => {
-      const card = document.createElement('div');
-      card.className = 'flavor-card';
-      card.innerHTML = `
+function renderFlavors(items, grid, tipo) {
+  items.forEach(s => {
+    const card = document.createElement("div");
+    card.className = "flavor-card";
+    card.innerHTML = `
         <div class="flavor-top">
           <div class="flavor-emoji">${rpEscHtml(s.emoji)}</div>
           <div class="flavor-price">${rpEscHtml(s.preco)}</div>
@@ -30,31 +38,31 @@
           Pedir esse sabor
         </button>
       `;
-      grid.appendChild(card);
-    });
-    grid.addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-flavor');
-      if(!btn) return;
-      pedirSabor(btn.getAttribute('data-sabor'), btn.getAttribute('data-tipo'));
-    });
-  }
-function pedirSabor(sabor, tipo){
-    const texto = `Olá! \uD83C\uDF70 Vim pelo site da R&P Doces e gostaria de fazer um pedido do(a) ${tipo} sabor *${sabor}*. Poderia me passar mais informações?`;
-    abrirWhatsApp(texto);
-  }
+    grid.appendChild(card);
+  });
+  grid.addEventListener("click", e => {
+    const btn = e.target.closest(".btn-flavor");
+    if (!btn) return;
+    pedirSabor(btn.getAttribute("data-sabor"), btn.getAttribute("data-tipo"));
+  });
+}
+function pedirSabor(sabor, tipo) {
+  const texto = `Olá! \uD83C\uDF70 Vim pelo site da R&P Doces e gostaria de fazer um pedido do(a) ${tipo} sabor *${sabor}*. Poderia me passar mais informações?`;
+  abrirWhatsApp(texto);
+}
 
-  function pedirGeral(e){
-    if(e) e.preventDefault();
-    const texto = `Olá! \uD83C\uDF70 Vim pelo site da R&P Doces e gostaria de saber mais sobre os bolos no pote e mini pudins disponíveis.`;
-    abrirWhatsApp(texto);
-    return false;
-  }
+function pedirGeral(e) {
+  if (e) e.preventDefault();
+  const texto = `Olá! \uD83C\uDF70 Vim pelo site da R&P Doces e gostaria de saber mais sobre os bolos no pote e mini pudins disponíveis.`;
+  abrirWhatsApp(texto);
+  return false;
+}
 
-  function abrirWhatsApp(texto){
-    const textoEncoded = encodeURIComponent(texto);
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const url = isMobile
-      ? `https://wa.me/${WHATSAPP_NUMBER}?text=${textoEncoded}`
-      : `https://web.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${textoEncoded}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
+function abrirWhatsApp(texto) {
+  const textoEncoded = encodeURIComponent(texto);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const url = isMobile
+    ? `https://wa.me/${WHATSAPP_NUMBER}?text=${textoEncoded}`
+    : `https://web.whatsapp.com/send?phone=${WHATSAPP_NUMBER}&text=${textoEncoded}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}

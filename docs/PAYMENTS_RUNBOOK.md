@@ -9,6 +9,7 @@ Documento operacional para administração, diagnóstico e resolução de incide
 O sistema de pagamentos e estoque do R&P Doces foi projetado sob princípios de **resiliência financeira**, **idempotência estrita**, **blindagem contra overselling** e **observabilidade sem vazamento de dados sensíveis**.
 
 ### Componentes Chave:
+
 - **Checkout Pix**: Geração idempotente de cobranças com chave baseada em `client_request_id`, snapshot financeiro imutável e proteção por Rate Limiting atômico (D1).
 - **Mercado Pago**: Integração server-side via API `/v1/orders` com validação de payload e chave de idempotência.
 - **Reserva Atômica de Estoque**: Garantia relacional via `CHECK (estoque_reservado <= estoque)` e transações atômicas `env.DB.batch()` que impedem venda duplicada de itens concorrentes.
@@ -21,6 +22,7 @@ O sistema de pagamentos e estoque do R&P Doces foi projetado sob princípios de 
 ## 2. Estados Principais do Sistema
 
 ### 2.1 Status Financeiro (`status_pagamento`)
+
 - `PENDENTE`: Cobrança Pix gerada aguardando confirmação do emissor.
 - `PAGO`: Pagamento aprovado e creditado. **Status terminal protegido contra qualquer regressão**.
 - `EXPIRADO`: Cobrança Pix expirada após o TTL (30 minutos) sem confirmação de pagamento.
@@ -30,6 +32,7 @@ O sistema de pagamentos e estoque do R&P Doces foi projetado sob princípios de 
 - `REEMBOLSADO`: Pagamento estornado administrativamente no Mercado Pago.
 
 ### 2.2 Status da Reserva de Estoque (`reserva_status`)
+
 - `SEM_RESERVA`: Pedidos legados ou criados sem reserva temporária.
 - `ATIVA`: Unidades reservadas temporariamente (`estoque_reservado` incrementado no produto).
 - `CONVERTIDA`: Pagamento confirmado (`estoque` físico e `estoque_reservado` decrementados atomicamente).
@@ -37,15 +40,15 @@ O sistema de pagamentos e estoque do R&P Doces foi projetado sob princípios de 
 
 ### 2.3 Combinações de Estados (Matriz Operacional)
 
-| Combinação | Classificação | Significado Operacional |
-| :--- | :---: | :--- |
-| `PENDENTE` + `ATIVA` | **Normal** | Cobrança Pix aberta aguardando cliente pagar dentro do TTL. |
-| `PAGO` + `CONVERTIDA` | **Saudável (Final)** | Pedido pago com baixa física de estoque e reserva concluídas com sucesso. |
-| `PAGO` + `ATIVA` | **Anomalia Recuperável** | Pagamento confirmado pelo gateway, mas a conversão transacional de estoque falhou temporariamente ou está em processamento. O sistema mantém a reserva para evitar venda a outro cliente. A reconciliação automática converte para `CONVERTIDA`. |
-| `ERRO` + `ATIVA` | **Conservador (Fail-Safe)** | Houve erro de comunicação ou timeout no checkout após a criação da Order poder ter ocorrido no MP. A reserva é mantida preventivamente para evitar overselling até confirmação definitiva na reconciliação. |
-| `EXPIRADO` + `LIBERADA` | **Saudável (Final)** | Pedido não foi pago no prazo; unidades devolvidas com segurança ao estoque disponível. |
-| `CANCELADO` + `LIBERADA` | **Saudável (Final)** | Pedido cancelado e reserva liberada. |
-| `REEMBOLSADO` + `CONVERTIDA` | **Saudável (Final)** | Reembolso financeiro registrado. O estoque físico não é devolvido automaticamente (requer ajuste manual de mercadoria recebida). |
+| Combinação                   |        Classificação        | Significado Operacional                                                                                                                                                                                                                          |
+| :--------------------------- | :-------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PENDENTE` + `ATIVA`         |         **Normal**          | Cobrança Pix aberta aguardando cliente pagar dentro do TTL.                                                                                                                                                                                      |
+| `PAGO` + `CONVERTIDA`        |    **Saudável (Final)**     | Pedido pago com baixa física de estoque e reserva concluídas com sucesso.                                                                                                                                                                        |
+| `PAGO` + `ATIVA`             |  **Anomalia Recuperável**   | Pagamento confirmado pelo gateway, mas a conversão transacional de estoque falhou temporariamente ou está em processamento. O sistema mantém a reserva para evitar venda a outro cliente. A reconciliação automática converte para `CONVERTIDA`. |
+| `ERRO` + `ATIVA`             | **Conservador (Fail-Safe)** | Houve erro de comunicação ou timeout no checkout após a criação da Order poder ter ocorrido no MP. A reserva é mantida preventivamente para evitar overselling até confirmação definitiva na reconciliação.                                      |
+| `EXPIRADO` + `LIBERADA`      |    **Saudável (Final)**     | Pedido não foi pago no prazo; unidades devolvidas com segurança ao estoque disponível.                                                                                                                                                           |
+| `CANCELADO` + `LIBERADA`     |    **Saudável (Final)**     | Pedido cancelado e reserva liberada.                                                                                                                                                                                                             |
+| `REEMBOLSADO` + `CONVERTIDA` |    **Saudável (Final)**     | Reembolso financeiro registrado. O estoque físico não é devolvido automaticamente (requer ajuste manual de mercadoria recebida).                                                                                                                 |
 
 ---
 
@@ -54,11 +57,13 @@ O sistema de pagamentos e estoque do R&P Doces foi projetado sob princípios de 
 Endpoint autenticado para verificação imediata da integridade de pagamentos e estoque.
 
 ### Status Retornados:
+
 - `healthy`: Nenhuma anomalia ativa no banco de dados.
 - `warning`: Existem reservas ativas vencidas ou pedidos em erro segurando reserva.
 - `critical`: Existem pedidos pagos sem baixa de estoque confirmada ou erros com reservas há muito vencidas.
 
 ### Métricas Diagnósticas e Tolerâncias:
+
 1. `pagos_sem_baixa_estoque`:
    - Pedidos com `status_pagamento = 'PAGO'` e `estoque_baixado_em IS NULL`.
    - **Tolerância**: Aplica margem de **2 minutos** (`pago_em <= datetime('now', '-2 minutes')`) para não disparar falso alarme durante a transição natural imediata pós-webhook.
@@ -166,6 +171,7 @@ Para preservar a conformidade e a segurança do e-commerce:
 ## 7. Checklist de Deploy em Produção
 
 ### Antes do Deploy (Validação Prévia)
+
 - [ ] Executar suíte de testes completa localmente (`npm test` com todos os testes passando verde).
 - [ ] Verificar `git status` limpo (sem arquivos modificados soltos ou não rastreados).
 - [ ] Garantir que todas as migrations até a `019_estoque_reservado.sql` foram aplicadas no D1 de produção.
@@ -176,6 +182,7 @@ Para preservar a conformidade e a segurança do e-commerce:
   - `APP_URL` / Domínio de produção configurado.
 
 ### Execução do Deploy
+
 ```bash
 # 1. Enviar alterações para a branch principal
 git push origin main
@@ -185,6 +192,7 @@ npx wrangler pages deploy public --project-name rp-doces
 ```
 
 ### Verificação Pós-Deploy (Smoke Tests)
+
 - [ ] Acessar a loja pública e verificar carregamento de produtos e estoque disponível.
 - [ ] Acessar o painel administrativo (`/admin`) e realizar login com sucesso.
 - [ ] Verificar o endpoint de saúde: `GET /api/admin/health/payments` deve responder `200 OK` com `status: "healthy"`.

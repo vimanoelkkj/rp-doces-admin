@@ -19,7 +19,7 @@ function produto(id, o = {}) {
     preco_promocional_centavos: null,
     promocao_inicio: null,
     promocao_fim: null,
-    ...o,
+    ...o
   };
 }
 
@@ -36,7 +36,11 @@ function db(produtos) {
       }
       return { run: () => ({ success: true, meta: { changes: 1 } }) };
     },
-    async ss => ss.map((_, i) => ({ success: true, meta: i === 0 ? { last_row_id: 91, changes: 1 } : { changes: 1 } }))
+    async ss =>
+      ss.map((_, i) => ({
+        success: true,
+        meta: i === 0 ? { last_row_id: 91, changes: 1 } : { changes: 1 }
+      }))
   );
 }
 
@@ -44,7 +48,7 @@ function req(body, headers = {}) {
   return new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
     headers: { "content-type": "application/json", Origin: "https://loja.test", ...headers },
-    body: JSON.stringify(body),
+    body: JSON.stringify(body)
   });
 }
 
@@ -152,10 +156,10 @@ function createRealSqliteDb() {
         return {
           meta: {
             changes: info.changes,
-            last_row_id: Number(info.lastInsertRowid),
-          },
+            last_row_id: Number(info.lastInsertRowid)
+          }
         };
-      },
+      }
     };
   }
 
@@ -168,30 +172,34 @@ function createRealSqliteDb() {
     async batch(statements) {
       db.exec("BEGIN TRANSACTION;");
       try {
-        const results = statements.map((statement) => statement.run());
+        const results = statements.map(statement => statement.run());
         db.exec("COMMIT;");
         return results;
       } catch (err) {
         db.exec("ROLLBACK;");
         throw err;
       }
-    },
+    }
   };
 }
 
 test("multi-item usa preços do backend, promoção e um Pix", async t => {
   const old = fetch;
-  let calls = 0, sent;
+  let calls = 0,
+    sent;
   globalThis.fetch = async (_u, i) => {
     calls++;
     sent = JSON.parse(i.body);
-    return new Response(JSON.stringify({
-      id: "order-91",
-      status: "created",
-      transactions: { payments: [{ id: "pay-1", payment_method: { qr_code: "PIX" } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: "order-91",
+        status: "created",
+        transactions: { payments: [{ id: "pay-1", payment_method: { qr_code: "PIX" } }] }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = old);
+  t.after(() => (globalThis.fetch = old));
 
   const env = {
     DB: db([
@@ -230,12 +238,16 @@ test("multi-item usa preços do backend, promoção e um Pix", async t => {
 
 test("contrato legado de um item continua aceito", async t => {
   const old = fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    id: "order-92",
-    status: "created",
-    transactions: { payments: [{}] }
-  }), { status: 200 });
-  t.after(() => globalThis.fetch = old);
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        id: "order-92",
+        status: "created",
+        transactions: { payments: [{}] }
+      }),
+      { status: 200 }
+    );
+  t.after(() => (globalThis.fetch = old));
 
   const r = await onRequestPost({
     request: req({ ...cliente, produto_id: 1, quantidade: 1 }),
@@ -249,7 +261,13 @@ test("contrato legado de um item continua aceito", async t => {
 
 test("itens repetidos respeitam limite total", async () => {
   const r = await onRequestPost({
-    request: req({ ...cliente, itens: [{ produto_id: 1, quantidade: 30 }, { produto_id: 1, quantidade: 21 }] }),
+    request: req({
+      ...cliente,
+      itens: [
+        { produto_id: 1, quantidade: 30 },
+        { produto_id: 1, quantidade: 21 }
+      ]
+    }),
     env: { DB: db([produto(1)]), MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET }
   });
   assert.equal(r.status, 400);
@@ -258,8 +276,11 @@ test("itens repetidos respeitam limite total", async () => {
 test("estoque insuficiente impede criação do Pix", async t => {
   const old = fetch;
   let calls = 0;
-  globalThis.fetch = async () => { calls++; throw Error(); };
-  t.after(() => globalThis.fetch = old);
+  globalThis.fetch = async () => {
+    calls++;
+    throw Error();
+  };
+  t.after(() => (globalThis.fetch = old));
 
   const r = await onRequestPost({
     request: req({ ...cliente, itens: [{ produto_id: 1, quantidade: 2 }] }),
@@ -271,7 +292,11 @@ test("estoque insuficiente impede criação do Pix", async t => {
 
 test("Caso 1: request com client_request_id cria pedido e envia X-Idempotency-Key estável ao MP", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let mpHeaders = null;
@@ -279,13 +304,23 @@ test("Caso 1: request com client_request_id cria pedido e envia X-Idempotency-Ke
   globalThis.fetch = async (url, init) => {
     calls++;
     mpHeaders = init.headers;
-    return new Response(JSON.stringify({
-      id: "mp-order-1",
-      status: "created",
-      transactions: { payments: [{ id: "pay-1", payment_method: { qr_code: "PIX-CODE-1", ticket_url: "https://mp.test/1" } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: "mp-order-1",
+        status: "created",
+        transactions: {
+          payments: [
+            {
+              id: "pay-1",
+              payment_method: { qr_code: "PIX-CODE-1", ticket_url: "https://mp.test/1" }
+            }
+          ]
+        }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const clientId = "c1111111-1111-4111-8111-111111111111";
   const r = await onRequestPost({
@@ -304,7 +339,9 @@ test("Caso 1: request com client_request_id cria pedido e envia X-Idempotency-Ke
   assert.equal(calls, 1);
   assert.equal(mpHeaders["X-Idempotency-Key"] || mpHeaders["x-idempotency-key"], clientId);
 
-  const pedidoNoBanco = DB.raw.prepare("SELECT idempotency_key, mp_order_id, mp_qr_code FROM pedidos WHERE id = 1").get();
+  const pedidoNoBanco = DB.raw
+    .prepare("SELECT idempotency_key, mp_order_id, mp_qr_code FROM pedidos WHERE id = 1")
+    .get();
   assert.equal(pedidoNoBanco.idempotency_key, clientId);
   assert.equal(pedidoNoBanco.mp_order_id, "mp-order-1");
   assert.equal(pedidoNoBanco.mp_qr_code, "PIX-CODE-1");
@@ -312,19 +349,26 @@ test("Caso 1: request com client_request_id cria pedido e envia X-Idempotency-Ke
 
 test("Caso 2: retry sequencial com mesmo client_request_id retorna mesmo pedido/Pix sem chamar MP novamente", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async () => {
     calls++;
-    return new Response(JSON.stringify({
-      id: "mp-order-2",
-      status: "created",
-      transactions: { payments: [{ id: "pay-2", payment_method: { qr_code: "PIX-CODE-2" } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: "mp-order-2",
+        status: "created",
+        transactions: { payments: [{ id: "pay-2", payment_method: { qr_code: "PIX-CODE-2" } }] }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const clientId = "c2222222-2222-4222-8222-222222222222";
   const requestBody = {
@@ -334,13 +378,19 @@ test("Caso 2: retry sequencial com mesmo client_request_id retorna mesmo pedido/
   };
 
   // Primeira chamada
-  const r1 = await onRequestPost({ request: req(requestBody), env: { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET } });
+  const r1 = await onRequestPost({
+    request: req(requestBody),
+    env: { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET }
+  });
   const b1 = await responseJson(r1);
   assert.equal(r1.status, 201);
   assert.equal(calls, 1);
 
   // Segunda chamada (retry)
-  const r2 = await onRequestPost({ request: req(requestBody), env: { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET } });
+  const r2 = await onRequestPost({
+    request: req(requestBody),
+    env: { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET }
+  });
   const b2 = await responseJson(r2);
   assert.equal(r2.status, 200);
   assert.equal(calls, 1); // NÃO chamou o MP novamente
@@ -355,23 +405,34 @@ test("Caso 2: retry sequencial com mesmo client_request_id retorna mesmo pedido/
 
 test("Caso 3: concorrência real com mesmo client_request_id cria exatamente 1 registro no banco e converge para o mesmo Pix", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let calls = 0;
   const sentIdempotencyKeys = [];
   globalThis.fetch = async (_url, init) => {
     calls++;
-    sentIdempotencyKeys.push(init.headers["X-Idempotency-Key"] || init.headers["x-idempotency-key"]);
+    sentIdempotencyKeys.push(
+      init.headers["X-Idempotency-Key"] || init.headers["x-idempotency-key"]
+    );
     // Simula latência de rede realista de gateway
     await new Promise(resolve => setTimeout(resolve, 20));
-    return new Response(JSON.stringify({
-      id: "mp-order-3",
-      status: "created",
-      transactions: { payments: [{ id: "pay-3", payment_method: { qr_code: "PIX-CODE-CONCURRENT" } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: "mp-order-3",
+        status: "created",
+        transactions: {
+          payments: [{ id: "pay-3", payment_method: { qr_code: "PIX-CODE-CONCURRENT" } }]
+        }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const clientId = "c3333333-3333-4333-8333-333333333333";
   const requestBody = {
@@ -401,35 +462,55 @@ test("Caso 3: concorrência real com mesmo client_request_id cria exatamente 1 r
     assert.equal(key, clientId);
   }
 
-  const count = DB.raw.prepare("SELECT count(*) as total FROM pedidos WHERE idempotency_key = ?").get(clientId);
+  const count = DB.raw
+    .prepare("SELECT count(*) as total FROM pedidos WHERE idempotency_key = ?")
+    .get(clientId);
   assert.equal(count.total, 1);
 });
 
 test("Caso 4: mesmo client_request_id com payload divergente retorna 409 Conflict", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10), (2, 'Bolo', 2500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10), (2, 'Bolo', 2500, 10)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    id: "mp-order-4",
-    status: "created",
-    transactions: { payments: [{ id: "pay-4", payment_method: { qr_code: "PIX-4" } }] }
-  }), { status: 200 });
-  t.after(() => globalThis.fetch = oldFetch);
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        id: "mp-order-4",
+        status: "created",
+        transactions: { payments: [{ id: "pay-4", payment_method: { qr_code: "PIX-4" } }] }
+      }),
+      { status: 200 }
+    );
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const clientId = "c4444444-4444-4444-8444-444444444444";
   const env = { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET };
 
   // Request 1: Produto 1
   const r1 = await onRequestPost({
-    request: req({ client_request_id: clientId, ...cliente, observacao: "Sem calda", itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: clientId,
+      ...cliente,
+      observacao: "Sem calda",
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env
   });
   assert.equal(r1.status, 201);
 
   // Request 2: Mesmo ID mas Produto 2
   const r2 = await onRequestPost({
-    request: req({ client_request_id: clientId, ...cliente, observacao: "Sem calda", itens: [{ produto_id: 2, quantidade: 1 }] }),
+    request: req({
+      client_request_id: clientId,
+      ...cliente,
+      observacao: "Sem calda",
+      itens: [{ produto_id: 2, quantidade: 1 }]
+    }),
     env
   });
   assert.equal(r2.status, 409);
@@ -438,21 +519,38 @@ test("Caso 4: mesmo client_request_id com payload divergente retorna 409 Conflic
 
   // Request 3: Mesmo ID mas email diferente
   const r3 = await onRequestPost({
-    request: req({ client_request_id: clientId, ...cliente, email: "outro@example.com", observacao: "Sem calda", itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: clientId,
+      ...cliente,
+      email: "outro@example.com",
+      observacao: "Sem calda",
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env
   });
   assert.equal(r3.status, 409);
 
   // Request 4: Mesmo ID mas whatsapp diferente
   const r4 = await onRequestPost({
-    request: req({ client_request_id: clientId, ...cliente, whatsapp: "33988887777", observacao: "Sem calda", itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: clientId,
+      ...cliente,
+      whatsapp: "33988887777",
+      observacao: "Sem calda",
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env
   });
   assert.equal(r4.status, 409);
 
   // Request 5: Mesmo ID mas observação diferente
   const r5 = await onRequestPost({
-    request: req({ client_request_id: clientId, ...cliente, observacao: "Com calda extra", itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: clientId,
+      ...cliente,
+      observacao: "Com calda extra",
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env
   });
   assert.equal(r5.status, 409);
@@ -460,19 +558,31 @@ test("Caso 4: mesmo client_request_id com payload divergente retorna 409 Conflic
 
 test("Caso 5: pedido local existente sem Pix (falha anterior) é recuperado no retry com a mesma X-Idempotency-Key", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)"
+    )
+    .run();
 
   const clientId = "c5555555-5555-4555-8555-555555555555";
   // Simula pedido inserido previamente no banco mas que falhou antes de salvar o Pix (status_pagamento = ERRO, mp_qr_code = NULL)
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedidos (token_publico, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos,
       cliente_nome, cliente_email, cliente_whatsapp, observacao, tipo_entrega, status_pagamento, idempotency_key)
     VALUES ('token-5', 1, 'Pudim', 1, 1500, 1500, 'Maria Silva', 'maria@example.com', '5533999999999', '', 'RETIRADA', 'ERRO', ?)
-  `).run(clientId);
-  DB.raw.prepare(`
+  `
+    )
+    .run(clientId);
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
     VALUES (1, 1, 'Pudim', 1, 1500, 1500)
-  `).run();
+  `
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let sentHeader = null;
@@ -480,16 +590,25 @@ test("Caso 5: pedido local existente sem Pix (falha anterior) é recuperado no r
   globalThis.fetch = async (_u, init) => {
     calls++;
     sentHeader = init.headers["X-Idempotency-Key"] || init.headers["x-idempotency-key"];
-    return new Response(JSON.stringify({
-      id: "mp-order-recovered",
-      status: "created",
-      transactions: { payments: [{ id: "pay-recovered", payment_method: { qr_code: "PIX-RECOVERED" } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: "mp-order-recovered",
+        status: "created",
+        transactions: {
+          payments: [{ id: "pay-recovered", payment_method: { qr_code: "PIX-RECOVERED" } }]
+        }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const r = await onRequestPost({
-    request: req({ client_request_id: clientId, ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: clientId,
+      ...cliente,
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env: { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET }
   });
 
@@ -500,7 +619,9 @@ test("Caso 5: pedido local existente sem Pix (falha anterior) é recuperado no r
   const count = DB.raw.prepare("SELECT count(*) as total FROM pedidos").get();
   assert.equal(count.total, 1); // NÃO criou um segundo pedido
 
-  const atualizado = DB.raw.prepare("SELECT mp_order_id, mp_qr_code, status_pagamento FROM pedidos WHERE id = 1").get();
+  const atualizado = DB.raw
+    .prepare("SELECT mp_order_id, mp_qr_code, status_pagamento FROM pedidos WHERE id = 1")
+    .get();
   assert.equal(atualizado.mp_order_id, "mp-order-recovered");
   assert.equal(atualizado.mp_qr_code, "PIX-RECOVERED");
   assert.equal(atualizado.status_pagamento, "PENDENTE");
@@ -508,27 +629,44 @@ test("Caso 5: pedido local existente sem Pix (falha anterior) é recuperado no r
 
 test("Caso 6: nova tentativa deliberada com novo client_request_id cria novo pedido", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let orderSeq = 0;
   globalThis.fetch = async () => {
     orderSeq++;
-    return new Response(JSON.stringify({
-      id: `mp-order-${orderSeq}`,
-      status: "created",
-      transactions: { payments: [{ id: `pay-${orderSeq}`, payment_method: { qr_code: `PIX-${orderSeq}` } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: `mp-order-${orderSeq}`,
+        status: "created",
+        transactions: {
+          payments: [{ id: `pay-${orderSeq}`, payment_method: { qr_code: `PIX-${orderSeq}` } }]
+        }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const env = { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET };
   const r1 = await onRequestPost({
-    request: req({ client_request_id: "c6666666-6666-4666-8666-111111111111", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: "c6666666-6666-4666-8666-111111111111",
+      ...cliente,
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env
   });
   const r2 = await onRequestPost({
-    request: req({ client_request_id: "c6666666-6666-4666-8666-222222222222", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: "c6666666-6666-4666-8666-222222222222",
+      ...cliente,
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env
   });
 
@@ -540,10 +678,18 @@ test("Caso 6: nova tentativa deliberada com novo client_request_id cria novo ped
 
 test("Caso 7: client_request_id inválido é rejeitado com 400 Bad Request", async () => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)"
+    )
+    .run();
 
   const r = await onRequestPost({
-    request: req({ client_request_id: "invalido!", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: "invalido!",
+      ...cliente,
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env: { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET }
   });
   assert.equal(r.status, 400);
@@ -553,30 +699,50 @@ test("Caso 7: client_request_id inválido é rejeitado com 400 Bad Request", asy
 
 test("Caso 8: nova compra idêntica com novo client_request_id após Pix anterior expirado", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)"
+    )
+    .run();
 
   // Simula pedido 1 que atingiu EXPIRADO
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedidos (token_publico, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos,
       cliente_nome, cliente_email, cliente_whatsapp, tipo_entrega, status_pagamento, mp_status, mp_qr_code, idempotency_key)
     VALUES ('token-exp', 1, 'Pudim', 1, 1500, 1500, 'Maria Silva', 'maria@example.com', '5533999999999', 'RETIRADA', 'EXPIRADO', 'expired', 'OLD-QR', 'c8888888-8888-4888-8888-111111111111')
-  `).run();
-  DB.raw.prepare(`
+  `
+    )
+    .run();
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
     VALUES (1, 1, 'Pudim', 1, 1500, 1500)
-  `).run();
+  `
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    id: "mp-order-new",
-    status: "created",
-    transactions: { payments: [{ id: "pay-new", payment_method: { qr_code: "NEW-PIX-QR" } }] }
-  }), { status: 200 });
-  t.after(() => globalThis.fetch = oldFetch);
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        id: "mp-order-new",
+        status: "created",
+        transactions: { payments: [{ id: "pay-new", payment_method: { qr_code: "NEW-PIX-QR" } }] }
+      }),
+      { status: 200 }
+    );
+  t.after(() => (globalThis.fetch = oldFetch));
 
   // Cliente tenta pagar novamente o mesmo carrinho com novo client_request_id
   const r = await onRequestPost({
-    request: req({ client_request_id: "c8888888-8888-4888-8888-222222222222", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: "c8888888-8888-4888-8888-222222222222",
+      ...cliente,
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env: { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET }
   });
 
@@ -594,19 +760,28 @@ test("Caso 8: nova compra idêntica com novo client_request_id após Pix anterio
 
 test("Rate Limit: tentativas 1 a 6 são permitidas, 7ª retorna 429 Too Many Requests com Retry-After", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 100)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 100)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let orderCount = 0;
   globalThis.fetch = async () => {
     orderCount++;
-    return new Response(JSON.stringify({
-      id: `mp-order-${orderCount}`,
-      status: "created",
-      transactions: { payments: [{ id: `pay-${orderCount}`, payment_method: { qr_code: `PIX-${orderCount}` } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: `mp-order-${orderCount}`,
+        status: "created",
+        transactions: {
+          payments: [{ id: `pay-${orderCount}`, payment_method: { qr_code: `PIX-${orderCount}` } }]
+        }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const env = { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET };
   const headers = { "CF-Connecting-IP": "192.168.1.50" };
@@ -614,7 +789,14 @@ test("Rate Limit: tentativas 1 a 6 são permitidas, 7ª retorna 429 Too Many Req
   // Tentativas 1 a 6: permitidas
   for (let i = 1; i <= 6; i++) {
     const r = await onRequestPost({
-      request: req({ client_request_id: `a0000000-0000-4000-8000-${String(i).padStart(12, "0")}`, ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, headers),
+      request: req(
+        {
+          client_request_id: `a0000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+          ...cliente,
+          itens: [{ produto_id: 1, quantidade: 1 }]
+        },
+        headers
+      ),
       env
     });
     assert.equal(r.status, 201, `Tentativa ${i} deveria ser 201`);
@@ -623,7 +805,14 @@ test("Rate Limit: tentativas 1 a 6 são permitidas, 7ª retorna 429 Too Many Req
 
   // 7ª tentativa: bloqueada
   const r7 = await onRequestPost({
-    request: req({ client_request_id: "a0000000-0000-4000-8000-000000000007", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, headers),
+    request: req(
+      {
+        client_request_id: "a0000000-0000-4000-8000-000000000007",
+        ...cliente,
+        itens: [{ produto_id: 1, quantidade: 1 }]
+      },
+      headers
+    ),
     env
   });
   assert.equal(r7.status, 429, "7ª tentativa deve retornar 429");
@@ -640,19 +829,28 @@ test("Rate Limit: tentativas 1 a 6 são permitidas, 7ª retorna 429 Too Many Req
 
 test("Rate Limit: replay de Pix já existente NÃO consome cota de criação e funciona mesmo no limite", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 100)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 100)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let orderCount = 0;
   globalThis.fetch = async () => {
     orderCount++;
-    return new Response(JSON.stringify({
-      id: `mp-order-${orderCount}`,
-      status: "created",
-      transactions: { payments: [{ id: `pay-${orderCount}`, payment_method: { qr_code: `PIX-${orderCount}` } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: `mp-order-${orderCount}`,
+        status: "created",
+        transactions: {
+          payments: [{ id: `pay-${orderCount}`, payment_method: { qr_code: `PIX-${orderCount}` } }]
+        }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const env = { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET };
   const headers = { "CF-Connecting-IP": "192.168.1.60" };
@@ -662,7 +860,10 @@ test("Rate Limit: replay de Pix já existente NÃO consome cota de criação e f
   for (let i = 1; i <= 6; i++) {
     const cid = i === 1 ? firstClientId : `b0000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
     const r = await onRequestPost({
-      request: req({ client_request_id: cid, ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, headers),
+      request: req(
+        { client_request_id: cid, ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] },
+        headers
+      ),
       env
     });
     assert.equal(r.status, 201);
@@ -670,14 +871,24 @@ test("Rate Limit: replay de Pix já existente NÃO consome cota de criação e f
 
   // Nova criação (7ª tentativa) é bloqueada com 429
   const rBlocked = await onRequestPost({
-    request: req({ client_request_id: "b0000000-0000-4000-8000-000000000099", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, headers),
+    request: req(
+      {
+        client_request_id: "b0000000-0000-4000-8000-000000000099",
+        ...cliente,
+        itens: [{ produto_id: 1, quantidade: 1 }]
+      },
+      headers
+    ),
     env
   });
   assert.equal(rBlocked.status, 429);
 
   // Mas o REPLAY do primeiro pedido (com Pix completo) funciona perfeitamente com 200 OK!
   const rReplay = await onRequestPost({
-    request: req({ client_request_id: firstClientId, ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, headers),
+    request: req(
+      { client_request_id: firstClientId, ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] },
+      headers
+    ),
     env
   });
   assert.equal(rReplay.status, 200, "Replay deve retornar 200 mesmo com IP no limite");
@@ -687,39 +898,71 @@ test("Rate Limit: replay de Pix já existente NÃO consome cota de criação e f
 
 test("Rate Limit: IPs diferentes possuem cotas independentes", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 100)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 100)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let orderSeq = 0;
   globalThis.fetch = async () => {
     orderSeq++;
-    return new Response(JSON.stringify({
-      id: `mp-order-ip-${orderSeq}`,
-      status: "created",
-      transactions: { payments: [{ id: `pay-ip-${orderSeq}`, payment_method: { qr_code: `PIX-IP-${orderSeq}` } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: `mp-order-ip-${orderSeq}`,
+        status: "created",
+        transactions: {
+          payments: [
+            { id: `pay-ip-${orderSeq}`, payment_method: { qr_code: `PIX-IP-${orderSeq}` } }
+          ]
+        }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const env = { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET };
 
   // Esgota IP 1
   for (let i = 1; i <= 6; i++) {
     const r = await onRequestPost({
-      request: req({ client_request_id: `ip1-0000-4000-8000-${String(i).padStart(12, "0")}`, ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, { "CF-Connecting-IP": "10.0.0.1" }),
+      request: req(
+        {
+          client_request_id: `ip1-0000-4000-8000-${String(i).padStart(12, "0")}`,
+          ...cliente,
+          itens: [{ produto_id: 1, quantidade: 1 }]
+        },
+        { "CF-Connecting-IP": "10.0.0.1" }
+      ),
       env
     });
     assert.equal(r.status, 201);
   }
   const rIp1Blocked = await onRequestPost({
-    request: req({ client_request_id: "ip1-0000-4000-8000-000000000007", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, { "CF-Connecting-IP": "10.0.0.1" }),
+    request: req(
+      {
+        client_request_id: "ip1-0000-4000-8000-000000000007",
+        ...cliente,
+        itens: [{ produto_id: 1, quantidade: 1 }]
+      },
+      { "CF-Connecting-IP": "10.0.0.1" }
+    ),
     env
   });
   assert.equal(rIp1Blocked.status, 429);
 
   // IP 2 faz pedido e tem sucesso (201)
   const rIp2 = await onRequestPost({
-    request: req({ client_request_id: "ip2-0000-4000-8000-000000000001", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, { "CF-Connecting-IP": "10.0.0.2" }),
+    request: req(
+      {
+        client_request_id: "ip2-0000-4000-8000-000000000001",
+        ...cliente,
+        itens: [{ produto_id: 1, quantidade: 1 }]
+      },
+      { "CF-Connecting-IP": "10.0.0.2" }
+    ),
     env
   });
   assert.equal(rIp2.status, 201);
@@ -727,11 +970,19 @@ test("Rate Limit: IPs diferentes possuem cotas independentes", async t => {
 
 test("Rate Limit: ausência de RATE_LIMIT_SECRET retorna erro seguro 503", async () => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 10)"
+    )
+    .run();
 
   const envSemSecret = { DB, MP_ACCESS_TOKEN: "teste" }; // RATE_LIMIT_SECRET ausente
   const r = await onRequestPost({
-    request: req({ client_request_id: "c7777777-7777-4777-8777-777777777777", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }),
+    request: req({
+      client_request_id: "c7777777-7777-4777-8777-777777777777",
+      ...cliente,
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
     env: envSemSecret
   });
   assert.equal(r.status, 503);
@@ -741,20 +992,31 @@ test("Rate Limit: ausência de RATE_LIMIT_SECRET retorna erro seguro 503", async
 
 test("Rate Limit: CONCORRÊNCIA REAL NO LIMITE (estado = 5, duas requests simultâneas -> exatamente 1 ganha e 1 recebe 429)", async t => {
   const DB = createRealSqliteDb();
-  DB.raw.prepare("INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 100)").run();
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque) VALUES (1, 'Pudim', 1500, 100)"
+    )
+    .run();
 
   const oldFetch = globalThis.fetch;
   let mpOrderCalls = 0;
   globalThis.fetch = async () => {
     mpOrderCalls++;
     await new Promise(r => setTimeout(r, 15));
-    return new Response(JSON.stringify({
-      id: `mp-order-${mpOrderCalls}`,
-      status: "created",
-      transactions: { payments: [{ id: `pay-${mpOrderCalls}`, payment_method: { qr_code: `PIX-${mpOrderCalls}` } }] }
-    }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id: `mp-order-${mpOrderCalls}`,
+        status: "created",
+        transactions: {
+          payments: [
+            { id: `pay-${mpOrderCalls}`, payment_method: { qr_code: `PIX-${mpOrderCalls}` } }
+          ]
+        }
+      }),
+      { status: 200 }
+    );
   };
-  t.after(() => globalThis.fetch = oldFetch);
+  t.after(() => (globalThis.fetch = oldFetch));
 
   const env = { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET };
   const headers = { "CF-Connecting-IP": "172.16.0.99" };
@@ -762,7 +1024,14 @@ test("Rate Limit: CONCORRÊNCIA REAL NO LIMITE (estado = 5, duas requests simult
   // 1. Preenche exatamente 5 tentativas no rate limit
   for (let i = 1; i <= 5; i++) {
     const r = await onRequestPost({
-      request: req({ client_request_id: `concur-0000-4000-8000-${String(i).padStart(12, "0")}`, ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, headers),
+      request: req(
+        {
+          client_request_id: `concur-0000-4000-8000-${String(i).padStart(12, "0")}`,
+          ...cliente,
+          itens: [{ produto_id: 1, quantidade: 1 }]
+        },
+        headers
+      ),
       env
     });
     assert.equal(r.status, 201);
@@ -771,11 +1040,25 @@ test("Rate Limit: CONCORRÊNCIA REAL NO LIMITE (estado = 5, duas requests simult
 
   // 2. Dispara 2 requests concorrentes com client_request_id diferentes no mesmo milissegundo para a 6ª vaga
   const reqA = onRequestPost({
-    request: req({ client_request_id: "concur-0000-4000-8000-00000000006A", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, headers),
+    request: req(
+      {
+        client_request_id: "concur-0000-4000-8000-00000000006A",
+        ...cliente,
+        itens: [{ produto_id: 1, quantidade: 1 }]
+      },
+      headers
+    ),
     env
   });
   const reqB = onRequestPost({
-    request: req({ client_request_id: "concur-0000-4000-8000-00000000006B", ...cliente, itens: [{ produto_id: 1, quantidade: 1 }] }, headers),
+    request: req(
+      {
+        client_request_id: "concur-0000-4000-8000-00000000006B",
+        ...cliente,
+        itens: [{ produto_id: 1, quantidade: 1 }]
+      },
+      headers
+    ),
     env
   });
 
@@ -783,7 +1066,11 @@ test("Rate Limit: CONCORRÊNCIA REAL NO LIMITE (estado = 5, duas requests simult
   const statuses = [resA.status, resB.status].sort();
 
   // EXATAMENTE UMA deve ser 201 (ganhou a 6ª vaga) e EXATAMENTE UMA deve ser 429 (excedeu para 7)
-  assert.deepEqual(statuses, [201, 429], "Concorrência no limite deve permitir exatamente uma (201) e bloquear a outra (429)");
+  assert.deepEqual(
+    statuses,
+    [201, 429],
+    "Concorrência no limite deve permitir exatamente uma (201) e bloquear a outra (429)"
+  );
 
   // Valida que o Mercado Pago foi chamado exatamente 6 vezes (5 anteriores + 1 vencedora)
   assert.equal(mpOrderCalls, 6, "Mercado Pago só deve ter sido chamado 6 vezes no total");
@@ -796,25 +1083,33 @@ test("Rate Limit: CONCORRÊNCIA REAL NO LIMITE (estado = 5, duas requests simult
 test("Rate Limit: avanço temporal de janela (+61s) concede nova cota ao mesmo IP", async () => {
   const DB = createRealSqliteDb();
   const env = { DB, RATE_LIMIT_SECRET };
-  const reqDummy = new Request("https://loja.test/api/checkout/pix", { headers: { "CF-Connecting-IP": "10.0.0.99" } });
+  const reqDummy = new Request("https://loja.test/api/checkout/pix", {
+    headers: { "CF-Connecting-IP": "10.0.0.99" }
+  });
 
   const t0 = 1700000000000; // Base timestamp
 
   // 6 tentativas no minuto 0 -> todas permitidas
   for (let i = 1; i <= 6; i++) {
-    const res = await (await import("../functions/lib/checkoutRateLimit.js")).checkCheckoutRateLimit(env, reqDummy, t0);
+    const res = await (
+      await import("../functions/lib/checkoutRateLimit.js")
+    ).checkCheckoutRateLimit(env, reqDummy, t0);
     assert.equal(res.allowed, true);
     assert.equal(res.count, i);
   }
 
   // 7ª tentativa no mesmo minuto -> bloqueada
-  const resBlocked = await (await import("../functions/lib/checkoutRateLimit.js")).checkCheckoutRateLimit(env, reqDummy, t0);
+  const resBlocked = await (
+    await import("../functions/lib/checkoutRateLimit.js")
+  ).checkCheckoutRateLimit(env, reqDummy, t0);
   assert.equal(resBlocked.allowed, false);
   assert.equal(resBlocked.count, 7);
 
   // Avança 61 segundos (minuto seguinte)
   const t1 = t0 + 61000;
-  const resNewWindow = await (await import("../functions/lib/checkoutRateLimit.js")).checkCheckoutRateLimit(env, reqDummy, t1);
+  const resNewWindow = await (
+    await import("../functions/lib/checkoutRateLimit.js")
+  ).checkCheckoutRateLimit(env, reqDummy, t1);
   assert.equal(resNewWindow.allowed, true, "Nova janela deve conceder nova cota");
   assert.equal(resNewWindow.count, 1, "Novo bucket inicia contador em 1");
 });
@@ -824,8 +1119,16 @@ test("Rate Limit: limpeza remove registros expirados sem afetar registros ativos
   const nowSec = 1700000000;
 
   // Insere um registro expirado e um ativo
-  DB.raw.prepare("INSERT INTO checkout_rate_limits (chave, tentativas, expira_em) VALUES ('expirado', 10, ?)").run(nowSec - 100);
-  DB.raw.prepare("INSERT INTO checkout_rate_limits (chave, tentativas, expira_em) VALUES ('ativo', 3, ?)").run(nowSec + 100);
+  DB.raw
+    .prepare(
+      "INSERT INTO checkout_rate_limits (chave, tentativas, expira_em) VALUES ('expirado', 10, ?)"
+    )
+    .run(nowSec - 100);
+  DB.raw
+    .prepare(
+      "INSERT INTO checkout_rate_limits (chave, tentativas, expira_em) VALUES ('ativo', 3, ?)"
+    )
+    .run(nowSec + 100);
 
   // Executa limpeza de registros expirados
   DB.raw.prepare("DELETE FROM checkout_rate_limits WHERE expira_em < ?").run(nowSec);
@@ -835,20 +1138,26 @@ test("Rate Limit: limpeza remove registros expirados sem afetar registros ativos
   assert.equal(restantes[0].chave, "ativo");
 });
 
-test("Segurança de Erro: resposta 400/422 do gateway não expõe err.data, internals ou PII na resposta pública", async (t) => {
+test("Segurança de Erro: resposta 400/422 do gateway não expõe err.data, internals ou PII na resposta pública", async t => {
   const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    access_token: "SEGREDO",
-    payer: {
-      email: "cliente@example.com"
-    },
-    internal_gateway_detail: "não pode sair",
-    message: "Invalid param X in internal MP backend"
-  }), {
-    status: 400,
-    headers: { "content-type": "application/json" }
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        access_token: "SEGREDO",
+        payer: {
+          email: "cliente@example.com"
+        },
+        internal_gateway_detail: "não pode sair",
+        message: "Invalid param X in internal MP backend"
+      }),
+      {
+        status: 400,
+        headers: { "content-type": "application/json" }
+      }
+    );
+  t.after(() => {
+    globalThis.fetch = oldFetch;
   });
-  t.after(() => { globalThis.fetch = oldFetch; });
 
   const DB = createRealSqliteDb();
   DB.raw.exec(`
@@ -866,7 +1175,7 @@ test("Segurança de Erro: resposta 400/422 do gateway não expõe err.data, inte
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "origin": "https://loja.test",
+      origin: "https://loja.test",
       "cf-connecting-ip": "203.0.113.1"
     },
     body: JSON.stringify({

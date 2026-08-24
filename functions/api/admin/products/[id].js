@@ -14,23 +14,43 @@ export async function onRequestPut({ request, env, params }) {
   if (!validacao.ok) return json({ erro: "Dados inválidos." }, 400);
   const p = validacao.produto;
 
-  const atual = await env.DB.prepare("SELECT estoque_reservado FROM produtos WHERE id = ?").bind(id).first();
+  const atual = await env.DB.prepare("SELECT estoque_reservado FROM produtos WHERE id = ?")
+    .bind(id)
+    .first();
   if (atual && p.estoque < Number(atual.estoque_reservado || 0)) {
-    return json({
-      erro: `Não é possível reduzir o estoque para ${p.estoque}, pois existem ${atual.estoque_reservado} unidade(s) reservada(s) em compras pendentes.`
-    }, 409);
+    return json(
+      {
+        erro: `Não é possível reduzir o estoque para ${p.estoque}, pois existem ${atual.estoque_reservado} unidade(s) reservada(s) em compras pendentes.`
+      },
+      409
+    );
   }
 
-  await env.DB.prepare(`
+  await env.DB.prepare(
+    `
     UPDATE produtos
     SET nome=?, categoria=?, descricao=?, preco_centavos=?, disponivel=?, ativo=?, destaque=?, emoji=?, estoque=?, promocao_ativa=?, preco_promocional_centavos=?, promocao_inicio=?, promocao_fim=?,
         atualizado_em=CURRENT_TIMESTAMP
     WHERE id=?
-  `).bind(
-    p.nome, p.categoria, p.descricao, p.preco_centavos,
-    p.disponivel ? 1 : 0, p.ativo ? 1 : 0, p.destaque ? 1 : 0,
-    p.emoji, p.estoque, p.promocao_ativa ? 1 : 0, p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim, id
-  ).run();
+  `
+  )
+    .bind(
+      p.nome,
+      p.categoria,
+      p.descricao,
+      p.preco_centavos,
+      p.disponivel ? 1 : 0,
+      p.ativo ? 1 : 0,
+      p.destaque ? 1 : 0,
+      p.emoji,
+      p.estoque,
+      p.promocao_ativa ? 1 : 0,
+      p.preco_promocional_centavos,
+      p.promocao_inicio,
+      p.promocao_fim,
+      id
+    )
+    .run();
 
   return json({ ok: true });
 }
@@ -45,7 +65,9 @@ export async function onRequestDelete({ request, env, params }) {
   if (permanent) {
     const vinculos = await env.DB.prepare(
       "SELECT COUNT(*) AS total FROM pedidos WHERE produto_id = ?"
-    ).bind(id).first();
+    )
+      .bind(id)
+      .first();
 
     await env.DB.prepare("DELETE FROM produtos WHERE id = ?").bind(id).run();
 
@@ -54,7 +76,11 @@ export async function onRequestDelete({ request, env, params }) {
       pedidos_preservados: Number(vinculos?.total || 0)
     });
   } else {
-    await env.DB.prepare("UPDATE produtos SET ativo = 0, disponivel = 0, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?").bind(id).run();
+    await env.DB.prepare(
+      "UPDATE produtos SET ativo = 0, disponivel = 0, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?"
+    )
+      .bind(id)
+      .run();
   }
   return json({ ok: true });
 }

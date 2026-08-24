@@ -1,11 +1,5 @@
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  statSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -31,8 +25,8 @@ function selectedBackup() {
   if (!existsSync(backupDirectory)) cancel("a pasta .private-backups não existe.");
 
   const backups = readdirSync(backupDirectory)
-    .filter((name) => name.startsWith("rp-doces-production-") && name.endsWith(".sql"))
-    .map((name) => path.join(backupDirectory, name))
+    .filter(name => name.startsWith("rp-doces-production-") && name.endsWith(".sql"))
+    .map(name => path.join(backupDirectory, name))
     .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
 
   if (!backups.length) cancel("nenhum backup de produção foi encontrado.");
@@ -46,8 +40,8 @@ function runWrangler(args, capture = false) {
     stdio: capture ? "pipe" : "inherit",
     env: {
       ...process.env,
-      WRANGLER_LOG_PATH: path.join(persistence, "wrangler.log"),
-    },
+      WRANGLER_LOG_PATH: path.join(persistence, "wrangler.log")
+    }
   });
 
   if (result.error) cancel(`não foi possível executar o Wrangler: ${result.error.message}`);
@@ -92,12 +86,12 @@ try {
       (SELECT COUNT(*) FROM pedido_itens item LEFT JOIN pedidos pedido ON pedido.id = item.pedido_id WHERE pedido.id IS NULL) +
       (SELECT COUNT(*) FROM pedido_itens item LEFT JOIN produtos produto ON produto.id = item.produto_id WHERE item.produto_id IS NOT NULL AND produto.id IS NULL) +
       (SELECT COUNT(*) FROM admin_passkeys passkey LEFT JOIN usuarios_admin usuario ON usuario.id = passkey.usuario_id WHERE usuario.id IS NULL)
-      AS foreign_key_problems`,
+      AS foreign_key_problems`
   ].join(";");
 
   const output = runWrangler(
     ["d1", "execute", ...localArgs, "--command", validationSql, "--json"],
-    true,
+    true
   );
   const results = JSON.parse(output);
   const schemaTables = results[0]?.results?.[0]?.schema_tables;
@@ -108,7 +102,7 @@ try {
   if (migration017 !== 1) cancel("a migration 017 não está registrada no backup.");
   if (foreignKeyProblems !== 0) cancel("foram encontradas referências inválidas.");
 
-  const counts = results.slice(1, 7).map((entry) => entry.results?.[0] || {});
+  const counts = results.slice(1, 7).map(entry => entry.results?.[0] || {});
   console.log("Estrutura e integridade aprovadas:");
   for (const count of counts) {
     const [table, total] = Object.entries(count)[0] || [];

@@ -14,9 +14,7 @@ function cancel(message) {
 }
 
 if (!process.argv.includes(CONFIRM_FLAG)) {
-  cancel(
-    `Backup cancelado: confirme explicitamente o banco de produção com ${CONFIRM_FLAG}.`,
-  );
+  cancel(`Backup cancelado: confirme explicitamente o banco de produção com ${CONFIRM_FLAG}.`);
 }
 
 const wrangler = path.join(process.cwd(), "node_modules", "wrangler", "bin", "wrangler.js");
@@ -44,8 +42,8 @@ const result = spawnSync(
   {
     cwd: process.cwd(),
     encoding: "utf8",
-    stdio: "inherit",
-  },
+    stdio: "inherit"
+  }
 );
 
 if (result.error) {

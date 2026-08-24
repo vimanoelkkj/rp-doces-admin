@@ -1,5 +1,10 @@
 import { json, bodyJson, sameOrigin } from "../../lib/http.js";
-import { mpRequest, mpOrderToLocalStatus, paymentFromOrder, calculatePixExpiration } from "../../lib/mercadoPago.js";
+import {
+  mpRequest,
+  mpOrderToLocalStatus,
+  paymentFromOrder,
+  calculatePixExpiration
+} from "../../lib/mercadoPago.js";
 import { baixarEstoquePedido, liberarReservaPedido } from "../../lib/stock.js";
 import { notifyPaidOrder } from "../../lib/push.js";
 import { checkCheckoutRateLimit } from "../../lib/checkoutRateLimit.js";
@@ -20,7 +25,9 @@ function normalizeWhatsapp(value) {
   if (digits.length === 10 || digits.length === 11) digits = "55" + digits;
   return digits;
 }
-function money(centavos) { return (centavos / 100).toFixed(2); }
+function money(centavos) {
+  return (centavos / 100).toFixed(2);
+}
 
 function normalizeItems(data) {
   // Contrato antigo aceito temporariamente para permitir deploy gradual.
@@ -43,7 +50,9 @@ function normalizeItems(data) {
 }
 
 function promotionPrice(produto, agora) {
-  const vigente = Boolean(produto.promocao_ativa) && Number(produto.preco_promocional_centavos) > 0 &&
+  const vigente =
+    Boolean(produto.promocao_ativa) &&
+    Number(produto.preco_promocional_centavos) > 0 &&
     (!produto.promocao_inicio || Date.parse(produto.promocao_inicio) <= agora) &&
     (!produto.promocao_fim || Date.parse(produto.promocao_fim) > agora);
   return vigente ? Number(produto.preco_promocional_centavos) : Number(produto.preco_centavos);
@@ -52,10 +61,17 @@ function promotionPrice(produto, agora) {
 function isValidClientId(value) {
   if (!value || typeof value !== "string") return false;
   const s = value.trim();
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) || /^[A-Za-z0-9_-]{16,64}$/.test(s);
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) ||
+    /^[A-Za-z0-9_-]{16,64}$/.test(s)
+  );
 }
 
-async function assertPayloadCompatibility(env, pedido, { email, whatsapp, observacao, itensNovos }) {
+async function assertPayloadCompatibility(
+  env,
+  pedido,
+  { email, whatsapp, observacao, itensNovos }
+) {
   if (
     pedido.cliente_email !== email ||
     String(pedido.cliente_whatsapp || "") !== whatsapp ||
@@ -65,13 +81,19 @@ async function assertPayloadCompatibility(env, pedido, { email, whatsapp, observ
     err.status = 409;
     throw err;
   }
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? ORDER BY produto_id
-  `).bind(pedido.id).all();
+  `
+  )
+    .bind(pedido.id)
+    .all();
 
-  const salvos = (results || []).map(i => ({ produto_id: Number(i.produto_id), quantidade: Number(i.quantidade) }))
+  const salvos = (results || [])
+    .map(i => ({ produto_id: Number(i.produto_id), quantidade: Number(i.quantidade) }))
     .sort((a, b) => a.produto_id - b.produto_id);
-  const novos = itensNovos.map(i => ({ produto_id: Number(i.produto_id), quantidade: Number(i.quantidade) }))
+  const novos = itensNovos
+    .map(i => ({ produto_id: Number(i.produto_id), quantidade: Number(i.quantidade) }))
     .sort((a, b) => a.produto_id - b.produto_id);
 
   if (salvos.length !== novos.length) {
@@ -80,7 +102,10 @@ async function assertPayloadCompatibility(env, pedido, { email, whatsapp, observ
     throw err;
   }
   for (let i = 0; i < salvos.length; i++) {
-    if (salvos[i].produto_id !== novos[i].produto_id || salvos[i].quantidade !== novos[i].quantidade) {
+    if (
+      salvos[i].produto_id !== novos[i].produto_id ||
+      salvos[i].quantidade !== novos[i].quantidade
+    ) {
       const err = new Error("Identificador de requisição já utilizado para um pedido diferente.");
       err.status = 409;
       throw err;
@@ -102,30 +127,44 @@ export async function onRequestPost({ request, env }) {
 
   const solicitados = normalizeItems(data);
   const nome = String(data.nome || "").trim();
-  const email = String(data.email || "").trim().toLowerCase();
-  const observacao = String(data.observacao || "").trim().slice(0, 500);
+  const email = String(data.email || "")
+    .trim()
+    .toLowerCase();
+  const observacao = String(data.observacao || "")
+    .trim()
+    .slice(0, 500);
   const whatsapp = normalizeWhatsapp(data.whatsapp);
-  if (!solicitados) return json({ erro: "Carrinho inválido. Revise os produtos e quantidades." }, 400);
+  if (!solicitados)
+    return json({ erro: "Carrinho inválido. Revise os produtos e quantidades." }, 400);
   if (nome.length < 2 || nome.length > 100) return json({ erro: "Informe seu nome." }, 400);
   if (!validEmail(email)) return json({ erro: "Informe um e-mail válido." }, 400);
   if (!validWhatsapp(whatsapp)) return json({ erro: "Informe um WhatsApp válido com DDD." }, 400);
 
   const placeholders = solicitados.map(() => "?").join(",");
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT id, nome, preco_centavos, disponivel, ativo, estoque, estoque_reservado,
            promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim
     FROM produtos WHERE id IN (${placeholders})
-  `).bind(...solicitados.map(item => item.produto_id)).all();
+  `
+  )
+    .bind(...solicitados.map(item => item.produto_id))
+    .all();
   const produtos = new Map((results || []).map(produto => [Number(produto.id), produto]));
   const agora = Date.now();
   const itens = [];
   for (const solicitado of solicitados) {
     const produto = produtos.get(solicitado.produto_id);
-    if (!produto || !produto.ativo) return json({ erro: "Um produto do carrinho não foi encontrado." }, 404);
-    if (!produto.disponivel) return json({ erro: `${produto.nome} está indisponível no momento.` }, 409);
+    if (!produto || !produto.ativo)
+      return json({ erro: "Um produto do carrinho não foi encontrado." }, 404);
+    if (!produto.disponivel)
+      return json({ erro: `${produto.nome} está indisponível no momento.` }, 409);
     const disponivelAtual = Number(produto.estoque) - Number(produto.estoque_reservado || 0);
     if (disponivelAtual < solicitado.quantidade) {
-      const detalhe = disponivelAtual > 0 ? `Restam apenas ${disponivelAtual} unidade(s) disponível(is).` : "O produto está esgotado ou com unidades reservadas.";
+      const detalhe =
+        disponivelAtual > 0
+          ? `Restam apenas ${disponivelAtual} unidade(s) disponível(is).`
+          : "O produto está esgotado ou com unidades reservadas.";
       return json({ erro: `${produto.nome}: ${detalhe}` }, 409);
     }
     const unitario = promotionPrice(produto, agora);
@@ -133,26 +172,41 @@ export async function onRequestPost({ request, env }) {
     if (!Number.isSafeInteger(unitario) || unitario <= 0 || !Number.isSafeInteger(subtotal)) {
       return json({ erro: "Valor do pedido inválido." }, 400);
     }
-    itens.push({ produto_id: Number(produto.id), produto: produto.nome, quantidade: solicitado.quantidade,
-      valor_unitario_centavos: unitario, valor_total_centavos: subtotal });
+    itens.push({
+      produto_id: Number(produto.id),
+      produto: produto.nome,
+      quantidade: solicitado.quantidade,
+      valor_unitario_centavos: unitario,
+      valor_total_centavos: subtotal
+    });
   }
 
   const total = itens.reduce((sum, item) => sum + item.valor_total_centavos, 0);
   const quantidadeTotal = itens.reduce((sum, item) => sum + item.quantidade, 0);
-  if (!Number.isSafeInteger(total) || total <= 0) return json({ erro: "Valor do pedido inválido." }, 400);
+  if (!Number.isSafeInteger(total) || total <= 0)
+    return json({ erro: "Valor do pedido inválido." }, 400);
 
   // 1. Verifica se já existe um pedido para esta idempotencyKey
-  let pedidoExistente = await env.DB.prepare(`
+  let pedidoExistente = await env.DB.prepare(
+    `
     SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos, cliente_email,
            cliente_whatsapp, observacao, status_pagamento, mp_order_id, mp_payment_id, mp_status,
            mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key,
            reserva_status, reserva_expira_em, pix_expira_em, criado_em
     FROM pedidos WHERE idempotency_key = ? LIMIT 1
-  `).bind(idempotencyKey).first();
+  `
+  )
+    .bind(idempotencyKey)
+    .first();
 
   if (pedidoExistente) {
     try {
-      await assertPayloadCompatibility(env, pedidoExistente, { email, whatsapp, observacao, itensNovos: itens });
+      await assertPayloadCompatibility(env, pedidoExistente, {
+        email,
+        whatsapp,
+        observacao,
+        itensNovos: itens
+      });
     } catch (err) {
       if (err.status === 409) return json({ erro: err.message }, 409);
       throw err;
@@ -160,30 +214,37 @@ export async function onRequestPost({ request, env }) {
 
     // Estado A: Pedido existente com Pix completo -> Replay imediato (não consome rate limit nem reserva adicional)
     if (pedidoExistente.mp_qr_code) {
-      const { results: itensSalvos } = await env.DB.prepare(`
+      const { results: itensSalvos } = await env.DB.prepare(
+        `
         SELECT produto_id, produto_nome AS produto, quantidade,
                valor_unitario_centavos, valor_total_centavos
         FROM pedido_itens WHERE pedido_id = ? ORDER BY id
-      `).bind(pedidoExistente.id).all();
+      `
+      )
+        .bind(pedidoExistente.id)
+        .all();
 
-      return json({
-        pedido: {
-          token: pedidoExistente.token_publico,
-          referencia: `RP-${pedidoExistente.id}`,
-          produto: pedidoExistente.produto_nome,
-          quantidade: pedidoExistente.quantidade,
-          quantidade_total: pedidoExistente.quantidade,
-          itens: itensSalvos || [],
-          valor_total_centavos: pedidoExistente.valor_total_centavos,
-          status: pedidoExistente.status_pagamento,
-          pix_expira_em: pedidoExistente.pix_expira_em || null
+      return json(
+        {
+          pedido: {
+            token: pedidoExistente.token_publico,
+            referencia: `RP-${pedidoExistente.id}`,
+            produto: pedidoExistente.produto_nome,
+            quantidade: pedidoExistente.quantidade,
+            quantidade_total: pedidoExistente.quantidade,
+            itens: itensSalvos || [],
+            valor_total_centavos: pedidoExistente.valor_total_centavos,
+            status: pedidoExistente.status_pagamento,
+            pix_expira_em: pedidoExistente.pix_expira_em || null
+          },
+          pix: {
+            qr_code: pedidoExistente.mp_qr_code,
+            qr_code_base64: pedidoExistente.mp_qr_code_base64,
+            ticket_url: pedidoExistente.mp_ticket_url
+          }
         },
-        pix: {
-          qr_code: pedidoExistente.mp_qr_code,
-          qr_code_base64: pedidoExistente.mp_qr_code_base64,
-          ticket_url: pedidoExistente.mp_ticket_url
-        }
-      }, 200);
+        200
+      );
     }
   }
 
@@ -201,7 +262,7 @@ export async function onRequestPost({ request, env }) {
     return json(
       {
         erro: "Muitas tentativas de pedido em pouco tempo. Por favor, aguarde alguns instantes antes de tentar novamente.",
-        retry_after: rateLimit.retryAfter,
+        retry_after: rateLimit.retryAfter
       },
       429,
       { "Retry-After": String(rateLimit.retryAfter) }
@@ -213,32 +274,56 @@ export async function onRequestPost({ request, env }) {
 
   if (!pedidoExistente) {
     tokenPublico = crypto.randomUUID();
-    const produtoResumo = itens.length === 1 ? itens[0].produto : `Pedido com ${itens.length} itens`;
+    const produtoResumo =
+      itens.length === 1 ? itens[0].produto : `Pedido com ${itens.length} itens`;
     const statements = [
-      env.DB.prepare(`
+      env.DB.prepare(
+        `
         INSERT INTO pedidos (token_publico, produto_id, produto_nome, quantidade,
           valor_unitario_centavos, valor_total_centavos, cliente_nome, cliente_email,
           cliente_whatsapp, tipo_entrega, observacao, idempotency_key, reserva_status, reserva_expira_em)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'))
-      `).bind(tokenPublico, itens.length === 1 ? itens[0].produto_id : null, produtoResumo, quantidadeTotal,
-        itens.length === 1 ? itens[0].valor_unitario_centavos : 0, total,
-        nome, email, whatsapp, "RETIRADA", observacao, idempotencyKey)
+      `
+      ).bind(
+        tokenPublico,
+        itens.length === 1 ? itens[0].produto_id : null,
+        produtoResumo,
+        quantidadeTotal,
+        itens.length === 1 ? itens[0].valor_unitario_centavos : 0,
+        total,
+        nome,
+        email,
+        whatsapp,
+        "RETIRADA",
+        observacao,
+        idempotencyKey
+      )
     ];
 
     for (const item of itens) {
       statements.push(
-        env.DB.prepare(`
+        env.DB.prepare(
+          `
           INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade,
             valor_unitario_centavos, valor_total_centavos)
           SELECT id, ?, ?, ?, ?, ? FROM pedidos WHERE token_publico = ?
-        `).bind(item.produto_id, item.produto, item.quantidade,
-          item.valor_unitario_centavos, item.valor_total_centavos, tokenPublico),
-        env.DB.prepare(`
+        `
+        ).bind(
+          item.produto_id,
+          item.produto,
+          item.quantidade,
+          item.valor_unitario_centavos,
+          item.valor_total_centavos,
+          tokenPublico
+        ),
+        env.DB.prepare(
+          `
           UPDATE produtos
           SET estoque_reservado = estoque_reservado + ?,
               atualizado_em = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).bind(item.quantidade, item.produto_id)
+        `
+        ).bind(item.quantidade, item.produto_id)
       );
     }
 
@@ -247,53 +332,75 @@ export async function onRequestPost({ request, env }) {
       pedidoId = inserted[0]?.meta?.last_row_id;
     } catch (insertErr) {
       // Se falhou por violação de constraint CHECK (ex: estoque_reservado > estoque)
-      if (insertErr?.message?.includes("CHECK constraint failed") || insertErr?.message?.includes("CHECK")) {
-        return json({ erro: "Um ou mais produtos selecionados não possuem estoque suficiente disponível." }, 409);
+      if (
+        insertErr?.message?.includes("CHECK constraint failed") ||
+        insertErr?.message?.includes("CHECK")
+      ) {
+        return json(
+          { erro: "Um ou mais produtos selecionados não possuem estoque suficiente disponível." },
+          409
+        );
       }
 
       // Concorrência atômica: se outro request inseriu no mesmo milissegundo com a mesma chave
-      pedidoExistente = await env.DB.prepare(`
+      pedidoExistente = await env.DB.prepare(
+        `
         SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos, cliente_email,
                cliente_whatsapp, observacao, status_pagamento, mp_order_id, mp_payment_id, mp_status,
                mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key,
                reserva_status, reserva_expira_em, pix_expira_em, criado_em
         FROM pedidos WHERE idempotency_key = ? LIMIT 1
-      `).bind(idempotencyKey).first();
+      `
+      )
+        .bind(idempotencyKey)
+        .first();
 
       if (!pedidoExistente) throw insertErr;
 
       try {
-        await assertPayloadCompatibility(env, pedidoExistente, { email, whatsapp, observacao, itensNovos: itens });
+        await assertPayloadCompatibility(env, pedidoExistente, {
+          email,
+          whatsapp,
+          observacao,
+          itensNovos: itens
+        });
       } catch (err) {
         if (err.status === 409) return json({ erro: err.message }, 409);
         throw err;
       }
 
       if (pedidoExistente.mp_qr_code) {
-        const { results: itensSalvos } = await env.DB.prepare(`
+        const { results: itensSalvos } = await env.DB.prepare(
+          `
           SELECT produto_id, produto_nome AS produto, quantidade,
                  valor_unitario_centavos, valor_total_centavos
           FROM pedido_itens WHERE pedido_id = ? ORDER BY id
-        `).bind(pedidoExistente.id).all();
+        `
+        )
+          .bind(pedidoExistente.id)
+          .all();
 
-        return json({
-          pedido: {
-            token: pedidoExistente.token_publico,
-            referencia: `RP-${pedidoExistente.id}`,
-            produto: pedidoExistente.produto_nome,
-            quantidade: pedidoExistente.quantidade,
-            quantidade_total: pedidoExistente.quantidade,
-            itens: itensSalvos || [],
-            valor_total_centavos: pedidoExistente.valor_total_centavos,
-            status: pedidoExistente.status_pagamento,
-            pix_expira_em: pedidoExistente.pix_expira_em || null
+        return json(
+          {
+            pedido: {
+              token: pedidoExistente.token_publico,
+              referencia: `RP-${pedidoExistente.id}`,
+              produto: pedidoExistente.produto_nome,
+              quantidade: pedidoExistente.quantidade,
+              quantidade_total: pedidoExistente.quantidade,
+              itens: itensSalvos || [],
+              valor_total_centavos: pedidoExistente.valor_total_centavos,
+              status: pedidoExistente.status_pagamento,
+              pix_expira_em: pedidoExistente.pix_expira_em || null
+            },
+            pix: {
+              qr_code: pedidoExistente.mp_qr_code,
+              qr_code_base64: pedidoExistente.mp_qr_code_base64,
+              ticket_url: pedidoExistente.mp_ticket_url
+            }
           },
-          pix: {
-            qr_code: pedidoExistente.mp_qr_code,
-            qr_code_base64: pedidoExistente.mp_qr_code_base64,
-            ticket_url: pedidoExistente.mp_ticket_url
-          }
-        }, 200);
+          200
+        );
       }
 
       pedidoId = pedidoExistente.id;
@@ -304,9 +411,12 @@ export async function onRequestPost({ request, env }) {
   if (!pedidoId) return json({ erro: "Não foi possível registrar o pedido." }, 500);
   const externalReference = `RP-${pedidoId}`;
 
-  const payerFirstName = String(env.MP_TEST_MODE || "").toLowerCase() === "true"
-    ? "APRO"
-    : (nome ? nome.split(/\s+/)[0] : "Cliente");
+  const payerFirstName =
+    String(env.MP_TEST_MODE || "").toLowerCase() === "true"
+      ? "APRO"
+      : nome
+        ? nome.split(/\s+/)[0]
+        : "Cliente";
 
   const totalAmount = money(total);
 
@@ -343,13 +453,18 @@ export async function onRequestPost({ request, env }) {
     const payment = paymentFromOrder(order);
     const localStatus = mpOrderToLocalStatus(order);
 
-    const pedidoRow = await env.DB.prepare(`
+    const pedidoRow = await env.DB.prepare(
+      `
       SELECT criado_em, pix_expira_em FROM pedidos WHERE id = ?
-    `).bind(pedidoId).first();
+    `
+    )
+      .bind(pedidoId)
+      .first();
 
     const pixExpiraEm = pedidoRow?.pix_expira_em || calculatePixExpiration(pedidoRow?.criado_em);
 
-    await env.DB.prepare(`
+    await env.DB.prepare(
+      `
       UPDATE pedidos SET
         mp_order_id = ?, mp_payment_id = ?, mp_status = ?, mp_status_detail = ?,
         mp_ticket_url = ?, mp_qr_code = ?, mp_qr_code_base64 = ?, status_pagamento = ?,
@@ -357,11 +472,22 @@ export async function onRequestPost({ request, env }) {
         atualizado_em = CURRENT_TIMESTAMP,
         pago_em = CASE WHEN ? = 'PAGO' THEN CURRENT_TIMESTAMP ELSE pago_em END
       WHERE id = ?
-    `).bind(
-      order.id || null, payment.paymentId, order.status || null, order.status_detail || null,
-      payment.ticketUrl, payment.qrCode, payment.qrCodeBase64, localStatus,
-      pixExpiraEm, localStatus, pedidoId
-    ).run();
+    `
+    )
+      .bind(
+        order.id || null,
+        payment.paymentId,
+        order.status || null,
+        order.status_detail || null,
+        payment.ticketUrl,
+        payment.qrCode,
+        payment.qrCodeBase64,
+        localStatus,
+        pixExpiraEm,
+        localStatus,
+        pedidoId
+      )
+      .run();
 
     if (localStatus === "PAGO") {
       const estoque = await baixarEstoquePedido(env, pedidoId);
@@ -374,25 +500,29 @@ export async function onRequestPost({ request, env }) {
       await notifyPaidOrder(env, pedidoId);
     }
 
-    const produtoResumo = itens.length === 1 ? itens[0].produto : `Pedido com ${itens.length} itens`;
-    return json({
-      pedido: {
-        token: tokenPublico,
-        referencia: externalReference,
-        produto: produtoResumo,
-        quantidade: quantidadeTotal,
-        quantidade_total: quantidadeTotal,
-        itens,
-        valor_total_centavos: total,
-        status: localStatus,
-        pix_expira_em: pixExpiraEm || null
+    const produtoResumo =
+      itens.length === 1 ? itens[0].produto : `Pedido com ${itens.length} itens`;
+    return json(
+      {
+        pedido: {
+          token: tokenPublico,
+          referencia: externalReference,
+          produto: produtoResumo,
+          quantidade: quantidadeTotal,
+          quantidade_total: quantidadeTotal,
+          itens,
+          valor_total_centavos: total,
+          status: localStatus,
+          pix_expira_em: pixExpiraEm || null
+        },
+        pix: {
+          qr_code: payment.qrCode,
+          qr_code_base64: payment.qrCodeBase64,
+          ticket_url: payment.ticketUrl
+        }
       },
-      pix: {
-        qr_code: payment.qrCode,
-        qr_code_base64: payment.qrCodeBase64,
-        ticket_url: payment.ticketUrl
-      }
-    }, 201);
+      201
+    );
   } catch (err) {
     logEvent("error", "payment.sync_failed", {
       pedido_id: pedidoId,
@@ -407,10 +537,17 @@ export async function onRequestPost({ request, env }) {
     }
 
     // Se for falha incerta (5xx, timeout, rede): MANTÉM a reserva ATIVA e registra status ERRO
-    await env.DB.prepare(`
+    await env.DB.prepare(
+      `
       UPDATE pedidos SET status_pagamento = 'ERRO', atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND status_pagamento NOT IN ('PAGO', 'REEMBOLSADO')
-    `).bind(pedidoId).run();
-    return json({ erro: "Não foi possível gerar o Pix no momento. Tente novamente em instantes." }, 502);
+    `
+    )
+      .bind(pedidoId)
+      .run();
+    return json(
+      { erro: "Não foi possível gerar o Pix no momento. Tente novamente em instantes." },
+      502
+    );
   }
 }

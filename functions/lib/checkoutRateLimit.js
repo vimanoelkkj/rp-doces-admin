@@ -35,7 +35,9 @@ export async function hmacSha256(secret, message) {
 async function triggerLazyCleanup(env, nowSec) {
   try {
     if (Math.random() < 0.05) {
-      await env.DB.prepare("DELETE FROM checkout_rate_limits WHERE expira_em < ?").bind(nowSec).run();
+      await env.DB.prepare("DELETE FROM checkout_rate_limits WHERE expira_em < ?")
+        .bind(nowSec)
+        .run();
     }
   } catch (err) {
     console.warn("Falha no cleanup de rate limit:", err?.message);
@@ -76,13 +78,17 @@ export async function checkCheckoutRateLimit(env, request, overrideTimestamp = n
   const chave = await hmacSha256(env.RATE_LIMIT_SECRET, `checkout:${clientIp}:${bucket}`);
 
   // Execução atômica no banco com UPSERT e RETURNING
-  const row = await env.DB.prepare(`
+  const row = await env.DB.prepare(
+    `
     INSERT INTO checkout_rate_limits (chave, tentativas, expira_em)
     VALUES (?, 1, ?)
     ON CONFLICT(chave) DO UPDATE SET
       tentativas = tentativas + 1
     RETURNING tentativas
-  `).bind(chave, expiraEm).first();
+  `
+  )
+    .bind(chave, expiraEm)
+    .first();
 
   const count = Number(row?.tentativas || 1);
   const allowed = count <= MAX_ATTEMPTS;

@@ -7,14 +7,11 @@ const PBKDF2_ITERATIONS = 100000;
 const PBKDF2_MAX_ITERATIONS = 100000;
 
 function bytesToHex(bytes) {
-  return [...new Uint8Array(bytes)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 function hexToBytes(hex) {
   const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++)
-    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   return out;
 }
 function randomToken(bytes = 32) {
@@ -24,10 +21,7 @@ function randomToken(bytes = 32) {
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 export async function sha256(text) {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(text),
-  );
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return bytesToHex(digest);
 }
 
@@ -38,12 +32,12 @@ export async function hashPassword(password) {
     new TextEncoder().encode(password),
     "PBKDF2",
     false,
-    ["deriveBits"],
+    ["deriveBits"]
   );
   const bits = await crypto.subtle.deriveBits(
     { name: "PBKDF2", hash: "SHA-256", salt, iterations: PBKDF2_ITERATIONS },
     key,
-    256,
+    256
   );
   return `pbkdf2_sha256$${PBKDF2_ITERATIONS}$${bytesToHex(salt)}$${bytesToHex(bits)}`;
 }
@@ -54,28 +48,25 @@ export async function verifyPassword(password, stored) {
     if (algo !== "pbkdf2_sha256") return false;
 
     const iterations = Number(iterationsText);
-    if (
-      !Number.isSafeInteger(iterations) ||
-      iterations < 1 ||
-      iterations > PBKDF2_MAX_ITERATIONS
-    ) return false;
+    if (!Number.isSafeInteger(iterations) || iterations < 1 || iterations > PBKDF2_MAX_ITERATIONS)
+      return false;
 
     const key = await crypto.subtle.importKey(
       "raw",
       new TextEncoder().encode(password),
       "PBKDF2",
       false,
-      ["deriveBits"],
+      ["deriveBits"]
     );
     const bits = await crypto.subtle.deriveBits(
       {
         name: "PBKDF2",
         hash: "SHA-256",
         salt: hexToBytes(saltHex),
-        iterations,
+        iterations
       },
       key,
-      256,
+      256
     );
     const computed = new Uint8Array(bits);
     const expected = hexToBytes(hashHex);
@@ -102,7 +93,7 @@ export async function createSession(env, userId) {
   const tokenHash = await sha256(token);
   const expires = new Date(Date.now() + SESSION_DAYS * 86400000).toISOString();
   await env.DB.prepare(
-    "INSERT INTO admin_sessoes (usuario_id, token_hash, expira_em) VALUES (?, ?, ?)",
+    "INSERT INTO admin_sessoes (usuario_id, token_hash, expira_em) VALUES (?, ?, ?)"
   )
     .bind(userId, tokenHash, expires)
     .run();
@@ -133,7 +124,7 @@ export async function currentUser(env, request) {
     JOIN usuarios_admin u ON u.id = s.usuario_id
     WHERE s.token_hash = ? AND s.expira_em > ? AND u.ativo = 1
     LIMIT 1
-  `,
+  `
   )
     .bind(hash, now)
     .first();

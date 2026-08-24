@@ -127,25 +127,28 @@ function mockMpSuccess(qrCode = "PIX-QR-CODE-TEST") {
   let counter = 0;
   return async () => {
     counter++;
-    return new Response(JSON.stringify({
-      id: `mp-order-test-${counter}-${Math.random().toString(36).slice(2)}`,
-      status: "created",
-      transactions: {
-        payments: [
-          {
-            id: `pay-test-${counter}`,
-            payment_method: {
-              qr_code: qrCode,
-              qr_code_base64: "base64-image-data",
-              ticket_url: "https://mercadopago.com/ticket/123"
+    return new Response(
+      JSON.stringify({
+        id: `mp-order-test-${counter}-${Math.random().toString(36).slice(2)}`,
+        status: "created",
+        transactions: {
+          payments: [
+            {
+              id: `pay-test-${counter}`,
+              payment_method: {
+                qr_code: qrCode,
+                qr_code_base64: "base64-image-data",
+                ticket_url: "https://mercadopago.com/ticket/123"
+              }
             }
-          }
-        ]
+          ]
+        }
+      }),
+      {
+        status: 201,
+        headers: { "content-type": "application/json" }
       }
-    }), {
-      status: 201,
-      headers: { "content-type": "application/json" }
-    });
+    );
   };
 }
 
@@ -183,23 +186,33 @@ test("2. Migration 020: Schema permite pix_expira_em NULL e aceita ALTER TABLE",
   // Executa migration 020
   db.exec("ALTER TABLE pedidos_legados ADD COLUMN pix_expira_em TEXT;");
 
-  const row = db.prepare("SELECT token_publico, pix_expira_em FROM pedidos_legados WHERE id = 1").get();
+  const row = db
+    .prepare("SELECT token_publico, pix_expira_em FROM pedidos_legados WHERE id = 1")
+    .get();
   assert.equal(row.token_publico, "tok-1");
   assert.equal(row.pix_expira_em, null, "Registro legado deve ter pix_expira_em NULL");
 });
 
-test("3. Checkout normal persiste pix_expira_em e retorna no payload POST", async (t) => {
+test("3. Checkout normal persiste pix_expira_em e retorna no payload POST", async t => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = mockMpSuccess("PIX-QR-NORMAL");
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);"
+  );
 
   const env = { DB, RATE_LIMIT_SECRET, MP_ACCESS_TOKEN: "mp-token" };
   const req = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body: JSON.stringify({
       client_request_id: "req-exp-normal-1",
       nome: "Maria",
@@ -216,10 +229,14 @@ test("3. Checkout normal persiste pix_expira_em e retorna no payload POST", asyn
   assert.ok(data.pedido.pix_expira_em, "pix_expira_em deve estar presente na resposta");
 
   // Valida persistência no D1
-  const row = DB.raw.prepare("SELECT criado_em, pix_expira_em FROM pedidos WHERE token_publico = ?").get(data.pedido.token);
+  const row = DB.raw
+    .prepare("SELECT criado_em, pix_expira_em FROM pedidos WHERE token_publico = ?")
+    .get(data.pedido.token);
   assert.equal(row.pix_expira_em, data.pedido.pix_expira_em);
 
-  const diffMs = new Date(row.pix_expira_em).getTime() - new Date(calculatePixExpiration(row.criado_em)).getTime();
+  const diffMs =
+    new Date(row.pix_expira_em).getTime() -
+    new Date(calculatePixExpiration(row.criado_em)).getTime();
   assert.equal(diffMs, 0, "pix_expira_em deve coincidir exatamente com criado_em + 30m");
 });
 
@@ -228,13 +245,17 @@ test("4. GET /api/orders/[token] retorna exatamente o mesmo pix_expira_em", asyn
   const token = "b5555555-5555-4555-8555-555555555555";
   const expira = "2026-08-24T03:00:00.000Z";
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedidos (
       id, token_publico, produto_nome, quantidade, valor_unitario_centavos,
       valor_total_centavos, cliente_nome, cliente_email, idempotency_key,
       status_pagamento, pix_expira_em
     ) VALUES (1, ?, 'Torta', 1, 3000, 3000, 'Carlos', 'carlos@test.com', 'key-get', 'PENDENTE', ?)
-  `).run(token, expira);
+  `
+    )
+    .run(token, expira);
 
   const env = { DB };
   const res = await getOrder({ params: { token }, env });
@@ -244,13 +265,17 @@ test("4. GET /api/orders/[token] retorna exatamente o mesmo pix_expira_em", asyn
   assert.equal(data.pedido.pix_expira_em, expira);
 });
 
-test("5. Replay com mesmo client_request_id retorna exatamente o mesmo pix_expira_em", async (t) => {
+test("5. Replay com mesmo client_request_id retorna exatamente o mesmo pix_expira_em", async t => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = mockMpSuccess("PIX-QR-REPLAY");
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);"
+  );
 
   const env = { DB, RATE_LIMIT_SECRET, MP_ACCESS_TOKEN: "mp-token" };
   const body = JSON.stringify({
@@ -263,7 +288,11 @@ test("5. Replay com mesmo client_request_id retorna exatamente o mesmo pix_expir
 
   const req1 = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body
   });
 
@@ -275,7 +304,11 @@ test("5. Replay com mesmo client_request_id retorna exatamente o mesmo pix_expir
   // 2ª chamada: Replay imediato
   const req2 = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body
   });
 
@@ -287,13 +320,17 @@ test("5. Replay com mesmo client_request_id retorna exatamente o mesmo pix_expir
   assert.equal(expira2, expira1, "Replay deve retornar exatamente o mesmo pix_expira_em");
 });
 
-test("6. Replay tardio não altera nem renova pix_expira_em", async (t) => {
+test("6. Replay tardio não altera nem renova pix_expira_em", async t => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = mockMpSuccess("PIX-QR-TIME");
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);"
+  );
 
   const env = { DB, RATE_LIMIT_SECRET, MP_ACCESS_TOKEN: "mp-token" };
   const body = JSON.stringify({
@@ -306,7 +343,11 @@ test("6. Replay tardio não altera nem renova pix_expira_em", async (t) => {
 
   const req1 = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body
   });
 
@@ -317,48 +358,72 @@ test("6. Replay tardio não altera nem renova pix_expira_em", async (t) => {
   // Simula avanço de tempo no banco
   const req2 = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body
   });
 
   const res2 = await checkoutPix({ request: req2, env });
   const data2 = await res2.json();
 
-  assert.equal(data2.pedido.pix_expira_em, expiraOriginal, "Timestamp de expiração não pode ter sido renovado");
+  assert.equal(
+    data2.pedido.pix_expira_em,
+    expiraOriginal,
+    "Timestamp de expiração não pode ter sido renovado"
+  );
 });
 
-test("7. Recovery 10 minutos após timeout mantém T0 + 30m ancorado no criado_em original", async (t) => {
+test("7. Recovery 10 minutos após timeout mantém T0 + 30m ancorado no criado_em original", async t => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = mockMpSuccess("PIX-RECOVERED");
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 1);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 1);"
+  );
 
   // Insere pedido criado 10 minutos atrás em estado ERRO (sem pix_expira_em ainda)
   const token = "c7777777-7777-4777-8777-777777777777";
   const idempotencyKey = "key-timeout-recovery-01";
   const criadoEmOriginal = "2026-08-24 00:00:00"; // T0
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedidos (
       id, token_publico, produto_nome, quantidade, valor_unitario_centavos,
       valor_total_centavos, cliente_nome, cliente_email, cliente_whatsapp, observacao,
       idempotency_key, status_pagamento, reserva_status, reserva_expira_em, criado_em
     ) VALUES (1, ?, 'Bolo', 1, 2500, 2500, 'Julia', 'julia@test.com', '5533999994444', '', ?, 'ERRO', 'ATIVA', '2026-08-24 00:31:00', ?)
-  `).run(token, idempotencyKey, criadoEmOriginal);
+  `
+    )
+    .run(token, idempotencyKey, criadoEmOriginal);
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
     VALUES (1, 1, 'Bolo', 1, 2500, 2500)
-  `).run();
+  `
+    )
+    .run();
 
   const env = { DB, RATE_LIMIT_SECRET, MP_ACCESS_TOKEN: "mp-token" };
 
   // Executa o retry (recovery)
   const req = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body: JSON.stringify({
       client_request_id: idempotencyKey,
       nome: "Julia",
@@ -373,22 +438,34 @@ test("7. Recovery 10 minutos após timeout mantém T0 + 30m ancorado no criado_e
   const data = await res.json();
 
   // Esperado: ancorado em 00:00:00 -> 00:30:00 UTC
-  assert.equal(data.pedido.pix_expira_em, "2026-08-24T00:30:00.000Z", "Recovery deve ancorar expiração em T0 + 30m, nunca no instante do recovery");
+  assert.equal(
+    data.pedido.pix_expira_em,
+    "2026-08-24T00:30:00.000Z",
+    "Recovery deve ancorar expiração em T0 + 30m, nunca no instante do recovery"
+  );
 });
 
-test("8. Novo client_request_id gera novo pedido com sua própria expiração", async (t) => {
+test("8. Novo client_request_id gera novo pedido com sua própria expiração", async t => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = mockMpSuccess("PIX-NEW");
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);"
+  );
 
   const env = { DB, RATE_LIMIT_SECRET, MP_ACCESS_TOKEN: "mp-token" };
 
   const req1 = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body: JSON.stringify({
       client_request_id: "req-diff-client-0001",
       nome: "Cliente 1",
@@ -400,7 +477,11 @@ test("8. Novo client_request_id gera novo pedido com sua própria expiração", 
 
   const req2 = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body: JSON.stringify({
       client_request_id: "req-diff-client-0002",
       nome: "Cliente 2",
@@ -425,23 +506,33 @@ test("8. Novo client_request_id gera novo pedido com sua própria expiração", 
 
 test("9. Pedido legado com pix_expira_em NULL funciona perfeitamente nas APIs", async () => {
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);"
+  );
 
   const token = "d8888888-8888-4888-8888-888888888888";
   const idempotencyKey = "key-legado-null-test-01";
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedidos (
       id, token_publico, produto_nome, quantidade, valor_unitario_centavos,
       valor_total_centavos, cliente_nome, cliente_email, cliente_whatsapp,
       idempotency_key, status_pagamento, mp_qr_code, pix_expira_em
     ) VALUES (1, ?, 'Bolo', 1, 2500, 2500, 'Legado', 'legado@test.com', '5533999990000', ?, 'PENDENTE', 'QR-LEGADO', NULL)
-  `).run(token, idempotencyKey);
+  `
+    )
+    .run(token, idempotencyKey);
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
     VALUES (1, 1, 'Bolo', 1, 2500, 2500)
-  `).run();
+  `
+    )
+    .run();
 
   const env = { DB, RATE_LIMIT_SECRET, MP_ACCESS_TOKEN: "mp-token" };
 
@@ -454,7 +545,11 @@ test("9. Pedido legado com pix_expira_em NULL funciona perfeitamente nas APIs", 
   // POST /api/checkout/pix replay
   const postReq = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body: JSON.stringify({
       client_request_id: idempotencyKey,
       nome: "Legado",
@@ -472,23 +567,33 @@ test("9. Pedido legado com pix_expira_em NULL funciona perfeitamente nas APIs", 
 
 test("10. Transição para PAGO preserva pix_expira_em histórico imutável", async () => {
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 1);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 1);"
+  );
 
   const token = "e9999999-9999-4999-8999-999999999999";
   const expira = "2026-08-24T01:30:00.000Z";
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedidos (
       id, token_publico, produto_nome, quantidade, valor_unitario_centavos,
       valor_total_centavos, cliente_nome, cliente_email, idempotency_key,
       status_pagamento, reserva_status, mp_order_id, pix_expira_em
     ) VALUES (1, ?, 'Bolo', 1, 2500, 2500, 'Paulo', 'paulo@test.com', 'key-pago', 'PENDENTE', 'ATIVA', 'mp-1', ?)
-  `).run(token, expira);
+  `
+    )
+    .run(token, expira);
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
     VALUES (1, 1, 'Bolo', 1, 2500, 2500)
-  `).run();
+  `
+    )
+    .run();
 
   const env = { DB };
   const synced = await syncOrderPayment(env, {
@@ -498,22 +603,32 @@ test("10. Transição para PAGO preserva pix_expira_em histórico imutável", as
 
   assert.equal(synced.status_pagamento, "PAGO");
 
-  const row = DB.raw.prepare("SELECT status_pagamento, pix_expira_em FROM pedidos WHERE id = 1").get();
+  const row = DB.raw
+    .prepare("SELECT status_pagamento, pix_expira_em FROM pedidos WHERE id = 1")
+    .get();
   assert.equal(row.status_pagamento, "PAGO");
-  assert.equal(row.pix_expira_em, expira, "pix_expira_em deve permanecer inalterado após pagamento");
+  assert.equal(
+    row.pix_expira_em,
+    expira,
+    "pix_expira_em deve permanecer inalterado após pagamento"
+  );
 });
 
 test("11. Transição para REEMBOLSADO preserva pix_expira_em histórico", async () => {
   const DB = createRealSqliteDb();
   const expira = "2026-08-24T02:30:00.000Z";
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedidos (
       id, token_publico, produto_nome, quantidade, valor_unitario_centavos,
       valor_total_centavos, cliente_nome, cliente_email, idempotency_key,
       status_pagamento, mp_order_id, pix_expira_em
     ) VALUES (1, 'tok-reemb', 'Bolo', 1, 2500, 2500, 'Reemb', 'reemb@test.com', 'key-reemb', 'PAGO', 'mp-reemb', ?)
-  `).run(expira);
+  `
+    )
+    .run(expira);
 
   const env = { DB };
   const synced = await syncOrderPayment(env, {
@@ -523,22 +638,32 @@ test("11. Transição para REEMBOLSADO preserva pix_expira_em histórico", async
 
   assert.equal(synced.status_pagamento, "REEMBOLSADO");
 
-  const row = DB.raw.prepare("SELECT status_pagamento, pix_expira_em FROM pedidos WHERE id = 1").get();
+  const row = DB.raw
+    .prepare("SELECT status_pagamento, pix_expira_em FROM pedidos WHERE id = 1")
+    .get();
   assert.equal(row.pix_expira_em, expira);
 });
 
-test("12. reserva_expira_em e pix_expira_em permanecem independentes", async (t) => {
+test("12. reserva_expira_em e pix_expira_em permanecem independentes", async t => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = mockMpSuccess("PIX-INDEP");
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 0);"
+  );
 
   const env = { DB, RATE_LIMIT_SECRET, MP_ACCESS_TOKEN: "mp-token" };
   const req = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body: JSON.stringify({
       client_request_id: "req-indep-test-client-1",
       nome: "Rafael",
@@ -552,42 +677,66 @@ test("12. reserva_expira_em e pix_expira_em permanecem independentes", async (t)
   assert.equal(res.status, 201);
   const data = await res.json();
 
-  const row = DB.raw.prepare("SELECT reserva_expira_em, pix_expira_em, criado_em FROM pedidos WHERE token_publico = ?").get(data.pedido.token);
+  const row = DB.raw
+    .prepare(
+      "SELECT reserva_expira_em, pix_expira_em, criado_em FROM pedidos WHERE token_publico = ?"
+    )
+    .get(data.pedido.token);
   assert.ok(row.reserva_expira_em, "reserva_expira_em deve existir");
   assert.ok(row.pix_expira_em, "pix_expira_em deve existir");
-  assert.notEqual(row.reserva_expira_em, row.pix_expira_em, "reserva_expira_em (31m) e pix_expira_em (30m) devem ser timestamps distintos");
+  assert.notEqual(
+    row.reserva_expira_em,
+    row.pix_expira_em,
+    "reserva_expira_em (31m) e pix_expira_em (30m) devem ser timestamps distintos"
+  );
 });
 
-test("13. Base temporal ausente/inválida: não fabrica timestamp com Date.now() e retorna null", async (t) => {
+test("13. Base temporal ausente/inválida: não fabrica timestamp com Date.now() e retorna null", async t => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = mockMpSuccess("PIX-NO-BASE");
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const DB = createRealSqliteDb();
-  DB.raw.exec("INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 1);");
+  DB.raw.exec(
+    "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Bolo', 2500, 10, 1);"
+  );
 
   // Insere pedido prévio com criado_em inválido ('INVALIDO')
   const token = "f0000000-0000-4000-8000-000000000000";
   const idempotencyKey = "key-invalid-base-test-01";
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedidos (
       id, token_publico, produto_nome, quantidade, valor_unitario_centavos,
       valor_total_centavos, cliente_nome, cliente_email, cliente_whatsapp, observacao,
       idempotency_key, status_pagamento, reserva_status, reserva_expira_em, criado_em
     ) VALUES (1, ?, 'Bolo', 1, 2500, 2500, 'SemData', 'semdata@test.com', '5533999996666', '', ?, 'ERRO', 'ATIVA', '2026-08-24 00:31:00', 'INVALIDO')
-  `).run(token, idempotencyKey);
+  `
+    )
+    .run(token, idempotencyKey);
 
-  DB.raw.prepare(`
+  DB.raw
+    .prepare(
+      `
     INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
     VALUES (1, 1, 'Bolo', 1, 2500, 2500)
-  `).run();
+  `
+    )
+    .run();
 
   const env = { DB, RATE_LIMIT_SECRET, MP_ACCESS_TOKEN: "mp-token" };
 
   const req = new Request("https://loja.test/api/checkout/pix", {
     method: "POST",
-    headers: { "content-type": "application/json", "origin": "https://loja.test", "cf-connecting-ip": "1.2.3.4" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://loja.test",
+      "cf-connecting-ip": "1.2.3.4"
+    },
     body: JSON.stringify({
       client_request_id: idempotencyKey,
       nome: "SemData",
@@ -601,6 +750,9 @@ test("13. Base temporal ausente/inválida: não fabrica timestamp com Date.now()
   assert.equal(res.status, 201);
   const data = await res.json();
 
-  assert.equal(data.pedido.pix_expira_em, null, "Base temporal inválida deve resultar em pix_expira_em null sem quebrar o checkout");
+  assert.equal(
+    data.pedido.pix_expira_em,
+    null,
+    "Base temporal inválida deve resultar em pix_expira_em null sem quebrar o checkout"
+  );
 });
-

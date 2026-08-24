@@ -109,7 +109,9 @@ function createRealSqliteDb() {
 async function seedAdminSession(sqlite) {
   const token = "admin-session-token-test";
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  const hash = Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
   const expiraEm = new Date(Date.now() + 3600000).toISOString();
   sqlite.raw.exec(`
     INSERT OR REPLACE INTO usuarios_admin (id, nome, username, email, ativo, papel)
@@ -127,16 +129,18 @@ async function authenticatedRequest() {
 }
 
 function mockAdminAuthDb(handlers = {}) {
-  return fakeDb((sql) => {
+  return fakeDb(sql => {
     if (sql.includes("FROM admin_sessoes")) {
-      return { first: () => ({ id: 1, nome: "Admin", username: "admin", ativo: 1, papel: "ADMIN" }) };
+      return {
+        first: () => ({ id: 1, nome: "Admin", username: "admin", ativo: 1, papel: "ADMIN" })
+      };
     }
     return handlers(sql) || {};
   });
 }
 
 test("1. Banco saudável -> status healthy", async () => {
-  const DB = mockAdminAuthDb((sql) => {
+  const DB = mockAdminAuthDb(sql => {
     if (sql.includes("FROM pedidos")) {
       return {
         first: () => ({
@@ -293,13 +297,13 @@ test("7. ERRO + reserva ATIVA vencida -> critical (SQLite real)", async () => {
 });
 
 test("8. Múltiplas anomalias respeitam precedência critical", async () => {
-  const DB = mockAdminAuthDb((sql) => {
+  const DB = mockAdminAuthDb(sql => {
     if (sql.includes("FROM pedidos")) {
       return {
         first: () => ({
           pagos_sem_baixa_estoque: 1, // trigger critical
           reservas_vencidas_ativas: 5, // trigger warning
-          erros_com_reserva_ativa: 2,  // trigger warning
+          erros_com_reserva_ativa: 2, // trigger warning
           erros_com_reserva_vencida: 0
         })
       };
@@ -315,7 +319,7 @@ test("8. Múltiplas anomalias respeitam precedência critical", async () => {
 });
 
 test("9. alertas_ativos conta categorias ativas, não quantidade de pedidos", async () => {
-  const DB = mockAdminAuthDb((sql) => {
+  const DB = mockAdminAuthDb(sql => {
     if (sql.includes("FROM pedidos")) {
       return {
         first: () => ({
@@ -336,7 +340,7 @@ test("9. alertas_ativos conta categorias ativas, não quantidade de pedidos", as
 });
 
 test("10. Resposta não contém PII nem chaves de pedidos individuais", async () => {
-  const DB = mockAdminAuthDb((sql) => {
+  const DB = mockAdminAuthDb(sql => {
     if (sql.includes("FROM pedidos")) {
       return {
         first: () => ({
@@ -392,7 +396,7 @@ test("11. Banco vazio -> zeros + healthy (SQLite real)", async () => {
 });
 
 test("12. Endpoint exige autenticação administrativa", async () => {
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("FROM admin_sessoes")) {
       return { first: () => null }; // Sessão não encontrada
     }
@@ -411,9 +415,11 @@ test("12. Endpoint exige autenticação administrativa", async () => {
 });
 
 test("13. Falha do DB retorna resposta genérica sem SQL/stack", async () => {
-  const DB = mockAdminAuthDb((sql) => {
+  const DB = mockAdminAuthDb(sql => {
     if (sql.includes("FROM pedidos")) {
-      throw new Error("FATAL_SQLITE_INTERNAL_ERROR: table corrupted at offset 0x999; SELECT * FROM secret_table");
+      throw new Error(
+        "FATAL_SQLITE_INTERNAL_ERROR: table corrupted at offset 0x999; SELECT * FROM secret_table"
+      );
     }
   });
 
@@ -435,7 +441,7 @@ test("14. Nenhuma função de Mercado Pago ou fetch externo é chamada", async (
   };
 
   try {
-    const DB = mockAdminAuthDb((sql) => {
+    const DB = mockAdminAuthDb(sql => {
       if (sql.includes("FROM pedidos")) {
         return {
           first: () => ({
@@ -458,25 +464,30 @@ test("14. Nenhuma função de Mercado Pago ou fetch externo é chamada", async (
 test("15 & 16. Endpoint é estritamente read-only: não executa mutações (INSERT/UPDATE/DELETE/REPLACE/batch)", async () => {
   const statementsExecutados = [];
 
-  const DB = fakeDb((sql) => {
-    statementsExecutados.push(sql.trim());
-    const isSelect = sql.trim().toUpperCase().startsWith("SELECT");
-    assert.ok(isSelect, `Statement não-SELECT detectado no endpoint: ${sql}`);
+  const DB = fakeDb(
+    sql => {
+      statementsExecutados.push(sql.trim());
+      const isSelect = sql.trim().toUpperCase().startsWith("SELECT");
+      assert.ok(isSelect, `Statement não-SELECT detectado no endpoint: ${sql}`);
 
-    if (sql.includes("FROM admin_sessoes")) {
-      return { first: () => ({ id: 1, nome: "Admin", username: "admin", ativo: 1, papel: "ADMIN" }) };
+      if (sql.includes("FROM admin_sessoes")) {
+        return {
+          first: () => ({ id: 1, nome: "Admin", username: "admin", ativo: 1, papel: "ADMIN" })
+        };
+      }
+      return {
+        first: () => ({
+          pagos_sem_baixa_estoque: 0,
+          reservas_vencidas_ativas: 0,
+          erros_com_reserva_ativa: 0,
+          erros_com_reserva_vencida: 0
+        })
+      };
+    },
+    async () => {
+      throw new Error("BATCH_MUTATIONS_NOT_ALLOWED_IN_READ_ONLY_HEALTH");
     }
-    return {
-      first: () => ({
-        pagos_sem_baixa_estoque: 0,
-        reservas_vencidas_ativas: 0,
-        erros_com_reserva_ativa: 0,
-        erros_com_reserva_vencida: 0
-      })
-    };
-  }, async () => {
-    throw new Error("BATCH_MUTATIONS_NOT_ALLOWED_IN_READ_ONLY_HEALTH");
-  });
+  );
 
   const res = await healthPayments({ request: await authenticatedRequest(), env: { DB } });
   assert.equal(res.status, 200);
@@ -536,7 +547,9 @@ test("17. Teste Adversarial de PII em Banco com Pedido Realista Completo", async
 
 test("18. EXPLAIN QUERY PLAN da consulta agregada", () => {
   const sqlite = createRealSqliteDb();
-  const explain = sqlite.raw.prepare(`
+  const explain = sqlite.raw
+    .prepare(
+      `
     EXPLAIN QUERY PLAN
     SELECT
       COALESCE(SUM(CASE
@@ -560,11 +573,12 @@ test("18. EXPLAIN QUERY PLAN da consulta agregada", () => {
           AND reserva_expira_em <= datetime('now', '-5 minutes')
         THEN 1 ELSE 0 END), 0) AS erros_com_reserva_vencida
     FROM pedidos
-  `).all();
+  `
+    )
+    .all();
 
   assert.ok(explain.length >= 1);
   const detail = explain[0].detail;
   // A query realiza uma varredura sequencial limpa (SCAN pedidos) em passagem única O(N)
   assert.ok(detail.includes("SCAN pedidos"));
 });
-

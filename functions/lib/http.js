@@ -4,8 +4,8 @@ export function json(data, status = 200, headers = {}) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
-      ...headers,
-    },
+      ...headers
+    }
   });
 }
 
@@ -29,8 +29,11 @@ export function sameOrigin(request) {
   // Fallback para navegadores/proxies que omitem Origin.
   const referer = request.headers.get("Referer");
   if (referer) {
-    try { return new URL(referer).origin === expected; }
-    catch { return false; }
+    try {
+      return new URL(referer).origin === expected;
+    } catch {
+      return false;
+    }
   }
 
   // Para métodos mutáveis, ausência dos dois cabeçalhos é rejeitada.

@@ -169,7 +169,10 @@ test("12. qr_code_base64 é descartado", () => {
 
 test("13. ticket_url é descartado", () => {
   const { result, logs } = captureConsoleOutput(() =>
-    logEvent("error", "test.ticket", { pedido_id: 113, ticket_url: "https://mercadopago.com/ticket" })
+    logEvent("error", "test.ticket", {
+      pedido_id: 113,
+      ticket_url: "https://mercadopago.com/ticket"
+    })
   );
   assert.equal(result.ticket_url, undefined);
   assert.equal(logs.error[0].includes("mercadopago.com"), false);
@@ -187,7 +190,11 @@ test("14. email/cliente_email são descartados", () => {
 
 test("15. whatsapp/cliente_whatsapp são descartados", () => {
   const { result, logs } = captureConsoleOutput(() =>
-    logEvent("error", "test.phone", { pedido_id: 115, whatsapp: "(33) 99999-0000", cliente_whatsapp: "(33) 98888-0000" })
+    logEvent("error", "test.phone", {
+      pedido_id: 115,
+      whatsapp: "(33) 99999-0000",
+      cliente_whatsapp: "(33) 98888-0000"
+    })
   );
   assert.equal(result.whatsapp, undefined);
   assert.equal(result.cliente_whatsapp, undefined);
@@ -300,7 +307,8 @@ test("23. Teste Adversarial Exato da Especificação", () => {
 });
 
 test("24. Webhook inválido chama webhook.invalid_signature e não vaza payload", async () => {
-  const { onRequestPost: webhookHandler } = await import("../functions/api/webhooks/mercadopago.js");
+  const { onRequestPost: webhookHandler } =
+    await import("../functions/api/webhooks/mercadopago.js");
   const request = new Request("https://loja.test/api/webhooks/mercadopago", {
     method: "POST",
     headers: {
@@ -308,7 +316,11 @@ test("24. Webhook inválido chama webhook.invalid_signature e não vaza payload"
       "x-signature": "ts=123,v1=invalida",
       "x-request-id": "req-1"
     },
-    body: JSON.stringify({ type: "order", data: { id: "999" }, sensitive_customer: "secret@email.com" })
+    body: JSON.stringify({
+      type: "order",
+      data: { id: "999" },
+      sensitive_customer: "secret@email.com"
+    })
   });
 
   const env = { MP_WEBHOOK_SECRET: "chave-webhook" };
@@ -336,7 +348,8 @@ test("24. Webhook inválido chama webhook.invalid_signature e não vaza payload"
 });
 
 test("25. Webhook com erro não loga err.data", async () => {
-  const { onRequestPost: webhookHandler } = await import("../functions/api/webhooks/mercadopago.js");
+  const { onRequestPost: webhookHandler } =
+    await import("../functions/api/webhooks/mercadopago.js");
   const request = new Request("https://loja.test/api/webhooks/mercadopago", {
     method: "POST",
     headers: {
@@ -375,7 +388,7 @@ test("26. Rate limit gera checkout.rate_limited com 429 e retry_after", async ()
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "origin": "https://loja.test",
+      origin: "https://loja.test",
       "cf-connecting-ip": "198.51.100.1"
     },
     body: JSON.stringify({
@@ -386,19 +399,21 @@ test("26. Rate limit gera checkout.rate_limited com 429 e retry_after", async ()
     })
   });
 
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("FROM produtos WHERE id IN")) {
       return {
         all: () => ({
-          results: [{
-            id: 1,
-            nome: "Bolo",
-            preco_centavos: 1000,
-            disponivel: 1,
-            ativo: 1,
-            estoque: 10,
-            estoque_reservado: 0
-          }]
+          results: [
+            {
+              id: 1,
+              nome: "Bolo",
+              preco_centavos: 1000,
+              disponivel: 1,
+              ativo: 1,
+              estoque: 10,
+              estoque_reservado: 0
+            }
+          ]
         })
       };
     }
@@ -436,15 +451,26 @@ test("26. Rate limit gera checkout.rate_limited com 429 e retry_after", async ()
 test("27. Falha de conversão de estoque gera stock.conversion_failed com pedido_id", async () => {
   const { baixarEstoquePedido } = await import("../functions/lib/stock.js");
 
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("HAVING") || sql.includes("MIN(i.id)")) {
-      return { first: () => ({ id: 1, produto_id: 10, quantidade: 2, estoque: 0, estoque_reservado: 0 }) };
+      return {
+        first: () => ({ id: 1, produto_id: 10, quantidade: 2, estoque: 0, estoque_reservado: 0 })
+      };
     }
     if (sql.includes("FROM pedidos WHERE id = ?")) {
-      return { first: () => ({ id: 50, status_pagamento: "PAGO", reserva_status: "ATIVA", estoque_baixado_em: null }) };
+      return {
+        first: () => ({
+          id: 50,
+          status_pagamento: "PAGO",
+          reserva_status: "ATIVA",
+          estoque_baixado_em: null
+        })
+      };
     }
     if (sql.includes("FROM pedido_itens")) {
-      return { all: () => ({ results: [{ id: 1, produto_id: 10, produto_nome: "Bolo", quantidade: 2 }] }) };
+      return {
+        all: () => ({ results: [{ id: 1, produto_id: 10, produto_nome: "Bolo", quantidade: 2 }] })
+      };
     }
     return {};
   });
@@ -472,18 +498,21 @@ test("27. Falha de conversão de estoque gera stock.conversion_failed com pedido
 test("28. Liberação bem-sucedida gera stock.reservation_released", async () => {
   const { liberarReservaPedido } = await import("../functions/lib/stock.js");
 
-  const DB = fakeDb((sql) => {
-    if (sql.includes("HAVING") || sql.includes("MIN(i.id)")) {
-      return { first: () => null };
-    }
-    if (sql.includes("FROM pedidos WHERE id = ?")) {
-      return { first: () => ({ id: 51, status_pagamento: "PENDENTE", reserva_status: "ATIVA" }) };
-    }
-    if (sql.includes("FROM pedido_itens")) {
-      return { all: () => ({ results: [{ id: 1, produto_id: 10, quantidade: 2 }] }) };
-    }
-    return {};
-  }, async () => [{ meta: { changes: 1 } }, { meta: { changes: 1 } }]);
+  const DB = fakeDb(
+    sql => {
+      if (sql.includes("HAVING") || sql.includes("MIN(i.id)")) {
+        return { first: () => null };
+      }
+      if (sql.includes("FROM pedidos WHERE id = ?")) {
+        return { first: () => ({ id: 51, status_pagamento: "PENDENTE", reserva_status: "ATIVA" }) };
+      }
+      if (sql.includes("FROM pedido_itens")) {
+        return { all: () => ({ results: [{ id: 1, produto_id: 10, quantidade: 2 }] }) };
+      }
+      return {};
+    },
+    async () => [{ meta: { changes: 1 } }, { meta: { changes: 1 } }]
+  );
 
   const env = { DB };
 
@@ -510,7 +539,7 @@ test("28. Liberação bem-sucedida gera stock.reservation_released", async () =>
 test("29. Falha de liberação gera stock.reservation_failed", async () => {
   const { liberarReservaPedido } = await import("../functions/lib/stock.js");
 
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("HAVING") || sql.includes("MIN(i.id)")) {
       return { first: () => ({ id: 1, produto_id: 10, estoque_reservado: 0 }) };
     }
@@ -546,12 +575,23 @@ test("29. Falha de liberação gera stock.reservation_failed", async () => {
 test("30. push.failed não inclui body da resposta", async () => {
   const { notifyPaidOrder } = await import("../functions/lib/push.js");
 
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("FROM push_inscricoes")) {
-      return { all: () => ({ results: [{ id: 1, endpoint: "https://push.test/sub", p256dh: "BMx", auth: "auth" }] }) };
+      return {
+        all: () => ({
+          results: [{ id: 1, endpoint: "https://push.test/sub", p256dh: "BMx", auth: "auth" }]
+        })
+      };
     }
     if (sql.includes("FROM pedidos")) {
-      return { first: () => ({ id: 53, status_pagamento: "PAGO", cliente_nome: "Maria", valor_total_centavos: 1000 }) };
+      return {
+        first: () => ({
+          id: 53,
+          status_pagamento: "PAGO",
+          cliente_nome: "Maria",
+          valor_total_centavos: 1000
+        })
+      };
     }
     if (sql.includes("INSERT OR IGNORE INTO push_eventos")) {
       return { run: () => ({ meta: { changes: 1 } }) };
@@ -586,7 +626,7 @@ test("31. PAGO real gera payment.paid", async () => {
   const { syncOrderPayment } = await import("../functions/lib/paymentSync.js");
 
   let estadoPedido = "PENDENTE";
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("SELECT status_pagamento FROM pedidos")) {
       return { first: () => ({ status_pagamento: estadoPedido }) };
     }
@@ -609,7 +649,12 @@ test("31. PAGO real gera payment.paid", async () => {
   try {
     await syncOrderPayment(env, {
       pedidoId: 54,
-      order: { id: "mp-54", status: "processed", status_detail: "accredited", transactions: { payments: [{ id: "p-54", status: "approved" }] } }
+      order: {
+        id: "mp-54",
+        status: "processed",
+        status_detail: "accredited",
+        transactions: { payments: [{ id: "p-54", status: "approved" }] }
+      }
     });
   } finally {
     console.log = origLog;
@@ -628,7 +673,7 @@ test("32. Webhook duplicado PAGO não gera payment.paid duplicado", async () => 
   const { syncOrderPayment } = await import("../functions/lib/paymentSync.js");
 
   // Pedido já está consolidado como PAGO
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("SELECT status_pagamento FROM pedidos")) {
       return { first: () => ({ status_pagamento: "PAGO" }) };
     }
@@ -647,7 +692,12 @@ test("32. Webhook duplicado PAGO não gera payment.paid duplicado", async () => 
   try {
     await syncOrderPayment(env, {
       pedidoId: 55,
-      order: { id: "mp-55", status: "processed", status_detail: "accredited", transactions: { payments: [{ id: "p-55", status: "approved" }] } }
+      order: {
+        id: "mp-55",
+        status: "processed",
+        status_detail: "accredited",
+        transactions: { payments: [{ id: "p-55", status: "approved" }] }
+      }
     });
   } finally {
     console.log = origLog;
@@ -658,36 +708,51 @@ test("32. Webhook duplicado PAGO não gera payment.paid duplicado", async () => 
 });
 
 test("33. Reconciliação de PAGO sem estoque gera reconciliation.recovered", async () => {
-  const { onRequestGet: adminOrdersHandler } = await import("../functions/api/admin/orders/index.js");
+  const { onRequestGet: adminOrdersHandler } =
+    await import("../functions/api/admin/orders/index.js");
 
   const request = new Request("https://loja.test/api/admin/orders", {
     headers: { Cookie: "rp_admin_session=test" }
   });
 
-  const DB = fakeDb((sql) => {
-    if (sql.includes("FROM admin_sessoes")) {
-      return { first: () => ({ id: 1, nome: "Admin", username: "admin", ativo: 1, papel: "ADMIN" }) };
-    }
-    if (sql.includes("status_pagamento = 'PENDENTE'")) {
-      return { all: () => ({ results: [] }) };
-    }
-    if (sql.includes("status_pagamento = 'PAGO'") && sql.includes("estoque_baixado_em IS NULL")) {
-      return { all: () => ({ results: [{ id: 56 }] }) };
-    }
-    if (sql.includes("SELECT id, status_pagamento, estoque_baixado_em")) {
-      return { first: () => ({ id: 56, status_pagamento: "PAGO", reserva_status: "ATIVA", estoque_baixado_em: null }) };
-    }
-    if (sql.includes("SELECT id, produto_id, produto_nome, quantidade")) {
-      return { all: () => ({ results: [{ id: 1, produto_id: 10, produto_nome: "Bolo", quantidade: 1 }] }) };
-    }
-    if (sql.includes("SELECT MIN(i.id)")) {
-      return { first: () => null };
-    }
-    if (sql.includes("FROM pedidos ORDER BY")) {
-      return { all: () => ({ results: [] }) };
-    }
-    return {};
-  }, async () => [{ meta: { changes: 1 } }, { meta: { changes: 1 } }, { meta: { changes: 1 } }]);
+  const DB = fakeDb(
+    sql => {
+      if (sql.includes("FROM admin_sessoes")) {
+        return {
+          first: () => ({ id: 1, nome: "Admin", username: "admin", ativo: 1, papel: "ADMIN" })
+        };
+      }
+      if (sql.includes("status_pagamento = 'PENDENTE'")) {
+        return { all: () => ({ results: [] }) };
+      }
+      if (sql.includes("status_pagamento = 'PAGO'") && sql.includes("estoque_baixado_em IS NULL")) {
+        return { all: () => ({ results: [{ id: 56 }] }) };
+      }
+      if (sql.includes("SELECT id, status_pagamento, estoque_baixado_em")) {
+        return {
+          first: () => ({
+            id: 56,
+            status_pagamento: "PAGO",
+            reserva_status: "ATIVA",
+            estoque_baixado_em: null
+          })
+        };
+      }
+      if (sql.includes("SELECT id, produto_id, produto_nome, quantidade")) {
+        return {
+          all: () => ({ results: [{ id: 1, produto_id: 10, produto_nome: "Bolo", quantidade: 1 }] })
+        };
+      }
+      if (sql.includes("SELECT MIN(i.id)")) {
+        return { first: () => null };
+      }
+      if (sql.includes("FROM pedidos ORDER BY")) {
+        return { all: () => ({ results: [] }) };
+      }
+      return {};
+    },
+    async () => [{ meta: { changes: 1 } }, { meta: { changes: 1 } }, { meta: { changes: 1 } }]
+  );
 
   const env = { DB };
 
@@ -708,4 +773,3 @@ test("33. Reconciliação de PAGO sem estoque gera reconciliation.recovered", as
   assert.equal(json.pedido_id, 56);
   assert.equal(json.status, "PAGO");
 });
-

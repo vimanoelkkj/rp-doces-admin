@@ -16,12 +16,12 @@ async function signature(dataId, requestId, timestamp = "1770000000") {
     new TextEncoder().encode(SECRET),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"],
+    ["sign"]
   );
   const digest = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest)),
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest))
   );
-  const value = [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const value = [...digest].map(byte => byte.toString(16).padStart(2, "0")).join("");
   return `ts=${timestamp},v1=${value}`;
 }
 
@@ -31,9 +31,9 @@ async function webhookRequest(dataId, signatureValue, requestId = "request-1") {
     headers: {
       "content-type": "application/json",
       "x-request-id": requestId,
-      "x-signature": signatureValue,
+      "x-signature": signatureValue
     },
-    body: JSON.stringify({ type: "order", data: { id: dataId } }),
+    body: JSON.stringify({ type: "order", data: { id: dataId } })
   });
 }
 
@@ -41,31 +41,38 @@ async function sendSignedWebhook(env, orderId, requestId = "request-1") {
   const signed = await signature(orderId, requestId);
   return webhook({
     request: await webhookRequest(orderId, signed, requestId),
-    env,
+    env
   });
 }
 
 function mockMercadoPagoOrder(t, orderData) {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify(orderData));
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 }
 
 function webhookDb() {
   const state = { updates: [], stockChecks: 0 };
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("WHERE mp_order_id = ? OR mp_payment_id = ?")) {
       return { first: () => ({ id: 7, mp_order_id: "order-7" }) };
     }
     if (sql.includes("UPDATE pedidos SET") && sql.includes("mp_order_id = COALESCE")) {
-      return { run: (statement) => { state.updates.push(statement.args); return { meta: { changes: 1 } }; } };
+      return {
+        run: statement => {
+          state.updates.push(statement.args);
+          return { meta: { changes: 1 } };
+        }
+      };
     }
     if (sql.includes("SELECT id, status_pagamento, estoque_baixado_em")) {
       return {
         first: () => {
           state.stockChecks++;
           return { id: 7, status_pagamento: "PAGO", estoque_baixado_em: "2026-08-23" };
-        },
+        }
       };
     }
     return {};
@@ -166,8 +173,11 @@ function createRealSqliteDb() {
         run() {
           const stmt = db.prepare(sql);
           const info = stmt.run(...(this.args || []));
-          return { success: true, meta: { changes: Number(info.changes), last_row_id: Number(info.lastInsertRowid) } };
-        },
+          return {
+            success: true,
+            meta: { changes: Number(info.changes), last_row_id: Number(info.lastInsertRowid) }
+          };
+        }
       };
     },
     async batch(statements) {
@@ -183,11 +193,23 @@ function createRealSqliteDb() {
         db.exec("ROLLBACK");
         throw err;
       }
-    },
+    }
   };
 }
 
-function seedPedido(db, { id, status_pagamento = "PENDENTE", mp_status = null, mp_status_detail = null, pago_em = null, estoque_baixado_em = null, estoque = 5, quantidade = 2 }) {
+function seedPedido(
+  db,
+  {
+    id,
+    status_pagamento = "PENDENTE",
+    mp_status = null,
+    mp_status_detail = null,
+    pago_em = null,
+    estoque_baixado_em = null,
+    estoque = 5,
+    quantidade = 2
+  }
+) {
   db.raw.exec(`
     INSERT INTO produtos (id, nome, preco_centavos, estoque, atualizado_em)
     VALUES (1, 'Bolo de Teste', 1500, ${estoque}, CURRENT_TIMESTAMP);
@@ -212,20 +234,24 @@ function seedPedido(db, { id, status_pagamento = "PENDENTE", mp_status = null, m
   `);
 }
 
-test("webhook aprovado sincroniza pagamento sem confiar no payload", async (t) => {
+test("webhook aprovado sincroniza pagamento sem confiar no payload", async t => {
   const oldFetch = globalThis.fetch;
   let calls = 0;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async url => {
     calls++;
     assert.equal(url, "https://api.mercadopago.com/v1/orders/order-7");
-    return new Response(JSON.stringify({
-      id: "order-7",
-      status: "processed",
-      status_detail: "accredited",
-      transactions: { payments: [{ id: "payment-7" }] },
-    }));
+    return new Response(
+      JSON.stringify({
+        id: "order-7",
+        status: "processed",
+        status_detail: "accredited",
+        transactions: { payments: [{ id: "payment-7" }] }
+      })
+    );
   };
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const { DB, state } = webhookDb();
   const response = await sendSignedWebhook(
@@ -246,11 +272,11 @@ test("webhook aprovado sincroniza pagamento sem confiar no payload", async (t) =
   assert.equal(DB.batches.length, 0);
 });
 
-test("webhook duplicado não força nova baixa de estoque", async (t) => {
+test("webhook duplicado não força nova baixa de estoque", async t => {
   mockMercadoPagoOrder(t, {
     id: "order-7",
     status: "processed",
-    transactions: { payments: [{ id: "payment-7" }] },
+    transactions: { payments: [{ id: "payment-7" }] }
   });
 
   const { DB, state } = webhookDb();
@@ -267,24 +293,31 @@ test("webhook duplicado não força nova baixa de estoque", async (t) => {
   assert.equal(DB.batches.length, 0);
 });
 
-test("webhook rejeita assinatura inválida sem consultar Mercado Pago", async (t) => {
+test("webhook rejeita assinatura inválida sem consultar Mercado Pago", async t => {
   const oldFetch = globalThis.fetch;
   let calls = 0;
-  globalThis.fetch = async () => { calls++; throw new Error("fetch não deveria ser chamado"); };
-  t.after(() => { globalThis.fetch = oldFetch; });
+  globalThis.fetch = async () => {
+    calls++;
+    throw new Error("fetch não deveria ser chamado");
+  };
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const response = await webhook({
     request: await webhookRequest("order-7", "ts=1,v1=invalida"),
-    env: { DB: fakeDb(() => ({})), MP_ACCESS_TOKEN: "token", MP_WEBHOOK_SECRET: SECRET },
+    env: { DB: fakeDb(() => ({})), MP_ACCESS_TOKEN: "token", MP_WEBHOOK_SECRET: SECRET }
   });
   assert.equal(response.status, 401);
   assert.equal(calls, 0);
 });
 
-test("falha transitória do Mercado Pago retorna 502 para permitir retry", async (t) => {
+test("falha transitória do Mercado Pago retorna 502 para permitir retry", async t => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response("indisponível", { status: 503 });
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const { DB, state } = webhookDb();
   const response = await sendSignedWebhook(
@@ -296,16 +329,20 @@ test("falha transitória do Mercado Pago retorna 502 para permitir retry", async
   assert.equal(state.updates.length, 0);
 });
 
-test("reconciliação recupera pedido pago com estoque pendente", async (t) => {
+test("reconciliação recupera pedido pago com estoque pendente", async t => {
   const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => { throw new Error("Mercado Pago não deveria ser consultado"); };
-  t.after(() => { globalThis.fetch = oldFetch; });
+  globalThis.fetch = async () => {
+    throw new Error("Mercado Pago não deveria ser consultado");
+  };
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   const itens = [
     { id: 10, produto_id: 1, produto_nome: "Bolo", quantidade: 2 },
-    { id: 11, produto_id: 2, produto_nome: "Pudim", quantidade: 1 },
+    { id: 11, produto_id: 2, produto_nome: "Pudim", quantidade: 1 }
   ];
-  const DB = fakeDb((sql) => {
+  const DB = fakeDb(sql => {
     if (sql.includes("FROM admin_sessoes")) {
       return { first: () => ({ id: 1, nome: "Admin", ativo: 1, papel: "ADMIN" }) };
     }
@@ -329,9 +366,9 @@ test("reconciliação recupera pedido pago com estoque pendente", async (t) => {
 
   const response = await adminOrders({
     request: new Request("https://loja.test/api/admin/orders", {
-      headers: { Cookie: "rp_admin_session=sessao" },
+      headers: { Cookie: "rp_admin_session=sessao" }
     }),
-    env: { DB },
+    env: { DB }
   });
 
   assert.equal(response.status, 200);
@@ -343,20 +380,28 @@ test("reconciliação recupera pedido pago com estoque pendente", async (t) => {
 // TESTES OBRIGATÓRIOS DA ETAPA 1 (BLINDAGEM CONTRA REGRESSÃO DE STATUS PAGO)
 // =========================================================================
 
-test("Caso 1: PENDENTE + processed -> status atualiza normalmente para PAGO e baixa estoque", async (t) => {
+test("Caso 1: PENDENTE + processed -> status atualiza normalmente para PAGO e baixa estoque", async t => {
   const DB = createRealSqliteDb();
   seedPedido(DB, { id: 101, status_pagamento: "PENDENTE", estoque: 5, quantidade: 2 });
   mockMercadoPagoOrder(t, {
     id: "order-101",
     status: "processed",
     status_detail: "accredited",
-    transactions: { payments: [{ id: "pay-101" }] },
+    transactions: { payments: [{ id: "pay-101" }] }
   });
 
-  const response = await sendSignedWebhook({ DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET }, "order-101", "req-101");
+  const response = await sendSignedWebhook(
+    { DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET },
+    "order-101",
+    "req-101"
+  );
   assert.equal(response.status, 200);
 
-  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, mp_status_detail, pago_em, estoque_baixado_em FROM pedidos WHERE id = 101").get();
+  const row = DB.raw
+    .prepare(
+      "SELECT status_pagamento, mp_status, mp_status_detail, pago_em, estoque_baixado_em FROM pedidos WHERE id = 101"
+    )
+    .get();
   assert.equal(row.status_pagamento, "PAGO");
   assert.equal(row.mp_status, "processed");
   assert.equal(row.mp_status_detail, "accredited");
@@ -367,84 +412,139 @@ test("Caso 1: PENDENTE + processed -> status atualiza normalmente para PAGO e ba
   assert.equal(prod.estoque, 3); // 5 - 2 = 3
 });
 
-test("Caso 2: PAGO + expired (evento atrasado) -> NÃO regride e permanece PAGO (atualiza mp_status bruto)", async (t) => {
+test("Caso 2: PAGO + expired (evento atrasado) -> NÃO regride e permanece PAGO (atualiza mp_status bruto)", async t => {
   const DB = createRealSqliteDb();
-  seedPedido(DB, { id: 102, status_pagamento: "PAGO", mp_status: "processed", pago_em: "2026-08-23 10:00:00", estoque_baixado_em: "2026-08-23 10:00:01" });
+  seedPedido(DB, {
+    id: 102,
+    status_pagamento: "PAGO",
+    mp_status: "processed",
+    pago_em: "2026-08-23 10:00:00",
+    estoque_baixado_em: "2026-08-23 10:00:01"
+  });
   mockMercadoPagoOrder(t, {
     id: "order-102",
     status: "expired",
     status_detail: "expired_by_time",
-    transactions: { payments: [] },
+    transactions: { payments: [] }
   });
 
-  const response = await sendSignedWebhook({ DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET }, "order-102", "req-102");
+  const response = await sendSignedWebhook(
+    { DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET },
+    "order-102",
+    "req-102"
+  );
   assert.equal(response.status, 200);
 
-  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, mp_status_detail, pago_em FROM pedidos WHERE id = 102").get();
+  const row = DB.raw
+    .prepare(
+      "SELECT status_pagamento, mp_status, mp_status_detail, pago_em FROM pedidos WHERE id = 102"
+    )
+    .get();
   assert.equal(row.status_pagamento, "PAGO"); // status financeiro protegido contra regressão
   assert.equal(row.mp_status, "expired"); // metadados brutos registram o último evento observado
   assert.equal(row.mp_status_detail, "expired_by_time");
   assert.equal(row.pago_em, "2026-08-23 10:00:00"); // pago_em preservado
 });
 
-test("Caso 3: PAGO + canceled (evento atrasado) -> NÃO regride e permanece PAGO (atualiza mp_status bruto)", async (t) => {
+test("Caso 3: PAGO + canceled (evento atrasado) -> NÃO regride e permanece PAGO (atualiza mp_status bruto)", async t => {
   const DB = createRealSqliteDb();
-  seedPedido(DB, { id: 103, status_pagamento: "PAGO", mp_status: "processed", pago_em: "2026-08-23 11:00:00" });
+  seedPedido(DB, {
+    id: 103,
+    status_pagamento: "PAGO",
+    mp_status: "processed",
+    pago_em: "2026-08-23 11:00:00"
+  });
   mockMercadoPagoOrder(t, {
     id: "order-103",
     status: "canceled",
-    status_detail: "by_collector",
+    status_detail: "by_collector"
   });
 
-  const response = await sendSignedWebhook({ DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET }, "order-103", "req-103");
+  const response = await sendSignedWebhook(
+    { DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET },
+    "order-103",
+    "req-103"
+  );
   assert.equal(response.status, 200);
 
-  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, mp_status_detail, pago_em FROM pedidos WHERE id = 103").get();
+  const row = DB.raw
+    .prepare(
+      "SELECT status_pagamento, mp_status, mp_status_detail, pago_em FROM pedidos WHERE id = 103"
+    )
+    .get();
   assert.equal(row.status_pagamento, "PAGO"); // status financeiro protegido
   assert.equal(row.mp_status, "canceled"); // metadados brutos registram último evento
   assert.equal(row.mp_status_detail, "by_collector");
   assert.equal(row.pago_em, "2026-08-23 11:00:00");
 });
 
-test("Caso 4: PAGO + failed (evento atrasado) -> NÃO regride e permanece PAGO (atualiza mp_status bruto)", async (t) => {
+test("Caso 4: PAGO + failed (evento atrasado) -> NÃO regride e permanece PAGO (atualiza mp_status bruto)", async t => {
   const DB = createRealSqliteDb();
-  seedPedido(DB, { id: 104, status_pagamento: "PAGO", mp_status: "processed", pago_em: "2026-08-23 12:00:00" });
+  seedPedido(DB, {
+    id: 104,
+    status_pagamento: "PAGO",
+    mp_status: "processed",
+    pago_em: "2026-08-23 12:00:00"
+  });
   mockMercadoPagoOrder(t, {
     id: "order-104",
     status: "failed",
-    status_detail: "rejected",
+    status_detail: "rejected"
   });
 
-  const response = await sendSignedWebhook({ DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET }, "order-104", "req-104");
+  const response = await sendSignedWebhook(
+    { DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET },
+    "order-104",
+    "req-104"
+  );
   assert.equal(response.status, 200);
 
-  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, mp_status_detail, pago_em FROM pedidos WHERE id = 104").get();
+  const row = DB.raw
+    .prepare(
+      "SELECT status_pagamento, mp_status, mp_status_detail, pago_em FROM pedidos WHERE id = 104"
+    )
+    .get();
   assert.equal(row.status_pagamento, "PAGO"); // status financeiro protegido
   assert.equal(row.mp_status, "failed"); // metadados brutos registram último evento
   assert.equal(row.mp_status_detail, "rejected");
 });
 
-test("Caso 5: PAGO + processed repetido -> continua PAGO, sem dupla baixa de estoque e sem push duplicado", async (t) => {
+test("Caso 5: PAGO + processed repetido -> continua PAGO, sem dupla baixa de estoque e sem push duplicado", async t => {
   const DB = createRealSqliteDb();
-  seedPedido(DB, { id: 105, status_pagamento: "PAGO", estoque: 10, quantidade: 2, pago_em: "2026-08-23 13:00:00", estoque_baixado_em: "2026-08-23 13:00:01" });
+  seedPedido(DB, {
+    id: 105,
+    status_pagamento: "PAGO",
+    estoque: 10,
+    quantidade: 2,
+    pago_em: "2026-08-23 13:00:00",
+    estoque_baixado_em: "2026-08-23 13:00:01"
+  });
   DB.raw.exec("INSERT INTO push_eventos (pedido_id) VALUES (105);");
 
   const oldFetch = globalThis.fetch;
   let pushCalls = 0;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async url => {
     if (url.includes("mercadopago.com")) {
-      return new Response(JSON.stringify({
-        id: "order-105",
-        status: "processed",
-        transactions: { payments: [{ id: "pay-105" }] },
-      }));
+      return new Response(
+        JSON.stringify({
+          id: "order-105",
+          status: "processed",
+          transactions: { payments: [{ id: "pay-105" }] }
+        })
+      );
     }
     pushCalls++;
     return new Response("", { status: 200 });
   };
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
-  const response = await sendSignedWebhook({ DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET }, "order-105", "req-105");
+  const response = await sendSignedWebhook(
+    { DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET },
+    "order-105",
+    "req-105"
+  );
   assert.equal(response.status, 200);
 
   const row = DB.raw.prepare("SELECT status_pagamento, pago_em FROM pedidos WHERE id = 105").get();
@@ -456,35 +556,49 @@ test("Caso 5: PAGO + processed repetido -> continua PAGO, sem dupla baixa de est
   assert.equal(pushCalls, 0); // não enviou push duplicado
 });
 
-test("Caso 6: polling com estado obsoleto após confirmação PAGO não causa regressão", async (t) => {
+test("Caso 6: polling com estado obsoleto após confirmação PAGO não causa regressão", async t => {
   const DB = createRealSqliteDb();
   seedPedido(DB, { id: 106, status_pagamento: "PENDENTE", estoque: 5, quantidade: 1 });
-  DB.raw.exec("UPDATE pedidos SET token_publico = '123e4567-e89b-12d3-a456-426614174106' WHERE id = 106");
+  DB.raw.exec(
+    "UPDATE pedidos SET token_publico = '123e4567-e89b-12d3-a456-426614174106' WHERE id = 106"
+  );
 
   const oldFetch = globalThis.fetch;
-  t.after(() => { globalThis.fetch = oldFetch; });
+  t.after(() => {
+    globalThis.fetch = oldFetch;
+  });
 
   // 1. Confirmação PAGO via webhook
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    id: "order-106",
-    status: "processed",
-    status_detail: "accredited",
-    transactions: { payments: [{ id: "pay-106" }] },
-  }));
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        id: "order-106",
+        status: "processed",
+        status_detail: "accredited",
+        transactions: { payments: [{ id: "pay-106" }] }
+      })
+    );
 
-  const webhookResp = await sendSignedWebhook({ DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET }, "order-106", "req-106");
+  const webhookResp = await sendSignedWebhook(
+    { DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET },
+    "order-106",
+    "req-106"
+  );
   assert.equal(webhookResp.status, 200);
 
   // 2. Polling subsequente com resposta defasada/obsoleta do MP ("opened" / PENDENTE)
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    id: "order-106",
-    status: "opened",
-    status_detail: "waiting_transfer",
-  }));
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        id: "order-106",
+        status: "opened",
+        status_detail: "waiting_transfer"
+      })
+    );
 
   const pollingResp = await getPublicOrder({
     params: { token: "123e4567-e89b-12d3-a456-426614174106" },
-    env: { DB, MP_ACCESS_TOKEN: "mp-token" },
+    env: { DB, MP_ACCESS_TOKEN: "mp-token" }
   });
   assert.equal(pollingResp.status, 200);
   const pollingBody = await responseJson(pollingResp);
@@ -495,20 +609,31 @@ test("Caso 6: polling com estado obsoleto após confirmação PAGO não causa re
   assert.equal(row.status_pagamento, "PAGO");
 });
 
-test("Caso 7: Reembolso legítimo: PAGO -> REEMBOLSADO transiciona corretamente", async (t) => {
+test("Caso 7: Reembolso legítimo: PAGO -> REEMBOLSADO transiciona corretamente", async t => {
   const DB = createRealSqliteDb();
-  seedPedido(DB, { id: 107, status_pagamento: "PAGO", pago_em: "2026-08-23 14:00:00", estoque_baixado_em: "2026-08-23 14:00:01" });
+  seedPedido(DB, {
+    id: 107,
+    status_pagamento: "PAGO",
+    pago_em: "2026-08-23 14:00:00",
+    estoque_baixado_em: "2026-08-23 14:00:01"
+  });
   mockMercadoPagoOrder(t, {
     id: "order-107",
     status: "refunded",
     status_detail: "refunded",
-    transactions: { payments: [{ id: "pay-107" }] },
+    transactions: { payments: [{ id: "pay-107" }] }
   });
 
-  const response = await sendSignedWebhook({ DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET }, "order-107", "req-107");
+  const response = await sendSignedWebhook(
+    { DB, MP_ACCESS_TOKEN: "mp-token", MP_WEBHOOK_SECRET: SECRET },
+    "order-107",
+    "req-107"
+  );
   assert.equal(response.status, 200);
 
-  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, pago_em FROM pedidos WHERE id = 107").get();
+  const row = DB.raw
+    .prepare("SELECT status_pagamento, mp_status, pago_em FROM pedidos WHERE id = 107")
+    .get();
   assert.equal(row.status_pagamento, "REEMBOLSADO");
   assert.equal(row.mp_status, "refunded");
   assert.equal(row.pago_em, "2026-08-23 14:00:00"); // pago_em preservado
@@ -518,19 +643,22 @@ test("Caso 7: Reembolso legítimo: PAGO -> REEMBOLSADO transiciona corretamente"
 // TESTES UNITÁRIOS DO SERVIÇO CENTRALIZADO (functions/lib/paymentSync.js)
 // =========================================================================
 
-test("syncOrderPayment: transiciona PENDENTE para PAGO, baixa estoque e preenche pago_em", async (t) => {
+test("syncOrderPayment: transiciona PENDENTE para PAGO, baixa estoque e preenche pago_em", async t => {
   const DB = createRealSqliteDb();
   seedPedido(DB, { id: 201, status_pagamento: "PENDENTE", estoque: 5, quantidade: 2 });
 
-  const result = await syncOrderPayment({ DB }, {
-    pedidoId: 201,
-    order: {
-      id: "order-201",
-      status: "processed",
-      status_detail: "accredited",
-      transactions: { payments: [{ id: "pay-201" }] },
-    },
-  });
+  const result = await syncOrderPayment(
+    { DB },
+    {
+      pedidoId: 201,
+      order: {
+        id: "order-201",
+        status: "processed",
+        status_detail: "accredited",
+        transactions: { payments: [{ id: "pay-201" }] }
+      }
+    }
+  );
 
   assert.equal(result.ok, true);
   assert.equal(result.status_pagamento, "PAGO");
@@ -538,7 +666,11 @@ test("syncOrderPayment: transiciona PENDENTE para PAGO, baixa estoque e preenche
   assert.equal(result.mp_status_detail, "accredited");
   assert.ok(result.pago_em);
 
-  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, mp_payment_id, estoque_baixado_em FROM pedidos WHERE id = 201").get();
+  const row = DB.raw
+    .prepare(
+      "SELECT status_pagamento, mp_status, mp_payment_id, estoque_baixado_em FROM pedidos WHERE id = 201"
+    )
+    .get();
   assert.equal(row.status_pagamento, "PAGO");
   assert.equal(row.mp_status, "processed");
   assert.equal(row.mp_payment_id, "pay-201");
@@ -548,29 +680,45 @@ test("syncOrderPayment: transiciona PENDENTE para PAGO, baixa estoque e preenche
   assert.equal(prod.estoque, 3); // 5 - 2 = 3
 });
 
-test("syncOrderPayment: protege PAGO contra regressão para CANCELADO/EXPIRADO e NÃO aciona pipeline pós-pagamento", async (t) => {
+test("syncOrderPayment: protege PAGO contra regressão para CANCELADO/EXPIRADO e NÃO aciona pipeline pós-pagamento", async t => {
   const DB = createRealSqliteDb();
   // Pedido já pago, estoque inicial do produto = 5 (com estoque_baixado_em ainda NULL para provar que a baixa não é disparada)
-  seedPedido(DB, { id: 202, status_pagamento: "PAGO", mp_status: "processed", pago_em: "2026-08-23 10:00:00", estoque: 5, quantidade: 2 });
+  seedPedido(DB, {
+    id: 202,
+    status_pagamento: "PAGO",
+    mp_status: "processed",
+    pago_em: "2026-08-23 10:00:00",
+    estoque: 5,
+    quantidade: 2
+  });
 
   const oldFetch = globalThis.fetch;
   let pushCalls = 0;
-  globalThis.fetch = async () => { pushCalls++; return new Response("", { status: 200 }); };
-  t.after(() => { globalThis.fetch = oldFetch; });
-
-  const result = await syncOrderPayment({
-    DB,
-    VAPID_PUBLIC_KEY: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-Skv6_yViEuiBIa-Ib9-Skv6_yViEuiBIa-Ib9-Skv6_yViEuiBIa8",
-    VAPID_PRIVATE_KEY: "segredo-vapid",
-  }, {
-    pedidoId: 202,
-    order: {
-      id: "order-202",
-      status: "expired",
-      status_detail: "expired_by_time",
-      transactions: { payments: [] },
-    },
+  globalThis.fetch = async () => {
+    pushCalls++;
+    return new Response("", { status: 200 });
+  };
+  t.after(() => {
+    globalThis.fetch = oldFetch;
   });
+
+  const result = await syncOrderPayment(
+    {
+      DB,
+      VAPID_PUBLIC_KEY:
+        "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-Skv6_yViEuiBIa-Ib9-Skv6_yViEuiBIa-Ib9-Skv6_yViEuiBIa8",
+      VAPID_PRIVATE_KEY: "segredo-vapid"
+    },
+    {
+      pedidoId: 202,
+      order: {
+        id: "order-202",
+        status: "expired",
+        status_detail: "expired_by_time",
+        transactions: { payments: [] }
+      }
+    }
+  );
 
   assert.equal(result.ok, true);
   assert.equal(result.status_pagamento, "PAGO");
@@ -578,7 +726,11 @@ test("syncOrderPayment: protege PAGO contra regressão para CANCELADO/EXPIRADO e
   assert.equal(result.mp_status_detail, "expired_by_time");
   assert.equal(result.pago_em, "2026-08-23 10:00:00");
 
-  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, mp_status_detail, pago_em, estoque_baixado_em FROM pedidos WHERE id = 202").get();
+  const row = DB.raw
+    .prepare(
+      "SELECT status_pagamento, mp_status, mp_status_detail, pago_em, estoque_baixado_em FROM pedidos WHERE id = 202"
+    )
+    .get();
   assert.equal(row.status_pagamento, "PAGO");
   assert.equal(row.mp_status, "expired");
   assert.equal(row.mp_status_detail, "expired_by_time");
@@ -590,50 +742,63 @@ test("syncOrderPayment: protege PAGO contra regressão para CANCELADO/EXPIRADO e
   assert.equal(pushCalls, 0); // Push NÃO foi disparado
 });
 
-test("syncOrderPayment: transiciona PAGO para REEMBOLSADO", async (t) => {
+test("syncOrderPayment: transiciona PAGO para REEMBOLSADO", async t => {
   const DB = createRealSqliteDb();
-  seedPedido(DB, { id: 203, status_pagamento: "PAGO", mp_status: "processed", pago_em: "2026-08-23 10:00:00", estoque_baixado_em: "2026-08-23 10:00:01" });
-
-  const result = await syncOrderPayment({ DB }, {
-    pedidoId: 203,
-    order: {
-      id: "order-203",
-      status: "refunded",
-      status_detail: "refunded",
-      transactions: { payments: [{ id: "pay-203" }] },
-    },
+  seedPedido(DB, {
+    id: 203,
+    status_pagamento: "PAGO",
+    mp_status: "processed",
+    pago_em: "2026-08-23 10:00:00",
+    estoque_baixado_em: "2026-08-23 10:00:01"
   });
+
+  const result = await syncOrderPayment(
+    { DB },
+    {
+      pedidoId: 203,
+      order: {
+        id: "order-203",
+        status: "refunded",
+        status_detail: "refunded",
+        transactions: { payments: [{ id: "pay-203" }] }
+      }
+    }
+  );
 
   assert.equal(result.ok, true);
   assert.equal(result.status_pagamento, "REEMBOLSADO");
   assert.equal(result.mp_status, "refunded");
   assert.equal(result.pago_em, "2026-08-23 10:00:00");
 
-  const row = DB.raw.prepare("SELECT status_pagamento, mp_status, pago_em FROM pedidos WHERE id = 203").get();
+  const row = DB.raw
+    .prepare("SELECT status_pagamento, mp_status, pago_em FROM pedidos WHERE id = 203")
+    .get();
   assert.equal(row.status_pagamento, "REEMBOLSADO");
   assert.equal(row.mp_status, "refunded");
   assert.equal(row.pago_em, "2026-08-23 10:00:00");
 });
 
-test("syncOrderPayment: utiliza fallback mpOrderId quando order.id está ausente no objeto", async (t) => {
+test("syncOrderPayment: utiliza fallback mpOrderId quando order.id está ausente no objeto", async t => {
   const DB = createRealSqliteDb();
   seedPedido(DB, { id: 204, status_pagamento: "PENDENTE" });
 
-  const result = await syncOrderPayment({ DB }, {
-    pedidoId: 204,
-    order: {
-      status: "processed",
-      status_detail: "accredited",
-      transactions: { payments: [{ id: "pay-204" }] },
-    },
-    mpOrderId: "order-fallback-204",
-  });
+  const result = await syncOrderPayment(
+    { DB },
+    {
+      pedidoId: 204,
+      order: {
+        status: "processed",
+        status_detail: "accredited",
+        transactions: { payments: [{ id: "pay-204" }] }
+      },
+      mpOrderId: "order-fallback-204"
+    }
+  );
 
   assert.equal(result.ok, true);
-  const row = DB.raw.prepare("SELECT mp_order_id, status_pagamento FROM pedidos WHERE id = 204").get();
+  const row = DB.raw
+    .prepare("SELECT mp_order_id, status_pagamento FROM pedidos WHERE id = 204")
+    .get();
   assert.equal(row.mp_order_id, "order-fallback-204");
   assert.equal(row.status_pagamento, "PAGO");
 });
-
-
-

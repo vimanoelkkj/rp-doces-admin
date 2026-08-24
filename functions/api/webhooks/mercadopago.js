@@ -24,16 +24,10 @@ export async function onRequestPost({ request, env }) {
   }
 
   const dataId =
-    url.searchParams.get("data.id") ||
-    url.searchParams.get("data_id") ||
-    getBodyDataId(body);
+    url.searchParams.get("data.id") || url.searchParams.get("data_id") || getBodyDataId(body);
 
   const type = String(
-    url.searchParams.get("type") ||
-    url.searchParams.get("topic") ||
-    body?.type ||
-    body?.topic ||
-    ""
+    url.searchParams.get("type") || url.searchParams.get("topic") || body?.type || body?.topic || ""
   ).toLowerCase();
 
   // Sem ID não há o que sincronizar. Outros tipos desconhecidos são reconhecidos
@@ -64,13 +58,17 @@ export async function onRequestPost({ request, env }) {
   try {
     // O MP pode notificar a Order ou o Payment. Primeiro tentamos resolver o
     // identificador recebido contra os dois IDs persistidos localmente.
-    local = await env.DB.prepare(`
+    local = await env.DB.prepare(
+      `
       SELECT id, mp_order_id
       FROM pedidos
       WHERE mp_order_id = ? OR mp_payment_id = ?
       ORDER BY id DESC
       LIMIT 1
-    `).bind(dataId, dataId).first();
+    `
+    )
+      .bind(dataId, dataId)
+      .first();
 
     orderId = local?.mp_order_id ? String(local.mp_order_id) : null;
     let order = null;
@@ -86,9 +84,9 @@ export async function onRequestPost({ request, env }) {
         if (!local) {
           const pedidoId = pedidoIdFromExternalReference(order?.external_reference);
           if (pedidoId) {
-            local = await env.DB.prepare(
-              "SELECT id, mp_order_id FROM pedidos WHERE id = ? LIMIT 1"
-            ).bind(pedidoId).first();
+            local = await env.DB.prepare("SELECT id, mp_order_id FROM pedidos WHERE id = ? LIMIT 1")
+              .bind(pedidoId)
+              .first();
           }
         }
       } catch (err) {

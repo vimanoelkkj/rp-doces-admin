@@ -1,1450 +1,3171 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow">
-<title>R&P Doces Admin</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-:root{--pink:#ff6b9d;--pink2:#e8548a;--soft:#fff2f6;--cream:#fffaf5;--brown:#6b4a3a;--text:#4a3a3f;--muted:#8a7378;--line:#ffd0e0;--danger:#c83d55}
-*{box-sizing:border-box}body{margin:0;font-family:Poppins,sans-serif;background:linear-gradient(180deg,#fffaf5,#fff5f8);color:var(--text);min-height:100vh}
-button,input,textarea,select{font:inherit}.hidden{display:none!important}
-.shell{max-width:1180px;margin:auto;padding:28px 20px 60px}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;gap:16px}.brand{font-weight:700;color:var(--pink2);font-size:1.25rem}.brand small{display:block;color:var(--muted);font-weight:500;font-size:.72rem}
-.btn{border:0;border-radius:14px;padding:11px 16px;font-weight:600;cursor:pointer;background:var(--pink);color:white}.btn.secondary{background:white;color:var(--pink2);border:1px solid var(--line)}.btn.danger{background:#fff0f2;color:var(--danger);border:1px solid #ffd0d8}
-.card{background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 14px 40px rgba(232,84,138,.08)}
-.auth{max-width:440px;margin:8vh auto 0}.auth h1{color:var(--brown);margin:0 0 8px}.auth p{color:var(--muted);margin:0 0 22px}.login-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
-.field{margin:13px 0}.field label{display:block;font-size:.84rem;font-weight:600;margin-bottom:6px;color:var(--brown)}
-.field input,.field textarea,.field select{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:12px;background:#fff;outline:none;color:var(--text)}.field textarea{min-height:92px;resize:vertical}.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--pink)}
-.msg{margin-top:12px;font-size:.86rem;color:var(--danger)}.muted{color:var(--muted);font-size:.85rem}
-.tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}.tab{padding:10px 14px;border:1px solid var(--line);background:white;border-radius:12px;color:var(--brown);cursor:pointer;font-weight:600}.tab.active{background:var(--soft);color:var(--pink2);border-color:#ffb3cf}
-.toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:14px 0 18px}.toolbar h2{margin:0;color:var(--brown)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
-.product{background:#fff;border:1px solid var(--line);border-radius:18px;padding:17px}.product-head{display:flex;justify-content:space-between;gap:12px}.price{color:var(--pink2);font-weight:700}.product h3{margin:6px 0;color:var(--brown)}.product p{color:var(--muted);font-size:.86rem;min-height:42px}.badges{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.badge{font-size:.72rem;padding:5px 8px;border-radius:999px;background:var(--soft);color:var(--pink2);font-weight:600}.badge.off{background:#f3f1f1;color:#8b8585}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions .btn{padding:8px 11px;font-size:.8rem}
-.modal-bg{position:fixed;inset:0;background:rgba(74,58,63,.35);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}.modal{width:min(520px,100%);max-height:92vh;overflow:auto;background:var(--cream);border:1px solid var(--line);border-radius:22px;padding:22px}.modal h2{margin:0;color:var(--brown)}
-.switchrow{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0}.switchrow label{display:flex;gap:7px;align-items:center;font-size:.86rem}
-.user{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 0;border-bottom:1px solid #ffe8f0}.user:last-child{border:0}.user strong{display:block;color:var(--brown)}.user small{color:var(--muted)}
-.orders-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}.orders-summary .card{padding:16px}.orders-summary small{display:block;color:var(--muted);font-weight:700}.orders-summary strong{display:block;font-size:1.55rem;color:var(--brown);margin-top:4px}.orders-list{display:grid;gap:10px}.order-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:14px;align-items:center;padding:15px 0;border-bottom:1px solid #ffe8f0}.order-row:last-child{border:0}.order-main strong,.order-total strong{color:var(--brown)}.order-main small,.order-total small{display:block;color:var(--muted);margin-top:4px}.order-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.order-status{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;color:var(--brown);font:inherit}.pay-ok{background:#eaf8ee;color:#26723b}.pay-pending{background:#fff5d9;color:#8a6510}.pay-error{background:#fff0f2;color:#a33a4a}.orders-view-toggle{display:flex;gap:8px;margin:0 0 12px}.orders-view-toggle .btn.active{background:var(--pink);color:#fff;border-color:var(--pink)}.order-row.order-new{background:#fff8fb;border:1px solid #ffd7e6;border-radius:14px;padding:15px 12px}.order-row.order-new+.order-row{border-top:0}.operational-badge{background:#f6f1ff;color:#6b4aa0}.order-detail-overlay{position:fixed;inset:0;background:rgba(55,30,34,.48);z-index:10020;display:none;align-items:center;justify-content:center;padding:20px}.order-detail-overlay.open{display:flex}.order-detail-modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 24px 80px rgba(64,31,38,.2);position:relative}.order-detail-close{position:absolute;right:14px;top:10px;border:0;background:transparent;font-size:28px;color:var(--brown);cursor:pointer}.order-detail-modal h3{margin:0 38px 5px 0;color:var(--brown)}.order-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.order-detail-box{padding:12px;border:1px solid #ffe2ec;border-radius:12px;background:#fffafb}.order-detail-box small{display:block;color:var(--muted);font-weight:700;margin-bottom:4px}.order-detail-box strong{color:var(--brown);overflow-wrap:anywhere}.order-detail-box>span{display:block;margin-top:3px}.order-detail-note{padding:12px;border-radius:12px;background:#fff8fb;color:var(--brown);margin:12px 0}.order-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}@media(max-width:560px){.order-detail-grid{grid-template-columns:1fr}}@media(max-width:720px){.orders-summary{grid-template-columns:1fr}.order-row{grid-template-columns:1fr}.order-actions{display:flex;justify-content:flex-start}}
-@media(max-width:620px){
-  .shell{padding:18px 14px 48px}
-  .top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:10px;margin-bottom:18px}
-  .top>div:last-child{display:flex;align-items:center;gap:7px;white-space:nowrap}
-  .top>div:last-child .btn{padding:9px 12px;border-radius:12px}
-  .brand{min-width:0;font-size:1.12rem}
-  .brand small{margin-top:3px;line-height:1.45;overflow-wrap:anywhere}
-  .tabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;margin:0 -14px 18px;padding:0 14px 7px;gap:7px}
-  .tabs::-webkit-scrollbar{display:none}
-  .tab{flex:0 0 auto;white-space:nowrap;padding:9px 12px}
-  .toolbar{align-items:flex-start;flex-direction:column}
-  .toolbar .actions{width:100%}
-  .user{align-items:flex-start;flex-direction:column}
-}
-@media(max-width:390px){
-  .top{grid-template-columns:1fr}
-  .top>div:last-child{justify-content:flex-start}
-}
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>R&P Doces Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --pink: #ff6b9d;
+        --pink2: #e8548a;
+        --soft: #fff2f6;
+        --cream: #fffaf5;
+        --brown: #6b4a3a;
+        --text: #4a3a3f;
+        --muted: #8a7378;
+        --line: #ffd0e0;
+        --danger: #c83d55;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Poppins, sans-serif;
+        background: linear-gradient(180deg, #fffaf5, #fff5f8);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .shell {
+        max-width: 1180px;
+        margin: auto;
+        padding: 28px 20px 60px;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 26px;
+        gap: 16px;
+      }
+      .brand {
+        font-weight: 700;
+        color: var(--pink2);
+        font-size: 1.25rem;
+      }
+      .brand small {
+        display: block;
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 0.72rem;
+      }
+      .btn {
+        border: 0;
+        border-radius: 14px;
+        padding: 11px 16px;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--pink);
+        color: white;
+      }
+      .btn.secondary {
+        background: white;
+        color: var(--pink2);
+        border: 1px solid var(--line);
+      }
+      .btn.danger {
+        background: #fff0f2;
+        color: var(--danger);
+        border: 1px solid #ffd0d8;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 22px;
+        box-shadow: 0 14px 40px rgba(232, 84, 138, 0.08);
+      }
+      .auth {
+        max-width: 440px;
+        margin: 8vh auto 0;
+      }
+      .auth h1 {
+        color: var(--brown);
+        margin: 0 0 8px;
+      }
+      .auth p {
+        color: var(--muted);
+        margin: 0 0 22px;
+      }
+      .login-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .field {
+        margin: 13px 0;
+      }
+      .field label {
+        display: block;
+        font-size: 0.84rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: var(--brown);
+      }
+      .field input,
+      .field textarea,
+      .field select {
+        width: 100%;
+        padding: 12px 13px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        outline: none;
+        color: var(--text);
+      }
+      .field textarea {
+        min-height: 92px;
+        resize: vertical;
+      }
+      .field input:focus,
+      .field textarea:focus,
+      .field select:focus {
+        border-color: var(--pink);
+      }
+      .msg {
+        margin-top: 12px;
+        font-size: 0.86rem;
+        color: var(--danger);
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        background: white;
+        border-radius: 12px;
+        color: var(--brown);
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .tab.active {
+        background: var(--soft);
+        color: var(--pink2);
+        border-color: #ffb3cf;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        margin: 14px 0 18px;
+      }
+      .toolbar h2 {
+        margin: 0;
+        color: var(--brown);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+        gap: 14px;
+      }
+      .product {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 17px;
+      }
+      .product-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .price {
+        color: var(--pink2);
+        font-weight: 700;
+      }
+      .product h3 {
+        margin: 6px 0;
+        color: var(--brown);
+      }
+      .product p {
+        color: var(--muted);
+        font-size: 0.86rem;
+        min-height: 42px;
+      }
+      .badges {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+        margin: 10px 0;
+      }
+      .badge {
+        font-size: 0.72rem;
+        padding: 5px 8px;
+        border-radius: 999px;
+        background: var(--soft);
+        color: var(--pink2);
+        font-weight: 600;
+      }
+      .badge.off {
+        background: #f3f1f1;
+        color: #8b8585;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .actions .btn {
+        padding: 8px 11px;
+        font-size: 0.8rem;
+      }
+      .modal-bg {
+        position: fixed;
+        inset: 0;
+        background: rgba(74, 58, 63, 0.35);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        z-index: 20;
+      }
+      .modal {
+        width: min(520px, 100%);
+        max-height: 92vh;
+        overflow: auto;
+        background: var(--cream);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 22px;
+      }
+      .modal h2 {
+        margin: 0;
+        color: var(--brown);
+      }
+      .switchrow {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        margin: 12px 0;
+      }
+      .switchrow label {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        font-size: 0.86rem;
+      }
+      .user {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        padding: 14px 0;
+        border-bottom: 1px solid #ffe8f0;
+      }
+      .user:last-child {
+        border: 0;
+      }
+      .user strong {
+        display: block;
+        color: var(--brown);
+      }
+      .user small {
+        color: var(--muted);
+      }
+      .orders-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .orders-summary .card {
+        padding: 16px;
+      }
+      .orders-summary small {
+        display: block;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .orders-summary strong {
+        display: block;
+        font-size: 1.55rem;
+        color: var(--brown);
+        margin-top: 4px;
+      }
+      .orders-list {
+        display: grid;
+        gap: 10px;
+      }
+      .order-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        padding: 15px 0;
+        border-bottom: 1px solid #ffe8f0;
+      }
+      .order-row:last-child {
+        border: 0;
+      }
+      .order-main strong,
+      .order-total strong {
+        color: var(--brown);
+      }
+      .order-main small,
+      .order-total small {
+        display: block;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .order-meta {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .order-status {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 10px;
+        background: #fff;
+        color: var(--brown);
+        font: inherit;
+      }
+      .pay-ok {
+        background: #eaf8ee;
+        color: #26723b;
+      }
+      .pay-pending {
+        background: #fff5d9;
+        color: #8a6510;
+      }
+      .pay-error {
+        background: #fff0f2;
+        color: #a33a4a;
+      }
+      .orders-view-toggle {
+        display: flex;
+        gap: 8px;
+        margin: 0 0 12px;
+      }
+      .orders-view-toggle .btn.active {
+        background: var(--pink);
+        color: #fff;
+        border-color: var(--pink);
+      }
+      .order-row.order-new {
+        background: #fff8fb;
+        border: 1px solid #ffd7e6;
+        border-radius: 14px;
+        padding: 15px 12px;
+      }
+      .order-row.order-new + .order-row {
+        border-top: 0;
+      }
+      .operational-badge {
+        background: #f6f1ff;
+        color: #6b4aa0;
+      }
+      .order-detail-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(55, 30, 34, 0.48);
+        z-index: 10020;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .order-detail-overlay.open {
+        display: flex;
+      }
+      .order-detail-modal {
+        width: min(560px, 100%);
+        max-height: 90vh;
+        overflow: auto;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 22px;
+        box-shadow: 0 24px 80px rgba(64, 31, 38, 0.2);
+        position: relative;
+      }
+      .order-detail-close {
+        position: absolute;
+        right: 14px;
+        top: 10px;
+        border: 0;
+        background: transparent;
+        font-size: 28px;
+        color: var(--brown);
+        cursor: pointer;
+      }
+      .order-detail-modal h3 {
+        margin: 0 38px 5px 0;
+        color: var(--brown);
+      }
+      .order-detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin: 18px 0;
+      }
+      .order-detail-box {
+        padding: 12px;
+        border: 1px solid #ffe2ec;
+        border-radius: 12px;
+        background: #fffafb;
+      }
+      .order-detail-box small {
+        display: block;
+        color: var(--muted);
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .order-detail-box strong {
+        color: var(--brown);
+        overflow-wrap: anywhere;
+      }
+      .order-detail-box > span {
+        display: block;
+        margin-top: 3px;
+      }
+      .order-detail-note {
+        padding: 12px;
+        border-radius: 12px;
+        background: #fff8fb;
+        color: var(--brown);
+        margin: 12px 0;
+      }
+      .order-detail-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      @media (max-width: 560px) {
+        .order-detail-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 720px) {
+        .orders-summary {
+          grid-template-columns: 1fr;
+        }
+        .order-row {
+          grid-template-columns: 1fr;
+        }
+        .order-actions {
+          display: flex;
+          justify-content: flex-start;
+        }
+      }
+      @media (max-width: 620px) {
+        .shell {
+          padding: 18px 14px 48px;
+        }
+        .top {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: start;
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+        .top > div:last-child {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          white-space: nowrap;
+        }
+        .top > div:last-child .btn {
+          padding: 9px 12px;
+          border-radius: 12px;
+        }
+        .brand {
+          min-width: 0;
+          font-size: 1.12rem;
+        }
+        .brand small {
+          margin-top: 3px;
+          line-height: 1.45;
+          overflow-wrap: anywhere;
+        }
+        .tabs {
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          overscroll-behavior-x: contain;
+          scrollbar-width: none;
+          margin: 0 -14px 18px;
+          padding: 0 14px 7px;
+          gap: 7px;
+        }
+        .tabs::-webkit-scrollbar {
+          display: none;
+        }
+        .tab {
+          flex: 0 0 auto;
+          white-space: nowrap;
+          padding: 9px 12px;
+        }
+        .toolbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .toolbar .actions {
+          width: 100%;
+        }
+        .user {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+      @media (max-width: 390px) {
+        .top {
+          grid-template-columns: 1fr;
+        }
+        .top > div:last-child {
+          justify-content: flex-start;
+        }
+      }
 
-.promo-schedule{display:grid;gap:12px;margin:14px 0}.promo-schedule-block{border:1px solid #ffe0eb;border-radius:16px;background:#fffafb;padding:14px}.promo-schedule-title{display:block;color:var(--brown);font-size:.86rem;font-weight:700;margin-bottom:9px}.promo-choice{display:flex!important;align-items:flex-start;gap:9px;padding:9px 10px;margin:4px 0!important;border-radius:11px;cursor:pointer}.promo-choice:hover{background:#fff2f6}.promo-choice input{width:auto!important;margin:3px 0 0;accent-color:var(--pink2)}.promo-choice span{display:block}.promo-choice strong{display:block;color:var(--brown);font-size:.84rem}.promo-choice small{display:block;color:var(--muted);font-size:.74rem;font-weight:400;margin-top:2px}.promo-date-time{display:grid;grid-template-columns:1.35fr .8fr;gap:10px;padding:5px 10px 2px}.promo-date-time .field{margin:5px 0}.promo-summary{border:1px solid #ffd5e4;background:#fff3f7;border-radius:14px;padding:12px 14px;color:var(--brown);font-size:.82rem;line-height:1.55}.promo-summary strong{color:var(--pink2)}@media(max-width:520px){.promo-date-time{grid-template-columns:1fr}}
-</style>
+      .promo-schedule {
+        display: grid;
+        gap: 12px;
+        margin: 14px 0;
+      }
+      .promo-schedule-block {
+        border: 1px solid #ffe0eb;
+        border-radius: 16px;
+        background: #fffafb;
+        padding: 14px;
+      }
+      .promo-schedule-title {
+        display: block;
+        color: var(--brown);
+        font-size: 0.86rem;
+        font-weight: 700;
+        margin-bottom: 9px;
+      }
+      .promo-choice {
+        display: flex !important;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 9px 10px;
+        margin: 4px 0 !important;
+        border-radius: 11px;
+        cursor: pointer;
+      }
+      .promo-choice:hover {
+        background: #fff2f6;
+      }
+      .promo-choice input {
+        width: auto !important;
+        margin: 3px 0 0;
+        accent-color: var(--pink2);
+      }
+      .promo-choice span {
+        display: block;
+      }
+      .promo-choice strong {
+        display: block;
+        color: var(--brown);
+        font-size: 0.84rem;
+      }
+      .promo-choice small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.74rem;
+        font-weight: 400;
+        margin-top: 2px;
+      }
+      .promo-date-time {
+        display: grid;
+        grid-template-columns: 1.35fr 0.8fr;
+        gap: 10px;
+        padding: 5px 10px 2px;
+      }
+      .promo-date-time .field {
+        margin: 5px 0;
+      }
+      .promo-summary {
+        border: 1px solid #ffd5e4;
+        background: #fff3f7;
+        border-radius: 14px;
+        padding: 12px 14px;
+        color: var(--brown);
+        font-size: 0.82rem;
+        line-height: 1.55;
+      }
+      .promo-summary strong {
+        color: var(--pink2);
+      }
+      @media (max-width: 520px) {
+        .promo-date-time {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
 
-<link rel="icon" type="image/png" href="/admin-favicon.png">
-<link rel="apple-touch-icon" href="/admin-apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/admin-favicon.png" />
+    <link rel="apple-touch-icon" href="/admin-apple-touch-icon.png" />
 
-<style id="rp-config-style">
-#tab-config .toolbar{
-  align-items:flex-end;
-  margin-bottom:18px;
-}
-.config-subtitle{
-  margin:5px 0 0;
-}
-.config-card{
-  max-width:860px;
-}
-.config-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:16px 18px;
-}
-.config-grid .field{
-  margin:0;
-}
-.config-grid .field label{
-  margin-bottom:7px;
-}
-.config-grid input,
-.config-grid select,
-.config-grid textarea{
-  width:100%;
-  min-height:44px;
-}
-.config-grid textarea{
-  min-height:110px;
-}
-.config-span-2{
-  grid-column:1 / -1;
-}
-.config-footer{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  margin-top:20px;
-  padding-top:18px;
-  border-top:1px solid #ffe8f0;
-}
-#configStatus{
-  min-height:20px;
-}
-@media(max-width:720px){
-  .config-grid{
-    grid-template-columns:1fr;
-  }
-  .config-span-2{
-    grid-column:auto;
-  }
-  .config-card{
-    padding:18px;
-  }
-  .config-footer{
-    align-items:flex-start;
-    flex-direction:column;
-  }
-  #salvarConfig{
-    width:100%;
-  }
-}
-</style>
+    <style id="rp-config-style">
+      #tab-config .toolbar {
+        align-items: flex-end;
+        margin-bottom: 18px;
+      }
+      .config-subtitle {
+        margin: 5px 0 0;
+      }
+      .config-card {
+        max-width: 860px;
+      }
+      .config-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px 18px;
+      }
+      .config-grid .field {
+        margin: 0;
+      }
+      .config-grid .field label {
+        margin-bottom: 7px;
+      }
+      .config-grid input,
+      .config-grid select,
+      .config-grid textarea {
+        width: 100%;
+        min-height: 44px;
+      }
+      .config-grid textarea {
+        min-height: 110px;
+      }
+      .config-span-2 {
+        grid-column: 1 / -1;
+      }
+      .config-footer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 20px;
+        padding-top: 18px;
+        border-top: 1px solid #ffe8f0;
+      }
+      #configStatus {
+        min-height: 20px;
+      }
+      @media (max-width: 720px) {
+        .config-grid {
+          grid-template-columns: 1fr;
+        }
+        .config-span-2 {
+          grid-column: auto;
+        }
+        .config-card {
+          padding: 18px;
+        }
+        .config-footer {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        #salvarConfig {
+          width: 100%;
+        }
+      }
+    </style>
 
+    <style id="rp-select-style">
+      .rp-select {
+        position: relative;
+        width: 100%;
+      }
+      .rp-select-trigger {
+        width: 100%;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 13px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        color: var(--text);
+        font-weight: 500;
+        cursor: pointer;
+        outline: none;
+        transition:
+          border-color 0.18s ease,
+          box-shadow 0.18s ease,
+          background 0.18s ease;
+      }
+      .rp-select-trigger:hover {
+        border-color: #ffb3cf;
+        background: #fffdfd;
+      }
+      .rp-select.open .rp-select-trigger,
+      .rp-select-trigger:focus-visible {
+        border-color: var(--pink);
+        box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.12);
+      }
+      .rp-select-trigger svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+        color: var(--pink2);
+        flex: 0 0 auto;
+        transition: transform 0.18s ease;
+      }
+      .rp-select.open .rp-select-trigger svg {
+        transform: rotate(180deg);
+      }
+      .rp-select-menu {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(100% + 8px);
+        z-index: 60;
+        padding: 7px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 18px 45px rgba(106, 61, 77, 0.16);
+        backdrop-filter: blur(12px);
+        opacity: 0;
+        transform: translateY(-6px) scale(0.985);
+        pointer-events: none;
+        transition:
+          opacity 0.16s ease,
+          transform 0.16s ease;
+      }
+      .rp-select.open .rp-select-menu {
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+      }
+      .rp-select-menu button {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 12px 1fr 20px;
+        align-items: center;
+        gap: 11px;
+        padding: 10px 11px;
+        border: 0;
+        border-radius: 11px;
+        background: transparent;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+      }
+      .rp-select-menu button:hover,
+      .rp-select-menu button[aria-selected="true"] {
+        background: var(--soft);
+      }
+      .rp-select-menu strong {
+        display: block;
+        color: var(--brown);
+        font-size: 0.86rem;
+      }
+      .rp-select-menu small {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 400;
+      }
+      .rp-select-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.035);
+      }
+      .rp-select-dot.em-breve {
+        background: #f0b34a;
+      }
+      .rp-select-dot.disponivel {
+        background: #48a96a;
+      }
+      .rp-select-dot.indisponivel {
+        background: #d96a79;
+      }
+      .rp-select-check {
+        color: var(--pink2);
+        font-weight: 700;
+        opacity: 0;
+      }
+      .rp-select-menu button[aria-selected="true"] .rp-select-check {
+        opacity: 1;
+      }
+      @media (max-width: 720px) {
+        .rp-select-menu {
+          position: fixed;
+          left: 16px;
+          right: 16px;
+          top: auto;
+          bottom: calc(16px + env(safe-area-inset-bottom));
+          border-radius: 20px;
+        }
+      }
+    </style>
 
-<style id="rp-select-style">
-.rp-select{
-  position:relative;
-  width:100%;
-}
-.rp-select-trigger{
-  width:100%;
-  min-height:44px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  padding:0 13px;
-  border:1px solid var(--line);
-  border-radius:12px;
-  background:#fff;
-  color:var(--text);
-  font-weight:500;
-  cursor:pointer;
-  outline:none;
-  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
-}
-.rp-select-trigger:hover{
-  border-color:#ffb3cf;
-  background:#fffdfd;
-}
-.rp-select.open .rp-select-trigger,
-.rp-select-trigger:focus-visible{
-  border-color:var(--pink);
-  box-shadow:0 0 0 3px rgba(255,107,157,.12);
-}
-.rp-select-trigger svg{
-  width:18px;
-  height:18px;
-  fill:currentColor;
-  color:var(--pink2);
-  flex:0 0 auto;
-  transition:transform .18s ease;
-}
-.rp-select.open .rp-select-trigger svg{
-  transform:rotate(180deg);
-}
-.rp-select-menu{
-  position:absolute;
-  left:0;
-  right:0;
-  top:calc(100% + 8px);
-  z-index:60;
-  padding:7px;
-  border:1px solid var(--line);
-  border-radius:16px;
-  background:rgba(255,255,255,.98);
-  box-shadow:0 18px 45px rgba(106,61,77,.16);
-  backdrop-filter:blur(12px);
-  opacity:0;
-  transform:translateY(-6px) scale(.985);
-  pointer-events:none;
-  transition:opacity .16s ease,transform .16s ease;
-}
-.rp-select.open .rp-select-menu{
-  opacity:1;
-  transform:none;
-  pointer-events:auto;
-}
-.rp-select-menu button{
-  width:100%;
-  display:grid;
-  grid-template-columns:12px 1fr 20px;
-  align-items:center;
-  gap:11px;
-  padding:10px 11px;
-  border:0;
-  border-radius:11px;
-  background:transparent;
-  color:var(--text);
-  text-align:left;
-  cursor:pointer;
-}
-.rp-select-menu button:hover,
-.rp-select-menu button[aria-selected="true"]{
-  background:var(--soft);
-}
-.rp-select-menu strong{
-  display:block;
-  color:var(--brown);
-  font-size:.86rem;
-}
-.rp-select-menu small{
-  display:block;
-  margin-top:2px;
-  color:var(--muted);
-  font-size:.72rem;
-  font-weight:400;
-}
-.rp-select-dot{
-  width:9px;
-  height:9px;
-  border-radius:50%;
-  box-shadow:0 0 0 3px rgba(0,0,0,.035);
-}
-.rp-select-dot.em-breve{background:#f0b34a}
-.rp-select-dot.disponivel{background:#48a96a}
-.rp-select-dot.indisponivel{background:#d96a79}
-.rp-select-check{
-  color:var(--pink2);
-  font-weight:700;
-  opacity:0;
-}
-.rp-select-menu button[aria-selected="true"] .rp-select-check{
-  opacity:1;
-}
-@media(max-width:720px){
-  .rp-select-menu{
-    position:fixed;
-    left:16px;
-    right:16px;
-    top:auto;
-    bottom:calc(16px + env(safe-area-inset-bottom));
-    border-radius:20px;
-  }
-}
-</style>
+    <style id="rp-password-modal-style">
+      .password-modal {
+        width: min(460px, 100%);
+      }
+      .password-modal h2 {
+        margin-bottom: 6px;
+      }
+      .password-modal .muted {
+        margin: 0 0 18px;
+      }
+      .password-input-wrap {
+        position: relative;
+      }
+      .password-input-wrap input {
+        padding-right: 48px;
+      }
+      .password-eye {
+        position: absolute;
+        right: 9px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--pink2);
+        cursor: pointer;
+        font-size: 16px;
+      }
+      .password-eye:hover {
+        background: var(--soft);
+      }
+    </style>
 
+    <style id="rp-schedule-style">
+      .schedule-box {
+        padding: 14px;
+        border: 1px solid #ffe1eb;
+        border-radius: 16px;
+        background: #fffdfd;
+      }
+      .schedule-days {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .schedule-days button {
+        min-width: 48px;
+        height: 38px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--brown);
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background 0.16s ease,
+          border-color 0.16s ease,
+          color 0.16s ease,
+          transform 0.16s ease;
+      }
+      .schedule-days button:hover {
+        border-color: #ffb3cf;
+        background: #fff7fa;
+      }
+      .schedule-days button.active {
+        background: var(--pink);
+        border-color: var(--pink);
+        color: #fff;
+        box-shadow: 0 6px 18px rgba(255, 107, 157, 0.18);
+      }
+      .schedule-days button:active {
+        transform: scale(0.96);
+      }
+      .schedule-times {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 180px));
+        gap: 14px;
+      }
+      .schedule-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--brown);
+      }
+      .time-select .rp-select-menu {
+        max-height: 260px;
+        overflow: auto;
+      }
+      .time-menu button {
+        grid-template-columns: 1fr 20px;
+      }
+      .schedule-preview {
+        margin: 12px 0 0;
+        font-size: 0.82rem;
+      }
+      @media (max-width: 720px) {
+        .schedule-times {
+          grid-template-columns: 1fr 1fr;
+        }
+        .schedule-days button {
+          min-width: 44px;
+          padding: 0 10px;
+        }
+      }
+    </style>
 
-<style id="rp-password-modal-style">
-.password-modal{
-  width:min(460px,100%);
-}
-.password-modal h2{
-  margin-bottom:6px;
-}
-.password-modal .muted{
-  margin:0 0 18px;
-}
-.password-input-wrap{
-  position:relative;
-}
-.password-input-wrap input{
-  padding-right:48px;
-}
-.password-eye{
-  position:absolute;
-  right:9px;
-  top:50%;
-  transform:translateY(-50%);
-  width:34px;
-  height:34px;
-  display:grid;
-  place-items:center;
-  border:0;
-  border-radius:10px;
-  background:transparent;
-  color:var(--pink2);
-  cursor:pointer;
-  font-size:16px;
-}
-.password-eye:hover{
-  background:var(--soft);
-}
-</style>
+    <style id="rp-availability-quick-style">
+      .availability-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 38px;
+        padding: 0 12px;
+        border: 1px solid #cfe8d6;
+        border-radius: 12px;
+        background: #f4fbf6;
+        color: #34784b;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          background 0.16s ease,
+          border-color 0.16s ease,
+          transform 0.16s ease,
+          opacity 0.16s ease;
+      }
+      .availability-toggle::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #48a96a;
+        box-shadow: 0 0 0 3px rgba(72, 169, 106, 0.1);
+      }
+      .availability-toggle:hover {
+        background: #ebf8ef;
+        border-color: #a9d8b6;
+      }
+      .availability-toggle.is-soldout {
+        border-color: #f0c7ce;
+        background: #fff5f6;
+        color: #a94f5e;
+      }
+      .availability-toggle.is-soldout::before {
+        background: #d96a79;
+        box-shadow: 0 0 0 3px rgba(217, 106, 121, 0.1);
+      }
+      .availability-toggle:active {
+        transform: scale(0.97);
+      }
+      .availability-toggle:disabled {
+        opacity: 0.55;
+        cursor: wait;
+        transform: none;
+      }
+    </style>
 
+    <style id="rp-toast-style">
+      #toastStack {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 99999;
+        display: grid;
+        gap: 10px;
+        width: min(360px, calc(100vw - 36px));
+        pointer-events: none;
+      }
+      .rp-toast {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        border: 1px solid #eadde2;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 16px 40px rgba(74, 43, 55, 0.14);
+        color: #5d4650;
+        font-weight: 700;
+        transform: translateY(12px);
+        opacity: 0;
+        animation: toastIn 0.2s ease forwards;
+      }
+      .rp-toast::before {
+        content: "✓";
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #edf8f0;
+        color: #3e8b59;
+        font-size: 13px;
+        flex: 0 0 auto;
+      }
+      .rp-toast.error::before {
+        content: "!";
+        background: #fff0f2;
+        color: #b85062;
+      }
+      .rp-toast.info::before {
+        content: "•";
+        background: #fff3f7;
+        color: #b85b7a;
+        font-size: 20px;
+      }
+      .rp-toast.out {
+        animation: toastOut 0.18s ease forwards;
+      }
+      @keyframes toastIn {
+        to {
+          transform: none;
+          opacity: 1;
+        }
+      }
+      @keyframes toastOut {
+        to {
+          transform: translateY(8px);
+          opacity: 0;
+        }
+      }
+    </style>
 
-<style id="rp-schedule-style">
-.schedule-box{
-  padding:14px;
-  border:1px solid #ffe1eb;
-  border-radius:16px;
-  background:#fffdfd;
-}
-.schedule-days{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-bottom:14px;
-}
-.schedule-days button{
-  min-width:48px;
-  height:38px;
-  padding:0 12px;
-  border:1px solid var(--line);
-  border-radius:999px;
-  background:#fff;
-  color:var(--brown);
-  font-weight:600;
-  cursor:pointer;
-  transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease;
-}
-.schedule-days button:hover{
-  border-color:#ffb3cf;
-  background:#fff7fa;
-}
-.schedule-days button.active{
-  background:var(--pink);
-  border-color:var(--pink);
-  color:#fff;
-  box-shadow:0 6px 18px rgba(255,107,157,.18);
-}
-.schedule-days button:active{
-  transform:scale(.96);
-}
-.schedule-times{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,180px));
-  gap:14px;
-}
-.schedule-label{
-  display:block;
-  margin-bottom:6px;
-  font-size:.78rem;
-  font-weight:600;
-  color:var(--brown);
-}
-.time-select .rp-select-menu{
-  max-height:260px;
-  overflow:auto;
-}
-.time-menu button{
-  grid-template-columns:1fr 20px;
-}
-.schedule-preview{
-  margin:12px 0 0;
-  font-size:.82rem;
-}
-@media(max-width:720px){
-  .schedule-times{
-    grid-template-columns:1fr 1fr;
-  }
-  .schedule-days button{
-    min-width:44px;
-    padding:0 10px;
-  }
-}
-</style>
+    <link rel="manifest" href="/admin/manifest.webmanifest" />
+    <meta name="theme-color" content="#ff6b9d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="R&P Admin" />
 
+    <style id="rp-delete-modal-style">
+      .rp-delete-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10050;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(55, 30, 34, 0.48);
+        backdrop-filter: blur(6px);
+      }
+      .rp-delete-overlay.open {
+        display: flex;
+      }
+      .rp-delete-modal {
+        width: min(440px, 100%);
+        background: #fff;
+        border: 1px solid #ffd9e5;
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 28px 90px rgba(77, 35, 47, 0.24);
+        text-align: left;
+        animation: rpDeleteIn 0.18s ease-out;
+      }
+      @keyframes rpDeleteIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px) scale(0.985);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .rp-delete-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 16px;
+        display: grid;
+        place-items: center;
+        background: #fff0f4;
+        color: #c43f63;
+        font-size: 24px;
+        margin-bottom: 16px;
+      }
+      .rp-delete-modal h3 {
+        margin: 0;
+        color: var(--brown);
+        font-size: 1.18rem;
+      }
+      .rp-delete-modal p {
+        margin: 9px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .rp-delete-product {
+        margin: 18px 0 0;
+        padding: 13px 14px;
+        border: 1px solid #ffe0e9;
+        border-radius: 14px;
+        background: #fff9fb;
+      }
+      .rp-delete-product small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+      .rp-delete-product strong {
+        display: block;
+        color: var(--brown);
+        overflow-wrap: anywhere;
+      }
+      .rp-delete-warning {
+        display: flex;
+        gap: 9px;
+        align-items: flex-start;
+        margin: 14px 0 0;
+        padding: 11px 12px;
+        border-radius: 12px;
+        background: #fff5f6;
+        color: #8f4052;
+        font-size: 0.84rem;
+        line-height: 1.4;
+      }
+      .rp-delete-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+        margin-top: 20px;
+      }
+      .rp-delete-actions .btn {
+        min-width: 112px;
+      }
+      .rp-delete-confirm {
+        background: #c94a68 !important;
+        border-color: #c94a68 !important;
+        color: #fff !important;
+      }
+      .rp-delete-confirm:hover {
+        filter: brightness(0.96);
+      }
+      @media (max-width: 520px) {
+        .rp-delete-modal {
+          padding: 20px;
+        }
+        .rp-delete-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+        .rp-delete-actions .btn {
+          min-width: 0;
+        }
+      }
 
-<style id="rp-availability-quick-style">
-.availability-toggle{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  min-height:38px;
-  padding:0 12px;
-  border:1px solid #cfe8d6;
-  border-radius:12px;
-  background:#f4fbf6;
-  color:#34784b;
-  font-weight:700;
-  cursor:pointer;
-  transition:background .16s ease,border-color .16s ease,transform .16s ease,opacity .16s ease;
-}
-.availability-toggle::before{
-  content:'';
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  background:#48a96a;
-  box-shadow:0 0 0 3px rgba(72,169,106,.10);
-}
-.availability-toggle:hover{
-  background:#ebf8ef;
-  border-color:#a9d8b6;
-}
-.availability-toggle.is-soldout{
-  border-color:#f0c7ce;
-  background:#fff5f6;
-  color:#a94f5e;
-}
-.availability-toggle.is-soldout::before{
-  background:#d96a79;
-  box-shadow:0 0 0 3px rgba(217,106,121,.10);
-}
-.availability-toggle:active{
-  transform:scale(.97);
-}
-.availability-toggle:disabled{
-  opacity:.55;
-  cursor:wait;
-  transform:none;
-}
-</style>
+      .rp-confirm-icon.info {
+        background: #fff4f8;
+        color: #c04a6e;
+      }
+      .rp-confirm-icon.warning {
+        background: #fff4e8;
+        color: #a9691f;
+      }
+      .rp-confirm-icon.danger {
+        background: #fff0f4;
+        color: #c43f63;
+      }
+      .rp-confirm-detail {
+        margin: 16px 0 0;
+        padding: 13px 14px;
+        border: 1px solid #ffe0e9;
+        border-radius: 14px;
+        background: #fff9fb;
+      }
+      .rp-confirm-detail small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+      .rp-confirm-detail strong {
+        display: block;
+        color: var(--brown);
+        overflow-wrap: anywhere;
+      }
+      .rp-confirm-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+        margin-top: 20px;
+      }
+      .rp-confirm-actions .btn {
+        min-width: 112px;
+      }
+      @media (max-width: 520px) {
+        .rp-confirm-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+        .rp-confirm-actions .btn {
+          min-width: 0;
+        }
+      }
 
+      .order-status-select {
+        position: relative;
+        min-width: 138px;
+      }
+      .order-status-trigger {
+        width: 100%;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 11px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        color: var(--brown);
+        font: inherit;
+        cursor: pointer;
+        transition:
+          border-color 0.16s ease,
+          background 0.16s ease,
+          box-shadow 0.16s ease;
+      }
+      .order-status-trigger:hover {
+        border-color: #ffb3cf;
+        background: #fff8fb;
+      }
+      .order-status-select.open .order-status-trigger,
+      .order-status-trigger:focus-visible {
+        border-color: var(--pink);
+        box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.12);
+        outline: none;
+      }
+      .order-status-trigger::after {
+        content: "⌄";
+        font-size: 18px;
+        line-height: 1;
+        color: #b85b7a;
+        transition: transform 0.16s ease;
+      }
+      .order-status-select.open .order-status-trigger::after {
+        transform: rotate(180deg);
+      }
+      .order-status-trigger:disabled {
+        opacity: 0.52;
+        cursor: not-allowed;
+        background: #fffafb;
+      }
+      .order-status-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 7px);
+        z-index: 120;
+        min-width: 190px;
+        padding: 7px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 18px 45px rgba(106, 61, 77, 0.18);
+        opacity: 0;
+        transform: translateY(-5px) scale(0.985);
+        pointer-events: none;
+        transition:
+          opacity 0.14s ease,
+          transform 0.14s ease;
+      }
+      .order-status-select.open .order-status-menu {
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+      }
+      .order-status-option {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 11px;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--brown);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        transition:
+          background 0.14s ease,
+          color 0.14s ease,
+          transform 0.14s ease;
+      }
+      .order-status-option:hover {
+        background: #fff0f6;
+        color: #b83f69;
+      }
+      .order-status-option:active {
+        transform: scale(0.985);
+      }
+      .order-status-option[aria-selected="true"] {
+        background: #fff4f8;
+        color: #b83f69;
+        font-weight: 700;
+      }
+      .order-status-option[aria-selected="true"]::after {
+        content: "✓";
+        color: var(--pink2);
+        font-weight: 800;
+      }
+      @media (max-width: 720px) {
+        .order-status-menu {
+          left: 0;
+          right: auto;
+          min-width: 210px;
+        }
+      }
+      .top-actions {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .push-active {
+        background: #effaf3 !important;
+        border-color: #bfe7cb !important;
+        color: #237a43 !important;
+      }
+      @media (max-width: 640px) {
+        .top-actions {
+          justify-content: flex-end;
+        }
+        .top-actions .btn {
+          white-space: nowrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="toastStack" aria-live="polite"></div>
+    <div class="shell">
+      <section id="setupView" class="auth card hidden">
+        <h1>Primeira configuração 🍰</h1>
+        <p>Crie a primeira conta administrativa da R&P.</p>
+        <div class="field"><label>Nome</label><input id="setupNome" /></div>
+        <div class="field">
+          <label>Usuário</label
+          ><input id="setupUsername" autocomplete="off" placeholder="ex.: vitor" />
+        </div>
+        <div class="field"><label>E-mail</label><input id="setupEmail" type="email" /></div>
+        <div class="field">
+          <label>Senha</label><input id="setupSenha" type="password" minlength="8" />
+        </div>
+        <div class="field">
+          <label>Chave de configuração</label><input id="setupKey" type="password" />
+        </div>
+        <button class="btn" id="setupBtn">Criar primeira conta</button>
+        <div id="setupMsg" class="msg"></div>
+      </section>
 
-<style id="rp-toast-style">
-#toastStack{position:fixed;right:18px;bottom:18px;z-index:99999;display:grid;gap:10px;width:min(360px,calc(100vw - 36px));pointer-events:none}
-.rp-toast{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #eadde2;border-radius:14px;background:rgba(255,255,255,.96);box-shadow:0 16px 40px rgba(74,43,55,.14);color:#5d4650;font-weight:700;transform:translateY(12px);opacity:0;animation:toastIn .2s ease forwards}
-.rp-toast::before{content:'✓';display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#edf8f0;color:#3e8b59;font-size:13px;flex:0 0 auto}
-.rp-toast.error::before{content:'!';background:#fff0f2;color:#b85062}
-.rp-toast.info::before{content:'•';background:#fff3f7;color:#b85b7a;font-size:20px}
-.rp-toast.out{animation:toastOut .18s ease forwards}
-@keyframes toastIn{to{transform:none;opacity:1}}
-@keyframes toastOut{to{transform:translateY(8px);opacity:0}}
-</style>
-
-
-<link rel="manifest" href="/admin/manifest.webmanifest">
-<meta name="theme-color" content="#ff6b9d">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="R&P Admin">
-
-
-<style id="rp-delete-modal-style">
-.rp-delete-overlay{position:fixed;inset:0;z-index:10050;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(55,30,34,.48);backdrop-filter:blur(6px)}
-.rp-delete-overlay.open{display:flex}
-.rp-delete-modal{width:min(440px,100%);background:#fff;border:1px solid #ffd9e5;border-radius:24px;padding:24px;box-shadow:0 28px 90px rgba(77,35,47,.24);text-align:left;animation:rpDeleteIn .18s ease-out}
-@keyframes rpDeleteIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
-.rp-delete-icon{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;background:#fff0f4;color:#c43f63;font-size:24px;margin-bottom:16px}
-.rp-delete-modal h3{margin:0;color:var(--brown);font-size:1.18rem}
-.rp-delete-modal p{margin:9px 0 0;color:var(--muted);line-height:1.55}
-.rp-delete-product{margin:18px 0 0;padding:13px 14px;border:1px solid #ffe0e9;border-radius:14px;background:#fff9fb}
-.rp-delete-product small{display:block;color:var(--muted);font-size:.75rem;font-weight:700;margin-bottom:3px}
-.rp-delete-product strong{display:block;color:var(--brown);overflow-wrap:anywhere}
-.rp-delete-warning{display:flex;gap:9px;align-items:flex-start;margin:14px 0 0;padding:11px 12px;border-radius:12px;background:#fff5f6;color:#8f4052;font-size:.84rem;line-height:1.4}
-.rp-delete-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
-.rp-delete-actions .btn{min-width:112px}
-.rp-delete-confirm{background:#c94a68!important;border-color:#c94a68!important;color:#fff!important}
-.rp-delete-confirm:hover{filter:brightness(.96)}
-@media(max-width:520px){.rp-delete-modal{padding:20px}.rp-delete-actions{display:grid;grid-template-columns:1fr 1fr}.rp-delete-actions .btn{min-width:0}}
-
-.rp-confirm-icon.info{background:#fff4f8;color:#c04a6e}
-.rp-confirm-icon.warning{background:#fff4e8;color:#a9691f}
-.rp-confirm-icon.danger{background:#fff0f4;color:#c43f63}
-.rp-confirm-detail{margin:16px 0 0;padding:13px 14px;border:1px solid #ffe0e9;border-radius:14px;background:#fff9fb}
-.rp-confirm-detail small{display:block;color:var(--muted);font-size:.75rem;font-weight:700;margin-bottom:3px}
-.rp-confirm-detail strong{display:block;color:var(--brown);overflow-wrap:anywhere}
-.rp-confirm-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
-.rp-confirm-actions .btn{min-width:112px}
-@media(max-width:520px){.rp-confirm-actions{display:grid;grid-template-columns:1fr 1fr}.rp-confirm-actions .btn{min-width:0}}
-
-.order-status-select{position:relative;min-width:138px}
-.order-status-trigger{width:100%;min-height:40px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 11px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--brown);font:inherit;cursor:pointer;transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}
-.order-status-trigger:hover{border-color:#ffb3cf;background:#fff8fb}
-.order-status-select.open .order-status-trigger,.order-status-trigger:focus-visible{border-color:var(--pink);box-shadow:0 0 0 3px rgba(255,107,157,.12);outline:none}
-.order-status-trigger::after{content:'⌄';font-size:18px;line-height:1;color:#b85b7a;transition:transform .16s ease}
-.order-status-select.open .order-status-trigger::after{transform:rotate(180deg)}
-.order-status-trigger:disabled{opacity:.52;cursor:not-allowed;background:#fffafb}
-.order-status-menu{position:absolute;right:0;top:calc(100% + 7px);z-index:120;min-width:190px;padding:7px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:0 18px 45px rgba(106,61,77,.18);opacity:0;transform:translateY(-5px) scale(.985);pointer-events:none;transition:opacity .14s ease,transform .14s ease}
-.order-status-select.open .order-status-menu{opacity:1;transform:none;pointer-events:auto}
-.order-status-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 11px;border:0;border-radius:10px;background:transparent;color:var(--brown);font:inherit;text-align:left;cursor:pointer;transition:background .14s ease,color .14s ease,transform .14s ease}
-.order-status-option:hover{background:#fff0f6;color:#b83f69}
-.order-status-option:active{transform:scale(.985)}
-.order-status-option[aria-selected="true"]{background:#fff4f8;color:#b83f69;font-weight:700}
-.order-status-option[aria-selected="true"]::after{content:'✓';color:var(--pink2);font-weight:800}
-@media(max-width:720px){.order-status-menu{left:0;right:auto;min-width:210px}}
-.top-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.push-active{background:#effaf3!important;border-color:#bfe7cb!important;color:#237a43!important}@media(max-width:640px){.top-actions{justify-content:flex-end}.top-actions .btn{white-space:nowrap}}
-</style>
-</head>
-<body>
-<div id="toastStack" aria-live="polite"></div>
-<div class="shell">
-  <section id="setupView" class="auth card hidden">
-    <h1>Primeira configuração 🍰</h1>
-    <p>Crie a primeira conta administrativa da R&P.</p>
-    <div class="field"><label>Nome</label><input id="setupNome"></div>
-    <div class="field"><label>Usuário</label><input id="setupUsername" autocomplete="off" placeholder="ex.: vitor"></div>
-    <div class="field"><label>E-mail</label><input id="setupEmail" type="email"></div>
-    <div class="field"><label>Senha</label><input id="setupSenha" type="password" minlength="8"></div>
-    <div class="field"><label>Chave de configuração</label><input id="setupKey" type="password"></div>
-    <button class="btn" id="setupBtn">Criar primeira conta</button>
-    <div id="setupMsg" class="msg"></div>
-  </section>
-
-  <section id="loginView" class="auth card hidden">
-    <h1>R&P Doces Admin</h1>
-    <p>Entre para gerenciar cardápio e disponibilidade.</p>
-    <div class="field"><label>Usuário</label><input id="loginUsername" autocomplete="off" placeholder="Seu usuário"></div>
-    <div class="field"><label>Senha</label><input id="loginSenha" type="password" autocomplete="off"></div>
-    <div class="login-actions">
-      <button class="btn" id="loginBtn">Entrar</button>
-      <button class="btn secondary" id="passkeyLoginBtn" type="button">Entrar com biometria</button>
-      <button class="btn secondary" id="forgotBtn">Esqueci a senha</button>
-    </div>
-    <div id="loginMsg" class="msg"></div>
-    <p class="muted" style="margin-top:16px">Enquanto o envio por e-mail não estiver configurado, outro administrador também poderá redefinir sua senha pelo painel.</p>
-  </section>
-
-  <section id="resetView" class="auth card hidden">
-    <h1>Nova senha</h1>
-    <p>Crie uma nova senha para sua conta.</p>
-    <div class="field"><label>Nova senha</label><input id="resetSenha" type="password" minlength="8"></div>
-    <button class="btn" id="resetBtn">Salvar nova senha</button>
-    <div id="resetMsg" class="msg"></div>
-  </section>
-
-  <main id="appView" class="hidden">
-    <div class="top">
-      <div class="brand">R&P Doces <small id="who"></small></div>
-      <div class="top-actions"><button class="btn secondary" id="pushBtn" type="button">🔔 Notificações</button> <a class="btn secondary" href="/" style="text-decoration:none">Ver site</a> <button class="btn secondary" id="logoutBtn">Sair</button></div>
-    </div>
-    <div class="tabs">
-      <button class="tab active" data-tab="produtos">Cardápio</button>
-      <button class="tab" data-tab="pedidos">Pedidos <span id="pedidosBadge"></span></button>
-      <button class="tab" data-tab="usuarios">Administradores</button><button class="tab" data-tab="config">Configurações da loja</button>
-    </div>
-
-    <section id="tab-produtos">
-      <div class="toolbar"><h2>Cardápio</h2><div class="actions"><button class="btn secondary" id="toggleArquivados">Ver arquivados</button><button class="btn" id="novoProduto">+ Adicionar sabor</button></div></div>
-      <div id="productsGrid" class="grid"></div>
-    </section>
-
-    <section id="tab-pedidos" class="hidden">
-      <div class="toolbar"><div><h2>Pedidos</h2><p class="muted">Pagamento e andamento dos pedidos em um só lugar.</p></div><button class="btn secondary" id="atualizarPedidos">Atualizar</button></div>
-      <div class="orders-summary">
-        <div class="card"><small>Pedidos hoje</small><strong id="pedidosHoje">0</strong></div>
-        <div class="card"><small>Faturamento pago hoje</small><strong id="faturamentoHoje">R$ 0,00</strong></div>
-        <div class="card"><small>Aguardando pagamento</small><strong id="pedidosPendentes">0</strong></div>
-      </div>
-      <div class="orders-view-toggle"><button class="btn secondary active" id="verFilaPedidos">Fila atual</button><button class="btn secondary" id="verHistoricoPedidos">Histórico</button><button class="btn secondary" id="verArquivadosPedidos">Arquivados</button></div>
-      <div class="card"><div id="ordersList" class="orders-list"></div></div>
-    </section>
-
-    <div id="orderDetailOverlay" class="order-detail-overlay" aria-hidden="true">
-      <div class="order-detail-modal" role="dialog" aria-modal="true" aria-labelledby="orderDetailTitle">
-        <button class="order-detail-close" id="orderDetailClose" aria-label="Fechar">×</button>
-        <h3 id="orderDetailTitle">Detalhes do pedido</h3>
-        <p class="muted" id="orderDetailSubtitle"></p>
-        <div id="orderDetailBody"></div>
-        <div class="order-detail-actions" id="orderDetailActions"></div>
-      </div>
-    </div>
-
-    <section id="tab-usuarios" class="hidden">
-      <div class="toolbar"><h2>Administradores</h2><button class="btn" id="novoUsuario">+ Adicionar administrador</button></div>
-      <div class="card" style="margin-bottom:14px">
-        <div class="toolbar" style="margin-bottom:10px"><div><h3 style="margin:0;color:var(--brown)">Biometria e passkeys</h3><p class="muted" style="margin:4px 0 0">Cadastre este aparelho para entrar sem preencher a senha.</p></div><button class="btn secondary" id="registerPasskeyBtn" type="button">Cadastrar biometria</button></div>
-        <div id="passkeysList" class="users-list"><p class="muted">Carregando...</p></div>
-      </div>
-      <div class="card" id="usersList"></div>
-    </section>
-  
-
-<section id="tab-config" class="hidden">
-  <div class="toolbar">
-    <div>
-      <h2>Configurações da loja</h2>
-      <p class="muted config-subtitle">Dados usados pelo site público e pelo fluxo de pedidos.</p>
-    </div>
-  </div>
-
-  <div class="card config-card">
-    <div class="config-grid">
-      <div class="field">
-        <label for="cfgWhatsapp">WhatsApp para pedidos</label>
-        <input id="cfgWhatsapp" inputmode="tel" placeholder="(33) 99128-5907">
-      </div>
-
-      <div class="field">
-        <label for="cfgLocal">Local de retirada</label>
-        <input id="cfgLocal" placeholder="Temponi Concept">
-      </div>
-
-      <div class="field">
-        <label for="cfgEndereco">Endereço</label>
-        <input id="cfgEndereco" placeholder="Ex.: Rua..., nº..., bairro...">
-      </div>
-
-      <div class="field">
-        <label for="cfgMapsUrl">Link do Google Maps</label>
-        <input id="cfgMapsUrl" type="url" placeholder="https://maps.google.com/...">
-      </div>
-
-      <div class="field">
-        <label for="cfgEntregas">Status das entregas</label>
-        <div class="rp-select" id="cfgEntregasSelect" data-value="EM_BREVE">
-          <button class="rp-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
-            <span class="rp-select-value">Em breve</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"/>
-            </svg>
+      <section id="loginView" class="auth card hidden">
+        <h1>R&P Doces Admin</h1>
+        <p>Entre para gerenciar cardápio e disponibilidade.</p>
+        <div class="field">
+          <label>Usuário</label
+          ><input id="loginUsername" autocomplete="off" placeholder="Seu usuário" />
+        </div>
+        <div class="field">
+          <label>Senha</label><input id="loginSenha" type="password" autocomplete="off" />
+        </div>
+        <div class="login-actions">
+          <button class="btn" id="loginBtn">Entrar</button>
+          <button class="btn secondary" id="passkeyLoginBtn" type="button">
+            Entrar com biometria
           </button>
-          <div class="rp-select-menu" role="listbox">
-            <button type="button" role="option" data-value="EM_BREVE" aria-selected="true">
-              <span class="rp-select-dot em-breve"></span>
-              <span><strong>Em breve</strong><small>Entrega ainda não disponível</small></span>
-              <span class="rp-select-check">✓</span>
-            </button>
-            <button type="button" role="option" data-value="DISPONIVEL" aria-selected="false">
-              <span class="rp-select-dot disponivel"></span>
-              <span><strong>Disponíveis</strong><small>Clientes podem pedir entrega</small></span>
-              <span class="rp-select-check">✓</span>
-            </button>
-            <button type="button" role="option" data-value="INDISPONIVEL" aria-selected="false">
-              <span class="rp-select-dot indisponivel"></span>
-              <span><strong>Indisponíveis</strong><small>Entrega temporariamente pausada</small></span>
-              <span class="rp-select-check">✓</span>
-            </button>
+          <button class="btn secondary" id="forgotBtn">Esqueci a senha</button>
+        </div>
+        <div id="loginMsg" class="msg"></div>
+        <p class="muted" style="margin-top: 16px">
+          Enquanto o envio por e-mail não estiver configurado, outro administrador também poderá
+          redefinir sua senha pelo painel.
+        </p>
+      </section>
+
+      <section id="resetView" class="auth card hidden">
+        <h1>Nova senha</h1>
+        <p>Crie uma nova senha para sua conta.</p>
+        <div class="field">
+          <label>Nova senha</label><input id="resetSenha" type="password" minlength="8" />
+        </div>
+        <button class="btn" id="resetBtn">Salvar nova senha</button>
+        <div id="resetMsg" class="msg"></div>
+      </section>
+
+      <main id="appView" class="hidden">
+        <div class="top">
+          <div class="brand">R&P Doces <small id="who"></small></div>
+          <div class="top-actions">
+            <button class="btn secondary" id="pushBtn" type="button">🔔 Notificações</button>
+            <a class="btn secondary" href="/" style="text-decoration: none">Ver site</a>
+            <button class="btn secondary" id="logoutBtn">Sair</button>
           </div>
         </div>
-      </div>
+        <div class="tabs">
+          <button class="tab active" data-tab="produtos">Cardápio</button>
+          <button class="tab" data-tab="pedidos">Pedidos <span id="pedidosBadge"></span></button>
+          <button class="tab" data-tab="usuarios">Administradores</button
+          ><button class="tab" data-tab="config">Configurações da loja</button>
+        </div>
 
-      <div class="field config-span-2">
-        <label>Horário de atendimento</label>
+        <section id="tab-produtos">
+          <div class="toolbar">
+            <h2>Cardápio</h2>
+            <div class="actions">
+              <button class="btn secondary" id="toggleArquivados">Ver arquivados</button
+              ><button class="btn" id="novoProduto">+ Adicionar sabor</button>
+            </div>
+          </div>
+          <div id="productsGrid" class="grid"></div>
+        </section>
 
-        <div class="schedule-box">
-          <div class="schedule-days" id="cfgDias">
-            <button type="button" data-day="seg">Seg</button>
-            <button type="button" data-day="ter">Ter</button>
-            <button type="button" data-day="qua">Qua</button>
-            <button type="button" data-day="qui">Qui</button>
-            <button type="button" data-day="sex">Sex</button>
-            <button type="button" data-day="sab">Sáb</button>
-            <button type="button" data-day="dom">Dom</button>
+        <section id="tab-pedidos" class="hidden">
+          <div class="toolbar">
+            <div>
+              <h2>Pedidos</h2>
+              <p class="muted">Pagamento e andamento dos pedidos em um só lugar.</p>
+            </div>
+            <button class="btn secondary" id="atualizarPedidos">Atualizar</button>
+          </div>
+          <div class="orders-summary">
+            <div class="card"><small>Pedidos hoje</small><strong id="pedidosHoje">0</strong></div>
+            <div class="card">
+              <small>Faturamento pago hoje</small><strong id="faturamentoHoje">R$ 0,00</strong>
+            </div>
+            <div class="card">
+              <small>Aguardando pagamento</small><strong id="pedidosPendentes">0</strong>
+            </div>
+          </div>
+          <div class="orders-view-toggle">
+            <button class="btn secondary active" id="verFilaPedidos">Fila atual</button
+            ><button class="btn secondary" id="verHistoricoPedidos">Histórico</button
+            ><button class="btn secondary" id="verArquivadosPedidos">Arquivados</button>
+          </div>
+          <div class="card"><div id="ordersList" class="orders-list"></div></div>
+        </section>
+
+        <div id="orderDetailOverlay" class="order-detail-overlay" aria-hidden="true">
+          <div
+            class="order-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="orderDetailTitle"
+          >
+            <button class="order-detail-close" id="orderDetailClose" aria-label="Fechar">×</button>
+            <h3 id="orderDetailTitle">Detalhes do pedido</h3>
+            <p class="muted" id="orderDetailSubtitle"></p>
+            <div id="orderDetailBody"></div>
+            <div class="order-detail-actions" id="orderDetailActions"></div>
+          </div>
+        </div>
+
+        <section id="tab-usuarios" class="hidden">
+          <div class="toolbar">
+            <h2>Administradores</h2>
+            <button class="btn" id="novoUsuario">+ Adicionar administrador</button>
+          </div>
+          <div class="card" style="margin-bottom: 14px">
+            <div class="toolbar" style="margin-bottom: 10px">
+              <div>
+                <h3 style="margin: 0; color: var(--brown)">Biometria e passkeys</h3>
+                <p class="muted" style="margin: 4px 0 0">
+                  Cadastre este aparelho para entrar sem preencher a senha.
+                </p>
+              </div>
+              <button class="btn secondary" id="registerPasskeyBtn" type="button">
+                Cadastrar biometria
+              </button>
+            </div>
+            <div id="passkeysList" class="users-list"><p class="muted">Carregando...</p></div>
+          </div>
+          <div class="card" id="usersList"></div>
+        </section>
+
+        <section id="tab-config" class="hidden">
+          <div class="toolbar">
+            <div>
+              <h2>Configurações da loja</h2>
+              <p class="muted config-subtitle">
+                Dados usados pelo site público e pelo fluxo de pedidos.
+              </p>
+            </div>
           </div>
 
-          <div class="schedule-times">
-            <div>
-              <span class="schedule-label">Abre</span>
-              <div class="rp-select time-select" id="cfgAbreSelect" data-value="10:00">
-                <button class="rp-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
-                  <span class="rp-select-value">10:00</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"/></svg>
-                </button>
-                <div class="rp-select-menu time-menu" role="listbox"></div>
+          <div class="card config-card">
+            <div class="config-grid">
+              <div class="field">
+                <label for="cfgWhatsapp">WhatsApp para pedidos</label>
+                <input id="cfgWhatsapp" inputmode="tel" placeholder="(33) 99128-5907" />
+              </div>
+
+              <div class="field">
+                <label for="cfgLocal">Local de retirada</label>
+                <input id="cfgLocal" placeholder="Temponi Concept" />
+              </div>
+
+              <div class="field">
+                <label for="cfgEndereco">Endereço</label>
+                <input id="cfgEndereco" placeholder="Ex.: Rua..., nº..., bairro..." />
+              </div>
+
+              <div class="field">
+                <label for="cfgMapsUrl">Link do Google Maps</label>
+                <input id="cfgMapsUrl" type="url" placeholder="https://maps.google.com/..." />
+              </div>
+
+              <div class="field">
+                <label for="cfgEntregas">Status das entregas</label>
+                <div class="rp-select" id="cfgEntregasSelect" data-value="EM_BREVE">
+                  <button
+                    class="rp-select-trigger"
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                  >
+                    <span class="rp-select-value">Em breve</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"
+                      />
+                    </svg>
+                  </button>
+                  <div class="rp-select-menu" role="listbox">
+                    <button type="button" role="option" data-value="EM_BREVE" aria-selected="true">
+                      <span class="rp-select-dot em-breve"></span>
+                      <span
+                        ><strong>Em breve</strong><small>Entrega ainda não disponível</small></span
+                      >
+                      <span class="rp-select-check">✓</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="option"
+                      data-value="DISPONIVEL"
+                      aria-selected="false"
+                    >
+                      <span class="rp-select-dot disponivel"></span>
+                      <span
+                        ><strong>Disponíveis</strong
+                        ><small>Clientes podem pedir entrega</small></span
+                      >
+                      <span class="rp-select-check">✓</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="option"
+                      data-value="INDISPONIVEL"
+                      aria-selected="false"
+                    >
+                      <span class="rp-select-dot indisponivel"></span>
+                      <span
+                        ><strong>Indisponíveis</strong
+                        ><small>Entrega temporariamente pausada</small></span
+                      >
+                      <span class="rp-select-check">✓</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field config-span-2">
+                <label>Horário de atendimento</label>
+
+                <div class="schedule-box">
+                  <div class="schedule-days" id="cfgDias">
+                    <button type="button" data-day="seg">Seg</button>
+                    <button type="button" data-day="ter">Ter</button>
+                    <button type="button" data-day="qua">Qua</button>
+                    <button type="button" data-day="qui">Qui</button>
+                    <button type="button" data-day="sex">Sex</button>
+                    <button type="button" data-day="sab">Sáb</button>
+                    <button type="button" data-day="dom">Dom</button>
+                  </div>
+
+                  <div class="schedule-times">
+                    <div>
+                      <span class="schedule-label">Abre</span>
+                      <div class="rp-select time-select" id="cfgAbreSelect" data-value="10:00">
+                        <button
+                          class="rp-select-trigger"
+                          type="button"
+                          aria-haspopup="listbox"
+                          aria-expanded="false"
+                        >
+                          <span class="rp-select-value">10:00</span>
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"
+                            />
+                          </svg>
+                        </button>
+                        <div class="rp-select-menu time-menu" role="listbox"></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span class="schedule-label">Fecha</span>
+                      <div class="rp-select time-select" id="cfgFechaSelect" data-value="19:00">
+                        <button
+                          class="rp-select-trigger"
+                          type="button"
+                          aria-haspopup="listbox"
+                          aria-expanded="false"
+                        >
+                          <span class="rp-select-value">19:00</span>
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"
+                            />
+                          </svg>
+                        </button>
+                        <div class="rp-select-menu time-menu" role="listbox"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <input id="cfgHorario" type="hidden" />
+                  <p class="schedule-preview muted" id="cfgHorarioPreview">Seg a sáb, 10h às 19h</p>
+                </div>
+              </div>
+
+              <div class="field config-span-2">
+                <label for="cfgMensagem">Mensagem inicial do WhatsApp</label>
+                <textarea
+                  id="cfgMensagem"
+                  rows="4"
+                  placeholder="Olá! Gostaria de fazer um pedido na R&P Doces."
+                ></textarea>
               </div>
             </div>
 
-            <div>
-              <span class="schedule-label">Fecha</span>
-              <div class="rp-select time-select" id="cfgFechaSelect" data-value="19:00">
-                <button class="rp-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
-                  <span class="rp-select-value">19:00</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 9.2a1 1 0 0 1 1.4 0L12 13.1l3.9-3.9a1 1 0 1 1 1.4 1.4l-4.6 4.6a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4Z"/></svg>
-                </button>
-                <div class="rp-select-menu time-menu" role="listbox"></div>
-              </div>
+            <div class="config-footer">
+              <button class="btn" id="salvarConfig" type="button">Salvar alterações</button>
+              <span id="configStatus" class="muted"></span>
             </div>
           </div>
+        </section>
+      </main>
+    </div>
 
-          <input id="cfgHorario" type="hidden">
-          <p class="schedule-preview muted" id="cfgHorarioPreview">Seg a sáb, 10h às 19h</p>
+    <div class="rp-delete-overlay" id="deleteProductOverlay" aria-hidden="true">
+      <div
+        class="rp-delete-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="deleteProductTitle"
+      >
+        <div class="rp-delete-icon">🗑️</div>
+        <h3 id="deleteProductTitle">Excluir produto definitivamente?</h3>
+        <p>O produto será removido do cardápio e não poderá ser restaurado.</p>
+        <div class="rp-delete-product">
+          <small>Produto</small>
+          <strong id="deleteProductName">—</strong>
+        </div>
+        <div class="rp-delete-warning">
+          <span>⚠️</span
+          ><span
+            >Os pedidos antigos continuarão preservados no histórico, mesmo após a exclusão do
+            produto.</span
+          >
+        </div>
+        <div class="rp-delete-actions">
+          <button class="btn secondary" type="button" id="deleteProductCancel">Cancelar</button>
+          <button class="btn danger rp-delete-confirm" type="button" id="deleteProductConfirm">
+            Excluir definitivamente
+          </button>
         </div>
       </div>
+    </div>
 
-      <div class="field config-span-2">
-        <label for="cfgMensagem">Mensagem inicial do WhatsApp</label>
-        <textarea id="cfgMensagem" rows="4" placeholder="Olá! Gostaria de fazer um pedido na R&P Doces."></textarea>
+    <div class="rp-delete-overlay" id="genericConfirmOverlay" aria-hidden="true">
+      <div
+        class="rp-delete-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="genericConfirmTitle"
+      >
+        <div class="rp-delete-icon rp-confirm-icon warning" id="genericConfirmIcon">⚠️</div>
+        <h3 id="genericConfirmTitle">Confirmar ação?</h3>
+        <p id="genericConfirmText">Esta ação precisa da sua confirmação.</p>
+        <div class="rp-confirm-detail hidden" id="genericConfirmDetail">
+          <small id="genericConfirmDetailLabel">Item</small>
+          <strong id="genericConfirmDetailValue">—</strong>
+        </div>
+        <div class="rp-confirm-actions">
+          <button class="btn secondary" type="button" id="genericConfirmCancel">Cancelar</button>
+          <button class="btn" type="button" id="genericConfirmOk">Confirmar</button>
+        </div>
       </div>
     </div>
 
-    <div class="config-footer">
-      <button class="btn" id="salvarConfig" type="button">Salvar alterações</button>
-      <span id="configStatus" class="muted"></span>
-    </div>
-  </div>
-</section>
-
-
-</main>
-</div>
-
-
-<div class="rp-delete-overlay" id="deleteProductOverlay" aria-hidden="true">
-  <div class="rp-delete-modal" role="dialog" aria-modal="true" aria-labelledby="deleteProductTitle">
-    <div class="rp-delete-icon">🗑️</div>
-    <h3 id="deleteProductTitle">Excluir produto definitivamente?</h3>
-    <p>O produto será removido do cardápio e não poderá ser restaurado.</p>
-    <div class="rp-delete-product">
-      <small>Produto</small>
-      <strong id="deleteProductName">—</strong>
-    </div>
-    <div class="rp-delete-warning"><span>⚠️</span><span>Os pedidos antigos continuarão preservados no histórico, mesmo após a exclusão do produto.</span></div>
-    <div class="rp-delete-actions">
-      <button class="btn secondary" type="button" id="deleteProductCancel">Cancelar</button>
-      <button class="btn danger rp-delete-confirm" type="button" id="deleteProductConfirm">Excluir definitivamente</button>
-    </div>
-  </div>
-</div>
-
-<div class="rp-delete-overlay" id="genericConfirmOverlay" aria-hidden="true">
-  <div class="rp-delete-modal" role="dialog" aria-modal="true" aria-labelledby="genericConfirmTitle">
-    <div class="rp-delete-icon rp-confirm-icon warning" id="genericConfirmIcon">⚠️</div>
-    <h3 id="genericConfirmTitle">Confirmar ação?</h3>
-    <p id="genericConfirmText">Esta ação precisa da sua confirmação.</p>
-    <div class="rp-confirm-detail hidden" id="genericConfirmDetail">
-      <small id="genericConfirmDetailLabel">Item</small>
-      <strong id="genericConfirmDetailValue">—</strong>
-    </div>
-    <div class="rp-confirm-actions">
-      <button class="btn secondary" type="button" id="genericConfirmCancel">Cancelar</button>
-      <button class="btn" type="button" id="genericConfirmOk">Confirmar</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-bg hidden" id="productModal">
-  <div class="modal">
-    <h2 id="productModalTitle">Produto</h2>
-    <input id="pId" type="hidden">
-    <div class="field"><label>Nome</label><input id="pNome"></div>
-    <div class="field"><label>Categoria</label><select id="pCategoria"><option value="BOLO_NO_POTE">Bolo no Pote</option><option value="MINI_PUDIM">Mini Pudim</option></select></div>
-    <div class="field"><label>Descrição</label><textarea id="pDescricao"></textarea></div>
-    <div class="field"><label>Preço</label><input id="pPreco" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off"></div>
-    <div class="switchrow"><label><input id="pPromocaoAtiva" type="checkbox"> Ativar promoção</label></div>
-    <div id="promoFields" style="display:none">
-      <div class="field"><label>Preço promocional</label><input id="pPrecoPromo" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off"><small class="muted">Deve ser menor que o preço normal.</small></div>
-      <div class="promo-schedule">
-        <div class="promo-schedule-block">
-          <span class="promo-schedule-title">Início da promoção</span>
-          <label class="promo-choice"><input type="radio" name="pPromoInicioModo" value="agora" checked> <span><strong>Começar agora</strong><small>A promoção entra em vigor assim que você salvar.</small></span></label>
-          <label class="promo-choice"><input type="radio" name="pPromoInicioModo" value="agendar"> <span><strong>Agendar início</strong><small>Escolha o dia e o horário.</small></span></label>
-          <div class="promo-date-time hidden" id="pPromoInicioAgenda">
-            <div class="field"><label>Data</label><input id="pPromoInicioData" type="date"></div>
-            <div class="field"><label>Hora</label><input id="pPromoInicioHora" type="time" value="09:00"></div>
+    <div class="modal-bg hidden" id="productModal">
+      <div class="modal">
+        <h2 id="productModalTitle">Produto</h2>
+        <input id="pId" type="hidden" />
+        <div class="field"><label>Nome</label><input id="pNome" /></div>
+        <div class="field">
+          <label>Categoria</label
+          ><select id="pCategoria">
+            <option value="BOLO_NO_POTE">Bolo no Pote</option>
+            <option value="MINI_PUDIM">Mini Pudim</option>
+          </select>
+        </div>
+        <div class="field"><label>Descrição</label><textarea id="pDescricao"></textarea></div>
+        <div class="field">
+          <label>Preço</label
+          ><input id="pPreco" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off" />
+        </div>
+        <div class="switchrow">
+          <label><input id="pPromocaoAtiva" type="checkbox" /> Ativar promoção</label>
+        </div>
+        <div id="promoFields" style="display: none">
+          <div class="field">
+            <label>Preço promocional</label
+            ><input
+              id="pPrecoPromo"
+              inputmode="numeric"
+              placeholder="R$ 0,00"
+              autocomplete="off"
+            /><small class="muted">Deve ser menor que o preço normal.</small>
+          </div>
+          <div class="promo-schedule">
+            <div class="promo-schedule-block">
+              <span class="promo-schedule-title">Início da promoção</span>
+              <label class="promo-choice"
+                ><input type="radio" name="pPromoInicioModo" value="agora" checked />
+                <span
+                  ><strong>Começar agora</strong
+                  ><small>A promoção entra em vigor assim que você salvar.</small></span
+                ></label
+              >
+              <label class="promo-choice"
+                ><input type="radio" name="pPromoInicioModo" value="agendar" />
+                <span
+                  ><strong>Agendar início</strong><small>Escolha o dia e o horário.</small></span
+                ></label
+              >
+              <div class="promo-date-time hidden" id="pPromoInicioAgenda">
+                <div class="field">
+                  <label>Data</label><input id="pPromoInicioData" type="date" />
+                </div>
+                <div class="field">
+                  <label>Hora</label><input id="pPromoInicioHora" type="time" value="09:00" />
+                </div>
+              </div>
+            </div>
+            <div class="promo-schedule-block">
+              <span class="promo-schedule-title">Fim da promoção</span>
+              <label class="promo-choice"
+                ><input type="radio" name="pPromoFimModo" value="sem_fim" checked />
+                <span
+                  ><strong>Sem data para terminar</strong
+                  ><small>Você pode desativar a promoção quando quiser.</small></span
+                ></label
+              >
+              <label class="promo-choice"
+                ><input type="radio" name="pPromoFimModo" value="agendar" />
+                <span
+                  ><strong>Definir término</strong
+                  ><small>Escolha quando o preço promocional deve acabar.</small></span
+                ></label
+              >
+              <div class="promo-date-time hidden" id="pPromoFimAgenda">
+                <div class="field"><label>Data</label><input id="pPromoFimData" type="date" /></div>
+                <div class="field">
+                  <label>Hora</label><input id="pPromoFimHora" type="time" value="23:59" />
+                </div>
+              </div>
+            </div>
+            <div class="promo-summary" id="pPromoResumo"></div>
           </div>
         </div>
-        <div class="promo-schedule-block">
-          <span class="promo-schedule-title">Fim da promoção</span>
-          <label class="promo-choice"><input type="radio" name="pPromoFimModo" value="sem_fim" checked> <span><strong>Sem data para terminar</strong><small>Você pode desativar a promoção quando quiser.</small></span></label>
-          <label class="promo-choice"><input type="radio" name="pPromoFimModo" value="agendar"> <span><strong>Definir término</strong><small>Escolha quando o preço promocional deve acabar.</small></span></label>
-          <div class="promo-date-time hidden" id="pPromoFimAgenda">
-            <div class="field"><label>Data</label><input id="pPromoFimData" type="date"></div>
-            <div class="field"><label>Hora</label><input id="pPromoFimHora" type="time" value="23:59"></div>
+        <div class="field">
+          <label>Estoque</label
+          ><input
+            id="pEstoque"
+            type="number"
+            min="0"
+            max="100000"
+            step="1"
+            inputmode="numeric"
+            placeholder="0"
+          /><small class="muted">Ao chegar a zero, o produto fica esgotado automaticamente.</small>
+        </div>
+        <div class="field">
+          <label>Emoji</label
+          ><select id="pEmoji">
+            <option value="🍰">🍰 Bolo</option>
+            <option value="🍮">🍮 Pudim</option>
+            <option value="🍓">🍓 Morango</option>
+            <option value="🍫">🍫 Chocolate</option>
+            <option value="🌰">🌰 Avelã / castanha</option>
+            <option value="🥥">🥥 Coco</option>
+            <option value="🥜">🥜 Amendoim / paçoca</option>
+            <option value="🍋">🍋 Limão</option>
+            <option value="🍯">🍯 Doce de leite / mel</option>
+            <option value="❤️">❤️ Coração</option>
+            <option value="🎉">🎉 Confete</option>
+            <option value="🧁">🧁 Cupcake</option>
+            <option value="🍪">🍪 Biscoito</option>
+            <option value="🍒">🍒 Cereja</option>
+            <option value="✨">✨ Especial</option>
+          </select>
+        </div>
+        <div class="switchrow">
+          <label><input id="pDisponivel" type="checkbox" checked /> Disponível</label
+          ><label><input id="pAtivo" type="checkbox" checked /> Visível no site</label
+          ><label><input id="pDestaque" type="checkbox" /> Destaque</label>
+        </div>
+        <div class="actions">
+          <button class="btn" id="saveProduct">Salvar</button
+          ><button class="btn secondary closeModal">Cancelar</button>
+        </div>
+        <div id="productMsg" class="msg"></div>
+      </div>
+    </div>
+
+    <div class="modal-bg hidden" id="userModal">
+      <div class="modal">
+        <h2>Novo administrador</h2>
+        <div class="field"><label>Nome</label><input id="uNome" /></div>
+        <div class="field">
+          <label>Usuário</label
+          ><input id="uUsername" autocomplete="off" placeholder="ex.: patricia" />
+        </div>
+        <div class="field"><label>E-mail</label><input id="uEmail" type="email" /></div>
+        <div class="field"><label>Senha inicial</label><input id="uSenha" type="password" /></div>
+        <div class="field">
+          <label>Nível de acesso</label
+          ><select id="uPapel">
+            <option value="ADMIN">Administrador</option>
+            <option value="OWNER">Administrador mestre</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="btn" id="saveUser">Criar conta</button
+          ><button class="btn secondary closeModal">Cancelar</button>
+        </div>
+        <div id="userMsg" class="msg"></div>
+      </div>
+    </div>
+
+    <div class="modal-bg hidden" id="passwordModal">
+      <div class="modal password-modal">
+        <h2>Definir nova senha</h2>
+        <p class="muted">A nova senha precisa ter pelo menos 8 caracteres, com letra e número.</p>
+
+        <div class="field">
+          <label for="newPassword">Nova senha</label>
+          <div class="password-input-wrap">
+            <input id="newPassword" type="password" minlength="8" autocomplete="off" />
+            <button
+              type="button"
+              class="password-eye"
+              id="toggleNewPassword"
+              aria-label="Mostrar senha"
+            >
+              👁
+            </button>
           </div>
         </div>
-        <div class="promo-summary" id="pPromoResumo"></div>
-      </div>
-    </div>
-    <div class="field"><label>Estoque</label><input id="pEstoque" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="0"><small class="muted">Ao chegar a zero, o produto fica esgotado automaticamente.</small></div>
-    <div class="field"><label>Emoji</label><select id="pEmoji">
-      <option value="🍰">🍰 Bolo</option><option value="🍮">🍮 Pudim</option><option value="🍓">🍓 Morango</option><option value="🍫">🍫 Chocolate</option><option value="🌰">🌰 Avelã / castanha</option><option value="🥥">🥥 Coco</option><option value="🥜">🥜 Amendoim / paçoca</option><option value="🍋">🍋 Limão</option><option value="🍯">🍯 Doce de leite / mel</option><option value="❤️">❤️ Coração</option><option value="🎉">🎉 Confete</option><option value="🧁">🧁 Cupcake</option><option value="🍪">🍪 Biscoito</option><option value="🍒">🍒 Cereja</option><option value="✨">✨ Especial</option>
-    </select></div>
-    <div class="switchrow"><label><input id="pDisponivel" type="checkbox" checked> Disponível</label><label><input id="pAtivo" type="checkbox" checked> Visível no site</label><label><input id="pDestaque" type="checkbox"> Destaque</label></div>
-    <div class="actions"><button class="btn" id="saveProduct">Salvar</button><button class="btn secondary closeModal">Cancelar</button></div>
-    <div id="productMsg" class="msg"></div>
-  </div>
-</div>
 
-<div class="modal-bg hidden" id="userModal">
-  <div class="modal">
-    <h2>Novo administrador</h2>
-    <div class="field"><label>Nome</label><input id="uNome"></div>
-    <div class="field"><label>Usuário</label><input id="uUsername" autocomplete="off" placeholder="ex.: patricia"></div>
-    <div class="field"><label>E-mail</label><input id="uEmail" type="email"></div>
-    <div class="field"><label>Senha inicial</label><input id="uSenha" type="password"></div>
-    <div class="field"><label>Nível de acesso</label><select id="uPapel"><option value="ADMIN">Administrador</option><option value="OWNER">Administrador mestre</option></select></div>
-    <div class="actions"><button class="btn" id="saveUser">Criar conta</button><button class="btn secondary closeModal">Cancelar</button></div>
-    <div id="userMsg" class="msg"></div>
-  </div>
-</div>
+        <div class="field">
+          <label for="confirmNewPassword">Confirmar nova senha</label>
+          <div class="password-input-wrap">
+            <input id="confirmNewPassword" type="password" minlength="8" autocomplete="off" />
+            <button
+              type="button"
+              class="password-eye"
+              id="toggleConfirmPassword"
+              aria-label="Mostrar senha"
+            >
+              👁
+            </button>
+          </div>
+        </div>
 
+        <div class="actions">
+          <button class="btn" id="saveNewPassword">Salvar nova senha</button>
+          <button class="btn secondary closeModal" type="button">Cancelar</button>
+        </div>
 
-<div class="modal-bg hidden" id="passwordModal">
-  <div class="modal password-modal">
-    <h2>Definir nova senha</h2>
-    <p class="muted">A nova senha precisa ter pelo menos 8 caracteres, com letra e número.</p>
-
-    <div class="field">
-      <label for="newPassword">Nova senha</label>
-      <div class="password-input-wrap">
-        <input id="newPassword" type="password" minlength="8" autocomplete="off">
-        <button type="button" class="password-eye" id="toggleNewPassword" aria-label="Mostrar senha">👁</button>
+        <div id="passwordMsg" class="msg"></div>
       </div>
     </div>
 
-    <div class="field">
-      <label for="confirmNewPassword">Confirmar nova senha</label>
-      <div class="password-input-wrap">
-        <input id="confirmNewPassword" type="password" minlength="8" autocomplete="off">
-        <button type="button" class="password-eye" id="toggleConfirmPassword" aria-label="Mostrar senha">👁</button>
-      </div>
-    </div>
+    <script>
+      const $ = s => document.querySelector(s),
+        $$ = s => document.querySelectorAll(s);
+      let me = null,
+        produtos = [],
+        usuarios = [],
+        pedidos = [];
+      $$('input:not([type="hidden"]),textarea').forEach(el =>
+        el.setAttribute("autocomplete", "off")
+      );
 
-    <div class="actions">
-      <button class="btn" id="saveNewPassword">Salvar nova senha</button>
-      <button class="btn secondary closeModal" type="button">Cancelar</button>
-    </div>
+      async function api(url, options = {}) {
+        const res = await fetch(url, {
+          ...options,
+          headers: { "content-type": "application/json", ...(options.headers || {}) }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.erro || data.mensagem || "Erro inesperado.");
+        return data;
+      }
+      function show(id) {
+        ["setupView", "loginView", "resetView", "appView"].forEach(x =>
+          $("#" + x).classList.add("hidden")
+        );
+        $("#" + id).classList.remove("hidden");
+      }
+      function money(c) {
+        return (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      }
+      function precoInput(c) {
+        return money(Number(c) || 0);
+      }
+      function precoCentavos(v) {
+        const digits = String(v || "").replace(/\D/g, "");
+        return digits ? Number(digits) : 0;
+      }
+      function formatPrecoField() {
+        const el = $("#pPreco");
+        el.value = money(precoCentavos(el.value));
+      }
+      function esc(s = "") {
+        return String(s).replace(
+          /[&<>"']/g,
+          m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]
+        );
+      }
 
-    <div id="passwordMsg" class="msg"></div>
-  </div>
-</div>
+      function toast(message, type = "success") {
+        const stack = document.getElementById("toastStack");
+        if (!stack) return;
+        const el = document.createElement("div");
+        el.className = "rp-toast " + type;
+        el.textContent = message;
+        stack.appendChild(el);
+        setTimeout(() => {
+          el.classList.add("out");
+          setTimeout(() => el.remove(), 220);
+        }, 2800);
+      }
 
-<script>
-const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-let me=null, produtos=[], usuarios=[], pedidos=[];
-$$('input:not([type="hidden"]),textarea').forEach(el=>el.setAttribute('autocomplete','off'));
+      async function init() {
+        const reset = new URLSearchParams(location.search).get("reset");
+        if (reset) {
+          show("resetView");
+          return;
+        }
+        const setup = await api("/api/setup");
+        if (setup.needsSetup) {
+          show("setupView");
+          return;
+        }
+        try {
+          const r = await api("/api/auth/me");
+          me = r.usuario;
+          $("#who").textContent =
+            `${me.nome} • @${me.username}${me.papel === "OWNER" ? " • Mestre" : ""}`;
+          show("appView");
+          await Promise.all([loadProducts(), loadUsers(), loadOrders(), loadPasskeys()]);
+          await getPushState();
+        } catch {
+          show("loginView");
+          setTimeout(() => startPasskeyLogin(true), 250);
+        }
+      }
 
-async function api(url, options={}){
-  const res=await fetch(url,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});
-  const data=await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(data.erro||data.mensagem||'Erro inesperado.');
-  return data;
-}
-function show(id){['setupView','loginView','resetView','appView'].forEach(x=>$('#'+x).classList.add('hidden'));$('#'+id).classList.remove('hidden')}
-function money(c){return(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
-function precoInput(c){return money(Number(c)||0)}
-function precoCentavos(v){const digits=String(v||'').replace(/\D/g,'');return digits?Number(digits):0}
-function formatPrecoField(){const el=$('#pPreco');el.value=money(precoCentavos(el.value))}
-function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+      const el_setupBtn = $("#setupBtn");
+      if (el_setupBtn)
+        el_setupBtn.onclick = async () => {
+          try {
+            await api("/api/setup", {
+              method: "POST",
+              body: JSON.stringify({
+                nome: $("#setupNome").value,
+                username: $("#setupUsername").value,
+                email: $("#setupEmail").value,
+                senha: $("#setupSenha").value,
+                setupKey: $("#setupKey").value
+              })
+            });
+            location.reload();
+          } catch (e) {
+            $("#setupMsg").textContent = e.message;
+          }
+        };
+      const el_loginBtn = $("#loginBtn");
+      if (el_loginBtn)
+        el_loginBtn.onclick = async () => {
+          try {
+            await api("/api/auth/login", {
+              method: "POST",
+              body: JSON.stringify({
+                username: $("#loginUsername").value,
+                senha: $("#loginSenha").value
+              })
+            });
+            location.reload();
+          } catch (e) {
+            $("#loginMsg").textContent = e.message;
+          }
+        };
+      ["loginUsername", "loginSenha"].forEach(id =>
+        $("#" + id).addEventListener("keydown", e => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            $("#loginBtn").click();
+          }
+        })
+      );
 
-function toast(message,type='success'){
-  const stack=document.getElementById('toastStack');
-  if(!stack)return;
-  const el=document.createElement('div');
-  el.className='rp-toast '+type;
-  el.textContent=message;
-  stack.appendChild(el);
-  setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),220)},2800);
-}
+      function urlB64ToUint8Array(value) {
+        const padding = "=".repeat((4 - (value.length % 4)) % 4);
+        const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+        const raw = atob(base64);
+        return Uint8Array.from(raw, c => c.charCodeAt(0));
+      }
+      function arrayBufferToUrlB64(value) {
+        const bytes = new Uint8Array(value);
+        let binary = "";
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      }
+      function creationOptionsFromJSON(options) {
+        return {
+          ...options,
+          challenge: urlB64ToUint8Array(options.challenge),
+          user: { ...options.user, id: urlB64ToUint8Array(options.user.id) },
+          excludeCredentials: (options.excludeCredentials || []).map(c => ({
+            ...c,
+            id: urlB64ToUint8Array(c.id)
+          }))
+        };
+      }
+      function requestOptionsFromJSON(options) {
+        const converted = { ...options, challenge: urlB64ToUint8Array(options.challenge) };
+        if (Array.isArray(options.allowCredentials))
+          converted.allowCredentials = options.allowCredentials.map(c => ({
+            ...c,
+            id: urlB64ToUint8Array(c.id)
+          }));
+        else delete converted.allowCredentials;
+        return converted;
+      }
+      function registrationToJSON(credential) {
+        const response = credential.response;
+        return {
+          id: credential.id,
+          rawId: arrayBufferToUrlB64(credential.rawId),
+          type: credential.type,
+          authenticatorAttachment: credential.authenticatorAttachment || undefined,
+          clientExtensionResults: credential.getClientExtensionResults(),
+          response: {
+            clientDataJSON: arrayBufferToUrlB64(response.clientDataJSON),
+            attestationObject: arrayBufferToUrlB64(response.attestationObject),
+            transports: typeof response.getTransports === "function" ? response.getTransports() : []
+          }
+        };
+      }
+      function authenticationToJSON(credential) {
+        const response = credential.response;
+        return {
+          id: credential.id,
+          rawId: arrayBufferToUrlB64(credential.rawId),
+          type: credential.type,
+          authenticatorAttachment: credential.authenticatorAttachment || undefined,
+          clientExtensionResults: credential.getClientExtensionResults(),
+          response: {
+            clientDataJSON: arrayBufferToUrlB64(response.clientDataJSON),
+            authenticatorData: arrayBufferToUrlB64(response.authenticatorData),
+            signature: arrayBufferToUrlB64(response.signature),
+            userHandle: response.userHandle ? arrayBufferToUrlB64(response.userHandle) : undefined
+          }
+        };
+      }
+      function passkeysSupported() {
+        return !!(window.PublicKeyCredential && navigator.credentials);
+      }
 
+      const passkeyLoginBtn = $("#passkeyLoginBtn");
+      if (passkeyLoginBtn) {
+        if (!passkeysSupported()) {
+          passkeyLoginBtn.disabled = true;
+          passkeyLoginBtn.title = "Biometria indisponível neste navegador";
+        }
+        passkeyLoginBtn.onclick = () => startPasskeyLogin(false);
+      }
+      let passkeyLoginEmAndamento = false;
+      async function startPasskeyLogin(automatico = false) {
+        if (!passkeysSupported() || passkeyLoginEmAndamento) return;
+        const msg = $("#loginMsg");
+        const username = $("#loginUsername").value.trim();
+        passkeyLoginEmAndamento = true;
+        passkeyLoginBtn.disabled = true;
+        if (!automatico) msg.textContent = "";
+        try {
+          const begin = await api("/api/auth/passkey", {
+            method: "POST",
+            body: JSON.stringify({ acao: "opcoes", username })
+          });
+          const credential = await navigator.credentials.get({
+            publicKey: requestOptionsFromJSON(begin.options),
+            mediation: "optional"
+          });
+          if (!credential) throw new Error("A biometria não foi concluída.");
+          await api("/api/auth/passkey", {
+            method: "POST",
+            body: JSON.stringify({
+              acao: "verificar",
+              challenge_id: begin.challenge_id,
+              response: authenticationToJSON(credential)
+            })
+          });
+          location.reload();
+        } catch (e) {
+          const cancelado = e.name === "NotAllowedError" || e.name === "AbortError";
+          if (!automatico || !cancelado)
+            msg.textContent = cancelado ? "Biometria cancelada ou não reconhecida." : e.message;
+        } finally {
+          passkeyLoginEmAndamento = false;
+          passkeyLoginBtn.disabled = !passkeysSupported();
+        }
+      }
 
-async function init(){
-  const reset=new URLSearchParams(location.search).get('reset');
-  if(reset){show('resetView');return}
-  const setup=await api('/api/setup');
-  if(setup.needsSetup){show('setupView');return}
-  try{const r=await api('/api/auth/me');me=r.usuario;$('#who').textContent=`${me.nome} • @${me.username}${me.papel==='OWNER'?' • Mestre':''}`;show('appView');await Promise.all([loadProducts(),loadUsers(),loadOrders(),loadPasskeys()]);await getPushState()}
-  catch{show('loginView');setTimeout(()=>startPasskeyLogin(true),250)}
-}
+      async function loadPasskeys() {
+        const list = $("#passkeysList");
+        if (!list) return;
+        if (!passkeysSupported()) {
+          list.innerHTML = '<p class="muted">Este navegador não oferece biometria/passkeys.</p>';
+          $("#registerPasskeyBtn").disabled = true;
+          return;
+        }
+        try {
+          const data = await api("/api/admin/passkeys");
+          list.innerHTML = data.passkeys.length
+            ? data.passkeys
+                .map(
+                  p =>
+                    `<div class="user"><div><strong>${esc(p.nome)}</strong><small>${p.backed_up ? "Passkey sincronizada" : "Este aparelho"}${p.ultimo_uso_em ? " • último uso " + esc(p.ultimo_uso_em) : ""}</small></div><button class="btn secondary" type="button" onclick="removePasskey(${p.id})">Remover</button></div>`
+                )
+                .join("")
+            : '<p class="muted">Nenhuma biometria cadastrada.</p>';
+        } catch (e) {
+          list.innerHTML = `<p class="muted">${esc(e.message)}</p>`;
+        }
+      }
+      const registerPasskeyBtn = $("#registerPasskeyBtn");
+      if (registerPasskeyBtn)
+        registerPasskeyBtn.onclick = async () => {
+          registerPasskeyBtn.disabled = true;
+          try {
+            const begin = await api("/api/admin/passkeys", {
+              method: "POST",
+              body: JSON.stringify({ acao: "opcoes" })
+            });
+            const credential = await navigator.credentials.create({
+              publicKey: creationOptionsFromJSON(begin.options)
+            });
+            if (!credential) throw new Error("O cadastro não foi concluído.");
+            await api("/api/admin/passkeys", {
+              method: "POST",
+              body: JSON.stringify({
+                acao: "verificar",
+                challenge_id: begin.challenge_id,
+                response: registrationToJSON(credential)
+              })
+            });
+            toast("Biometria cadastrada com segurança.");
+            await loadPasskeys();
+          } catch (e) {
+            toast(
+              e.name === "NotAllowedError" ? "Cadastro biométrico cancelado." : e.message,
+              "error"
+            );
+          } finally {
+            registerPasskeyBtn.disabled = !passkeysSupported();
+          }
+        };
+      window.removePasskey = async id => {
+        if (!confirm("Remover esta biometria? O login por senha continuará disponível.")) return;
+        try {
+          await api("/api/admin/passkeys", { method: "DELETE", body: JSON.stringify({ id }) });
+          toast("Biometria removida.");
+          await loadPasskeys();
+        } catch (e) {
+          toast(e.message, "error");
+        }
+      };
+      async function getPushState() {
+        const btn = $("#pushBtn");
+        if (!btn) return;
+        if (
+          !("serviceWorker" in navigator) ||
+          !("PushManager" in window) ||
+          !("Notification" in window)
+        ) {
+          btn.textContent = "🔕 Push indisponível";
+          btn.disabled = true;
+          return;
+        }
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          btn.textContent = sub ? "🔔 Notificações ativas" : "🔔 Ativar notificações";
+          btn.classList.toggle("push-active", !!sub);
+        } catch {
+          btn.textContent = "🔔 Ativar notificações";
+        }
+      }
+      const el_pushBtn = $("#pushBtn");
+      if (el_pushBtn)
+        el_pushBtn.onclick = async () => {
+          try {
+            if (!("serviceWorker" in navigator) || !("PushManager" in window))
+              throw new Error("Este navegador não oferece notificações push.");
+            const cfg = await api("/api/admin/push/config");
+            if (!cfg.supported || !cfg.publicKey)
+              throw new Error("As notificações ainda não foram configuradas no servidor.");
+            const reg = await navigator.serviceWorker.ready;
+            let sub = await reg.pushManager.getSubscription();
+            if (sub) {
+              await api("/api/admin/push/subscribe", {
+                method: "DELETE",
+                body: JSON.stringify({ endpoint: sub.endpoint })
+              });
+              await sub.unsubscribe();
+              toast("Notificações desativadas neste dispositivo.");
+            } else {
+              const permission = await Notification.requestPermission();
+              if (permission !== "granted")
+                throw new Error("Permissão de notificações não concedida.");
+              sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlB64ToUint8Array(cfg.publicKey)
+              });
+              await api("/api/admin/push/subscribe", {
+                method: "POST",
+                body: JSON.stringify(sub.toJSON())
+              });
+              toast("Notificações ativadas neste dispositivo. 🔔");
+            }
+            await getPushState();
+          } catch (e) {
+            toast(e.message || "Não foi possível configurar as notificações.", "error");
+          }
+        };
 
-const el_setupBtn = $('#setupBtn');
-if (el_setupBtn) el_setupBtn.onclick = async()=>{try{
-  await api('/api/setup',{method:'POST',body:JSON.stringify({nome:$('#setupNome').value,username:$('#setupUsername').value,email:$('#setupEmail').value,senha:$('#setupSenha').value,setupKey:$('#setupKey').value})});
-  location.reload();
-}catch(e){$('#setupMsg').textContent=e.message}};
-const el_loginBtn = $('#loginBtn');
-if (el_loginBtn) el_loginBtn.onclick = async()=>{try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:$('#loginUsername').value,senha:$('#loginSenha').value})});location.reload()}catch(e){$('#loginMsg').textContent=e.message}};
-['loginUsername','loginSenha'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#loginBtn').click()}}));
+      const el_logoutBtn = $("#logoutBtn");
+      if (el_logoutBtn)
+        el_logoutBtn.onclick = async () => {
+          await api("/api/auth/logout", { method: "POST", body: "{}" });
+          location.reload();
+        };
+      const el_forgotBtn = $("#forgotBtn");
+      if (el_forgotBtn)
+        el_forgotBtn.onclick = async () => {
+          const email = prompt("Digite o e-mail da sua conta para recuperar a senha:")?.trim();
+          if (!email) return;
+          try {
+            const r = await api("/api/auth/forgot", {
+              method: "POST",
+              body: JSON.stringify({ email })
+            });
+            $("#loginMsg").style.color = "#5d8a63";
+            $("#loginMsg").textContent = r.mensagem;
+          } catch (e) {
+            $("#loginMsg").textContent = e.message;
+          }
+        };
+      const el_resetBtn = $("#resetBtn");
+      if (el_resetBtn)
+        el_resetBtn.onclick = async () => {
+          try {
+            const token = new URLSearchParams(location.search).get("reset");
+            await api("/api/auth/reset", {
+              method: "POST",
+              body: JSON.stringify({ token, senha: $("#resetSenha").value })
+            });
+            history.replaceState({}, "", "/admin/");
+            alert("Senha alterada. Faça login novamente.");
+            location.reload();
+          } catch (e) {
+            $("#resetMsg").textContent = e.message;
+          }
+        };
 
-function urlB64ToUint8Array(value){
-  const padding='='.repeat((4-value.length%4)%4);
-  const base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/');
-  const raw=atob(base64); return Uint8Array.from(raw,c=>c.charCodeAt(0));
-}
-function arrayBufferToUrlB64(value){
-  const bytes=new Uint8Array(value);let binary='';
-  for(const byte of bytes)binary+=String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
-}
-function creationOptionsFromJSON(options){
-  return {...options,challenge:urlB64ToUint8Array(options.challenge),user:{...options.user,id:urlB64ToUint8Array(options.user.id)},excludeCredentials:(options.excludeCredentials||[]).map(c=>({...c,id:urlB64ToUint8Array(c.id)}))};
-}
-function requestOptionsFromJSON(options){
-  const converted={...options,challenge:urlB64ToUint8Array(options.challenge)};
-  if(Array.isArray(options.allowCredentials))converted.allowCredentials=options.allowCredentials.map(c=>({...c,id:urlB64ToUint8Array(c.id)}));
-  else delete converted.allowCredentials;
-  return converted;
-}
-function registrationToJSON(credential){
-  const response=credential.response;
-  return {id:credential.id,rawId:arrayBufferToUrlB64(credential.rawId),type:credential.type,authenticatorAttachment:credential.authenticatorAttachment||undefined,clientExtensionResults:credential.getClientExtensionResults(),response:{clientDataJSON:arrayBufferToUrlB64(response.clientDataJSON),attestationObject:arrayBufferToUrlB64(response.attestationObject),transports:typeof response.getTransports==='function'?response.getTransports():[]}};
-}
-function authenticationToJSON(credential){
-  const response=credential.response;
-  return {id:credential.id,rawId:arrayBufferToUrlB64(credential.rawId),type:credential.type,authenticatorAttachment:credential.authenticatorAttachment||undefined,clientExtensionResults:credential.getClientExtensionResults(),response:{clientDataJSON:arrayBufferToUrlB64(response.clientDataJSON),authenticatorData:arrayBufferToUrlB64(response.authenticatorData),signature:arrayBufferToUrlB64(response.signature),userHandle:response.userHandle?arrayBufferToUrlB64(response.userHandle):undefined}};
-}
-function passkeysSupported(){return !!(window.PublicKeyCredential&&navigator.credentials)}
+      $$(".tab").forEach(
+        b =>
+          (b.onclick = () => {
+            $$(".tab").forEach(x => x.classList.remove("active"));
+            b.classList.add("active");
 
-const passkeyLoginBtn=$('#passkeyLoginBtn');
-if(passkeyLoginBtn){
-  if(!passkeysSupported()){passkeyLoginBtn.disabled=true;passkeyLoginBtn.title='Biometria indisponível neste navegador'}
-  passkeyLoginBtn.onclick=()=>startPasskeyLogin(false);
-}
-let passkeyLoginEmAndamento=false;
-async function startPasskeyLogin(automatico=false){
-  if(!passkeysSupported()||passkeyLoginEmAndamento)return;
-  const msg=$('#loginMsg');
-  const username=$('#loginUsername').value.trim();
-  passkeyLoginEmAndamento=true;passkeyLoginBtn.disabled=true;
-  if(!automatico)msg.textContent='';
-  try{
-    const begin=await api('/api/auth/passkey',{method:'POST',body:JSON.stringify({acao:'opcoes',username})});
-    const credential=await navigator.credentials.get({publicKey:requestOptionsFromJSON(begin.options),mediation:'optional'});
-    if(!credential)throw new Error('A biometria não foi concluída.');
-    await api('/api/auth/passkey',{method:'POST',body:JSON.stringify({acao:'verificar',challenge_id:begin.challenge_id,response:authenticationToJSON(credential)})});
-    location.reload();
-  }catch(e){
-    const cancelado=e.name==='NotAllowedError'||e.name==='AbortError';
-    if(!automatico||!cancelado)msg.textContent=cancelado?'Biometria cancelada ou não reconhecida.':e.message;
-  }finally{passkeyLoginEmAndamento=false;passkeyLoginBtn.disabled=!passkeysSupported()}
-}
+            ["produtos", "pedidos", "usuarios", "config"].forEach(tab => {
+              const sec = $("#tab-" + tab);
+              if (sec) sec.classList.toggle("hidden", b.dataset.tab !== tab);
+            });
+          })
+      );
 
-async function loadPasskeys(){
-  const list=$('#passkeysList');if(!list)return;
-  if(!passkeysSupported()){list.innerHTML='<p class="muted">Este navegador não oferece biometria/passkeys.</p>';$('#registerPasskeyBtn').disabled=true;return}
-  try{
-    const data=await api('/api/admin/passkeys');
-    list.innerHTML=data.passkeys.length?data.passkeys.map(p=>`<div class="user"><div><strong>${esc(p.nome)}</strong><small>${p.backed_up?'Passkey sincronizada':'Este aparelho'}${p.ultimo_uso_em?' • último uso '+esc(p.ultimo_uso_em):''}</small></div><button class="btn secondary" type="button" onclick="removePasskey(${p.id})">Remover</button></div>`).join(''):'<p class="muted">Nenhuma biometria cadastrada.</p>';
-  }catch(e){list.innerHTML=`<p class="muted">${esc(e.message)}</p>`}
-}
-const registerPasskeyBtn=$('#registerPasskeyBtn');
-if(registerPasskeyBtn)registerPasskeyBtn.onclick=async()=>{
-  registerPasskeyBtn.disabled=true;
-  try{
-    const begin=await api('/api/admin/passkeys',{method:'POST',body:JSON.stringify({acao:'opcoes'})});
-    const credential=await navigator.credentials.create({publicKey:creationOptionsFromJSON(begin.options)});
-    if(!credential)throw new Error('O cadastro não foi concluído.');
-    await api('/api/admin/passkeys',{method:'POST',body:JSON.stringify({acao:'verificar',challenge_id:begin.challenge_id,response:registrationToJSON(credential)})});
-    toast('Biometria cadastrada com segurança.');await loadPasskeys();
-  }catch(e){toast(e.name==='NotAllowedError'?'Cadastro biométrico cancelado.':e.message,'error')}
-  finally{registerPasskeyBtn.disabled=!passkeysSupported()}
-};
-window.removePasskey=async id=>{
-  if(!confirm('Remover esta biometria? O login por senha continuará disponível.'))return;
-  try{await api('/api/admin/passkeys',{method:'DELETE',body:JSON.stringify({id})});toast('Biometria removida.');await loadPasskeys()}catch(e){toast(e.message,'error')}
-};
-async function getPushState(){
-  const btn=$('#pushBtn'); if(!btn)return;
-  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){
-    btn.textContent='🔕 Push indisponível'; btn.disabled=true; return;
-  }
-  try{
-    const reg=await navigator.serviceWorker.ready;
-    const sub=await reg.pushManager.getSubscription();
-    btn.textContent=sub?'🔔 Notificações ativas':'🔔 Ativar notificações';
-    btn.classList.toggle('push-active',!!sub);
-  }catch{btn.textContent='🔔 Ativar notificações'}
-}
-const el_pushBtn=$('#pushBtn');
-if(el_pushBtn) el_pushBtn.onclick=async()=>{
-  try{
-    if(!('serviceWorker' in navigator)||!('PushManager' in window))throw new Error('Este navegador não oferece notificações push.');
-    const cfg=await api('/api/admin/push/config');
-    if(!cfg.supported||!cfg.publicKey)throw new Error('As notificações ainda não foram configuradas no servidor.');
-    const reg=await navigator.serviceWorker.ready;
-    let sub=await reg.pushManager.getSubscription();
-    if(sub){
-      await api('/api/admin/push/subscribe',{method:'DELETE',body:JSON.stringify({endpoint:sub.endpoint})});
-      await sub.unsubscribe(); toast('Notificações desativadas neste dispositivo.');
-    }else{
-      const permission=await Notification.requestPermission();
-      if(permission!=='granted')throw new Error('Permissão de notificações não concedida.');
-      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8Array(cfg.publicKey)});
-      await api('/api/admin/push/subscribe',{method:'POST',body:JSON.stringify(sub.toJSON())});
-      toast('Notificações ativadas neste dispositivo. 🔔');
-    }
-    await getPushState();
-  }catch(e){toast(e.message||'Não foi possível configurar as notificações.','error')}
-};
-
-const el_logoutBtn = $('#logoutBtn');
-if (el_logoutBtn) el_logoutBtn.onclick = async()=>{await api('/api/auth/logout',{method:'POST',body:'{}'});location.reload()};
-const el_forgotBtn = $('#forgotBtn');
-if (el_forgotBtn) el_forgotBtn.onclick = async()=>{const email=prompt('Digite o e-mail da sua conta para recuperar a senha:')?.trim();if(!email)return;try{const r=await api('/api/auth/forgot',{method:'POST',body:JSON.stringify({email})});$('#loginMsg').style.color='#5d8a63';$('#loginMsg').textContent=r.mensagem}catch(e){$('#loginMsg').textContent=e.message}};
-const el_resetBtn = $('#resetBtn');
-if (el_resetBtn) el_resetBtn.onclick = async()=>{try{const token=new URLSearchParams(location.search).get('reset');await api('/api/auth/reset',{method:'POST',body:JSON.stringify({token,senha:$('#resetSenha').value})});history.replaceState({},'', '/admin/');alert('Senha alterada. Faça login novamente.');location.reload()}catch(e){$('#resetMsg').textContent=e.message}};
-
-$$('.tab').forEach(b=>b.onclick=()=>{
-  $$('.tab').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active');
-
-  ['produtos','pedidos','usuarios','config'].forEach(tab=>{
-    const sec=$('#tab-'+tab);
-    if(sec) sec.classList.toggle('hidden', b.dataset.tab!==tab);
-  });
-});
-
-async function loadProducts(){const r=await api('/api/admin/products');produtos=r.produtos;renderProducts()}
-async function loadOrders(){
-  const r=await api('/api/admin/orders'); pedidos=r.pedidos||[]; renderOrders();
-}
-let visualizacaoPedidos="fila";
-const ORDER_STATUSES=['NOVO','PRONTO','ENTREGUE','CANCELADO'];
-const orderStatusLabel=v=>v[0]+v.slice(1).toLowerCase();
-function renderOrderStatusSelect(p,op){
-  const disabled=p.status_pagamento!=='PAGO';
-  return `<div class="order-status-select ${disabled?'is-disabled':''}" data-order-id="${p.id}">
-    <button class="order-status-trigger" type="button" ${disabled?'disabled title="Aguardando confirmação do pagamento"':''} onclick="toggleOrderStatusMenu(event,${p.id})">${orderStatusLabel(op)}</button>
+      async function loadProducts() {
+        const r = await api("/api/admin/products");
+        produtos = r.produtos;
+        renderProducts();
+      }
+      async function loadOrders() {
+        const r = await api("/api/admin/orders");
+        pedidos = r.pedidos || [];
+        renderOrders();
+      }
+      let visualizacaoPedidos = "fila";
+      const ORDER_STATUSES = ["NOVO", "PRONTO", "ENTREGUE", "CANCELADO"];
+      const orderStatusLabel = v => v[0] + v.slice(1).toLowerCase();
+      function renderOrderStatusSelect(p, op) {
+        const disabled = p.status_pagamento !== "PAGO";
+        return `<div class="order-status-select ${disabled ? "is-disabled" : ""}" data-order-id="${p.id}">
+    <button class="order-status-trigger" type="button" ${disabled ? 'disabled title="Aguardando confirmação do pagamento"' : ""} onclick="toggleOrderStatusMenu(event,${p.id})">${orderStatusLabel(op)}</button>
     <div class="order-status-menu" role="listbox">
-      ${ORDER_STATUSES.map(x=>`<button class="order-status-option" type="button" role="option" aria-selected="${op===x}" onclick="chooseOrderStatus(event,${p.id},'${x}')">${orderStatusLabel(x)}</button>`).join('')}
+      ${ORDER_STATUSES.map(x => `<button class="order-status-option" type="button" role="option" aria-selected="${op === x}" onclick="chooseOrderStatus(event,${p.id},'${x}')">${orderStatusLabel(x)}</button>`).join("")}
     </div>
   </div>`;
-}
-window.toggleOrderStatusMenu=(event,id)=>{
-  event.stopPropagation();
-  const root=event.currentTarget.closest('.order-status-select');
-  if(!root || event.currentTarget.disabled)return;
-  document.querySelectorAll('.order-status-select.open').forEach(x=>{if(x!==root)x.classList.remove('open')});
-  root.classList.toggle('open');
-};
-window.chooseOrderStatus=async(event,id,status)=>{
-  event.stopPropagation();
-  const root=event.currentTarget.closest('.order-status-select');
-  if(root)root.classList.remove('open');
-  await setOrderStatus(id,status);
-};
-document.addEventListener('click',()=>document.querySelectorAll('.order-status-select.open').forEach(x=>x.classList.remove('open')));
-document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.order-status-select.open').forEach(x=>x.classList.remove('open'))});
-function orderItems(p){
-  return Array.isArray(p.itens)&&p.itens.length?p.itens:[{produto_nome:p.produto_nome,quantidade:p.quantidade,valor_unitario_centavos:p.valor_unitario_centavos,valor_total_centavos:p.valor_total_centavos}];
-}
-function orderItemsHtml(p){return orderItems(p).map(i=>`${esc(i.quantidade)}× ${esc(i.produto_nome)}`).join('<br>')}
-function renderOrders(){
-  const hoje=new Date().toISOString().slice(0,10);
-  const ativos=pedidos.filter(p=>!Number(p.arquivado));
-  const deHoje=ativos.filter(p=>String(p.criado_em||'').slice(0,10)===hoje);
-  const pagosHoje=deHoje.filter(p=>p.status_pagamento==='PAGO');
-  $('#pedidosHoje').textContent=deHoje.length;
-  $('#faturamentoHoje').textContent=money(pagosHoje.reduce((a,p)=>a+Number(p.valor_total_centavos||0),0));
-  $('#pedidosPendentes').textContent=ativos.filter(p=>p.status_pagamento==='PENDENTE').length;
-  const novos=ativos.filter(p=>p.status_pagamento==='PAGO' && p.status_pedido==='NOVO').length;
-  $('#pedidosBadge').textContent=novos?`(${novos})`:'';
+      }
+      window.toggleOrderStatusMenu = (event, id) => {
+        event.stopPropagation();
+        const root = event.currentTarget.closest(".order-status-select");
+        if (!root || event.currentTarget.disabled) return;
+        document.querySelectorAll(".order-status-select.open").forEach(x => {
+          if (x !== root) x.classList.remove("open");
+        });
+        root.classList.toggle("open");
+      };
+      window.chooseOrderStatus = async (event, id, status) => {
+        event.stopPropagation();
+        const root = event.currentTarget.closest(".order-status-select");
+        if (root) root.classList.remove("open");
+        await setOrderStatus(id, status);
+      };
+      document.addEventListener("click", () =>
+        document
+          .querySelectorAll(".order-status-select.open")
+          .forEach(x => x.classList.remove("open"))
+      );
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape")
+          document
+            .querySelectorAll(".order-status-select.open")
+            .forEach(x => x.classList.remove("open"));
+      });
+      function orderItems(p) {
+        return Array.isArray(p.itens) && p.itens.length
+          ? p.itens
+          : [
+              {
+                produto_nome: p.produto_nome,
+                quantidade: p.quantidade,
+                valor_unitario_centavos: p.valor_unitario_centavos,
+                valor_total_centavos: p.valor_total_centavos
+              }
+            ];
+      }
+      function orderItemsHtml(p) {
+        return orderItems(p)
+          .map(i => `${esc(i.quantidade)}× ${esc(i.produto_nome)}`)
+          .join("<br>");
+      }
+      function renderOrders() {
+        const hoje = new Date().toISOString().slice(0, 10);
+        const ativos = pedidos.filter(p => !Number(p.arquivado));
+        const deHoje = ativos.filter(p => String(p.criado_em || "").slice(0, 10) === hoje);
+        const pagosHoje = deHoje.filter(p => p.status_pagamento === "PAGO");
+        $("#pedidosHoje").textContent = deHoje.length;
+        $("#faturamentoHoje").textContent = money(
+          pagosHoje.reduce((a, p) => a + Number(p.valor_total_centavos || 0), 0)
+        );
+        $("#pedidosPendentes").textContent = ativos.filter(
+          p => p.status_pagamento === "PENDENTE"
+        ).length;
+        const novos = ativos.filter(
+          p => p.status_pagamento === "PAGO" && p.status_pedido === "NOVO"
+        ).length;
+        $("#pedidosBadge").textContent = novos ? `(${novos})` : "";
 
-  const encerrado=p=>['ENTREGUE','CANCELADO'].includes(p.status_pedido);
-  let lista=visualizacaoPedidos==='arquivados'
-    ? pedidos.filter(p=>Number(p.arquivado))
-    : ativos.filter(p=>visualizacaoPedidos==='historico'?encerrado(p):!encerrado(p));
-  if(visualizacaoPedidos==='fila')lista=[...lista].sort((a,b)=>b.id-a.id);
+        const encerrado = p => ["ENTREGUE", "CANCELADO"].includes(p.status_pedido);
+        let lista =
+          visualizacaoPedidos === "arquivados"
+            ? pedidos.filter(p => Number(p.arquivado))
+            : ativos.filter(p =>
+                visualizacaoPedidos === "historico" ? encerrado(p) : !encerrado(p)
+              );
+        if (visualizacaoPedidos === "fila") lista = [...lista].sort((a, b) => b.id - a.id);
 
-  const fila=$('#verFilaPedidos'), hist=$('#verHistoricoPedidos'), arq=$('#verArquivadosPedidos');
-  if(fila) fila.classList.toggle('active',visualizacaoPedidos==='fila');
-  if(hist) hist.classList.toggle('active',visualizacaoPedidos==='historico');
-  if(arq) arq.classList.toggle('active',visualizacaoPedidos==='arquivados');
+        const fila = $("#verFilaPedidos"),
+          hist = $("#verHistoricoPedidos"),
+          arq = $("#verArquivadosPedidos");
+        if (fila) fila.classList.toggle("active", visualizacaoPedidos === "fila");
+        if (hist) hist.classList.toggle("active", visualizacaoPedidos === "historico");
+        if (arq) arq.classList.toggle("active", visualizacaoPedidos === "arquivados");
 
-  $('#ordersList').innerHTML=lista.map(p=>{
-    const pay=p.status_pagamento==='PAGO'?'Pago':p.status_pagamento==='PENDENTE'?'Aguardando':'Erro';
-    const payClass=p.status_pagamento==='PAGO'?'pay-ok':p.status_pagamento==='PENDENTE'?'pay-pending':'pay-error';
-    const when=p.criado_em?new Date(String(p.criado_em).replace(' ','T')+'Z').toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
-    const op=(p.status_pedido||'NOVO');
-    const isNew=p.status_pagamento==='PAGO'&&op==='NOVO';
-    return `<div class="order-row ${isNew?'order-new':''}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${orderItemsHtml(p)}</small><small>${esc(p.cliente_email)}${p.cliente_whatsapp?' · '+esc(formatPhone(p.cliente_whatsapp)):''}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento==='PAGO'?`<span class="badge operational-badge">${op[0]+op.slice(1).toLowerCase()}</span>`:''}<span class="badge">${when}</span></div>${p.observacao?`<small>Obs.: ${esc(p.observacao)}</small>`:''}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em?'Pago em '+esc(p.pago_em):esc(p.mp_status_detail||'')}</small></div><div class="order-actions">${renderOrderStatusSelect(p,op)}<button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
-  }).join('')||`<p class="muted">${visualizacaoPedidos==='arquivados'?'Nenhum pedido arquivado.':visualizacaoPedidos==='historico'?'Nenhum pedido concluído ou cancelado ainda.':'Nenhum pedido na fila atual.'}</p>`;
-}
-const verFilaPedidos=$('#verFilaPedidos'); if(verFilaPedidos) verFilaPedidos.onclick=()=>{visualizacaoPedidos='fila';renderOrders()};
-const verHistoricoPedidos=$('#verHistoricoPedidos'); if(verHistoricoPedidos) verHistoricoPedidos.onclick=()=>{visualizacaoPedidos='historico';renderOrders()};
-const verArquivadosPedidos=$('#verArquivadosPedidos'); if(verArquivadosPedidos) verArquivadosPedidos.onclick=()=>{visualizacaoPedidos='arquivados';renderOrders()};
-function formatPhone(value){
-  let d=String(value||'').replace(/\D/g,'');
-  if(d.startsWith('55')&&d.length>=12)d=d.slice(2);
-  if(d.length===11)return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
-  if(d.length===10)return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-  return value||'Não informado';
-}
-function closeOrderDetail(){const o=$('#orderDetailOverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true')}}
-window.openOrderDetail=id=>{
-  const p=pedidos.find(x=>Number(x.id)===Number(id)); if(!p)return;
-  const op=p.status_pedido||'NOVO';
-  const itensHtml=orderItems(p).map(i=>`<div class="order-detail-box"><small>${i.quantidade}× ${esc(i.produto_nome)}</small><strong>${money(i.valor_total_centavos)}</strong><span class="muted">${money(i.valor_unitario_centavos)} cada</span></div>`).join('');
-  $('#orderDetailTitle').textContent=`Pedido #${p.id} · ${p.cliente_nome}`;
-  $('#orderDetailSubtitle').textContent=`${p.tipo_entrega==='RETIRADA'||!p.tipo_entrega?'Retirada':'Entrega'} · ${p.status_pagamento==='PAGO'?'Pagamento confirmado':p.status_pagamento==='PENDENTE'?'Aguardando pagamento':'Erro no pagamento'}`;
-  $('#orderDetailBody').innerHTML=`<div class="order-detail-grid">
+        $("#ordersList").innerHTML =
+          lista
+            .map(p => {
+              const pay =
+                p.status_pagamento === "PAGO"
+                  ? "Pago"
+                  : p.status_pagamento === "PENDENTE"
+                    ? "Aguardando"
+                    : "Erro";
+              const payClass =
+                p.status_pagamento === "PAGO"
+                  ? "pay-ok"
+                  : p.status_pagamento === "PENDENTE"
+                    ? "pay-pending"
+                    : "pay-error";
+              const when = p.criado_em
+                ? new Date(String(p.criado_em).replace(" ", "T") + "Z").toLocaleString("pt-BR", {
+                    dateStyle: "short",
+                    timeStyle: "short"
+                  })
+                : "";
+              const op = p.status_pedido || "NOVO";
+              const isNew = p.status_pagamento === "PAGO" && op === "NOVO";
+              return `<div class="order-row ${isNew ? "order-new" : ""}"><div class="order-main"><strong>#${p.id} · ${esc(p.cliente_nome)}</strong><small>${orderItemsHtml(p)}</small><small>${esc(p.cliente_email)}${p.cliente_whatsapp ? " · " + esc(formatPhone(p.cliente_whatsapp)) : ""}</small><div class="order-meta"><span class="badge ${payClass}">${pay}</span><span class="badge">${esc(p.metodo_pagamento)}</span><span class="badge">Retirada</span>${p.status_pagamento === "PAGO" ? `<span class="badge operational-badge">${op[0] + op.slice(1).toLowerCase()}</span>` : ""}<span class="badge">${when}</span></div>${p.observacao ? `<small>Obs.: ${esc(p.observacao)}</small>` : ""}</div><div class="order-total"><strong>${money(p.valor_total_centavos)}</strong><small>${p.pago_em ? "Pago em " + esc(p.pago_em) : esc(p.mp_status_detail || "")}</small></div><div class="order-actions">${renderOrderStatusSelect(p, op)}<button class="btn secondary" type="button" onclick="openOrderDetail(${p.id})">Detalhes</button></div></div>`;
+            })
+            .join("") ||
+          `<p class="muted">${visualizacaoPedidos === "arquivados" ? "Nenhum pedido arquivado." : visualizacaoPedidos === "historico" ? "Nenhum pedido concluído ou cancelado ainda." : "Nenhum pedido na fila atual."}</p>`;
+      }
+      const verFilaPedidos = $("#verFilaPedidos");
+      if (verFilaPedidos)
+        verFilaPedidos.onclick = () => {
+          visualizacaoPedidos = "fila";
+          renderOrders();
+        };
+      const verHistoricoPedidos = $("#verHistoricoPedidos");
+      if (verHistoricoPedidos)
+        verHistoricoPedidos.onclick = () => {
+          visualizacaoPedidos = "historico";
+          renderOrders();
+        };
+      const verArquivadosPedidos = $("#verArquivadosPedidos");
+      if (verArquivadosPedidos)
+        verArquivadosPedidos.onclick = () => {
+          visualizacaoPedidos = "arquivados";
+          renderOrders();
+        };
+      function formatPhone(value) {
+        let d = String(value || "").replace(/\D/g, "");
+        if (d.startsWith("55") && d.length >= 12) d = d.slice(2);
+        if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+        if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+        return value || "Não informado";
+      }
+      function closeOrderDetail() {
+        const o = $("#orderDetailOverlay");
+        if (o) {
+          o.classList.remove("open");
+          o.setAttribute("aria-hidden", "true");
+        }
+      }
+      window.openOrderDetail = id => {
+        const p = pedidos.find(x => Number(x.id) === Number(id));
+        if (!p) return;
+        const op = p.status_pedido || "NOVO";
+        const itensHtml = orderItems(p)
+          .map(
+            i =>
+              `<div class="order-detail-box"><small>${i.quantidade}× ${esc(i.produto_nome)}</small><strong>${money(i.valor_total_centavos)}</strong><span class="muted">${money(i.valor_unitario_centavos)} cada</span></div>`
+          )
+          .join("");
+        $("#orderDetailTitle").textContent = `Pedido #${p.id} · ${p.cliente_nome}`;
+        $("#orderDetailSubtitle").textContent =
+          `${p.tipo_entrega === "RETIRADA" || !p.tipo_entrega ? "Retirada" : "Entrega"} · ${p.status_pagamento === "PAGO" ? "Pagamento confirmado" : p.status_pagamento === "PENDENTE" ? "Aguardando pagamento" : "Erro no pagamento"}`;
+        $("#orderDetailBody").innerHTML = `<div class="order-detail-grid">
     <div class="order-detail-box"><small>WhatsApp</small><strong>${esc(formatPhone(p.cliente_whatsapp))}</strong></div>
     <div class="order-detail-box"><small>E-mail</small><strong>${esc(p.cliente_email)}</strong></div>
     ${itensHtml}
     <div class="order-detail-box"><small>Total</small><strong>${money(p.valor_total_centavos)}</strong></div>
     <div class="order-detail-box"><small>Pagamento</small><strong>${esc(p.status_pagamento)} · ${esc(p.metodo_pagamento)}</strong></div>
-    <div class="order-detail-box"><small>Andamento</small><strong>${esc(op[0]+op.slice(1).toLowerCase())}</strong></div>
+    <div class="order-detail-box"><small>Andamento</small><strong>${esc(op[0] + op.slice(1).toLowerCase())}</strong></div>
     <div class="order-detail-box"><small>Recebimento</small><strong>Retirada</strong></div>
-    <div class="order-detail-box"><small>Pago em</small><strong>${esc(p.pago_em||'Ainda não confirmado')}</strong></div>
-  </div>${p.observacao?`<div class="order-detail-note"><strong>Observação:</strong> ${esc(p.observacao)}</div>`:''}`;
-  const digits=String(p.cliente_whatsapp||'').replace(/\D/g,'');
-  // Emojis escritos como escapes Unicode para o arquivo continuar seguro mesmo em ambientes
-  // que alterem a codificação durante copia/deploy. encodeURIComponent cuida da URL do WhatsApp.
-  const mensagensWhatsApp={
-    NOVO:`Olá, ${p.cliente_nome}! \u2764 Recebemos o pagamento do seu pedido #${p.id} da R&P Doces. Em breve começaremos a preparação. \u2728`,
-    PREPARANDO:`Olá, ${p.cliente_nome}! \u2764 Seu pedido #${p.id} da R&P Doces já está sendo preparado com carinho. Avisaremos assim que estiver pronto para retirada. \u2728`,
-    PRONTO:`Olá, ${p.cliente_nome}! \u2728 Seu pedido #${p.id} da R&P Doces está pronto para retirada. Pode vir buscar! \u2764`,
-    ENTREGUE:`Olá, ${p.cliente_nome}! \u2764 Obrigado pelo pedido #${p.id} na R&P Doces. Esperamos que você aproveite cada colherada! \u2728`,
-    CANCELADO:`Olá, ${p.cliente_nome}! Estamos entrando em contato sobre o cancelamento do seu pedido #${p.id} da R&P Doces.`
-  };
-  const textoWhats=mensagensWhatsApp[op]||`Olá, ${p.cliente_nome}! \u2764 Estamos entrando em contato sobre o seu pedido #${p.id} da R&P Doces.`;
-  const msg=encodeURIComponent(textoWhats);
-  $('#orderDetailActions').innerHTML=
-    (digits?`<a class="btn" href="https://api.whatsapp.com/send?phone=${digits}&text=${msg}" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>`:'')+
-    (Number(p.arquivado)?`<button class="btn secondary" type="button" onclick="archiveOrder(${p.id},false)">Restaurar</button>`:`<button class="btn secondary" type="button" onclick="archiveOrder(${p.id},true)">Arquivar</button>`)+
-    (me?.papel==='OWNER'?`<button class="btn danger" type="button" onclick="deleteOrder(${p.id})">Excluir definitivamente</button>`:'')+
-    `<button class="btn secondary" type="button" onclick="closeOrderDetail()">Fechar</button>`;
-  const o=$('#orderDetailOverlay');o.classList.add('open');o.setAttribute('aria-hidden','false');
-};
-window.closeOrderDetail=closeOrderDetail;
-const orderDetailClose=$('#orderDetailClose');if(orderDetailClose)orderDetailClose.onclick=closeOrderDetail;
-const orderDetailOverlay=$('#orderDetailOverlay');if(orderDetailOverlay)orderDetailOverlay.onclick=e=>{if(e.target===orderDetailOverlay)closeOrderDetail()};
+    <div class="order-detail-box"><small>Pago em</small><strong>${esc(p.pago_em || "Ainda não confirmado")}</strong></div>
+  </div>${p.observacao ? `<div class="order-detail-note"><strong>Observação:</strong> ${esc(p.observacao)}</div>` : ""}`;
+        const digits = String(p.cliente_whatsapp || "").replace(/\D/g, "");
+        // Emojis escritos como escapes Unicode para o arquivo continuar seguro mesmo em ambientes
+        // que alterem a codificação durante copia/deploy. encodeURIComponent cuida da URL do WhatsApp.
+        const mensagensWhatsApp = {
+          NOVO: `Olá, ${p.cliente_nome}! \u2764 Recebemos o pagamento do seu pedido #${p.id} da R&P Doces. Em breve começaremos a preparação. \u2728`,
+          PREPARANDO: `Olá, ${p.cliente_nome}! \u2764 Seu pedido #${p.id} da R&P Doces já está sendo preparado com carinho. Avisaremos assim que estiver pronto para retirada. \u2728`,
+          PRONTO: `Olá, ${p.cliente_nome}! \u2728 Seu pedido #${p.id} da R&P Doces está pronto para retirada. Pode vir buscar! \u2764`,
+          ENTREGUE: `Olá, ${p.cliente_nome}! \u2764 Obrigado pelo pedido #${p.id} na R&P Doces. Esperamos que você aproveite cada colherada! \u2728`,
+          CANCELADO: `Olá, ${p.cliente_nome}! Estamos entrando em contato sobre o cancelamento do seu pedido #${p.id} da R&P Doces.`
+        };
+        const textoWhats =
+          mensagensWhatsApp[op] ||
+          `Olá, ${p.cliente_nome}! \u2764 Estamos entrando em contato sobre o seu pedido #${p.id} da R&P Doces.`;
+        const msg = encodeURIComponent(textoWhats);
+        $("#orderDetailActions").innerHTML =
+          (digits
+            ? `<a class="btn" href="https://api.whatsapp.com/send?phone=${digits}&text=${msg}" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>`
+            : "") +
+          (Number(p.arquivado)
+            ? `<button class="btn secondary" type="button" onclick="archiveOrder(${p.id},false)">Restaurar</button>`
+            : `<button class="btn secondary" type="button" onclick="archiveOrder(${p.id},true)">Arquivar</button>`) +
+          (me?.papel === "OWNER"
+            ? `<button class="btn danger" type="button" onclick="deleteOrder(${p.id})">Excluir definitivamente</button>`
+            : "") +
+          `<button class="btn secondary" type="button" onclick="closeOrderDetail()">Fechar</button>`;
+        const o = $("#orderDetailOverlay");
+        o.classList.add("open");
+        o.setAttribute("aria-hidden", "false");
+      };
+      window.closeOrderDetail = closeOrderDetail;
+      const orderDetailClose = $("#orderDetailClose");
+      if (orderDetailClose) orderDetailClose.onclick = closeOrderDetail;
+      const orderDetailOverlay = $("#orderDetailOverlay");
+      if (orderDetailOverlay)
+        orderDetailOverlay.onclick = e => {
+          if (e.target === orderDetailOverlay) closeOrderDetail();
+        };
 
-window.setOrderStatus=async(id,status)=>{try{await api('/api/admin/orders/'+id,{method:'PUT',body:JSON.stringify({status_pedido:status})});toast('Status do pedido atualizado');await loadOrders()}catch(e){alert(e.message)}};
-window.archiveOrder=async(id,arquivado)=>{
-  try{
-    await api('/api/admin/orders/'+id,{method:'PUT',body:JSON.stringify({arquivado})});
-    closeOrderDetail();
-    toast(arquivado?'Pedido arquivado':'Pedido restaurado');
-    await loadOrders();
-  }catch(e){alert(e.message)}
-};
-window.deleteOrder=async id=>{
-  const p=pedidos.find(x=>Number(x.id)===Number(id)); if(!p)return;
-  const pago=p.status_pagamento==='PAGO';
-  if(pago){
-    const digitado=prompt(`ATENÇÃO: o pedido #${id} está PAGO. Excluir aqui NÃO estorna o Pix no Mercado Pago.\n\nPara excluir definitivamente do R&P Doces, digite EXCLUIR #${id}`);
-    if(digitado!==`EXCLUIR #${id}`)return;
-  }else{
-    const ok=await appConfirm({
-      title:`Excluir pedido #${id}?`,
-      text:'O pedido será removido definitivamente do R&P Doces e esta ação não poderá ser desfeita.',
-      confirmLabel:'Excluir definitivamente',
-      detailLabel:'Pedido',
-      detailValue:`#${id} · ${p.cliente_nome}`,
-      tone:'danger',
-      icon:'🗑️',
-      danger:true
-    });
-    if(!ok)return;
-  }
-  try{
-    await api('/api/admin/orders/'+id,{method:'DELETE'});
-    closeOrderDetail();
-    toast(`Pedido #${id} excluído definitivamente`);
-    await loadOrders();
-  }catch(e){alert(e.message)}
-};
-const atualizarPedidos=$('#atualizarPedidos'); if(atualizarPedidos) atualizarPedidos.onclick=loadOrders;
-let mostrarArquivados=false;
-function renderProducts(){
-  const lista=produtos.filter(p=>mostrarArquivados ? !p.ativo : p.ativo);
-  $('#toggleArquivados').textContent=mostrarArquivados?'Ver cardápio':'Ver arquivados';
-  $('#productsGrid').innerHTML=lista.map(p=>`<article class="product">
-    <div class="product-head"><span>${esc(p.emoji||(p.categoria==='MINI_PUDIM'?'🍮':'🍰'))}</span><span class="price">${p.promocao_ativa&&p.preco_promocional_centavos?`<s style="opacity:.55;font-weight:500">${money(p.preco_centavos)}</s> ${money(p.preco_promocional_centavos)}`:money(p.preco_centavos)}</span></div>
-    <h3>${esc(p.nome)}</h3><p>${esc(p.descricao||'')}</p>
-    <div class="badges"><span class="badge">${p.categoria==='MINI_PUDIM'?'Mini Pudim':'Bolo no Pote'}</span>${p.promocao_ativa?`<span class="badge">Promo 🏷️</span>`:''}<span class="badge">Estoque: ${Number(p.estoque)||0}</span><span class="badge ${p.disponivel?'':'off'}">${p.disponivel?'Disponível':'Esgotado'}</span><span class="badge ${p.ativo?'':'off'}">${p.ativo?'Visível':'Arquivado'}</span></div>
-    <div class="actions">${p.ativo?`<button class="availability-toggle ${p.disponivel?'':'is-soldout'}" onclick="toggleProductAvailability(${p.id}, this)">${p.disponivel?'Disponível':'Esgotado'}</button><button class="btn secondary" onclick="editProduct(${p.id})">Editar</button><button class="btn danger" onclick="delProduct(${p.id})">Arquivar</button>`:`<button class="btn" onclick="restoreProduct(${p.id})">Restaurar</button><button class="btn danger" onclick="deleteForever(${p.id})">Excluir definitivamente</button>`}</div>
-  </article>`).join('')||`<p class="muted">${mostrarArquivados?'Nenhum produto arquivado.':'Nenhum produto cadastrado ainda.'}</p>`;
-}
-const el_toggleArquivados = $('#toggleArquivados');
-if (el_toggleArquivados) el_toggleArquivados.onclick = ()=>{mostrarArquivados=!mostrarArquivados;renderProducts()};
+      window.setOrderStatus = async (id, status) => {
+        try {
+          await api("/api/admin/orders/" + id, {
+            method: "PUT",
+            body: JSON.stringify({ status_pedido: status })
+          });
+          toast("Status do pedido atualizado");
+          await loadOrders();
+        } catch (e) {
+          alert(e.message);
+        }
+      };
+      window.archiveOrder = async (id, arquivado) => {
+        try {
+          await api("/api/admin/orders/" + id, {
+            method: "PUT",
+            body: JSON.stringify({ arquivado })
+          });
+          closeOrderDetail();
+          toast(arquivado ? "Pedido arquivado" : "Pedido restaurado");
+          await loadOrders();
+        } catch (e) {
+          alert(e.message);
+        }
+      };
+      window.deleteOrder = async id => {
+        const p = pedidos.find(x => Number(x.id) === Number(id));
+        if (!p) return;
+        const pago = p.status_pagamento === "PAGO";
+        if (pago) {
+          const digitado = prompt(
+            `ATENÇÃO: o pedido #${id} está PAGO. Excluir aqui NÃO estorna o Pix no Mercado Pago.\n\nPara excluir definitivamente do R&P Doces, digite EXCLUIR #${id}`
+          );
+          if (digitado !== `EXCLUIR #${id}`) return;
+        } else {
+          const ok = await appConfirm({
+            title: `Excluir pedido #${id}?`,
+            text: "O pedido será removido definitivamente do R&P Doces e esta ação não poderá ser desfeita.",
+            confirmLabel: "Excluir definitivamente",
+            detailLabel: "Pedido",
+            detailValue: `#${id} · ${p.cliente_nome}`,
+            tone: "danger",
+            icon: "🗑️",
+            danger: true
+          });
+          if (!ok) return;
+        }
+        try {
+          await api("/api/admin/orders/" + id, { method: "DELETE" });
+          closeOrderDetail();
+          toast(`Pedido #${id} excluído definitivamente`);
+          await loadOrders();
+        } catch (e) {
+          alert(e.message);
+        }
+      };
+      const atualizarPedidos = $("#atualizarPedidos");
+      if (atualizarPedidos) atualizarPedidos.onclick = loadOrders;
+      let mostrarArquivados = false;
+      function renderProducts() {
+        const lista = produtos.filter(p => (mostrarArquivados ? !p.ativo : p.ativo));
+        $("#toggleArquivados").textContent = mostrarArquivados ? "Ver cardápio" : "Ver arquivados";
+        $("#productsGrid").innerHTML =
+          lista
+            .map(
+              p => `<article class="product">
+    <div class="product-head"><span>${esc(p.emoji || (p.categoria === "MINI_PUDIM" ? "🍮" : "🍰"))}</span><span class="price">${p.promocao_ativa && p.preco_promocional_centavos ? `<s style="opacity:.55;font-weight:500">${money(p.preco_centavos)}</s> ${money(p.preco_promocional_centavos)}` : money(p.preco_centavos)}</span></div>
+    <h3>${esc(p.nome)}</h3><p>${esc(p.descricao || "")}</p>
+    <div class="badges"><span class="badge">${p.categoria === "MINI_PUDIM" ? "Mini Pudim" : "Bolo no Pote"}</span>${p.promocao_ativa ? `<span class="badge">Promo 🏷️</span>` : ""}<span class="badge">Estoque: ${Number(p.estoque) || 0}</span><span class="badge ${p.disponivel ? "" : "off"}">${p.disponivel ? "Disponível" : "Esgotado"}</span><span class="badge ${p.ativo ? "" : "off"}">${p.ativo ? "Visível" : "Arquivado"}</span></div>
+    <div class="actions">${p.ativo ? `<button class="availability-toggle ${p.disponivel ? "" : "is-soldout"}" onclick="toggleProductAvailability(${p.id}, this)">${p.disponivel ? "Disponível" : "Esgotado"}</button><button class="btn secondary" onclick="editProduct(${p.id})">Editar</button><button class="btn danger" onclick="delProduct(${p.id})">Arquivar</button>` : `<button class="btn" onclick="restoreProduct(${p.id})">Restaurar</button><button class="btn danger" onclick="deleteForever(${p.id})">Excluir definitivamente</button>`}</div>
+  </article>`
+            )
+            .join("") ||
+          `<p class="muted">${mostrarArquivados ? "Nenhum produto arquivado." : "Nenhum produto cadastrado ainda."}</p>`;
+      }
+      const el_toggleArquivados = $("#toggleArquivados");
+      if (el_toggleArquivados)
+        el_toggleArquivados.onclick = () => {
+          mostrarArquivados = !mostrarArquivados;
+          renderProducts();
+        };
 
+      function notifyStockUpdate() {
+        try {
+          if ("BroadcastChannel" in window) {
+            const channel = new BroadcastChannel("rp-doces-stock");
+            channel.postMessage({ type: "stock-updated", at: Date.now() });
+            channel.close();
+          }
+          localStorage.setItem("rp-doces-stock-updated", String(Date.now()));
+        } catch (_) {}
+      }
 
-function notifyStockUpdate(){
-  try {
-    if ('BroadcastChannel' in window) {
-      const channel = new BroadcastChannel('rp-doces-stock');
-      channel.postMessage({type:'stock-updated', at:Date.now()});
-      channel.close();
-    }
-    localStorage.setItem('rp-doces-stock-updated', String(Date.now()));
-  } catch (_) {}
-}
+      window.toggleProductAvailability = async (id, btn) => {
+        const p = produtos.find(x => x.id === id);
+        if (!p || !p.ativo || btn?.disabled) return;
 
-window.toggleProductAvailability=async(id,btn)=>{
-  const p=produtos.find(x=>x.id===id);
-  if(!p || !p.ativo || btn?.disabled)return;
+        const novoStatus = !p.disponivel;
+        if (btn) btn.disabled = true;
 
-  const novoStatus=!p.disponivel;
-  if(btn) btn.disabled=true;
+        try {
+          await api("/api/admin/products/" + id, {
+            method: "PUT",
+            body: JSON.stringify({
+              nome: p.nome,
+              categoria: p.categoria,
+              descricao: p.descricao || "",
+              preco_centavos: Number(p.preco_centavos) || 0,
+              emoji: p.emoji || "",
+              disponivel: novoStatus,
+              ativo: true,
+              destaque: !!p.destaque,
+              estoque: Number(p.estoque) || 0,
+              promocao_ativa: !!p.promocao_ativa,
+              preco_promocional_centavos: p.preco_promocional_centavos
+                ? Number(p.preco_promocional_centavos)
+                : null,
+              promocao_inicio: p.promocao_inicio || null,
+              promocao_fim: p.promocao_fim || null
+            })
+          });
 
-  try{
-    await api('/api/admin/products/'+id,{
-      method:'PUT',
-      body:JSON.stringify({
-        nome:p.nome,
-        categoria:p.categoria,
-        descricao:p.descricao||'',
-        preco_centavos:Number(p.preco_centavos)||0,
-        emoji:p.emoji||'',
-        disponivel:novoStatus,
-        ativo:true,
-        destaque:!!p.destaque,
-        estoque:Number(p.estoque)||0,
-        promocao_ativa:!!p.promocao_ativa, preco_promocional_centavos:p.preco_promocional_centavos?Number(p.preco_promocional_centavos):null,
-        promocao_inicio:p.promocao_inicio||null, promocao_fim:p.promocao_fim||null
-      })
-    });
+          p.disponivel = novoStatus;
+          renderProducts();
+          notifyStockUpdate();
+          toast(
+            novoStatus ? "Produto disponível novamente" : "Produto marcado como esgotado",
+            novoStatus ? "success" : "info"
+          );
+        } catch (e) {
+          if (btn) btn.disabled = false;
+          alert(e.message || "Não foi possível alterar a disponibilidade.");
+        }
+      };
 
-    p.disponivel=novoStatus;
-    renderProducts();
-    notifyStockUpdate();
-    toast(novoStatus ? 'Produto disponível novamente' : 'Produto marcado como esgotado', novoStatus ? 'success' : 'info');
-  }catch(e){
-    if(btn) btn.disabled=false;
-    alert(e.message||'Não foi possível alterar a disponibilidade.');
-  }
-};
+      function appConfirm({
+        title = "Confirmar ação?",
+        text = "Esta ação precisa da sua confirmação.",
+        confirmLabel = "Confirmar",
+        cancelLabel = "Cancelar",
+        detailLabel = "",
+        detailValue = "",
+        tone = "warning",
+        icon = "⚠️",
+        danger = false
+      } = {}) {
+        return new Promise(resolve => {
+          const overlay = $("#genericConfirmOverlay");
+          const titleEl = $("#genericConfirmTitle"),
+            textEl = $("#genericConfirmText");
+          const iconEl = $("#genericConfirmIcon"),
+            detail = $("#genericConfirmDetail");
+          const detailLabelEl = $("#genericConfirmDetailLabel"),
+            detailValueEl = $("#genericConfirmDetailValue");
+          const cancel = $("#genericConfirmCancel"),
+            ok = $("#genericConfirmOk");
+          if (!overlay || !titleEl || !textEl || !cancel || !ok) {
+            resolve(false);
+            return;
+          }
+          titleEl.textContent = title;
+          textEl.textContent = text;
+          iconEl.textContent = icon;
+          iconEl.className = `rp-delete-icon rp-confirm-icon ${tone}`;
+          cancel.textContent = cancelLabel;
+          ok.textContent = confirmLabel;
+          ok.className = `btn ${danger ? "danger rp-delete-confirm" : ""}`.trim();
+          if (detailValue) {
+            detail.classList.remove("hidden");
+            detailLabelEl.textContent = detailLabel || "Item";
+            detailValueEl.textContent = detailValue;
+          } else {
+            detail.classList.add("hidden");
+          }
+          overlay.classList.add("open");
+          overlay.setAttribute("aria-hidden", "false");
+          const fechar = result => {
+            overlay.classList.remove("open");
+            overlay.setAttribute("aria-hidden", "true");
+            cancel.onclick = null;
+            ok.onclick = null;
+            overlay.onclick = null;
+            document.removeEventListener("keydown", onKey);
+            resolve(result);
+          };
+          const onKey = e => {
+            if (e.key === "Escape") fechar(false);
+            if (e.key === "Enter" && !e.repeat) fechar(true);
+          };
+          cancel.onclick = () => fechar(false);
+          ok.onclick = () => fechar(true);
+          overlay.onclick = e => {
+            if (e.target === overlay) fechar(false);
+          };
+          document.addEventListener("keydown", onKey);
+          setTimeout(() => ok.focus(), 0);
+        });
+      }
+      function confirmarExclusaoProduto(p) {
+        return new Promise(resolve => {
+          const overlay = $("#deleteProductOverlay");
+          const nome = $("#deleteProductName");
+          const cancel = $("#deleteProductCancel");
+          const confirmBtn = $("#deleteProductConfirm");
+          if (!overlay || !nome || !cancel || !confirmBtn) {
+            resolve(confirm(`Excluir "${p.nome}" definitivamente?`));
+            return;
+          }
+          nome.textContent = p.nome || "Produto";
+          overlay.classList.add("open");
+          overlay.setAttribute("aria-hidden", "false");
+          const fechar = resultado => {
+            overlay.classList.remove("open");
+            overlay.setAttribute("aria-hidden", "true");
+            cancel.onclick = null;
+            confirmBtn.onclick = null;
+            overlay.onclick = null;
+            document.removeEventListener("keydown", onKey);
+            resolve(resultado);
+          };
+          const onKey = e => {
+            if (e.key === "Escape") fechar(false);
+          };
+          cancel.onclick = () => fechar(false);
+          confirmBtn.onclick = () => fechar(true);
+          overlay.onclick = e => {
+            if (e.target === overlay) fechar(false);
+          };
+          document.addEventListener("keydown", onKey);
+          setTimeout(() => confirmBtn.focus(), 0);
+        });
+      }
+      window.deleteForever = async id => {
+        const p = produtos.find(x => x.id === id);
+        if (!p) return;
+        const ok = await confirmarExclusaoProduto(p);
+        if (!ok) return;
+        try {
+          await api("/api/admin/products/" + id + "?permanent=1", { method: "DELETE" });
+          await loadProducts();
+          toast("Produto excluído definitivamente", "success");
+        } catch (e) {
+          alert(e.message || "Não foi possível excluir o produto.");
+        }
+      };
+      window.restoreProduct = async id => {
+        const p = produtos.find(x => x.id === id);
+        if (!p) return;
+        await api("/api/admin/products/" + id, {
+          method: "PUT",
+          body: JSON.stringify({
+            nome: p.nome,
+            categoria: p.categoria,
+            descricao: p.descricao,
+            preco_centavos: p.preco_centavos,
+            emoji: p.emoji || "",
+            disponivel: true,
+            ativo: true,
+            destaque: !!p.destaque,
+            estoque: Number(p.estoque) || 0,
+            promocao_ativa: !!p.promocao_ativa,
+            preco_promocional_centavos: p.preco_promocional_centavos
+              ? Number(p.preco_promocional_centavos)
+              : null,
+            promocao_inicio: p.promocao_inicio || null,
+            promocao_fim: p.promocao_fim || null
+          })
+        });
+        await loadProducts();
+      };
 
-function appConfirm({
-  title='Confirmar ação?',
-  text='Esta ação precisa da sua confirmação.',
-  confirmLabel='Confirmar',
-  cancelLabel='Cancelar',
-  detailLabel='',
-  detailValue='',
-  tone='warning',
-  icon='⚠️',
-  danger=false
-}={}){
-  return new Promise(resolve=>{
-    const overlay=$('#genericConfirmOverlay');
-    const titleEl=$('#genericConfirmTitle'), textEl=$('#genericConfirmText');
-    const iconEl=$('#genericConfirmIcon'), detail=$('#genericConfirmDetail');
-    const detailLabelEl=$('#genericConfirmDetailLabel'), detailValueEl=$('#genericConfirmDetailValue');
-    const cancel=$('#genericConfirmCancel'), ok=$('#genericConfirmOk');
-    if(!overlay||!titleEl||!textEl||!cancel||!ok){resolve(false);return}
-    titleEl.textContent=title;
-    textEl.textContent=text;
-    iconEl.textContent=icon;
-    iconEl.className=`rp-delete-icon rp-confirm-icon ${tone}`;
-    cancel.textContent=cancelLabel;
-    ok.textContent=confirmLabel;
-    ok.className=`btn ${danger?'danger rp-delete-confirm':''}`.trim();
-    if(detailValue){
-      detail.classList.remove('hidden');
-      detailLabelEl.textContent=detailLabel||'Item';
-      detailValueEl.textContent=detailValue;
-    }else{
-      detail.classList.add('hidden');
-    }
-    overlay.classList.add('open');
-    overlay.setAttribute('aria-hidden','false');
-    const fechar=result=>{
-      overlay.classList.remove('open');
-      overlay.setAttribute('aria-hidden','true');
-      cancel.onclick=null;ok.onclick=null;overlay.onclick=null;
-      document.removeEventListener('keydown',onKey);
-      resolve(result);
-    };
-    const onKey=e=>{if(e.key==='Escape')fechar(false);if(e.key==='Enter'&&!e.repeat)fechar(true)};
-    cancel.onclick=()=>fechar(false);
-    ok.onclick=()=>fechar(true);
-    overlay.onclick=e=>{if(e.target===overlay)fechar(false)};
-    document.addEventListener('keydown',onKey);
-    setTimeout(()=>ok.focus(),0);
-  });
-}
-function confirmarExclusaoProduto(p){
-  return new Promise(resolve=>{
-    const overlay=$('#deleteProductOverlay');
-    const nome=$('#deleteProductName');
-    const cancel=$('#deleteProductCancel');
-    const confirmBtn=$('#deleteProductConfirm');
-    if(!overlay||!nome||!cancel||!confirmBtn){resolve(confirm(`Excluir "${p.nome}" definitivamente?`));return}
-    nome.textContent=p.nome||'Produto';
-    overlay.classList.add('open');
-    overlay.setAttribute('aria-hidden','false');
-    const fechar=resultado=>{
-      overlay.classList.remove('open');
-      overlay.setAttribute('aria-hidden','true');
-      cancel.onclick=null; confirmBtn.onclick=null; overlay.onclick=null;
-      document.removeEventListener('keydown',onKey);
-      resolve(resultado);
-    };
-    const onKey=e=>{if(e.key==='Escape')fechar(false)};
-    cancel.onclick=()=>fechar(false);
-    confirmBtn.onclick=()=>fechar(true);
-    overlay.onclick=e=>{if(e.target===overlay)fechar(false)};
-    document.addEventListener('keydown',onKey);
-    setTimeout(()=>confirmBtn.focus(),0);
-  });
-}
-window.deleteForever=async id=>{
-  const p=produtos.find(x=>x.id===id);
-  if(!p)return;
-  const ok=await confirmarExclusaoProduto(p);
-  if(!ok)return;
-  try{
-    await api('/api/admin/products/'+id+'?permanent=1',{method:'DELETE'});
-    await loadProducts();
-    toast('Produto excluído definitivamente','success');
-  }catch(e){
-    alert(e.message||'Não foi possível excluir o produto.');
-  }
-};
-window.restoreProduct=async id=>{
-  const p=produtos.find(x=>x.id===id); if(!p)return;
-  await api('/api/admin/products/'+id,{method:'PUT',body:JSON.stringify({
-    nome:p.nome,categoria:p.categoria,descricao:p.descricao,preco_centavos:p.preco_centavos,
-    emoji:p.emoji||'',disponivel:true,ativo:true,destaque:!!p.destaque,estoque:Number(p.estoque)||0,
-    promocao_ativa:!!p.promocao_ativa,preco_promocional_centavos:p.preco_promocional_centavos?Number(p.preco_promocional_centavos):null,
-    promocao_inicio:p.promocao_inicio||null,promocao_fim:p.promocao_fim||null
-  })});
-  await loadProducts();
-};
+      const el_novoProduto = $("#novoProduto");
+      if (el_novoProduto) el_novoProduto.onclick = () => openProduct();
+      function promoParts(v) {
+        if (!v) return { data: "", hora: "" };
+        const d = new Date(v);
+        if (!Number.isFinite(d.getTime())) return { data: "", hora: "" };
+        const pad = n => String(n).padStart(2, "0");
+        return {
+          data: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+          hora: `${pad(d.getHours())}:${pad(d.getMinutes())}`
+        };
+      }
+      function promoIsoFromParts(data, hora) {
+        if (!data) return null;
+        const d = new Date(`${data}T${hora || "00:00"}`);
+        return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+      }
+      function promoRadio(name) {
+        return document.querySelector(`input[name="${name}"]:checked`)?.value;
+      }
+      function setPromoRadio(name, value) {
+        const el = document.querySelector(`input[name="${name}"][value="${value}"]`);
+        if (el) el.checked = true;
+      }
+      function promoPretty(data, hora) {
+        if (!data) return "";
+        const [a, m, d] = data.split("-");
+        return `${d}/${m}/${a} às ${hora || "00:00"}`;
+      }
+      function updatePromoSchedule() {
+        const inicioAgendado = promoRadio("pPromoInicioModo") === "agendar";
+        const fimAgendado = promoRadio("pPromoFimModo") === "agendar";
+        $("#pPromoInicioAgenda").classList.toggle("hidden", !inicioAgendado);
+        $("#pPromoFimAgenda").classList.toggle("hidden", !fimAgendado);
+        const inicio = inicioAgendado
+          ? promoPretty($("#pPromoInicioData").value, $("#pPromoInicioHora").value)
+          : "agora";
+        const fim = fimAgendado
+          ? promoPretty($("#pPromoFimData").value, $("#pPromoFimHora").value)
+          : "sem data para terminar";
+        $("#pPromoResumo").innerHTML =
+          `💗 <strong>Promoção programada</strong><br>${inicioAgendado ? "Começa em " + inicio : "Começa agora"} • ${fimAgendado ? "termina em " + fim : fim}.`;
+      }
+      function togglePromoFields() {
+        const on = $("#pPromocaoAtiva").checked;
+        $("#promoFields").style.display = on ? "block" : "none";
+        if (on) updatePromoSchedule();
+      }
+      function openProduct(p = null) {
+        $("#pId").value = p?.id || "";
+        $("#pNome").value = p?.nome || "";
+        $("#pCategoria").value = p?.categoria || "BOLO_NO_POTE";
+        $("#pDescricao").value = p?.descricao || "";
+        $("#pPreco").value = p ? precoInput(p.preco_centavos) : "";
+        $("#pEstoque").value = p ? Number(p.estoque) || 0 : 0;
+        $("#pEmoji").value = p?.emoji || (p?.categoria === "MINI_PUDIM" ? "🍮" : "🍰");
+        $("#pDisponivel").checked = p ? !!p.disponivel : true;
+        $("#pAtivo").checked = p ? !!p.ativo : true;
+        $("#pDestaque").checked = p ? !!p.destaque : false;
+        $("#pPromocaoAtiva").checked = p ? !!p.promocao_ativa : false;
+        $("#pPrecoPromo").value = p?.preco_promocional_centavos
+          ? precoInput(p.preco_promocional_centavos)
+          : "";
+        const inicio = promoParts(p?.promocao_inicio),
+          fim = promoParts(p?.promocao_fim);
+        setPromoRadio("pPromoInicioModo", p?.promocao_inicio ? "agendar" : "agora");
+        setPromoRadio("pPromoFimModo", p?.promocao_fim ? "agendar" : "sem_fim");
+        $("#pPromoInicioData").value = inicio.data;
+        $("#pPromoInicioHora").value = inicio.hora || "09:00";
+        $("#pPromoFimData").value = fim.data;
+        $("#pPromoFimHora").value = fim.hora || "23:59";
+        togglePromoFields();
+        $("#productModalTitle").textContent = p ? "Editar produto" : "Novo produto";
+        $("#productMsg").textContent = "";
+        $("#productModal").classList.remove("hidden");
+      }
+      window.editProduct = id => openProduct(produtos.find(p => p.id === id));
+      window.delProduct = async id => {
+        const p = produtos.find(x => Number(x.id) === Number(id));
+        if (!p) return;
+        const ok = await appConfirm({
+          title: "Arquivar produto?",
+          text: "Ele sairá do site e do cardápio ativo, mas poderá ser restaurado quando você quiser.",
+          confirmLabel: "Arquivar",
+          detailLabel: "Produto",
+          detailValue: p.nome,
+          tone: "warning",
+          icon: "📦"
+        });
+        if (!ok) return;
+        await api("/api/admin/products/" + id, { method: "DELETE" });
+        await loadProducts();
+        toast("Produto arquivado");
+      };
+      $("#pPreco").addEventListener("input", formatPrecoField);
+      $("#pPrecoPromo").addEventListener("input", () => {
+        const el = $("#pPrecoPromo");
+        el.value = money(precoCentavos(el.value));
+      });
+      $("#pPromocaoAtiva").addEventListener("change", togglePromoFields);
+      document
+        .querySelectorAll('input[name="pPromoInicioModo"],input[name="pPromoFimModo"]')
+        .forEach(el => el.addEventListener("change", updatePromoSchedule));
+      ["pPromoInicioData", "pPromoInicioHora", "pPromoFimData", "pPromoFimHora"].forEach(id =>
+        $("#" + id).addEventListener("input", updatePromoSchedule)
+      );
+      $("#pPreco").addEventListener("focus", () => {
+        const el = $("#pPreco");
+        if (!el.value) el.value = money(0);
+        requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
+      });
+      const el_saveProduct = $("#saveProduct");
+      if (el_saveProduct)
+        el_saveProduct.onclick = async () => {
+          try {
+            const preco = precoCentavos($("#pPreco").value);
+            const estoque = Math.max(0, Math.trunc(Number($("#pEstoque").value) || 0));
+            const promoAtiva = $("#pPromocaoAtiva").checked;
+            const precoPromo = precoCentavos($("#pPrecoPromo").value);
+            const inicioAgendado = promoRadio("pPromoInicioModo") === "agendar";
+            const fimAgendado = promoRadio("pPromoFimModo") === "agendar";
+            if (promoAtiva && inicioAgendado && !$("#pPromoInicioData").value)
+              throw new Error("Escolha a data de início da promoção.");
+            if (promoAtiva && fimAgendado && !$("#pPromoFimData").value)
+              throw new Error("Escolha a data de término da promoção.");
+            const promoInicio =
+              promoAtiva && inicioAgendado
+                ? promoIsoFromParts($("#pPromoInicioData").value, $("#pPromoInicioHora").value)
+                : null;
+            const promoFim =
+              promoAtiva && fimAgendado
+                ? promoIsoFromParts($("#pPromoFimData").value, $("#pPromoFimHora").value)
+                : null;
+            if (promoInicio && promoFim && Date.parse(promoFim) <= Date.parse(promoInicio))
+              throw new Error("O término da promoção precisa ser depois do início.");
+            const payload = {
+              nome: $("#pNome").value,
+              categoria: $("#pCategoria").value,
+              descricao: $("#pDescricao").value,
+              preco_centavos: preco,
+              emoji: $("#pEmoji").value,
+              estoque,
+              disponivel: $("#pDisponivel").checked && estoque > 0,
+              ativo: $("#pAtivo").checked,
+              destaque: $("#pDestaque").checked,
+              promocao_ativa: promoAtiva,
+              preco_promocional_centavos: promoAtiva ? precoPromo : null,
+              promocao_inicio: promoInicio,
+              promocao_fim: promoFim
+            };
+            const id = $("#pId").value;
+            await api(id ? "/api/admin/products/" + id : "/api/admin/products", {
+              method: id ? "PUT" : "POST",
+              body: JSON.stringify(payload)
+            });
+            $("#productModal").classList.add("hidden");
+            await loadProducts();
+          } catch (e) {
+            $("#productMsg").textContent = e.message;
+          }
+        };
 
-const el_novoProduto = $('#novoProduto');
-if (el_novoProduto) el_novoProduto.onclick = ()=>openProduct();
-function promoParts(v){if(!v)return {data:'',hora:''};const d=new Date(v);if(!Number.isFinite(d.getTime()))return {data:'',hora:''};const pad=n=>String(n).padStart(2,'0');return {data:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,hora:`${pad(d.getHours())}:${pad(d.getMinutes())}`}}
-function promoIsoFromParts(data,hora){if(!data)return null;const d=new Date(`${data}T${hora||'00:00'}`);return Number.isFinite(d.getTime())?d.toISOString():null}
-function promoRadio(name){return document.querySelector(`input[name="${name}"]:checked`)?.value}
-function setPromoRadio(name,value){const el=document.querySelector(`input[name="${name}"][value="${value}"]`);if(el)el.checked=true}
-function promoPretty(data,hora){if(!data)return '';const [a,m,d]=data.split('-');return `${d}/${m}/${a} às ${hora||'00:00'}`}
-function updatePromoSchedule(){const inicioAgendado=promoRadio('pPromoInicioModo')==='agendar';const fimAgendado=promoRadio('pPromoFimModo')==='agendar';$('#pPromoInicioAgenda').classList.toggle('hidden',!inicioAgendado);$('#pPromoFimAgenda').classList.toggle('hidden',!fimAgendado);const inicio=inicioAgendado?promoPretty($('#pPromoInicioData').value,$('#pPromoInicioHora').value):'agora';const fim=fimAgendado?promoPretty($('#pPromoFimData').value,$('#pPromoFimHora').value):'sem data para terminar';$('#pPromoResumo').innerHTML=`💗 <strong>Promoção programada</strong><br>${inicioAgendado?'Começa em '+inicio:'Começa agora'} • ${fimAgendado?'termina em '+fim:fim}.`}
-function togglePromoFields(){const on=$('#pPromocaoAtiva').checked;$('#promoFields').style.display=on?'block':'none';if(on)updatePromoSchedule()}
-function openProduct(p=null){
-  $('#pId').value=p?.id||'';$('#pNome').value=p?.nome||'';$('#pCategoria').value=p?.categoria||'BOLO_NO_POTE';$('#pDescricao').value=p?.descricao||'';$('#pPreco').value=p?precoInput(p.preco_centavos):'';$('#pEstoque').value=p?Number(p.estoque)||0:0;$('#pEmoji').value=p?.emoji||(p?.categoria==='MINI_PUDIM'?'🍮':'🍰');$('#pDisponivel').checked=p?!!p.disponivel:true;$('#pAtivo').checked=p?!!p.ativo:true;$('#pDestaque').checked=p?!!p.destaque:false;
-  $('#pPromocaoAtiva').checked=p?!!p.promocao_ativa:false;$('#pPrecoPromo').value=p?.preco_promocional_centavos?precoInput(p.preco_promocional_centavos):'';const inicio=promoParts(p?.promocao_inicio),fim=promoParts(p?.promocao_fim);setPromoRadio('pPromoInicioModo',p?.promocao_inicio?'agendar':'agora');setPromoRadio('pPromoFimModo',p?.promocao_fim?'agendar':'sem_fim');$('#pPromoInicioData').value=inicio.data;$('#pPromoInicioHora').value=inicio.hora||'09:00';$('#pPromoFimData').value=fim.data;$('#pPromoFimHora').value=fim.hora||'23:59';togglePromoFields();
-  $('#productModalTitle').textContent=p?'Editar produto':'Novo produto';$('#productMsg').textContent='';$('#productModal').classList.remove('hidden')
-}
-window.editProduct=id=>openProduct(produtos.find(p=>p.id===id));
-window.delProduct=async id=>{
-  const p=produtos.find(x=>Number(x.id)===Number(id));if(!p)return;
-  const ok=await appConfirm({
-    title:'Arquivar produto?',
-    text:'Ele sairá do site e do cardápio ativo, mas poderá ser restaurado quando você quiser.',
-    confirmLabel:'Arquivar',
-    detailLabel:'Produto',
-    detailValue:p.nome,
-    tone:'warning',
-    icon:'📦'
-  });
-  if(!ok)return;
-  await api('/api/admin/products/'+id,{method:'DELETE'});
-  await loadProducts();
-  toast('Produto arquivado');
-};
-$('#pPreco').addEventListener('input',formatPrecoField);
-$('#pPrecoPromo').addEventListener('input',()=>{const el=$('#pPrecoPromo');el.value=money(precoCentavos(el.value))});
-$('#pPromocaoAtiva').addEventListener('change',togglePromoFields);
-document.querySelectorAll('input[name="pPromoInicioModo"],input[name="pPromoFimModo"]').forEach(el=>el.addEventListener('change',updatePromoSchedule));
-['pPromoInicioData','pPromoInicioHora','pPromoFimData','pPromoFimHora'].forEach(id=>$('#'+id).addEventListener('input',updatePromoSchedule));
-$('#pPreco').addEventListener('focus',()=>{const el=$('#pPreco');if(!el.value)el.value=money(0);requestAnimationFrame(()=>el.setSelectionRange(el.value.length,el.value.length))});
-const el_saveProduct = $('#saveProduct');
-if (el_saveProduct) el_saveProduct.onclick = async()=>{try{
- const preco=precoCentavos($('#pPreco').value);const estoque=Math.max(0,Math.trunc(Number($('#pEstoque').value)||0));const promoAtiva=$('#pPromocaoAtiva').checked;const precoPromo=precoCentavos($('#pPrecoPromo').value);const inicioAgendado=promoRadio('pPromoInicioModo')==='agendar';const fimAgendado=promoRadio('pPromoFimModo')==='agendar';if(promoAtiva&&inicioAgendado&&!$('#pPromoInicioData').value)throw new Error('Escolha a data de início da promoção.');if(promoAtiva&&fimAgendado&&!$('#pPromoFimData').value)throw new Error('Escolha a data de término da promoção.');const promoInicio=promoAtiva&&inicioAgendado?promoIsoFromParts($('#pPromoInicioData').value,$('#pPromoInicioHora').value):null;const promoFim=promoAtiva&&fimAgendado?promoIsoFromParts($('#pPromoFimData').value,$('#pPromoFimHora').value):null;if(promoInicio&&promoFim&&Date.parse(promoFim)<=Date.parse(promoInicio))throw new Error('O término da promoção precisa ser depois do início.');const payload={nome:$('#pNome').value,categoria:$('#pCategoria').value,descricao:$('#pDescricao').value,preco_centavos:preco,emoji:$('#pEmoji').value,estoque,disponivel:$('#pDisponivel').checked&&estoque>0,ativo:$('#pAtivo').checked,destaque:$('#pDestaque').checked,promocao_ativa:promoAtiva,preco_promocional_centavos:promoAtiva?precoPromo:null,promocao_inicio:promoInicio,promocao_fim:promoFim};
- const id=$('#pId').value;await api(id?'/api/admin/products/'+id:'/api/admin/products',{method:id?'PUT':'POST',body:JSON.stringify(payload)});$('#productModal').classList.add('hidden');await loadProducts()
-}catch(e){$('#productMsg').textContent=e.message}};
+      async function loadUsers() {
+        const r = await api("/api/admin/users");
+        usuarios = r.usuarios;
+        renderUsers();
+      }
+      function renderUsers() {
+        const owner = me?.papel === "OWNER";
+        if (el_novoUsuario) el_novoUsuario.classList.toggle("hidden", !owner);
+        $("#usersList").innerHTML = usuarios
+          .map(u => {
+            const papel = u.papel === "OWNER" ? "Mestre" : "Administrador";
+            const roleAction =
+              owner && u.id !== me.id
+                ? `<button class="btn secondary" onclick="changeUserRole(${u.id},'${u.papel === "OWNER" ? "ADMIN" : "OWNER"}')">${u.papel === "OWNER" ? "Rebaixar para admin" : "Promover a mestre"}</button>`
+                : "";
+            const toggleAction =
+              owner && u.id !== me.id
+                ? `<button class="btn ${u.ativo ? "danger" : "secondary"}" onclick="toggleUser(${u.id},${u.ativo ? 0 : 1})">${u.ativo ? "Desativar" : "Ativar"}</button>`
+                : "";
+            return `<div class="user"><div><strong>${esc(u.nome)} ${u.id === me.id ? "(você)" : ""}</strong><small>@${esc(u.username)} • ${esc(u.email)} • ${papel} • ${u.ativo ? "Ativo" : "Desativado"}</small></div><div class="actions"><button class="btn secondary" onclick="resetUser(${u.id})">Nova senha</button>${roleAction}${toggleAction}</div></div>`;
+          })
+          .join("");
+      }
+      const el_novoUsuario = $("#novoUsuario");
+      if (el_novoUsuario)
+        el_novoUsuario.onclick = () => {
+          if (me?.papel !== "OWNER") return;
+          $("#uNome").value = $("#uUsername").value = $("#uEmail").value = $("#uSenha").value = "";
+          $("#uPapel").value = "ADMIN";
+          $("#userMsg").textContent = "";
+          $("#userModal").classList.remove("hidden");
+        };
+      const el_saveUser = $("#saveUser");
+      if (el_saveUser)
+        el_saveUser.onclick = async () => {
+          try {
+            await api("/api/admin/users", {
+              method: "POST",
+              body: JSON.stringify({
+                nome: $("#uNome").value,
+                username: $("#uUsername").value,
+                email: $("#uEmail").value,
+                senha: $("#uSenha").value,
+                papel: $("#uPapel").value
+              })
+            });
+            $("#userModal").classList.add("hidden");
+            await loadUsers();
+          } catch (e) {
+            $("#userMsg").textContent = e.message;
+          }
+        };
+      let passwordUserId = null;
 
-async function loadUsers(){const r=await api('/api/admin/users');usuarios=r.usuarios;renderUsers()}
-function renderUsers(){
- const owner=me?.papel==='OWNER';
- if(el_novoUsuario) el_novoUsuario.classList.toggle('hidden',!owner);
- $('#usersList').innerHTML=usuarios.map(u=>{
-   const papel=u.papel==='OWNER'?'Mestre':'Administrador';
-   const roleAction=owner && u.id!==me.id ? `<button class="btn secondary" onclick="changeUserRole(${u.id},'${u.papel==='OWNER'?'ADMIN':'OWNER'}')">${u.papel==='OWNER'?'Rebaixar para admin':'Promover a mestre'}</button>` : '';
-   const toggleAction=owner && u.id!==me.id ? `<button class="btn ${u.ativo?'danger':'secondary'}" onclick="toggleUser(${u.id},${u.ativo?0:1})">${u.ativo?'Desativar':'Ativar'}</button>` : '';
-   return `<div class="user"><div><strong>${esc(u.nome)} ${u.id===me.id?'(você)':''}</strong><small>@${esc(u.username)} • ${esc(u.email)} • ${papel} • ${u.ativo?'Ativo':'Desativado'}</small></div><div class="actions"><button class="btn secondary" onclick="resetUser(${u.id})">Nova senha</button>${roleAction}${toggleAction}</div></div>`;
- }).join('');
-}
-const el_novoUsuario = $('#novoUsuario');
-if (el_novoUsuario) el_novoUsuario.onclick = ()=>{if(me?.papel!=='OWNER')return;$('#uNome').value=$('#uUsername').value=$('#uEmail').value=$('#uSenha').value='';$('#uPapel').value='ADMIN';$('#userMsg').textContent='';$('#userModal').classList.remove('hidden')};
-const el_saveUser = $('#saveUser');
-if (el_saveUser) el_saveUser.onclick = async()=>{try{await api('/api/admin/users',{method:'POST',body:JSON.stringify({nome:$('#uNome').value,username:$('#uUsername').value,email:$('#uEmail').value,senha:$('#uSenha').value,papel:$('#uPapel').value})});$('#userModal').classList.add('hidden');await loadUsers()}catch(e){$('#userMsg').textContent=e.message}};
-let passwordUserId=null;
+      window.resetUser = id => {
+        passwordUserId = id;
+        $("#newPassword").value = "";
+        $("#confirmNewPassword").value = "";
+        $("#passwordMsg").textContent = "";
+        $("#passwordModal").classList.remove("hidden");
+        setTimeout(() => $("#newPassword").focus(), 50);
+      };
 
-window.resetUser=id=>{
-  passwordUserId=id;
-  $('#newPassword').value='';
-  $('#confirmNewPassword').value='';
-  $('#passwordMsg').textContent='';
-  $('#passwordModal').classList.remove('hidden');
-  setTimeout(()=>$('#newPassword').focus(),50);
-};
+      $("#saveNewPassword").onclick = async () => {
+        const senha = $("#newPassword").value;
+        const confirmar = $("#confirmNewPassword").value;
+        const msg = $("#passwordMsg");
 
-$('#saveNewPassword').onclick=async()=>{
-  const senha=$('#newPassword').value;
-  const confirmar=$('#confirmNewPassword').value;
-  const msg=$('#passwordMsg');
+        msg.textContent = "";
 
-  msg.textContent='';
+        if (senha.length < 8) {
+          msg.textContent = "A senha precisa ter pelo menos 8 caracteres.";
+          return;
+        }
+        if (!/[A-Za-z]/.test(senha) || !/\d/.test(senha)) {
+          msg.textContent = "Use pelo menos uma letra e um número.";
+          return;
+        }
+        if (senha !== confirmar) {
+          msg.textContent = "As senhas não coincidem.";
+          return;
+        }
 
-  if(senha.length<8){
-    msg.textContent='A senha precisa ter pelo menos 8 caracteres.';
-    return;
-  }
-  if(!/[A-Za-z]/.test(senha) || !/\d/.test(senha)){
-    msg.textContent='Use pelo menos uma letra e um número.';
-    return;
-  }
-  if(senha!==confirmar){
-    msg.textContent='As senhas não coincidem.';
-    return;
-  }
+        try {
+          await api("/api/admin/users/" + passwordUserId, {
+            method: "PUT",
+            body: JSON.stringify({ acao: "resetar_senha", senha })
+          });
+          $("#passwordModal").classList.add("hidden");
+        } catch (e) {
+          msg.textContent = e.message;
+        }
+      };
 
-  try{
-    await api('/api/admin/users/'+passwordUserId,{
-      method:'PUT',
-      body:JSON.stringify({acao:'resetar_senha',senha})
-    });
-    $('#passwordModal').classList.add('hidden');
-  }catch(e){
-    msg.textContent=e.message;
-  }
-};
+      function bindPasswordToggle(buttonId, inputId) {
+        const btn = $(buttonId);
+        const input = $(inputId);
+        if (!btn || !input) return;
+        btn.onclick = () => {
+          const show = input.type === "password";
+          input.type = show ? "text" : "password";
+          btn.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
+        };
+      }
+      bindPasswordToggle("#toggleNewPassword", "#newPassword");
+      bindPasswordToggle("#toggleConfirmPassword", "#confirmNewPassword");
 
-function bindPasswordToggle(buttonId,inputId){
-  const btn=$(buttonId);
-  const input=$(inputId);
-  if(!btn || !input) return;
-  btn.onclick=()=>{
-    const show=input.type==='password';
-    input.type=show?'text':'password';
-    btn.setAttribute('aria-label',show?'Ocultar senha':'Mostrar senha');
-  };
-}
-bindPasswordToggle('#toggleNewPassword','#newPassword');
-bindPasswordToggle('#toggleConfirmPassword','#confirmNewPassword');
+      ["#newPassword", "#confirmNewPassword"].forEach(sel => {
+        $(sel).addEventListener("keydown", e => {
+          if (e.key === "Enter") $("#saveNewPassword").click();
+        });
+      });
+      window.toggleUser = async (id, ativo) => {
+        const u = usuarios.find(x => Number(x.id) === Number(id));
+        if (!u) return;
+        const reativar = !!ativo;
+        const ok = await appConfirm({
+          title: reativar ? "Reativar conta?" : "Desativar conta?",
+          text: reativar
+            ? "O administrador voltará a conseguir acessar o painel."
+            : "O administrador perderá o acesso ao painel até que a conta seja reativada.",
+          confirmLabel: reativar ? "Reativar" : "Desativar",
+          detailLabel: "Administrador",
+          detailValue: `${u.nome} · @${u.username}`,
+          tone: reativar ? "info" : "danger",
+          icon: reativar ? "👤" : "⛔",
+          danger: !reativar
+        });
+        if (!ok) return;
+        await api("/api/admin/users/" + id, {
+          method: "PUT",
+          body: JSON.stringify({ acao: "toggle_ativo", ativo: reativar })
+        });
+        await loadUsers();
+        toast(reativar ? "Conta reativada" : "Conta desativada");
+      };
+      window.changeUserRole = async (id, papel) => {
+        const u = usuarios.find(x => Number(x.id) === Number(id));
+        if (!u) return;
+        const promover = papel === "OWNER";
+        const ok = await appConfirm({
+          title: promover ? "Promover a mestre?" : "Rebaixar para administrador?",
+          text: promover
+            ? "Esta conta passará a ter acesso às ações reservadas ao Mestre."
+            : "Esta conta deixará de ter permissões exclusivas de Mestre.",
+          confirmLabel: promover ? "Promover" : "Rebaixar",
+          detailLabel: "Administrador",
+          detailValue: `${u.nome} · @${u.username}`,
+          tone: promover ? "info" : "warning",
+          icon: promover ? "👑" : "↘️"
+        });
+        if (!ok) return;
+        await api("/api/admin/users/" + id, {
+          method: "PUT",
+          body: JSON.stringify({ acao: "alterar_papel", papel })
+        });
+        await loadUsers();
+        toast(promover ? "Administrador promovido a mestre" : "Conta rebaixada para administrador");
+      };
 
-['#newPassword','#confirmNewPassword'].forEach(sel=>{
-  $(sel).addEventListener('keydown',e=>{
-    if(e.key==='Enter') $('#saveNewPassword').click();
-  });
-});
-window.toggleUser=async(id,ativo)=>{
-  const u=usuarios.find(x=>Number(x.id)===Number(id));if(!u)return;
-  const reativar=!!ativo;
-  const ok=await appConfirm({
-    title:reativar?'Reativar conta?':'Desativar conta?',
-    text:reativar?'O administrador voltará a conseguir acessar o painel.':'O administrador perderá o acesso ao painel até que a conta seja reativada.',
-    confirmLabel:reativar?'Reativar':'Desativar',
-    detailLabel:'Administrador',
-    detailValue:`${u.nome} · @${u.username}`,
-    tone:reativar?'info':'danger',
-    icon:reativar?'👤':'⛔',
-    danger:!reativar
-  });
-  if(!ok)return;
-  await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'toggle_ativo',ativo:reativar})});
-  await loadUsers();
-  toast(reativar?'Conta reativada':'Conta desativada');
-};
-window.changeUserRole=async(id,papel)=>{
-  const u=usuarios.find(x=>Number(x.id)===Number(id));if(!u)return;
-  const promover=papel==='OWNER';
-  const ok=await appConfirm({
-    title:promover?'Promover a mestre?':'Rebaixar para administrador?',
-    text:promover?'Esta conta passará a ter acesso às ações reservadas ao Mestre.':'Esta conta deixará de ter permissões exclusivas de Mestre.',
-    confirmLabel:promover?'Promover':'Rebaixar',
-    detailLabel:'Administrador',
-    detailValue:`${u.nome} · @${u.username}`,
-    tone:promover?'info':'warning',
-    icon:promover?'👑':'↘️'
-  });
-  if(!ok)return;
-  await api('/api/admin/users/'+id,{method:'PUT',body:JSON.stringify({acao:'alterar_papel',papel})});
-  await loadUsers();
-  toast(promover?'Administrador promovido a mestre':'Conta rebaixada para administrador');
-};
+      $$(".closeModal").forEach(
+        b => (b.onclick = () => b.closest(".modal-bg").classList.add("hidden"))
+      );
+      $$(".modal-bg").forEach(bg =>
+        bg.addEventListener("click", e => {
+          if (e.target === bg) bg.classList.add("hidden");
+        })
+      );
+      init();
+    </script>
 
-$$('.closeModal').forEach(b=>b.onclick=()=>b.closest('.modal-bg').classList.add('hidden'));
-$$('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.add('hidden')}));
-init();
-</script>
+    <script src="/admin/assets/js/admin-auto-sync.js"></script>
 
-<script src="/admin/assets/js/admin-auto-sync.js"></script>
+    <script id="rp-admin-config" src="/admin/assets/js/admin-config.js"></script>
 
+    <script id="rp-pwa-register" src="/assets/js/pwa-register.js"></script>
 
-<script id="rp-admin-config" src="/admin/assets/js/admin-config.js"></script>
-
-
-
-
-    
-<script id="rp-pwa-register" src="/assets/js/pwa-register.js"></script>
-
-
-<script id="rp-admin-modal-scroll-lock" src="/admin/assets/js/modal-scroll-lock.js"></script>
-</body></html>
+    <script id="rp-admin-modal-scroll-lock" src="/admin/assets/js/modal-scroll-lock.js"></script>
+  </body>
+</html>

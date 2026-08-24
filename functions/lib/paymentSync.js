@@ -25,16 +25,21 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
   if (!pedidoId) throw new Error("pedidoId é obrigatório para sincronização.");
   if (!order) throw new Error("order do Mercado Pago é obrigatória para sincronização.");
 
-  const pedidoAnterior = await env.DB.prepare(`
+  const pedidoAnterior = await env.DB.prepare(
+    `
     SELECT status_pagamento FROM pedidos WHERE id = ? LIMIT 1
-  `).bind(pedidoId).first();
+  `
+  )
+    .bind(pedidoId)
+    .first();
   const statusAnterior = pedidoAnterior?.status_pagamento || null;
 
   const localStatus = mpOrderToLocalStatus(order);
   const payment = paymentFromOrder(order);
-  const resolvedMpOrderId = order?.id ? String(order.id) : (mpOrderId ? String(mpOrderId) : null);
+  const resolvedMpOrderId = order?.id ? String(order.id) : mpOrderId ? String(mpOrderId) : null;
 
-  await env.DB.prepare(`
+  await env.DB.prepare(
+    `
     UPDATE pedidos SET
       mp_order_id = COALESCE(?, mp_order_id),
       status_pagamento = CASE
@@ -51,21 +56,28 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
         ELSE pago_em
       END
     WHERE id = ?
-  `).bind(
-    resolvedMpOrderId,
-    localStatus,
-    localStatus,
-    order?.status || null,
-    order?.status_detail || null,
-    payment.paymentId,
-    localStatus,
-    pedidoId
-  ).run();
+  `
+  )
+    .bind(
+      resolvedMpOrderId,
+      localStatus,
+      localStatus,
+      order?.status || null,
+      order?.status_detail || null,
+      payment.paymentId,
+      localStatus,
+      pedidoId
+    )
+    .run();
 
-  const consolidado = await env.DB.prepare(`
+  const consolidado = await env.DB.prepare(
+    `
     SELECT status_pagamento, mp_status, mp_status_detail, pago_em
     FROM pedidos WHERE id = ? LIMIT 1
-  `).bind(pedidoId).first();
+  `
+  )
+    .bind(pedidoId)
+    .first();
 
   const statusFinal = consolidado?.status_pagamento || localStatus;
 
@@ -77,7 +89,10 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
       status: "PAGO",
       mp_status: consolidado?.mp_status ?? order?.status ?? null
     });
-  } else if (statusAnterior !== statusFinal && ["REEMBOLSADO", "EXPIRADO", "CANCELADO", "FALHOU"].includes(statusFinal)) {
+  } else if (
+    statusAnterior !== statusFinal &&
+    ["REEMBOLSADO", "EXPIRADO", "CANCELADO", "FALHOU"].includes(statusFinal)
+  ) {
     logEvent("info", "payment.status_updated", {
       pedido_id: pedidoId,
       mp_order_id: resolvedMpOrderId,
@@ -107,6 +122,6 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
     mp_status: consolidado?.mp_status ?? order?.status ?? null,
     mp_status_detail: consolidado?.mp_status_detail ?? order?.status_detail ?? null,
     pago_em: consolidado?.pago_em ?? null,
-    order,
+    order
   };
 }

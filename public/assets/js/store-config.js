@@ -1,5 +1,5 @@
 window.RP_CONFIG = {
-  whatsapp: (window.RP_WHATSAPP_NUMBER || "5533991285907"),
+  whatsapp: window.RP_WHATSAPP_NUMBER || "5533991285907",
   local_retirada: "Temponi Concept",
   endereco: "",
   maps_url: "",
@@ -12,28 +12,29 @@ window.RP_CONFIG = {
 };
 (async () => {
   try {
-    const r = await fetch('/api/config', {cache:'no-store'});
+    const r = await fetch("/api/config", { cache: "no-store" });
     if (!r.ok) return;
     const cfg = await r.json();
     Object.assign(window.RP_CONFIG, cfg);
     if (cfg.whatsapp) {
-      const numero = String(cfg.whatsapp).replace(/\D/g,'');
+      const numero = String(cfg.whatsapp).replace(/\D/g, "");
       window.RP_WHATSAPP_NUMBER = numero;
-      try { WHATSAPP_NUMBER = numero; } catch (_) {}
-      if (typeof window.atualizarFooterWhatsapp === 'function') {
+      try {
+        WHATSAPP_NUMBER = numero;
+      } catch (_) {}
+      if (typeof window.atualizarFooterWhatsapp === "function") {
         window.atualizarFooterWhatsapp(numero);
-    if (typeof window.rpMarkMenuReady === 'function') window.rpMarkMenuReady();
+        if (typeof window.rpMarkMenuReady === "function") window.rpMarkMenuReady();
       }
 
-      const footerWhatsapp = document.getElementById('footerWhatsapp');
+      const footerWhatsapp = document.getElementById("footerWhatsapp");
       if (footerWhatsapp) {
-        const br = numero.startsWith('55') ? numero.slice(2) : numero;
+        const br = numero.startsWith("55") ? numero.slice(2) : numero;
         const ddd = br.slice(0, 2);
         const parte1 = br.slice(2, 7);
         const parte2 = br.slice(7);
-        footerWhatsapp.textContent = ddd && parte1 && parte2
-          ? `(${ddd}) ${parte1}-${parte2}`
-          : String(cfg.whatsapp);
+        footerWhatsapp.textContent =
+          ddd && parte1 && parte2 ? `(${ddd}) ${parte1}-${parte2}` : String(cfg.whatsapp);
       }
     }
   } catch (_) {}

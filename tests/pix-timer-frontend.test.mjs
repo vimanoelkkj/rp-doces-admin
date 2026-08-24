@@ -15,14 +15,26 @@ function setupDomEnvironment() {
       style: {},
       classList: {
         classes: new Set(),
-        add(...cls) { cls.forEach(c => this.classes.add(c)); },
-        remove(...cls) { cls.forEach(c => this.classes.delete(c)); },
-        contains(c) { return this.classes.has(c); },
+        add(...cls) {
+          cls.forEach(c => this.classes.add(c));
+        },
+        remove(...cls) {
+          cls.forEach(c => this.classes.delete(c));
+        },
+        contains(c) {
+          return this.classes.has(c);
+        }
       },
       attributes: new Map(),
-      setAttribute(k, v) { this.attributes.set(k, String(v)); },
-      getAttribute(k) { return this.attributes.get(k) ?? null; },
-      removeAttribute(k) { this.attributes.delete(k); },
+      setAttribute(k, v) {
+        this.attributes.set(k, String(v));
+      },
+      getAttribute(k) {
+        return this.attributes.get(k) ?? null;
+      },
+      removeAttribute(k) {
+        this.attributes.delete(k);
+      },
       textContent: "",
       value: "",
       src: "",
@@ -42,20 +54,43 @@ function setupDomEnvironment() {
       }
     };
     Object.defineProperty(el, "className", {
-      get() { return [...this.classList.classes].join(" "); },
+      get() {
+        return [...this.classList.classes].join(" ");
+      },
       set(val) {
         this.classList.classes.clear();
-        if (val) val.split(/\s+/).filter(Boolean).forEach(c => this.classList.classes.add(c));
+        if (val)
+          val
+            .split(/\s+/)
+            .filter(Boolean)
+            .forEach(c => this.classList.classes.add(c));
       }
     });
     return el;
   }
 
   const ids = [
-    "pixOverlay", "pixClose", "pixPaymentView", "pixSuccessView", "pixQr", "pixCode",
-    "pixCopy", "pixTicket", "pixNovo", "pixStatus", "pixStatusHelp", "pixResumo",
-    "pixDone", "successOrder", "pixSuccessOrder", "pixSuccessSummary",
-    "pixTimerBlock", "pixTimerLabel", "pixTimerCount", "pixTimerHint", "pixAnnouncer"
+    "pixOverlay",
+    "pixClose",
+    "pixPaymentView",
+    "pixSuccessView",
+    "pixQr",
+    "pixCode",
+    "pixCopy",
+    "pixTicket",
+    "pixNovo",
+    "pixStatus",
+    "pixStatusHelp",
+    "pixResumo",
+    "pixDone",
+    "successOrder",
+    "pixSuccessOrder",
+    "pixSuccessSummary",
+    "pixTimerBlock",
+    "pixTimerLabel",
+    "pixTimerCount",
+    "pixTimerHint",
+    "pixAnnouncer"
   ];
 
   ids.forEach(id => {
@@ -69,14 +104,19 @@ function setupDomEnvironment() {
       }
       return elements.get(id);
     },
-    querySelector() { return null; },
+    querySelector() {
+      return null;
+    },
     addEventListener(event, fn) {
       if (!listeners.has(event)) listeners.set(event, []);
       listeners.get(event).push(fn);
     },
     removeEventListener(event, fn) {
       if (!listeners.has(event)) return;
-      listeners.set(event, listeners.get(event).filter(f => f !== fn));
+      listeners.set(
+        event,
+        listeners.get(event).filter(f => f !== fn)
+      );
     },
     dispatchEvent(event) {
       const fns = listeners.get(event.type) || [];
@@ -87,16 +127,26 @@ function setupDomEnvironment() {
   };
 
   const sessStorage = {
-    getItem(k) { return storage.get(k) ?? null; },
-    setItem(k, v) { storage.set(k, String(v)); },
-    removeItem(k) { storage.delete(k); },
-    clear() { storage.clear(); }
+    getItem(k) {
+      return storage.get(k) ?? null;
+    },
+    setItem(k, v) {
+      storage.set(k, String(v));
+    },
+    removeItem(k) {
+      storage.delete(k);
+    },
+    clear() {
+      storage.clear();
+    }
   };
 
   const nav = {
     clipboard: {
       written: null,
-      async writeText(txt) { this.written = txt; }
+      async writeText(txt) {
+        this.written = txt;
+      }
     }
   };
 
@@ -105,7 +155,7 @@ function setupDomEnvironment() {
     sessionStorage: sessStorage,
     navigator: nav,
     location: { href: "https://loja.test/" },
-    abrirCarrinho() { }
+    abrirCarrinho() {}
   };
 
   // Carrega e executa o script de public/index.html
@@ -291,7 +341,11 @@ test("H. 00:00 NÃO mostra Expirado automaticamente (aguarda backend)", () => {
     const novoBtn = doc.getElementById("pixNovo");
     assert.notEqual(status.textContent, "Este Pix expirou.");
     assert.equal(status.textContent, "Verificando pagamento…");
-    assert.equal(novoBtn.style.display, "none", "Botão Novo Pix não deve aparecer enquanto não confirmado pelo backend");
+    assert.equal(
+      novoBtn.style.display,
+      "none",
+      "Botão Novo Pix não deve aparecer enquanto não confirmado pelo backend"
+    );
   } finally {
     Date.now = realDateNow;
     win.RPPix.fechar();
@@ -301,10 +355,11 @@ test("H. 00:00 NÃO mostra Expirado automaticamente (aguarda backend)", () => {
 test("I. Backend PENDENTE após zero mantém Verificando pagamento", async () => {
   const { win, doc } = setupDomEnvironment();
   const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ pedido: { status: "PENDENTE" } }), {
-    status: 200,
-    headers: { "content-type": "application/json" }
-  });
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ pedido: { status: "PENDENTE" } }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
 
   const realDateNow = Date.now;
   let simulatedTime = 1770000000000;
@@ -332,12 +387,22 @@ test("I. Backend PENDENTE após zero mantém Verificando pagamento", async () =>
 test("J. Backend PAGO após zero entra no fluxo de sucesso", async () => {
   const { win, doc } = setupDomEnvironment();
   const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    pedido: { status: "PAGO", referencia: "RP-1234", produto: "Bolo", quantidade: 1, valor_total_centavos: 2500 }
-  }), {
-    status: 200,
-    headers: { "content-type": "application/json" }
-  });
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        pedido: {
+          status: "PAGO",
+          referencia: "RP-1234",
+          produto: "Bolo",
+          quantidade: 1,
+          valor_total_centavos: 2500
+        }
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      }
+    );
 
   const realDateNow = Date.now;
   let simulatedTime = 1770000000000;
@@ -369,12 +434,16 @@ test("K. Backend EXPIRADO confirma tela expirada e libera Gerar novo Pix", async
   sessStorage.setItem("rp_cart_attempt", "attempt-old");
 
   const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    pedido: { status: "EXPIRADO" }
-  }), {
-    status: 200,
-    headers: { "content-type": "application/json" }
-  });
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        pedido: { status: "EXPIRADO" }
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      }
+    );
 
   try {
     win.RPPix.abrir({
@@ -386,10 +455,22 @@ test("K. Backend EXPIRADO confirma tela expirada e libera Gerar novo Pix", async
 
     assert.equal(doc.getElementById("pixStatus").textContent, "Este Pix expirou.");
     assert.ok(doc.getElementById("pixStatus").classList.contains("pix-status--expired"));
-    assert.equal(doc.getElementById("pixNovo").style.display, "inline-flex", "Botão Gerar novo Pix deve estar visível");
-    assert.equal(doc.getElementById("pixCopy").style.display, "none", "Botão copiar deve ser oculto");
+    assert.equal(
+      doc.getElementById("pixNovo").style.display,
+      "inline-flex",
+      "Botão Gerar novo Pix deve estar visível"
+    );
+    assert.equal(
+      doc.getElementById("pixCopy").style.display,
+      "none",
+      "Botão copiar deve ser oculto"
+    );
     assert.equal(doc.getElementById("pixQr").style.display, "none", "QR Code deve ser oculto");
-    assert.equal(sessStorage.getItem("rp_cart_attempt"), null, "Tentativa anterior deve ser limpa do sessionStorage");
+    assert.equal(
+      sessStorage.getItem("rp_cart_attempt"),
+      null,
+      "Tentativa anterior deve ser limpa do sessionStorage"
+    );
     assert.equal(win.RPPix._getTimerInterval(), null, "Timer deve ser parado");
     assert.equal(win.RPPix._getPollInterval(), null, "Polling deve ser parado");
   } finally {
@@ -434,8 +515,16 @@ test("M. pix_expira_em null oculta timer mantendo QR e polling", () => {
     pix: { qr_code: "PIX-LEGADO" }
   });
 
-  assert.equal(doc.getElementById("pixTimerBlock").style.display, "none", "Timer deve permanecer oculto");
-  assert.equal(doc.getElementById("pixCode").value, "PIX-LEGADO", "Código Pix deve ser preenchido normalmente");
+  assert.equal(
+    doc.getElementById("pixTimerBlock").style.display,
+    "none",
+    "Timer deve permanecer oculto"
+  );
+  assert.equal(
+    doc.getElementById("pixCode").value,
+    "PIX-LEGADO",
+    "Código Pix deve ser preenchido normalmente"
+  );
   assert.ok(win.RPPix._getPollInterval() !== null, "Polling deve continuar ativo");
   win.RPPix.fechar();
 });
@@ -517,7 +606,8 @@ test("R. Nova tentativa utiliza novo client_request_id (sessão limpa garante ge
   sessStorage.setItem("rp_cart_attempt", "attempt-1111");
   sessStorage.removeItem("rp_cart_attempt");
 
-  const clientRequestId = sessStorage.getItem("rp_cart_attempt") || "new-random-uuid-" + Math.random();
+  const clientRequestId =
+    sessStorage.getItem("rp_cart_attempt") || "new-random-uuid-" + Math.random();
   assert.match(clientRequestId, /^new-random-uuid-/);
 });
 
@@ -534,16 +624,25 @@ test("S. Botão copiar deixa de ficar disponível somente após EXPIRADO confirm
     });
 
     const copyBtn = doc.getElementById("pixCopy");
-    assert.equal(copyBtn.style.display, "inline-flex", "Copiar deve estar disponível em Verificando");
+    assert.equal(
+      copyBtn.style.display,
+      "inline-flex",
+      "Copiar deve estar disponível em Verificando"
+    );
 
     // 2. Quando o backend confirma EXPIRADO, botão é ocultado
-    globalThis.fetch = async () => new Response(JSON.stringify({ pedido: { status: "EXPIRADO" } }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    });
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ pedido: { status: "EXPIRADO" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
 
     await win.RPPix.consultar();
-    assert.equal(copyBtn.style.display, "none", "Copiar deve ser desabilitado/oculto após confirmação de expirado");
+    assert.equal(
+      copyBtn.style.display,
+      "none",
+      "Copiar deve ser desabilitado/oculto após confirmação de expirado"
+    );
   } finally {
     globalThis.fetch = oldFetch;
     win.RPPix.fechar();

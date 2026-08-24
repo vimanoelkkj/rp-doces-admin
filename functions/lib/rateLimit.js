@@ -5,9 +5,11 @@ const WINDOW_MS = 15 * 60 * 1000;
 const BLOCK_MS = 15 * 60 * 1000;
 
 function clientIp(request) {
-  return request.headers.get("CF-Connecting-IP") ||
-         request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
-         "unknown";
+  return (
+    request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
 }
 
 async function keyFor(request, username) {
@@ -17,10 +19,14 @@ async function keyFor(request, username) {
 export async function checkLoginRateLimit(env, request, username) {
   const key = await keyFor(request, username);
   const now = Date.now();
-  const row = await env.DB.prepare(`
+  const row = await env.DB.prepare(
+    `
     SELECT falhas, janela_inicio, bloqueado_ate
     FROM auth_rate_limits WHERE chave = ? LIMIT 1
-  `).bind(key).first();
+  `
+  )
+    .bind(key)
+    .first();
 
   if (!row) return { allowed: true, key };
 
@@ -45,9 +51,13 @@ export async function recordLoginFailure(env, key) {
   const now = new Date();
   const nowIso = now.toISOString();
 
-  const row = await env.DB.prepare(`
+  const row = await env.DB.prepare(
+    `
     SELECT falhas, janela_inicio FROM auth_rate_limits WHERE chave = ? LIMIT 1
-  `).bind(key).first();
+  `
+  )
+    .bind(key)
+    .first();
 
   let failures = 1;
   let windowStart = nowIso;
@@ -60,11 +70,11 @@ export async function recordLoginFailure(env, key) {
     }
   }
 
-  const blockedUntil = failures >= MAX_FAILURES
-    ? new Date(now.getTime() + BLOCK_MS).toISOString()
-    : null;
+  const blockedUntil =
+    failures >= MAX_FAILURES ? new Date(now.getTime() + BLOCK_MS).toISOString() : null;
 
-  await env.DB.prepare(`
+  await env.DB.prepare(
+    `
     INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(chave) DO UPDATE SET
@@ -72,7 +82,10 @@ export async function recordLoginFailure(env, key) {
       janela_inicio=excluded.janela_inicio,
       bloqueado_ate=excluded.bloqueado_ate,
       atualizado_em=CURRENT_TIMESTAMP
-  `).bind(key, failures, windowStart, blockedUntil).run();
+  `
+  )
+    .bind(key, failures, windowStart, blockedUntil)
+    .run();
 }
 
 export async function clearLoginFailures(env, key) {

@@ -1,0 +1,8 @@
+node_modules
+.git
+.wrangler
+.private-backups
+dist
+*.min.js
+*.min.css
+migrations

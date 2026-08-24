@@ -4,7 +4,8 @@ import { logEvent } from "./logger.js";
 
 async function itemSemEstoque(env, pedidoId, isReservaAtiva = false) {
   if (isReservaAtiva) {
-    return env.DB.prepare(`
+    return env.DB.prepare(
+      `
       SELECT MIN(i.id) AS id, i.produto_id, MIN(i.produto_nome) AS produto_nome,
              SUM(i.quantidade) AS quantidade, COALESCE(p.estoque, 0) AS estoque
       FROM pedido_itens i
@@ -13,9 +14,13 @@ async function itemSemEstoque(env, pedidoId, isReservaAtiva = false) {
       GROUP BY i.produto_id, p.estoque, p.estoque_reservado
       HAVING i.produto_id IS NULL OR p.id IS NULL OR p.estoque < SUM(i.quantidade) OR p.estoque_reservado < SUM(i.quantidade)
       ORDER BY MIN(i.id) LIMIT 1
-    `).bind(pedidoId).first();
+    `
+    )
+      .bind(pedidoId)
+      .first();
   }
-  return env.DB.prepare(`
+  return env.DB.prepare(
+    `
     SELECT MIN(i.id) AS id, i.produto_id, MIN(i.produto_nome) AS produto_nome,
            SUM(i.quantidade) AS quantidade, COALESCE(p.estoque, 0) AS estoque
     FROM pedido_itens i
@@ -24,11 +29,15 @@ async function itemSemEstoque(env, pedidoId, isReservaAtiva = false) {
     GROUP BY i.produto_id, p.estoque
     HAVING i.produto_id IS NULL OR p.id IS NULL OR p.estoque < SUM(i.quantidade)
     ORDER BY MIN(i.id) LIMIT 1
-  `).bind(pedidoId).first();
+  `
+  )
+    .bind(pedidoId)
+    .first();
 }
 
 async function itemSemReserva(env, pedidoId) {
-  return env.DB.prepare(`
+  return env.DB.prepare(
+    `
     SELECT MIN(i.id) AS id, i.produto_id, MIN(i.produto_nome) AS produto_nome,
            SUM(i.quantidade) AS quantidade, COALESCE(p.estoque_reservado, 0) AS estoque_reservado
     FROM pedido_itens i
@@ -37,7 +46,10 @@ async function itemSemReserva(env, pedidoId) {
     GROUP BY i.produto_id, p.estoque_reservado
     HAVING i.produto_id IS NULL OR p.id IS NULL OR p.estoque_reservado < SUM(i.quantidade)
     ORDER BY MIN(i.id) LIMIT 1
-  `).bind(pedidoId).first();
+  `
+  )
+    .bind(pedidoId)
+    .first();
 }
 
 /**
@@ -49,10 +61,14 @@ async function itemSemReserva(env, pedidoId) {
  * para garantir atomicidade e idempotência estrita sem mascarar inconsistências com MAX(0).
  */
 export async function baixarEstoquePedido(env, pedidoId) {
-  const pedido = await env.DB.prepare(`
+  const pedido = await env.DB.prepare(
+    `
     SELECT id, status_pagamento, estoque_baixado_em, reserva_status
     FROM pedidos WHERE id = ? LIMIT 1
-  `).bind(pedidoId).first();
+  `
+  )
+    .bind(pedidoId)
+    .first();
 
   if (!pedido || pedido.status_pagamento !== "PAGO" || pedido.estoque_baixado_em) {
     return { ok: true, baixado: false };
@@ -60,12 +76,16 @@ export async function baixarEstoquePedido(env, pedidoId) {
 
   const isReservaAtiva = pedido.reserva_status === "ATIVA";
 
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT id, produto_id, produto_nome, quantidade
     FROM pedido_itens
     WHERE pedido_id = ? AND estoque_baixado_em IS NULL
     ORDER BY id
-  `).bind(pedidoId).all();
+  `
+  )
+    .bind(pedidoId)
+    .all();
 
   const itens = results || [];
   if (!itens.length) return { ok: false, baixado: false, erro: "ITENS_NAO_ENCONTRADOS" };
@@ -76,7 +96,12 @@ export async function baixarEstoquePedido(env, pedidoId) {
       pedido_id: pedidoId,
       reason: "STOCK_CONVERSION_FAILED"
     });
-    return { ok: false, baixado: false, erro: "ESTOQUE_INSUFICIENTE", item_id: insuficienteInicial.id };
+    return {
+      ok: false,
+      baixado: false,
+      erro: "ESTOQUE_INSUFICIENTE",
+      item_id: insuficienteInicial.id
+    };
   }
 
   const statements = [];
@@ -87,7 +112,8 @@ export async function baixarEstoquePedido(env, pedidoId) {
       // O UPDATE do produto SOMENTE afeta linhas se o pedido AINDA estiver no estado PAGO + ATIVA + estoque_baixado_em IS NULL
       // e houver saldo estrito tanto de estoque físico quanto de estoque reservado (sem MAX(0)).
       statements.push(
-        env.DB.prepare(`
+        env.DB.prepare(
+          `
           UPDATE produtos
           SET estoque = estoque - ?,
               estoque_reservado = estoque_reservado - ?,
@@ -103,12 +129,23 @@ export async function baixarEstoquePedido(env, pedidoId) {
                 AND estoque_baixado_em IS NULL
                 AND reserva_status = 'ATIVA'
             )
-        `).bind(item.quantidade, item.quantidade, item.quantidade, item.quantidade, item.produto_id, item.quantidade, item.quantidade, pedidoId)
+        `
+        ).bind(
+          item.quantidade,
+          item.quantidade,
+          item.quantidade,
+          item.quantidade,
+          item.produto_id,
+          item.quantidade,
+          item.quantidade,
+          pedidoId
+        )
       );
 
       // Marca o item como baixado condicionado ao pedido continuar PAGO + ATIVA
       statements.push(
-        env.DB.prepare(`
+        env.DB.prepare(
+          `
           UPDATE pedido_itens SET estoque_baixado_em = CURRENT_TIMESTAMP
           WHERE id = ? AND estoque_baixado_em IS NULL
             AND EXISTS (
@@ -118,12 +155,14 @@ export async function baixarEstoquePedido(env, pedidoId) {
                 AND estoque_baixado_em IS NULL
                 AND reserva_status = 'ATIVA'
             )
-        `).bind(item.id, pedidoId)
+        `
+        ).bind(item.id, pedidoId)
       );
     } else {
       // Pedidos legados (SEM_RESERVA): reduz apenas o estoque físico
       statements.push(
-        env.DB.prepare(`
+        env.DB.prepare(
+          `
           UPDATE produtos
           SET estoque = estoque - ?,
               disponivel = CASE WHEN estoque - ? <= 0 THEN 0 ELSE disponivel END,
@@ -136,11 +175,13 @@ export async function baixarEstoquePedido(env, pedidoId) {
                 AND status_pagamento = 'PAGO'
                 AND estoque_baixado_em IS NULL
             )
-        `).bind(item.quantidade, item.quantidade, item.produto_id, item.quantidade, pedidoId)
+        `
+        ).bind(item.quantidade, item.quantidade, item.produto_id, item.quantidade, pedidoId)
       );
 
       statements.push(
-        env.DB.prepare(`
+        env.DB.prepare(
+          `
           UPDATE pedido_itens SET estoque_baixado_em = CURRENT_TIMESTAMP
           WHERE id = ? AND estoque_baixado_em IS NULL
             AND EXISTS (
@@ -149,27 +190,36 @@ export async function baixarEstoquePedido(env, pedidoId) {
                 AND status_pagamento = 'PAGO'
                 AND estoque_baixado_em IS NULL
             )
-        `).bind(item.id, pedidoId)
+        `
+        ).bind(item.id, pedidoId)
       );
     }
   }
 
   // Atualiza o pedido marcando estoque baixado e reserva convertida
   if (isReservaAtiva) {
-    statements.push(env.DB.prepare(`
+    statements.push(
+      env.DB.prepare(
+        `
       UPDATE pedidos
       SET estoque_baixado_em = CURRENT_TIMESTAMP,
           reserva_status = 'CONVERTIDA',
           atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND status_pagamento = 'PAGO' AND estoque_baixado_em IS NULL AND reserva_status = 'ATIVA'
-    `).bind(pedidoId));
+    `
+      ).bind(pedidoId)
+    );
   } else {
-    statements.push(env.DB.prepare(`
+    statements.push(
+      env.DB.prepare(
+        `
       UPDATE pedidos
       SET estoque_baixado_em = CURRENT_TIMESTAMP,
           atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND status_pagamento = 'PAGO' AND estoque_baixado_em IS NULL
-    `).bind(pedidoId));
+    `
+      ).bind(pedidoId)
+    );
   }
 
   try {
@@ -197,21 +247,29 @@ export async function baixarEstoquePedido(env, pedidoId) {
  * Se qualquer item apresentar inconsistência, o batch falha e nenhuma liberação parcial ocorre.
  */
 export async function liberarReservaPedido(env, pedidoId, { novoStatus = null } = {}) {
-  const pedido = await env.DB.prepare(`
+  const pedido = await env.DB.prepare(
+    `
     SELECT id, status_pagamento, reserva_status
     FROM pedidos WHERE id = ? LIMIT 1
-  `).bind(pedidoId).first();
+  `
+  )
+    .bind(pedidoId)
+    .first();
 
   if (!pedido || pedido.reserva_status !== "ATIVA") {
     return { ok: true, liberado: false };
   }
 
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT id, produto_id, quantidade
     FROM pedido_itens
     WHERE pedido_id = ?
     ORDER BY id
-  `).bind(pedidoId).all();
+  `
+  )
+    .bind(pedidoId)
+    .all();
 
   const itens = results || [];
   if (!itens.length) return { ok: false, liberado: false, erro: "ITENS_NAO_ENCONTRADOS" };
@@ -222,7 +280,12 @@ export async function liberarReservaPedido(env, pedidoId, { novoStatus = null } 
       pedido_id: pedidoId,
       reason: "RESERVATION_RELEASE_FAILED"
     });
-    return { ok: false, liberado: false, erro: "ESTOQUE_RESERVADO_INSUFICIENTE", item_id: insuficienteReserva.id };
+    return {
+      ok: false,
+      liberado: false,
+      erro: "ESTOQUE_RESERVADO_INSUFICIENTE",
+      item_id: insuficienteReserva.id
+    };
   }
 
   const statements = [];
@@ -230,7 +293,8 @@ export async function liberarReservaPedido(env, pedidoId, { novoStatus = null } 
   for (const item of itens) {
     // Reduz estoque_reservado SOMENTE SE o pedido ainda estiver no estado ATIVA e houver reserva suficiente
     statements.push(
-      env.DB.prepare(`
+      env.DB.prepare(
+        `
         UPDATE produtos
         SET estoque_reservado = estoque_reservado - ?,
             atualizado_em = CURRENT_TIMESTAMP
@@ -240,20 +304,23 @@ export async function liberarReservaPedido(env, pedidoId, { novoStatus = null } 
             SELECT 1 FROM pedidos
             WHERE id = ? AND reserva_status = 'ATIVA'
           )
-      `).bind(item.quantidade, item.produto_id, item.quantidade, pedidoId)
+      `
+      ).bind(item.quantidade, item.produto_id, item.quantidade, pedidoId)
     );
   }
 
   // Atualiza o pedido marcando reserva liberada
   statements.push(
-    env.DB.prepare(`
+    env.DB.prepare(
+      `
       UPDATE pedidos
       SET reserva_status = 'LIBERADA',
           reserva_liberada_em = CURRENT_TIMESTAMP,
           status_pagamento = COALESCE(?, status_pagamento),
           atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND reserva_status = 'ATIVA'
-    `).bind(novoStatus, pedidoId)
+    `
+    ).bind(novoStatus, pedidoId)
   );
 
   try {
@@ -281,12 +348,16 @@ export async function liberarReservaPedido(env, pedidoId, { novoStatus = null } 
  * Reconcilia um pedido pendente com reserva vencida perante o Mercado Pago antes de qualquer liberação.
  */
 export async function reconciliarReservaExpirada(env, pedidoId) {
-  const pedido = await env.DB.prepare(`
+  const pedido = await env.DB.prepare(
+    `
     SELECT id, token_publico, status_pagamento, reserva_status, reserva_expira_em,
            mp_order_id, idempotency_key, valor_total_centavos, cliente_nome,
            cliente_email, cliente_whatsapp
     FROM pedidos WHERE id = ? LIMIT 1
-  `).bind(pedidoId).first();
+  `
+  )
+    .bind(pedidoId)
+    .first();
 
   if (!pedido || pedido.reserva_status !== "ATIVA" || pedido.status_pagamento !== "PENDENTE") {
     return { reconciliado: false };
@@ -297,16 +368,23 @@ export async function reconciliarReservaExpirada(env, pedidoId) {
   // 1. Se mp_order_id for NULL (resultado incerto na criação anterior), repete o POST idempotente com o snapshot original
   if (!mpOrderId) {
     try {
-      const { results: itensSalvos } = await env.DB.prepare(`
+      const { results: itensSalvos } = await env.DB.prepare(
+        `
         SELECT produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos
         FROM pedido_itens WHERE pedido_id = ? ORDER BY id
-      `).bind(pedidoId).all();
+      `
+      )
+        .bind(pedidoId)
+        .all();
 
       const externalReference = `RP-${pedidoId}`;
       const totalAmount = (pedido.valor_total_centavos / 100).toFixed(2);
-      const payerFirstName = String(env.MP_TEST_MODE || "").toLowerCase() === "true"
-        ? "APRO"
-        : (pedido.cliente_nome ? pedido.cliente_nome.split(/\s+/)[0] : "Cliente");
+      const payerFirstName =
+        String(env.MP_TEST_MODE || "").toLowerCase() === "true"
+          ? "APRO"
+          : pedido.cliente_nome
+            ? pedido.cliente_nome.split(/\s+/)[0]
+            : "Cliente";
 
       const body = {
         type: "online",
@@ -333,9 +411,13 @@ export async function reconciliarReservaExpirada(env, pedidoId) {
 
       if (orderRecuperada?.id) {
         mpOrderId = String(orderRecuperada.id);
-        await env.DB.prepare(`
+        await env.DB.prepare(
+          `
           UPDATE pedidos SET mp_order_id = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?
-        `).bind(mpOrderId, pedidoId).run();
+        `
+        )
+          .bind(mpOrderId, pedidoId)
+          .run();
       }
     } catch (createErr) {
       logEvent("warn", "payment.sync_failed", {
@@ -391,14 +473,16 @@ export async function reconciliarReservaExpirada(env, pedidoId) {
  */
 export async function limparReservasExpiradas(env) {
   try {
-    const { results } = await env.DB.prepare(`
+    const { results } = await env.DB.prepare(
+      `
       SELECT id FROM pedidos
       WHERE status_pagamento = 'PENDENTE'
         AND reserva_status = 'ATIVA'
         AND datetime(reserva_expira_em) <= datetime('now')
       ORDER BY reserva_expira_em ASC
       LIMIT 10
-    `).all();
+    `
+    ).all();
 
     const pedidosExpirados = results || [];
     for (const p of pedidosExpirados) {

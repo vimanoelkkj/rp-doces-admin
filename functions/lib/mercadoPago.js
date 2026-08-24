@@ -8,7 +8,7 @@ export async function mpRequest(env, path, { method = "GET", body, idempotencyKe
   requireMercadoPago(env);
   const headers = {
     Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
-    Accept: "application/json",
+    Accept: "application/json"
   };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (idempotencyKey) headers["X-Idempotency-Key"] = idempotencyKey;
@@ -16,12 +16,16 @@ export async function mpRequest(env, path, { method = "GET", body, idempotencyKe
   const response = await fetch(`${MP_BASE}${path}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body)
   });
 
   const text = await response.text();
   let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { raw: text };
+  }
 
   if (!response.ok) {
     const err = new Error(`Mercado Pago respondeu ${response.status}`);
@@ -49,7 +53,7 @@ export function paymentFromOrder(order) {
     paymentId: payment?.id ? String(payment.id) : null,
     ticketUrl: pm.ticket_url || null,
     qrCode: pm.qr_code || order?.type_response?.qr_data || null,
-    qrCodeBase64: pm.qr_code_base64 || null,
+    qrCodeBase64: pm.qr_code_base64 || null
   };
 }
 

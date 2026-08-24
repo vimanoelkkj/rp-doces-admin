@@ -16,7 +16,7 @@ function run(command, args, options = {}) {
     cwd: process.cwd(),
     encoding: "utf8",
     stdio: options.capture ? "pipe" : "inherit",
-    shell: process.platform === "win32",
+    shell: process.platform === "win32"
   });
   if (result.error) cancel(`Não foi possível executar ${command}.`, result.error.message);
   return result;
@@ -30,7 +30,8 @@ function gitOutput(args) {
 function assertCleanTree() {
   const status = gitOutput(["status", "--porcelain", "--untracked-files=all"]);
   if (status.status !== 0) cancel("Deploy cancelado: não foi possível verificar o working tree.");
-  if (status.output) cancel("Deploy cancelado: existem alterações locais não commitadas.", status.output);
+  if (status.output)
+    cancel("Deploy cancelado: existem alterações locais não commitadas.", status.output);
 }
 
 const branch = gitOutput(["symbolic-ref", "--quiet", "--short", "HEAD"]);
@@ -62,5 +63,12 @@ if (!existsSync(wrangler)) {
 }
 
 console.log("Testes aprovados. Publicando explicitamente a branch main...");
-const deploy = run(wrangler, ["pages", "deploy", "public", "--project-name=rp-doces", "--branch", "main"]);
+const deploy = run(wrangler, [
+  "pages",
+  "deploy",
+  "public",
+  "--project-name=rp-doces",
+  "--branch",
+  "main"
+]);
 if (deploy.status !== 0) cancel("Deploy de produção falhou.");

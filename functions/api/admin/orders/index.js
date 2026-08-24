@@ -9,7 +9,8 @@ const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
 
 async function reconcilePaidOrdersWithoutStock(env) {
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT id
     FROM pedidos
     WHERE status_pagamento = 'PAGO'
@@ -17,34 +18,54 @@ async function reconcilePaidOrdersWithoutStock(env) {
       AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
     ORDER BY atualizado_em ASC, id ASC
     LIMIT ?
-  `).bind(RECONCILE_AFTER_SECONDS, RECONCILE_BATCH_SIZE).all();
+  `
+  )
+    .bind(RECONCILE_AFTER_SECONDS, RECONCILE_BATCH_SIZE)
+    .all();
 
-  await Promise.allSettled((results || []).map(async ({ id }) => {
-    try {
-      const estoque = await baixarEstoquePedido(env, id);
-      if (estoque.ok && estoque.baixado) {
-        logEvent("info", "reconciliation.recovered", { pedido_id: id, status: "PAGO" });
-      } else if (!estoque.ok) {
-        logEvent("error", "stock.conversion_failed", { pedido_id: id, reason: "STOCK_CONVERSION_FAILED" });
-        await env.DB.prepare(`
+  await Promise.allSettled(
+    (results || []).map(async ({ id }) => {
+      try {
+        const estoque = await baixarEstoquePedido(env, id);
+        if (estoque.ok && estoque.baixado) {
+          logEvent("info", "reconciliation.recovered", { pedido_id: id, status: "PAGO" });
+        } else if (!estoque.ok) {
+          logEvent("error", "stock.conversion_failed", {
+            pedido_id: id,
+            reason: "STOCK_CONVERSION_FAILED"
+          });
+          await env.DB.prepare(
+            `
           UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP
           WHERE id = ? AND estoque_baixado_em IS NULL
-        `).bind(id).run();
-      }
-    } catch (err) {
-      logEvent("error", "stock.conversion_failed", { pedido_id: id, reason: "STOCK_CONVERSION_FAILED" });
-      await env.DB.prepare(`
+        `
+          )
+            .bind(id)
+            .run();
+        }
+      } catch (err) {
+        logEvent("error", "stock.conversion_failed", {
+          pedido_id: id,
+          reason: "STOCK_CONVERSION_FAILED"
+        });
+        await env.DB.prepare(
+          `
         UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP
         WHERE id = ? AND estoque_baixado_em IS NULL
-      `).bind(id).run();
-    }
-  }));
+      `
+        )
+          .bind(id)
+          .run();
+      }
+    })
+  );
 }
 
 async function reconcilePendingOrders(env) {
   if (!env.MP_ACCESS_TOKEN) return;
 
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT id, mp_order_id
     FROM pedidos
     WHERE status_pagamento = 'PENDENTE'
@@ -52,29 +73,34 @@ async function reconcilePendingOrders(env) {
       AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
     ORDER BY atualizado_em ASC, id ASC
     LIMIT ?
-  `).bind(RECONCILE_AFTER_SECONDS, RECONCILE_BATCH_SIZE).all();
+  `
+  )
+    .bind(RECONCILE_AFTER_SECONDS, RECONCILE_BATCH_SIZE)
+    .all();
 
   const pending = results || [];
   if (!pending.length) return;
 
-  await Promise.allSettled(pending.map(async (pedido) => {
-    try {
-      const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(pedido.mp_order_id)}`);
-      await syncOrderPayment(env, { pedidoId: pedido.id, order, mpOrderId: pedido.mp_order_id });
-    } catch (err) {
-      // A reconciliação é uma rede de segurança. Falha ao consultar o MP não
-      // deve derrubar a tela administrativa nem gerar uma tempestade de retries.
-      logEvent("warn", "payment.sync_failed", {
-        pedido_id: pedido.id,
-        mp_order_id: pedido.mp_order_id,
-        http_status: err?.status || undefined,
-        reason: err?.status ? "MP_HTTP_ERROR" : "MP_RECONCILIATION_FAILED"
-      });
-      await env.DB.prepare(
-        "UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP WHERE id = ?"
-      ).bind(pedido.id).run();
-    }
-  }));
+  await Promise.allSettled(
+    pending.map(async pedido => {
+      try {
+        const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(pedido.mp_order_id)}`);
+        await syncOrderPayment(env, { pedidoId: pedido.id, order, mpOrderId: pedido.mp_order_id });
+      } catch (err) {
+        // A reconciliação é uma rede de segurança. Falha ao consultar o MP não
+        // deve derrubar a tela administrativa nem gerar uma tempestade de retries.
+        logEvent("warn", "payment.sync_failed", {
+          pedido_id: pedido.id,
+          mp_order_id: pedido.mp_order_id,
+          http_status: err?.status || undefined,
+          reason: err?.status ? "MP_HTTP_ERROR" : "MP_RECONCILIATION_FAILED"
+        });
+        await env.DB.prepare("UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(pedido.id)
+          .run();
+      }
+    })
+  );
 }
 
 export async function onRequestGet({ request, env }) {
@@ -87,24 +113,28 @@ export async function onRequestGet({ request, env }) {
   await reconcilePendingOrders(env);
   await reconcilePaidOrdersWithoutStock(env);
 
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT id, token_publico, produto_id, produto_nome, quantidade,
       valor_unitario_centavos, valor_total_centavos, cliente_nome, cliente_email,
       cliente_whatsapp, tipo_entrega, observacao, metodo_pagamento, status_pagamento, status_pedido,
       mp_order_id, mp_payment_id, mp_status, mp_status_detail,
       criado_em, atualizado_em, pago_em, estoque_baixado_em
     FROM pedidos ORDER BY id DESC LIMIT 250
-  `).all();
+  `
+  ).all();
   const pedidos = results || [];
   if (!pedidos.length) return json({ pedidos: [] });
 
-  const { results: itemRows } = await env.DB.prepare(`
+  const { results: itemRows } = await env.DB.prepare(
+    `
     SELECT pedido_id, produto_id, produto_nome, quantidade,
            valor_unitario_centavos, valor_total_centavos, estoque_baixado_em
     FROM pedido_itens
     WHERE pedido_id IN (SELECT id FROM pedidos ORDER BY id DESC LIMIT 250)
     ORDER BY pedido_id DESC, id
-  `).all();
+  `
+  ).all();
   const porPedido = new Map();
   for (const item of itemRows || []) {
     if (!porPedido.has(Number(item.pedido_id))) porPedido.set(Number(item.pedido_id), []);
