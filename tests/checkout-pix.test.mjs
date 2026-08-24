@@ -93,6 +93,7 @@ function createRealSqliteDb() {
       reserva_status TEXT NOT NULL DEFAULT 'SEM_RESERVA' CHECK (reserva_status IN ('SEM_RESERVA', 'ATIVA', 'CONVERTIDA', 'LIBERADA')),
       reserva_expira_em TEXT,
       reserva_liberada_em TEXT,
+      pix_expira_em TEXT,
       criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       pago_em TEXT,

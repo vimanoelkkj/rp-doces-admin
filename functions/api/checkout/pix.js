@@ -1,5 +1,5 @@
 import { json, bodyJson, sameOrigin } from "../../lib/http.js";
-import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../lib/mercadoPago.js";
+import { mpRequest, mpOrderToLocalStatus, paymentFromOrder, calculatePixExpiration } from "../../lib/mercadoPago.js";
 import { baixarEstoquePedido, liberarReservaPedido } from "../../lib/stock.js";
 import { notifyPaidOrder } from "../../lib/push.js";
 import { checkCheckoutRateLimit } from "../../lib/checkoutRateLimit.js";
@@ -146,7 +146,7 @@ export async function onRequestPost({ request, env }) {
     SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos, cliente_email,
            cliente_whatsapp, observacao, status_pagamento, mp_order_id, mp_payment_id, mp_status,
            mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key,
-           reserva_status, reserva_expira_em
+           reserva_status, reserva_expira_em, pix_expira_em, criado_em
     FROM pedidos WHERE idempotency_key = ? LIMIT 1
   `).bind(idempotencyKey).first();
 
@@ -175,7 +175,8 @@ export async function onRequestPost({ request, env }) {
           quantidade_total: pedidoExistente.quantidade,
           itens: itensSalvos || [],
           valor_total_centavos: pedidoExistente.valor_total_centavos,
-          status: pedidoExistente.status_pagamento
+          status: pedidoExistente.status_pagamento,
+          pix_expira_em: pedidoExistente.pix_expira_em || null
         },
         pix: {
           qr_code: pedidoExistente.mp_qr_code,
@@ -255,7 +256,7 @@ export async function onRequestPost({ request, env }) {
         SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos, cliente_email,
                cliente_whatsapp, observacao, status_pagamento, mp_order_id, mp_payment_id, mp_status,
                mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key,
-               reserva_status, reserva_expira_em
+               reserva_status, reserva_expira_em, pix_expira_em, criado_em
         FROM pedidos WHERE idempotency_key = ? LIMIT 1
       `).bind(idempotencyKey).first();
 
@@ -284,7 +285,8 @@ export async function onRequestPost({ request, env }) {
             quantidade_total: pedidoExistente.quantidade,
             itens: itensSalvos || [],
             valor_total_centavos: pedidoExistente.valor_total_centavos,
-            status: pedidoExistente.status_pagamento
+            status: pedidoExistente.status_pagamento,
+            pix_expira_em: pedidoExistente.pix_expira_em || null
           },
           pix: {
             qr_code: pedidoExistente.mp_qr_code,
@@ -341,16 +343,24 @@ export async function onRequestPost({ request, env }) {
     const payment = paymentFromOrder(order);
     const localStatus = mpOrderToLocalStatus(order);
 
+    const pedidoRow = await env.DB.prepare(`
+      SELECT criado_em, pix_expira_em FROM pedidos WHERE id = ?
+    `).bind(pedidoId).first();
+
+    const pixExpiraEm = pedidoRow?.pix_expira_em || calculatePixExpiration(pedidoRow?.criado_em);
+
     await env.DB.prepare(`
       UPDATE pedidos SET
         mp_order_id = ?, mp_payment_id = ?, mp_status = ?, mp_status_detail = ?,
         mp_ticket_url = ?, mp_qr_code = ?, mp_qr_code_base64 = ?, status_pagamento = ?,
+        pix_expira_em = COALESCE(pix_expira_em, ?),
         atualizado_em = CURRENT_TIMESTAMP,
         pago_em = CASE WHEN ? = 'PAGO' THEN CURRENT_TIMESTAMP ELSE pago_em END
       WHERE id = ?
     `).bind(
       order.id || null, payment.paymentId, order.status || null, order.status_detail || null,
-      payment.ticketUrl, payment.qrCode, payment.qrCodeBase64, localStatus, localStatus, pedidoId
+      payment.ticketUrl, payment.qrCode, payment.qrCodeBase64, localStatus,
+      pixExpiraEm, localStatus, pedidoId
     ).run();
 
     if (localStatus === "PAGO") {
@@ -374,7 +384,8 @@ export async function onRequestPost({ request, env }) {
         quantidade_total: quantidadeTotal,
         itens,
         valor_total_centavos: total,
-        status: localStatus
+        status: localStatus,
+        pix_expira_em: pixExpiraEm || null
       },
       pix: {
         qr_code: payment.qrCode,

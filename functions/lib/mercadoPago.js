@@ -53,6 +53,31 @@ export function paymentFromOrder(order) {
   };
 }
 
+export const PIX_TTL_MS = 30 * 60 * 1000; // 30 minutos
+
+/**
+ * Calcula o timestamp de expiração visual do Pix a partir de uma data base segura.
+ * Retorna null se baseDateOrIso for ausente ou inválida. Nunca usa Date.now().
+ *
+ * @param {string|Date|number|null|undefined} baseDateOrIso
+ * @returns {string|null} ISO 8601 UTC string ou null
+ */
+export function calculatePixExpiration(baseDateOrIso) {
+  if (!baseDateOrIso) return null;
+  let dateVal = baseDateOrIso;
+  if (typeof dateVal === "string") {
+    // Normaliza formato SQLite 'YYYY-MM-DD HH:MM:SS' para ISO UTC
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(dateVal)) {
+      dateVal = dateVal.replace(" ", "T") + "Z";
+    }
+  }
+  const parsed = dateVal instanceof Date ? dateVal.getTime() : new Date(dateVal).getTime();
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return new Date(parsed + PIX_TTL_MS).toISOString();
+}
+
 function hex(buffer) {
   return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, "0")).join("");
 }

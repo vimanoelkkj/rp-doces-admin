@@ -9,7 +9,8 @@ export async function onRequestGet({ params, env }) {
 
   let pedido = await env.DB.prepare(`
     SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos,
-           status_pagamento, mp_order_id, mp_status, mp_status_detail, pago_em
+           status_pagamento, mp_order_id, mp_status, mp_status_detail, pago_em,
+           pix_expira_em
     FROM pedidos WHERE token_publico = ? LIMIT 1
   `).bind(token).first();
   if (!pedido) return json({ erro: "Pedido não encontrado." }, 404);
@@ -52,6 +53,7 @@ export async function onRequestGet({ params, env }) {
       mp_status: pedido.mp_status,
       mp_status_detail: pedido.mp_status_detail,
       pago_em: pedido.pago_em,
+      pix_expira_em: pedido.pix_expira_em || null
     }
   });
 }
