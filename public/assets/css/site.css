@@ -1334,7 +1334,8 @@ body.rp-mobile-cta-visible .rp-cart-trigger{bottom:calc(80px + env(safe-area-ins
     position:absolute; top:14px; right:16px;
     width:36px; height:36px; border:0; border-radius:50%;
     background:var(--pink-50); color:var(--pink-700);
-    font-size:22px; cursor:pointer;
+    z-index:4; display:grid; place-items:center; padding:0;
+    font-size:22px; line-height:1; cursor:pointer;
   }
   .pedido-modal .eyebrow{margin-bottom:5px}
   .pedido-modal h3{color:var(--brown-700);font-size:1.55rem;margin:0 42px 6px 0}
