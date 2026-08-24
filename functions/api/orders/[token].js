@@ -1,6 +1,7 @@
 import { json } from "../../lib/http.js";
 import { mpRequest } from "../../lib/mercadoPago.js";
 import { syncOrderPayment } from "../../lib/paymentSync.js";
+import { logEvent } from "../../lib/logger.js";
 
 export async function onRequestGet({ params, env }) {
   const token = String(params.token || "");
@@ -30,7 +31,12 @@ export async function onRequestGet({ params, env }) {
       pedido.mp_status_detail = synced.mp_status_detail;
       pedido.pago_em = synced.pago_em;
     } catch (err) {
-      console.error("Mercado Pago get order:", err?.status, err?.message);
+      logEvent("warn", "payment.sync_failed", {
+        pedido_id: pedido.id,
+        mp_order_id: pedido.mp_order_id,
+        http_status: err?.status || undefined,
+        reason: err?.status ? "MP_HTTP_ERROR" : "MP_TIMEOUT"
+      });
     }
   }
 

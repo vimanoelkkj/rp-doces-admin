@@ -833,3 +833,60 @@ test("Rate Limit: limpeza remove registros expirados sem afetar registros ativos
   assert.equal(restantes.length, 1);
   assert.equal(restantes[0].chave, "ativo");
 });
+
+test("Segurança de Erro: resposta 400/422 do gateway não expõe err.data, internals ou PII na resposta pública", async (t) => {
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    access_token: "SEGREDO",
+    payer: {
+      email: "cliente@example.com"
+    },
+    internal_gateway_detail: "não pode sair",
+    message: "Invalid param X in internal MP backend"
+  }), {
+    status: 400,
+    headers: { "content-type": "application/json" }
+  });
+  t.after(() => { globalThis.fetch = oldFetch; });
+
+  const DB = createRealSqliteDb();
+  DB.raw.exec(`
+    INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado)
+    VALUES (1, 'Bolo de Chocolate', 1000, 10, 0);
+  `);
+
+  const env = {
+    DB,
+    RATE_LIMIT_SECRET: "secret-key",
+    MP_ACCESS_TOKEN: "mp-token-test"
+  };
+
+  const request = new Request("https://loja.test/api/checkout/pix", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "origin": "https://loja.test",
+      "cf-connecting-ip": "203.0.113.1"
+    },
+    body: JSON.stringify({
+      nome: "João Teste",
+      email: "joao@example.com",
+      whatsapp: "(33) 99999-9999",
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    })
+  });
+
+  const response = await onRequestPost({ request, env });
+  assert.equal(response.status, 400);
+
+  const rawJson = await response.text();
+  const data = JSON.parse(rawJson);
+
+  assert.equal(data.erro, "Não foi possível gerar o Pix com os dados informados.");
+  assert.equal(rawJson.includes("SEGREDO"), false);
+  assert.equal(rawJson.includes("cliente@example.com"), false);
+  assert.equal(rawJson.includes("não pode sair"), false);
+  assert.equal(rawJson.includes("Invalid param X in internal MP backend"), false);
+  assert.equal(rawJson.includes("access_token"), false);
+  assert.equal(rawJson.includes("internal_gateway_detail"), false);
+});

@@ -392,7 +392,7 @@ export async function onRequestPost({ request, env }) {
     // Se o gateway rejeitou com 400/422 definitivo (comprovando que nenhuma Order foi criada):
     if (err?.status === 400 || err?.status === 422) {
       await liberarReservaPedido(env, pedidoId, { novoStatus: "ERRO" });
-      return json({ erro: err?.data?.message || "Pagamento Pix recusado pelo emissor." }, err.status);
+      return json({ erro: "Não foi possível gerar o Pix com os dados informados." }, err.status);
     }
 
     // Se for falha incerta (5xx, timeout, rede): MANTÉM a reserva ATIVA e registra status ERRO
