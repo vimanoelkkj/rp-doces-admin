@@ -37,13 +37,23 @@ export async function mpRequest(env, path, { method = "GET", body, idempotencyKe
 }
 
 export function mpOrderToLocalStatus(order) {
-  const status = String(order?.status || "").toLowerCase();
-  if (status === "processed") return "PAGO";
-  if (status === "refunded") return "REEMBOLSADO";
-  if (status === "canceled") return "CANCELADO";
-  if (status === "expired") return "EXPIRADO";
-  if (status === "failed") return "FALHOU";
-  return "PENDENTE";
+  const mapStatus = value => {
+    const status = String(value || "").toLowerCase();
+    if (status === "processed") return "PAGO";
+    if (status === "refunded") return "REEMBOLSADO";
+    if (status === "canceled") return "CANCELADO";
+    if (status === "expired") return "EXPIRADO";
+    if (status === "failed") return "FALHOU";
+    return "PENDENTE";
+  };
+
+  const orderStatus = mapStatus(order?.status);
+  if (orderStatus !== "PENDENTE") return orderStatus;
+
+  // No Pix, a transação pode alcançar o estado terminal antes de o status
+  // superior da Order deixar action_required. Sem este fallback, o polling
+  // continuaria persistindo PENDENTE mesmo após processed/expired no pagamento.
+  return mapStatus(order?.transactions?.payments?.[0]?.status);
 }
 
 export function paymentFromOrder(order) {

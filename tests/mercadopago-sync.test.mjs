@@ -5,9 +5,30 @@ import { onRequestPost as webhook } from "../functions/api/webhooks/mercadopago.
 import { onRequestGet as adminOrders } from "../functions/api/admin/orders/index.js";
 import { onRequestGet as getPublicOrder } from "../functions/api/orders/[token].js";
 import { syncOrderPayment } from "../functions/lib/paymentSync.js";
+import { mpOrderToLocalStatus } from "../functions/lib/mercadoPago.js";
 import { fakeDb, responseJson } from "./helpers/fake-db.mjs";
 
 const SECRET = "segredo-de-teste";
+
+test("Pix usa status processed da transação quando a Order ainda está action_required", () => {
+  assert.equal(
+    mpOrderToLocalStatus({
+      status: "action_required",
+      transactions: { payments: [{ status: "processed", status_detail: "accredited" }] }
+    }),
+    "PAGO"
+  );
+});
+
+test("Pix usa status expired da transação quando a Order ainda está action_required", () => {
+  assert.equal(
+    mpOrderToLocalStatus({
+      status: "action_required",
+      transactions: { payments: [{ status: "expired", status_detail: "expired" }] }
+    }),
+    "EXPIRADO"
+  );
+});
 
 async function signature(dataId, requestId, timestamp = "1770000000") {
   const manifest = `id:${String(dataId).toLowerCase()};request-id:${requestId};ts:${timestamp};`;

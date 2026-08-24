@@ -85,11 +85,17 @@ function setupDomEnvironment() {
     "pixDone",
     "successOrder",
     "pixSuccessOrder",
-    "pixSuccessSummary",
+    "pixSuccessTotal",
+    "pixSuccessItems",
+    "pixPaymentCard",
     "pixTimerBlock",
     "pixTimerLabel",
     "pixTimerCount",
     "pixTimerHint",
+    "pixTimerVerifyingTitle",
+    "pixTimerVerifyingText",
+    "pixScanCopy",
+    "pixExpiredIcon",
     "pixAnnouncer"
   ];
 
@@ -289,7 +295,7 @@ test("F. <= 5 minutos entra em estado urgente", () => {
     assert.ok(timerBlock.classList.contains("urgent"), "Deve conter classe .urgent");
     assert.equal(count.textContent, "04:30");
     assert.equal(hint.style.display, "block", "Hint deve estar visível");
-    assert.equal(announcer.textContent, "Faltam menos de 5 minutos");
+    assert.equal(announcer.textContent, "", "Contagem regressiva não deve ser anunciada");
   } finally {
     Date.now = realDateNow;
     win.RPPix.fechar();
@@ -311,13 +317,20 @@ test("G. 00:00 entra em Verificando pagamento", () => {
 
     const timerBlock = doc.getElementById("pixTimerBlock");
     const count = doc.getElementById("pixTimerCount");
-    const status = doc.getElementById("pixStatus");
+    const verifyingTitle = doc.getElementById("pixTimerVerifyingTitle");
+    const verifyingText = doc.getElementById("pixTimerVerifyingText");
     const announcer = doc.getElementById("pixAnnouncer");
 
     assert.ok(timerBlock.classList.contains("verifying"), "Deve conter classe .verifying");
-    assert.equal(count.textContent, "00:00");
-    assert.equal(status.textContent, "Verificando pagamento…");
+    assert.notEqual(
+      count.textContent,
+      "00:00",
+      "00:00 não deve permanecer como conteúdo principal"
+    );
+    assert.equal(verifyingTitle.textContent, "Verificando pagamento...");
+    assert.equal(verifyingText.textContent, "Confirmando o status do Pix com o Mercado Pago.");
     assert.equal(announcer.textContent, "Verificando pagamento");
+    assert.notEqual(win.RPPix._getPollInterval(), null, "Timer zero deve manter polling ativo");
   } finally {
     Date.now = realDateNow;
     win.RPPix.fechar();
@@ -337,10 +350,12 @@ test("H. 00:00 NÃO mostra Expirado automaticamente (aguarda backend)", () => {
       pix: { qr_code: "PIX..." }
     });
 
-    const status = doc.getElementById("pixStatus");
     const novoBtn = doc.getElementById("pixNovo");
-    assert.notEqual(status.textContent, "Este Pix expirou.");
-    assert.equal(status.textContent, "Verificando pagamento…");
+    assert.notEqual(doc.getElementById("pixStatus").textContent, "Pix expirado");
+    assert.equal(
+      doc.getElementById("pixTimerVerifyingTitle").textContent,
+      "Verificando pagamento..."
+    );
     assert.equal(
       novoBtn.style.display,
       "none",
@@ -374,9 +389,12 @@ test("I. Backend PENDENTE após zero mantém Verificando pagamento", async () =>
 
     await win.RPPix.consultar();
 
-    const status = doc.getElementById("pixStatus");
-    assert.equal(status.textContent, "Verificando pagamento…");
+    assert.equal(
+      doc.getElementById("pixTimerVerifyingTitle").textContent,
+      "Verificando pagamento..."
+    );
     assert.equal(doc.getElementById("pixNovo").style.display, "none");
+    assert.notEqual(win.RPPix._getPollInterval(), null, "PENDENTE deve manter polling ativo");
   } finally {
     Date.now = realDateNow;
     globalThis.fetch = oldFetch;
@@ -395,6 +413,10 @@ test("J. Backend PAGO após zero entra no fluxo de sucesso", async () => {
           referencia: "RP-1234",
           produto: "Bolo",
           quantidade: 1,
+          itens: [
+            { produto: "Bolo no pote", quantidade: 1 },
+            { produto: "Mini pudim", quantidade: 2 }
+          ],
           valor_total_centavos: 2500
         }
       }),
@@ -412,7 +434,11 @@ test("J. Backend PAGO após zero entra no fluxo de sucesso", async () => {
     const expIso = new Date(simulatedTime - 1000).toISOString();
     win.RPPix.abrir({
       pedido: { token: "tok-pago", pix_expira_em: expIso },
-      pix: { qr_code: "PIX..." }
+      pix: {
+        qr_code: "PIX...",
+        qr_code_base64: "BASE64-QR",
+        ticket_url: "https://example.test/pix"
+      }
     });
 
     await win.RPPix.consultar();
@@ -421,7 +447,21 @@ test("J. Backend PAGO após zero entra no fluxo de sucesso", async () => {
     const successView = doc.getElementById("pixSuccessView");
     assert.equal(paymentView.style.display, "none", "Payment view deve ser oculta");
     assert.ok(successView.classList.contains("show"), "Success view deve ser exibida");
+    assert.equal(doc.getElementById("pixQr").style.display, "none");
+    assert.equal(doc.getElementById("pixCode").style.display, "none");
+    assert.equal(doc.getElementById("pixCodeField").style.display, "none");
+    assert.equal(doc.getElementById("pixCopy").style.display, "none");
+    assert.equal(doc.getElementById("pixTicket").style.display, "none");
+    assert.equal(doc.getElementById("pixTimerBlock").style.display, "none");
+    assert.equal(doc.getElementById("pixSuccessOrder").textContent, "Pedido RP-1234 confirmado");
+    assert.equal(doc.getElementById("pixSuccessTotal").textContent, "R$ 25,00");
+    assert.equal(
+      doc.getElementById("pixSuccessItems").textContent,
+      "1× Bolo no pote • 2× Mini pudim"
+    );
+    assert.equal(doc.getElementById("pixAnnouncer").textContent, "Pagamento confirmado");
     assert.equal(win.RPPix._getTimerInterval(), null, "Timer deve ser parado após confirmação");
+    assert.equal(win.RPPix._getPollInterval(), null, "Polling deve ser parado após confirmação");
   } finally {
     Date.now = realDateNow;
     globalThis.fetch = oldFetch;
@@ -448,13 +488,21 @@ test("K. Backend EXPIRADO confirma tela expirada e libera Gerar novo Pix", async
   try {
     win.RPPix.abrir({
       pedido: { token: "tok-exp", pix_expira_em: new Date().toISOString() },
-      pix: { qr_code: "PIX..." }
+      pix: {
+        qr_code: "PIX-COPIA-E-COLA",
+        qr_code_base64: "BASE64-QR",
+        ticket_url: "https://example.test/pix"
+      }
     });
 
     await win.RPPix.consultar();
 
-    assert.equal(doc.getElementById("pixStatus").textContent, "Este Pix expirou.");
+    assert.equal(doc.getElementById("pixStatus").textContent, "Pix expirado");
     assert.ok(doc.getElementById("pixStatus").classList.contains("pix-status--expired"));
+    assert.match(
+      doc.getElementById("pixStatusHelp").textContent,
+      /Este código Pix não pode mais ser utilizado\./
+    );
     assert.equal(
       doc.getElementById("pixNovo").style.display,
       "inline-flex",
@@ -466,6 +514,20 @@ test("K. Backend EXPIRADO confirma tela expirada e libera Gerar novo Pix", async
       "Botão copiar deve ser oculto"
     );
     assert.equal(doc.getElementById("pixQr").style.display, "none", "QR Code deve ser oculto");
+    assert.equal(doc.getElementById("pixCode").style.display, "none", "Código Pix deve ser oculto");
+    assert.equal(
+      doc.getElementById("pixCodeField").style.display,
+      "none",
+      "Campo copia-e-cola deve ser oculto"
+    );
+    assert.equal(
+      doc.getElementById("pixTicket").style.display,
+      "none",
+      "Link do Mercado Pago deve ser oculto"
+    );
+    assert.equal(doc.getElementById("pixTimerBlock").style.display, "none");
+    assert.equal(doc.getElementById("pixExpiredIcon").style.display, "flex");
+    assert.equal(doc.getElementById("pixAnnouncer").textContent, "Pix expirado");
     assert.equal(
       sessStorage.getItem("rp_cart_attempt"),
       null,
@@ -497,11 +559,85 @@ test("L. Erro 5xx/timeout após zero não mostra expirado", async () => {
 
     await win.RPPix.consultar();
 
-    const status = doc.getElementById("pixStatus");
-    assert.equal(status.textContent, "Verificando pagamento…");
-    assert.notEqual(status.textContent, "Este Pix expirou.");
+    assert.equal(
+      doc.getElementById("pixTimerVerifyingTitle").textContent,
+      "Verificando pagamento..."
+    );
+    assert.notEqual(doc.getElementById("pixStatus").textContent, "Pix expirado");
+    assert.notEqual(win.RPPix._getPollInterval(), null, "5xx deve manter polling ativo");
   } finally {
     Date.now = realDateNow;
+    globalThis.fetch = oldFetch;
+    win.RPPix.fechar();
+  }
+});
+
+test("L2. PENDENTE após zero aceita PAGO terminal na consulta seguinte", async () => {
+  const { win, doc } = setupDomEnvironment();
+  const oldFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        pedido:
+          ++calls < 4
+            ? { status: "PENDENTE" }
+            : { status: "PAGO", referencia: "RP-200", valor_total_centavos: 1600 }
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+
+  try {
+    win.RPPix.abrir({
+      pedido: {
+        token: "tok-verifying-paid",
+        pix_expira_em: new Date(Date.now() - 1000).toISOString()
+      },
+      pix: { qr_code: "PIX" }
+    });
+
+    await win.RPPix.consultar();
+    assert.notEqual(win.RPPix._getPollInterval(), null);
+    assert.equal(
+      doc.getElementById("pixTimerVerifyingTitle").textContent,
+      "Verificando pagamento..."
+    );
+
+    await win.RPPix.consultar();
+    assert.ok(doc.getElementById("pixSuccessView").classList.contains("show"));
+    assert.equal(win.RPPix._getPollInterval(), null);
+  } finally {
+    globalThis.fetch = oldFetch;
+    win.RPPix.fechar();
+  }
+});
+
+test("L3. PENDENTE após zero aceita EXPIRADO terminal na consulta seguinte", async () => {
+  const { win, doc } = setupDomEnvironment();
+  const oldFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ pedido: { status: ++calls < 4 ? "PENDENTE" : "EXPIRADO" } }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+
+  try {
+    win.RPPix.abrir({
+      pedido: {
+        token: "tok-verifying-expired",
+        pix_expira_em: new Date(Date.now() - 1000).toISOString()
+      },
+      pix: { qr_code: "PIX" }
+    });
+
+    await win.RPPix.consultar();
+    assert.notEqual(win.RPPix._getPollInterval(), null);
+
+    await win.RPPix.consultar();
+    assert.equal(doc.getElementById("pixStatus").textContent, "Pix expirado");
+    assert.equal(win.RPPix._getPollInterval(), null);
+  } finally {
     globalThis.fetch = oldFetch;
     win.RPPix.fechar();
   }
@@ -646,5 +782,187 @@ test("S. Botão copiar deixa de ficar disponível somente após EXPIRADO confirm
   } finally {
     globalThis.fetch = oldFetch;
     win.RPPix.fechar();
+  }
+});
+
+test("T. PENDENTE -> PAGO antes do zero entra no estado terminal aprovado", async () => {
+  const { win, doc } = setupDomEnvironment();
+  const oldFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        pedido:
+          ++calls === 1
+            ? { status: "PENDENTE" }
+            : {
+                status: "PAGO",
+                valor_total_centavos: 3200,
+                itens: [{ produto: "Bolo no pote", quantidade: 2 }]
+              }
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+
+  try {
+    win.RPPix.abrir({
+      pedido: {
+        token: "tok-paid-before-zero",
+        referencia: "RP-77",
+        pix_expira_em: new Date(Date.now() + 12 * 60 * 1000).toISOString(),
+        valor_total_centavos: 3200,
+        itens: [{ produto: "Bolo no pote", quantidade: 2 }]
+      },
+      pix: {
+        qr_code: "PIX-ATIVO",
+        qr_code_base64: "BASE64-QR",
+        ticket_url: "https://example.test/pix"
+      }
+    });
+
+    await win.RPPix.consultar();
+
+    assert.ok(doc.getElementById("pixSuccessView").classList.contains("show"));
+    assert.equal(doc.getElementById("pixSuccessOrder").textContent, "Pedido RP-77 confirmado");
+    assert.equal(doc.getElementById("pixSuccessTotal").textContent, "R$ 32,00");
+    assert.equal(doc.getElementById("pixSuccessItems").textContent, "2× Bolo no pote");
+    assert.equal(win.RPPix._getTimerInterval(), null);
+    assert.equal(win.RPPix._getPollInterval(), null);
+  } finally {
+    globalThis.fetch = oldFetch;
+    win.RPPix.fechar();
+  }
+});
+
+test("U. resposta PENDENTE atrasada não regride o estado PAGO", async () => {
+  const { win, doc } = setupDomEnvironment();
+  const oldFetch = globalThis.fetch;
+  let resolvePending;
+  let call = 0;
+  globalThis.fetch = () => {
+    call += 1;
+    if (call === 1) {
+      return new Promise(resolve => {
+        resolvePending = () =>
+          resolve(
+            new Response(JSON.stringify({ pedido: { status: "PENDENTE" } }), {
+              status: 200,
+              headers: { "content-type": "application/json" }
+            })
+          );
+      });
+    }
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          pedido: {
+            status: "PAGO",
+            referencia: "RP-88",
+            valor_total_centavos: 1800,
+            itens: [{ produto: "Mini pudim", quantidade: 1 }]
+          }
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+  };
+
+  try {
+    win.RPPix.abrir({
+      pedido: {
+        token: "tok-race",
+        referencia: "RP-88",
+        pix_expira_em: new Date(Date.now() + 60_000).toISOString()
+      },
+      pix: { qr_code: "PIX" }
+    });
+
+    await win.RPPix.consultar();
+    assert.ok(doc.getElementById("pixSuccessView").classList.contains("show"));
+
+    resolvePending();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.ok(doc.getElementById("pixSuccessView").classList.contains("show"));
+    assert.equal(doc.getElementById("pixPaymentView").style.display, "none");
+    assert.equal(doc.getElementById("pixAnnouncer").textContent, "Pagamento confirmado");
+  } finally {
+    globalThis.fetch = oldFetch;
+    win.RPPix.fechar();
+  }
+});
+
+test("V. visibilitychange após PAGO não reinicia timer e anúncio ocorre uma vez", async () => {
+  const { win, doc } = setupDomEnvironment();
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ pedido: { status: "PAGO", valor_total_centavos: 1000 } }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+
+  const announcer = doc.getElementById("pixAnnouncer");
+  let announced = "";
+  let announcementCount = 0;
+  Object.defineProperty(announcer, "textContent", {
+    configurable: true,
+    get: () => announced,
+    set: value => {
+      announced = value;
+      if (value === "Pagamento confirmado") announcementCount += 1;
+    }
+  });
+
+  try {
+    win.RPPix.abrir({
+      pedido: {
+        token: "tok-visible-paid",
+        referencia: "RP-99",
+        pix_expira_em: new Date(Date.now() + 60_000).toISOString()
+      },
+      pix: { qr_code: "PIX" }
+    });
+    await win.RPPix.consultar();
+    await win.RPPix.consultar();
+
+    doc.visibilityState = "visible";
+    doc.dispatchEvent({ type: "visibilitychange" });
+
+    assert.equal(win.RPPix._getTimerInterval(), null);
+    assert.equal(win.RPPix._getPollInterval(), null);
+    assert.equal(announcementCount, 1);
+  } finally {
+    globalThis.fetch = oldFetch;
+    win.RPPix.fechar();
+  }
+});
+
+test("W. Voltar para a loja fecha o modal sem iniciar novo Pix", async () => {
+  const { win, doc } = setupDomEnvironment();
+  const oldFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return new Response(JSON.stringify({ pedido: { status: "PAGO" } }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+
+  try {
+    win.RPPix.abrir({
+      pedido: { token: "tok-done", referencia: "RP-100", status: "PAGO" },
+      pix: { qr_code: "PIX" }
+    });
+    const callsBeforeClose = fetchCalls;
+
+    doc.getElementById("pixDone").click();
+
+    assert.ok(!doc.getElementById("pixOverlay").classList.contains("open"));
+    assert.equal(win.RPPix._getTimerInterval(), null);
+    assert.equal(win.RPPix._getPollInterval(), null);
+    assert.equal(fetchCalls, callsBeforeClose, "Fechar não deve criar uma nova tentativa Pix");
+  } finally {
+    globalThis.fetch = oldFetch;
   }
 });

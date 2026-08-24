@@ -1666,66 +1666,149 @@
 
     <div id="pixOverlay" aria-hidden="true">
       <div class="pix-modal" role="dialog" aria-modal="true" aria-labelledby="pixTitulo">
-        <button class="pix-close" id="pixClose" aria-label="Fechar">×</button>
-        <div id="pixPaymentView">
-          <span class="eyebrow">Pagamento seguro</span>
-          <h3 id="pixTitulo" style="margin: 5px 36px 4px; color: var(--brown-700)">
-            Pague com Pix
-          </h3>
-          <p id="pixResumo" class="muted"></p>
+        <header class="pix-modal-header">
+          <span class="eyebrow pix-secure-label">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 5 6v5c0 4.5 2.8 8.1 7 10 4.2-1.9 7-5.5 7-10V6l-7-3Z"></path>
+              <path d="m9 12 2 2 4-4"></path>
+            </svg>
+            Pagamento seguro
+          </span>
+          <button class="pix-close" id="pixClose" type="button" aria-label="Fechar pagamento Pix">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18"></path>
+            </svg>
+          </button>
+        </header>
+        <div class="pix-modal-body-viewport">
+          <div id="pixPaymentView" class="pix-modal-body">
+            <header class="pix-heading">
+              <h3 id="pixTitulo">Pague com Pix</h3>
+              <span class="pix-order-badge" id="pixOrderReference"></span>
+              <strong class="pix-total" id="pixTotal"></strong>
+              <p id="pixResumo" class="pix-summary"></p>
+            </header>
 
-          <div id="pixTimerBlock" class="pix-timer" style="display: none">
-            <div class="pix-timer-header">
-              <span class="pix-timer-label" id="pixTimerLabel">Pix válido por</span>
-              <strong class="pix-timer-count" id="pixTimerCount">29:59</strong>
+            <div id="pixTimerBlock" class="pix-timer" style="display: none">
+              <svg class="pix-timer-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5l3 2"></path>
+              </svg>
+              <div class="pix-timer-copy">
+                <div class="pix-timer-header">
+                  <strong class="pix-timer-count" id="pixTimerCount">29:59</strong>
+                  <span class="pix-timer-label" id="pixTimerLabel">para pagar</span>
+                </div>
+                <span class="pix-timer-reservation"
+                  >O estoque fica reservado durante este período</span
+                >
+                <span class="pix-timer-hint" id="pixTimerHint" style="display: none"
+                  >Pague antes de expirar.</span
+                >
+              </div>
+              <div class="pix-timer-track" aria-hidden="true">
+                <span id="pixTimerProgress"></span>
+              </div>
+              <div class="pix-timer-verifying" id="pixTimerVerifying">
+                <svg class="pix-verifying-spinner" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <path d="M12 3a9 9 0 0 1 9 9"></path>
+                </svg>
+                <div>
+                  <strong id="pixTimerVerifyingTitle">Verificando pagamento...</strong>
+                  <span id="pixTimerVerifyingText"
+                    >Confirmando o status do Pix com o Mercado Pago.</span
+                  >
+                </div>
+              </div>
             </div>
-            <span class="pix-timer-hint" id="pixTimerHint" style="display: none"
-              >Pague antes de expirar.</span
-            >
+
+            <section class="pix-payment-card" id="pixPaymentCard">
+              <img id="pixQr" class="pix-qr" alt="QR Code Pix" style="display: none" />
+              <div class="pix-scan-copy" id="pixScanCopy">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"
+                  ></path>
+                </svg>
+                <p><strong>Escaneie o QR Code</strong><span>ou copie o código Pix abaixo</span></p>
+              </div>
+              <div class="pix-code-field" id="pixCodeField">
+                <input
+                  id="pixCode"
+                  class="pix-code"
+                  readonly
+                  aria-label="Código Pix copia e cola"
+                />
+                <button id="pixCopyInline" type="button" aria-label="Copiar código Pix">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="8" y="3" width="11" height="14" rx="2"></rect>
+                    <path d="M16 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"></path>
+                  </svg>
+                </button>
+              </div>
+              <div id="pixExpiredIcon" class="pix-expired-icon" style="display: none">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <path d="M12 7v5l3 2"></path>
+                </svg>
+              </div>
+              <div class="pix-actions">
+                <button id="pixCopy" class="btn btn-primary" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="8" y="3" width="11" height="14" rx="2"></rect>
+                    <path d="M16 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"></path></svg
+                  ><span id="pixCopyLabel">Copiar código Pix</span>
+                </button>
+                <a
+                  id="pixTicket"
+                  class="btn btn-outline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style="display: none"
+                  ><svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14 5h5v5M19 5l-8 8"></path>
+                    <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"></path></svg
+                  ><span>Abrir pagamento no Mercado Pago</span></a
+                >
+                <button id="pixNovo" class="btn btn-primary" type="button" style="display: none">
+                  Gerar novo Pix
+                </button>
+              </div>
+              <div id="pixStatus" class="pix-status">Aguardando pagamento…</div>
+              <small class="muted" id="pixStatusHelp"
+                >A confirmação é consultada diretamente no Mercado Pago.</small
+              >
+            </section>
           </div>
 
-          <img id="pixQr" class="pix-qr" alt="QR Code Pix" style="display: none" />
-          <textarea
-            id="pixCode"
-            class="pix-code"
-            readonly
-            placeholder="Código Pix copia e cola"
-          ></textarea>
-          <div class="pix-actions">
-            <button id="pixCopy" class="btn btn-primary" type="button">Copiar código Pix</button>
-            <a
-              id="pixTicket"
-              class="btn btn-outline"
-              target="_blank"
-              rel="noopener noreferrer"
-              style="display: none"
-              >Abrir pagamento no Mercado Pago</a
-            >
-            <button id="pixNovo" class="btn btn-primary" type="button" style="display: none">
-              Gerar novo Pix
-            </button>
+          <div id="pixAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+          <div id="pixSuccessView" class="pix-modal-body pix-success">
+            <div class="pix-success-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m7 12 3 3 7-7"></path></svg>
+            </div>
+            <h3>Pagamento aprovado!</h3>
+            <strong id="pixSuccessOrder" class="pix-success-order">Pedido confirmado</strong>
+            <strong id="pixSuccessTotal" class="pix-success-total"></strong>
+            <p id="pixSuccessItems" class="pix-success-items"></p>
+            <p id="pixSuccessText" class="pix-success-text">
+              Seu pagamento foi recebido com sucesso.
+            </p>
+            <p class="pix-success-guidance">
+              Seu pedido foi confirmado. Agora é só aguardar o preparo.
+            </p>
+            <button id="pixDone" class="btn btn-primary" type="button">Voltar para a loja</button>
           </div>
-          <div id="pixStatus" class="pix-status">Aguardando pagamento…</div>
-          <small class="muted" id="pixStatusHelp"
-            >A confirmação é consultada diretamente no Mercado Pago.</small
-          >
         </div>
-
-        <div id="pixAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
-
-        <div id="pixSuccessView" class="pix-success" aria-live="polite">
-          <div class="pix-success-icon">✓</div>
-          <span class="eyebrow">Tudo certo</span>
-          <h3>Pagamento confirmado!</h3>
-          <p id="pixSuccessText" class="pix-success-text">
-            Recebemos seu pagamento. Seu pedido já foi enviado para preparação. 💗
-          </p>
-          <div class="pix-success-card">
-            <strong id="pixSuccessOrder">Pedido confirmado</strong>
-            <span id="pixSuccessSummary"></span>
-          </div>
-          <button id="pixDone" class="btn btn-primary" type="button">Concluir</button>
-        </div>
+        <footer class="pix-modal-footer pix-security-footer">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 5 6v5c0 4.5 2.8 8.1 7 10 4.2-1.9 7-5.5 7-10V6l-7-3Z"></path>
+            <rect x="9" y="10" width="6" height="5" rx="1"></rect>
+            <path d="M10.5 10V8.5a1.5 1.5 0 0 1 3 0V10"></path>
+          </svg>
+          Pagamento processado com segurança pelo Mercado Pago
+        </footer>
       </div>
     </div>
     <script id="rp-pix-flow">
@@ -1736,20 +1819,32 @@
         const successView = document.getElementById("pixSuccessView");
         const qr = document.getElementById("pixQr");
         const code = document.getElementById("pixCode");
+        const codeField = document.getElementById("pixCodeField");
         const copy = document.getElementById("pixCopy");
+        const copyLabel = document.getElementById("pixCopyLabel");
+        const copyInline = document.getElementById("pixCopyInline");
         const ticket = document.getElementById("pixTicket");
         const novo = document.getElementById("pixNovo");
         const status = document.getElementById("pixStatus");
         const statusHelp = document.getElementById("pixStatusHelp");
         const resumo = document.getElementById("pixResumo");
+        const orderReference = document.getElementById("pixOrderReference");
+        const total = document.getElementById("pixTotal");
         const done = document.getElementById("pixDone");
         const successOrder = document.getElementById("pixSuccessOrder");
-        const successSummary = document.getElementById("pixSuccessSummary");
+        const successTotal = document.getElementById("pixSuccessTotal");
+        const successItems = document.getElementById("pixSuccessItems");
+        const paymentCard = document.getElementById("pixPaymentCard");
 
         const timerBlock = document.getElementById("pixTimerBlock");
         const timerLabel = document.getElementById("pixTimerLabel");
         const timerCount = document.getElementById("pixTimerCount");
         const timerHint = document.getElementById("pixTimerHint");
+        const timerProgress = document.getElementById("pixTimerProgress");
+        const timerVerifyingTitle = document.getElementById("pixTimerVerifyingTitle");
+        const timerVerifyingText = document.getElementById("pixTimerVerifyingText");
+        const scanCopy = document.getElementById("pixScanCopy");
+        const expiredIcon = document.getElementById("pixExpiredIcon");
         const announcer = document.getElementById("pixAnnouncer");
 
         let pollInterval = null,
@@ -1759,6 +1854,9 @@
         let currentExpirationMs = null;
         let lastAnnouncedState = null;
         let zeroTriggered = false;
+        let visualState = "idle";
+        let flowVersion = 0;
+        const PIX_DURATION_MS = 30 * 60 * 1000;
 
         const moeda = c =>
           (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1798,21 +1896,21 @@
           timerBlock.classList.remove("urgent", "verifying");
           if (state === "verifying") {
             timerBlock.classList.add("verifying");
-            if (timerLabel) timerLabel.textContent = "Tempo estimado:";
-            if (timerCount) timerCount.textContent = "00:00";
+            if (timerCount) timerCount.textContent = "";
             if (timerHint) timerHint.style.display = "none";
-            if (status) status.textContent = "Verificando pagamento…";
-            if (statusHelp)
-              statusHelp.textContent = "Confirmando recebimento junto ao Mercado Pago.";
+            if (timerVerifyingTitle) timerVerifyingTitle.textContent = "Verificando pagamento...";
+            if (timerVerifyingText)
+              timerVerifyingText.textContent = "Confirmando o status do Pix com o Mercado Pago.";
+            if (status) status.textContent = "";
+            if (statusHelp) statusHelp.textContent = "";
             announce("Verificando pagamento");
           } else if (state === "urgent") {
             timerBlock.classList.add("urgent");
-            if (timerLabel) timerLabel.textContent = "Pix válido por";
+            if (timerLabel) timerLabel.textContent = "para pagar";
             if (timerCount) timerCount.textContent = formatted.text;
             if (timerHint) timerHint.style.display = "block";
-            announce("Faltam menos de 5 minutos");
           } else {
-            if (timerLabel) timerLabel.textContent = "Pix válido por";
+            if (timerLabel) timerLabel.textContent = "para pagar";
             if (timerCount) timerCount.textContent = formatted.text;
             if (timerHint) timerHint.style.display = "none";
           }
@@ -1824,6 +1922,10 @@
           const state = getPixTimerState(remainingMs);
           const formatted = formatRemainingTime(remainingMs);
           renderPixTimer(state, formatted);
+          if (timerProgress) {
+            const percent = Math.max(0, Math.min(100, (remainingMs / PIX_DURATION_MS) * 100));
+            timerProgress.style.width = `${percent}%`;
+          }
 
           if (state === "verifying" && !zeroTriggered) {
             zeroTriggered = true;
@@ -1871,14 +1973,20 @@
         }
 
         function reset() {
-          paymentView.style.display = "block";
+          visualState = "idle";
+          paymentView.style.display = "";
           successView.classList.remove("show");
           copy.style.display = "inline-flex";
           copy.disabled = false;
-          copy.textContent = "Copiar código Pix";
+          if (copyLabel) copyLabel.textContent = "Copiar código Pix";
+          else copy.textContent = "Copiar código Pix";
           if (novo) novo.style.display = "none";
+          if (expiredIcon) expiredIcon.style.display = "none";
+          if (paymentCard) paymentCard.classList.remove("is-expired");
           qr.style.display = "none";
+          if (scanCopy) scanCopy.style.display = "flex";
           code.style.display = "block";
+          if (codeField) codeField.style.display = "flex";
           status.className = "pix-status";
           status.textContent = "Aguardando pagamento…";
           if (statusHelp)
@@ -1887,9 +1995,12 @@
             timerBlock.style.display = "none";
             timerBlock.className = "pix-timer";
           }
+          if (timerProgress) timerProgress.style.width = "100%";
         }
 
         function fechar() {
+          visualState = "closed";
+          flowVersion += 1;
           overlay.classList.remove("open");
           overlay.setAttribute("aria-hidden", "true");
           stopPolling();
@@ -1904,14 +2015,36 @@
         }
 
         function mostrarSucesso(pedido) {
+          if (visualState === "paid") return;
+          visualState = "paid";
           stopPolling();
           stopPixTimer();
           const p = { ...(pedidoAtual || {}), ...(pedido || {}) };
+          pedidoAtual = p;
+          qr.style.display = "none";
+          if (scanCopy) scanCopy.style.display = "none";
+          code.style.display = "none";
+          if (codeField) codeField.style.display = "none";
+          copy.style.display = "none";
+          if (ticket) ticket.style.display = "none";
+          if (timerBlock) timerBlock.style.display = "none";
           paymentView.style.display = "none";
-          successOrder.textContent = p.referencia ? `Pedido ${p.referencia}` : "Pedido confirmado";
-          successSummary.textContent = `${p.quantidade || 1}× ${p.produto || "Pedido"} • ${moeda(p.valor_total_centavos || 0)}`;
+          successOrder.textContent = p.referencia
+            ? `Pedido ${p.referencia} confirmado`
+            : "Pedido confirmado";
+          successTotal.textContent = moeda(p.valor_total_centavos || 0);
+          const itens = Array.isArray(p.itens) ? p.itens : [];
+          successItems.textContent = itens.length
+            ? itens
+                .map(
+                  item =>
+                    `${item.quantidade || 1}× ${item.produto || item.produto_nome || "Produto"}`
+                )
+                .join(" • ")
+            : `${p.quantidade || 1}× ${p.produto || "Pedido"}`;
           successView.classList.add("show");
           announce("Pagamento confirmado");
+          setTimeout(() => done?.focus?.(), 0);
         }
 
         function mostrarExpirado() {
@@ -1921,15 +2054,19 @@
             sessionStorage.removeItem("rp_cart_attempt");
           } catch (_) {}
           qr.style.display = "none";
+          if (scanCopy) scanCopy.style.display = "none";
           code.style.display = "none";
+          if (codeField) codeField.style.display = "none";
           copy.style.display = "none";
           if (ticket) ticket.style.display = "none";
           if (timerBlock) timerBlock.style.display = "none";
-          status.textContent = "Este Pix expirou.";
+          if (expiredIcon) expiredIcon.style.display = "flex";
+          if (paymentCard) paymentCard.classList.add("is-expired");
+          status.textContent = "Pix expirado";
           status.className = "pix-status pix-status--expired";
           if (statusHelp) {
             statusHelp.textContent =
-              "Você pode gerar uma nova tentativa. A disponibilidade dos produtos será confirmada novamente.";
+              "Este código Pix não pode mais ser utilizado. Você pode gerar uma nova tentativa. A disponibilidade dos produtos será confirmada novamente.";
           }
           if (novo) novo.style.display = "inline-flex";
           announce("Pix expirado");
@@ -1937,6 +2074,8 @@
 
         async function consultar() {
           if (!token) return;
+          const requestToken = token;
+          const requestVersion = flowVersion;
           try {
             const r = await fetch("/api/orders/" + encodeURIComponent(token), {
               headers: { Accept: "application/json" },
@@ -1944,6 +2083,13 @@
             });
             if (!r.ok) return;
             const d = await r.json();
+            if (
+              requestToken !== token ||
+              requestVersion !== flowVersion ||
+              visualState === "paid" ||
+              visualState === "closed"
+            )
+              return;
             const st = d?.pedido?.status;
             if (st === "PAGO") {
               mostrarSucesso(d.pedido);
@@ -1969,9 +2115,25 @@
         window.RPPix = {
           abrir(data) {
             reset();
+            flowVersion += 1;
             pedidoAtual = data?.pedido || {};
             token = pedidoAtual?.token || null;
-            resumo.textContent = `${pedidoAtual?.quantidade || 1}× ${pedidoAtual?.produto || "Pedido"} • ${moeda(pedidoAtual?.valor_total_centavos || 0)}`;
+            const itens = Array.isArray(pedidoAtual?.itens) ? pedidoAtual.itens : [];
+            resumo.textContent = itens.length
+              ? itens
+                  .map(
+                    item =>
+                      `${item.quantidade || 1}× ${item.produto || item.produto_nome || "Produto"}`
+                  )
+                  .join(" • ")
+              : `${pedidoAtual?.quantidade || 1}× ${pedidoAtual?.produto || "Pedido"}`;
+            if (orderReference) {
+              orderReference.textContent = pedidoAtual?.referencia
+                ? `Pedido ${pedidoAtual.referencia}`
+                : "";
+              orderReference.hidden = !pedidoAtual?.referencia;
+            }
+            if (total) total.textContent = moeda(pedidoAtual?.valor_total_centavos || 0);
             code.value = data?.pix?.qr_code || "";
             const b64 = data?.pix?.qr_code_base64 || "";
             if (b64) {
@@ -2019,19 +2181,24 @@
           _getTimerInterval: () => timerInterval
         };
 
-        copy.addEventListener("click", async () => {
+        async function copiarCodigoPix() {
           if (!code.value) return;
           try {
             await navigator.clipboard.writeText(code.value);
-            copy.textContent = "Código copiado!";
+            if (copyLabel) copyLabel.textContent = "Código copiado!";
+            else copy.textContent = "Código copiado!";
             setTimeout(() => {
-              copy.textContent = "Copiar código Pix";
+              if (copyLabel) copyLabel.textContent = "Copiar código Pix";
+              else copy.textContent = "Copiar código Pix";
             }, 1600);
           } catch {
             code.select();
             document.execCommand("copy");
           }
-        });
+        }
+
+        copy.addEventListener("click", copiarCodigoPix);
+        copyInline?.addEventListener("click", copiarCodigoPix);
 
         if (novo) {
           novo.addEventListener("click", () => {
