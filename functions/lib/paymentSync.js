@@ -1,5 +1,5 @@
 import { mpOrderToLocalStatus, paymentFromOrder } from "./mercadoPago.js";
-import { baixarEstoquePedido } from "./stock.js";
+import { baixarEstoquePedido, liberarReservaPedido } from "./stock.js";
 import { notifyPaidOrder } from "./push.js";
 
 /**
@@ -68,6 +68,8 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
     const estoque = await baixarEstoquePedido(env, pedidoId);
     if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", pedidoId);
     await notifyPaidOrder(env, pedidoId);
+  } else if (["EXPIRADO", "CANCELADO", "FALHOU"].includes(localStatus)) {
+    await liberarReservaPedido(env, pedidoId, { novoStatus: localStatus });
   }
 
   return {

@@ -14,6 +14,13 @@ export async function onRequestPut({ request, env, params }) {
   if (!validacao.ok) return json({ erro: "Dados inválidos." }, 400);
   const p = validacao.produto;
 
+  const atual = await env.DB.prepare("SELECT estoque_reservado FROM produtos WHERE id = ?").bind(id).first();
+  if (atual && p.estoque < Number(atual.estoque_reservado || 0)) {
+    return json({
+      erro: `Não é possível reduzir o estoque para ${p.estoque}, pois existem ${atual.estoque_reservado} unidade(s) reservada(s) em compras pendentes.`
+    }, 409);
+  }
+
   await env.DB.prepare(`
     UPDATE produtos
     SET nome=?, categoria=?, descricao=?, preco_centavos=?, disponivel=?, ativo=?, destaque=?, emoji=?, estoque=?, promocao_ativa=?, preco_promocional_centavos=?, promocao_inicio=?, promocao_fim=?,

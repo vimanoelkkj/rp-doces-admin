@@ -83,6 +83,7 @@ function createRealSqliteDb() {
       disponivel INTEGER NOT NULL DEFAULT 1,
       ativo INTEGER NOT NULL DEFAULT 1,
       estoque INTEGER NOT NULL DEFAULT 0 CHECK (estoque >= 0),
+      estoque_reservado INTEGER NOT NULL DEFAULT 0 CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque),
       atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -110,6 +111,9 @@ function createRealSqliteDb() {
       mp_qr_code TEXT,
       mp_qr_code_base64 TEXT,
       idempotency_key TEXT NOT NULL UNIQUE,
+      reserva_status TEXT NOT NULL DEFAULT 'SEM_RESERVA' CHECK (reserva_status IN ('SEM_RESERVA', 'ATIVA', 'CONVERTIDA', 'LIBERADA')),
+      reserva_expira_em TEXT,
+      reserva_liberada_em TEXT,
       criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       pago_em TEXT,
@@ -331,7 +335,7 @@ test("reconciliação recupera pedido pago com estoque pendente", async (t) => {
 
   assert.equal(response.status, 200);
   assert.equal(DB.batches.length, 1);
-  assert.equal(DB.batches[0].length, 1 + itens.length * 2 + 1);
+  assert.equal(DB.batches[0].length, itens.length * 2 + 1);
 });
 
 // =========================================================================

@@ -6,7 +6,9 @@ export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
   const { results } = await env.DB.prepare(`
-    SELECT id, nome, categoria, descricao, preco_centavos, disponivel, ativo, destaque, ordem, emoji, estoque, promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim, criado_em, atualizado_em
+    SELECT id, nome, categoria, descricao, preco_centavos, disponivel, ativo, destaque, ordem, emoji,
+           estoque, estoque_reservado, promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim,
+           criado_em, atualizado_em
     FROM produtos ORDER BY categoria, ordem, nome
   `).all();
   return json({ produtos: results || [] });

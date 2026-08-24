@@ -1,6 +1,6 @@
 import { json, bodyJson, sameOrigin } from "../../lib/http.js";
 import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../lib/mercadoPago.js";
-import { baixarEstoquePedido } from "../../lib/stock.js";
+import { baixarEstoquePedido, liberarReservaPedido } from "../../lib/stock.js";
 import { notifyPaidOrder } from "../../lib/push.js";
 import { checkCheckoutRateLimit } from "../../lib/checkoutRateLimit.js";
 
@@ -54,12 +54,11 @@ function isValidClientId(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) || /^[A-Za-z0-9_-]{16,64}$/.test(s);
 }
 
-async function assertPayloadCompatibility(env, pedido, { email, whatsapp, observacao, total, itensNovos }) {
+async function assertPayloadCompatibility(env, pedido, { email, whatsapp, observacao, itensNovos }) {
   if (
     pedido.cliente_email !== email ||
     String(pedido.cliente_whatsapp || "") !== whatsapp ||
-    String(pedido.observacao || "").trim() !== observacao ||
-    Number(pedido.valor_total_centavos) !== Number(total)
+    String(pedido.observacao || "").trim() !== observacao
   ) {
     const err = new Error("Identificador de requisição já utilizado para um pedido diferente.");
     err.status = 409;
@@ -112,7 +111,7 @@ export async function onRequestPost({ request, env }) {
 
   const placeholders = solicitados.map(() => "?").join(",");
   const { results } = await env.DB.prepare(`
-    SELECT id, nome, preco_centavos, disponivel, ativo, estoque,
+    SELECT id, nome, preco_centavos, disponivel, ativo, estoque, estoque_reservado,
            promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim
     FROM produtos WHERE id IN (${placeholders})
   `).bind(...solicitados.map(item => item.produto_id)).all();
@@ -123,8 +122,9 @@ export async function onRequestPost({ request, env }) {
     const produto = produtos.get(solicitado.produto_id);
     if (!produto || !produto.ativo) return json({ erro: "Um produto do carrinho não foi encontrado." }, 404);
     if (!produto.disponivel) return json({ erro: `${produto.nome} está indisponível no momento.` }, 409);
-    if (Number(produto.estoque) < solicitado.quantidade) {
-      const detalhe = produto.estoque > 0 ? `Restam apenas ${produto.estoque} unidade(s).` : "O produto está esgotado.";
+    const disponivelAtual = Number(produto.estoque) - Number(produto.estoque_reservado || 0);
+    if (disponivelAtual < solicitado.quantidade) {
+      const detalhe = disponivelAtual > 0 ? `Restam apenas ${disponivelAtual} unidade(s) disponível(is).` : "O produto está esgotado ou com unidades reservadas.";
       return json({ erro: `${produto.nome}: ${detalhe}` }, 409);
     }
     const unitario = promotionPrice(produto, agora);
@@ -144,19 +144,20 @@ export async function onRequestPost({ request, env }) {
   let pedidoExistente = await env.DB.prepare(`
     SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos, cliente_email,
            cliente_whatsapp, observacao, status_pagamento, mp_order_id, mp_payment_id, mp_status,
-           mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key
+           mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key,
+           reserva_status, reserva_expira_em
     FROM pedidos WHERE idempotency_key = ? LIMIT 1
   `).bind(idempotencyKey).first();
 
   if (pedidoExistente) {
     try {
-      await assertPayloadCompatibility(env, pedidoExistente, { email, whatsapp, observacao, total, itensNovos: itens });
+      await assertPayloadCompatibility(env, pedidoExistente, { email, whatsapp, observacao, itensNovos: itens });
     } catch (err) {
       if (err.status === 409) return json({ erro: err.message }, 409);
       throw err;
     }
 
-    // Estado A: Pedido existente com Pix completo -> Replay imediato
+    // Estado A: Pedido existente com Pix completo -> Replay imediato (não consome rate limit nem reserva adicional)
     if (pedidoExistente.mp_qr_code) {
       const { results: itensSalvos } = await env.DB.prepare(`
         SELECT produto_id, produto_nome AS produto, quantidade,
@@ -207,39 +208,56 @@ export async function onRequestPost({ request, env }) {
   if (!pedidoExistente) {
     tokenPublico = crypto.randomUUID();
     const produtoResumo = itens.length === 1 ? itens[0].produto : `Pedido com ${itens.length} itens`;
-    const statements = [env.DB.prepare(`
-      INSERT INTO pedidos (token_publico, produto_id, produto_nome, quantidade,
-        valor_unitario_centavos, valor_total_centavos, cliente_nome, cliente_email,
-        cliente_whatsapp, tipo_entrega, observacao, idempotency_key)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(tokenPublico, itens.length === 1 ? itens[0].produto_id : null, produtoResumo, quantidadeTotal,
-      itens.length === 1 ? itens[0].valor_unitario_centavos : 0, total,
-      nome, email, whatsapp, "RETIRADA", observacao, idempotencyKey)];
+    const statements = [
+      env.DB.prepare(`
+        INSERT INTO pedidos (token_publico, produto_id, produto_nome, quantidade,
+          valor_unitario_centavos, valor_total_centavos, cliente_nome, cliente_email,
+          cliente_whatsapp, tipo_entrega, observacao, idempotency_key, reserva_status, reserva_expira_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'))
+      `).bind(tokenPublico, itens.length === 1 ? itens[0].produto_id : null, produtoResumo, quantidadeTotal,
+        itens.length === 1 ? itens[0].valor_unitario_centavos : 0, total,
+        nome, email, whatsapp, "RETIRADA", observacao, idempotencyKey)
+    ];
+
     for (const item of itens) {
-      statements.push(env.DB.prepare(`
-        INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade,
-          valor_unitario_centavos, valor_total_centavos)
-        SELECT id, ?, ?, ?, ?, ? FROM pedidos WHERE token_publico = ?
-      `).bind(item.produto_id, item.produto, item.quantidade,
-        item.valor_unitario_centavos, item.valor_total_centavos, tokenPublico));
+      statements.push(
+        env.DB.prepare(`
+          INSERT INTO pedido_itens (pedido_id, produto_id, produto_nome, quantidade,
+            valor_unitario_centavos, valor_total_centavos)
+          SELECT id, ?, ?, ?, ?, ? FROM pedidos WHERE token_publico = ?
+        `).bind(item.produto_id, item.produto, item.quantidade,
+          item.valor_unitario_centavos, item.valor_total_centavos, tokenPublico),
+        env.DB.prepare(`
+          UPDATE produtos
+          SET estoque_reservado = estoque_reservado + ?,
+              atualizado_em = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(item.quantidade, item.produto_id)
+      );
     }
 
     try {
       const inserted = await env.DB.batch(statements);
       pedidoId = inserted[0]?.meta?.last_row_id;
     } catch (insertErr) {
+      // Se falhou por violação de constraint CHECK (ex: estoque_reservado > estoque)
+      if (insertErr?.message?.includes("CHECK constraint failed") || insertErr?.message?.includes("CHECK")) {
+        return json({ erro: "Um ou mais produtos selecionados não possuem estoque suficiente disponível." }, 409);
+      }
+
       // Concorrência atômica: se outro request inseriu no mesmo milissegundo com a mesma chave
       pedidoExistente = await env.DB.prepare(`
         SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos, cliente_email,
                cliente_whatsapp, observacao, status_pagamento, mp_order_id, mp_payment_id, mp_status,
-               mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key
+               mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key,
+               reserva_status, reserva_expira_em
         FROM pedidos WHERE idempotency_key = ? LIMIT 1
       `).bind(idempotencyKey).first();
 
       if (!pedidoExistente) throw insertErr;
 
       try {
-        await assertPayloadCompatibility(env, pedidoExistente, { email, whatsapp, observacao, total, itensNovos: itens });
+        await assertPayloadCompatibility(env, pedidoExistente, { email, whatsapp, observacao, itensNovos: itens });
       } catch (err) {
         if (err.status === 409) return json({ erro: err.message }, 409);
         throw err;
@@ -279,40 +297,87 @@ export async function onRequestPost({ request, env }) {
   if (!pedidoId) return json({ erro: "Não foi possível registrar o pedido." }, 500);
   const externalReference = `RP-${pedidoId}`;
 
-  // 2. Chamada idempotente ao Mercado Pago usando a mesma chave
+  // 3. Chamada idempotente ao Mercado Pago usando a mesma chave e payload original
   try {
+    const totalAmount = money(total);
+    const payerFirstName = String(env.MP_TEST_MODE || "").toLowerCase() === "true" ? "APRO" : nome.split(/\s+/)[0];
+
+    const body = {
+      type: "online",
+      processing_mode: "automatic",
+      external_reference: externalReference,
+      total_amount: totalAmount,
+      payer: { email, first_name: payerFirstName },
+      transactions: {
+        payments: [
+          {
+            amount: totalAmount,
+            payment_method: { id: "pix", type: "bank_transfer" },
+            expiration_time: "PT30M"
+          }
+        ]
+      }
+    };
+
     const order = await mpRequest(env, "/v1/orders", {
-      method: "POST", idempotencyKey,
-      body: { type: "online", processing_mode: "automatic", external_reference: externalReference,
-        total_amount: money(total), payer: { email,
-          first_name: String(env.MP_TEST_MODE || "").toLowerCase() === "true" ? "APRO" : nome.split(/\s+/)[0] },
-        transactions: { payments: [{ amount: money(total), payment_method: { id: "pix", type: "bank_transfer" } }] } }
+      method: "POST",
+      idempotencyKey,
+      body
     });
+
     const payment = paymentFromOrder(order);
     const localStatus = mpOrderToLocalStatus(order);
-    await env.DB.prepare(`UPDATE pedidos SET mp_order_id = ?, mp_payment_id = ?, mp_status = ?, mp_status_detail = ?,
-      mp_ticket_url = ?, mp_qr_code = ?, mp_qr_code_base64 = ?, status_pagamento = ?, atualizado_em = CURRENT_TIMESTAMP,
-      pago_em = CASE WHEN ? = 'PAGO' THEN CURRENT_TIMESTAMP ELSE pago_em END WHERE id = ?`).bind(
+
+    await env.DB.prepare(`
+      UPDATE pedidos SET
+        mp_order_id = ?, mp_payment_id = ?, mp_status = ?, mp_status_detail = ?,
+        mp_ticket_url = ?, mp_qr_code = ?, mp_qr_code_base64 = ?, status_pagamento = ?,
+        atualizado_em = CURRENT_TIMESTAMP,
+        pago_em = CASE WHEN ? = 'PAGO' THEN CURRENT_TIMESTAMP ELSE pago_em END
+      WHERE id = ?
+    `).bind(
       order.id || null, payment.paymentId, order.status || null, order.status_detail || null,
-      payment.ticketUrl, payment.qrCode, payment.qrCodeBase64, localStatus, localStatus, pedidoId).run();
+      payment.ticketUrl, payment.qrCode, payment.qrCodeBase64, localStatus, localStatus, pedidoId
+    ).run();
+
     if (localStatus === "PAGO") {
       const estoque = await baixarEstoquePedido(env, pedidoId);
       if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", pedidoId);
       await notifyPaidOrder(env, pedidoId);
     }
+
     const produtoResumo = itens.length === 1 ? itens[0].produto : `Pedido com ${itens.length} itens`;
-    return json({ pedido: { token: tokenPublico, referencia: externalReference, produto: produtoResumo,
-      quantidade: quantidadeTotal, quantidade_total: quantidadeTotal, itens,
-      valor_total_centavos: total, status: localStatus },
-      pix: { qr_code: payment.qrCode, qr_code_base64: payment.qrCodeBase64, ticket_url: payment.ticketUrl } }, 201);
+    return json({
+      pedido: {
+        token: tokenPublico,
+        referencia: externalReference,
+        produto: produtoResumo,
+        quantidade: quantidadeTotal,
+        quantidade_total: quantidadeTotal,
+        itens,
+        valor_total_centavos: total,
+        status: localStatus
+      },
+      pix: {
+        qr_code: payment.qrCode,
+        qr_code_base64: payment.qrCodeBase64,
+        ticket_url: payment.ticketUrl
+      }
+    }, 201);
   } catch (err) {
+    console.error("Mercado Pago create order error:", err?.status, err?.message);
+
+    // Se o gateway rejeitou com 400/422 definitivo (comprovando que nenhuma Order foi criada):
+    if (err?.status === 400 || err?.status === 422) {
+      await liberarReservaPedido(env, pedidoId, { novoStatus: "ERRO" });
+      return json({ erro: err?.data?.message || "Pagamento Pix recusado pelo emissor." }, err.status);
+    }
+
+    // Se for falha incerta (5xx, timeout, rede): MANTÉM a reserva ATIVA e registra status ERRO
     await env.DB.prepare(`
-      UPDATE pedidos SET
-        status_pagamento = 'ERRO',
-        atualizado_em = CURRENT_TIMESTAMP
+      UPDATE pedidos SET status_pagamento = 'ERRO', atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ? AND status_pagamento NOT IN ('PAGO', 'REEMBOLSADO')
     `).bind(pedidoId).run();
-    console.error("Mercado Pago create order:", err?.status, err?.data || err?.message);
-    return json({ erro: "Não foi possível gerar o Pix agora. Tente novamente em instantes." }, 502);
+    return json({ erro: "Não foi possível gerar o Pix no momento. Tente novamente em instantes." }, 502);
   }
 }
