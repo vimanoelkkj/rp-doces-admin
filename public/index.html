@@ -1665,7 +1665,7 @@
     <script id="rp-mobile-bottom-nav" src="/assets/js/mobile-navigation.js"></script>
 
     <div id="pixOverlay" aria-hidden="true">
-      <div class="pix-modal" role="dialog" aria-modal="true" aria-labelledby="pixTitulo">
+      <div class="pix-modal pix-sheet" role="dialog" aria-modal="true" aria-labelledby="pixTitulo">
         <header class="pix-modal-header">
           <span class="eyebrow pix-secure-label">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1680,15 +1680,21 @@
             </svg>
           </button>
         </header>
-        <div class="pix-modal-body-viewport">
-          <div id="pixPaymentView" class="pix-modal-body">
-            <header class="pix-heading">
-              <h3 id="pixTitulo">Pague com Pix</h3>
-              <span class="pix-order-badge" id="pixOrderReference"></span>
-              <strong class="pix-total" id="pixTotal"></strong>
-              <p id="pixResumo" class="pix-summary"></p>
-            </header>
+        <div id="pixPaymentView" class="pix-modal-body">
+          <header class="pix-heading">
+            <img
+              class="pix-brand-mark"
+              src="/assets/images/rp-image-01.webp"
+              alt="Logo R&amp;P Doces"
+              decoding="async"
+            />
+            <h3 id="pixTitulo">Pague com Pix</h3>
+            <p class="pix-heading-help">Escaneie o QR Code ou copie o código Pix</p>
+            <p id="pixResumo" class="pix-summary"></p>
+          </header>
 
+          <section class="pix-payment-card" id="pixPaymentCard">
+            <img id="pixQr" class="pix-qr" alt="QR Code Pix" style="display: none" />
             <div id="pixTimerBlock" class="pix-timer" style="display: none">
               <svg class="pix-timer-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9"></circle>
@@ -1722,84 +1728,89 @@
                 </div>
               </div>
             </div>
-
-            <section class="pix-payment-card" id="pixPaymentCard">
-              <img id="pixQr" class="pix-qr" alt="QR Code Pix" style="display: none" />
-              <div class="pix-scan-copy" id="pixScanCopy">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"
-                  ></path>
-                </svg>
-                <p><strong>Escaneie o QR Code</strong><span>ou copie o código Pix abaixo</span></p>
-              </div>
-              <div class="pix-code-field" id="pixCodeField">
-                <input
-                  id="pixCode"
-                  class="pix-code"
-                  readonly
-                  aria-label="Código Pix copia e cola"
-                />
-                <button id="pixCopyInline" type="button" aria-label="Copiar código Pix">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="8" y="3" width="11" height="14" rx="2"></rect>
-                    <path d="M16 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"></path>
-                  </svg>
-                </button>
-              </div>
-              <div id="pixExpiredIcon" class="pix-expired-icon" style="display: none">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9"></circle>
-                  <path d="M12 7v5l3 2"></path>
-                </svg>
-              </div>
-              <div class="pix-actions">
-                <button id="pixCopy" class="btn btn-primary" type="button">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="8" y="3" width="11" height="14" rx="2"></rect>
-                    <path d="M16 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"></path></svg
-                  ><span id="pixCopyLabel">Copiar código Pix</span>
-                </button>
-                <a
-                  id="pixTicket"
-                  class="btn btn-outline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style="display: none"
-                  ><svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M14 5h5v5M19 5l-8 8"></path>
-                    <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"></path></svg
-                  ><span>Abrir pagamento no Mercado Pago</span></a
-                >
-                <button id="pixNovo" class="btn btn-primary" type="button" style="display: none">
-                  Gerar novo Pix
-                </button>
-              </div>
-              <div id="pixStatus" class="pix-status">Aguardando pagamento…</div>
-              <small class="muted" id="pixStatusHelp"
-                >A confirmação é consultada diretamente no Mercado Pago.</small
-              >
-            </section>
-          </div>
-
-          <div id="pixAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
-
-          <div id="pixSuccessView" class="pix-modal-body pix-success">
-            <div class="pix-success-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="m7 12 3 3 7-7"></path></svg>
+            <div class="pix-scan-copy" id="pixScanCopy">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"
+                ></path>
+              </svg>
+              <p><strong>Escaneie o QR Code</strong><span>ou copie o código Pix abaixo</span></p>
             </div>
-            <h3>Pagamento aprovado!</h3>
-            <strong id="pixSuccessOrder" class="pix-success-order">Pedido confirmado</strong>
-            <strong id="pixSuccessTotal" class="pix-success-total"></strong>
-            <p id="pixSuccessItems" class="pix-success-items"></p>
-            <p id="pixSuccessText" class="pix-success-text">
-              Seu pagamento foi recebido com sucesso.
-            </p>
-            <p class="pix-success-guidance">
-              Seu pedido foi confirmado. Agora é só aguardar o preparo.
-            </p>
-            <button id="pixDone" class="btn btn-primary" type="button">Voltar para a loja</button>
+            <label class="pix-code-label" for="pixCode">Copie o código Pix</label>
+            <div class="pix-code-field" id="pixCodeField">
+              <input id="pixCode" class="pix-code" readonly aria-label="Código Pix copia e cola" />
+              <button id="pixCopy" type="button" aria-label="Copiar código Pix">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="8" y="3" width="11" height="14" rx="2"></rect>
+                  <path d="M16 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"></path>
+                </svg>
+                <span id="pixCopyLabel">Copiar</span>
+              </button>
+            </div>
+            <div id="pixExpiredIcon" class="pix-expired-icon" style="display: none">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5l3 2"></path>
+              </svg>
+            </div>
+            <div class="pix-actions">
+              <a
+                id="pixTicket"
+                class="btn btn-outline"
+                target="_blank"
+                rel="noopener noreferrer"
+                style="display: none"
+                ><svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 5h5v5M19 5l-8 8"></path>
+                  <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"></path></svg
+                ><span>Abrir pagamento no Mercado Pago</span></a
+              >
+              <button id="pixNovo" class="btn btn-primary" type="button" style="display: none">
+                Gerar novo Pix
+              </button>
+            </div>
+            <div id="pixStatus" class="pix-status">Aguardando pagamento…</div>
+            <small class="muted" id="pixStatusHelp"
+              >A confirmação é consultada diretamente no Mercado Pago.</small
+            >
+          </section>
+          <section class="pix-order-details" aria-label="Resumo do pedido">
+            <div>
+              <span>Total do pedido</span>
+              <strong class="pix-total" id="pixTotal"></strong>
+            </div>
+            <div>
+              <span>Pedido</span>
+              <strong class="pix-order-badge" id="pixOrderReference"></strong>
+            </div>
+          </section>
+          <section class="pix-processor-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 5 6v5c0 4.5 2.8 8.1 7 10 4.2-1.9 7-5.5 7-10V6l-7-3Z"></path>
+              <path d="m9 12 2 2 4-4"></path>
+            </svg>
+            <span>Seu pagamento é processado com segurança pelo Mercado Pago</span>
+            <strong>mercado<br />pago</strong>
+          </section>
+        </div>
+
+        <div id="pixAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+        <div id="pixSuccessView" class="pix-modal-body pix-success">
+          <div class="pix-success-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m7 12 3 3 7-7"></path></svg>
           </div>
+          <h3>Pagamento aprovado!</h3>
+          <strong id="pixSuccessOrder" class="pix-success-order">Pedido confirmado</strong>
+          <strong id="pixSuccessTotal" class="pix-success-total"></strong>
+          <p id="pixSuccessItems" class="pix-success-items"></p>
+          <p id="pixSuccessText" class="pix-success-text">
+            Seu pagamento foi recebido com sucesso.
+          </p>
+          <p class="pix-success-guidance">
+            Seu pedido foi confirmado. Agora é só aguardar o preparo.
+          </p>
+          <button id="pixDone" class="btn btn-primary" type="button">Voltar para a loja</button>
         </div>
         <footer class="pix-modal-footer pix-security-footer">
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1807,7 +1818,7 @@
             <rect x="9" y="10" width="6" height="5" rx="1"></rect>
             <path d="M10.5 10V8.5a1.5 1.5 0 0 1 3 0V10"></path>
           </svg>
-          Pagamento processado com segurança pelo Mercado Pago
+          Ambiente seguro e criptografado
         </footer>
       </div>
     </div>
@@ -1822,7 +1833,6 @@
         const codeField = document.getElementById("pixCodeField");
         const copy = document.getElementById("pixCopy");
         const copyLabel = document.getElementById("pixCopyLabel");
-        const copyInline = document.getElementById("pixCopyInline");
         const ticket = document.getElementById("pixTicket");
         const novo = document.getElementById("pixNovo");
         const status = document.getElementById("pixStatus");
@@ -1934,6 +1944,8 @@
         function renderPixTimer(state, formatted) {
           if (!timerBlock) return;
           timerBlock.classList.remove("urgent", "verifying");
+          if (state === "verifying") paymentCard?.classList.add("is-verifying");
+          else paymentCard?.classList.remove("is-verifying");
           if (state === "verifying") {
             timerBlock.classList.add("verifying");
             if (timerCount) timerCount.textContent = "";
@@ -2025,7 +2037,7 @@
           else copy.textContent = "Copiar código Pix";
           if (novo) novo.style.display = "none";
           if (expiredIcon) expiredIcon.style.display = "none";
-          if (paymentCard) paymentCard.classList.remove("is-expired");
+          if (paymentCard) paymentCard.classList.remove("is-expired", "is-verifying");
           qr.style.display = "none";
           if (scanCopy) scanCopy.style.display = "flex";
           code.style.display = "block";
@@ -2104,7 +2116,10 @@
           if (ticket) ticket.style.display = "none";
           if (timerBlock) timerBlock.style.display = "none";
           if (expiredIcon) expiredIcon.style.display = "flex";
-          if (paymentCard) paymentCard.classList.add("is-expired");
+          if (paymentCard) {
+            paymentCard.classList.remove("is-verifying");
+            paymentCard.classList.add("is-expired");
+          }
           status.textContent = "Pix expirado";
           status.className = "pix-status pix-status--expired";
           if (statusHelp) {
@@ -2262,7 +2277,6 @@
         }
 
         copy.addEventListener("click", copiarCodigoPix);
-        copyInline?.addEventListener("click", copiarCodigoPix);
 
         if (novo) {
           novo.addEventListener("click", () => {

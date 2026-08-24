@@ -51,12 +51,23 @@ async function carregarCardapioDinamico() {
     const detailDescription = document.getElementById("rpProductDetailDescription");
     const detailPrice = document.getElementById("rpProductDetailPrice");
     const detailAdd = document.getElementById("rpProductDetailAdd");
+    const detailSheet = detailOverlay?.querySelector(".rp-product-detail-sheet");
     let detailCard = null;
     function fecharDetalhe() {
       if (!detailOverlay?.classList.contains("open")) return;
       detailOverlay.classList.remove("open");
       detailOverlay.setAttribute("aria-hidden", "true");
       document.body.classList.remove("rp-mobile-menu-open");
+      document.body.style.removeProperty("overflow");
+      detailSheet?.style.removeProperty("transform");
+      if (detailTitle) detailTitle.textContent = "";
+      if (detailEmoji) detailEmoji.textContent = "";
+      if (detailDescription) detailDescription.textContent = "";
+      if (detailPrice) detailPrice.textContent = "";
+      if (detailAdd) {
+        detailAdd.hidden = false;
+        detailAdd.disabled = false;
+      }
       detailCard = null;
     }
     function abrirDetalhe(item) {

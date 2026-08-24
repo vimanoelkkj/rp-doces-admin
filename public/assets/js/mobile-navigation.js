@@ -56,11 +56,14 @@
   let trocaTimer = 0;
   function trocarPainel(abrirProximo) {
     const cartOverlay = document.getElementById("pedidoOverlay");
+    const productDetailOverlay = document.getElementById("rpProductDetailOverlay");
     const haviaPainel =
       menuOverlay.classList.contains("open") ||
       partyOverlay.classList.contains("open") ||
-      cartOverlay?.classList.contains("open");
+      cartOverlay?.classList.contains("open") ||
+      productDetailOverlay?.classList.contains("open");
     clearTimeout(trocaTimer);
+    dispatchEvent(new Event("rp-close-mobile-sheets"));
     if (menuOverlay.classList.contains("open")) fecharMenu();
     if (partyOverlay.classList.contains("open")) fecharFestas();
     if (cartOverlay?.classList.contains("open")) dispatchEvent(new Event("rp-close-cart-sheet"));

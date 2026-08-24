@@ -180,6 +180,20 @@ function setupDomEnvironment({ href = "https://loja.test/" } = {}) {
   return { doc, win, elements, sessStorage, listeners };
 }
 
+test("Estrutura Pix possui somente o sheet como região rolável", () => {
+  const html = fs.readFileSync(path.resolve(process.cwd(), "public/index.html"), "utf8");
+  const css = fs.readFileSync(path.resolve(process.cwd(), "public/assets/css/site.css"), "utf8");
+  const pixCss = css.slice(css.lastIndexOf("/* Modal Pix */"));
+
+  assert.match(html, /class="pix-modal pix-sheet"/);
+  assert.doesNotMatch(html, /pix-modal-body-viewport/);
+  assert.match(pixCss, /\.pix-modal\s*\{[\s\S]*?overflow-y:\s*auto;/);
+  assert.match(pixCss, /\.pix-modal-body\s*\{[\s\S]*?overflow:\s*visible;/);
+  assert.doesNotMatch(pixCss, /\.pix-modal-header\s*\{[^}]*position:\s*sticky;/s);
+  assert.doesNotMatch(pixCss, /\.pix-modal-footer\s*\{[^}]*position:\s*sticky;/s);
+  assert.doesNotMatch(pixCss, /contain:\s*strict|clip-path:/);
+});
+
 test("A. pix_expira_em válido renderiza timer", () => {
   const { win, doc } = setupDomEnvironment();
   const expIso = new Date(Date.now() + 25 * 60 * 1000).toISOString();
