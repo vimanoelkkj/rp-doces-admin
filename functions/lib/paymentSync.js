@@ -1,6 +1,7 @@
 import { mpOrderToLocalStatus, paymentFromOrder } from "./mercadoPago.js";
 import { baixarEstoquePedido, liberarReservaPedido } from "./stock.js";
 import { notifyPaidOrder } from "./push.js";
+import { logEvent } from "./logger.js";
 
 /**
  * Sincroniza o estado financeiro e metadados de um pedido a partir de um objeto Order do Mercado Pago.
@@ -23,6 +24,11 @@ import { notifyPaidOrder } from "./push.js";
 export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null }) {
   if (!pedidoId) throw new Error("pedidoId é obrigatório para sincronização.");
   if (!order) throw new Error("order do Mercado Pago é obrigatória para sincronização.");
+
+  const pedidoAnterior = await env.DB.prepare(`
+    SELECT status_pagamento FROM pedidos WHERE id = ? LIMIT 1
+  `).bind(pedidoId).first();
+  const statusAnterior = pedidoAnterior?.status_pagamento || null;
 
   const localStatus = mpOrderToLocalStatus(order);
   const payment = paymentFromOrder(order);
@@ -63,10 +69,32 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
 
   const statusFinal = consolidado?.status_pagamento || localStatus;
 
+  // Log de transição financeira efetiva (evita logs duplicados em webhooks repetidos)
+  if (statusAnterior !== "PAGO" && statusFinal === "PAGO") {
+    logEvent("info", "payment.paid", {
+      pedido_id: pedidoId,
+      mp_order_id: resolvedMpOrderId,
+      status: "PAGO",
+      mp_status: consolidado?.mp_status ?? order?.status ?? null
+    });
+  } else if (statusAnterior !== statusFinal && ["REEMBOLSADO", "EXPIRADO", "CANCELADO", "FALHOU"].includes(statusFinal)) {
+    logEvent("info", "payment.status_updated", {
+      pedido_id: pedidoId,
+      mp_order_id: resolvedMpOrderId,
+      status: statusFinal,
+      mp_status: consolidado?.mp_status ?? order?.status ?? null
+    });
+  }
+
   // Efeitos colaterais pós-pagamento só são disparados quando a Order atual representar PAGO
   if (localStatus === "PAGO") {
     const estoque = await baixarEstoquePedido(env, pedidoId);
-    if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", pedidoId);
+    if (!estoque.ok) {
+      logEvent("error", "stock.conversion_failed", {
+        pedido_id: pedidoId,
+        reason: "STOCK_CONVERSION_FAILED"
+      });
+    }
     await notifyPaidOrder(env, pedidoId);
   } else if (["EXPIRADO", "CANCELADO", "FALHOU"].includes(localStatus)) {
     await liberarReservaPedido(env, pedidoId, { novoStatus: localStatus });

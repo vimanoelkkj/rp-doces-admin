@@ -3,6 +3,7 @@ import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../lib/mer
 import { baixarEstoquePedido, liberarReservaPedido } from "../../lib/stock.js";
 import { notifyPaidOrder } from "../../lib/push.js";
 import { checkCheckoutRateLimit } from "../../lib/checkoutRateLimit.js";
+import { logEvent } from "../../lib/logger.js";
 
 const MAX_ITENS_DISTINTOS = 20;
 const MAX_UNIDADES = 50;
@@ -191,7 +192,11 @@ export async function onRequestPost({ request, env }) {
     return json({ erro: "Serviço temporariamente indisponível." }, 503);
   }
   if (!rateLimit.allowed) {
-    console.warn("Checkout rate limit excedido:", { retryAfter: rateLimit.retryAfter, count: rateLimit.count });
+    logEvent("warn", "checkout.rate_limited", {
+      http_status: 429,
+      attempts: rateLimit.count,
+      retry_after: rateLimit.retryAfter
+    });
     return json(
       {
         erro: "Muitas tentativas de pedido em pouco tempo. Por favor, aguarde alguns instantes antes de tentar novamente.",
@@ -297,28 +302,36 @@ export async function onRequestPost({ request, env }) {
   if (!pedidoId) return json({ erro: "Não foi possível registrar o pedido." }, 500);
   const externalReference = `RP-${pedidoId}`;
 
-  // 3. Chamada idempotente ao Mercado Pago usando a mesma chave e payload original
+  const payerFirstName = String(env.MP_TEST_MODE || "").toLowerCase() === "true"
+    ? "APRO"
+    : (nome ? nome.split(/\s+/)[0] : "Cliente");
+
+  const totalAmount = money(total);
+
+  const body = {
+    type: "online",
+    processing_mode: "automatic",
+    external_reference: externalReference,
+    total_amount: totalAmount,
+    payer: {
+      email,
+      first_name: payerFirstName
+    },
+    transactions: {
+      payments: [
+        {
+          amount: totalAmount,
+          payment_method: {
+            id: "pix",
+            type: "bank_transfer"
+          },
+          expiration_time: "PT30M"
+        }
+      ]
+    }
+  };
+
   try {
-    const totalAmount = money(total);
-    const payerFirstName = String(env.MP_TEST_MODE || "").toLowerCase() === "true" ? "APRO" : nome.split(/\s+/)[0];
-
-    const body = {
-      type: "online",
-      processing_mode: "automatic",
-      external_reference: externalReference,
-      total_amount: totalAmount,
-      payer: { email, first_name: payerFirstName },
-      transactions: {
-        payments: [
-          {
-            amount: totalAmount,
-            payment_method: { id: "pix", type: "bank_transfer" },
-            expiration_time: "PT30M"
-          }
-        ]
-      }
-    };
-
     const order = await mpRequest(env, "/v1/orders", {
       method: "POST",
       idempotencyKey,
@@ -342,7 +355,12 @@ export async function onRequestPost({ request, env }) {
 
     if (localStatus === "PAGO") {
       const estoque = await baixarEstoquePedido(env, pedidoId);
-      if (!estoque.ok) console.error("Falha na baixa de estoque:", estoque.erro, "pedido", pedidoId);
+      if (!estoque.ok) {
+        logEvent("error", "stock.conversion_failed", {
+          pedido_id: pedidoId,
+          reason: "STOCK_CONVERSION_FAILED"
+        });
+      }
       await notifyPaidOrder(env, pedidoId);
     }
 
@@ -365,7 +383,11 @@ export async function onRequestPost({ request, env }) {
       }
     }, 201);
   } catch (err) {
-    console.error("Mercado Pago create order error:", err?.status, err?.message);
+    logEvent("error", "payment.sync_failed", {
+      pedido_id: pedidoId,
+      http_status: err?.status || undefined,
+      reason: err?.status ? "MP_HTTP_ERROR" : "MP_TIMEOUT"
+    });
 
     // Se o gateway rejeitou com 400/422 definitivo (comprovando que nenhuma Order foi criada):
     if (err?.status === 400 || err?.status === 422) {

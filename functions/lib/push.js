@@ -1,3 +1,5 @@
+import { logEvent } from "./logger.js";
+
 const enc = new TextEncoder();
 
 function b64urlToBytes(value) {
@@ -78,8 +80,10 @@ export async function notifyPaidOrder(env, pedidoId) {
       const r=await sendWebPush(env,sub,payload);
       if (r.ok) delivered++;
       else if (r.status===404 || r.status===410) await env.DB.prepare('DELETE FROM push_inscricoes WHERE id=?').bind(sub.id).run();
-      else console.error('Web Push:',r.status,await r.text().catch(()=>''));
-    } catch(e){console.error('Web Push:',e?.message||e)}
+      else logEvent("warn", "push.failed", { pedido_id: pedidoId, http_status: r.status, reason: "PUSH_FAILED" });
+    } catch(e){
+      logEvent("warn", "push.failed", { pedido_id: pedidoId, reason: "PUSH_FAILED" });
+    }
   }
   if (!delivered) await env.DB.prepare('DELETE FROM push_eventos WHERE pedido_id=?').bind(pedidoId).run();
   return {ok:delivered>0,delivered};

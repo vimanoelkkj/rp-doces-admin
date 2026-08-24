@@ -1,5 +1,6 @@
 import { mpRequest, mpOrderToLocalStatus } from "./mercadoPago.js";
 import { syncOrderPayment } from "./paymentSync.js";
+import { logEvent } from "./logger.js";
 
 async function itemSemEstoque(env, pedidoId, isReservaAtiva = false) {
   if (isReservaAtiva) {
@@ -40,8 +41,12 @@ async function itemSemReserva(env, pedidoId) {
 }
 
 /**
- * Converte a reserva em baixa definitiva de estoque quando o pedido atinge status PAGO.
- * Executa em batch transacional atômico no D1.
+ * Converte atomicamente a reserva de estoque em baixa física definitiva.
+ * Se o pedido for legado (SEM_RESERVA), decrementa apenas o estoque físico.
+ * Se o pedido tiver reserva ATIVA, decrementa simultaneamente estoque físico e estoque_reservado.
+ *
+ * Utiliza guardas relacionais WHERE EXISTS vinculadas ao pedido e restrições de integridade
+ * para garantir atomicidade e idempotência estrita sem mascarar inconsistências com MAX(0).
  */
 export async function baixarEstoquePedido(env, pedidoId) {
   const pedido = await env.DB.prepare(`
@@ -53,6 +58,8 @@ export async function baixarEstoquePedido(env, pedidoId) {
     return { ok: true, baixado: false };
   }
 
+  const isReservaAtiva = pedido.reserva_status === "ATIVA";
+
   const { results } = await env.DB.prepare(`
     SELECT id, produto_id, produto_nome, quantidade
     FROM pedido_itens
@@ -63,24 +70,28 @@ export async function baixarEstoquePedido(env, pedidoId) {
   const itens = results || [];
   if (!itens.length) return { ok: false, baixado: false, erro: "ITENS_NAO_ENCONTRADOS" };
 
-  const isReservaAtiva = pedido.reserva_status === "ATIVA";
   const insuficienteInicial = await itemSemEstoque(env, pedidoId, isReservaAtiva);
   if (insuficienteInicial) {
-    const erro = insuficienteInicial.produto_id ? "ESTOQUE_INSUFICIENTE" : "PRODUTO_NAO_ENCONTRADO";
-    return { ok: false, baixado: false, erro, item_id: insuficienteInicial.id };
+    logEvent("error", "stock.conversion_failed", {
+      pedido_id: pedidoId,
+      reason: "STOCK_CONVERSION_FAILED"
+    });
+    return { ok: false, baixado: false, erro: "ESTOQUE_INSUFICIENTE", item_id: insuficienteInicial.id };
   }
 
   const statements = [];
 
   for (const item of itens) {
     if (isReservaAtiva) {
-      // Converte reserva em baixa física: reduz estoque físico e estoque reservado simultaneamente
+      // Baixa atômica de estoque físico E de reserva:
+      // O UPDATE do produto SOMENTE afeta linhas se o pedido AINDA estiver no estado PAGO + ATIVA + estoque_baixado_em IS NULL
+      // e houver saldo estrito tanto de estoque físico quanto de estoque reservado (sem MAX(0)).
       statements.push(
         env.DB.prepare(`
           UPDATE produtos
           SET estoque = estoque - ?,
               estoque_reservado = estoque_reservado - ?,
-              disponivel = CASE WHEN estoque - ? <= 0 THEN 0 ELSE disponivel END,
+              disponivel = CASE WHEN (estoque - ?) - (estoque_reservado - ?) <= 0 THEN 0 ELSE disponivel END,
               atualizado_em = CURRENT_TIMESTAMP
           WHERE id = ?
             AND estoque >= ?
@@ -92,9 +103,10 @@ export async function baixarEstoquePedido(env, pedidoId) {
                 AND estoque_baixado_em IS NULL
                 AND reserva_status = 'ATIVA'
             )
-        `).bind(item.quantidade, item.quantidade, item.quantidade, item.produto_id, item.quantidade, item.quantidade, pedidoId)
+        `).bind(item.quantidade, item.quantidade, item.quantidade, item.quantidade, item.produto_id, item.quantidade, item.quantidade, pedidoId)
       );
 
+      // Marca o item como baixado condicionado ao pedido continuar PAGO + ATIVA
       statements.push(
         env.DB.prepare(`
           UPDATE pedido_itens SET estoque_baixado_em = CURRENT_TIMESTAMP
@@ -164,9 +176,18 @@ export async function baixarEstoquePedido(env, pedidoId) {
     const results = await env.DB.batch(statements);
     const pedidoResult = results[results.length - 1];
     const baixado = Number(pedidoResult?.meta?.changes || 0) === 1;
+    if (baixado) {
+      logEvent("info", "stock.conversion_success", {
+        pedido_id: pedidoId,
+        reservation_status: isReservaAtiva ? "CONVERTIDA" : undefined
+      });
+    }
     return { ok: true, baixado };
   } catch (err) {
-    console.error(`Falha na baixa física de estoque do pedido #${pedidoId}:`, err?.message);
+    logEvent("error", "stock.conversion_failed", {
+      pedido_id: pedidoId,
+      reason: "STOCK_CONVERSION_FAILED"
+    });
     return { ok: false, baixado: false, erro: "ERRO_TRANSACIONAL_BAIXA" };
   }
 }
@@ -197,6 +218,10 @@ export async function liberarReservaPedido(env, pedidoId, { novoStatus = null } 
 
   const insuficienteReserva = await itemSemReserva(env, pedidoId);
   if (insuficienteReserva) {
+    logEvent("error", "stock.reservation_failed", {
+      pedido_id: pedidoId,
+      reason: "RESERVATION_RELEASE_FAILED"
+    });
     return { ok: false, liberado: false, erro: "ESTOQUE_RESERVADO_INSUFICIENTE", item_id: insuficienteReserva.id };
   }
 
@@ -235,9 +260,19 @@ export async function liberarReservaPedido(env, pedidoId, { novoStatus = null } 
     const results = await env.DB.batch(statements);
     const pedidoResult = results[results.length - 1];
     const liberado = Number(pedidoResult?.meta?.changes || 0) === 1;
+    if (liberado) {
+      logEvent("info", "stock.reservation_released", {
+        pedido_id: pedidoId,
+        reservation_status: "LIBERADA",
+        status: novoStatus || undefined
+      });
+    }
     return { ok: true, liberado };
   } catch (err) {
-    console.error(`Erro ao liberar reserva do pedido #${pedidoId}:`, err?.message);
+    logEvent("error", "stock.reservation_failed", {
+      pedido_id: pedidoId,
+      reason: "RESERVATION_RELEASE_FAILED"
+    });
     return { ok: false, liberado: false, erro: "ERRO_BATCH_LIBERACAO" };
   }
 }
@@ -303,7 +338,11 @@ export async function reconciliarReservaExpirada(env, pedidoId) {
         `).bind(mpOrderId, pedidoId).run();
       }
     } catch (createErr) {
-      console.warn(`Tentativa de recuperação de Order para pedido #${pedidoId} falhou:`, createErr?.message);
+      logEvent("warn", "payment.sync_failed", {
+        pedido_id: pedidoId,
+        http_status: createErr?.status || undefined,
+        reason: createErr?.status ? "MP_HTTP_ERROR" : "MP_TIMEOUT"
+      });
       // Se for erro 4xx definitivo comprovando que a criação foi rejeitada e nenhuma order existe
       if (createErr?.status === 400 || createErr?.status === 422) {
         await liberarReservaPedido(env, pedidoId, { novoStatus: "ERRO" });
@@ -337,7 +376,12 @@ export async function reconciliarReservaExpirada(env, pedidoId) {
     // Se o status retornado ainda for PENDENTE ou desconhecido, mantém a reserva ATIVA
     return { reconciliado: false };
   } catch (queryErr) {
-    console.warn(`Consulta de reconciliação para pedido #${pedidoId} falhou (mantendo reserva ativa):`, queryErr?.message);
+    logEvent("warn", "payment.sync_failed", {
+      pedido_id: pedidoId,
+      mp_order_id: mpOrderId,
+      http_status: queryErr?.status || undefined,
+      reason: "RESERVATION_RECONCILIATION_FAILED"
+    });
     return { reconciliado: false };
   }
 }
@@ -361,6 +405,6 @@ export async function limparReservasExpiradas(env) {
       await reconciliarReservaExpirada(env, p.id);
     }
   } catch (err) {
-    console.warn("Falha no cleanup de reservas expiradas:", err?.message);
+    // Falha pontual em cleanup não interrompe fluxo de leitura
   }
 }

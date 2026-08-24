@@ -1,6 +1,7 @@
 import { json } from "../../lib/http.js";
 import { mpRequest, validateMpWebhook } from "../../lib/mercadoPago.js";
 import { syncOrderPayment } from "../../lib/paymentSync.js";
+import { logEvent } from "../../lib/logger.js";
 
 function getBodyDataId(body) {
   const value = body?.data?.id ?? body?.data_id ?? body?.id ?? null;
@@ -41,17 +42,29 @@ export async function onRequestPost({ request, env }) {
   if (!dataId || !supportedType) return json({ ok: true });
 
   if (!env.MP_WEBHOOK_SECRET) {
-    console.error("MP_WEBHOOK_SECRET não configurado");
+    logEvent("error", "webhook.error", {
+      http_status: 503,
+      reason: "MP_HTTP_ERROR"
+    });
     return json({ erro: "Webhook não configurado." }, 503);
   }
 
   const valid = await validateMpWebhook(request, env.MP_WEBHOOK_SECRET, dataId);
-  if (!valid) return json({ erro: "Assinatura inválida." }, 401);
+  if (!valid) {
+    logEvent("warn", "webhook.invalid_signature", {
+      http_status: 401,
+      reason: "HMAC_MISMATCH"
+    });
+    return json({ erro: "Assinatura inválida." }, 401);
+  }
+
+  let local = null;
+  let orderId = null;
 
   try {
     // O MP pode notificar a Order ou o Payment. Primeiro tentamos resolver o
     // identificador recebido contra os dois IDs persistidos localmente.
-    let local = await env.DB.prepare(`
+    local = await env.DB.prepare(`
       SELECT id, mp_order_id
       FROM pedidos
       WHERE mp_order_id = ? OR mp_payment_id = ?
@@ -59,7 +72,7 @@ export async function onRequestPost({ request, env }) {
       LIMIT 1
     `).bind(dataId, dataId).first();
 
-    let orderId = local?.mp_order_id ? String(local.mp_order_id) : null;
+    orderId = local?.mp_order_id ? String(local.mp_order_id) : null;
     let order = null;
 
     // Para notificações de Order, o próprio data.id é consultável diretamente.
@@ -98,7 +111,12 @@ export async function onRequestPost({ request, env }) {
 
     return json({ ok: true });
   } catch (err) {
-    console.error("Mercado Pago webhook:", err?.status, err?.data || err?.message);
+    logEvent("error", "webhook.error", {
+      pedido_id: local?.id || undefined,
+      mp_order_id: orderId || undefined,
+      http_status: err?.status || 502,
+      reason: err?.status ? "MP_HTTP_ERROR" : "UNKNOWN_ERROR"
+    });
     // Em falhas transitórias devolvemos não-2xx para o MP reenviar a notificação.
     return json({ erro: "Falha ao sincronizar pagamento." }, 502);
   }

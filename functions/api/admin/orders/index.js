@@ -3,6 +3,7 @@ import { requireUser } from "../../../lib/auth.js";
 import { mpRequest } from "../../../lib/mercadoPago.js";
 import { baixarEstoquePedido } from "../../../lib/stock.js";
 import { syncOrderPayment } from "../../../lib/paymentSync.js";
+import { logEvent } from "../../../lib/logger.js";
 
 const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
@@ -21,15 +22,17 @@ async function reconcilePaidOrdersWithoutStock(env) {
   await Promise.allSettled((results || []).map(async ({ id }) => {
     try {
       const estoque = await baixarEstoquePedido(env, id);
-      if (!estoque.ok) {
-        console.error("Reconciliação de estoque pendente:", estoque.erro, "pedido", id);
+      if (estoque.ok && estoque.baixado) {
+        logEvent("info", "reconciliation.recovered", { pedido_id: id, status: "PAGO" });
+      } else if (!estoque.ok) {
+        logEvent("error", "stock.conversion_failed", { pedido_id: id, reason: "STOCK_CONVERSION_FAILED" });
         await env.DB.prepare(`
           UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP
           WHERE id = ? AND estoque_baixado_em IS NULL
         `).bind(id).run();
       }
     } catch (err) {
-      console.error("Reconciliação de estoque pendente:", err?.message, "pedido", id);
+      logEvent("error", "stock.conversion_failed", { pedido_id: id, reason: "STOCK_CONVERSION_FAILED" });
       await env.DB.prepare(`
         UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP
         WHERE id = ? AND estoque_baixado_em IS NULL
@@ -61,7 +64,12 @@ async function reconcilePendingOrders(env) {
     } catch (err) {
       // A reconciliação é uma rede de segurança. Falha ao consultar o MP não
       // deve derrubar a tela administrativa nem gerar uma tempestade de retries.
-      console.error("Reconciliação Mercado Pago:", pedido.id, err?.status, err?.data || err?.message);
+      logEvent("warn", "payment.sync_failed", {
+        pedido_id: pedido.id,
+        mp_order_id: pedido.mp_order_id,
+        http_status: err?.status || undefined,
+        reason: err?.status ? "MP_HTTP_ERROR" : "MP_RECONCILIATION_FAILED"
+      });
       await env.DB.prepare(
         "UPDATE pedidos SET atualizado_em = CURRENT_TIMESTAMP WHERE id = ?"
       ).bind(pedido.id).run();
