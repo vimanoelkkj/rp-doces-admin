@@ -1856,7 +1856,47 @@
         let zeroTriggered = false;
         let visualState = "idle";
         let flowVersion = 0;
+        let pixQaReachedZero = false;
+        let pixQaResponseIndex = 0;
         const PIX_DURATION_MS = 30 * 60 * 1000;
+        const PIX_QA_SCENARIOS = {
+          paid: ["PENDENTE", "PENDENTE", "PAGO"],
+          expired: ["PENDENTE", "PENDENTE", "EXPIRADO"],
+          pending: ["PENDENTE"],
+          "recovery-paid": ["PENDENTE", 500, 500, "PAGO"],
+          "recovery-expired": ["PENDENTE", 500, "EXPIRADO"]
+        };
+
+        function isPixQaEnvironment(locationLike = window.location) {
+          let hostname = String(locationLike?.hostname || "").toLowerCase();
+          if (!hostname && locationLike?.href) {
+            try {
+              hostname = new URL(locationLike.href).hostname.toLowerCase();
+            } catch (_) {}
+          }
+          return hostname === "localhost" || hostname === "127.0.0.1";
+        }
+
+        function getPixQaConfig(locationLike = window.location) {
+          if (!isPixQaEnvironment(locationLike)) return { enabled: false };
+          let params;
+          try {
+            params = new URL(locationLike?.href || String(locationLike), "http://localhost")
+              .searchParams;
+          } catch (_) {
+            return { enabled: false };
+          }
+          if (params.get("pixQa") !== "1") return { enabled: false };
+          const scenario = params.get("scenario") || "pending";
+          if (!Object.hasOwn(PIX_QA_SCENARIOS, scenario)) return { enabled: false };
+          const requestedTtl = Number.parseInt(params.get("ttl") || "20", 10);
+          const ttlSeconds = Number.isFinite(requestedTtl)
+            ? Math.max(1, Math.min(300, requestedTtl))
+            : 20;
+          return { enabled: true, scenario, ttlSeconds };
+        }
+
+        const pixQaConfig = getPixQaConfig(window.location);
 
         const moeda = c =>
           (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1929,6 +1969,7 @@
 
           if (state === "verifying" && !zeroTriggered) {
             zeroTriggered = true;
+            pixQaReachedZero = true;
             consultar();
           }
         }
@@ -1974,6 +2015,8 @@
 
         function reset() {
           visualState = "idle";
+          pixQaReachedZero = false;
+          pixQaResponseIndex = 0;
           paymentView.style.display = "";
           successView.classList.remove("show");
           copy.style.display = "inline-flex";
@@ -2077,10 +2120,25 @@
           const requestToken = token;
           const requestVersion = flowVersion;
           try {
-            const r = await fetch("/api/orders/" + encodeURIComponent(token), {
-              headers: { Accept: "application/json" },
-              cache: "no-store"
-            });
+            let r;
+            if (pixQaConfig.enabled) {
+              const sequence = PIX_QA_SCENARIOS[pixQaConfig.scenario];
+              const qaResult = pixQaReachedZero
+                ? sequence[Math.min(pixQaResponseIndex++, sequence.length - 1)]
+                : "PENDENTE";
+              r =
+                qaResult === 500
+                  ? new Response("QA temporary error", { status: 500 })
+                  : new Response(JSON.stringify({ pedido: { ...pedidoAtual, status: qaResult } }), {
+                      status: 200,
+                      headers: { "content-type": "application/json" }
+                    });
+            } else {
+              r = await fetch("/api/orders/" + encodeURIComponent(token), {
+                headers: { Accept: "application/json" },
+                cache: "no-store"
+              });
+            }
             if (!r.ok) return;
             const d = await r.json();
             if (
@@ -2163,7 +2221,10 @@
               return;
             }
 
-            startPixTimer(pedidoAtual?.pix_expira_em);
+            const timerExpiration = pixQaConfig.enabled
+              ? new Date(Date.now() + pixQaConfig.ttlSeconds * 1000).toISOString()
+              : pedidoAtual?.pix_expira_em;
+            startPixTimer(timerExpiration);
 
             stopPolling();
             consultar();
@@ -2178,7 +2239,10 @@
           _stopPixTimer: stopPixTimer,
           _getCurrentExpiration: () => currentExpirationMs,
           _getPollInterval: () => pollInterval,
-          _getTimerInterval: () => timerInterval
+          _getTimerInterval: () => timerInterval,
+          _isPixQaEnvironment: isPixQaEnvironment,
+          _getPixQaConfig: getPixQaConfig,
+          _getActiveQaConfig: () => ({ ...pixQaConfig })
         };
 
         async function copiarCodigoPix() {

@@ -233,6 +233,11 @@ test("multi-item usa preços do backend, promoção e um Pix", async t => {
   assert.equal(body.pedido.itens[1].valor_unitario_centavos, 1500);
   assert.equal(sent.total_amount, "35.00");
   assert.equal(sent.transactions.payments.length, 1);
+  assert.equal(
+    sent.transactions.payments[0].expiration_time,
+    "PT30M",
+    "QA frontend não pode alterar a validade financeira enviada ao Mercado Pago"
+  );
   assert.equal(calls, 1);
 });
 

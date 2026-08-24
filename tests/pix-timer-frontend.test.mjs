@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-function setupDomEnvironment() {
+function setupDomEnvironment({ href = "https://loja.test/" } = {}) {
   const elements = new Map();
   const listeners = new Map();
   const storage = new Map();
@@ -160,7 +160,11 @@ function setupDomEnvironment() {
     RPPix: null,
     sessionStorage: sessStorage,
     navigator: nav,
-    location: { href: "https://loja.test/" },
+    location: {
+      href,
+      hostname: new URL(href).hostname,
+      search: new URL(href).search
+    },
     abrirCarrinho() {}
   };
 
@@ -964,5 +968,138 @@ test("W. Voltar para a loja fecha o modal sem iniciar novo Pix", async () => {
     assert.equal(fetchCalls, callsBeforeClose, "Fechar não deve criar uma nova tentativa Pix");
   } finally {
     globalThis.fetch = oldFetch;
+  }
+});
+
+test("X. QA Mode aceita somente localhost e 127.0.0.1", () => {
+  const { win } = setupDomEnvironment();
+  assert.equal(win.RPPix._isPixQaEnvironment({ hostname: "localhost" }), true);
+  assert.equal(win.RPPix._isPixQaEnvironment({ hostname: "127.0.0.1" }), true);
+  assert.equal(win.RPPix._isPixQaEnvironment({ hostname: "rp-doces.pages.dev" }), false);
+  assert.equal(win.RPPix._isPixQaEnvironment({ hostname: "example.com" }), false);
+});
+
+test("Y. parâmetros QA são ignorados em produção", () => {
+  const { win } = setupDomEnvironment({
+    href: "https://rp-doces.pages.dev/?pixQa=1&ttl=1&scenario=paid"
+  });
+  assert.deepEqual(win.RPPix._getActiveQaConfig(), { enabled: false });
+  assert.deepEqual(
+    win.RPPix._getPixQaConfig({
+      href: "https://rp-doces.pages.dev/?pixQa=1&ttl=1&scenario=expired",
+      hostname: "rp-doces.pages.dev"
+    }),
+    { enabled: false }
+  );
+});
+
+test("Z. TTL visual curto de QA chega a zero sem alterar o timestamp do pedido", async () => {
+  const realDateNow = Date.now;
+  let now = 1770000000000;
+  Date.now = () => now;
+  const originalExpiration = new Date(now + 30 * 60 * 1000).toISOString();
+  const { win, doc } = setupDomEnvironment({
+    href: "http://localhost:8788/?pixQa=1&ttl=10&scenario=pending"
+  });
+
+  try {
+    win.RPPix.abrir({
+      pedido: { token: "qa-pending", pix_expira_em: originalExpiration },
+      pix: { qr_code: "PIX-QA" }
+    });
+    assert.equal(win.RPPix._getCurrentExpiration(), now + 10_000);
+
+    now += 10_000;
+    doc.dispatchEvent({ type: "visibilitychange" });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.equal(
+      doc.getElementById("pixTimerVerifyingTitle").textContent,
+      "Verificando pagamento..."
+    );
+    assert.notEqual(win.RPPix._getPollInterval(), null);
+    assert.equal(originalExpiration, new Date(1770000000000 + 30 * 60 * 1000).toISOString());
+  } finally {
+    Date.now = realDateNow;
+    win.RPPix.fechar();
+  }
+});
+
+async function enterQaVerifying(win, doc, scenario) {
+  win.RPPix.abrir({
+    pedido: {
+      token: `qa-${scenario}`,
+      pix_expira_em: new Date(Date.now() + 30 * 60_000).toISOString()
+    },
+    pix: { qr_code: "PIX-QA" }
+  });
+  win.RPPix._startPixTimer(new Date(Date.now() - 1).toISOString());
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(
+    doc.getElementById("pixTimerVerifyingTitle").textContent,
+    "Verificando pagamento..."
+  );
+}
+
+test("AA. QA paid alimenta a máquina real: PENDENTE -> PAGO", async () => {
+  const { win, doc } = setupDomEnvironment({
+    href: "http://localhost:8788/?pixQa=1&ttl=20&scenario=paid"
+  });
+  try {
+    await enterQaVerifying(win, doc, "paid");
+    await win.RPPix.consultar();
+    assert.notEqual(win.RPPix._getPollInterval(), null);
+    await win.RPPix.consultar();
+    assert.ok(doc.getElementById("pixSuccessView").classList.contains("show"));
+    assert.equal(win.RPPix._getPollInterval(), null);
+  } finally {
+    win.RPPix.fechar();
+  }
+});
+
+test("AB. QA expired alimenta a máquina real: PENDENTE -> EXPIRADO", async () => {
+  const { win, doc } = setupDomEnvironment({
+    href: "http://127.0.0.1:8788/?pixQa=1&ttl=20&scenario=expired"
+  });
+  try {
+    await enterQaVerifying(win, doc, "expired");
+    await win.RPPix.consultar();
+    assert.notEqual(win.RPPix._getPollInterval(), null);
+    await win.RPPix.consultar();
+    assert.equal(doc.getElementById("pixStatus").textContent, "Pix expirado");
+    assert.equal(win.RPPix._getPollInterval(), null);
+  } finally {
+    win.RPPix.fechar();
+  }
+});
+
+test("AC. QA recovery-paid preserva polling em 5xx e recupera para PAGO", async () => {
+  const { win, doc } = setupDomEnvironment({
+    href: "http://localhost:8788/?pixQa=1&ttl=10&scenario=recovery-paid"
+  });
+  try {
+    await enterQaVerifying(win, doc, "recovery-paid");
+    await win.RPPix.consultar();
+    await win.RPPix.consultar();
+    assert.notEqual(win.RPPix._getPollInterval(), null);
+    await win.RPPix.consultar();
+    assert.ok(doc.getElementById("pixSuccessView").classList.contains("show"));
+  } finally {
+    win.RPPix.fechar();
+  }
+});
+
+test("AD. QA recovery-expired preserva polling em 5xx e recupera para EXPIRADO", async () => {
+  const { win, doc } = setupDomEnvironment({
+    href: "http://localhost:8788/?pixQa=1&ttl=10&scenario=recovery-expired"
+  });
+  try {
+    await enterQaVerifying(win, doc, "recovery-expired");
+    await win.RPPix.consultar();
+    assert.notEqual(win.RPPix._getPollInterval(), null);
+    await win.RPPix.consultar();
+    assert.equal(doc.getElementById("pixStatus").textContent, "Pix expirado");
+  } finally {
+    win.RPPix.fechar();
   }
 });
