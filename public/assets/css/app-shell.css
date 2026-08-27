@@ -1,0 +1,67 @@
+/* R&P Doces — camada visual mobile-first inspirada nos mockups */
+:root{
+  --rp-pink:#ff5f93;
+  --rp-pink-dark:#e94479;
+  --rp-ink:#35242b;
+  --rp-muted:#806c74;
+  --rp-bg:#fff8fb;
+  --rp-card:#fff;
+  --rp-line:#f2dce5;
+  --rp-shadow:0 16px 40px rgba(107,54,76,.12);
+}
+html{scroll-behavior:smooth}
+body{background:var(--rp-bg);color:var(--rp-ink)}
+header{background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-bottom:1px solid rgba(242,220,229,.8)}
+.nav{min-height:74px}
+.brand img{width:48px;height:48px;object-fit:contain}
+.brand-name{font-weight:700}
+.brand-name span{font-size:.72rem;color:var(--rp-muted)}
+.nav-cta{border-radius:999px;box-shadow:0 8px 22px rgba(255,95,147,.22)}
+.hero{background:radial-gradient(circle at 80% 15%,rgba(255,196,216,.5),transparent 35%),linear-gradient(180deg,#fff 0%,#fff6fa 100%)}
+.hero>.container{min-height:620px;align-items:center}
+.hero h1{max-width:760px}
+.hero h1 em{color:var(--rp-pink)}
+.hero-media img,.sobre-media img{filter:drop-shadow(0 22px 26px rgba(112,61,82,.14))}
+.btn,.rp-menu-filters button{border-radius:999px}
+.btn-primary{box-shadow:0 12px 28px rgba(255,95,147,.24)}
+.menu{background:#fff}
+.rp-menu-filters{position:sticky;top:74px;z-index:8;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);padding:12px 0;overflow-x:auto;scrollbar-width:none}
+.rp-menu-filters::-webkit-scrollbar{display:none}
+.rp-menu-filters button{white-space:nowrap}
+.flavor-card{border:1px solid var(--rp-line)!important;border-radius:24px!important;box-shadow:0 10px 28px rgba(107,54,76,.07)!important;transition:transform .2s ease,box-shadow .2s ease}
+.flavor-card:hover{transform:translateY(-4px);box-shadow:var(--rp-shadow)!important}
+.category-photos .photo-card{border-radius:26px;overflow:hidden}
+.category-photos img{transition:transform .35s ease}
+.category-photos .photo-card:hover img{transform:scale(1.03)}
+.sobre{background:linear-gradient(180deg,#fff8fb,#fff)}
+.depo-card{border-radius:24px!important;border:1px solid var(--rp-line)!important}
+@media(max-width:760px){
+  body{padding-bottom:74px}
+  .nav{min-height:66px}
+  .brand-name span,.desktop-cta-label{display:none}
+  .brand img{width:42px;height:42px}
+  .nav-cta{padding:10px 14px}
+  .hero{padding-top:28px}
+  .hero>.container{min-height:auto}
+  .hero-text{text-align:left}
+  .hero h1{font-size:clamp(2.1rem,10vw,3.15rem);line-height:1.02}
+  .hero .lead{font-size:1rem}
+  .hero-actions{display:grid;grid-template-columns:1fr;gap:10px}
+  .hero-actions .btn{width:100%;justify-content:center}
+  .hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .hero-stats div{padding:10px 6px}
+  .hero-media{margin-top:18px}
+  .hero-media img{max-height:300px}
+  .section{padding-top:62px;padding-bottom:62px}
+  .section-head{text-align:left}
+  .rp-menu-filters{top:66px;margin-left:-18px;margin-right:-18px;padding-left:18px;padding-right:18px}
+  .menu-grid{grid-template-columns:1fr!important}
+  .category-photos{grid-template-columns:1fr 1fr!important;gap:10px}
+  .category-photos .photo-card{min-height:150px}
+  .sobre>.container{gap:28px}
+  .sobre-media{order:2}
+  .sobre-text{order:1}
+  .depo-grid{grid-template-columns:1fr!important}
+}
+@media(min-width:761px){.mobile-cta-label{display:none}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.flavor-card,.category-photos img{transition:none}}
