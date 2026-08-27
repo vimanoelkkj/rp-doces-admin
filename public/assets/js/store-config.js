@@ -15,6 +15,14 @@
     document.head.appendChild(desktop);
   }
 
+  if (!document.querySelector('link[data-rp-app-shell-cart]')) {
+    const cart = document.createElement('link');
+    cart.rel = 'stylesheet';
+    cart.href = '/assets/css/app-shell-cart.css';
+    cart.dataset.rpAppShellCart = 'true';
+    document.head.appendChild(cart);
+  }
+
   if (!document.querySelector('script[data-rp-app-shell]')) {
     const script = document.createElement('script');
     script.src = '/assets/js/app-shell.js';
