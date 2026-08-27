@@ -1,0 +1,6 @@
+Teste manual sugerido:
+1. Abrir o cardápio no mobile.
+2. Adicionar um item.
+3. Confirmar a barra flutuante com quantidade, total e botão Ver pedido.
+4. Abrir o carrinho e avançar ao checkout.
+5. Confirmar o bottom sheet e o fluxo Pix existente.
