@@ -7,6 +7,14 @@
     document.head.appendChild(link);
   }
 
+  if (!document.querySelector('link[data-rp-app-shell-desktop]')) {
+    const desktop = document.createElement('link');
+    desktop.rel = 'stylesheet';
+    desktop.href = '/assets/css/app-shell-desktop.css';
+    desktop.dataset.rpAppShellDesktop = 'true';
+    document.head.appendChild(desktop);
+  }
+
   if (!document.querySelector('script[data-rp-app-shell]')) {
     const script = document.createElement('script');
     script.src = '/assets/js/app-shell.js';
