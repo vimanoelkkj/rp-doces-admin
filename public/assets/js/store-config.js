@@ -6,6 +6,14 @@
     link.dataset.rpAppShell = 'true';
     document.head.appendChild(link);
   }
+
+  if (!document.querySelector('script[data-rp-app-shell]')) {
+    const script = document.createElement('script');
+    script.src = '/assets/js/app-shell.js';
+    script.defer = true;
+    script.dataset.rpAppShell = 'true';
+    document.head.appendChild(script);
+  }
 })();
 
 window.RP_CONFIG = {
