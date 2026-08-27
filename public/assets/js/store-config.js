@@ -1,3 +1,13 @@
+(() => {
+  if (!document.querySelector('link[data-rp-app-shell]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/assets/css/app-shell.css';
+    link.dataset.rpAppShell = 'true';
+    document.head.appendChild(link);
+  }
+})();
+
 window.RP_CONFIG = {
   whatsapp: window.RP_WHATSAPP_NUMBER || "5533991285907",
   local_retirada: "Temponi Concept",
