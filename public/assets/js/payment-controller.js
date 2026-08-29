@@ -7,20 +7,25 @@ import {
 } from "./utils/polling-policy.js";
 import { isPaidStatus, isFailedStatus, normalizeOrderStatus } from "./utils/payment-status.js";
 import { orderStatusCopy } from "./utils/order-copy.js";
-
+import { pageVisible } from "./utils/visibility.js";
 let timer = null;
 let attempts = 0;
-
 export function stopOrderPolling() {
   if (timer) clearTimeout(timer);
   timer = null;
   attempts = 0;
 }
-
 export function startOrderPolling(token) {
   stopOrderPolling();
   if (!token) return;
+  const schedule = () => {
+    timer = setTimeout(poll, ORDER_POLL_INTERVAL_MS);
+  };
   const poll = async () => {
+    if (!pageVisible()) {
+      schedule();
+      return;
+    }
     attempts += 1;
     try {
       const payload = await api.getOrder(token);
@@ -48,7 +53,7 @@ export function startOrderPolling(token) {
         return;
       }
       setOrderState({ phase: "pending", token, data: pedido, error: null });
-    } catch (error) {
+    } catch {
       if (pollingExhausted(attempts)) {
         setOrderState({
           phase: "error",
@@ -59,7 +64,7 @@ export function startOrderPolling(token) {
         return;
       }
     }
-    if (attempts < ORDER_POLL_MAX_ATTEMPTS) timer = setTimeout(poll, ORDER_POLL_INTERVAL_MS);
+    if (attempts < ORDER_POLL_MAX_ATTEMPTS) schedule();
   };
-  timer = setTimeout(poll, ORDER_POLL_INTERVAL_MS);
+  schedule();
 }
