@@ -31,6 +31,7 @@ import { startOrderPolling, stopOrderPolling } from "./payment-controller.js";
 import { paymentCreationAllowed, paymentDisabledMessage } from "./runtime-policy.js";
 import { checkoutIsValid } from "./utils/checkout-validity.js";
 import { isPixPayment } from "./utils/payment-method.js";
+import { checkoutErrorMessage } from "./utils/checkout-errors.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -99,10 +100,7 @@ async function submitCheckout() {
     });
     if (!paid && token) startOrderPolling(token);
   } catch (error) {
-    setOrderState({
-      phase: "error",
-      error: error.message || "Não foi possível iniciar o pagamento."
-    });
+    setOrderState({ phase: "error", error: checkoutErrorMessage(error) });
   }
 }
 
