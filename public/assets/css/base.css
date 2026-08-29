@@ -68,13 +68,13 @@ body.rp-cart-open .rp-party__backdrop {
   .rp-payment {
     animation: none !important;
   }
-  #rp-app:has([data-payment-root]) [data-catalog-route],
-  #rp-app:has([data-payment-root]) [data-catalog-route] .rp-site-header,
-  #rp-app:has([data-payment-root]) [data-catalog-route] .rp-menu__head,
-  #rp-app:has([data-payment-root]) [data-catalog-route] .rp-menu__filters,
-  #rp-app:has([data-payment-root]) [data-catalog-route] .rp-menu__grid,
-  #rp-app:has([data-payment-root]) [data-catalog-route] .rp-menu__empty,
-  #rp-app:has([data-payment-root]) [data-catalog-route] .rp-menu__skeleton {
+  body.rp-cart-open [data-catalog-route],
+  body.rp-cart-open [data-catalog-route] .rp-site-header,
+  body.rp-cart-open [data-catalog-route] .rp-menu__head,
+  body.rp-cart-open [data-catalog-route] .rp-menu__filters,
+  body.rp-cart-open [data-catalog-route] .rp-menu__grid,
+  body.rp-cart-open [data-catalog-route] .rp-menu__empty,
+  body.rp-cart-open [data-catalog-route] .rp-menu__skeleton {
     animation: none !important;
   }
   .rp-cart-overlay.is-checkout-handoff .rp-cart-overlay__backdrop,
