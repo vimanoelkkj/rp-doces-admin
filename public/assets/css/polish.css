@@ -10,3 +10,11 @@
 .rp-hero__lede {
   text-wrap: pretty;
 }
+.rp-hero__cta {
+  transition:
+    transform var(--rp-duration-fast) var(--rp-ease-out),
+    box-shadow var(--rp-duration-fast) ease;
+}
+.rp-hero__cta:hover {
+  box-shadow: 0 16px 34px rgb(230 79 132 / 24%);
+}
