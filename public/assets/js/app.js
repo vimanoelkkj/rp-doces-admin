@@ -3,6 +3,7 @@ import {
   state,
   subscribe,
   changeCartQuantity,
+  setCartQuantity,
   getCartItems,
   getCartSummary,
   setCartOpen,
@@ -191,6 +192,8 @@ function bindStorefrontEvents() {
   if (!root || root.dataset.eventsBound === "true") return;
   root.dataset.eventsBound = "true";
   root.addEventListener("click", async event => {
+    const removeButton = event.target.closest("[data-cart-remove]");
+    if (removeButton) return setCartQuantity(removeButton.dataset.productId, 0);
     const quantityButton = event.target.closest("[data-cart-delta]");
     if (quantityButton)
       return changeCartQuantity(
