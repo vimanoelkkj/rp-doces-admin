@@ -154,6 +154,9 @@
   .rp-mobile-menu__trust {
     animation-delay: 210ms;
   }
+  .rp-party__cake-flame {
+    animation: rp-party-flame-lively 860ms cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  }
   @keyframes rp-fade-in {
     from {
       opacity: 0;
@@ -348,6 +351,58 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+  @keyframes rp-party-flame-lively {
+    0%,
+    100% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) rotate(45deg) scale(1, 1);
+      box-shadow:
+        0 0 8px rgb(240 165 95 / 52%),
+        0 0 16px rgb(240 165 95 / 28%);
+    }
+    12% {
+      opacity: 0.86;
+      transform: translateX(-57%) translateY(-2px) rotate(34deg) scale(0.82, 1.18);
+      box-shadow:
+        0 0 5px rgb(240 165 95 / 38%),
+        0 0 11px rgb(240 165 95 / 18%);
+    }
+    27% {
+      opacity: 1;
+      transform: translateX(-44%) translateY(-4px) rotate(57deg) scale(1.12, 1.38);
+      box-shadow:
+        0 0 12px rgb(240 165 95 / 66%),
+        0 0 24px rgb(240 165 95 / 34%);
+    }
+    43% {
+      opacity: 0.9;
+      transform: translateX(-54%) translateY(-1px) rotate(39deg) scale(0.9, 1.08);
+      box-shadow:
+        0 0 7px rgb(240 165 95 / 44%),
+        0 0 14px rgb(240 165 95 / 22%);
+    }
+    61% {
+      opacity: 1;
+      transform: translateX(-46%) translateY(-3px) rotate(53deg) scale(1.06, 1.28);
+      box-shadow:
+        0 0 11px rgb(240 165 95 / 62%),
+        0 0 21px rgb(240 165 95 / 31%);
+    }
+    78% {
+      opacity: 0.88;
+      transform: translateX(-58%) translateY(-2px) rotate(32deg) scale(0.84, 1.15);
+      box-shadow:
+        0 0 6px rgb(240 165 95 / 40%),
+        0 0 12px rgb(240 165 95 / 19%);
+    }
+    90% {
+      opacity: 0.97;
+      transform: translateX(-47%) translateY(-1px) rotate(49deg) scale(1.03, 1.12);
+      box-shadow:
+        0 0 9px rgb(240 165 95 / 54%),
+        0 0 18px rgb(240 165 95 / 27%);
     }
   }
 }
