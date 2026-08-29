@@ -25,6 +25,14 @@ function renderStorefront() {
   document.body.classList.toggle("rp-cart-open", state.ui.cartOpen || state.ui.checkoutOpen);
 }
 
+function dispatchCheckoutSubmit() {
+  window.dispatchEvent(
+    new CustomEvent("rp:submit-checkout", {
+      detail: { checkout: { ...state.checkout }, items: getCartItems(), summary: getCartSummary() }
+    })
+  );
+}
+
 function bindStorefrontEvents() {
   const root = document.getElementById("rp-app");
   if (!root || root.dataset.eventsBound === "true") return;
@@ -62,20 +70,13 @@ function bindStorefrontEvents() {
 
     if (event.target.closest("[data-back-to-cart]")) {
       setCartOpen(true);
-      return;
     }
+  });
 
-    if (event.target.closest("[data-submit-checkout]")) {
-      window.dispatchEvent(
-        new CustomEvent("rp:submit-checkout", {
-          detail: {
-            checkout: { ...state.checkout },
-            items: getCartItems(),
-            summary: getCartSummary()
-          }
-        })
-      );
-    }
+  root.addEventListener("submit", event => {
+    if (!event.target.matches("[data-checkout-form]")) return;
+    event.preventDefault();
+    dispatchCheckoutSubmit();
   });
 
   root.addEventListener("input", event => {
