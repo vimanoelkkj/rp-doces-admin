@@ -73,3 +73,12 @@
 .rp-cart-bar__cta:active {
   transform: scale(0.97);
 }
+.rp-cart-sheet__items {
+  scroll-margin-top: 20px;
+}
+.rp-cart-item__copy strong {
+  letter-spacing: -0.01em;
+}
+.rp-cart-total strong {
+  letter-spacing: -0.03em;
+}
