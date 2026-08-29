@@ -10,10 +10,28 @@ function visibleProducts(products = []) {
     });
 }
 
-export function renderProductList(products = [], cart = new Map()) {
+function shell(content) {
+  return `<section class="rp-menu rp-section" id="cardapio"><div class="rp-container"><div class="rp-menu__head"><div><p class="rp-menu__eyebrow">Cardápio</p><h2 class="rp-menu__title">O que tem hoje</h2></div></div>${content}</div></section>`;
+}
+
+export function renderProductList(products = [], cart = new Map(), status = "ready") {
+  if (status === "loading") {
+    return shell(
+      `<div class="rp-menu__skeleton" aria-label="Carregando cardápio"><span></span><span></span><span></span></div>`
+    );
+  }
+
+  if (status === "error") {
+    return shell(
+      `<div class="rp-menu__empty"><strong>Não conseguimos carregar o cardápio agora.</strong><p>Tente novamente em instantes.</p><button class="rp-btn rp-btn--ghost" type="button" data-reload-products>Tentar novamente</button></div>`
+    );
+  }
+
   const list = visibleProducts(products);
   if (!list.length) {
-    return `<section class="rp-menu rp-section" id="cardapio"><div class="rp-container"><div class="rp-menu__head"><div><p class="rp-menu__eyebrow">Cardápio</p><h2 class="rp-menu__title">O que tem hoje</h2></div></div><p class="rp-menu__empty">Nenhum doce disponível no momento.</p></div></section>`;
+    return shell(
+      `<div class="rp-menu__empty"><strong>Os doces acabaram por enquanto.</strong><p>Quando houver novidades, elas aparecem aqui.</p></div>`
+    );
   }
 
   return `
