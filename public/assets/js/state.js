@@ -3,7 +3,7 @@ const listeners = new Set();
 export const state = {
   products: [],
   cart: new Map(),
-  checkout: { name: "", whatsapp: "", note: "", paymentMethod: "PIX" },
+  checkout: { name: "", email: "", whatsapp: "", note: "", paymentMethod: "PIX" },
   ui: { cartOpen: false, checkoutOpen: false }
 };
 
