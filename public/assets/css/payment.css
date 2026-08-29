@@ -30,7 +30,8 @@
   line-height: 1.05;
   letter-spacing: -0.025em;
 }
-.rp-payment__sheet > p:not(.rp-kicker):not(.rp-payment__hint) {
+.rp-payment__sheet > p:not(.rp-kicker):not(.rp-payment__hint),
+.rp-payment__state > p:not(.rp-kicker) {
   color: var(--rp-color-muted-strong);
   font-size: 13px;
   line-height: 1.55;
@@ -97,6 +98,71 @@
 .rp-payment__sheet .rp-btn + .rp-btn {
   margin-top: 9px;
 }
+.rp-payment__sheet--state {
+  padding-top: 12px;
+}
+.rp-payment__state {
+  text-align: center;
+  padding: 12px 0 2px;
+}
+.rp-payment__state .rp-kicker {
+  margin: 14px 0 6px;
+}
+.rp-payment__state h2 {
+  margin-top: 0;
+}
+.rp-payment__state > p:not(.rp-kicker) {
+  max-width: 36ch;
+  margin: 0 auto 20px;
+}
+.rp-payment__state-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin: 8px auto 0;
+  place-items: center;
+  border-radius: 999px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+}
+.rp-payment__state-icon--success {
+  background: var(--rp-color-brand-soft);
+  color: var(--rp-color-brand-strong);
+}
+.rp-payment__state-icon--failure {
+  background: var(--rp-color-neutral-bg);
+  color: var(--rp-color-muted-strong);
+}
+.rp-payment__reference {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 20px;
+  padding: 13px 15px;
+  border: 1px solid var(--rp-color-border);
+  border-radius: 13px;
+  background: #fff;
+  text-align: left;
+}
+.rp-payment__reference span {
+  color: var(--rp-color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.rp-payment__reference strong {
+  color: var(--rp-color-text);
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+}
+.rp-payment__secondary {
+  border: 0;
+  background: transparent;
+  color: var(--rp-color-brand-strong);
+}
 @keyframes rp-waiting-clock-hand {
   from {
     transform: rotate(0deg);
@@ -118,5 +184,8 @@
   .rp-payment__sheet {
     border-radius: 26px;
     padding: 18px 26px 30px;
+  }
+  .rp-payment__sheet--state {
+    max-width: 440px;
   }
 }
