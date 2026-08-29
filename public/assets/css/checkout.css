@@ -7,7 +7,8 @@
   z-index: 100;
   display: flex;
   align-items: end;
-  background: rgba(42, 24, 19, 0.48);
+  background: rgb(42 24 19 / 50%);
+  backdrop-filter: blur(3px);
 }
 .rp-checkout__backdrop {
   position: absolute;
@@ -23,12 +24,12 @@
   border-radius: 28px 28px 0 0;
   padding: 12px 20px 28px;
   background: var(--rp-color-surface);
-  box-shadow: 0 -20px 70px rgba(42, 24, 19, 0.2);
+  box-shadow: 0 -22px 70px rgb(42 24 19 / 20%);
 }
 .rp-sheet-handle {
-  width: 40px;
+  width: 38px;
   height: 4px;
-  margin: 0 auto 14px;
+  margin: 0 auto 16px;
   border-radius: 999px;
   background: var(--rp-color-border);
 }
@@ -40,33 +41,34 @@
   height: 40px;
   border: 0;
   border-radius: 50%;
-  background: #fff4f7;
+  background: var(--rp-color-surface-soft);
   color: var(--rp-color-text);
   font-size: 24px;
   line-height: 1;
 }
 .rp-checkout__header {
-  padding: 14px 48px 18px 0;
+  padding: 14px 48px 20px 0;
 }
 .rp-kicker {
-  margin: 0 0 6px;
+  margin: 0 0 7px;
   color: var(--rp-color-brand-strong);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 .rp-checkout__header h2 {
   margin: 0;
   font-family: Fraunces, Georgia, serif;
-  font-size: 34px;
-  line-height: 1;
+  font-size: 36px;
+  line-height: 0.98;
+  letter-spacing: -0.025em;
 }
 .rp-checkout__header p:last-child {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   color: var(--rp-color-muted);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .rp-checkout__summary {
   border-block: 1px solid var(--rp-color-border);
@@ -75,7 +77,7 @@
   display: grid;
   gap: 10px;
   margin: 0;
-  padding: 16px 0;
+  padding: 17px 0;
   list-style: none;
 }
 .rp-checkout__item {
@@ -90,26 +92,27 @@
 .rp-checkout__total {
   display: flex;
   justify-content: space-between;
-  padding: 0 0 16px;
+  align-items: end;
+  padding: 0 0 17px;
 }
 .rp-checkout__total span {
   color: var(--rp-color-muted);
   font-size: 13px;
 }
 .rp-checkout__total strong {
-  font-size: 22px;
+  font-size: 23px;
 }
 .rp-checkout__form {
   display: grid;
-  gap: 14px;
-  padding-top: 18px;
+  gap: 15px;
+  padding-top: 20px;
 }
 .rp-checkout__form > label {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   color: var(--rp-color-text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 900;
 }
 .rp-checkout__form > label span {
   color: var(--rp-color-muted);
@@ -120,59 +123,70 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--rp-color-border);
-  border-radius: 13px;
-  padding: 12px 13px;
+  border-radius: 14px;
+  padding: 13px 14px;
   background: #fff;
   color: var(--rp-color-text);
   font: inherit;
   outline: none;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 .rp-checkout__form input:focus,
 .rp-checkout__form textarea:focus {
   border-color: var(--rp-color-brand);
-  box-shadow: 0 0 0 3px rgba(224, 102, 133, 0.12);
+  box-shadow: 0 0 0 4px rgb(255 107 157 / 10%);
 }
 .rp-checkout__form fieldset {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 9px;
   margin: 0;
   padding: 0;
   border: 0;
 }
 .rp-checkout__form legend {
-  margin-bottom: 6px;
+  margin-bottom: 7px;
   color: var(--rp-color-text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 900;
 }
 .rp-payment-option {
   display: flex;
   align-items: center;
   gap: 8px;
   border: 1px solid var(--rp-color-border);
-  border-radius: 13px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 13px;
+  background: #fff;
   color: var(--rp-color-text);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 900;
+}
+.rp-payment-option:has(input:checked) {
+  border-color: rgb(255 107 157 / 55%);
+  background: var(--rp-color-surface-soft);
 }
 .rp-payment-option input {
   accent-color: var(--rp-color-brand);
 }
 .rp-checkout__submit {
   width: 100%;
-  min-height: 50px;
-  margin-top: 2px;
+  min-height: 52px;
+  margin-top: 3px;
+  border-radius: var(--rp-radius-pill);
 }
 @media (min-width: 680px) {
   .rp-checkout {
     align-items: center;
     justify-content: center;
+    padding: 24px;
   }
   .rp-checkout__sheet {
     width: min(560px, calc(100% - 32px));
     max-height: 88dvh;
-    border-radius: 28px;
+    border-radius: var(--rp-radius-xl);
+    padding-inline: 26px;
   }
 }
