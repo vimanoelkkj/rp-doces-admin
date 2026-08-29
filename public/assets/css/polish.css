@@ -96,3 +96,10 @@
 .rp-payment-option[aria-disabled="true"] {
   opacity: 0.52;
 }
+.rp-payment__code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  word-break: break-all;
+}
+.rp-payment__total {
+  letter-spacing: -0.03em;
+}
