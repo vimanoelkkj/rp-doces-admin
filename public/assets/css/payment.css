@@ -191,6 +191,60 @@
     transform: rotate(360deg);
   }
 }
+@keyframes rp-payment-success-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+    box-shadow: 0 0 0 0 rgb(207 163 84 / 24%);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(1.08);
+    box-shadow: 0 0 0 12px rgb(207 163 84 / 0%);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(207 163 84 / 0%);
+  }
+}
+@keyframes rp-payment-success-content {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rp-payment__state-icon--success {
+    animation: rp-payment-success-pop 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+  .rp-payment__state-icon--success ~ .rp-kicker,
+  .rp-payment__state-icon--success ~ h2,
+  .rp-payment__state-icon--success ~ p,
+  .rp-payment__state-icon--success ~ .rp-payment__reference,
+  .rp-payment__state-icon--success ~ .rp-btn {
+    animation: rp-payment-success-content 340ms ease both;
+  }
+  .rp-payment__state-icon--success ~ .rp-kicker {
+    animation-delay: 120ms;
+  }
+  .rp-payment__state-icon--success ~ h2 {
+    animation-delay: 170ms;
+  }
+  .rp-payment__state-icon--success ~ p {
+    animation-delay: 220ms;
+  }
+  .rp-payment__state-icon--success ~ .rp-payment__reference {
+    animation-delay: 270ms;
+  }
+  .rp-payment__state-icon--success ~ .rp-btn {
+    animation-delay: 320ms;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .rp-payment__waiting-clock-hand {
     animation: none;
