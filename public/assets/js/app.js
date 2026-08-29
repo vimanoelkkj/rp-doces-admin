@@ -36,6 +36,7 @@ import { storefrontProducts } from "./utils/product-filter.js";
 import { sortProducts } from "./utils/product-sort.js";
 import { hasOpenOverlay } from "./utils/overlay.js";
 import { setPageScrollLocked } from "./utils/scroll-lock.js";
+import { isEscapeKey } from "./utils/keyboard.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -119,6 +120,13 @@ function finishOrder() {
   notify();
   document.getElementById("cardapio")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+function closeTopOverlay() {
+  if (state.order.phase !== "idle") return returnToCheckout();
+  if (state.ui.checkoutOpen) return setCheckoutOpen(false);
+  if (state.ui.cartOpen) return setCartOpen(false);
+  if (state.ui.partyOpen) return setPartyOpen(false);
+  if (state.ui.menuOpen) return setMenuOpen(false);
+}
 
 function bindStorefrontEvents() {
   const root = document.getElementById("rp-app");
@@ -168,6 +176,12 @@ function bindStorefrontEvents() {
   root.addEventListener("change", event => {
     const field = event.target.dataset.checkoutField;
     if (field) updateCheckout(field, event.target.value);
+  });
+  document.addEventListener("keydown", event => {
+    if (isEscapeKey(event) && hasOpenOverlay(state)) {
+      event.preventDefault();
+      closeTopOverlay();
+    }
   });
 }
 
