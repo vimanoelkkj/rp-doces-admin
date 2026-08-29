@@ -10,6 +10,7 @@ const waitingCardIcon = `<svg class="rp-payment__waiting-icon" style="width:72px
 const successIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--success" aria-hidden="true">✓</span>`;
 const failureIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--failure" aria-hidden="true">×</span>`;
 const declinedCardIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--failure rp-payment__state-icon--card-declined" aria-hidden="true"><svg viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect class="rp-payment__declined-card-body" x="9" y="8" width="54" height="36" rx="7"/><path class="rp-payment__declined-card-stripe" d="M9 18H63"/><path class="rp-payment__declined-card-detail" d="M18 34H30"/><circle class="rp-payment__declined-card-x-ring" cx="52" cy="45" r="13"/><path class="rp-payment__declined-card-x" d="M47 40L57 50M57 40L47 50"/></svg></span>`;
+const warningIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--warning" aria-hidden="true">!</span>`;
 const cancelledIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--muted" aria-hidden="true">—</span>`;
 function stateShell({ icon, kicker, title, body, content = "", state = "" }) {
   return `<div class="rp-payment__state${state ? ` rp-payment__state--${state}` : ""}">${icon}<p class="rp-kicker">${kicker}</p><h2>${title}</h2><p>${body}</p>${content}</div>`;
@@ -54,11 +55,12 @@ export function renderPaymentStatus(order = {}) {
     });
   else if (demoState === "cancel-confirm")
     body = stateShell({
-      icon: cancelledIcon,
+      icon: warningIcon,
       kicker: "Cancelar pedido",
       title: "Tem certeza que deseja cancelar?",
       body: "Se continuar, este pedido será encerrado e você precisará montar outro para pedir novamente.",
-      content: `<button class="rp-btn rp-btn--danger" type="button" data-confirm-demo-cancel>Sim, cancelar pedido</button><button class="rp-btn rp-payment__secondary" type="button" data-keep-demo-order>Não, continuar pedido</button>`
+      content: `<button class="rp-btn rp-btn--danger" type="button" data-confirm-demo-cancel>Sim, cancelar pedido</button><button class="rp-btn rp-payment__secondary" type="button" data-keep-demo-order>Não, continuar pedido</button>`,
+      state: "cancel-confirm"
     });
   else if (demoState === "cancelled")
     body = stateShell({
