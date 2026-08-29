@@ -18,3 +18,8 @@
 .rp-hero__cta:hover {
   box-shadow: 0 16px 34px rgb(230 79 132 / 24%);
 }
+.rp-site-header__inner {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 80%),
+    0 12px 38px rgb(74 45 36 / 8%);
+}
