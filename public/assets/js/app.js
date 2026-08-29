@@ -34,19 +34,15 @@ import { isPixPayment } from "./utils/payment-method.js";
 import { checkoutErrorMessage } from "./utils/checkout-errors.js";
 import { storefrontProducts } from "./utils/product-filter.js";
 import { sortProducts } from "./utils/product-sort.js";
+import { hasOpenOverlay } from "./utils/overlay.js";
+import { setPageScrollLocked } from "./utils/scroll-lock.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
   if (!root) return;
   const summary = getCartSummary();
   root.innerHTML = `${renderSiteHeader(summary)}${renderHero()}${renderProductList(state.products, state.cart, state.productsStatus)}${renderSiteFooter()}${renderCartBar(summary)}${renderCart({ open: state.ui.cartOpen, items: getCartItems(), summary })}${renderCheckout({ open: state.ui.checkoutOpen, items: getCartItems(), summary, checkout: state.checkout })}${renderPaymentStatus(state.order)}${renderMobileMenu(state.ui.menuOpen)}${renderPartySheet(state.ui.partyOpen)}`;
-  const overlayOpen =
-    state.ui.cartOpen ||
-    state.ui.checkoutOpen ||
-    state.ui.menuOpen ||
-    state.ui.partyOpen ||
-    state.order.phase !== "idle";
-  document.body.classList.toggle("rp-cart-open", overlayOpen);
+  setPageScrollLocked(hasOpenOverlay(state));
 }
 
 async function loadProducts() {
