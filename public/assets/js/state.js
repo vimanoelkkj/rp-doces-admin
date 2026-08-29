@@ -2,10 +2,11 @@ const listeners = new Set();
 
 export const state = {
   products: [],
+  productsStatus: "loading",
   cart: new Map(),
   checkout: { name: "", email: "", whatsapp: "", note: "", paymentMethod: "PIX" },
   order: { phase: "idle", token: null, data: null, pix: null, error: null },
-  ui: { cartOpen: false, checkoutOpen: false }
+  ui: { cartOpen: false, checkoutOpen: false, menuOpen: false, partyOpen: false }
 };
 
 export function subscribe(listener) {
@@ -17,15 +18,46 @@ export function notify() {
   listeners.forEach(listener => listener(state));
 }
 
+function closeTransientUi() {
+  state.ui.menuOpen = false;
+  state.ui.partyOpen = false;
+}
+
 export function setCartOpen(open) {
   state.ui.cartOpen = Boolean(open);
-  if (open) state.ui.checkoutOpen = false;
+  if (open) {
+    state.ui.checkoutOpen = false;
+    closeTransientUi();
+  }
   notify();
 }
 
 export function setCheckoutOpen(open) {
   state.ui.checkoutOpen = Boolean(open);
-  if (open) state.ui.cartOpen = false;
+  if (open) {
+    state.ui.cartOpen = false;
+    closeTransientUi();
+  }
+  notify();
+}
+
+export function setMenuOpen(open) {
+  state.ui.menuOpen = Boolean(open);
+  if (open) {
+    state.ui.cartOpen = false;
+    state.ui.checkoutOpen = false;
+    state.ui.partyOpen = false;
+  }
+  notify();
+}
+
+export function setPartyOpen(open) {
+  state.ui.partyOpen = Boolean(open);
+  if (open) {
+    state.ui.cartOpen = false;
+    state.ui.checkoutOpen = false;
+    state.ui.menuOpen = false;
+  }
   notify();
 }
 
