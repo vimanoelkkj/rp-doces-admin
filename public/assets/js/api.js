@@ -1,11 +1,11 @@
 import { API_PATHS, orderPath } from "./utils/api-path.js";
-
+import { timeoutSignal } from "./utils/fetch-timeout.js";
 async function request(path, options = {}) {
   const response = await fetch(path, {
     headers: { Accept: "application/json", ...(options.headers || {}) },
+    signal: options.signal || timeoutSignal(),
     ...options
   });
-
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(payload.erro || `HTTP ${response.status}`);
@@ -15,7 +15,6 @@ async function request(path, options = {}) {
   }
   return payload;
 }
-
 function postJson(path, body) {
   return request(path, {
     method: "POST",
@@ -23,7 +22,6 @@ function postJson(path, body) {
     body: JSON.stringify(body)
   });
 }
-
 export const api = {
   getConfig: () => request("/api/config", { cache: "no-store" }),
   getProducts: () => request(API_PATHS.products, { cache: "no-store" }),
