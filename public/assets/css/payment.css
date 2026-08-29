@@ -137,8 +137,8 @@
   font-weight: 800;
 }
 .rp-payment__state-icon--success {
-  background: var(--rp-color-brand-soft);
-  color: var(--rp-color-brand-strong);
+  background: #dff3e4;
+  color: #287a45;
 }
 .rp-payment__state-icon--failure {
   background: var(--rp-color-neutral-bg);
@@ -228,17 +228,17 @@
   0% {
     opacity: 0;
     transform: scale(0.55);
-    box-shadow: 0 0 0 0 rgb(207 163 84 / 24%);
+    box-shadow: 0 0 0 0 rgb(40 122 69 / 24%);
   }
   58% {
     opacity: 1;
     transform: scale(1.08);
-    box-shadow: 0 0 0 12px rgb(207 163 84 / 0%);
+    box-shadow: 0 0 0 12px rgb(40 122 69 / 0%);
   }
   100% {
     opacity: 1;
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgb(207 163 84 / 0%);
+    box-shadow: 0 0 0 0 rgb(40 122 69 / 0%);
   }
 }
 @keyframes rp-payment-success-content {
