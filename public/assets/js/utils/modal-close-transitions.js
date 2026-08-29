@@ -1,14 +1,16 @@
 const CLOSE_TRANSITION_MS = 220;
 const CHECKOUT_HANDOFF_MS = 200;
 const PAYMENT_HANDOFF_MS = 190;
+const PAYMENT_RETURN_MS = 200;
 
 const CLOSE_BINDINGS = [
-  ["[data-close-payment]", ".rp-payment"],
   ["[data-close-checkout]", ".rp-checkout"],
   ["[data-close-cart]", ".rp-cart-overlay"],
   ["[data-close-party]", ".rp-party"],
   ["[data-close-menu]", ".rp-mobile-menu"]
 ];
+
+const PAYMENT_RETURN_SELECTOR = "[data-close-payment], [data-retry-payment]";
 
 const ESCAPE_ROOTS = [
   ".rp-payment",
@@ -73,6 +75,10 @@ function handoffCheckoutToPayment(form) {
   finishAfterAnimation(root, "is-payment-handoff", () => replaySubmit(form), PAYMENT_HANDOFF_MS);
 }
 
+function handoffPaymentToCheckout(root, callback) {
+  finishAfterAnimation(root, "is-checkout-return", callback, PAYMENT_RETURN_MS);
+}
+
 document.addEventListener(
   "click",
   event => {
@@ -83,6 +89,18 @@ document.addEventListener(
       event.preventDefault();
       event.stopImmediatePropagation();
       handoffCartToCheckout(checkoutTrigger);
+      return;
+    }
+
+    const paymentReturnTrigger = event.target.closest?.(PAYMENT_RETURN_SELECTOR);
+    if (paymentReturnTrigger && !paymentReturnTrigger.disabled) {
+      const root =
+        paymentReturnTrigger.closest(".rp-payment") || document.querySelector(".rp-payment");
+      if (!root) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      handoffPaymentToCheckout(root, () => replayClick(paymentReturnTrigger));
       return;
     }
 
@@ -124,6 +142,10 @@ document.addEventListener(
 
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (root.matches(".rp-payment")) {
+      handoffPaymentToCheckout(root, replayEscape);
+      return;
+    }
     closeAfterAnimation(root, replayEscape);
   },
   true
