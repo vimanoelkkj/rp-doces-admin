@@ -242,6 +242,11 @@
   background: transparent;
   color: var(--rp-color-brand-strong);
 }
+.rp-payment__secondary[disabled] {
+  cursor: not-allowed;
+  color: var(--rp-color-muted);
+  opacity: 0.48;
+}
 .rp-payment__sheet .rp-btn--danger {
   border-color: #b65252;
   background: #b65252;
