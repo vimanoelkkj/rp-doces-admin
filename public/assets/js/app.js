@@ -121,8 +121,31 @@ function applyPreviewDemo() {
   const mode = new URLSearchParams(location.search).get("demo");
   const previewDisabled =
     document.querySelector('meta[name="rp-payment-mode"]')?.content === "disabled";
-  if (!previewDisabled || !["pix-pending", "card-pending"].includes(mode)) return false;
+  const demos = ["pix-pending", "card-pending", "payment-confirmed", "payment-error"];
+  if (!previewDisabled || !demos.includes(mode)) return false;
   storefrontRoute = "catalog";
+  if (mode === "payment-confirmed") {
+    state.order = {
+      phase: "paid",
+      paymentMethod: "PIX",
+      token: "demo-payment-confirmed",
+      data: { referencia: "RP-DEMO-2408", valor_total_centavos: 3100, status: "PAGO" },
+      pix: null,
+      error: null
+    };
+    return true;
+  }
+  if (mode === "payment-error") {
+    state.order = {
+      phase: "error",
+      paymentMethod: "PIX",
+      token: "demo-payment-error",
+      data: { referencia: "RP-DEMO-ERRO", valor_total_centavos: 3100, status: "FALHA" },
+      pix: null,
+      error: "O pagamento não foi confirmado. Você pode tentar novamente."
+    };
+    return true;
+  }
   const card = mode === "card-pending";
   const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   state.order = {
