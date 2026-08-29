@@ -45,3 +45,12 @@
 .rp-product-card__description {
   text-wrap: pretty;
 }
+.rp-product-card__media {
+  isolation: isolate;
+}
+.rp-product-card__media .rp-product-card__emoji {
+  transition: transform var(--rp-duration-base) var(--rp-ease-out);
+}
+.rp-product-card:hover .rp-product-card__emoji {
+  transform: translateY(-3px) scale(1.035);
+}
