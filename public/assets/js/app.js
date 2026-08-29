@@ -138,6 +138,7 @@ function applyPreviewDemo() {
   const previewDisabled =
     document.querySelector('meta[name="rp-payment-mode"]')?.content === "disabled";
   const demos = [
+    "payment-creating",
     "pix-pending",
     "pix-pending-to-paid",
     "card-pending",
@@ -154,6 +155,18 @@ function applyPreviewDemo() {
   clearPreviewPaymentTimers();
   storefrontRoute = "catalog";
   const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  if (mode === "payment-creating") {
+    state.order = {
+      phase: "creating",
+      paymentMethod: "PIX",
+      token: null,
+      data: null,
+      pix: null,
+      error: null,
+      demoState: ""
+    };
+    return true;
+  }
   if (mode === "payment-confirmed") {
     state.order = {
       phase: "paid",
