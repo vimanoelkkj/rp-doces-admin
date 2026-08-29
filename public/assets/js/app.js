@@ -9,6 +9,8 @@ import {
   setCheckoutOpen,
   updateCheckout,
   syncCartWithProducts,
+  setOrderState,
+  resetOrderState,
   notify
 } from "./state.js";
 import { renderHero } from "./components/hero.js";
@@ -17,6 +19,9 @@ import { renderCartBar } from "./components/cart-bar.js";
 import { renderCart } from "./components/cart.js";
 import { renderCheckout } from "./components/checkout.js";
 import { renderPaymentStatus } from "./components/payment-status.js";
+import { copyText } from "./clipboard.js";
+import { resetCheckoutRequestId } from "./checkout-service.js";
+import { stopOrderPolling } from "./payment-controller.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -37,12 +42,29 @@ function dispatchCheckoutSubmit() {
   );
 }
 
+function closePayment() {
+  stopOrderPolling();
+  resetOrderState();
+  setCheckoutOpen(true);
+}
+
+function finishOrder() {
+  stopOrderPolling();
+  resetCheckoutRequestId();
+  resetOrderState();
+  state.cart.clear();
+  state.ui.cartOpen = false;
+  state.ui.checkoutOpen = false;
+  notify();
+  document.getElementById("cardapio")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function bindStorefrontEvents() {
   const root = document.getElementById("rp-app");
   if (!root || root.dataset.eventsBound === "true") return;
   root.dataset.eventsBound = "true";
 
-  root.addEventListener("click", event => {
+  root.addEventListener("click", async event => {
     const quantityButton = event.target.closest("[data-cart-delta]");
     if (quantityButton) {
       changeCartQuantity(
@@ -55,12 +77,27 @@ function bindStorefrontEvents() {
     if (event.target.closest("[data-close-cart]")) return setCartOpen(false);
     if (event.target.closest("[data-start-checkout]")) return setCheckoutOpen(true);
     if (event.target.closest("[data-close-checkout]")) return setCheckoutOpen(false);
-    if (event.target.closest("[data-back-to-cart]")) setCartOpen(true);
+    if (event.target.closest("[data-back-to-cart]")) return setCartOpen(true);
+    if (event.target.closest("[data-close-payment]")) return closePayment();
+    if (event.target.closest("[data-finish-order]")) return finishOrder();
+    if (event.target.closest("[data-retry-payment]")) return setCheckoutOpen(true);
+
+    if (event.target.closest("[data-copy-pix]")) {
+      const copied = await copyText(state.order.pix?.qr_code);
+      const button = event.target.closest("[data-copy-pix]");
+      if (copied && button) {
+        button.textContent = "Código copiado ✓";
+        setTimeout(() => {
+          if (button.isConnected) button.textContent = "Copiar código Pix";
+        }, 1800);
+      }
+    }
   });
 
   root.addEventListener("submit", event => {
     if (!event.target.matches("[data-checkout-form]")) return;
     event.preventDefault();
+    if (state.order.phase === "creating") return;
     dispatchCheckoutSubmit();
   });
 
@@ -80,7 +117,7 @@ export async function bootstrapStorefront() {
   bindStorefrontEvents();
   state.ui.cartOpen = false;
   state.ui.checkoutOpen = false;
-  renderStorefront();
+  setOrderState({ phase: "idle", token: null, data: null, pix: null, error: null });
 
   try {
     const payload = await api.getProducts();
