@@ -15,15 +15,16 @@ const cancelledIcon = `<span class="rp-payment__state-icon rp-payment__state-ico
 function stateShell({ icon, kicker, title, body, content = "", state = "" }) {
   return `<div class="rp-payment__state${state ? ` rp-payment__state--${state}` : ""}">${icon}<p class="rp-kicker">${kicker}</p><h2>${title}</h2><p>${body}</p>${content}</div>`;
 }
-function pendingContent({ cardPending, total, qrCode, expiresAt, copied = false }) {
-  return `<style>.rp-payment .rp-payment__copied{background:#dff3e4;color:#287a45}@keyframes rp-pix-copy-feedback{0%{opacity:0;transform:translateY(6px) scale(.985)}14%{opacity:1;transform:translateY(0) scale(1.012)}22%{opacity:1;transform:translateY(0) scale(1)}86%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(4px) scale(.99)}}@media (prefers-reduced-motion:no-preference){.rp-payment .rp-payment__copied{animation:rp-pix-copy-feedback 1.8s cubic-bezier(.2,.75,.25,1) both}}</style><div class="rp-payment__waiting-mark">${cardPending ? waitingCardIcon : waitingPixIcon}</div><h2>Aguardando pagamento</h2><p>${cardPending ? "Já estamos levando a maquininha até você. Pague no débito ou crédito quando ela chegar." : "Copie o código Pix e pague no app do seu próprio banco."}</p>${!cardPending && total ? `<strong class="rp-payment__total">${formatMoney(total)}</strong>` : ""}${!cardPending && qrCode ? `<textarea class="rp-payment__code" readonly aria-label="Código Pix copia e cola">${escapeHtml(qrCode)}</textarea><button class="rp-btn rp-btn--primary" type="button" data-copy-pix>Copiar código Pix</button>${copied ? `<div class="rp-payment__copied" role="status">✓ Código Pix copiado. Agora é só colar no app do seu banco.</div>` : ""}` : ""}${!cardPending && expiresAt ? `<p class="rp-payment__hint">Pix válido até ${escapeHtml(expiresAt)}.</p>` : ""}${!cardPending ? `<p class="rp-payment__hint">Esta tela acompanha a confirmação do pagamento automaticamente.</p>` : ""}`;
+function pendingContent({ cardPending, total, qrCode, expiresAt, copied = false, exiting = false }) {
+  return `<div class="rp-payment__pending${exiting ? " rp-payment__pending--exit" : ""}"><style>.rp-payment .rp-payment__copied{background:#dff3e4;color:#287a45}@keyframes rp-pix-copy-feedback{0%{opacity:0;transform:translateY(6px) scale(.985)}14%{opacity:1;transform:translateY(0) scale(1.012)}22%{opacity:1;transform:translateY(0) scale(1)}86%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(4px) scale(.99)}}@media (prefers-reduced-motion:no-preference){.rp-payment .rp-payment__copied{animation:rp-pix-copy-feedback 1.8s cubic-bezier(.2,.75,.25,1) both}}</style><div class="rp-payment__waiting-mark">${cardPending ? waitingCardIcon : waitingPixIcon}</div><h2>Aguardando pagamento</h2><p>${cardPending ? "Já estamos levando a maquininha até você. Pague no débito ou crédito quando ela chegar." : "Copie o código Pix e pague no app do seu próprio banco."}</p>${!cardPending && total ? `<strong class="rp-payment__total">${formatMoney(total)}</strong>` : ""}${!cardPending && qrCode ? `<textarea class="rp-payment__code" readonly aria-label="Código Pix copia e cola">${escapeHtml(qrCode)}</textarea><button class="rp-btn rp-btn--primary" type="button" data-copy-pix>Copiar código Pix</button>${copied ? `<div class="rp-payment__copied" role="status">✓ Código Pix copiado. Agora é só colar no app do seu banco.</div>` : ""}` : ""}${!cardPending && expiresAt ? `<p class="rp-payment__hint">Pix válido até ${escapeHtml(expiresAt)}.</p>` : ""}${!cardPending ? `<p class="rp-payment__hint">Esta tela acompanha a confirmação do pagamento automaticamente.</p>` : ""}</div>`;
 }
 export function renderPaymentStatus(order = {}) {
   if (!order || order.phase === "idle") return "";
   const loading = order.phase === "creating",
     failed = order.phase === "error",
     paid = order.phase === "paid",
-    pending = order.phase === "pending",
+    transitioningToPaid = order.phase === "confirming-paid",
+    pending = order.phase === "pending" || transitioningToPaid,
     cardPending = pending && String(order.paymentMethod || "").toUpperCase() === "CARD",
     total = paymentTotalCents(order),
     qrCode = pixCode(order),
@@ -76,7 +77,8 @@ export function renderPaymentStatus(order = {}) {
       total,
       qrCode,
       expiresAt,
-      copied: demoState === "pix-copied"
+      copied: demoState === "pix-copied",
+      exiting: transitioningToPaid
     });
   else if (paid)
     body = stateShell({
