@@ -1,6 +1,6 @@
 import { renderProductCard } from "./product-card.js";
 
-export function renderProductList(products = []) {
+export function renderProductList(products = [], cart = new Map()) {
   if (!products.length) {
     return `
       <section class="rp-menu rp-section" id="cardapio">
@@ -28,7 +28,7 @@ export function renderProductList(products = []) {
           <span class="rp-menu__count">${products.length} ${products.length === 1 ? "doce" : "doces"}</span>
         </div>
         <div class="rp-menu__grid">
-          ${products.map(renderProductCard).join("")}
+          ${products.map(product => renderProductCard(product, cart.get(String(product.id)) || 0)).join("")}
         </div>
       </div>
     </section>
