@@ -2,6 +2,7 @@ const CLOSE_TRANSITION_MS = 220;
 const CHECKOUT_HANDOFF_MS = 200;
 const PAYMENT_HANDOFF_MS = 190;
 const PAYMENT_RETURN_MS = 200;
+const CATALOG_RETURN_GUARD_MS = 420;
 
 const CLOSE_BINDINGS = [
   ["[data-close-checkout]", ".rp-checkout"],
@@ -94,6 +95,19 @@ function handoffPaymentToCheckout(root, callback) {
   }, PAYMENT_RETURN_MS);
 }
 
+function handoffPaymentToCatalog(root, trigger) {
+  if (!root || reducedMotion()) return replayClick(trigger);
+  if (root.classList.contains("is-closing")) return;
+
+  document.body.classList.add("rp-catalog-returning");
+  closeAfterAnimation(root, () => {
+    replayClick(trigger);
+    window.setTimeout(() => {
+      document.body.classList.remove("rp-catalog-returning");
+    }, CATALOG_RETURN_GUARD_MS);
+  });
+}
+
 document.addEventListener(
   "click",
   event => {
@@ -104,6 +118,17 @@ document.addEventListener(
       event.preventDefault();
       event.stopImmediatePropagation();
       handoffCartToCheckout(checkoutTrigger);
+      return;
+    }
+
+    const finishOrderTrigger = event.target.closest?.("[data-finish-order]");
+    if (finishOrderTrigger && !finishOrderTrigger.disabled) {
+      const root = finishOrderTrigger.closest(".rp-payment") || document.querySelector(".rp-payment");
+      if (!root) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      handoffPaymentToCatalog(root, finishOrderTrigger);
       return;
     }
 
