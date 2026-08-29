@@ -42,8 +42,9 @@ function dispatchCheckoutSubmit() {
   );
 }
 
-function closePayment() {
+function returnToCheckout({ resetRequest = false } = {}) {
   stopOrderPolling();
+  if (resetRequest) resetCheckoutRequestId();
   resetOrderState();
   setCheckoutOpen(true);
 }
@@ -78,9 +79,10 @@ function bindStorefrontEvents() {
     if (event.target.closest("[data-start-checkout]")) return setCheckoutOpen(true);
     if (event.target.closest("[data-close-checkout]")) return setCheckoutOpen(false);
     if (event.target.closest("[data-back-to-cart]")) return setCartOpen(true);
-    if (event.target.closest("[data-close-payment]")) return closePayment();
+    if (event.target.closest("[data-close-payment]")) return returnToCheckout();
     if (event.target.closest("[data-finish-order]")) return finishOrder();
-    if (event.target.closest("[data-retry-payment]")) return setCheckoutOpen(true);
+    if (event.target.closest("[data-retry-payment]"))
+      return returnToCheckout({ resetRequest: true });
 
     if (event.target.closest("[data-copy-pix]")) {
       const copied = await copyText(state.order.pix?.qr_code);
@@ -117,7 +119,8 @@ export async function bootstrapStorefront() {
   bindStorefrontEvents();
   state.ui.cartOpen = false;
   state.ui.checkoutOpen = false;
-  setOrderState({ phase: "idle", token: null, data: null, pix: null, error: null });
+  state.order = { phase: "idle", token: null, data: null, pix: null, error: null };
+  renderStorefront();
 
   try {
     const payload = await api.getProducts();
