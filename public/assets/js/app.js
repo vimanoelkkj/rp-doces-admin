@@ -30,8 +30,6 @@ import { copyText } from "./clipboard.js";
 import { createPixOrder, resetCheckoutRequestId } from "./checkout-service.js";
 import { startOrderPolling, stopOrderPolling } from "./payment-controller.js";
 import { paymentCreationAllowed, paymentDisabledMessage } from "./runtime-policy.js";
-import { checkoutIsValid } from "./utils/checkout-validity.js";
-import { isPixPayment } from "./utils/payment-method.js";
 import { checkoutErrorMessage } from "./utils/checkout-errors.js";
 import { storefrontProducts } from "./utils/product-filter.js";
 import { sortProducts } from "./utils/product-sort.js";
@@ -39,7 +37,9 @@ import { hasOpenOverlay } from "./utils/overlay.js";
 import { setPageScrollLocked } from "./utils/scroll-lock.js";
 import { isEscapeKey } from "./utils/keyboard.js";
 import { scrollBehavior } from "./utils/reduced-motion.js";
-
+import { checkoutReadiness } from "./utils/checkout-readiness.js";
+import { checkoutReadinessMessage } from "./utils/checkout-readiness-copy.js";
+import { normalizeOrderResponse } from "./utils/order-response.js";
 function renderStorefront() {
   const root = document.getElementById("rp-app");
   if (!root) return;
@@ -65,17 +65,10 @@ async function loadProducts() {
 async function submitCheckout() {
   if (state.order.phase === "creating") return;
   const items = getCartItems();
-  if (!items.length) return setCartOpen(true);
-  if (!checkoutIsValid(state.checkout)) {
-    setOrderState({ phase: "error", error: "Revise nome, e-mail e WhatsApp antes de continuar." });
-    setCheckoutOpen(false);
-    return;
-  }
-  if (!isPixPayment(state.checkout.paymentMethod)) {
-    setOrderState({
-      phase: "error",
-      error: "Pagamento com cartão ainda não está disponível nesta versão."
-    });
+  const readiness = checkoutReadiness(state.checkout, items);
+  if (!readiness.ok) {
+    if (readiness.reason === "empty") return setCartOpen(true);
+    setOrderState({ phase: "error", error: checkoutReadinessMessage(readiness.reason) });
     setCheckoutOpen(false);
     return;
   }
@@ -87,18 +80,17 @@ async function submitCheckout() {
   setCheckoutOpen(false);
   setOrderState({ phase: "creating", token: null, data: null, pix: null, error: null });
   try {
-    const payload = await createPixOrder({ checkout: state.checkout, items });
-    const pedido = payload.pedido || {};
-    const token = pedido.token || null;
-    const paid = String(pedido.status || "").toUpperCase() === "PAGO";
+    const result = normalizeOrderResponse(
+      await createPixOrder({ checkout: state.checkout, items })
+    );
     setOrderState({
-      phase: paid ? "paid" : "pending",
-      token,
-      data: pedido,
-      pix: payload.pix || null,
+      phase: result.paid ? "paid" : "pending",
+      token: result.token,
+      data: result.pedido,
+      pix: result.pix,
       error: null
     });
-    if (!paid && token) startOrderPolling(token);
+    if (!result.paid && result.token) startOrderPolling(result.token);
   } catch (error) {
     setOrderState({ phase: "error", error: checkoutErrorMessage(error) });
   }
