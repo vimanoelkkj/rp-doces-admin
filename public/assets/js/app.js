@@ -7,18 +7,23 @@ import {
   getCartSummary,
   setCartOpen,
   setCheckoutOpen,
+  setMenuOpen,
+  setPartyOpen,
   updateCheckout,
   syncCartWithProducts,
-  setOrderState,
   resetOrderState,
   notify
 } from "./state.js";
+import { renderSiteHeader } from "./components/site-header.js";
 import { renderHero } from "./components/hero.js";
 import { renderProductList } from "./components/product-list.js";
 import { renderCartBar } from "./components/cart-bar.js";
 import { renderCart } from "./components/cart.js";
 import { renderCheckout } from "./components/checkout.js";
 import { renderPaymentStatus } from "./components/payment-status.js";
+import { renderMobileMenu } from "./components/mobile-menu.js";
+import { renderPartySheet } from "./components/party-sheet.js";
+import { renderSiteFooter } from "./components/site-footer.js";
 import { copyText } from "./clipboard.js";
 import { resetCheckoutRequestId } from "./checkout-service.js";
 import { stopOrderPolling } from "./payment-controller.js";
@@ -27,11 +32,14 @@ function renderStorefront() {
   const root = document.getElementById("rp-app");
   if (!root) return;
   const summary = getCartSummary();
-  root.innerHTML = `${renderHero()}${renderProductList(state.products, state.cart)}${renderCartBar(summary)}${renderCart({ open: state.ui.cartOpen, items: getCartItems(), summary })}${renderCheckout({ open: state.ui.checkoutOpen, items: getCartItems(), summary, checkout: state.checkout })}${renderPaymentStatus(state.order)}`;
-  document.body.classList.toggle(
-    "rp-cart-open",
-    state.ui.cartOpen || state.ui.checkoutOpen || state.order.phase !== "idle"
-  );
+  root.innerHTML = `${renderSiteHeader(summary)}${renderHero()}${renderProductList(state.products, state.cart, state.productsStatus)}${renderSiteFooter()}${renderCartBar(summary)}${renderCart({ open: state.ui.cartOpen, items: getCartItems(), summary })}${renderCheckout({ open: state.ui.checkoutOpen, items: getCartItems(), summary, checkout: state.checkout })}${renderPaymentStatus(state.order)}${renderMobileMenu(state.ui.menuOpen)}${renderPartySheet(state.ui.partyOpen)}`;
+  const overlayOpen =
+    state.ui.cartOpen ||
+    state.ui.checkoutOpen ||
+    state.ui.menuOpen ||
+    state.ui.partyOpen ||
+    state.order.phase !== "idle";
+  document.body.classList.toggle("rp-cart-open", overlayOpen);
 }
 
 function dispatchCheckoutSubmit() {
@@ -40,6 +48,21 @@ function dispatchCheckoutSubmit() {
       detail: { checkout: { ...state.checkout }, items: getCartItems(), summary: getCartSummary() }
     })
   );
+}
+
+async function loadProducts() {
+  state.productsStatus = "loading";
+  notify();
+  try {
+    const payload = await api.getProducts();
+    state.products = Array.isArray(payload.produtos) ? payload.produtos : [];
+    state.productsStatus = "ready";
+    syncCartWithProducts();
+  } catch (error) {
+    state.productsStatus = "error";
+    console.warn("R&P: não foi possível carregar produtos no bootstrap modular.", error);
+  }
+  notify();
 }
 
 function returnToCheckout({ resetRequest = false } = {}) {
@@ -79,6 +102,11 @@ function bindStorefrontEvents() {
     if (event.target.closest("[data-start-checkout]")) return setCheckoutOpen(true);
     if (event.target.closest("[data-close-checkout]")) return setCheckoutOpen(false);
     if (event.target.closest("[data-back-to-cart]")) return setCartOpen(true);
+    if (event.target.closest("[data-open-menu]")) return setMenuOpen(true);
+    if (event.target.closest("[data-close-menu]")) return setMenuOpen(false);
+    if (event.target.closest("[data-open-party]")) return setPartyOpen(true);
+    if (event.target.closest("[data-close-party]")) return setPartyOpen(false);
+    if (event.target.closest("[data-reload-products]")) return loadProducts();
     if (event.target.closest("[data-close-payment]")) return returnToCheckout();
     if (event.target.closest("[data-finish-order]")) return finishOrder();
     if (event.target.closest("[data-retry-payment]"))
@@ -117,19 +145,11 @@ function bindStorefrontEvents() {
 export async function bootstrapStorefront() {
   subscribe(renderStorefront);
   bindStorefrontEvents();
-  state.ui.cartOpen = false;
-  state.ui.checkoutOpen = false;
+  state.ui = { cartOpen: false, checkoutOpen: false, menuOpen: false, partyOpen: false };
   state.order = { phase: "idle", token: null, data: null, pix: null, error: null };
+  state.productsStatus = "loading";
   renderStorefront();
-
-  try {
-    const payload = await api.getProducts();
-    state.products = Array.isArray(payload.produtos) ? payload.produtos : [];
-    syncCartWithProducts();
-  } catch (error) {
-    console.warn("R&P: não foi possível carregar produtos no bootstrap modular.", error);
-  }
-  notify();
+  await loadProducts();
 }
 
 bootstrapStorefront();
