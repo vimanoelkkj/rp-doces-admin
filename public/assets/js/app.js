@@ -16,13 +16,17 @@ import { renderProductList } from "./components/product-list.js";
 import { renderCartBar } from "./components/cart-bar.js";
 import { renderCart } from "./components/cart.js";
 import { renderCheckout } from "./components/checkout.js";
+import { renderPaymentStatus } from "./components/payment-status.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
   if (!root) return;
   const summary = getCartSummary();
-  root.innerHTML = `${renderHero()}${renderProductList(state.products, state.cart)}${renderCartBar(summary)}${renderCart({ open: state.ui.cartOpen, items: getCartItems(), summary })}${renderCheckout({ open: state.ui.checkoutOpen, items: getCartItems(), summary, checkout: state.checkout })}`;
-  document.body.classList.toggle("rp-cart-open", state.ui.cartOpen || state.ui.checkoutOpen);
+  root.innerHTML = `${renderHero()}${renderProductList(state.products, state.cart)}${renderCartBar(summary)}${renderCart({ open: state.ui.cartOpen, items: getCartItems(), summary })}${renderCheckout({ open: state.ui.checkoutOpen, items: getCartItems(), summary, checkout: state.checkout })}${renderPaymentStatus(state.order)}`;
+  document.body.classList.toggle(
+    "rp-cart-open",
+    state.ui.cartOpen || state.ui.checkoutOpen || state.order.phase !== "idle"
+  );
 }
 
 function dispatchCheckoutSubmit() {
@@ -47,30 +51,11 @@ function bindStorefrontEvents() {
       );
       return;
     }
-
-    if (event.target.closest("[data-open-cart]")) {
-      setCartOpen(true);
-      return;
-    }
-
-    if (event.target.closest("[data-close-cart]")) {
-      setCartOpen(false);
-      return;
-    }
-
-    if (event.target.closest("[data-start-checkout]")) {
-      setCheckoutOpen(true);
-      return;
-    }
-
-    if (event.target.closest("[data-close-checkout]")) {
-      setCheckoutOpen(false);
-      return;
-    }
-
-    if (event.target.closest("[data-back-to-cart]")) {
-      setCartOpen(true);
-    }
+    if (event.target.closest("[data-open-cart]")) return setCartOpen(true);
+    if (event.target.closest("[data-close-cart]")) return setCartOpen(false);
+    if (event.target.closest("[data-start-checkout]")) return setCheckoutOpen(true);
+    if (event.target.closest("[data-close-checkout]")) return setCheckoutOpen(false);
+    if (event.target.closest("[data-back-to-cart]")) setCartOpen(true);
   });
 
   root.addEventListener("submit", event => {
@@ -93,7 +78,6 @@ function bindStorefrontEvents() {
 export async function bootstrapStorefront() {
   subscribe(renderStorefront);
   bindStorefrontEvents();
-
   state.ui.cartOpen = false;
   state.ui.checkoutOpen = false;
   renderStorefront();
@@ -105,7 +89,6 @@ export async function bootstrapStorefront() {
   } catch (error) {
     console.warn("R&P: não foi possível carregar produtos no bootstrap modular.", error);
   }
-
   notify();
 }
 
