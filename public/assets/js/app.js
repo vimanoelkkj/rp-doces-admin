@@ -45,6 +45,7 @@ import { catalogProducts } from "./utils/catalog-response.js";
 
 const regionMarkup = new Map();
 let storefrontRoute = "home";
+let catalogCategory = "ALL";
 
 function catalogMarkup() {
   return `<section data-catalog-route><div data-region="header"></div><div data-region="products"></div>${renderSiteFooter()}</section>`;
@@ -77,7 +78,10 @@ function renderStorefront() {
   const items = getCartItems();
   if (storefrontRoute === "catalog") {
     updateRegion("header", renderSiteHeader(summary));
-    updateRegion("products", renderProductList(state.products, state.cart, state.productsStatus));
+    updateRegion(
+      "products",
+      renderProductList(state.products, state.cart, state.productsStatus, catalogCategory)
+    );
   }
   updateRegion("cart-bar", storefrontRoute === "catalog" ? renderCartBar(summary) : "");
   updateRegion("cart", renderCart({ open: state.ui.cartOpen, items, summary }));
@@ -218,6 +222,12 @@ function bindStorefrontEvents() {
     if (homeSectionButton) return showHomeSection(homeSectionButton.dataset.homeSection);
     if (event.target.closest("[data-show-catalog]")) return showCatalog();
     if (event.target.closest("[data-home-top]")) return showHome();
+    const categoryButton = event.target.closest("[data-catalog-category]");
+    if (categoryButton) {
+      catalogCategory = categoryButton.dataset.catalogCategory || "ALL";
+      regionMarkup.delete("products");
+      return renderStorefront();
+    }
     const removeButton = event.target.closest("[data-cart-remove]");
     if (removeButton) return setCartQuantity(removeButton.dataset.productId, 0);
     const quantityButton = event.target.closest("[data-cart-delta]");
