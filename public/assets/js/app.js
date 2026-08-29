@@ -28,6 +28,7 @@ import { renderSiteFooter } from "./components/site-footer.js";
 import { copyText } from "./clipboard.js";
 import { createPixOrder, resetCheckoutRequestId } from "./checkout-service.js";
 import { startOrderPolling, stopOrderPolling } from "./payment-controller.js";
+import { paymentCreationAllowed, paymentDisabledMessage } from "./runtime-policy.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -70,7 +71,11 @@ async function submitCheckout() {
     setCheckoutOpen(false);
     return;
   }
-
+  if (!paymentCreationAllowed()) {
+    setOrderState({ phase: "error", error: paymentDisabledMessage() });
+    setCheckoutOpen(false);
+    return;
+  }
   setCheckoutOpen(false);
   setOrderState({ phase: "creating", token: null, data: null, pix: null, error: null });
   try {
@@ -100,7 +105,6 @@ function returnToCheckout({ resetRequest = false } = {}) {
   resetOrderState();
   setCheckoutOpen(true);
 }
-
 function finishOrder() {
   stopOrderPolling();
   resetCheckoutRequestId();
@@ -116,7 +120,6 @@ function bindStorefrontEvents() {
   const root = document.getElementById("rp-app");
   if (!root || root.dataset.eventsBound === "true") return;
   root.dataset.eventsBound = "true";
-
   root.addEventListener("click", async event => {
     const quantityButton = event.target.closest("[data-cart-delta]");
     if (quantityButton)
@@ -138,7 +141,6 @@ function bindStorefrontEvents() {
     if (event.target.closest("[data-finish-order]")) return finishOrder();
     if (event.target.closest("[data-retry-payment]"))
       return returnToCheckout({ resetRequest: true });
-
     if (event.target.closest("[data-copy-pix]")) {
       const copied = await copyText(state.order.pix?.qr_code);
       const button = event.target.closest("[data-copy-pix]");
@@ -150,13 +152,11 @@ function bindStorefrontEvents() {
       }
     }
   });
-
   root.addEventListener("submit", event => {
     if (!event.target.matches("[data-checkout-form]")) return;
     event.preventDefault();
     submitCheckout();
   });
-
   root.addEventListener("input", event => {
     const field = event.target.dataset.checkoutField;
     if (field) updateCheckout(field, event.target.value);
@@ -176,5 +176,4 @@ export async function bootstrapStorefront() {
   renderStorefront();
   await loadProducts();
 }
-
 bootstrapStorefront();
