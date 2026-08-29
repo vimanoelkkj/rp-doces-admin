@@ -4,6 +4,8 @@ import { summarizeCartItems } from "./utils/cart-summary.js";
 import { checkoutIsValid } from "./utils/checkout-validity.js";
 
 const listeners = new Set();
+let notifyEpoch = 0;
+
 const initialUi = () => ({
   cartOpen: false,
   checkoutOpen: false,
@@ -51,6 +53,11 @@ function syncCheckoutSubmitAvailability() {
   if (ready) submit.removeAttribute("aria-disabled");
   else submit.setAttribute("aria-disabled", "true");
 }
+function notifyUnlessSuperseded(epoch) {
+  queueMicrotask(() => {
+    if (notifyEpoch === epoch) notify();
+  });
+}
 export function resetTransientState() {
   state.ui = initialUi();
   state.order = initialOrder();
@@ -62,6 +69,7 @@ export function subscribe(listener) {
   return () => listeners.delete(listener);
 }
 export function notify() {
+  notifyEpoch += 1;
   listeners.forEach(listener => listener(state));
 }
 function closeTransientUi() {
@@ -115,7 +123,7 @@ export function setOrderState(patch) {
 export function resetOrderState() {
   state.order = initialOrder();
   syncPaymentInteractionLock();
-  notify();
+  notifyUnlessSuperseded(notifyEpoch);
 }
 export function getCartQuantity(id) {
   return Number(state.cart.get(productId(id))) || 0;
