@@ -8,8 +8,8 @@ const waitingCardIcon = `<svg class="rp-payment__waiting-icon" width="33" height
 const successIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--success" aria-hidden="true">✓</span>`;
 const failureIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--failure" aria-hidden="true">×</span>`;
 const cancelledIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--muted" aria-hidden="true">—</span>`;
-function stateShell({ icon, kicker, title, body, content = "" }) {
-  return `<div class="rp-payment__state">${icon}<p class="rp-kicker">${kicker}</p><h2>${title}</h2><p>${body}</p>${content}</div>`;
+function stateShell({ icon, kicker, title, body, content = "", state = "" }) {
+  return `<div class="rp-payment__state${state ? ` rp-payment__state--${state}` : ""}">${icon}<p class="rp-kicker">${kicker}</p><h2>${title}</h2><p>${body}</p>${content}</div>`;
 }
 function pendingContent({ cardPending, total, qrCode, expiresAt, copied = false }) {
   return `<div class="rp-payment__waiting-mark">${cardPending ? waitingCardIcon : waitingPixIcon}</div><h2>Aguardando pagamento</h2><p>${cardPending ? "Já estamos levando a maquininha até você. Pague no débito ou crédito quando ela chegar." : "Copie o código Pix e pague no app do seu próprio banco."}</p>${!cardPending && total ? `<strong class="rp-payment__total">${formatMoney(total)}</strong>` : ""}${!cardPending && qrCode ? `<textarea class="rp-payment__code" readonly aria-label="Código Pix copia e cola">${escapeHtml(qrCode)}</textarea><button class="rp-btn rp-btn--primary" type="button" data-copy-pix>${copied ? "Código copiado ✓" : "Copiar código Pix"}</button>${copied ? `<div class="rp-payment__copied" role="status">Código Pix copiado. Agora é só colar no app do seu banco.</div>` : ""}` : ""}${!cardPending && expiresAt ? `<p class="rp-payment__hint">Pix válido até ${escapeHtml(expiresAt)}.</p>` : ""}${!cardPending ? `<p class="rp-payment__hint">Esta tela acompanha a confirmação do pagamento automaticamente.</p>` : ""}`;
@@ -37,7 +37,8 @@ export function renderPaymentStatus(order = {}) {
       kicker: "Cartão não aprovado",
       title: "O pagamento não passou",
       body: "A maquininha não aprovou esta tentativa. Você pode escolher outra forma de pagamento.",
-      content: `<button class="rp-btn rp-btn--primary" type="button" data-close-payment>Escolher outra forma</button><button class="rp-btn rp-payment__secondary" type="button" data-finish-order>Voltar ao cardápio</button>`
+      content: `<button class="rp-btn rp-btn--primary" type="button" data-close-payment>Escolher outra forma</button><button class="rp-btn rp-payment__secondary" type="button" data-finish-order>Voltar ao cardápio</button>`,
+      state: "card-declined"
     });
   else if (demoState === "pix-error")
     body = stateShell({
