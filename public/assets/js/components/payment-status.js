@@ -88,7 +88,7 @@ export function renderPaymentStatus(order = {}) {
       qrCode,
       expiresAt,
       copied: demoState === "pix-copied",
-      exiting: transitioningToPaid
+      exiting: false
     });
   else if (failed)
     body = stateShell({
