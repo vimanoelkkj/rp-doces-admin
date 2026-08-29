@@ -47,7 +47,7 @@
 .rp-party__cake-middle { bottom: 25px; height: 27px; left: 12px; right: 12px; border-radius: 8px 8px 5px 5px; }
 .rp-party__cake-bottom { bottom: 0; height: 30px; border-radius: 8px 8px 12px 12px; background: color-mix(in oklch, var(--rp-color-brand-soft) 52%, white); }
 .rp-party__cake-candle { position: absolute; left: 50%; bottom: 69px; width: 4px; height: 14px; border-radius: 3px; background: var(--rp-color-brand-action); transform: translateX(-50%); }
-.rp-party__cake-flame { position: absolute; left: 50%; bottom: 84px; width: 9px; height: 13px; border-radius: 70% 35% 70% 35%; background: #f0a55f; transform: translateX(-50%) rotate(45deg); }
+.rp-party__cake-flame { position: absolute; left: 50%; bottom: 84px; width: 9px; height: 13px; border-radius: 70% 35% 70% 35%; background: #f0a55f; box-shadow: 0 0 8px rgb(240 165 95 / 48%), 0 0 15px rgb(240 165 95 / 24%); transform: translateX(-50%) rotate(45deg); transform-origin: 50% 90%; }
 .rp-party__features { display: grid; gap: 4px; margin-top: 14px; }
 .rp-party__features article { display: block; padding: 13px 2px; border-bottom: 1px solid var(--rp-color-border); }
 .rp-party__features strong { display: block; color: var(--rp-color-text); font-size: 13.5px; }
@@ -64,5 +64,14 @@
 .rp-menu__skeleton { display: grid; grid-template-columns: 1fr; gap: 28px; }
 .rp-menu__skeleton span { min-height: 260px; border-radius: 22px; background: linear-gradient(90deg, var(--rp-color-neutral-bg) 25%, var(--rp-color-surface) 50%, var(--rp-color-neutral-bg) 75%); background-size: 200% 100%; animation: rp-skeleton 1.25s infinite linear; }
 @keyframes rp-skeleton { to { background-position: -200% 0; } }
+@keyframes rp-party-flame-flicker {
+  0%, 100% { transform: translateX(-50%) rotate(45deg) scale(1); opacity: 1; box-shadow: 0 0 8px rgb(240 165 95 / 48%), 0 0 15px rgb(240 165 95 / 24%); }
+  22% { transform: translateX(-52%) translateY(-1px) rotate(40deg) scale(0.92, 1.06); opacity: 0.9; box-shadow: 0 0 6px rgb(240 165 95 / 40%), 0 0 12px rgb(240 165 95 / 20%); }
+  48% { transform: translateX(-48%) translateY(-2px) rotate(50deg) scale(1.05, 1.12); opacity: 1; box-shadow: 0 0 10px rgb(240 165 95 / 56%), 0 0 18px rgb(240 165 95 / 28%); }
+  72% { transform: translateX(-51%) translateY(-1px) rotate(43deg) scale(0.96, 1.02); opacity: 0.94; box-shadow: 0 0 7px rgb(240 165 95 / 44%), 0 0 14px rgb(240 165 95 / 22%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rp-party__cake-flame { animation: rp-party-flame-flicker 1.35s ease-in-out infinite; }
+}
 @media (min-width: 768px) { .rp-site-header__inner { padding: 20px 56px 8px; } .rp-mobile-menu__sheet, .rp-party__sheet { border-radius: 24px; margin-bottom: 24px; } .rp-site-footer__inner { grid-template-columns: 1fr auto; align-items: end; } .rp-site-footer small { grid-column: 1/-1; } .rp-menu__skeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .rp-site-header { position: absolute; } .rp-site-footer { padding-bottom: 52px; } .rp-menu__skeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
