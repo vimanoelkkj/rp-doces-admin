@@ -9,3 +9,61 @@
     margin-top: 24px;
   }
 }
+
+.rp-home-map {
+  gap: 10px;
+  min-height: 260px;
+  padding: 28px 24px;
+  text-align: center;
+}
+.rp-home-map__partner {
+  color: var(--rp-color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.rp-home-map__logo {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: min(78%, 240px);
+  margin: 2px auto 4px;
+  text-decoration: none;
+}
+.rp-home-map__logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.rp-home-map__place {
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+  color: var(--rp-color-muted);
+  font-size: 12px;
+}
+.rp-home-map__cta {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--rp-color-brand-strong);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+@media (min-width: 768px) {
+  .rp-home-map {
+    min-height: 280px;
+  }
+  .rp-home-map__logo {
+    width: min(72%, 250px);
+  }
+  .rp-home-map__partner {
+    font-size: 13px;
+  }
+  .rp-home-map__place,
+  .rp-home-map__cta {
+    font-size: 13px;
+  }
+}
