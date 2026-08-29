@@ -1,56 +1,12 @@
-const money = cents =>
-  (Number(cents || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-function esc(value = "") {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
+import { formatMoney } from "../utils/money.js";
+import { escapeHtml } from "../utils/html.js";
 export function renderCheckout({ open = false, items = [], summary = {}, checkout = {} } = {}) {
   const hiddenAttribute = open ? "" : " hidden";
   const rows = items
     .map(
-      ({ product, quantity }) => `
-    <li class="rp-checkout__item">
-      <span>${esc(product.nome || product.name || "Produto")} × ${quantity}</span>
-      <strong>${money((Number(product.preco_centavos) || 0) * quantity)}</strong>
-    </li>
-  `
+      ({ product, quantity }) =>
+        `<li class="rp-checkout__item"><span>${escapeHtml(product.nome || product.name || "Produto")} × ${quantity}</span><strong>${formatMoney((Number(product.preco_centavos) || 0) * quantity)}</strong></li>`
     )
     .join("");
-
-  return `
-    <div class="rp-checkout"${hiddenAttribute} data-checkout-root aria-hidden="${!open}">
-      <button class="rp-checkout__backdrop" type="button" data-close-checkout aria-label="Fechar checkout"></button>
-      <section class="rp-checkout__sheet" role="dialog" aria-modal="true" aria-labelledby="rp-checkout-title" aria-describedby="rp-checkout-description">
-        <div class="rp-sheet-handle" aria-hidden="true"></div>
-        <button class="rp-icon-button" type="button" data-close-checkout aria-label="Voltar">×</button>
-        <header class="rp-checkout__header">
-          <p class="rp-kicker">Finalizar pedido</p>
-          <h2 id="rp-checkout-title">Quase lá 🍰</h2>
-          <p id="rp-checkout-description">Preencha seus dados e escolha como deseja pagar.</p>
-        </header>
-        <div class="rp-checkout__summary" aria-label="Resumo do pedido">
-          <ul>${rows || "<li>Seu pedido está vazio.</li>"}</ul>
-          <div class="rp-checkout__total"><span>Total</span><strong>${money(summary.totalCents)}</strong></div>
-        </div>
-        <form class="rp-checkout__form" data-checkout-form novalidate>
-          <label for="rp-checkout-name">Nome</label><input id="rp-checkout-name" name="name" autocomplete="name" value="${esc(checkout.name || "")}" required minlength="2" maxlength="100" data-checkout-field="name">
-          <label for="rp-checkout-email">E-mail</label><input id="rp-checkout-email" name="email" type="email" autocomplete="email" value="${esc(checkout.email || "")}" required maxlength="160" data-checkout-field="email">
-          <label for="rp-checkout-whatsapp">WhatsApp</label><input id="rp-checkout-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" value="${esc(checkout.whatsapp || "")}" required maxlength="13" data-checkout-field="whatsapp">
-          <fieldset>
-            <legend>Pagamento</legend>
-            <label class="rp-payment-option"><input type="radio" name="paymentMethod" value="PIX" checked data-checkout-field="paymentMethod"> Pix</label>
-            <label class="rp-payment-option" aria-disabled="true"><input type="radio" name="paymentMethod" value="CARD" disabled> Cartão <small>em breve</small></label>
-          </fieldset>
-          <label for="rp-checkout-note">Observação <span>(opcional)</span></label><textarea id="rp-checkout-note" name="note" rows="2" maxlength="500" data-checkout-field="note">${esc(checkout.note || "")}</textarea>
-          <button class="rp-btn rp-btn--primary rp-checkout__submit" type="submit" data-submit-checkout>Continuar para pagamento</button>
-        </form>
-      </section>
-    </div>
-  `;
+  return `<div class="rp-checkout"${hiddenAttribute} data-checkout-root aria-hidden="${!open}"><button class="rp-checkout__backdrop" type="button" data-close-checkout aria-label="Fechar checkout"></button><section class="rp-checkout__sheet" role="dialog" aria-modal="true" aria-labelledby="rp-checkout-title" aria-describedby="rp-checkout-description"><div class="rp-sheet-handle" aria-hidden="true"></div><button class="rp-icon-button" type="button" data-close-checkout aria-label="Voltar">×</button><header class="rp-checkout__header"><p class="rp-kicker">Finalizar pedido</p><h2 id="rp-checkout-title">Quase lá 🍰</h2><p id="rp-checkout-description">Preencha seus dados e escolha como deseja pagar.</p></header><div class="rp-checkout__summary" aria-label="Resumo do pedido"><ul>${rows || "<li>Seu pedido está vazio.</li>"}</ul><div class="rp-checkout__total"><span>Total</span><strong>${formatMoney(summary.totalCents)}</strong></div></div><form class="rp-checkout__form" data-checkout-form novalidate><label for="rp-checkout-name">Nome</label><input id="rp-checkout-name" name="name" autocomplete="name" value="${escapeHtml(checkout.name || "")}" required minlength="2" maxlength="100" data-checkout-field="name"><label for="rp-checkout-email">E-mail</label><input id="rp-checkout-email" name="email" type="email" autocomplete="email" value="${escapeHtml(checkout.email || "")}" required maxlength="160" data-checkout-field="email"><label for="rp-checkout-whatsapp">WhatsApp</label><input id="rp-checkout-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" value="${escapeHtml(checkout.whatsapp || "")}" required maxlength="13" data-checkout-field="whatsapp"><fieldset><legend>Pagamento</legend><label class="rp-payment-option"><input type="radio" name="paymentMethod" value="PIX" checked data-checkout-field="paymentMethod"> Pix</label><label class="rp-payment-option" aria-disabled="true"><input type="radio" name="paymentMethod" value="CARD" disabled> Cartão <small>em breve</small></label></fieldset><label for="rp-checkout-note">Observação <span>(opcional)</span></label><textarea id="rp-checkout-note" name="note" rows="2" maxlength="500" data-checkout-field="note">${escapeHtml(checkout.note || "")}</textarea><button class="rp-btn rp-btn--primary rp-checkout__submit" type="submit" data-submit-checkout>Continuar para pagamento</button></form></section></div>`;
 }
