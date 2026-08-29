@@ -19,7 +19,7 @@
 .rp-mobile-menu__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .rp-mobile-menu__head h2 { margin: 0; color: var(--rp-color-text); font-family: "Bricolage Grotesque", sans-serif; font-size: 24px; font-weight: 700; line-height: 1.05; letter-spacing: -0.015em; }
 .rp-mobile-menu__head p { margin: 6px 0 0; color: var(--rp-color-muted); font-size: 12.5px; }
-.rp-mobile-menu__close { flex: 0 0 34px; width: 34px; height: 34px; border: 0; border-radius: 999px; background: var(--rp-color-brand-soft); color: var(--rp-color-brand-strong); font-size: 20px; }
+.rp-mobile-menu__close { flex: 0 0 34px; width: 34px; height: 34px; border: 0; border-radius: 999px; background: transparent; color: var(--rp-color-brand-strong); font-size: 20px; }
 .rp-mobile-menu__group { margin-top: 22px; }
 .rp-mobile-menu__label { margin: 0 0 9px; color: var(--rp-color-brand-strong); font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 .rp-mobile-menu__links { display: grid; gap: 8px; border: 0; }
@@ -35,7 +35,8 @@
 .rp-party__sheet { max-height: min(92dvh, 820px); overflow: auto; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 .rp-party__head { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 10px; margin-bottom: 18px; }
 .rp-party__head h2 { margin: 0; color: var(--rp-color-brand-strong); font-family: "Bricolage Grotesque", sans-serif; font-size: 18px; font-weight: 700; text-align: center; line-height: 1.05; }
-.rp-party__back, .rp-party__close { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 999px; background: var(--rp-color-brand-soft); color: var(--rp-color-brand-strong); font-size: 18px; }
+.rp-party__head-spacer { width: 34px; height: 34px; }
+.rp-party__back, .rp-party__close { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 999px; background: transparent; color: var(--rp-color-brand-strong); font-size: 18px; }
 .rp-party__hero { position: relative; min-height: 178px; overflow: hidden; border-radius: 20px; padding: 20px 132px 18px 18px; background: var(--rp-color-brand-soft); }
 .rp-party__hero-copy { position: relative; z-index: 2; }
 .rp-party__hero h3 { margin: 0; color: var(--rp-color-text); font-family: "Bricolage Grotesque", sans-serif; font-size: 22px; font-weight: 700; line-height: 1.05; }
