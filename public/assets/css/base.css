@@ -18,6 +18,15 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+a,
+button,
+input,
+textarea,
+select,
+label,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
 body.rp-cart-open {
   overflow: hidden;
   overscroll-behavior: none;
