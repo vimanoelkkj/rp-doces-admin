@@ -114,3 +114,10 @@
   padding-left: 5px;
   color: var(--rp-color-brand-strong);
 }
+.rp-party__sheet > p {
+  max-width: 44ch;
+  margin: 2px 0 18px;
+}
+.rp-party__head h2 {
+  text-wrap: balance;
+}
