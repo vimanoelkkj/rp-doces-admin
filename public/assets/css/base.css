@@ -39,6 +39,10 @@ body.rp-cart-open [data-payment-status] {
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
+.rp-party__back,
+.rp-party__close {
+  background: transparent !important;
+}
 @media (prefers-reduced-motion: no-preference) {
   .rp-cart-overlay.is-closing,
   .rp-checkout.is-closing,
