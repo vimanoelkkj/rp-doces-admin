@@ -10,80 +10,120 @@
 }
 
 .rp-hero {
+  position: relative;
   min-height: 100svh;
   display: grid;
   align-items: center;
   overflow: hidden;
   background: var(--rp-color-bg);
 }
-
-.rp-hero__grid {
-  display: grid;
-  gap: var(--rp-space-8);
-  padding-block: 88px 48px;
+.rp-hero::before {
+  content: "";
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  right: -190px;
+  top: 80px;
+  border-radius: 50%;
+  background: rgba(255, 107, 157, 0.09);
 }
-
-.rp-hero__copy {
+.rp-hero::after {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  left: -110px;
+  bottom: 70px;
+  border-radius: 50%;
+  background: rgba(230, 79, 132, 0.07);
+}
+.rp-hero__grid {
   position: relative;
   z-index: 1;
+  display: grid;
+  gap: 34px;
+  padding-block: 104px 54px;
+}
+.rp-hero__copy {
+  position: relative;
+  z-index: 2;
   max-width: 620px;
 }
-
 .rp-hero__eyebrow {
-  margin: 0 0 var(--rp-space-4);
+  width: fit-content;
+  margin: 0 0 18px;
+  border: 1px solid rgba(230, 79, 132, 0.18);
+  border-radius: var(--rp-radius-pill);
+  padding: 7px 11px;
+  background: rgba(255, 255, 255, 0.7);
   color: var(--rp-color-brand-strong);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-
 .rp-hero__title {
   margin: 0;
   color: var(--rp-color-text);
   font-family: Fraunces, Georgia, serif;
-  font-size: clamp(46px, 13vw, 72px);
+  font-size: clamp(48px, 13.5vw, 76px);
   font-weight: 800;
-  line-height: 0.98;
-  letter-spacing: -0.035em;
+  line-height: 0.94;
+  letter-spacing: -0.045em;
 }
-
 .rp-hero__title span,
 .rp-hero__title em {
   display: block;
 }
 .rp-hero__title em {
-  color: var(--rp-color-brand);
+  color: var(--rp-color-brand-strong);
   font-style: italic;
+  font-weight: 700;
 }
-
 .rp-hero__lede {
-  max-width: 430px;
-  margin: var(--rp-space-5) 0 0;
+  max-width: 390px;
+  margin: 22px 0 0;
   color: var(--rp-color-muted);
   font-size: 16px;
   line-height: 1.55;
 }
-
 .rp-hero__cta {
-  margin-top: var(--rp-space-6);
+  margin-top: 26px;
+  min-height: 50px;
+  border-radius: var(--rp-radius-pill);
+  padding-inline: 22px;
   text-decoration: none;
+  box-shadow: 0 12px 28px rgba(230, 79, 132, 0.2);
 }
-
 .rp-hero__media {
-  min-height: 310px;
+  position: relative;
+  min-height: 330px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--rp-color-border);
-  border-radius: 28px;
-  background: linear-gradient(145deg, #fff 0%, #fff1f5 100%);
+  border: 1px solid rgba(230, 79, 132, 0.13);
+  border-radius: 34px 34px 90px 34px;
+  background:
+    radial-gradient(circle at 70% 22%, #fff 0 10%, transparent 35%),
+    linear-gradient(145deg, #fff 0%, #fff1f5 100%);
   overflow: hidden;
+  box-shadow: 0 24px 70px rgba(74, 45, 36, 0.09);
 }
-
+.rp-hero__media::before {
+  content: "";
+  position: absolute;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  background: rgba(255, 107, 157, 0.13);
+  filter: blur(1px);
+}
 .rp-hero__media-label {
+  position: relative;
+  z-index: 1;
   max-width: 220px;
   color: var(--rp-color-muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 800;
   line-height: 1.5;
   text-align: center;
   text-transform: uppercase;
@@ -92,15 +132,25 @@
 
 @media (min-width: 820px) {
   .rp-hero {
-    min-height: 720px;
+    min-height: 760px;
+  }
+  .rp-hero::before {
+    width: 560px;
+    height: 560px;
+    right: -250px;
+    top: -80px;
   }
   .rp-hero__grid {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.82fr);
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 0.82fr);
     align-items: center;
     gap: clamp(48px, 7vw, 96px);
-    padding-block: 96px;
+    padding-block: 112px 90px;
+  }
+  .rp-hero__title {
+    font-size: clamp(68px, 6.2vw, 92px);
   }
   .rp-hero__media {
-    min-height: 520px;
+    min-height: 540px;
+    border-radius: 48px 48px 140px 48px;
   }
 }
