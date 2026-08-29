@@ -6,6 +6,8 @@ import {
   getCartItems,
   getCartSummary,
   setCartOpen,
+  setCheckoutOpen,
+  updateCheckout,
   syncCartWithProducts,
   notify
 } from "./state.js";
@@ -39,9 +41,7 @@ function bindStorefrontEvents() {
     }
 
     if (event.target.closest("[data-open-cart]")) {
-      state.ui.cartOpen = true;
-      state.ui.checkoutOpen = false;
-      notify();
+      setCartOpen(true);
       return;
     }
 
@@ -51,49 +51,51 @@ function bindStorefrontEvents() {
     }
 
     if (event.target.closest("[data-start-checkout]")) {
-      state.ui.cartOpen = false;
-      state.ui.checkoutOpen = true;
-      notify();
+      setCheckoutOpen(true);
       return;
     }
 
     if (event.target.closest("[data-close-checkout]")) {
-      state.ui.checkoutOpen = false;
-      notify();
+      setCheckoutOpen(false);
+      return;
     }
+
+    if (event.target.closest("[data-back-to-cart]")) {
+      setCartOpen(true);
+      return;
+    }
+
+    if (event.target.closest("[data-submit-checkout]")) {
+      window.dispatchEvent(
+        new CustomEvent("rp:submit-checkout", {
+          detail: {
+            checkout: { ...state.checkout },
+            items: getCartItems(),
+            summary: getCartSummary()
+          }
+        })
+      );
+    }
+  });
+
+  root.addEventListener("input", event => {
+    const field = event.target.dataset.checkoutField;
+    if (field) updateCheckout(field, event.target.value);
   });
 
   root.addEventListener("change", event => {
-    if (event.target.name === "paymentMethod") {
-      state.checkout.paymentMethod = event.target.value;
-    }
-  });
-
-  root.addEventListener("submit", event => {
-    const form = event.target.closest("[data-checkout-form]");
-    if (!form) return;
-    event.preventDefault();
-    const data = new FormData(form);
-    state.checkout.name = String(data.get("name") || "").trim();
-    state.checkout.whatsapp = String(data.get("whatsapp") || "").trim();
-    state.checkout.note = String(data.get("note") || "").trim();
-    state.checkout.paymentMethod = String(data.get("paymentMethod") || "PIX");
-    window.dispatchEvent(
-      new CustomEvent("rp:checkout-ready", {
-        detail: {
-          checkout: { ...state.checkout },
-          items: getCartItems(),
-          summary: getCartSummary()
-        }
-      })
-    );
+    const field = event.target.dataset.checkoutField;
+    if (field) updateCheckout(field, event.target.value);
   });
 }
 
 export async function bootstrapStorefront() {
   subscribe(renderStorefront);
-  renderStorefront();
   bindStorefrontEvents();
+
+  state.ui.cartOpen = false;
+  state.ui.checkoutOpen = false;
+  renderStorefront();
 
   try {
     const payload = await api.getProducts();
