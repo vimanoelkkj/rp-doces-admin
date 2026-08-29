@@ -9,7 +9,16 @@ const initialUi = () => ({
   menuOpen: false,
   partyOpen: false
 });
-const initialOrder = () => ({ phase: "idle", token: null, data: null, pix: null, error: null });
+const initialOrder = () => ({
+  phase: "idle",
+  token: null,
+  data: null,
+  pix: null,
+  error: null,
+  demoState: "",
+  cancelPending: false,
+  cancelError: null
+});
 
 export const state = {
   products: [],
