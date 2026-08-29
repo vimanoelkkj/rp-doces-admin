@@ -3,6 +3,7 @@ const params = new URLSearchParams(location.search);
 if (params.get("debug") === "transitions") {
   const logs = [];
   let sampleRun = 0;
+  let frozen = false;
 
   const panel = document.createElement("aside");
   panel.setAttribute("data-transition-debug", "");
@@ -12,11 +13,11 @@ if (params.get("debug") === "transitions") {
     "top:8px",
     "left:8px",
     "right:8px",
-    "max-height:42dvh",
+    "max-height:54dvh",
     "overflow:auto",
     "padding:9px 10px",
     "border-radius:10px",
-    "background:rgb(20 16 16 / 88%)",
+    "background:rgb(20 16 16 / 90%)",
     "color:#fff",
     "font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace",
     "white-space:pre-wrap",
@@ -28,12 +29,17 @@ if (params.get("debug") === "transitions") {
     return performance.now().toFixed(1).padStart(7, " ");
   }
 
-  function write(message) {
+  function renderPanel() {
+    panel.textContent = logs.slice(-32).join("\n");
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function write(message, { force = false } = {}) {
+    if (frozen && !force) return;
     const line = `${stamp()} ${message}`;
     logs.push(line);
-    if (logs.length > 120) logs.shift();
-    panel.textContent = logs.slice(-18).join("\n");
-    panel.scrollTop = panel.scrollHeight;
+    if (logs.length > 180) logs.shift();
+    renderPanel();
     console.debug(`[rp-transition] ${line}`);
   }
 
@@ -44,6 +50,8 @@ if (params.get("debug") === "transitions") {
     const paymentBackdrop = document.querySelector(".rp-payment__backdrop");
     const paymentBackdropStyle = paymentBackdrop ? getComputedStyle(paymentBackdrop) : null;
     const globalBackdrop = getComputedStyle(document.body, "::before");
+    const catalog = document.querySelector("[data-catalog-route]");
+    const catalogStyle = catalog ? getComputedStyle(catalog) : null;
 
     const parts = [
       label,
@@ -54,23 +62,45 @@ if (params.get("debug") === "transitions") {
       `hidden=${checkout?.hidden ? 1 : 0}`,
       `coDisplay=${checkoutStyle?.display || "-"}`,
       `coOpacity=${checkoutStyle?.opacity || "-"}`,
+      `catalogOpacity=${catalogStyle?.opacity || "-"}`,
+      `catalogTransform=${catalogStyle?.transform || "-"}`,
       `payBg=${paymentBackdropStyle?.backgroundColor || "-"}`,
       `globalBg=${globalBackdrop.backgroundColor || "-"}`,
       `globalBlur=${globalBackdrop.backdropFilter || globalBackdrop.webkitBackdropFilter || "-"}`
     ];
 
     write(parts.join(" "));
+    return Boolean(payment);
   }
 
-  function sampleFrames(reason, total = 36) {
+  function sampleFrames(reason, total = 72) {
     const run = ++sampleRun;
     let frame = 0;
+    let sawPayment = false;
+    let removalFrame = null;
+    frozen = false;
+    logs.length = 0;
     snapshot(`START:${reason}`);
 
     function next() {
-      if (run !== sampleRun) return;
-      snapshot(`f${String(frame).padStart(2, "0")}`);
+      if (run !== sampleRun || frozen) return;
+
+      const hasPayment = snapshot(`f${String(frame).padStart(2, "0")}`);
+      if (hasPayment) sawPayment = true;
+      if (sawPayment && !hasPayment && removalFrame === null) {
+        removalFrame = frame;
+        write(`MARK:payment-removed@f${String(frame).padStart(2, "0")}`);
+      }
+
       frame += 1;
+
+      if (removalFrame !== null && frame > removalFrame + 10) {
+        write(`FROZEN:${reason}`);
+        frozen = true;
+        renderPanel();
+        return;
+      }
+
       if (frame < total) requestAnimationFrame(next);
       else write(`END:${reason}`);
     }
@@ -90,24 +120,29 @@ if (params.get("debug") === "transitions") {
   );
 
   const observer = new MutationObserver(mutations => {
+    if (frozen) return;
+
     let bodyChanged = false;
     let paymentChanged = false;
     let checkoutChanged = false;
+    let catalogChanged = false;
 
     for (const mutation of mutations) {
       if (mutation.target === document.body && mutation.attributeName === "class") bodyChanged = true;
       const element = mutation.target.nodeType === Node.ELEMENT_NODE ? mutation.target : null;
       if (element?.matches?.(".rp-payment, [data-region='payment']")) paymentChanged = true;
       if (element?.matches?.(".rp-checkout, [data-region='checkout']")) checkoutChanged = true;
+      if (element?.matches?.("[data-catalog-route], [data-region='products']")) catalogChanged = true;
       if (mutation.type === "childList") {
         if (element?.matches?.("[data-region='payment']")) paymentChanged = true;
         if (element?.matches?.("[data-region='checkout']")) checkoutChanged = true;
+        if (element?.matches?.("[data-region='products']")) catalogChanged = true;
       }
     }
 
-    if (bodyChanged || paymentChanged || checkoutChanged) {
+    if (bodyChanged || paymentChanged || checkoutChanged || catalogChanged) {
       snapshot(
-        `MUT:${bodyChanged ? "B" : "-"}${paymentChanged ? "P" : "-"}${checkoutChanged ? "C" : "-"}`
+        `MUT:${bodyChanged ? "B" : "-"}${paymentChanged ? "P" : "-"}${checkoutChanged ? "C" : "-"}${catalogChanged ? "G" : "-"}`
       );
     }
   });
@@ -116,13 +151,17 @@ if (params.get("debug") === "transitions") {
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ["class", "hidden", "aria-hidden"]
+    attributeFilter: ["class", "hidden", "aria-hidden", "style"]
   });
 
   window.__rpTransitionDebug = {
     logs,
     snapshot: () => snapshot("MANUAL"),
-    sampleFrames
+    sampleFrames,
+    unfreeze() {
+      frozen = false;
+      write("UNFROZEN", { force: true });
+    }
   };
 
   document.addEventListener("DOMContentLoaded", () => {
