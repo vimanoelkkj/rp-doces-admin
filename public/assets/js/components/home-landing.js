@@ -1,0 +1,89 @@
+export function renderHomeLanding() {
+  return `<section class="rp-home" id="topo" data-home-landing>
+    <header class="rp-home-header">
+      <button type="button" class="rp-home-header__brand" data-home-top>R&amp;P Doces</button>
+      <nav class="rp-home-header__nav" aria-label="Seções da página">
+        <button type="button" data-show-catalog>Cardápio</button>
+        <a href="#sobre">Sobre</a>
+        <a href="#onde-encontrar">Onde estamos</a>
+        <a href="#contato">Contato</a>
+      </nav>
+      <div class="rp-home-header__actions">
+        <button type="button" class="rp-home-header__menu" data-open-menu aria-label="Abrir menu"><span aria-hidden="true"></span></button>
+        <button type="button" class="rp-home-header__cart" data-open-cart aria-label="Abrir carrinho"><span class="rp-home-header__bag" aria-hidden="true"></span></button>
+      </div>
+    </header>
+
+    <div class="rp-home-hero">
+      <div class="rp-home-hero__body">
+        <div class="rp-home-hero__copy">
+          <span class="rp-home-hero__eyebrow">Dentro da Temponi Concept</span>
+          <h1 class="rp-home-hero__title"><span>Um docinho</span><span>enquanto você</span><em>se cuida</em></h1>
+          <p class="rp-home-hero__lede">Bolo no pote e mini pudim, feitos à mão. Escolha o sabor e a gente leva até a sua cadeira.</p>
+          <button type="button" class="rp-home-btn" data-show-catalog>Ver o cardápio →</button>
+        </div>
+        <div class="rp-home-media rp-home-media--hero" role="img" aria-label="Foto do bolo no pote de morango"><span>foto do produto<br>bolo no pote · morango</span></div>
+      </div>
+    </div>
+
+    <section class="rp-home-section rp-home-section--about" id="sobre">
+      <div class="rp-home-section__inner">
+        <div class="rp-home-section__copy">
+          <span class="rp-home-eyebrow">Nossa história</span>
+          <h2 class="rp-home-section__title">Uma nova doçura dentro do salão</h2>
+          <p class="rp-home-section__text">A R&amp;P Doces está começando sua história dentro da Temponi Concept, unindo o carinho que já faz parte do dia a dia do salão a uma nova paixão: os doces.</p>
+          <p class="rp-home-section__text">A ideia nasce para oferecer bolos no pote e mini pudins feitos com cuidado, trazendo um toque ainda mais doce para quem passa por aqui.</p>
+          <p class="rp-home-section__highlight">É o começo de uma nova história, feita para ser saboreada colherada por colherada.</p>
+          <ul class="rp-home-values">
+            <li><span aria-hidden="true"></span>Ingredientes selecionados e frescos</li>
+            <li><span aria-hidden="true"></span>Feito à mão, com todo o carinho</li>
+            <li><span aria-hidden="true"></span>Atendimento direto pelo WhatsApp</li>
+          </ul>
+        </div>
+        <div class="rp-home-media rp-home-media--about" role="img" aria-label="A R&amp;P Doces dentro da Temponi Concept"><span>foto ·<br>r&amp;p doces</span></div>
+      </div>
+    </section>
+
+    <section class="rp-home-section rp-home-section--tinted">
+      <div class="rp-home-section__inner rp-home-section__inner--stack">
+        <div class="rp-home-section__head"><span class="rp-home-eyebrow">Quem já provou</span><h2 class="rp-home-section__title">O que estão dizendo</h2></div>
+        <ul class="rp-home-testimonials">
+          <li><span class="rp-home-stars" aria-label="5 de 5 estrelas">★★★★★</span><blockquote>O sabor de Ninho com Nutella é surreal! Cada camada derrete na boca. Já virei cliente fiel.</blockquote><footer><span>J</span>Juliana R.</footer></li>
+          <li><span class="rp-home-stars" aria-label="5 de 5 estrelas">★★★★★</span><blockquote>Pedi pelo WhatsApp e foi super rápido combinar tudo. O Red Velvet ficou perfeito para o aniversário da minha filha.</blockquote><footer><span>M</span>Marcos T.</footer></li>
+          <li><span class="rp-home-stars" aria-label="5 de 5 estrelas">★★★★★</span><blockquote>Dá pra sentir o carinho em cada garfada. O Prestígio é meu favorito, recomendo demais!</blockquote><footer><span>C</span>Camila S.</footer></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="rp-home-section" id="onde-encontrar">
+      <div class="rp-home-section__inner rp-home-section__inner--stack">
+        <div class="rp-home-section__head"><span class="rp-home-eyebrow">Onde encontrar</span><h2 class="rp-home-section__title">R&amp;P Doces na Temponi Concept</h2></div>
+        <div class="rp-home-location">
+          <div><span>Horário de atendimento</span><b>Consulte nossos horários</b></div>
+          <p class="rp-home-section__text">Atendimento no salão. Encomendas para festa combinadas com antecedência.</p>
+          <button type="button" class="rp-home-btn" data-show-catalog>Ver o cardápio →</button>
+        </div>
+        <p class="rp-home-location__partner">Produto em conjunto com <a href="https://temponiconcept.com.br/" target="_blank" rel="noopener noreferrer">Temponi Concept</a></p>
+      </div>
+    </section>
+
+    <section class="rp-home-section rp-home-section--tinted" id="contato">
+      <div class="rp-home-section__inner rp-home-section__inner--stack">
+        <div class="rp-home-contact">
+          <span class="rp-home-eyebrow">Fale com a gente</span>
+          <h2 class="rp-home-section__title">Ficou com vontade de experimentar?</h2>
+          <p class="rp-home-section__text">Manda um oi no WhatsApp e vamos combinar o seu docinho dos sonhos — bolo no pote ou mini pudim.</p>
+          <a href="https://wa.me/5533991285907" class="rp-home-btn" target="_blank" rel="noopener noreferrer">Chamar no WhatsApp</a>
+        </div>
+      </div>
+    </section>
+
+    <footer class="rp-home-footer">
+      <div class="rp-home-footer__inner">
+        <div><b class="rp-home-footer__name">R&amp;P Doces</b><p>Bolo no pote e mini pudim artesanais, feitos com amor em cada colherada.</p></div>
+        <nav aria-label="Navegação"><span class="rp-home-eyebrow">Navegação</span><ul><li><a href="#topo">Início</a></li><li><button type="button" data-show-catalog>Cardápio</button></li><li><a href="#sobre">Sobre</a></li><li><a href="#contato">Contato</a></li></ul></nav>
+        <div><span class="rp-home-eyebrow">Contato</span><ul><li><a href="https://wa.me/5533991285907" target="_blank" rel="noopener noreferrer">WhatsApp (33) 99128-5907</a></li><li><a href="https://instagram.com/r.e.p" target="_blank" rel="noopener noreferrer">Instagram @r.e.p</a></li></ul></div>
+      </div>
+    </footer>
+  </section>`;
+}
