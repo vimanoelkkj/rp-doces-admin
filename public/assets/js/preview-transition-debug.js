@@ -4,6 +4,7 @@ if (params.get("debug") === "transitions") {
   const logs = [];
   let sampleRun = 0;
   let frozen = false;
+  let userScrolled = false;
 
   const panel = document.createElement("aside");
   panel.setAttribute("data-transition-debug", "");
@@ -14,14 +15,18 @@ if (params.get("debug") === "transitions") {
     "left:8px",
     "right:8px",
     "max-height:54dvh",
-    "overflow:auto",
+    "overflow-y:auto",
+    "overflow-x:hidden",
+    "overscroll-behavior:contain",
+    "touch-action:pan-y",
+    "-webkit-overflow-scrolling:touch",
     "padding:9px 10px",
     "border-radius:10px",
     "background:rgb(20 16 16 / 90%)",
     "color:#fff",
     "font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace",
     "white-space:pre-wrap",
-    "pointer-events:none",
+    "pointer-events:auto",
     "box-shadow:0 6px 24px rgb(0 0 0 / 28%)"
   ].join(";");
 
@@ -30,9 +35,30 @@ if (params.get("debug") === "transitions") {
   }
 
   function renderPanel() {
-    panel.textContent = logs.slice(-32).join("\n");
-    panel.scrollTop = panel.scrollHeight;
+    panel.textContent = logs.join("\n");
+    if (!userScrolled) panel.scrollTop = panel.scrollHeight;
   }
+
+  panel.addEventListener(
+    "touchstart",
+    () => {
+      userScrolled = true;
+    },
+    { passive: true }
+  );
+
+  panel.addEventListener(
+    "wheel",
+    () => {
+      userScrolled = true;
+    },
+    { passive: true }
+  );
+
+  panel.addEventListener("scroll", () => {
+    const distanceFromBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight;
+    if (distanceFromBottom < 8) userScrolled = false;
+  });
 
   function write(message, { force = false } = {}) {
     if (frozen && !force) return;
@@ -79,6 +105,7 @@ if (params.get("debug") === "transitions") {
     let sawPayment = false;
     let removalFrame = null;
     frozen = false;
+    userScrolled = false;
     logs.length = 0;
     snapshot(`START:${reason}`);
 
@@ -160,6 +187,7 @@ if (params.get("debug") === "transitions") {
     sampleFrames,
     unfreeze() {
       frozen = false;
+      userScrolled = false;
       write("UNFROZEN", { force: true });
     }
   };
