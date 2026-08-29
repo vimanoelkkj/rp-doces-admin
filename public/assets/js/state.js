@@ -4,6 +4,7 @@ export const state = {
   products: [],
   cart: new Map(),
   checkout: { name: "", email: "", whatsapp: "", note: "", paymentMethod: "PIX" },
+  order: { phase: "idle", token: null, data: null, pix: null, error: null },
   ui: { cartOpen: false, checkoutOpen: false }
 };
 
@@ -31,6 +32,16 @@ export function setCheckoutOpen(open) {
 export function updateCheckout(field, value) {
   if (!(field in state.checkout)) return;
   state.checkout[field] = value;
+}
+
+export function setOrderState(patch) {
+  state.order = { ...state.order, ...patch };
+  notify();
+}
+
+export function resetOrderState() {
+  state.order = { phase: "idle", token: null, data: null, pix: null, error: null };
+  notify();
 }
 
 export function getCartQuantity(productId) {
