@@ -134,16 +134,23 @@
 .rp-hero__media-label {
   position: absolute;
   z-index: 1;
-  left: 20px;
-  right: 20px;
+  left: 50%;
   bottom: 18px;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  transform: translateX(-50%);
+  border: 1px solid rgb(241 221 213 / 75%);
+  border-radius: var(--rp-radius-pill);
+  padding: 7px 11px;
+  background: rgb(255 255 255 / 78%);
   color: var(--rp-color-muted);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.45;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.3;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
+  backdrop-filter: blur(8px);
 }
 @media (min-width: 820px) {
   .rp-hero {
