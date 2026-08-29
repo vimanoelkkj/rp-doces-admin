@@ -2,6 +2,7 @@ import { productId } from "./utils/product-id.js";
 import { clampQuantity, isProductAvailable } from "./utils/stock.js";
 import { summarizeCartItems } from "./utils/cart-summary.js";
 import { checkoutIsValid } from "./utils/checkout-validity.js";
+import { loadStoredCart, saveStoredCart } from "./utils/cart-storage.js";
 
 const listeners = new Set();
 let notifyEpoch = 0;
@@ -28,7 +29,7 @@ const initialOrder = () => ({
 export const state = {
   products: [],
   productsStatus: "loading",
-  cart: new Map(),
+  cart: loadStoredCart(),
   checkout: { name: "", whatsapp: "", note: "", paymentMethod: "PIX" },
   order: initialOrder(),
   ui: initialUi()
@@ -53,6 +54,9 @@ function syncCheckoutSubmitAvailability() {
   if (ready) submit.removeAttribute("aria-disabled");
   else submit.setAttribute("aria-disabled", "true");
 }
+function syncStoredCart() {
+  saveStoredCart(state.cart);
+}
 function notifyUnlessSuperseded(epoch) {
   queueMicrotask(() => {
     if (notifyEpoch === epoch) notify();
@@ -63,7 +67,10 @@ function seedPreviewCartForRetry() {
   const product = state.products.find(isProductAvailable);
   if (!product) return;
   const quantity = clampQuantity(product, 1);
-  if (quantity > 0) state.cart.set(productId(product), quantity);
+  if (quantity > 0) {
+    state.cart.set(productId(product), quantity);
+    syncStoredCart();
+  }
 }
 export function resetTransientState() {
   state.ui = initialUi();
@@ -145,6 +152,7 @@ export function setCartQuantity(id, quantity, { additionFeedback = false } = {})
   state.ui.cartAdditionFeedback = Boolean(additionFeedback && next > current);
   if (next <= 0) state.cart.delete(key);
   else state.cart.set(key, next);
+  syncStoredCart();
   if (state.cart.size === 0) {
     state.ui.cartOpen = false;
     state.ui.checkoutOpen = false;
@@ -154,6 +162,10 @@ export function setCartQuantity(id, quantity, { additionFeedback = false } = {})
 export function changeCartQuantity(id, delta) {
   const amount = Number(delta || 0);
   setCartQuantity(id, getCartQuantity(id) + amount, { additionFeedback: amount > 0 });
+}
+export function clearCart() {
+  state.cart.clear();
+  syncStoredCart();
 }
 export function syncCartWithProducts() {
   for (const [id, quantity] of state.cart.entries()) {
@@ -166,6 +178,7 @@ export function syncCartWithProducts() {
     if (capped <= 0) state.cart.delete(id);
     else state.cart.set(id, capped);
   }
+  syncStoredCart();
   if (state.cart.size === 0) {
     state.ui.cartOpen = false;
     state.ui.checkoutOpen = false;
