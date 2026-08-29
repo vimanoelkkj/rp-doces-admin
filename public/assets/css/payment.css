@@ -268,6 +268,36 @@
     transform: translateY(0);
   }
 }
+@keyframes rp-payment-card-declined-icon {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.78);
+  }
+  52% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06);
+  }
+  70% {
+    transform: translateX(-3px) rotate(-2deg) scale(1);
+  }
+  84% {
+    transform: translateX(3px) rotate(2deg) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) rotate(0deg) scale(1);
+  }
+}
+@keyframes rp-payment-card-declined-content {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .rp-payment__state-icon--success {
     animation: rp-payment-success-pop 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
@@ -335,6 +365,27 @@
   }
   .rp-payment__state-icon--muted ~ .rp-btn {
     animation-delay: 200ms;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure {
+    animation: rp-payment-card-declined-icon 470ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ .rp-kicker,
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ h2,
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ p,
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ .rp-btn {
+    animation: rp-payment-card-declined-content 310ms ease both;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ .rp-kicker {
+    animation-delay: 105ms;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ h2 {
+    animation-delay: 150ms;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ p {
+    animation-delay: 195ms;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ .rp-btn {
+    animation-delay: 240ms;
   }
 }
 @media (prefers-reduced-motion: reduce) {
