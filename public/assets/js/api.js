@@ -1,3 +1,5 @@
+import { API_PATHS, orderPath } from "./utils/api-path.js";
+
 async function request(path, options = {}) {
   const response = await fetch(path, {
     headers: { Accept: "application/json", ...(options.headers || {}) },
@@ -24,7 +26,7 @@ function postJson(path, body) {
 
 export const api = {
   getConfig: () => request("/api/config", { cache: "no-store" }),
-  getProducts: () => request("/api/products", { cache: "no-store" }),
-  createPixCheckout: payload => postJson("/api/checkout/pix", payload),
-  getOrder: token => request(`/api/orders/${encodeURIComponent(token)}`, { cache: "no-store" })
+  getProducts: () => request(API_PATHS.products, { cache: "no-store" }),
+  createPixCheckout: payload => postJson(API_PATHS.checkoutPix, payload),
+  getOrder: token => request(orderPath(token), { cache: "no-store" })
 };
