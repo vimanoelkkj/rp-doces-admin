@@ -15,7 +15,7 @@ export const state = {
   products: [],
   productsStatus: "loading",
   cart: new Map(),
-  checkout: { name: "", email: "", whatsapp: "", note: "", paymentMethod: "PIX" },
+  checkout: { name: "", whatsapp: "", note: "", paymentMethod: "PIX" },
   order: initialOrder(),
   ui: initialUi()
 };
