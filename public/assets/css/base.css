@@ -36,14 +36,36 @@ body.rp-cart-open [data-payment-status] {
 .rp-payment__backdrop,
 .rp-mobile-menu__backdrop,
 .rp-party__backdrop {
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.rp-cart-overlay__backdrop,
+.rp-payment__backdrop,
+.rp-mobile-menu__backdrop,
+.rp-party__backdrop {
+  will-change: opacity, backdrop-filter;
+  transform: translateZ(0);
+}
+.rp-payment {
+  opacity: 1;
 }
 .rp-party__back,
 .rp-party__close {
   background: transparent !important;
 }
 @media (prefers-reduced-motion: no-preference) {
+  .rp-payment {
+    animation: none !important;
+  }
+  .rp-cart-overlay.is-checkout-handoff .rp-cart-overlay__backdrop,
+  .rp-checkout.is-payment-handoff,
+  .rp-payment.is-checkout-return .rp-payment__backdrop {
+    opacity: 1 !important;
+  }
+  .rp-cart-overlay.is-checkout-handoff .rp-cart-overlay__backdrop,
+  .rp-payment.is-checkout-return .rp-payment__backdrop {
+    animation: none !important;
+  }
   .rp-cart-overlay.is-closing,
   .rp-checkout.is-closing,
   .rp-payment.is-closing,
@@ -61,9 +83,6 @@ body.rp-cart-open [data-payment-status] {
   }
   .rp-payment.is-checkout-return {
     pointer-events: none;
-  }
-  .rp-payment.is-checkout-return .rp-payment__backdrop {
-    animation: rp-payment-checkout-backdrop-out 200ms ease both !important;
   }
   .rp-payment.is-checkout-return .rp-payment__sheet {
     transform-origin: center bottom;
@@ -108,14 +127,6 @@ body.rp-cart-open [data-payment-status] {
     to {
       opacity: 0;
       transform: translateY(18px) scale(0.992);
-    }
-  }
-  @keyframes rp-payment-checkout-backdrop-out {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0.58;
     }
   }
 }
