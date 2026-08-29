@@ -54,3 +54,13 @@
 .rp-product-card:hover .rp-product-card__emoji {
   transform: translateY(-3px) scale(1.035);
 }
+.rp-product-card__add,
+.rp-product-card__stepper button {
+  transition:
+    transform var(--rp-duration-fast) ease,
+    filter var(--rp-duration-fast) ease;
+}
+.rp-product-card__add:active,
+.rp-product-card__stepper button:active {
+  transform: scale(0.93);
+}
