@@ -64,14 +64,14 @@
   min-height: 210px;
   display: grid;
   place-items: center;
-  background: repeating-linear-gradient(135deg, #fff0f4 0 10px, #ffe7ef 10px 20px);
+  background:
+    radial-gradient(circle at 50% 45%, #fff 0 18%, transparent 19%),
+    linear-gradient(145deg, #fff4f7, #fde7ee);
 }
-.rp-product-card__media-copy {
-  color: var(--rp-color-muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.rp-product-card__emoji {
+  font-size: clamp(58px, 15vw, 84px);
+  filter: drop-shadow(0 14px 18px rgba(74, 45, 36, 0.12));
+  transform: translateY(3px);
 }
 .rp-product-card__badge {
   position: absolute;
