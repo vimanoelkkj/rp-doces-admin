@@ -82,3 +82,11 @@
 .rp-cart-total strong {
   letter-spacing: -0.03em;
 }
+.rp-checkout__form input:not([type="radio"]):hover,
+.rp-checkout__form textarea:hover {
+  border-color: #e8cbc0;
+}
+.rp-checkout__form input:not([type="radio"])::placeholder,
+.rp-checkout__form textarea::placeholder {
+  color: #bba59e;
+}
