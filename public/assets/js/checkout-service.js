@@ -10,12 +10,21 @@ function cartSignature(items = []) {
     .join("|");
 }
 
+function fallbackRequestId() {
+  const random = Math.random().toString(36).slice(2);
+  return `rp_${Date.now().toString(36)}_${random}`.slice(0, 64);
+}
+
+function newRequestId() {
+  return globalThis.crypto?.randomUUID?.() || fallbackRequestId();
+}
+
 function requestId(items) {
   const signature = cartSignature(items);
   let id = sessionStorage.getItem(REQUEST_KEY);
   const previousSignature = sessionStorage.getItem(CART_KEY);
   if (!id || previousSignature !== signature) {
-    id = crypto.randomUUID();
+    id = newRequestId();
     sessionStorage.setItem(REQUEST_KEY, id);
     sessionStorage.setItem(CART_KEY, signature);
   }
