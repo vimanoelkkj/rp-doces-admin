@@ -90,3 +90,9 @@
 .rp-checkout__form textarea::placeholder {
   color: #bba59e;
 }
+.rp-payment-option:has(input:checked) {
+  box-shadow: inset 0 0 0 1px rgb(255 107 157 / 16%);
+}
+.rp-payment-option[aria-disabled="true"] {
+  opacity: 0.52;
+}
