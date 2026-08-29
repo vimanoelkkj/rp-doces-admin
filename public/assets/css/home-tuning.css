@@ -24,15 +24,23 @@
 .rp-home-map__logo {
   position: relative;
   z-index: 1;
-  display: block;
+  display: flex;
   width: min(78%, 240px);
+  height: 128px;
   margin: 2px auto 4px;
+  align-items: center;
+  justify-content: center;
   text-decoration: none;
+  overflow: visible;
 }
 .rp-home-map__logo img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 .rp-home-map__place {
   position: relative;
@@ -58,6 +66,7 @@
   }
   .rp-home-map__logo {
     width: min(72%, 250px);
+    height: 150px;
   }
   .rp-home-map__partner {
     font-size: 13px;
