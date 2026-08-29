@@ -29,6 +29,7 @@ body.rp-cart-open::before {
   z-index: 70;
   inset: 0;
   pointer-events: none;
+  background: rgb(59 34 32 / 36%);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   transform: translateZ(0);
@@ -48,6 +49,13 @@ body.rp-cart-open [data-payment-status] {
 .rp-party__backdrop {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+body.rp-cart-open .rp-cart-overlay__backdrop,
+body.rp-cart-open .rp-checkout,
+body.rp-cart-open .rp-payment__backdrop,
+body.rp-cart-open .rp-mobile-menu__backdrop,
+body.rp-cart-open .rp-party__backdrop {
+  background: transparent;
 }
 .rp-payment {
   opacity: 1;
