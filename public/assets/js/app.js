@@ -30,6 +30,7 @@ import { createPixOrder, resetCheckoutRequestId } from "./checkout-service.js";
 import { startOrderPolling, stopOrderPolling } from "./payment-controller.js";
 import { paymentCreationAllowed, paymentDisabledMessage } from "./runtime-policy.js";
 import { checkoutIsValid } from "./utils/checkout-validity.js";
+import { isPixPayment } from "./utils/payment-method.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -69,7 +70,7 @@ async function submitCheckout() {
     setCheckoutOpen(false);
     return;
   }
-  if (state.checkout.paymentMethod !== "PIX") {
+  if (!isPixPayment(state.checkout.paymentMethod)) {
     setOrderState({
       phase: "error",
       error: "Pagamento com cartão ainda não está disponível nesta versão."
