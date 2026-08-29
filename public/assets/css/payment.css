@@ -45,10 +45,10 @@
   height: 30px;
   overflow: visible;
 }
-.rp-payment__waiting-clock {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: rp-waiting-clock 1.8s ease-in-out infinite;
+.rp-payment__waiting-clock-hand {
+  transform-box: view-box;
+  transform-origin: 28.3px 24.3px;
+  animation: rp-waiting-clock-hand 1.6s linear infinite;
 }
 .rp-payment__total {
   display: block;
@@ -92,20 +92,16 @@
 .rp-payment__sheet .rp-btn + .rp-btn {
   margin-top: 9px;
 }
-@keyframes rp-waiting-clock {
-  0%,
-  100% {
+@keyframes rp-waiting-clock-hand {
+  from {
     transform: rotate(0deg);
   }
-  35% {
-    transform: rotate(12deg);
-  }
-  70% {
-    transform: rotate(-8deg);
+  to {
+    transform: rotate(360deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rp-payment__waiting-clock {
+  .rp-payment__waiting-clock-hand {
     animation: none;
   }
 }
