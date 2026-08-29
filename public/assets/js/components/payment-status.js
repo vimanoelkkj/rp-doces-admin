@@ -43,8 +43,8 @@ export function renderPaymentStatus(order = {}) {
       icon: successIcon,
       kicker: "Pagamento confirmado",
       title: "Pedido confirmado",
-      body: "Recebemos seu pagamento. Seu pedido já está confirmado.",
-      content: `${reference ? `<div class="rp-payment__reference"><span>Pedido</span><strong>${escapeHtml(reference)}</strong></div>` : ""}<button class="rp-btn rp-btn--primary" type="button" data-finish-order>Voltar ao cardápio</button>`
+      body: "Recebemos seu pagamento. Agora vamos separar seu pedido.",
+      content: `${reference ? `<div class="rp-payment__reference"><span>Pedido</span><strong>${escapeHtml(reference)}</strong></div>` : ""}<div class="rp-payment__next-step"><span>Próxima etapa</span><strong>Preparando seu pedido</strong><small>Quando estiver pronto, nossa equipe dará continuidade ao atendimento.</small></div><button class="rp-btn rp-btn--primary" type="button" data-finish-order>Voltar ao cardápio</button>`
     });
   else if (demoState === "card-declined")
     body = stateShell({
