@@ -418,6 +418,7 @@ function finishOrder() {
     ?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
 }
 function closeTopOverlay() {
+  if (state.order.cancelPending) return;
   if (state.order.phase !== "idle") return returnToCheckout();
   if (state.ui.checkoutOpen) return setCheckoutOpen(false);
   if (state.ui.cartOpen) return setCartOpen(false);
@@ -429,6 +430,11 @@ function bindStorefrontEvents() {
   if (!root || root.dataset.eventsBound === "true") return;
   root.dataset.eventsBound = "true";
   root.addEventListener("click", async event => {
+    if (state.order.cancelPending) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const homeSectionButton = event.target.closest("[data-home-section]");
     if (homeSectionButton) return showHomeSection(homeSectionButton.dataset.homeSection);
     if (event.target.closest("[data-show-catalog]")) return showCatalog();
@@ -536,6 +542,7 @@ function bindStorefrontEvents() {
   document.addEventListener("keydown", event => {
     if (isEscapeKey(event) && hasOpenOverlay(state)) {
       event.preventDefault();
+      if (state.order.cancelPending) return;
       closeTopOverlay();
     }
   });
