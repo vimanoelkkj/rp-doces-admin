@@ -3,16 +3,27 @@ import { clampQuantity, isProductAvailable } from "./utils/stock.js";
 import { summarizeCartItems } from "./utils/cart-summary.js";
 
 const listeners = new Set();
+const initialUi = () => ({
+  cartOpen: false,
+  checkoutOpen: false,
+  menuOpen: false,
+  partyOpen: false
+});
+const initialOrder = () => ({ phase: "idle", token: null, data: null, pix: null, error: null });
 
 export const state = {
   products: [],
   productsStatus: "loading",
   cart: new Map(),
   checkout: { name: "", email: "", whatsapp: "", note: "", paymentMethod: "PIX" },
-  order: { phase: "idle", token: null, data: null, pix: null, error: null },
-  ui: { cartOpen: false, checkoutOpen: false, menuOpen: false, partyOpen: false }
+  order: initialOrder(),
+  ui: initialUi()
 };
-
+export function resetTransientState() {
+  state.ui = initialUi();
+  state.order = initialOrder();
+  state.productsStatus = "loading";
+}
 export function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -67,7 +78,7 @@ export function setOrderState(patch) {
   notify();
 }
 export function resetOrderState() {
-  state.order = { phase: "idle", token: null, data: null, pix: null, error: null };
+  state.order = initialOrder();
   notify();
 }
 export function getCartQuantity(id) {
