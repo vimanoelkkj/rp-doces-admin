@@ -88,6 +88,29 @@ function renderStorefront() {
   setPageScrollLocked(hasOpenOverlay(state));
 }
 
+function applyPreviewDemo() {
+  const mode = new URLSearchParams(location.search).get("demo");
+  const previewDisabled =
+    document.querySelector('meta[name="rp-payment-mode"]')?.content === "disabled";
+  if (!previewDisabled || mode !== "pix-pending") return false;
+  const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  state.order = {
+    phase: "pending",
+    token: "demo-pix-pending",
+    data: {
+      referencia: "DEMO-PIX",
+      valor_total_centavos: 3100,
+      status: "PENDENTE",
+      pix_expira_em: expires
+    },
+    pix: {
+      qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation"
+    },
+    error: null
+  };
+  return true;
+}
+
 async function loadProducts() {
   state.productsStatus = "loading";
   notify();
@@ -220,6 +243,7 @@ export async function bootstrapStorefront() {
   subscribe(renderStorefront);
   bindStorefrontEvents();
   resetTransientState();
+  applyPreviewDemo();
   renderStorefront();
   await loadProducts();
 }
