@@ -31,6 +31,12 @@ a {
 button {
   cursor: pointer;
 }
+p {
+  letter-spacing: 0.002em;
+}
+strong {
+  font-weight: 900;
+}
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -40,4 +46,17 @@ textarea:focus-visible {
 }
 ::selection {
   background: rgb(255 107 157 / 24%);
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
