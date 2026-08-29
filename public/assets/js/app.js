@@ -49,6 +49,10 @@ let catalogCategory = "ALL";
 let pixCopiedTimer = null;
 let previewPaymentTimers = [];
 
+function clearPixCopiedTimer() {
+  if (pixCopiedTimer) clearTimeout(pixCopiedTimer);
+  pixCopiedTimer = null;
+}
 function clearPreviewPaymentTimers() {
   previewPaymentTimers.forEach(timer => clearTimeout(timer));
   previewPaymentTimers = [];
@@ -386,7 +390,7 @@ async function cancelCurrentOrder() {
           return;
         }
       } catch {
-        // Mantém a mensagem original do cancelamento quando a reconciliação falhar.
+        // Mantém a mensagem original do cancelamento quando a reconciliação também falhar.
       }
     }
 
@@ -398,6 +402,7 @@ async function cancelCurrentOrder() {
   }
 }
 function returnToCheckout({ resetRequest = false } = {}) {
+  clearPixCopiedTimer();
   clearPreviewPaymentTimers();
   stopOrderPolling();
   if (resetRequest) resetCheckoutRequestId();
@@ -405,6 +410,7 @@ function returnToCheckout({ resetRequest = false } = {}) {
   setCheckoutOpen(true);
 }
 function finishOrder() {
+  clearPixCopiedTimer();
   clearPreviewPaymentTimers();
   stopOrderPolling();
   resetCheckoutRequestId();
@@ -504,26 +510,26 @@ function bindStorefrontEvents() {
     if (event.target.closest("[data-retry-payment]"))
       return returnToCheckout({ resetRequest: true });
     if (event.target.closest("[data-copy-pix]")) {
-      const copied = await copyText(state.order.pix?.qr_code);
       const button = event.target.closest("[data-copy-pix]");
-      if (copied && button) {
-        let message = button.parentElement?.querySelector(".rp-payment__copied");
-        if (!message) {
-          message = document.createElement("div");
-          message.className = "rp-payment__copied";
-          message.setAttribute("role", "status");
-          button.insertAdjacentElement("afterend", message);
-        }
-        message.textContent = "✓ Código Pix copiado. Agora é só colar no app do seu banco.";
-        message.style.animation = "none";
-        void message.offsetWidth;
-        message.style.animation = "";
-        if (pixCopiedTimer) clearTimeout(pixCopiedTimer);
-        pixCopiedTimer = setTimeout(() => {
-          if (message?.isConnected) message.remove();
-          pixCopiedTimer = null;
-        }, 1800);
+      const qrCode = state.order.pix?.qr_code;
+      const copied = await copyText(qrCode);
+      if (!copied || !button?.isConnected) return;
+      let message = button.parentElement?.querySelector(".rp-payment__copied");
+      if (!message) {
+        message = document.createElement("div");
+        message.className = "rp-payment__copied";
+        message.setAttribute("role", "status");
+        button.insertAdjacentElement("afterend", message);
       }
+      message.textContent = "✓ Código Pix copiado. Agora é só colar no app do seu banco.";
+      message.style.animation = "none";
+      void message.offsetWidth;
+      message.style.animation = "";
+      clearPixCopiedTimer();
+      pixCopiedTimer = setTimeout(() => {
+        if (message?.isConnected) message.remove();
+        pixCopiedTimer = null;
+      }, 1800);
     }
   });
   root.addEventListener("submit", event => {
