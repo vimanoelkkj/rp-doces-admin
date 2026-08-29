@@ -246,18 +246,23 @@
 .rp-cart-bar__info {
   flex: 1;
   min-width: 0;
-  display: block;
+  display: grid;
+  gap: 2px;
 }
 .rp-cart-bar__count {
+  display: block;
   color: var(--rp-color-muted);
   font-size: 10.5px;
+  line-height: 1.15;
 }
 .rp-cart-bar__total {
+  display: block;
   margin-top: 0;
   color: var(--rp-color-text);
   font-family: "Bricolage Grotesque", sans-serif;
   font-size: 17px;
   font-weight: 700;
+  line-height: 1.05;
   letter-spacing: -0.01em;
 }
 .rp-cart-bar__cta {
