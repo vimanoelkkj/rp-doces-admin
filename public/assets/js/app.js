@@ -123,6 +123,7 @@ function applyPreviewDemo() {
     document.querySelector('meta[name="rp-payment-mode"]')?.content === "disabled";
   const demos = [
     "pix-pending",
+    "pix-pending-to-paid",
     "card-pending",
     "payment-confirmed",
     "payment-error",
@@ -216,6 +217,35 @@ function applyPreviewDemo() {
     error: null,
     demoState: mode === "pix-copied" ? "pix-copied" : ""
   };
+  if (mode === "pix-pending-to-paid") {
+    setTimeout(() => {
+      const paidData = {
+        ...state.order.data,
+        referencia: "RP-DEMO-2408",
+        status: "PAGO"
+      };
+      setOrderState({
+        phase: "confirming-paid",
+        paymentMethod: "PIX",
+        token: "demo-pix-pending-to-paid",
+        data: paidData,
+        error: null,
+        demoState: ""
+      });
+      setTimeout(() => {
+        if (state.order.phase !== "confirming-paid") return;
+        setOrderState({
+          phase: "paid",
+          paymentMethod: "PIX",
+          token: "demo-pix-pending-to-paid",
+          data: paidData,
+          pix: null,
+          error: null,
+          demoState: ""
+        });
+      }, 220);
+    }, 2400);
+  }
   return true;
 }
 async function loadProducts() {
