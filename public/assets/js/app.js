@@ -45,6 +45,7 @@ import { catalogProducts } from "./utils/catalog-response.js";
 
 const regionMarkup = new Map();
 let storefrontRoute = "home";
+let renderedRoute = null;
 let catalogCategory = "ALL";
 let pixCopiedTimer = null;
 let previewPaymentTimers = [];
@@ -79,12 +80,12 @@ function updateRegion(name, markup) {
   regionMarkup.set(name, markup);
 }
 function ensureRouteMarkup() {
+  if (renderedRoute === storefrontRoute) return;
   const markup = storefrontRoute === "home" ? renderHomeLanding() : catalogMarkup();
   updateRegion("route", markup);
-  if (storefrontRoute === "catalog") {
-    regionMarkup.delete("header");
-    regionMarkup.delete("products");
-  }
+  renderedRoute = storefrontRoute;
+  regionMarkup.delete("header");
+  regionMarkup.delete("products");
 }
 function renderStorefront() {
   mountStorefront();
