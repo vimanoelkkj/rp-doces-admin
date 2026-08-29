@@ -5,3 +5,6 @@ export const API_PATHS = Object.freeze({
 export function orderPath(token) {
   return `/api/orders/${encodeURIComponent(String(token || ""))}`;
 }
+export function orderCancelPath(token) {
+  return `${orderPath(token)}/cancel`;
+}
