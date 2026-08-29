@@ -2,7 +2,6 @@ import { api } from "./api.js";
 import { newIdempotencyId, validIdempotencyId } from "./utils/idempotency.js";
 import { sessionGet, sessionSet, sessionRemove } from "./utils/session.js";
 import { normalizeCustomerName } from "./utils/customer-name.js";
-import { normalizeCustomerEmail } from "./utils/customer-email.js";
 import { normalizeCustomerWhatsapp } from "./utils/customer-whatsapp.js";
 import { normalizeOrderNote } from "./utils/order-note.js";
 import { checkoutLineItems } from "./utils/checkout-payload.js";
@@ -26,15 +25,21 @@ function requestId(items) {
   }
   return id;
 }
+function internalPayerEmail(id) {
+  return `checkout+${String(id)
+    .replace(/[^a-z0-9_-]/gi, "")
+    .slice(0, 48)}@example.com`;
+}
 export function resetCheckoutRequestId() {
   sessionRemove(REQUEST_KEY);
   sessionRemove(CART_KEY);
 }
 export function buildCheckoutPayload({ checkout, items }) {
+  const id = requestId(items);
   return {
-    client_request_id: requestId(items),
+    client_request_id: id,
     nome: normalizeCustomerName(checkout?.name),
-    email: normalizeCustomerEmail(checkout?.email),
+    email: internalPayerEmail(id),
     whatsapp: normalizeCustomerWhatsapp(checkout?.whatsapp),
     observacao: normalizeOrderNote(checkout?.note),
     itens: checkoutLineItems(items)
