@@ -47,7 +47,17 @@ const regionMarkup = new Map();
 let storefrontRoute = "home";
 let catalogCategory = "ALL";
 let pixCopiedTimer = null;
+let previewPaymentTimers = [];
 
+function clearPreviewPaymentTimers() {
+  previewPaymentTimers.forEach(timer => clearTimeout(timer));
+  previewPaymentTimers = [];
+}
+function schedulePreviewPaymentTimer(callback, delay) {
+  const timer = setTimeout(callback, delay);
+  previewPaymentTimers.push(timer);
+  return timer;
+}
 function catalogMarkup() {
   return `<section data-catalog-route><div data-region="header"></div><div data-region="products"></div>${renderSiteFooter()}</section>`;
 }
@@ -135,6 +145,7 @@ function applyPreviewDemo() {
     "pix-copied"
   ];
   if (!previewDisabled || !demos.includes(mode)) return false;
+  clearPreviewPaymentTimers();
   storefrontRoute = "catalog";
   const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   if (mode === "payment-confirmed") {
@@ -219,7 +230,8 @@ function applyPreviewDemo() {
     demoState: mode === "pix-copied" ? "pix-copied" : ""
   };
   if (mode === "pix-pending-to-paid") {
-    setTimeout(() => {
+    schedulePreviewPaymentTimer(() => {
+      if (state.order.token !== "demo-pix-pending") return;
       const paidData = {
         ...state.order.data,
         referencia: "RP-DEMO-2408",
@@ -233,8 +245,12 @@ function applyPreviewDemo() {
         error: null,
         demoState: ""
       });
-      setTimeout(() => {
-        if (state.order.phase !== "confirming-paid") return;
+      schedulePreviewPaymentTimer(() => {
+        if (
+          state.order.phase !== "confirming-paid" ||
+          state.order.token !== "demo-pix-pending-to-paid"
+        )
+          return;
         setOrderState({
           phase: "paid",
           paymentMethod: "PIX",
@@ -304,12 +320,14 @@ async function submitCheckout() {
   }
 }
 function returnToCheckout({ resetRequest = false } = {}) {
+  clearPreviewPaymentTimers();
   stopOrderPolling();
   if (resetRequest) resetCheckoutRequestId();
   resetOrderState();
   setCheckoutOpen(true);
 }
 function finishOrder() {
+  clearPreviewPaymentTimers();
   stopOrderPolling();
   resetCheckoutRequestId();
   resetOrderState();
