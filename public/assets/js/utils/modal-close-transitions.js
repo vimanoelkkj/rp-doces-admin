@@ -1,5 +1,6 @@
 const CLOSE_TRANSITION_MS = 220;
 const CHECKOUT_HANDOFF_MS = 200;
+const PAYMENT_HANDOFF_MS = 190;
 
 const CLOSE_BINDINGS = [
   ["[data-close-payment]", ".rp-payment"],
@@ -31,6 +32,16 @@ function replayClick(trigger) {
   trigger.dispatchEvent(replay);
 }
 
+function replaySubmit(form) {
+  const replay = new SubmitEvent("submit", {
+    bubbles: true,
+    cancelable: true,
+    submitter: form.querySelector("[data-submit-checkout]") || undefined
+  });
+  Object.defineProperty(replay, "rpSkipPaymentTransition", { value: true });
+  form.dispatchEvent(replay);
+}
+
 function replayEscape() {
   const replay = new KeyboardEvent("keydown", {
     key: "Escape",
@@ -57,6 +68,11 @@ function handoffCartToCheckout(trigger) {
   finishAfterAnimation(root, "is-checkout-handoff", () => replayClick(trigger), CHECKOUT_HANDOFF_MS);
 }
 
+function handoffCheckoutToPayment(form) {
+  const root = form.closest(".rp-checkout") || document.querySelector(".rp-checkout:not([hidden])");
+  finishAfterAnimation(root, "is-payment-handoff", () => replaySubmit(form), PAYMENT_HANDOFF_MS);
+}
+
 document.addEventListener(
   "click",
   event => {
@@ -81,6 +97,20 @@ document.addEventListener(
       closeAfterAnimation(root, () => replayClick(trigger));
       return;
     }
+  },
+  true
+);
+
+document.addEventListener(
+  "submit",
+  event => {
+    if (event.rpSkipPaymentTransition) return;
+    const form = event.target.closest?.("[data-checkout-form]");
+    if (!form) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    handoffCheckoutToPayment(form);
   },
   true
 );
