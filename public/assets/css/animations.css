@@ -17,40 +17,6 @@
   .rp-shell:not([data-mounted="true"]) .rp-product-card:nth-child(3) {
     animation-delay: 100ms;
   }
-  .rp-payment__sheet--state .rp-payment__state {
-    animation: rp-payment-state-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .rp-payment__state-icon--success {
-    animation: rp-payment-success-pop 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  .rp-payment__state-icon--failure {
-    animation: rp-payment-failure-pop 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .rp-payment__state .rp-kicker,
-  .rp-payment__state h2,
-  .rp-payment__state > p,
-  .rp-payment__state .rp-payment__reference,
-  .rp-payment__state .rp-btn {
-    animation: rp-payment-copy-in 320ms ease both;
-  }
-  .rp-payment__state .rp-kicker {
-    animation-delay: 120ms;
-  }
-  .rp-payment__state h2 {
-    animation-delay: 160ms;
-  }
-  .rp-payment__state > p {
-    animation-delay: 200ms;
-  }
-  .rp-payment__state .rp-payment__reference {
-    animation-delay: 240ms;
-  }
-  .rp-payment__state .rp-btn {
-    animation-delay: 280ms;
-  }
-  .rp-payment__state .rp-btn + .rp-btn {
-    animation-delay: 320ms;
-  }
   @keyframes rp-fade-in {
     from {
       opacity: 0;
@@ -85,66 +51,6 @@
     from {
       opacity: 0;
       transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  @keyframes rp-payment-state-in {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  @keyframes rp-payment-success-pop {
-    0% {
-      opacity: 0;
-      transform: scale(0.55);
-    }
-    55% {
-      opacity: 1;
-      transform: scale(1.12);
-    }
-    78% {
-      transform: scale(0.96);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-  @keyframes rp-payment-failure-pop {
-    0% {
-      opacity: 0;
-      transform: scale(0.7);
-    }
-    35% {
-      opacity: 1;
-      transform: scale(1.05);
-    }
-    50% {
-      transform: translateX(-3px) rotate(-2deg);
-    }
-    65% {
-      transform: translateX(3px) rotate(2deg);
-    }
-    80% {
-      transform: translateX(-1px);
-    }
-    100% {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  @keyframes rp-payment-copy-in {
-    from {
-      opacity: 0;
-      transform: translateY(5px);
     }
     to {
       opacity: 1;
