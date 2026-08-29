@@ -40,6 +40,7 @@ import { scrollBehavior } from "./utils/reduced-motion.js";
 import { checkoutReadiness } from "./utils/checkout-readiness.js";
 import { checkoutReadinessMessage } from "./utils/checkout-readiness-copy.js";
 import { normalizeOrderResponse } from "./utils/order-response.js";
+import { catalogProducts } from "./utils/catalog-response.js";
 function renderStorefront() {
   const root = document.getElementById("rp-app");
   if (!root) return;
@@ -51,9 +52,7 @@ async function loadProducts() {
   state.productsStatus = "loading";
   notify();
   try {
-    const payload = await api.getProducts();
-    const products = Array.isArray(payload.produtos) ? payload.produtos : [];
-    state.products = sortProducts(storefrontProducts(products));
+    state.products = sortProducts(storefrontProducts(catalogProducts(await api.getProducts())));
     state.productsStatus = "ready";
     syncCartWithProducts();
   } catch (error) {
