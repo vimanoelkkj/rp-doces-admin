@@ -70,7 +70,7 @@ export function renderPaymentStatus(order = {}) {
       kicker: "Cancelar pedido",
       title: "Tem certeza que deseja cancelar?",
       body: "Se continuar, o Pix será cancelado e este código não poderá mais ser usado para pagar.",
-      content: `${cancelError ? `<p class="rp-payment__hint" role="alert">${escapeHtml(cancelError)}</p>` : ""}<button class="rp-btn rp-btn--danger" type="button" data-confirm-cancel-order${cancelPending ? " disabled" : ""}>${cancelPending ? "Cancelando…" : "Sim, cancelar pedido"}</button><button class="rp-btn rp-payment__secondary" type="button" data-keep-order${cancelPending ? " disabled" : ""}>Não, continuar pedido</button>`,
+      content: `${cancelError ? `<p class="rp-payment__hint" role="alert">${escapeHtml(cancelError)}</p>` : ""}<button class="rp-btn rp-btn--danger" type="button" data-confirm-cancel-order${cancelPending ? " disabled aria-busy=\"true\"" : ""}>${cancelPending ? `<span class="rp-payment__cancel-progress"><span class="rp-payment__cancel-spinner" aria-hidden="true"></span>Cancelando…</span>` : "Sim, cancelar pedido"}</button><button class="rp-btn rp-payment__secondary" type="button" data-keep-order${cancelPending ? " disabled" : ""}>Não, continuar pedido</button>`,
       state: "cancel-confirm"
     });
   else if (demoState === "cancelled")
