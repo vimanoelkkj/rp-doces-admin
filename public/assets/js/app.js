@@ -13,6 +13,7 @@ import {
   syncCartWithProducts,
   setOrderState,
   resetOrderState,
+  resetTransientState,
   notify
 } from "./state.js";
 import { renderSiteHeader } from "./components/site-header.js";
@@ -46,7 +47,6 @@ function renderStorefront() {
   root.innerHTML = `${renderSiteHeader(summary)}${renderHero()}${renderProductList(state.products, state.cart, state.productsStatus)}${renderSiteFooter()}${renderCartBar(summary)}${renderCart({ open: state.ui.cartOpen, items: getCartItems(), summary })}${renderCheckout({ open: state.ui.checkoutOpen, items: getCartItems(), summary, checkout: state.checkout })}${renderPaymentStatus(state.order)}${renderMobileMenu(state.ui.menuOpen)}${renderPartySheet(state.ui.partyOpen)}`;
   setPageScrollLocked(hasOpenOverlay(state));
 }
-
 async function loadProducts() {
   state.productsStatus = "loading";
   notify();
@@ -62,7 +62,6 @@ async function loadProducts() {
   }
   notify();
 }
-
 async function submitCheckout() {
   if (state.order.phase === "creating") return;
   const items = getCartItems();
@@ -104,7 +103,6 @@ async function submitCheckout() {
     setOrderState({ phase: "error", error: checkoutErrorMessage(error) });
   }
 }
-
 function returnToCheckout({ resetRequest = false } = {}) {
   stopOrderPolling();
   if (resetRequest) resetCheckoutRequestId();
@@ -130,7 +128,6 @@ function closeTopOverlay() {
   if (state.ui.partyOpen) return setPartyOpen(false);
   if (state.ui.menuOpen) return setMenuOpen(false);
 }
-
 function bindStorefrontEvents() {
   const root = document.getElementById("rp-app");
   if (!root || root.dataset.eventsBound === "true") return;
@@ -187,13 +184,10 @@ function bindStorefrontEvents() {
     }
   });
 }
-
 export async function bootstrapStorefront() {
   subscribe(renderStorefront);
   bindStorefrontEvents();
-  state.ui = { cartOpen: false, checkoutOpen: false, menuOpen: false, partyOpen: false };
-  state.order = { phase: "idle", token: null, data: null, pix: null, error: null };
-  state.productsStatus = "loading";
+  resetTransientState();
   renderStorefront();
   await loadProducts();
 }
