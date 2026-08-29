@@ -74,8 +74,16 @@ body.rp-cart-open .rp-party__backdrop {
   body.rp-cart-open [data-catalog-route] .rp-menu__filters,
   body.rp-cart-open [data-catalog-route] .rp-menu__grid,
   body.rp-cart-open [data-catalog-route] .rp-menu__empty,
-  body.rp-cart-open [data-catalog-route] .rp-menu__skeleton {
-    animation: none !important;
+  body.rp-cart-open [data-catalog-route] .rp-menu__skeleton,
+  body.rp-catalog-returning [data-catalog-route],
+  body.rp-catalog-returning [data-catalog-route] .rp-site-header,
+  body.rp-catalog-returning [data-catalog-route] .rp-menu__head,
+  body.rp-catalog-returning [data-catalog-route] .rp-menu__filters,
+  body.rp-catalog-returning [data-catalog-route] .rp-menu__grid,
+  body.rp-catalog-returning [data-catalog-route] .rp-menu__empty,
+  body.rp-catalog-returning [data-catalog-route] .rp-menu__skeleton {
+    opacity: 1 !important;
+    transform: none !important;
   }
   .rp-cart-overlay.is-checkout-handoff .rp-cart-overlay__backdrop,
   .rp-checkout.is-payment-handoff,
