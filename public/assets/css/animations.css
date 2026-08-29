@@ -59,6 +59,27 @@
   .rp-cart-sheet__actions {
     animation: rp-cart-content-in 280ms 170ms ease both;
   }
+  .rp-checkout:not([hidden]) .rp-checkout__backdrop {
+    animation: rp-checkout-backdrop-in 220ms ease both;
+  }
+  .rp-checkout:not([hidden]) .rp-checkout__sheet {
+    transform-origin: center bottom;
+    animation: rp-checkout-sheet-in 360ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
+  }
+  .rp-checkout:not([hidden]) .rp-checkout__items,
+  .rp-checkout:not([hidden]) .rp-checkout__total,
+  .rp-checkout:not([hidden]) .rp-checkout__form {
+    animation: rp-checkout-content-in 300ms ease both;
+  }
+  .rp-checkout:not([hidden]) .rp-checkout__items {
+    animation-delay: 70ms;
+  }
+  .rp-checkout:not([hidden]) .rp-checkout__total {
+    animation-delay: 105ms;
+  }
+  .rp-checkout:not([hidden]) .rp-checkout__form {
+    animation-delay: 140ms;
+  }
   @keyframes rp-fade-in {
     from {
       opacity: 0;
@@ -166,10 +187,29 @@
       transform: none;
     }
   }
-  @keyframes rp-cart-content-in {
+  @keyframes rp-cart-content-in,
+  @keyframes rp-checkout-content-in {
     from {
       opacity: 0;
       transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-checkout-backdrop-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes rp-checkout-sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(24px) scale(0.988);
     }
     to {
       opacity: 1;
