@@ -1,4 +1,5 @@
 const CLOSE_TRANSITION_MS = 220;
+const CHECKOUT_HANDOFF_MS = 200;
 
 const CLOSE_BINDINGS = [
   ["[data-close-payment]", ".rp-payment"],
@@ -40,17 +41,34 @@ function replayEscape() {
   document.dispatchEvent(replay);
 }
 
-function closeAfterAnimation(root, callback) {
+function finishAfterAnimation(root, className, callback, duration) {
   if (!root || reducedMotion()) return callback();
-  if (root.classList.contains("is-closing")) return;
-  root.classList.add("is-closing");
-  window.setTimeout(callback, CLOSE_TRANSITION_MS);
+  if (root.classList.contains(className)) return;
+  root.classList.add(className);
+  window.setTimeout(callback, duration);
+}
+
+function closeAfterAnimation(root, callback) {
+  finishAfterAnimation(root, "is-closing", callback, CLOSE_TRANSITION_MS);
+}
+
+function handoffCartToCheckout(trigger) {
+  const root = trigger.closest(".rp-cart-overlay") || document.querySelector(".rp-cart-overlay");
+  finishAfterAnimation(root, "is-checkout-handoff", () => replayClick(trigger), CHECKOUT_HANDOFF_MS);
 }
 
 document.addEventListener(
   "click",
   event => {
     if (event.rpSkipCloseTransition) return;
+
+    const checkoutTrigger = event.target.closest?.("[data-start-checkout]");
+    if (checkoutTrigger && !checkoutTrigger.disabled) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      handoffCartToCheckout(checkoutTrigger);
+      return;
+    }
 
     for (const [triggerSelector, rootSelector] of CLOSE_BINDINGS) {
       const trigger = event.target.closest?.(triggerSelector);
