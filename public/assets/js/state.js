@@ -1,5 +1,6 @@
 import { productId } from "./utils/product-id.js";
 import { clampQuantity, isProductAvailable } from "./utils/stock.js";
+import { summarizeCartItems } from "./utils/cart-summary.js";
 
 const listeners = new Set();
 
@@ -113,11 +114,5 @@ export function getCartItems() {
     .filter(Boolean);
 }
 export function getCartSummary() {
-  let items = 0;
-  let totalCents = 0;
-  for (const { product, quantity } of getCartItems()) {
-    items += quantity;
-    totalCents += (Number(product.preco_centavos) || 0) * quantity;
-  }
-  return { items, totalCents };
+  return summarizeCartItems(getCartItems());
 }
