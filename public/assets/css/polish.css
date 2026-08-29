@@ -33,3 +33,9 @@
 .rp-site-header__cart:active {
   transform: scale(0.97);
 }
+.rp-menu {
+  background: linear-gradient(180deg, #fff 0%, #fffdfc 100%);
+}
+.rp-menu__head {
+  padding-bottom: 6px;
+}
