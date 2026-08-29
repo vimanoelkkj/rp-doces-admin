@@ -13,6 +13,7 @@ const initialUi = () => ({
 });
 const initialOrder = () => ({
   phase: "idle",
+  paymentMethod: "PIX",
   token: null,
   data: null,
   pix: null,
