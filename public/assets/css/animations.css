@@ -106,6 +106,21 @@
   .rp-cart-sheet__actions {
     animation: rp-cart-content-in 280ms 170ms ease both;
   }
+  .rp-cart-overlay.is-checkout-handoff {
+    pointer-events: none;
+  }
+  .rp-cart-overlay.is-checkout-handoff .rp-cart-overlay__backdrop {
+    animation: rp-cart-checkout-backdrop-out 200ms ease both !important;
+  }
+  .rp-cart-overlay.is-checkout-handoff .rp-cart-sheet {
+    animation: rp-cart-checkout-sheet-out 200ms cubic-bezier(0.4, 0, 1, 1) both !important;
+  }
+  .rp-cart-overlay.is-checkout-handoff .rp-cart-item,
+  .rp-cart-overlay.is-checkout-handoff .rp-cart-total,
+  .rp-cart-overlay.is-checkout-handoff .rp-cart-sheet__note,
+  .rp-cart-overlay.is-checkout-handoff .rp-cart-sheet__actions {
+    animation: rp-cart-checkout-content-out 150ms ease both !important;
+  }
   .rp-checkout:not([hidden]) .rp-checkout__backdrop {
     animation: rp-checkout-backdrop-in 220ms ease both;
   }
@@ -295,6 +310,34 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+  @keyframes rp-cart-checkout-content-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+  }
+  @keyframes rp-cart-checkout-sheet-out {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(18px) scale(0.992);
+    }
+  }
+  @keyframes rp-cart-checkout-backdrop-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0.62;
     }
   }
   @keyframes rp-checkout-content-in {
