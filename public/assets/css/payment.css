@@ -248,6 +248,26 @@
     transform: translateY(0);
   }
 }
+@keyframes rp-payment-cancelled-icon {
+  from {
+    opacity: 0;
+    transform: scale(0.86) rotate(-8deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+@keyframes rp-payment-cancelled-content {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .rp-payment__state-icon--success {
     animation: rp-payment-success-pop 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
@@ -294,6 +314,27 @@
   }
   .rp-payment__state-icon--failure ~ .rp-btn {
     animation-delay: 225ms;
+  }
+  .rp-payment__state-icon--muted {
+    animation: rp-payment-cancelled-icon 360ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+  }
+  .rp-payment__state-icon--muted ~ .rp-kicker,
+  .rp-payment__state-icon--muted ~ h2,
+  .rp-payment__state-icon--muted ~ p,
+  .rp-payment__state-icon--muted ~ .rp-btn {
+    animation: rp-payment-cancelled-content 280ms ease both;
+  }
+  .rp-payment__state-icon--muted ~ .rp-kicker {
+    animation-delay: 80ms;
+  }
+  .rp-payment__state-icon--muted ~ h2 {
+    animation-delay: 120ms;
+  }
+  .rp-payment__state-icon--muted ~ p {
+    animation-delay: 160ms;
+  }
+  .rp-payment__state-icon--muted ~ .rp-btn {
+    animation-delay: 200ms;
   }
 }
 @media (prefers-reduced-motion: reduce) {
