@@ -3,18 +3,23 @@ import {
   state,
   subscribe,
   changeCartQuantity,
+  getCartItems,
   getCartSummary,
+  setCartOpen,
   syncCartWithProducts,
   notify
 } from "./state.js";
 import { renderHero } from "./components/hero.js";
 import { renderProductList } from "./components/product-list.js";
 import { renderCartBar } from "./components/cart-bar.js";
+import { renderCart } from "./components/cart.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
   if (!root) return;
-  root.innerHTML = `${renderHero()}${renderProductList(state.products, state.cart)}${renderCartBar(getCartSummary())}`;
+  const summary = getCartSummary();
+  root.innerHTML = `${renderHero()}${renderProductList(state.products, state.cart)}${renderCartBar(summary)}${renderCart({ open: state.ui.cartOpen, items: getCartItems(), summary })}`;
+  document.body.classList.toggle("rp-cart-open", state.ui.cartOpen);
 }
 
 function bindStorefrontEvents() {
@@ -34,7 +39,26 @@ function bindStorefrontEvents() {
 
     const cartButton = event.target.closest("[data-open-cart]");
     if (cartButton) {
-      window.dispatchEvent(new CustomEvent("rp:open-cart", { detail: getCartSummary() }));
+      setCartOpen(true);
+      return;
+    }
+
+    const closeButton = event.target.closest("[data-close-cart]");
+    if (
+      (closeButton && !event.target.closest("[data-cart-sheet]")) ||
+      event.target.closest("button[data-close-cart]")
+    ) {
+      setCartOpen(false);
+      return;
+    }
+
+    const checkoutButton = event.target.closest("[data-start-checkout]");
+    if (checkoutButton) {
+      window.dispatchEvent(
+        new CustomEvent("rp:start-checkout", {
+          detail: { items: getCartItems(), summary: getCartSummary() }
+        })
+      );
     }
   });
 }
