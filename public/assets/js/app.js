@@ -37,6 +37,7 @@ import { sortProducts } from "./utils/product-sort.js";
 import { hasOpenOverlay } from "./utils/overlay.js";
 import { setPageScrollLocked } from "./utils/scroll-lock.js";
 import { isEscapeKey } from "./utils/keyboard.js";
+import { scrollBehavior } from "./utils/reduced-motion.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -118,7 +119,9 @@ function finishOrder() {
   state.ui.cartOpen = false;
   state.ui.checkoutOpen = false;
   notify();
-  document.getElementById("cardapio")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document
+    .getElementById("cardapio")
+    ?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
 }
 function closeTopOverlay() {
   if (state.order.phase !== "idle") return returnToCheckout();
