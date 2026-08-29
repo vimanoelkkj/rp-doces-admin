@@ -121,9 +121,20 @@ function applyPreviewDemo() {
   const mode = new URLSearchParams(location.search).get("demo");
   const previewDisabled =
     document.querySelector('meta[name="rp-payment-mode"]')?.content === "disabled";
-  const demos = ["pix-pending", "card-pending", "payment-confirmed", "payment-error"];
+  const demos = [
+    "pix-pending",
+    "card-pending",
+    "payment-confirmed",
+    "payment-error",
+    "pix-error",
+    "card-declined",
+    "cancel-confirm",
+    "cancelled",
+    "pix-copied"
+  ];
   if (!previewDisabled || !demos.includes(mode)) return false;
   storefrontRoute = "catalog";
+  const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   if (mode === "payment-confirmed") {
     state.order = {
       phase: "paid",
@@ -131,7 +142,8 @@ function applyPreviewDemo() {
       token: "demo-payment-confirmed",
       data: { referencia: "RP-DEMO-2408", valor_total_centavos: 3100, status: "PAGO" },
       pix: null,
-      error: null
+      error: null,
+      demoState: ""
     };
     return true;
   }
@@ -142,12 +154,52 @@ function applyPreviewDemo() {
       token: "demo-payment-error",
       data: { referencia: "RP-DEMO-ERRO", valor_total_centavos: 3100, status: "FALHA" },
       pix: null,
-      error: "O pagamento não foi confirmado. Você pode tentar novamente."
+      error: "O pagamento não foi confirmado. Você pode tentar novamente.",
+      demoState: ""
+    };
+    return true;
+  }
+  if (mode === "pix-error") {
+    state.order = {
+      phase: "pending",
+      paymentMethod: "PIX",
+      token: "demo-pix-error",
+      data: { referencia: "RP-DEMO-PIX-ERRO", valor_total_centavos: 3100, status: "FALHA" },
+      pix: null,
+      error: null,
+      demoState: "pix-error"
+    };
+    return true;
+  }
+  if (mode === "card-declined") {
+    state.order = {
+      phase: "pending",
+      paymentMethod: "CARD",
+      token: "demo-card-declined",
+      data: { referencia: "RP-DEMO-CARD-ERRO", valor_total_centavos: 3100, status: "FALHA" },
+      pix: null,
+      error: null,
+      demoState: "card-declined"
+    };
+    return true;
+  }
+  if (mode === "cancel-confirm" || mode === "cancelled") {
+    state.order = {
+      phase: "pending",
+      paymentMethod: "PIX",
+      token: `demo-${mode}`,
+      data: {
+        referencia: "RP-DEMO-CANCEL",
+        valor_total_centavos: 3100,
+        status: mode === "cancelled" ? "CANCELADO" : "PENDENTE"
+      },
+      pix: null,
+      error: null,
+      demoState: mode
     };
     return true;
   }
   const card = mode === "card-pending";
-  const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   state.order = {
     phase: "pending",
     paymentMethod: card ? "CARD" : "PIX",
@@ -161,7 +213,8 @@ function applyPreviewDemo() {
     pix: card
       ? null
       : { qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation" },
-    error: null
+    error: null,
+    demoState: mode === "pix-copied" ? "pix-copied" : ""
   };
   return true;
 }
@@ -194,7 +247,14 @@ async function submitCheckout() {
     return;
   }
   setCheckoutOpen(false);
-  setOrderState({ phase: "creating", token: null, data: null, pix: null, error: null });
+  setOrderState({
+    phase: "creating",
+    token: null,
+    data: null,
+    pix: null,
+    error: null,
+    demoState: ""
+  });
   try {
     const result = normalizeOrderResponse(
       await createPixOrder({ checkout: state.checkout, items })
@@ -204,11 +264,12 @@ async function submitCheckout() {
       token: result.token,
       data: result.pedido,
       pix: result.pix,
-      error: null
+      error: null,
+      demoState: ""
     });
     if (!result.paid && result.token) startOrderPolling(result.token);
   } catch (error) {
-    setOrderState({ phase: "error", error: checkoutErrorMessage(error) });
+    setOrderState({ phase: "error", error: checkoutErrorMessage(error), demoState: "" });
   }
 }
 function returnToCheckout({ resetRequest = false } = {}) {
@@ -269,6 +330,29 @@ function bindStorefrontEvents() {
     if (event.target.closest("[data-open-party]")) return setPartyOpen(true);
     if (event.target.closest("[data-close-party]")) return setPartyOpen(false);
     if (event.target.closest("[data-reload-products]")) return loadProducts();
+    if (
+      event.target.closest("[data-confirm-demo-cancel]") &&
+      state.order.demoState === "cancel-confirm"
+    )
+      return setOrderState({
+        demoState: "cancelled",
+        data: { ...state.order.data, status: "CANCELADO" }
+      });
+    if (
+      event.target.closest("[data-keep-demo-order]") &&
+      state.order.demoState === "cancel-confirm"
+    )
+      return setOrderState({
+        demoState: "",
+        pix: {
+          qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation"
+        },
+        data: {
+          ...state.order.data,
+          status: "PENDENTE",
+          pix_expira_em: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+        }
+      });
     if (event.target.closest("[data-close-payment]")) return returnToCheckout();
     if (event.target.closest("[data-finish-order]")) return finishOrder();
     if (event.target.closest("[data-retry-payment]"))
@@ -278,8 +362,17 @@ function bindStorefrontEvents() {
       const button = event.target.closest("[data-copy-pix]");
       if (copied && button) {
         button.textContent = "Código copiado ✓";
+        let message = button.parentElement?.querySelector(".rp-payment__copied");
+        if (!message) {
+          message = document.createElement("div");
+          message.className = "rp-payment__copied";
+          message.setAttribute("role", "status");
+          message.textContent = "Código Pix copiado. Agora é só colar no app do seu banco.";
+          button.insertAdjacentElement("afterend", message);
+        }
         setTimeout(() => {
           if (button.isConnected) button.textContent = "Copiar código Pix";
+          if (message?.isConnected) message.remove();
         }, 1800);
       }
     }
