@@ -41,11 +41,11 @@ export function renderCheckout({ open = false, items = [], summary = {}, checkou
         <form class="rp-checkout__form" data-checkout-form>
           <label>Nome<input name="name" autocomplete="name" value="${esc(checkout.name || "")}" required minlength="2" maxlength="100" data-checkout-field="name"></label>
           <label>E-mail<input name="email" type="email" autocomplete="email" value="${esc(checkout.email || "")}" required maxlength="160" data-checkout-field="email"></label>
-          <label>WhatsApp<input name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" value="${esc(checkout.whatsapp || "")}" required data-checkout-field="whatsapp"></label>
+          <label>WhatsApp<input name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" value="${esc(checkout.whatsapp || "")}" required maxlength="13" data-checkout-field="whatsapp"></label>
           <fieldset>
             <legend>Pagamento</legend>
-            <label class="rp-payment-option"><input type="radio" name="paymentMethod" value="PIX" ${checkout.paymentMethod !== "CARD" ? "checked" : ""} data-checkout-field="paymentMethod"> Pix</label>
-            <label class="rp-payment-option"><input type="radio" name="paymentMethod" value="CARD" ${checkout.paymentMethod === "CARD" ? "checked" : ""} data-checkout-field="paymentMethod"> Cartão</label>
+            <label class="rp-payment-option"><input type="radio" name="paymentMethod" value="PIX" checked data-checkout-field="paymentMethod"> Pix</label>
+            <label class="rp-payment-option" aria-disabled="true"><input type="radio" name="paymentMethod" value="CARD" disabled> Cartão <small>em breve</small></label>
           </fieldset>
           <label>Observação <span>(opcional)</span><textarea name="note" rows="2" maxlength="500" data-checkout-field="note">${esc(checkout.note || "")}</textarea></label>
           <button class="rp-btn rp-btn--primary rp-checkout__submit" type="submit" data-submit-checkout>Continuar para pagamento</button>
