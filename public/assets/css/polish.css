@@ -64,3 +64,12 @@
 .rp-product-card__stepper button:active {
   transform: scale(0.93);
 }
+.rp-cart-bar__total {
+  letter-spacing: -0.025em;
+}
+.rp-cart-bar__cta {
+  transition: transform var(--rp-duration-fast) ease;
+}
+.rp-cart-bar__cta:active {
+  transform: scale(0.97);
+}
