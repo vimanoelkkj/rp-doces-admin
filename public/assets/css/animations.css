@@ -17,6 +17,27 @@
   .rp-shell:not([data-mounted="true"]) .rp-product-card:nth-child(3) {
     animation-delay: 100ms;
   }
+  [data-catalog-route] {
+    animation: rp-catalog-route-in 360ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
+  }
+  [data-catalog-route] .rp-site-header {
+    animation: rp-catalog-header-in 320ms 35ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
+  }
+  [data-catalog-route] .rp-menu__head,
+  [data-catalog-route] .rp-menu__filters {
+    animation: rp-catalog-content-in 320ms ease both;
+  }
+  [data-catalog-route] .rp-menu__head {
+    animation-delay: 90ms;
+  }
+  [data-catalog-route] .rp-menu__filters {
+    animation-delay: 125ms;
+  }
+  [data-catalog-route] .rp-menu__grid,
+  [data-catalog-route] .rp-menu__empty,
+  [data-catalog-route] .rp-menu__skeleton {
+    animation: rp-catalog-content-in 360ms 155ms ease both;
+  }
   .rp-cart-bar--feedback {
     transform-origin: center bottom;
     animation: rp-cart-bar-feedback 340ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
@@ -111,6 +132,36 @@
     }
   }
   @keyframes rp-card-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-catalog-route-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.996);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-catalog-header-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-catalog-content-in {
     from {
       opacity: 0;
       transform: translateY(8px);
