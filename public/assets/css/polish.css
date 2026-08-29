@@ -23,3 +23,13 @@
     inset 0 1px 0 rgb(255 255 255 / 80%),
     0 12px 38px rgb(74 45 36 / 8%);
 }
+.rp-site-header__menu,
+.rp-site-header__cart {
+  transition:
+    transform var(--rp-duration-fast) var(--rp-ease-out),
+    filter var(--rp-duration-fast) ease;
+}
+.rp-site-header__menu:active,
+.rp-site-header__cart:active {
+  transform: scale(0.97);
+}
