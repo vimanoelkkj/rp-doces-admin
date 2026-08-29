@@ -2,7 +2,7 @@ const money = cents =>
   (Number(cents || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function renderCheckout({ open = false, items = [], summary = {}, checkout = {} } = {}) {
-  const hidden = open ? "" : " hidden";
+  const hiddenAttribute = open ? "" : " hidden";
   const rows = items
     .map(
       ({ product, quantity }) => `
@@ -15,7 +15,7 @@ export function renderCheckout({ open = false, items = [], summary = {}, checkou
     .join("");
 
   return `
-    <div class="rp-checkout${hidden}" data-checkout-root aria-hidden="${!open}">
+    <div class="rp-checkout"${hiddenAttribute} data-checkout-root aria-hidden="${!open}">
       <button class="rp-checkout__backdrop" type="button" data-close-checkout aria-label="Fechar checkout"></button>
       <section class="rp-checkout__sheet" role="dialog" aria-modal="true" aria-labelledby="rp-checkout-title">
         <div class="rp-sheet-handle" aria-hidden="true"></div>
@@ -30,15 +30,15 @@ export function renderCheckout({ open = false, items = [], summary = {}, checkou
           <div class="rp-checkout__total"><span>Total</span><strong>${money(summary.totalCents)}</strong></div>
         </div>
         <form class="rp-checkout__form" data-checkout-form>
-          <label>Nome<input name="name" autocomplete="name" value="${checkout.name || ""}" required></label>
-          <label>WhatsApp<input name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" value="${checkout.whatsapp || ""}" required></label>
+          <label>Nome<input name="name" autocomplete="name" value="${checkout.name || ""}" required data-checkout-field="name"></label>
+          <label>WhatsApp<input name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" value="${checkout.whatsapp || ""}" required data-checkout-field="whatsapp"></label>
           <fieldset>
             <legend>Pagamento</legend>
-            <label class="rp-payment-option"><input type="radio" name="paymentMethod" value="PIX" ${checkout.paymentMethod !== "CARD" ? "checked" : ""}> Pix</label>
-            <label class="rp-payment-option"><input type="radio" name="paymentMethod" value="CARD" ${checkout.paymentMethod === "CARD" ? "checked" : ""}> Cartão</label>
+            <label class="rp-payment-option"><input type="radio" name="paymentMethod" value="PIX" ${checkout.paymentMethod !== "CARD" ? "checked" : ""} data-checkout-field="paymentMethod"> Pix</label>
+            <label class="rp-payment-option"><input type="radio" name="paymentMethod" value="CARD" ${checkout.paymentMethod === "CARD" ? "checked" : ""} data-checkout-field="paymentMethod"> Cartão</label>
           </fieldset>
-          <label>Observação <span>(opcional)</span><textarea name="note" rows="2">${checkout.note || ""}</textarea></label>
-          <button class="rp-btn rp-btn--primary rp-checkout__submit" type="submit">Continuar para pagamento</button>
+          <label>Observação <span>(opcional)</span><textarea name="note" rows="2" data-checkout-field="note">${checkout.note || ""}</textarea></label>
+          <button class="rp-btn rp-btn--primary rp-checkout__submit" type="submit" data-submit-checkout>Continuar para pagamento</button>
         </form>
       </section>
     </div>
