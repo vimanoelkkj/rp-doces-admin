@@ -41,13 +41,53 @@ import { checkoutReadiness } from "./utils/checkout-readiness.js";
 import { checkoutReadinessMessage } from "./utils/checkout-readiness-copy.js";
 import { normalizeOrderResponse } from "./utils/order-response.js";
 import { catalogProducts } from "./utils/catalog-response.js";
-function renderStorefront() {
+
+const regionMarkup = new Map();
+
+function mountStorefront() {
   const root = document.getElementById("rp-app");
-  if (!root) return;
+  if (!root || root.dataset.mounted === "true") return;
+  root.innerHTML = `
+    <div data-region="header"></div>
+    ${renderHero()}
+    <div data-region="products"></div>
+    ${renderSiteFooter()}
+    <div data-region="cart-bar"></div>
+    <div data-region="cart"></div>
+    <div data-region="checkout"></div>
+    <div data-region="payment"></div>
+    <div data-region="menu"></div>
+    <div data-region="party"></div>
+  `;
+  root.dataset.mounted = "true";
+}
+
+function updateRegion(name, markup) {
+  const root = document.getElementById("rp-app");
+  const region = root?.querySelector(`[data-region="${name}"]`);
+  if (!region || regionMarkup.get(name) === markup) return;
+  region.innerHTML = markup;
+  regionMarkup.set(name, markup);
+}
+
+function renderStorefront() {
+  mountStorefront();
   const summary = getCartSummary();
-  root.innerHTML = `${renderSiteHeader(summary)}${renderHero()}${renderProductList(state.products, state.cart, state.productsStatus)}${renderSiteFooter()}${renderCartBar(summary)}${renderCart({ open: state.ui.cartOpen, items: getCartItems(), summary })}${renderCheckout({ open: state.ui.checkoutOpen, items: getCartItems(), summary, checkout: state.checkout })}${renderPaymentStatus(state.order)}${renderMobileMenu(state.ui.menuOpen)}${renderPartySheet(state.ui.partyOpen)}`;
+  const items = getCartItems();
+  updateRegion("header", renderSiteHeader(summary));
+  updateRegion("products", renderProductList(state.products, state.cart, state.productsStatus));
+  updateRegion("cart-bar", renderCartBar(summary));
+  updateRegion("cart", renderCart({ open: state.ui.cartOpen, items, summary }));
+  updateRegion(
+    "checkout",
+    renderCheckout({ open: state.ui.checkoutOpen, items, summary, checkout: state.checkout })
+  );
+  updateRegion("payment", renderPaymentStatus(state.order));
+  updateRegion("menu", renderMobileMenu(state.ui.menuOpen));
+  updateRegion("party", renderPartySheet(state.ui.partyOpen));
   setPageScrollLocked(hasOpenOverlay(state));
 }
+
 async function loadProducts() {
   state.productsStatus = "loading";
   notify();
@@ -176,6 +216,7 @@ function bindStorefrontEvents() {
   });
 }
 export async function bootstrapStorefront() {
+  mountStorefront();
   subscribe(renderStorefront);
   bindStorefrontEvents();
   resetTransientState();
