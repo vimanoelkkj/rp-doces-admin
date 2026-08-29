@@ -1,10 +1,15 @@
 import { api } from "./api.js";
 import { setOrderState } from "./state.js";
+import {
+  ORDER_POLL_INTERVAL_MS,
+  ORDER_POLL_MAX_ATTEMPTS,
+  pollingExhausted
+} from "./utils/polling-policy.js";
+import { isPaidStatus, isFailedStatus, normalizeOrderStatus } from "./utils/payment-status.js";
+import { orderStatusCopy } from "./utils/order-copy.js";
 
 let timer = null;
 let attempts = 0;
-const MAX_ATTEMPTS = 120;
-const TERMINAL_FAILURES = new Set(["CANCELADO", "REJEITADO", "EXPIRADO", "ERRO", "REEMBOLSADO"]);
 
 export function stopOrderPolling() {
   if (timer) clearTimeout(timer);
@@ -15,35 +20,36 @@ export function stopOrderPolling() {
 export function startOrderPolling(token) {
   stopOrderPolling();
   if (!token) return;
-
   const poll = async () => {
     attempts += 1;
     try {
       const payload = await api.getOrder(token);
       const pedido = payload.pedido || {};
-      const status = String(pedido.status || "").toUpperCase();
-
-      if (status === "PAGO") {
+      const status = normalizeOrderStatus(pedido.status);
+      if (isPaidStatus(status)) {
         setOrderState({ phase: "paid", token, data: pedido, error: null });
         stopOrderPolling();
         return;
       }
-
-      if (TERMINAL_FAILURES.has(status)) {
-        const message =
-          status === "REEMBOLSADO"
-            ? "O pagamento foi reembolsado."
-            : status === "EXPIRADO"
-              ? "O prazo para pagar este Pix expirou."
-              : "O pagamento não foi concluído.";
-        setOrderState({ phase: "error", token, data: pedido, error: message });
+      if (isFailedStatus(status)) {
+        setOrderState({ phase: "error", token, data: pedido, error: orderStatusCopy(status) });
         stopOrderPolling();
         return;
       }
-
+      if (pollingExhausted(attempts)) {
+        setOrderState({
+          phase: "error",
+          token,
+          data: pedido,
+          error:
+            "A confirmação está demorando mais que o esperado. Você pode tentar consultar novamente."
+        });
+        stopOrderPolling();
+        return;
+      }
       setOrderState({ phase: "pending", token, data: pedido, error: null });
     } catch (error) {
-      if (attempts >= MAX_ATTEMPTS) {
+      if (pollingExhausted(attempts)) {
         setOrderState({
           phase: "error",
           token,
@@ -53,9 +59,7 @@ export function startOrderPolling(token) {
         return;
       }
     }
-
-    if (attempts < MAX_ATTEMPTS) timer = setTimeout(poll, 3000);
+    if (attempts < ORDER_POLL_MAX_ATTEMPTS) timer = setTimeout(poll, ORDER_POLL_INTERVAL_MS);
   };
-
-  timer = setTimeout(poll, 3000);
+  timer = setTimeout(poll, ORDER_POLL_INTERVAL_MS);
 }
