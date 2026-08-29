@@ -1,4 +1,5 @@
 import { productId } from "./utils/product-id.js";
+import { clampQuantity, isProductAvailable } from "./utils/stock.js";
 
 const listeners = new Set();
 
@@ -75,9 +76,7 @@ export function setCartQuantity(id, quantity) {
   const key = productId(id);
   const product = state.products.find(item => productId(item) === key);
   if (!product) return;
-  const stock = Math.max(0, Number(product.estoque) || 0);
-  const available = product.disponivel !== false && stock > 0;
-  const next = available ? Math.min(Math.max(0, Number(quantity) || 0), stock) : 0;
+  const next = clampQuantity(product, quantity);
   if (next <= 0) state.cart.delete(key);
   else state.cart.set(key, next);
   if (state.cart.size === 0) {
@@ -92,11 +91,11 @@ export function changeCartQuantity(id, delta) {
 export function syncCartWithProducts() {
   for (const [id, quantity] of state.cart.entries()) {
     const product = state.products.find(item => productId(item) === id);
-    if (!product || product.disponivel === false || Number(product.estoque) <= 0) {
+    if (!product || !isProductAvailable(product)) {
       state.cart.delete(id);
       continue;
     }
-    const capped = Math.min(quantity, Number(product.estoque) || 0);
+    const capped = clampQuantity(product, quantity);
     if (capped <= 0) state.cart.delete(id);
     else state.cart.set(id, capped);
   }
