@@ -1,1 +1,5 @@
 /* Final visual polish layer for the modular storefront. */
+.rp-hero {
+  background:
+    radial-gradient(circle at 88% 18%, rgb(255 226 235 / 62%), transparent 30%), var(--rp-color-bg);
+}
