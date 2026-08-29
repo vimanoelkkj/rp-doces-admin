@@ -6,9 +6,8 @@
   margin-inline: auto;
 }
 .rp-section {
-  padding-block: 48px;
+  padding-block: var(--rp-space-16);
 }
-
 .rp-hero {
   position: relative;
   min-height: 100svh;
@@ -20,116 +19,132 @@
 .rp-hero::before {
   content: "";
   position: absolute;
-  width: 360px;
-  height: 360px;
+  width: 330px;
+  height: 330px;
   right: -190px;
-  top: 80px;
+  top: 92px;
   border-radius: 50%;
-  background: rgba(255, 107, 157, 0.09);
+  background: var(--rp-color-brand-soft);
+  opacity: 0.7;
 }
 .rp-hero::after {
   content: "";
   position: absolute;
-  width: 180px;
-  height: 180px;
-  left: -110px;
-  bottom: 70px;
+  width: 170px;
+  height: 170px;
+  left: -105px;
+  bottom: 72px;
+  border: 1px solid rgb(230 79 132 / 12%);
   border-radius: 50%;
-  background: rgba(230, 79, 132, 0.07);
 }
 .rp-hero__grid {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 34px;
-  padding-block: 104px 54px;
+  gap: 36px;
+  padding-block: 112px 58px;
 }
 .rp-hero__copy {
   position: relative;
   z-index: 2;
-  max-width: 620px;
+  max-width: var(--rp-content-narrow);
 }
 .rp-hero__eyebrow {
   width: fit-content;
-  margin: 0 0 18px;
-  border: 1px solid rgba(230, 79, 132, 0.18);
-  border-radius: var(--rp-radius-pill);
-  padding: 7px 11px;
-  background: rgba(255, 255, 255, 0.7);
+  margin: 0 0 20px;
   color: var(--rp-color-brand-strong);
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  font-weight: 900;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 .rp-hero__title {
   margin: 0;
   color: var(--rp-color-text);
   font-family: Fraunces, Georgia, serif;
-  font-size: clamp(48px, 13.5vw, 76px);
+  font-size: clamp(50px, 14vw, 78px);
   font-weight: 800;
-  line-height: 0.94;
-  letter-spacing: -0.045em;
+  line-height: 0.91;
+  letter-spacing: -0.05em;
 }
 .rp-hero__title span,
 .rp-hero__title em {
   display: block;
 }
 .rp-hero__title em {
+  position: relative;
+  width: fit-content;
   color: var(--rp-color-brand-strong);
   font-style: italic;
   font-weight: 700;
 }
+.rp-hero__title em::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: -4px;
+  bottom: -7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(255 107 157 / 14%);
+  transform: rotate(-1deg);
+}
 .rp-hero__lede {
-  max-width: 390px;
-  margin: 22px 0 0;
+  max-width: 360px;
+  margin: 25px 0 0;
   color: var(--rp-color-muted);
   font-size: 16px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 .rp-hero__cta {
-  margin-top: 26px;
-  min-height: 50px;
+  margin-top: 28px;
+  min-height: 52px;
   border-radius: var(--rp-radius-pill);
-  padding-inline: 22px;
+  padding-inline: 23px;
   text-decoration: none;
-  box-shadow: 0 12px 28px rgba(230, 79, 132, 0.2);
+  box-shadow: 0 12px 28px rgb(230 79 132 / 18%);
 }
 .rp-hero__media {
   position: relative;
-  min-height: 330px;
+  min-height: 350px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(230, 79, 132, 0.13);
-  border-radius: 34px 34px 90px 34px;
-  background:
-    radial-gradient(circle at 70% 22%, #fff 0 10%, transparent 35%),
-    linear-gradient(145deg, #fff 0%, #fff1f5 100%);
+  border: 1px solid rgb(230 79 132 / 10%);
+  border-radius: var(--rp-radius-2xl);
+  background: linear-gradient(150deg, #fff 0%, var(--rp-color-surface-soft) 100%);
   overflow: hidden;
-  box-shadow: 0 24px 70px rgba(74, 45, 36, 0.09);
+  box-shadow: var(--rp-shadow-soft);
 }
 .rp-hero__media::before {
+  content: "🍓";
+  position: absolute;
+  font-size: 118px;
+  filter: drop-shadow(0 20px 22px rgb(74 45 36 / 12%));
+  transform: rotate(-5deg);
+  opacity: 0.95;
+}
+.rp-hero__media::after {
   content: "";
   position: absolute;
-  width: 190px;
-  height: 190px;
+  width: 240px;
+  height: 240px;
   border-radius: 50%;
-  background: rgba(255, 107, 157, 0.13);
-  filter: blur(1px);
+  border: 1px solid rgb(230 79 132 / 10%);
 }
 .rp-hero__media-label {
-  position: relative;
+  position: absolute;
   z-index: 1;
-  max-width: 220px;
+  left: 20px;
+  right: 20px;
+  bottom: 18px;
   color: var(--rp-color-muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
-  line-height: 1.5;
+  line-height: 1.45;
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-
 @media (min-width: 820px) {
   .rp-hero {
     min-height: 760px;
@@ -137,20 +152,27 @@
   .rp-hero::before {
     width: 560px;
     height: 560px;
-    right: -250px;
-    top: -80px;
+    right: -260px;
+    top: -90px;
   }
   .rp-hero__grid {
-    grid-template-columns: minmax(0, 1fr) minmax(380px, 0.82fr);
+    grid-template-columns: minmax(0, 1fr) minmax(390px, 0.82fr);
     align-items: center;
     gap: clamp(48px, 7vw, 96px);
-    padding-block: 112px 90px;
+    padding-block: 122px 92px;
   }
   .rp-hero__title {
-    font-size: clamp(68px, 6.2vw, 92px);
+    font-size: clamp(70px, 6.3vw, 94px);
   }
   .rp-hero__media {
-    min-height: 540px;
-    border-radius: 48px 48px 140px 48px;
+    min-height: 550px;
+    border-radius: 48px;
+  }
+  .rp-hero__media::before {
+    font-size: 180px;
+  }
+  .rp-hero__media::after {
+    width: 360px;
+    height: 360px;
   }
 }
