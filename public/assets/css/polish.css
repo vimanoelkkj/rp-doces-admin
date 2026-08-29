@@ -39,3 +39,9 @@
 .rp-menu__head {
   padding-bottom: 6px;
 }
+.rp-product-card__title {
+  text-wrap: balance;
+}
+.rp-product-card__description {
+  text-wrap: pretty;
+}
