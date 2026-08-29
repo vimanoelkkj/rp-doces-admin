@@ -361,17 +361,15 @@ function bindStorefrontEvents() {
       const copied = await copyText(state.order.pix?.qr_code);
       const button = event.target.closest("[data-copy-pix]");
       if (copied && button) {
-        button.textContent = "Código copiado ✓";
         let message = button.parentElement?.querySelector(".rp-payment__copied");
         if (!message) {
           message = document.createElement("div");
           message.className = "rp-payment__copied";
           message.setAttribute("role", "status");
-          message.textContent = "Código Pix copiado. Agora é só colar no app do seu banco.";
           button.insertAdjacentElement("afterend", message);
         }
+        message.textContent = "✓ Código Pix copiado. Agora é só colar no app do seu banco.";
         setTimeout(() => {
-          if (button.isConnected) button.textContent = "Copiar código Pix";
           if (message?.isConnected) message.remove();
         }, 1800);
       }
