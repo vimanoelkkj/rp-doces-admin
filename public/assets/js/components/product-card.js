@@ -9,16 +9,27 @@ function esc(value = "") {
     .replaceAll("'", "&#039;");
 }
 
-export function renderProductCard(product) {
+export function renderProductCard(product, quantity = 0) {
   const stock = Number(product.estoque) || 0;
   const soldOut = !product.disponivel || stock <= 0;
   const price = money.format((Number(product.preco_centavos) || 0) / 100);
   const badge = product.destaque ? '<span class="rp-product-card__badge">Mais pedido</span>' : "";
   const stockLabel =
     stock === 1 && !soldOut ? '<span class="rp-product-card__stock">Última unidade</span>' : "";
+  const safeQuantity = Math.min(Math.max(0, Number(quantity) || 0), stock);
+
+  const cartControl =
+    safeQuantity > 0
+      ? `
+      <div class="rp-product-card__stepper" aria-label="Quantidade de ${esc(product.nome || "produto")}">
+        <button type="button" data-cart-delta="-1" data-product-id="${esc(product.id)}" aria-label="Remover uma unidade">−</button>
+        <strong>${safeQuantity}</strong>
+        <button type="button" data-cart-delta="1" data-product-id="${esc(product.id)}" ${safeQuantity >= stock ? "disabled" : ""} aria-label="Adicionar uma unidade">+</button>
+      </div>`
+      : `<button class="rp-product-card__add" type="button" data-cart-delta="1" data-product-id="${esc(product.id)}" ${soldOut ? "disabled" : ""} aria-label="Adicionar ${esc(product.nome || "produto")} ao carrinho">+</button>`;
 
   return `
-    <article class="rp-product-card" data-product-id="${esc(product.id)}">
+    <article class="rp-product-card" data-product-card="${esc(product.id)}">
       <div class="rp-product-card__media" aria-hidden="true">
         ${badge}
         <span class="rp-product-card__media-copy">FOTO DO PRODUTO</span>
@@ -31,7 +42,7 @@ export function renderProductCard(product) {
             <strong class="rp-product-card__price">${soldOut ? "Esgotado" : price}</strong>
             ${stockLabel}
           </div>
-          <button class="rp-product-card__add" type="button" data-add-product="${esc(product.id)}" ${soldOut ? "disabled" : ""} aria-label="Adicionar ${esc(product.nome || "produto")} ao carrinho">+</button>
+          ${cartControl}
         </div>
       </div>
     </article>
