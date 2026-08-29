@@ -1,0 +1,3 @@
+Storefront preview rebuild trigger.
+
+The preview deployment should run after the Cloudflare Pages build configuration is saved.
