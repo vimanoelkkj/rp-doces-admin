@@ -100,20 +100,26 @@
 .rp-product-card__media::after {
   display: none;
 }
-.rp-product-card__media-label {
+.rp-product-card__media-label,
+.rp-product-card__media-name {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   color: var(--rp-color-muted);
   font-family: "DM Mono", monospace;
-  font-size: 9px;
   font-weight: 500;
-  line-height: 1.45;
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.12em;
+}
+.rp-product-card__media-label {
+  top: 46%;
+  font-size: 8px;
+}
+.rp-product-card__media-name {
+  top: 52%;
+  width: 80%;
+  font-size: 9px;
 }
 .rp-product-card__badge {
   position: absolute;
