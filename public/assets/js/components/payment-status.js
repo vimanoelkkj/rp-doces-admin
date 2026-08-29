@@ -7,6 +7,13 @@ const waitingPixIcon = `<svg class="rp-payment__waiting-icon" width="34" height=
 const waitingCardIcon = `<svg class="rp-payment__waiting-icon" width="33" height="29" viewBox="0 0 33 29" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="0.5" y="0.5" width="27" height="19" rx="4.5" stroke="#81685F"/><rect x="1" y="6" width="26" height="3" fill="#81685F"/><path d="M26.8 27.6C29.451 27.6 31.6 25.451 31.6 22.8C31.6 20.149 29.451 18 26.8 18C24.149 18 22 20.149 22 22.8C22 25.451 24.149 27.6 26.8 27.6Z" stroke="#CFA354" stroke-width="1.4"/><path class="rp-payment__waiting-clock-hand rp-payment__waiting-clock-hand--card" d="M27 19V23.2H29.8" stroke="#CFA354" stroke-width="1.4"/></svg>`;
 const successIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--success" aria-hidden="true">✓</span>`;
 const failureIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--failure" aria-hidden="true">×</span>`;
+const cancelledIcon = `<span class="rp-payment__state-icon rp-payment__state-icon--muted" aria-hidden="true">—</span>`;
+function stateShell({ icon, kicker, title, body, content = "" }) {
+  return `<div class="rp-payment__state">${icon}<p class="rp-kicker">${kicker}</p><h2>${title}</h2><p>${body}</p>${content}</div>`;
+}
+function pendingContent({ cardPending, total, qrCode, expiresAt, copied = false }) {
+  return `<div class="rp-payment__waiting-mark">${cardPending ? waitingCardIcon : waitingPixIcon}</div><h2>Aguardando pagamento</h2><p>${cardPending ? "Já estamos levando a maquininha até você. Pague no débito ou crédito quando ela chegar." : "Copie o código Pix e pague no app do seu próprio banco."}</p>${!cardPending && total ? `<strong class="rp-payment__total">${formatMoney(total)}</strong>` : ""}${!cardPending && qrCode ? `<textarea class="rp-payment__code" readonly aria-label="Código Pix copia e cola">${escapeHtml(qrCode)}</textarea><button class="rp-btn rp-btn--primary" type="button" data-copy-pix>${copied ? "Código copiado ✓" : "Copiar código Pix"}</button>${copied ? `<div class="rp-payment__copied" role="status">Código Pix copiado. Agora é só colar no app do seu banco.</div>` : ""}` : ""}${!cardPending && expiresAt ? `<p class="rp-payment__hint">Pix válido até ${escapeHtml(expiresAt)}.</p>` : ""}${!cardPending ? `<p class="rp-payment__hint">Esta tela acompanha a confirmação do pagamento automaticamente.</p>` : ""}`;
+}
 export function renderPaymentStatus(order = {}) {
   if (!order || order.phase === "idle") return "";
   const loading = order.phase === "creating",
@@ -17,6 +24,70 @@ export function renderPaymentStatus(order = {}) {
     total = paymentTotalCents(order),
     qrCode = pixCode(order),
     reference = shortOrderReference(paymentReference(order)),
-    expiresAt = formatPixExpiry(order.data?.pix_expira_em);
-  return `<div class="rp-payment" data-payment-root><div class="rp-payment__backdrop"></div><section class="rp-payment__sheet${paid || failed ? " rp-payment__sheet--state" : ""}" role="dialog" aria-modal="true" aria-live="polite"><div class="rp-sheet-handle" aria-hidden="true"></div>${loading ? `<p class="rp-kicker">Preparando pagamento</p><h2>Gerando seu Pix…</h2><p>Só um instante.</p>` : ""}${pending ? `<div class="rp-payment__waiting-mark">${cardPending ? waitingCardIcon : waitingPixIcon}</div><h2>Aguardando pagamento</h2><p>${cardPending ? "Já estamos levando a maquininha até você. Pague no débito ou crédito quando ela chegar." : "Copie o código Pix e pague no app do seu próprio banco."}</p>${!cardPending && total ? `<strong class="rp-payment__total">${formatMoney(total)}</strong>` : ""}${!cardPending && qrCode ? `<textarea class="rp-payment__code" readonly aria-label="Código Pix copia e cola">${escapeHtml(qrCode)}</textarea><button class="rp-btn rp-btn--primary" type="button" data-copy-pix>Copiar código Pix</button>` : ""}${!cardPending && expiresAt ? `<p class="rp-payment__hint">Pix válido até ${escapeHtml(expiresAt)}.</p>` : ""}${!cardPending ? `<p class="rp-payment__hint">Esta tela acompanha a confirmação do pagamento automaticamente.</p>` : ""}` : ""}${paid ? `<div class="rp-payment__state">${successIcon}<p class="rp-kicker">Pagamento confirmado</p><h2>Pedido confirmado</h2><p>Recebemos seu pagamento. Seu pedido já está confirmado.</p>${reference ? `<div class="rp-payment__reference"><span>Pedido</span><strong>${escapeHtml(reference)}</strong></div>` : ""}<button class="rp-btn rp-btn--primary" type="button" data-finish-order>Voltar ao cardápio</button></div>` : ""}${failed ? `<div class="rp-payment__state">${failureIcon}<p class="rp-kicker">Pagamento não confirmado</p><h2>Não conseguimos concluir</h2><p>${escapeHtml(order.error || "O pagamento não foi confirmado. Você pode tentar novamente.")}</p><button class="rp-btn rp-btn--primary" type="button" data-retry-payment>Tentar novamente</button><button class="rp-btn rp-payment__secondary" type="button" data-close-payment>Voltar ao pedido</button></div>` : ""}</section></div>`;
+    expiresAt = formatPixExpiry(order.data?.pix_expira_em),
+    demoState = String(order.demoState || "");
+  const special = ["card-declined", "pix-error", "cancel-confirm", "cancelled"].includes(demoState);
+  const isState = paid || failed || special;
+  let body = "";
+  if (loading)
+    body = `<p class="rp-kicker">Preparando pagamento</p><h2>Gerando seu Pix…</h2><p>Só um instante.</p>`;
+  else if (demoState === "card-declined")
+    body = stateShell({
+      icon: failureIcon,
+      kicker: "Cartão não aprovado",
+      title: "O pagamento não passou",
+      body: "A maquininha não aprovou esta tentativa. Você pode escolher outra forma de pagamento.",
+      content: `<button class="rp-btn rp-btn--primary" type="button" data-close-payment>Escolher outra forma</button><button class="rp-btn rp-payment__secondary" type="button" data-finish-order>Voltar ao cardápio</button>`
+    });
+  else if (demoState === "pix-error")
+    body = stateShell({
+      icon: failureIcon,
+      kicker: "Pix não confirmado",
+      title: "Não recebemos a confirmação",
+      body: "O Pix não foi confirmado dentro do tempo esperado. Confira no seu banco antes de tentar de novo.",
+      content: `<button class="rp-btn rp-btn--primary" type="button" data-retry-payment>Tentar novamente</button><button class="rp-btn rp-payment__secondary" type="button" data-close-payment>Voltar ao pedido</button>`
+    });
+  else if (demoState === "cancel-confirm")
+    body = stateShell({
+      icon: cancelledIcon,
+      kicker: "Cancelar pedido",
+      title: "Tem certeza que deseja cancelar?",
+      body: "Se continuar, este pedido será encerrado e você precisará montar outro para pedir novamente.",
+      content: `<button class="rp-btn rp-btn--danger" type="button" data-confirm-demo-cancel>Sim, cancelar pedido</button><button class="rp-btn rp-payment__secondary" type="button" data-keep-demo-order>Não, continuar pedido</button>`
+    });
+  else if (demoState === "cancelled")
+    body = stateShell({
+      icon: cancelledIcon,
+      kicker: "Pedido cancelado",
+      title: "Seu pedido foi cancelado",
+      body: "Tudo certo. Nenhuma nova tentativa de pagamento será feita por esta tela.",
+      content: `<button class="rp-btn rp-btn--primary" type="button" data-finish-order>Voltar ao cardápio</button>`
+    });
+  else if (pending)
+    body = pendingContent({
+      cardPending,
+      total,
+      qrCode,
+      expiresAt,
+      copied: demoState === "pix-copied"
+    });
+  else if (paid)
+    body = stateShell({
+      icon: successIcon,
+      kicker: "Pagamento confirmado",
+      title: "Pedido confirmado",
+      body: "Recebemos seu pagamento. Seu pedido já está confirmado.",
+      content: `${reference ? `<div class="rp-payment__reference"><span>Pedido</span><strong>${escapeHtml(reference)}</strong></div>` : ""}<button class="rp-btn rp-btn--primary" type="button" data-finish-order>Voltar ao cardápio</button>`
+    });
+  else if (failed)
+    body = stateShell({
+      icon: failureIcon,
+      kicker: "Pagamento não confirmado",
+      title: "Não conseguimos concluir",
+      body: escapeHtml(
+        order.error || "O pagamento não foi confirmado. Você pode tentar novamente."
+      ),
+      content: `<button class="rp-btn rp-btn--primary" type="button" data-retry-payment>Tentar novamente</button><button class="rp-btn rp-payment__secondary" type="button" data-close-payment>Voltar ao pedido</button>`
+    });
+  return `<div class="rp-payment" data-payment-root><div class="rp-payment__backdrop"></div><section class="rp-payment__sheet${isState ? " rp-payment__sheet--state" : ""}" role="dialog" aria-modal="true" aria-live="polite"><div class="rp-sheet-handle" aria-hidden="true"></div>${body}</section></div>`;
 }
