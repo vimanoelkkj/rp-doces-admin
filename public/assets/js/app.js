@@ -141,6 +141,7 @@ function applyPreviewDemo() {
     "pix-error",
     "card-declined",
     "cancel-confirm",
+    "cancel-pending",
     "cancelled",
     "pix-copied"
   ];
@@ -196,7 +197,7 @@ function applyPreviewDemo() {
     };
     return true;
   }
-  if (mode === "cancel-confirm" || mode === "cancelled") {
+  if (mode === "cancel-confirm" || mode === "cancel-pending" || mode === "cancelled") {
     state.order = {
       phase: "pending",
       paymentMethod: "PIX",
@@ -208,7 +209,9 @@ function applyPreviewDemo() {
       },
       pix: null,
       error: null,
-      demoState: mode
+      demoState: mode === "cancelled" ? "cancelled" : "cancel-confirm",
+      cancelPending: mode === "cancel-pending",
+      cancelError: null
     };
     return true;
   }
