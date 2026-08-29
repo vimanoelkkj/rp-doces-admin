@@ -1,0 +1,15 @@
+@media (prefers-reduced-motion: no-preference) {
+  .rp-fade-in {
+    animation: rp-fade-in 220ms ease both;
+  }
+  @keyframes rp-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}

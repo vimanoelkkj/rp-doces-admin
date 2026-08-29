@@ -1,0 +1,10 @@
+.rp-shell {
+  min-height: 100dvh;
+}
+.rp-container {
+  width: min(calc(100% - 32px), var(--rp-container));
+  margin-inline: auto;
+}
+.rp-section {
+  padding-block: 48px;
+}

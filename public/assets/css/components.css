@@ -1,0 +1,18 @@
+.rp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-weight: 700;
+}
+.rp-btn--primary {
+  background: var(--rp-color-brand);
+  color: #fff;
+}
+.rp-btn--ghost {
+  background: transparent;
+  color: var(--rp-color-brand-strong);
+}

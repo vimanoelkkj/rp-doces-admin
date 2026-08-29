@@ -1,0 +1,8 @@
+@media (min-width: 768px) {
+  .rp-container {
+    width: min(calc(100% - 48px), var(--rp-container));
+  }
+  .rp-section {
+    padding-block: 64px;
+  }
+}
