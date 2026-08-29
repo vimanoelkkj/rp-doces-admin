@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { paymentSimulationEnabled } from "./runtime-policy.js";
 import { newIdempotencyId, validIdempotencyId } from "./utils/idempotency.js";
 import { sessionGet, sessionSet, sessionRemove } from "./utils/session.js";
 import { normalizeCustomerName } from "./utils/customer-name.js";
@@ -30,6 +31,31 @@ function internalPayerEmail(id) {
     .replace(/[^a-z0-9_-]/gi, "")
     .slice(0, 48)}@example.com`;
 }
+function previewTotal(items = []) {
+  return items.reduce(
+    (total, { product, quantity }) =>
+      total + (Number(product?.preco_centavos) || 0) * (Number(quantity) || 0),
+    0
+  );
+}
+async function simulatePixOrder(context = {}) {
+  const id = requestId(context.items || []);
+  const token = `demo-checkout-${id}`;
+  const total = previewTotal(context.items || []);
+  await new Promise(resolve => setTimeout(resolve, 650));
+  return {
+    pedido: {
+      token,
+      referencia: "RP-DEMO-CHECKOUT",
+      status: "PENDENTE",
+      valor_total_centavos: total,
+      pix_expira_em: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+    },
+    pix: {
+      qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-checkout-preview"
+    }
+  };
+}
 export function resetCheckoutRequestId() {
   sessionRemove(REQUEST_KEY);
   sessionRemove(CART_KEY);
@@ -46,5 +72,6 @@ export function buildCheckoutPayload({ checkout, items }) {
   };
 }
 export async function createPixOrder(context) {
+  if (paymentSimulationEnabled()) return simulatePixOrder(context);
   return api.createPixCheckout(buildCheckoutPayload(context));
 }
