@@ -23,7 +23,7 @@ export function stopOrderPolling() {
 }
 export function startOrderPolling(token) {
   stopOrderPolling();
-  if (!token) return;
+  if (!token || String(token).startsWith("demo-")) return;
   const run = pollingRun;
   const active = () => run === pollingRun;
   const schedule = () => {
