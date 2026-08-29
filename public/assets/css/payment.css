@@ -144,6 +144,39 @@
   background: var(--rp-color-neutral-bg);
   color: var(--rp-color-muted-strong);
 }
+.rp-payment__state-icon--card-declined {
+  width: 72px;
+  height: 64px;
+  background: transparent;
+  color: #b65252;
+  border-radius: 0;
+}
+.rp-payment__state-icon--card-declined svg {
+  width: 72px;
+  height: 64px;
+  overflow: visible;
+}
+.rp-payment__declined-card-body {
+  fill: #fff5f5;
+  stroke: currentcolor;
+  stroke-width: 2.4;
+}
+.rp-payment__declined-card-stripe,
+.rp-payment__declined-card-detail {
+  stroke: currentcolor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.rp-payment__declined-card-x-ring {
+  fill: var(--rp-color-surface);
+  stroke: currentcolor;
+  stroke-width: 3;
+}
+.rp-payment__declined-card-x {
+  stroke: currentcolor;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+}
 .rp-payment__state-icon--muted {
   background: #f3eee9;
   color: var(--rp-color-muted-strong);
