@@ -98,7 +98,7 @@
   border-radius: 999px;
   padding: 0 3px;
   background: var(--rp-color-brand-action);
-  color: #fff;
+  color: var(--rp-color-on-brand);
   font-size: 9px;
   font-weight: 800;
 }
