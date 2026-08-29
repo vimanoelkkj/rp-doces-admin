@@ -208,6 +208,100 @@
   font-weight: 800;
   cursor: pointer;
 }
+@media (prefers-reduced-motion: no-preference) {
+  .rp-checkout.is-payment-handoff {
+    pointer-events: none;
+  }
+  .rp-checkout.is-payment-handoff .rp-checkout__backdrop {
+    animation: rp-checkout-payment-backdrop-out 190ms ease both !important;
+  }
+  .rp-checkout.is-payment-handoff .rp-checkout__sheet {
+    animation: rp-checkout-payment-sheet-out 190ms cubic-bezier(0.4, 0, 1, 1) both !important;
+  }
+  .rp-checkout.is-payment-handoff .rp-checkout__top,
+  .rp-checkout.is-payment-handoff .rp-checkout__items,
+  .rp-checkout.is-payment-handoff .rp-checkout__total,
+  .rp-checkout.is-payment-handoff .rp-checkout__form {
+    animation: rp-checkout-payment-content-out 145ms ease both !important;
+  }
+  .rp-payment {
+    animation: rp-payment-handoff-backdrop-in 220ms ease both;
+  }
+  .rp-payment__sheet {
+    transform-origin: center bottom;
+    animation: rp-payment-handoff-sheet-in 330ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
+  }
+  .rp-payment__sheet > .rp-kicker,
+  .rp-payment__sheet > .rp-kicker + h2,
+  .rp-payment__sheet > .rp-kicker + h2 + p {
+    animation: rp-payment-creating-content-in 280ms ease both;
+  }
+  .rp-payment__sheet > .rp-kicker {
+    animation-delay: 60ms;
+  }
+  .rp-payment__sheet > .rp-kicker + h2 {
+    animation-delay: 100ms;
+  }
+  .rp-payment__sheet > .rp-kicker + h2 + p {
+    animation-delay: 140ms;
+  }
+  @keyframes rp-checkout-payment-content-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+  }
+  @keyframes rp-checkout-payment-sheet-out {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(16px) scale(0.993);
+    }
+  }
+  @keyframes rp-checkout-payment-backdrop-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0.7;
+    }
+  }
+  @keyframes rp-payment-handoff-backdrop-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes rp-payment-handoff-sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.99);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-payment-creating-content-in {
+    from {
+      opacity: 0;
+      transform: translateY(7px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
 @media (min-width: 680px) {
   .rp-checkout {
     align-items: center;
