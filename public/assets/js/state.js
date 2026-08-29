@@ -58,6 +58,13 @@ function notifyUnlessSuperseded(epoch) {
     if (notifyEpoch === epoch) notify();
   });
 }
+function seedPreviewCartForRetry() {
+  if (!String(state.order.token || "").startsWith("demo-") || state.cart.size > 0) return;
+  const product = state.products.find(isProductAvailable);
+  if (!product) return;
+  const quantity = clampQuantity(product, 1);
+  if (quantity > 0) state.cart.set(productId(product), quantity);
+}
 export function resetTransientState() {
   state.ui = initialUi();
   state.order = initialOrder();
@@ -121,6 +128,7 @@ export function setOrderState(patch) {
   notify();
 }
 export function resetOrderState() {
+  seedPreviewCartForRetry();
   state.order = initialOrder();
   syncPaymentInteractionLock();
   notifyUnlessSuperseded(notifyEpoch);
