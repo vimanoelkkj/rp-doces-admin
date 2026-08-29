@@ -29,6 +29,7 @@ import { copyText } from "./clipboard.js";
 import { createPixOrder, resetCheckoutRequestId } from "./checkout-service.js";
 import { startOrderPolling, stopOrderPolling } from "./payment-controller.js";
 import { paymentCreationAllowed, paymentDisabledMessage } from "./runtime-policy.js";
+import { checkoutIsValid } from "./utils/checkout-validity.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -63,6 +64,11 @@ async function submitCheckout() {
   if (state.order.phase === "creating") return;
   const items = getCartItems();
   if (!items.length) return setCartOpen(true);
+  if (!checkoutIsValid(state.checkout)) {
+    setOrderState({ phase: "error", error: "Revise nome, e-mail e WhatsApp antes de continuar." });
+    setCheckoutOpen(false);
+    return;
+  }
   if (state.checkout.paymentMethod !== "PIX") {
     setOrderState({
       phase: "error",
