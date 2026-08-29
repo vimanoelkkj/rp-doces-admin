@@ -10,7 +10,6 @@ export function renderHomeLanding() {
       </nav>
       <div class="rp-home-header__actions">
         <button type="button" class="rp-home-header__menu" data-open-menu aria-label="Abrir menu"><span aria-hidden="true"></span></button>
-        <button type="button" class="rp-home-header__cart" data-open-cart aria-label="Abrir carrinho"><span class="rp-home-header__bag" aria-hidden="true"></span></button>
       </div>
     </header>
 
