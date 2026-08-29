@@ -9,68 +9,79 @@
 .rp-payment__backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(42 24 19 / 50%);
-  backdrop-filter: blur(4px);
+  background: rgb(59 34 32 / 48%);
 }
 .rp-payment__sheet {
   position: relative;
   width: min(100%, 560px);
   max-height: min(88vh, 760px);
   overflow: auto;
-  padding: 12px 20px 30px;
-  border-radius: 28px 28px 0 0;
+  padding: 12px 20px 28px;
+  border-radius: 26px 26px 0 0;
   background: var(--rp-color-surface);
-  box-shadow: 0 -20px 64px rgb(74 45 36 / 20%);
+  box-shadow: 0 -18px 40px rgb(59 34 32 / 18%);
 }
 .rp-payment__sheet h2 {
   margin: 8px 0 10px;
-  font-family: Fraunces, Georgia, serif;
-  font-size: 34px;
-  line-height: 1;
   color: var(--rp-color-text);
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings:
+    "SOFT" 100,
+    "WONK" 1;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1;
   letter-spacing: -0.025em;
 }
 .rp-payment__sheet > p:not(.rp-kicker):not(.rp-payment__hint) {
-  color: var(--rp-color-muted);
+  color: var(--rp-color-muted-strong);
+  font-size: 13px;
   line-height: 1.55;
 }
 .rp-payment__total {
   display: block;
   width: fit-content;
-  margin: 20px 0;
-  padding: 8px 13px;
-  border-radius: var(--rp-radius-pill);
-  background: var(--rp-color-surface-soft);
+  margin: 18px 0;
   color: var(--rp-color-text);
-  font-size: 1.35rem;
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings:
+    "SOFT" 100,
+    "WONK" 1;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
 }
 .rp-payment__code {
   width: 100%;
-  min-height: 112px;
+  min-height: 108px;
   resize: none;
-  margin: 8px 0 14px;
-  padding: 13px;
-  border: 1px solid var(--rp-color-border);
-  border-radius: 14px;
-  background: var(--rp-color-bg);
+  margin: 8px 0 12px;
+  padding: 11px 13px;
+  border: 1.5px solid var(--rp-color-border);
+  border-radius: 12px;
+  background: #fff;
   color: var(--rp-color-text);
-  font: inherit;
-  font-size: 0.82rem;
-  line-height: 1.45;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.rp-payment__code:focus {
+  border-color: var(--rp-color-brand);
+  box-shadow: 0 0 0 3px #fbdce7;
 }
 .rp-payment__hint {
-  margin-top: 14px;
+  margin-top: 12px;
   color: var(--rp-color-muted);
-  font-size: 0.88rem;
+  font-size: 12px;
   line-height: 1.5;
 }
 .rp-payment__sheet .rp-btn {
   width: 100%;
-  min-height: 50px;
-  border-radius: var(--rp-radius-pill);
+  min-height: 48px;
+  border-radius: 13px;
 }
 .rp-payment__sheet .rp-btn + .rp-btn {
-  margin-top: 10px;
+  margin-top: 9px;
 }
 @media (min-width: 760px) {
   .rp-payment {
@@ -78,7 +89,7 @@
     padding: 24px;
   }
   .rp-payment__sheet {
-    border-radius: var(--rp-radius-xl);
-    padding: 18px 28px 32px;
+    border-radius: 26px;
+    padding: 18px 26px 30px;
   }
 }
