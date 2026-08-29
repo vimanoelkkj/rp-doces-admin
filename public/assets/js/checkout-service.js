@@ -1,4 +1,10 @@
 import { api } from "./api.js";
+import { newIdempotencyId, validIdempotencyId } from "./utils/idempotency.js";
+import { sessionGet, sessionSet, sessionRemove } from "./utils/session.js";
+import { normalizeCustomerName } from "./utils/customer-name.js";
+import { normalizeCustomerEmail } from "./utils/customer-email.js";
+import { normalizeCustomerWhatsapp } from "./utils/customer-whatsapp.js";
+import { normalizeOrderNote } from "./utils/order-note.js";
 
 const REQUEST_KEY = "rp_checkout_request_id";
 const CART_KEY = "rp_checkout_cart_signature";
@@ -10,41 +16,30 @@ function cartSignature(items = []) {
     .join("|");
 }
 
-function fallbackRequestId() {
-  const random = Math.random().toString(36).slice(2);
-  return `rp_${Date.now().toString(36)}_${random}`.slice(0, 64);
-}
-
-function newRequestId() {
-  return globalThis.crypto?.randomUUID?.() || fallbackRequestId();
-}
-
 function requestId(items) {
   const signature = cartSignature(items);
-  let id = sessionStorage.getItem(REQUEST_KEY);
-  const previousSignature = sessionStorage.getItem(CART_KEY);
-  if (!id || previousSignature !== signature) {
-    id = newRequestId();
-    sessionStorage.setItem(REQUEST_KEY, id);
-    sessionStorage.setItem(CART_KEY, signature);
+  let id = sessionGet(REQUEST_KEY);
+  const previousSignature = sessionGet(CART_KEY);
+  if (!validIdempotencyId(id) || previousSignature !== signature) {
+    id = newIdempotencyId();
+    sessionSet(REQUEST_KEY, id);
+    sessionSet(CART_KEY, signature);
   }
   return id;
 }
 
 export function resetCheckoutRequestId() {
-  sessionStorage.removeItem(REQUEST_KEY);
-  sessionStorage.removeItem(CART_KEY);
+  sessionRemove(REQUEST_KEY);
+  sessionRemove(CART_KEY);
 }
 
 export function buildCheckoutPayload({ checkout, items }) {
   return {
     client_request_id: requestId(items),
-    nome: String(checkout?.name || "").trim(),
-    email: String(checkout?.email || "")
-      .trim()
-      .toLowerCase(),
-    whatsapp: String(checkout?.whatsapp || "").trim(),
-    observacao: String(checkout?.note || "").trim(),
+    nome: normalizeCustomerName(checkout?.name),
+    email: normalizeCustomerEmail(checkout?.email),
+    whatsapp: normalizeCustomerWhatsapp(checkout?.whatsapp),
+    observacao: normalizeOrderNote(checkout?.note),
     itens: (items || []).map(({ product, quantity }) => ({
       produto_id: Number(product.id),
       quantidade: Number(quantity)
