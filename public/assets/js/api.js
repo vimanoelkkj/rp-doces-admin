@@ -1,4 +1,4 @@
-import { API_PATHS, orderPath } from "./utils/api-path.js";
+import { API_PATHS, orderCancelPath, orderPath } from "./utils/api-path.js";
 import { timeoutSignal } from "./utils/fetch-timeout.js";
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -26,5 +26,6 @@ export const api = {
   getConfig: () => request("/api/config", { cache: "no-store" }),
   getProducts: () => request(API_PATHS.products, { cache: "no-store" }),
   createPixCheckout: payload => postJson(API_PATHS.checkoutPix, payload),
-  getOrder: token => request(orderPath(token), { cache: "no-store" })
+  getOrder: token => request(orderPath(token), { cache: "no-store" }),
+  cancelOrder: token => request(orderCancelPath(token), { method: "POST" })
 };
