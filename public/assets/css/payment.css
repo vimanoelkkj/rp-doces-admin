@@ -247,6 +247,30 @@
   background: #b65252;
   color: #fff;
 }
+.rp-payment__sheet .rp-btn--danger[disabled] {
+  cursor: wait;
+  opacity: 0.86;
+}
+.rp-payment__cancel-progress {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.rp-payment__cancel-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 2px solid rgb(255 255 255 / 38%);
+  border-top-color: currentcolor;
+  border-radius: 999px;
+  animation: rp-payment-cancel-spin 720ms linear infinite;
+}
+@keyframes rp-payment-cancel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 @keyframes rp-waiting-clock-hand {
   from {
     transform: rotate(0deg);
@@ -541,7 +565,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rp-payment__waiting-clock-hand {
+  .rp-payment__waiting-clock-hand,
+  .rp-payment__cancel-spinner {
     animation: none;
   }
 }
