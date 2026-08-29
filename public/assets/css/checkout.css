@@ -83,7 +83,7 @@
   font-weight: 800;
 }
 .rp-checkout__item > small {
-  color: #81685f;
+  color: var(--rp-color-muted);
   font-size: 10px;
 }
 .rp-checkout__total {
@@ -93,7 +93,7 @@
   padding: 18px 0 17px;
 }
 .rp-checkout__total span {
-  color: #81685f;
+  color: var(--rp-color-muted);
   font-family: "DM Mono", monospace;
   font-size: 8px;
   font-weight: 600;
@@ -122,7 +122,7 @@
   font-weight: 800;
 }
 .rp-checkout__field em {
-  color: #81685f;
+  color: var(--rp-color-muted);
   font-style: normal;
   font-weight: 500;
 }
@@ -149,7 +149,7 @@
 }
 .rp-checkout__form input:focus,
 .rp-checkout__form textarea:focus {
-  border-color: #e07081;
+  border-color: var(--rp-color-brand);
   box-shadow: 0 0 0 2px #fce7eb;
 }
 .rp-checkout__payment {
@@ -177,7 +177,7 @@
   color: #4b302b;
 }
 .rp-checkout__pay-option:has(input:checked) {
-  border-color: #e07081;
+  border-color: var(--rp-color-brand);
   background: #fde7eb;
 }
 .rp-checkout__pay-option input {
@@ -202,8 +202,8 @@
   margin-top: 5px;
   border: 0;
   border-radius: 12px;
-  background: #e07081;
-  color: #fff;
+  background: var(--rp-color-brand);
+  color: var(--rp-color-on-brand);
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
