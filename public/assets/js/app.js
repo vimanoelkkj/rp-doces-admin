@@ -46,6 +46,7 @@ import { catalogProducts } from "./utils/catalog-response.js";
 const regionMarkup = new Map();
 let storefrontRoute = "home";
 let catalogCategory = "ALL";
+let pixCopiedTimer = null;
 
 function catalogMarkup() {
   return `<section data-catalog-route><div data-region="header"></div><div data-region="products"></div>${renderSiteFooter()}</section>`;
@@ -399,8 +400,13 @@ function bindStorefrontEvents() {
           button.insertAdjacentElement("afterend", message);
         }
         message.textContent = "✓ Código Pix copiado. Agora é só colar no app do seu banco.";
-        setTimeout(() => {
+        message.style.animation = "none";
+        void message.offsetWidth;
+        message.style.animation = "";
+        if (pixCopiedTimer) clearTimeout(pixCopiedTimer);
+        pixCopiedTimer = setTimeout(() => {
           if (message?.isConnected) message.remove();
+          pixCopiedTimer = null;
         }, 1800);
       }
     }
