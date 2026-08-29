@@ -8,6 +8,8 @@
   --rp-color-brand-action: oklch(68% 0.14 12);
   --rp-color-brand-soft: oklch(90% 0.045 18);
   --rp-color-brand-soft-strong: oklch(90% 0.045 18);
+  --rp-color-on-brand: #fff;
+  --rp-color-chip-surface: rgb(255 255 255 / 90%);
   --rp-color-border: oklch(85% 0.018 40);
   --rp-color-border-strong: oklch(85% 0.018 40);
   --rp-color-neutral-bg: oklch(93% 0.008 40);
