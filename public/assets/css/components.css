@@ -108,6 +108,15 @@
   gap: 16px;
   margin-top: 18px;
 }
+.rp-product-card__pricing {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+}
+.rp-product-card__old-price {
+  color: var(--rp-color-muted);
+  font-size: 12px;
+}
 .rp-product-card__price {
   display: block;
   font-size: 18px;
