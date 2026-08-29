@@ -4,6 +4,7 @@ import { setOrderState } from "./state.js";
 let timer = null;
 let attempts = 0;
 const MAX_ATTEMPTS = 120;
+const TERMINAL_FAILURES = new Set(["CANCELADO", "REJEITADO", "EXPIRADO", "ERRO", "REEMBOLSADO"]);
 
 export function stopOrderPolling() {
   if (timer) clearTimeout(timer);
@@ -22,19 +23,20 @@ export function startOrderPolling(token) {
       const pedido = payload.pedido || {};
       const status = String(pedido.status || "").toUpperCase();
 
-      if (status === "PAGO" || status === "APROVADO") {
+      if (status === "PAGO") {
         setOrderState({ phase: "paid", token, data: pedido, error: null });
         stopOrderPolling();
         return;
       }
 
-      if (["CANCELADO", "REJEITADO", "EXPIRADO"].includes(status)) {
-        setOrderState({
-          phase: "error",
-          token,
-          data: pedido,
-          error: "O pagamento não foi concluído."
-        });
+      if (TERMINAL_FAILURES.has(status)) {
+        const message =
+          status === "REEMBOLSADO"
+            ? "O pagamento foi reembolsado."
+            : status === "EXPIRADO"
+              ? "O prazo para pagar este Pix expirou."
+              : "O pagamento não foi concluído.";
+        setOrderState({ phase: "error", token, data: pedido, error: message });
         stopOrderPolling();
         return;
       }
