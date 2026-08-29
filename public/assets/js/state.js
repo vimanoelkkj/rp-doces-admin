@@ -18,7 +18,19 @@ export function notify() {
 
 export function setCartOpen(open) {
   state.ui.cartOpen = Boolean(open);
+  if (open) state.ui.checkoutOpen = false;
   notify();
+}
+
+export function setCheckoutOpen(open) {
+  state.ui.checkoutOpen = Boolean(open);
+  if (open) state.ui.cartOpen = false;
+  notify();
+}
+
+export function updateCheckout(field, value) {
+  if (!(field in state.checkout)) return;
+  state.checkout[field] = value;
 }
 
 export function getCartQuantity(productId) {
