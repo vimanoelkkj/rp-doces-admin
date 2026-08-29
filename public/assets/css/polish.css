@@ -3,3 +3,10 @@
   background:
     radial-gradient(circle at 88% 18%, rgb(255 226 235 / 62%), transparent 30%), var(--rp-color-bg);
 }
+.rp-hero__title {
+  max-width: 10.5ch;
+  text-wrap: balance;
+}
+.rp-hero__lede {
+  text-wrap: pretty;
+}
