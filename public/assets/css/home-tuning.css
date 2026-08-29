@@ -15,6 +15,12 @@
   min-height: 260px;
   padding: 28px 24px;
   text-align: center;
+  background: #fff;
+  background-image: none;
+}
+.rp-home-map::before,
+.rp-home-map::after {
+  display: none;
 }
 .rp-home-map__partner {
   color: var(--rp-color-muted);
