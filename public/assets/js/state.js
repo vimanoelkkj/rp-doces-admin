@@ -29,10 +29,22 @@ export const state = {
   order: initialOrder(),
   ui: initialUi()
 };
+function paymentInteractionLocked() {
+  return state.order.phase === "creating" || state.order.cancelPending;
+}
+function syncPaymentInteractionLock() {
+  if (typeof document === "undefined") return;
+  const locked = paymentInteractionLocked();
+  document.querySelectorAll("#rp-app > [data-region]").forEach(region => {
+    if (region.dataset.region === "payment") return;
+    region.inert = locked;
+  });
+}
 export function resetTransientState() {
   state.ui = initialUi();
   state.order = initialOrder();
   state.productsStatus = "loading";
+  syncPaymentInteractionLock();
 }
 export function subscribe(listener) {
   listeners.add(listener);
@@ -85,10 +97,12 @@ export function updateCheckout(field, value) {
 }
 export function setOrderState(patch) {
   state.order = { ...state.order, ...patch };
+  syncPaymentInteractionLock();
   notify();
 }
 export function resetOrderState() {
   state.order = initialOrder();
+  syncPaymentInteractionLock();
   notify();
 }
 export function getCartQuantity(id) {
