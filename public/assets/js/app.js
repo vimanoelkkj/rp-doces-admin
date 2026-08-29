@@ -319,6 +319,81 @@ async function submitCheckout() {
     setOrderState({ phase: "error", error: checkoutErrorMessage(error), demoState: "" });
   }
 }
+async function cancelCurrentOrder() {
+  const token = state.order.token;
+  if (!token || state.order.cancelPending) return;
+
+  if (String(token).startsWith("demo-")) {
+    clearPreviewPaymentTimers();
+    stopOrderPolling();
+    setOrderState({
+      demoState: "cancelled",
+      cancelPending: false,
+      cancelError: null,
+      pix: null,
+      data: { ...state.order.data, status: "CANCELADO" }
+    });
+    return;
+  }
+
+  stopOrderPolling();
+  setOrderState({ cancelPending: true, cancelError: null });
+
+  try {
+    const payload = await api.cancelOrder(token);
+    if (state.order.token !== token) return;
+    setOrderState({
+      phase: "pending",
+      demoState: "cancelled",
+      cancelPending: false,
+      cancelError: null,
+      pix: null,
+      data: { ...state.order.data, ...(payload.pedido || {}), status: "CANCELADO" }
+    });
+  } catch (error) {
+    if (state.order.token !== token) return;
+
+    if (error?.status === 409) {
+      try {
+        const payload = await api.getOrder(token);
+        if (state.order.token !== token) return;
+        const pedido = payload.pedido || {};
+        const status = String(pedido.status || "").toUpperCase();
+        if (status === "PAGO") {
+          setOrderState({
+            phase: "paid",
+            data: pedido,
+            pix: null,
+            error: null,
+            demoState: "",
+            cancelPending: false,
+            cancelError: null
+          });
+          return;
+        }
+        if (status === "CANCELADO") {
+          setOrderState({
+            phase: "pending",
+            data: pedido,
+            pix: null,
+            demoState: "cancelled",
+            cancelPending: false,
+            cancelError: null
+          });
+          return;
+        }
+      } catch {
+        // Mantém a mensagem original do cancelamento quando a reconciliação falhar.
+      }
+    }
+
+    setOrderState({
+      cancelPending: false,
+      cancelError: error?.message || "Não foi possível cancelar o Pix agora."
+    });
+    startOrderPolling(token);
+  }
+}
 function returnToCheckout({ resetRequest = false } = {}) {
   clearPreviewPaymentTimers();
   stopOrderPolling();
@@ -380,28 +455,41 @@ function bindStorefrontEvents() {
     if (event.target.closest("[data-close-party]")) return setPartyOpen(false);
     if (event.target.closest("[data-reload-products]")) return loadProducts();
     if (
-      event.target.closest("[data-confirm-demo-cancel]") &&
-      state.order.demoState === "cancel-confirm"
+      event.target.closest("[data-request-cancel-order]") &&
+      state.order.phase === "pending" &&
+      String(state.order.paymentMethod || "").toUpperCase() === "PIX"
     )
       return setOrderState({
-        demoState: "cancelled",
-        data: { ...state.order.data, status: "CANCELADO" }
+        demoState: "cancel-confirm",
+        cancelPending: false,
+        cancelError: null
       });
     if (
-      event.target.closest("[data-keep-demo-order]") &&
+      event.target.closest("[data-confirm-cancel-order]") &&
       state.order.demoState === "cancel-confirm"
     )
-      return setOrderState({
-        demoState: "",
-        pix: {
-          qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation"
-        },
-        data: {
-          ...state.order.data,
-          status: "PENDENTE",
-          pix_expira_em: new Date(Date.now() + 30 * 60 * 1000).toISOString()
-        }
-      });
+      return cancelCurrentOrder();
+    if (
+      event.target.closest("[data-keep-order]") &&
+      state.order.demoState === "cancel-confirm" &&
+      !state.order.cancelPending
+    ) {
+      if (String(state.order.token || "").startsWith("demo-")) {
+        return setOrderState({
+          demoState: "",
+          cancelError: null,
+          pix: {
+            qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation"
+          },
+          data: {
+            ...state.order.data,
+            status: "PENDENTE",
+            pix_expira_em: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+          }
+        });
+      }
+      return setOrderState({ demoState: "", cancelError: null });
+    }
     if (event.target.closest("[data-close-payment]")) return returnToCheckout();
     if (event.target.closest("[data-finish-order]")) return finishOrder();
     if (event.target.closest("[data-retry-payment]"))
