@@ -69,7 +69,7 @@
   .rp-checkout:not([hidden]) .rp-checkout__items,
   .rp-checkout:not([hidden]) .rp-checkout__total,
   .rp-checkout:not([hidden]) .rp-checkout__form {
-    animation: rp-checkout-content-in 300ms ease both;
+    animation: rp-cart-content-in 300ms ease both;
   }
   .rp-checkout:not([hidden]) .rp-checkout__items {
     animation-delay: 70ms;
@@ -187,8 +187,7 @@
       transform: none;
     }
   }
-  @keyframes rp-cart-content-in,
-  @keyframes rp-checkout-content-in {
+  @keyframes rp-cart-content-in {
     from {
       opacity: 0;
       transform: translateY(6px);
