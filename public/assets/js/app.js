@@ -19,6 +19,7 @@ import {
 } from "./state.js";
 import { renderSiteHeader } from "./components/site-header.js";
 import { renderHero } from "./components/hero.js";
+import { renderHomeLanding } from "./components/home-landing.js";
 import { renderProductList } from "./components/product-list.js";
 import { renderCartBar } from "./components/cart-bar.js";
 import { renderCart } from "./components/cart.js";
@@ -44,25 +45,17 @@ import { normalizeOrderResponse } from "./utils/order-response.js";
 import { catalogProducts } from "./utils/catalog-response.js";
 
 const regionMarkup = new Map();
+let storefrontRoute = "home";
 
+function catalogMarkup() {
+  return `<section data-catalog-route><div data-region="header"></div>${renderHero()}<div data-region="products"></div>${renderSiteFooter()}</section>`;
+}
 function mountStorefront() {
   const root = document.getElementById("rp-app");
   if (!root || root.dataset.mounted === "true") return;
-  root.innerHTML = `
-    <div data-region="header"></div>
-    ${renderHero()}
-    <div data-region="products"></div>
-    ${renderSiteFooter()}
-    <div data-region="cart-bar"></div>
-    <div data-region="cart"></div>
-    <div data-region="checkout"></div>
-    <div data-region="payment"></div>
-    <div data-region="menu"></div>
-    <div data-region="party"></div>
-  `;
+  root.innerHTML = `<div data-region="route"></div><div data-region="cart-bar"></div><div data-region="cart"></div><div data-region="checkout"></div><div data-region="payment"></div><div data-region="menu"></div><div data-region="party"></div>`;
   root.dataset.mounted = "true";
 }
-
 function updateRegion(name, markup) {
   const root = document.getElementById("rp-app");
   const region = root?.querySelector(`[data-region="${name}"]`);
@@ -70,14 +63,24 @@ function updateRegion(name, markup) {
   region.innerHTML = markup;
   regionMarkup.set(name, markup);
 }
-
+function ensureRouteMarkup() {
+  const markup = storefrontRoute === "home" ? renderHomeLanding() : catalogMarkup();
+  updateRegion("route", markup);
+  if (storefrontRoute === "catalog") {
+    regionMarkup.delete("header");
+    regionMarkup.delete("products");
+  }
+}
 function renderStorefront() {
   mountStorefront();
+  ensureRouteMarkup();
   const summary = getCartSummary();
   const items = getCartItems();
-  updateRegion("header", renderSiteHeader(summary));
-  updateRegion("products", renderProductList(state.products, state.cart, state.productsStatus));
-  updateRegion("cart-bar", renderCartBar(summary));
+  if (storefrontRoute === "catalog") {
+    updateRegion("header", renderSiteHeader(summary));
+    updateRegion("products", renderProductList(state.products, state.cart, state.productsStatus));
+  }
+  updateRegion("cart-bar", storefrontRoute === "catalog" ? renderCartBar(summary) : "");
   updateRegion("cart", renderCart({ open: state.ui.cartOpen, items, summary }));
   updateRegion(
     "checkout",
@@ -88,12 +91,24 @@ function renderStorefront() {
   updateRegion("party", renderPartySheet(state.ui.partyOpen));
   setPageScrollLocked(hasOpenOverlay(state));
 }
-
+function showCatalog() {
+  storefrontRoute = "catalog";
+  regionMarkup.delete("route");
+  renderStorefront();
+  window.scrollTo({ top: 0, behavior: scrollBehavior() });
+}
+function showHome() {
+  storefrontRoute = "home";
+  regionMarkup.delete("route");
+  renderStorefront();
+  window.scrollTo({ top: 0, behavior: scrollBehavior() });
+}
 function applyPreviewDemo() {
   const mode = new URLSearchParams(location.search).get("demo");
   const previewDisabled =
     document.querySelector('meta[name="rp-payment-mode"]')?.content === "disabled";
   if (!previewDisabled || !["pix-pending", "card-pending"].includes(mode)) return false;
+  storefrontRoute = "catalog";
   const card = mode === "card-pending";
   const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   state.order = {
@@ -108,14 +123,11 @@ function applyPreviewDemo() {
     },
     pix: card
       ? null
-      : {
-          qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation"
-        },
+      : { qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation" },
     error: null
   };
   return true;
 }
-
 async function loadProducts() {
   state.productsStatus = "loading";
   notify();
@@ -192,6 +204,8 @@ function bindStorefrontEvents() {
   if (!root || root.dataset.eventsBound === "true") return;
   root.dataset.eventsBound = "true";
   root.addEventListener("click", async event => {
+    if (event.target.closest("[data-show-catalog]")) return showCatalog();
+    if (event.target.closest("[data-home-top]")) return showHome();
     const removeButton = event.target.closest("[data-cart-remove]");
     if (removeButton) return setCartQuantity(removeButton.dataset.productId, 0);
     const quantityButton = event.target.closest("[data-cart-delta]");
