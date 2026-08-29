@@ -18,6 +18,19 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+body.rp-cart-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+body.rp-cart-open .rp-cart-sheet,
+body.rp-cart-open .rp-checkout__sheet,
+body.rp-cart-open .rp-mobile-menu__sheet,
+body.rp-cart-open .rp-party__sheet,
+body.rp-cart-open [data-payment-status] {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
 h1,
 h2,
 h3,
