@@ -214,6 +214,11 @@
   font-weight: 800;
   cursor: pointer;
 }
+.rp-checkout__submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: saturate(0.55);
+}
 @media (prefers-reduced-motion: no-preference) {
   .rp-checkout__form input[type="text"],
   .rp-checkout__form input[type="tel"],
@@ -242,9 +247,10 @@
     transition:
       transform 150ms ease,
       filter 150ms ease,
-      box-shadow 150ms ease;
+      box-shadow 150ms ease,
+      opacity 150ms ease;
   }
-  .rp-checkout__submit:active {
+  .rp-checkout__submit:not(:disabled):active {
     transform: translateY(1px) scale(0.985);
     filter: saturate(0.96);
   }
