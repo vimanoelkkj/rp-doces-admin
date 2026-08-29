@@ -127,3 +127,18 @@
 .rp-site-footer__top:hover {
   transform: translateY(-2px);
 }
+@media (max-width: 380px) {
+  .rp-hero__grid {
+    gap: 28px;
+  }
+  .rp-hero__title {
+    font-size: 46px;
+  }
+  .rp-product-card__body {
+    padding: 18px;
+  }
+  .rp-cart-bar {
+    left: 12px;
+    right: 12px;
+  }
+}
