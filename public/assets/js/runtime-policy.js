@@ -5,8 +5,11 @@ export function paymentMode() {
   );
 }
 export function paymentCreationAllowed() {
-  return paymentMode() === "enabled";
+  return ["enabled", "disabled"].includes(paymentMode());
+}
+export function paymentSimulationEnabled() {
+  return paymentMode() === "disabled";
 }
 export function paymentDisabledMessage() {
-  return "Checkout real desativado nesta prévia para não criar pedidos ou cobranças reais.";
+  return "Checkout indisponível neste ambiente.";
 }
