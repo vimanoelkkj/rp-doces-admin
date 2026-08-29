@@ -11,6 +11,7 @@ import {
   setPartyOpen,
   updateCheckout,
   syncCartWithProducts,
+  setOrderState,
   resetOrderState,
   notify
 } from "./state.js";
@@ -25,8 +26,8 @@ import { renderMobileMenu } from "./components/mobile-menu.js";
 import { renderPartySheet } from "./components/party-sheet.js";
 import { renderSiteFooter } from "./components/site-footer.js";
 import { copyText } from "./clipboard.js";
-import { resetCheckoutRequestId } from "./checkout-service.js";
-import { stopOrderPolling } from "./payment-controller.js";
+import { createPixOrder, resetCheckoutRequestId } from "./checkout-service.js";
+import { startOrderPolling, stopOrderPolling } from "./payment-controller.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -42,14 +43,6 @@ function renderStorefront() {
   document.body.classList.toggle("rp-cart-open", overlayOpen);
 }
 
-function dispatchCheckoutSubmit() {
-  window.dispatchEvent(
-    new CustomEvent("rp:submit-checkout", {
-      detail: { checkout: { ...state.checkout }, items: getCartItems(), summary: getCartSummary() }
-    })
-  );
-}
-
 async function loadProducts() {
   state.productsStatus = "loading";
   notify();
@@ -63,6 +56,42 @@ async function loadProducts() {
     console.warn("R&P: não foi possível carregar produtos no bootstrap modular.", error);
   }
   notify();
+}
+
+async function submitCheckout() {
+  if (state.order.phase === "creating") return;
+  const items = getCartItems();
+  if (!items.length) return setCartOpen(true);
+  if (state.checkout.paymentMethod !== "PIX") {
+    setOrderState({
+      phase: "error",
+      error: "Pagamento com cartão ainda não está disponível nesta versão."
+    });
+    setCheckoutOpen(false);
+    return;
+  }
+
+  setCheckoutOpen(false);
+  setOrderState({ phase: "creating", token: null, data: null, pix: null, error: null });
+  try {
+    const payload = await createPixOrder({ checkout: state.checkout, items });
+    const pedido = payload.pedido || {};
+    const token = pedido.token || null;
+    const paid = String(pedido.status || "").toUpperCase() === "PAGO";
+    setOrderState({
+      phase: paid ? "paid" : "pending",
+      token,
+      data: pedido,
+      pix: payload.pix || null,
+      error: null
+    });
+    if (!paid && token) startOrderPolling(token);
+  } catch (error) {
+    setOrderState({
+      phase: "error",
+      error: error.message || "Não foi possível iniciar o pagamento."
+    });
+  }
 }
 
 function returnToCheckout({ resetRequest = false } = {}) {
@@ -90,13 +119,11 @@ function bindStorefrontEvents() {
 
   root.addEventListener("click", async event => {
     const quantityButton = event.target.closest("[data-cart-delta]");
-    if (quantityButton) {
-      changeCartQuantity(
+    if (quantityButton)
+      return changeCartQuantity(
         quantityButton.dataset.productId,
         Number(quantityButton.dataset.cartDelta)
       );
-      return;
-    }
     if (event.target.closest("[data-open-cart]")) return setCartOpen(true);
     if (event.target.closest("[data-close-cart]")) return setCartOpen(false);
     if (event.target.closest("[data-start-checkout]")) return setCheckoutOpen(true);
@@ -127,15 +154,13 @@ function bindStorefrontEvents() {
   root.addEventListener("submit", event => {
     if (!event.target.matches("[data-checkout-form]")) return;
     event.preventDefault();
-    if (state.order.phase === "creating") return;
-    dispatchCheckoutSubmit();
+    submitCheckout();
   });
 
   root.addEventListener("input", event => {
     const field = event.target.dataset.checkoutField;
     if (field) updateCheckout(field, event.target.value);
   });
-
   root.addEventListener("change", event => {
     const field = event.target.dataset.checkoutField;
     if (field) updateCheckout(field, event.target.value);
