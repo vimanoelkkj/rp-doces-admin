@@ -4,7 +4,7 @@ export const state = {
   products: [],
   cart: new Map(),
   checkout: { name: "", whatsapp: "", note: "", paymentMethod: "PIX" },
-  ui: { cartOpen: false }
+  ui: { cartOpen: false, checkoutOpen: false }
 };
 
 export function subscribe(listener) {
@@ -36,7 +36,10 @@ export function setCartQuantity(productId, quantity) {
 
   if (next <= 0) state.cart.delete(id);
   else state.cart.set(id, next);
-  if (state.cart.size === 0) state.ui.cartOpen = false;
+  if (state.cart.size === 0) {
+    state.ui.cartOpen = false;
+    state.ui.checkoutOpen = false;
+  }
   notify();
 }
 
@@ -55,7 +58,10 @@ export function syncCartWithProducts() {
     if (capped <= 0) state.cart.delete(productId);
     else state.cart.set(productId, capped);
   }
-  if (state.cart.size === 0) state.ui.cartOpen = false;
+  if (state.cart.size === 0) {
+    state.ui.cartOpen = false;
+    state.ui.checkoutOpen = false;
+  }
 }
 
 export function getCartItems() {
