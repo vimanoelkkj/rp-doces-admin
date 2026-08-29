@@ -39,6 +39,41 @@ body.rp-cart-open [data-payment-status] {
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
+@media (prefers-reduced-motion: no-preference) {
+  .rp-cart-overlay.is-closing,
+  .rp-checkout.is-closing,
+  .rp-payment.is-closing,
+  .rp-mobile-menu.is-closing,
+  .rp-party.is-closing {
+    pointer-events: none;
+    animation: rp-modal-overlay-out 220ms ease both !important;
+  }
+  .rp-cart-overlay.is-closing .rp-cart-sheet,
+  .rp-checkout.is-closing .rp-checkout__sheet,
+  .rp-payment.is-closing .rp-payment__sheet,
+  .rp-mobile-menu.is-closing .rp-mobile-menu__sheet,
+  .rp-party.is-closing .rp-party__sheet {
+    animation: rp-modal-sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) both !important;
+  }
+  @keyframes rp-modal-overlay-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes rp-modal-sheet-out {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(22px) scale(0.99);
+    }
+  }
+}
 h1,
 h2,
 h3,
