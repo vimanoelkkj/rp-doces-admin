@@ -17,6 +17,18 @@
   .rp-shell:not([data-mounted="true"]) .rp-product-card:nth-child(3) {
     animation-delay: 100ms;
   }
+  .rp-cart-bar {
+    transform-origin: center bottom;
+    animation: rp-cart-bar-feedback 340ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  }
+  .rp-site-header__cart {
+    transform-origin: center;
+    animation: rp-header-cart-feedback 360ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
+  }
+  .rp-site-header__badge {
+    transform-origin: center;
+    animation: rp-cart-badge-feedback 420ms 40ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  }
   @keyframes rp-fade-in {
     from {
       opacity: 0;
@@ -55,6 +67,45 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+  @keyframes rp-cart-bar-feedback {
+    0% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.985);
+    }
+    55% {
+      opacity: 1;
+      transform: translateY(-2px) scale(1.015);
+    }
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-header-cart-feedback {
+    0% {
+      opacity: 0;
+      transform: scale(0.82) rotate(-5deg);
+    }
+    55% {
+      opacity: 1;
+      transform: scale(1.1) rotate(3deg);
+    }
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-cart-badge-feedback {
+    0% {
+      transform: scale(0.55);
+    }
+    55% {
+      transform: scale(1.22);
+    }
+    100% {
+      transform: scale(1);
     }
   }
 }
