@@ -76,7 +76,22 @@ function handoffCheckoutToPayment(form) {
 }
 
 function handoffPaymentToCheckout(root, callback) {
-  finishAfterAnimation(root, "is-checkout-return", callback, PAYMENT_RETURN_MS);
+  if (!root || reducedMotion()) return callback();
+  if (root.classList.contains("is-checkout-return")) return;
+
+  root.classList.add("is-checkout-return");
+  window.setTimeout(() => {
+    const checkout = document.querySelector(".rp-checkout");
+    if (checkout) {
+      checkout.hidden = false;
+      checkout.setAttribute("aria-hidden", "false");
+      checkout.classList.add("is-payment-return-preview");
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(callback);
+    });
+  }, PAYMENT_RETURN_MS);
 }
 
 document.addEventListener(
