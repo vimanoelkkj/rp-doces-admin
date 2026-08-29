@@ -31,6 +31,14 @@ body.rp-cart-open [data-payment-status] {
   touch-action: pan-y;
   overscroll-behavior: contain;
 }
+.rp-cart-overlay__backdrop,
+.rp-checkout,
+.rp-payment__backdrop,
+.rp-mobile-menu__backdrop,
+.rp-party__backdrop {
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
 h1,
 h2,
 h3,
