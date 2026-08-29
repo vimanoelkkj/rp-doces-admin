@@ -1,0 +1,11 @@
+@media (max-width: 767px) {
+  .rp-home {
+    background: var(--rp-color-bg);
+  }
+  .rp-home-hero .rp-home-btn {
+    margin-top: 18px;
+  }
+  .rp-home-media--hero {
+    margin-top: 24px;
+  }
+}
