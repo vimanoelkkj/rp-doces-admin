@@ -16,7 +16,7 @@ function stateShell({ icon, kicker, title, body, content = "", state = "" }) {
   return `<div class="rp-payment__state${state ? ` rp-payment__state--${state}` : ""}">${icon}<p class="rp-kicker">${kicker}</p><h2>${title}</h2><p>${body}</p>${content}</div>`;
 }
 function pendingContent({ cardPending, total, qrCode, expiresAt, copied = false, exiting = false }) {
-  return `<div class="rp-payment__pending${exiting ? " rp-payment__pending--exit" : ""}"><style>.rp-payment .rp-payment__copied{background:#dff3e4;color:#287a45}@keyframes rp-pix-copy-feedback{0%{opacity:0;transform:translateY(6px) scale(.985)}14%{opacity:1;transform:translateY(0) scale(1.012)}22%{opacity:1;transform:translateY(0) scale(1)}86%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(4px) scale(.99)}}@keyframes rp-payment-pending-exit{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-5px) scale(.992)}}@media (prefers-reduced-motion:no-preference){.rp-payment .rp-payment__copied{animation:rp-pix-copy-feedback 1.8s cubic-bezier(.2,.75,.25,1) both}.rp-payment__pending--exit{animation:rp-payment-pending-exit 220ms ease both}.rp-payment__pending--exit .rp-payment__waiting-mark,.rp-payment__pending--exit .rp-payment__waiting-mark~h2,.rp-payment__pending--exit .rp-payment__waiting-mark~p,.rp-payment__pending--exit .rp-payment__waiting-mark~.rp-payment__total,.rp-payment__pending--exit .rp-payment__waiting-mark~.rp-payment__code,.rp-payment__pending--exit .rp-payment__waiting-mark~.rp-btn,.rp-payment__pending--exit .rp-payment__waiting-mark~.rp-payment__hint{animation:none!important}}</style><div class="rp-payment__waiting-mark">${cardPending ? waitingCardIcon : waitingPixIcon}</div><h2>Aguardando pagamento</h2><p>${cardPending ? "Já estamos levando a maquininha até você. Pague no débito ou crédito quando ela chegar." : "Copie o código Pix e pague no app do seu próprio banco."}</p>${!cardPending && total ? `<strong class="rp-payment__total">${formatMoney(total)}</strong>` : ""}${!cardPending && qrCode ? `<textarea class="rp-payment__code" readonly aria-label="Código Pix copia e cola">${escapeHtml(qrCode)}</textarea><button class="rp-btn rp-btn--primary" type="button" data-copy-pix>Copiar código Pix</button>${copied ? `<div class="rp-payment__copied" role="status">✓ Código Pix copiado. Agora é só colar no app do seu banco.</div>` : ""}` : ""}${!cardPending && expiresAt ? `<p class="rp-payment__hint">Pix válido até ${escapeHtml(expiresAt)}.</p>` : ""}${!cardPending ? `<p class="rp-payment__hint">Esta tela acompanha a confirmação do pagamento automaticamente.</p>` : ""}</div>`;
+  return `<div class="rp-payment__pending${exiting ? " rp-payment__pending--exit" : ""}"><style>.rp-payment .rp-payment__copied{background:#dff3e4;color:#287a45}@keyframes rp-pix-copy-feedback{0%{opacity:0;transform:translateY(6px) scale(.985)}14%{opacity:1;transform:translateY(0) scale(1.012)}22%{opacity:1;transform:translateY(0) scale(1)}86%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(4px) scale(.99)}}@keyframes rp-payment-pending-exit{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-5px) scale(.992)}}@media (prefers-reduced-motion:no-preference){.rp-payment .rp-payment__copied{animation:rp-pix-copy-feedback 1.8s cubic-bezier(.2,.75,.25,1) both}.rp-payment__pending--exit{animation:rp-payment-pending-exit 220ms ease both}.rp-payment__pending--exit .rp-payment__waiting-mark,.rp-payment__pending--exit .rp-payment__waiting-mark~h2,.rp-payment__pending--exit .rp-payment__waiting-mark~p,.rp-payment__pending--exit .rp-payment__waiting-mark~.rp-payment__total,.rp-payment__pending--exit .rp-payment__waiting-mark~.rp-payment__code,.rp-payment__pending--exit .rp-payment__waiting-mark~.rp-btn,.rp-payment__pending--exit .rp-payment__waiting-mark~.rp-payment__hint{animation:none!important}}</style><div class="rp-payment__waiting-mark">${cardPending ? waitingCardIcon : waitingPixIcon}</div><h2>Aguardando pagamento</h2><p>${cardPending ? "Já estamos levando a maquininha até você. Pague no débito ou crédito quando ela chegar." : "Copie o código Pix e pague no app do seu próprio banco."}</p>${!cardPending && total ? `<strong class="rp-payment__total">${formatMoney(total)}</strong>` : ""}${!cardPending && qrCode ? `<textarea class="rp-payment__code" readonly aria-label="Código Pix copia e cola">${escapeHtml(qrCode)}</textarea><button class="rp-btn rp-btn--primary" type="button" data-copy-pix>Copiar código Pix</button>${copied ? `<div class="rp-payment__copied" role="status">✓ Código Pix copiado. Agora é só colar no app do seu banco.</div>` : ""}` : ""}${!cardPending && expiresAt ? `<p class="rp-payment__hint">Pix válido até ${escapeHtml(expiresAt)}.</p>` : ""}${!cardPending ? `<p class="rp-payment__hint">Esta tela acompanha a confirmação do pagamento automaticamente.</p>${exiting ? "" : `<button class="rp-btn rp-payment__secondary" type="button" data-request-cancel-order>Desistir da compra</button>`}` : ""}</div>`;
 }
 export function renderPaymentStatus(order = {}) {
   if (!order || order.phase === "idle") return "";
@@ -30,12 +30,22 @@ export function renderPaymentStatus(order = {}) {
     qrCode = pixCode(order),
     reference = shortOrderReference(paymentReference(order)),
     expiresAt = formatPixExpiry(order.data?.pix_expira_em),
-    demoState = String(order.demoState || "");
+    demoState = String(order.demoState || ""),
+    cancelPending = Boolean(order.cancelPending),
+    cancelError = String(order.cancelError || "");
   const special = ["card-declined", "pix-error", "cancel-confirm", "cancelled"].includes(demoState);
   const isState = paid || failed || special;
   let body = "";
   if (loading)
     body = `<p class="rp-kicker">Preparando pagamento</p><h2>Gerando seu Pix…</h2><p>Só um instante.</p>`;
+  else if (paid)
+    body = stateShell({
+      icon: successIcon,
+      kicker: "Pagamento confirmado",
+      title: "Pedido confirmado",
+      body: "Recebemos seu pagamento. Seu pedido já está confirmado.",
+      content: `${reference ? `<div class="rp-payment__reference"><span>Pedido</span><strong>${escapeHtml(reference)}</strong></div>` : ""}<button class="rp-btn rp-btn--primary" type="button" data-finish-order>Voltar ao cardápio</button>`
+    });
   else if (demoState === "card-declined")
     body = stateShell({
       icon: declinedCardIcon,
@@ -59,8 +69,8 @@ export function renderPaymentStatus(order = {}) {
       icon: warningIcon,
       kicker: "Cancelar pedido",
       title: "Tem certeza que deseja cancelar?",
-      body: "Se continuar, este pedido será encerrado e você precisará montar outro para pedir novamente.",
-      content: `<button class="rp-btn rp-btn--danger" type="button" data-confirm-demo-cancel>Sim, cancelar pedido</button><button class="rp-btn rp-payment__secondary" type="button" data-keep-demo-order>Não, continuar pedido</button>`,
+      body: "Se continuar, o Pix será cancelado e este código não poderá mais ser usado para pagar.",
+      content: `${cancelError ? `<p class="rp-payment__hint" role="alert">${escapeHtml(cancelError)}</p>` : ""}<button class="rp-btn rp-btn--danger" type="button" data-confirm-cancel-order${cancelPending ? " disabled" : ""}>${cancelPending ? "Cancelando…" : "Sim, cancelar pedido"}</button><button class="rp-btn rp-payment__secondary" type="button" data-keep-order${cancelPending ? " disabled" : ""}>Não, continuar pedido</button>`,
       state: "cancel-confirm"
     });
   else if (demoState === "cancelled")
@@ -68,7 +78,7 @@ export function renderPaymentStatus(order = {}) {
       icon: cancelledIcon,
       kicker: "Pedido cancelado",
       title: "Seu pedido foi cancelado",
-      body: "Tudo certo. Nenhuma nova tentativa de pagamento será feita por esta tela.",
+      body: "O Pix foi invalidado e este código não pode mais ser usado para pagar.",
       content: `<button class="rp-btn rp-btn--primary" type="button" data-finish-order>Voltar ao cardápio</button>`
     });
   else if (pending)
@@ -79,14 +89,6 @@ export function renderPaymentStatus(order = {}) {
       expiresAt,
       copied: demoState === "pix-copied",
       exiting: transitioningToPaid
-    });
-  else if (paid)
-    body = stateShell({
-      icon: successIcon,
-      kicker: "Pagamento confirmado",
-      title: "Pedido confirmado",
-      body: "Recebemos seu pagamento. Seu pedido já está confirmado.",
-      content: `${reference ? `<div class="rp-payment__reference"><span>Pedido</span><strong>${escapeHtml(reference)}</strong></div>` : ""}<button class="rp-btn rp-btn--primary" type="button" data-finish-order>Voltar ao cardápio</button>`
     });
   else if (failed)
     body = stateShell({
