@@ -228,6 +228,26 @@
     transform: rotate(360deg);
   }
 }
+@keyframes rp-payment-pending-mark {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes rp-payment-pending-content {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @keyframes rp-payment-success-pop {
   0% {
     opacity: 0;
@@ -350,6 +370,35 @@
   }
 }
 @media (prefers-reduced-motion: no-preference) {
+  .rp-payment__waiting-mark {
+    animation: rp-payment-pending-mark 430ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+  .rp-payment__waiting-mark ~ h2,
+  .rp-payment__waiting-mark ~ p,
+  .rp-payment__waiting-mark ~ .rp-payment__total,
+  .rp-payment__waiting-mark ~ .rp-payment__code,
+  .rp-payment__waiting-mark ~ .rp-btn,
+  .rp-payment__waiting-mark ~ .rp-payment__hint {
+    animation: rp-payment-pending-content 320ms ease both;
+  }
+  .rp-payment__waiting-mark ~ h2 {
+    animation-delay: 90ms;
+  }
+  .rp-payment__waiting-mark ~ p:not(.rp-payment__hint) {
+    animation-delay: 135ms;
+  }
+  .rp-payment__waiting-mark ~ .rp-payment__total {
+    animation-delay: 180ms;
+  }
+  .rp-payment__waiting-mark ~ .rp-payment__code {
+    animation-delay: 225ms;
+  }
+  .rp-payment__waiting-mark ~ .rp-btn {
+    animation-delay: 270ms;
+  }
+  .rp-payment__waiting-mark ~ .rp-payment__hint {
+    animation-delay: 315ms;
+  }
   .rp-payment__state-icon--success {
     animation: rp-payment-success-pop 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
   }
