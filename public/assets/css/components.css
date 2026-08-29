@@ -136,6 +136,82 @@
   cursor: not-allowed;
 }
 
+.rp-product-card__stepper {
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-pill);
+  padding: 3px;
+  background: #fff;
+}
+.rp-product-card__stepper button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--rp-color-brand-strong);
+  font-size: 20px;
+  font-weight: 800;
+}
+.rp-product-card__stepper button:last-child {
+  background: var(--rp-color-brand);
+  color: #fff;
+}
+.rp-product-card__stepper button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.rp-product-card__stepper strong {
+  min-width: 24px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.rp-cart-bar {
+  position: fixed;
+  z-index: 50;
+  left: 16px;
+  right: 16px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--rp-color-border);
+  border-radius: 20px;
+  padding: 12px 14px;
+  background: var(--rp-color-surface);
+  box-shadow: 0 14px 40px rgba(74, 45, 36, 0.14);
+}
+.rp-cart-bar__info {
+  min-width: 0;
+  display: grid;
+}
+.rp-cart-bar__count {
+  color: var(--rp-color-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.rp-cart-bar__total {
+  margin-top: 2px;
+  font-family: "Bricolage Grotesque", Nunito, sans-serif;
+  font-size: 18px;
+  line-height: 1.15;
+}
+.rp-cart-bar__cta {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  background: var(--rp-color-brand);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 @media (min-width: 680px) {
   .rp-menu__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -145,5 +221,8 @@
 @media (min-width: 1040px) {
   .rp-menu__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .rp-cart-bar {
+    display: none;
   }
 }
