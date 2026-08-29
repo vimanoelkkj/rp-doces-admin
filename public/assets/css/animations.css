@@ -2,10 +2,55 @@
   .rp-fade-in {
     animation: rp-fade-in 220ms ease both;
   }
+  .rp-hero__copy {
+    animation: rp-hero-copy 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .rp-hero__media {
+    animation: rp-hero-media 620ms 80ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .rp-product-card {
+    animation: rp-card-in 360ms ease both;
+  }
+  .rp-product-card:nth-child(2) {
+    animation-delay: 50ms;
+  }
+  .rp-product-card:nth-child(3) {
+    animation-delay: 100ms;
+  }
   @keyframes rp-fade-in {
     from {
       opacity: 0;
       transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-hero-copy {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-hero-media {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-card-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
