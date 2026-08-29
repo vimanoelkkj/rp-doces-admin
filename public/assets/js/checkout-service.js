@@ -1,23 +1,35 @@
 import { api } from "./api.js";
 
 const REQUEST_KEY = "rp_checkout_request_id";
+const CART_KEY = "rp_checkout_cart_signature";
 
-function requestId() {
+function cartSignature(items = []) {
+  return items
+    .map(({ product, quantity }) => `${Number(product.id)}:${Number(quantity)}`)
+    .sort()
+    .join("|");
+}
+
+function requestId(items) {
+  const signature = cartSignature(items);
   let id = sessionStorage.getItem(REQUEST_KEY);
-  if (!id) {
+  const previousSignature = sessionStorage.getItem(CART_KEY);
+  if (!id || previousSignature !== signature) {
     id = crypto.randomUUID();
     sessionStorage.setItem(REQUEST_KEY, id);
+    sessionStorage.setItem(CART_KEY, signature);
   }
   return id;
 }
 
 export function resetCheckoutRequestId() {
   sessionStorage.removeItem(REQUEST_KEY);
+  sessionStorage.removeItem(CART_KEY);
 }
 
 export function buildCheckoutPayload({ checkout, items }) {
   return {
-    client_request_id: requestId(),
+    client_request_id: requestId(items),
     nome: String(checkout?.name || "").trim(),
     email: String(checkout?.email || "")
       .trim()
