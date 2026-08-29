@@ -7,7 +7,8 @@ const initialUi = () => ({
   cartOpen: false,
   checkoutOpen: false,
   menuOpen: false,
-  partyOpen: false
+  partyOpen: false,
+  cartAdditionFeedback: false
 });
 const initialOrder = () => ({
   phase: "idle",
@@ -93,11 +94,13 @@ export function resetOrderState() {
 export function getCartQuantity(id) {
   return Number(state.cart.get(productId(id))) || 0;
 }
-export function setCartQuantity(id, quantity) {
+export function setCartQuantity(id, quantity, { additionFeedback = false } = {}) {
   const key = productId(id);
   const product = state.products.find(item => productId(item) === key);
   if (!product) return;
+  const current = getCartQuantity(key);
   const next = clampQuantity(product, quantity);
+  state.ui.cartAdditionFeedback = Boolean(additionFeedback && next > current);
   if (next <= 0) state.cart.delete(key);
   else state.cart.set(key, next);
   if (state.cart.size === 0) {
@@ -107,7 +110,8 @@ export function setCartQuantity(id, quantity) {
   notify();
 }
 export function changeCartQuantity(id, delta) {
-  setCartQuantity(id, getCartQuantity(id) + Number(delta || 0));
+  const amount = Number(delta || 0);
+  setCartQuantity(id, getCartQuantity(id) + amount, { additionFeedback: amount > 0 });
 }
 export function syncCartWithProducts() {
   for (const [id, quantity] of state.cart.entries()) {
@@ -134,5 +138,8 @@ export function getCartItems() {
     .filter(Boolean);
 }
 export function getCartSummary() {
-  return summarizeCartItems(getCartItems());
+  return {
+    ...summarizeCartItems(getCartItems()),
+    additionFeedback: state.ui.cartAdditionFeedback
+  };
 }
