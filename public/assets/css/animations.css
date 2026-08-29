@@ -17,15 +17,15 @@
   .rp-shell:not([data-mounted="true"]) .rp-product-card:nth-child(3) {
     animation-delay: 100ms;
   }
-  .rp-cart-bar {
+  .rp-cart-bar--feedback {
     transform-origin: center bottom;
     animation: rp-cart-bar-feedback 340ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
   }
-  .rp-site-header__cart {
+  .rp-site-header__cart--feedback {
     transform-origin: center;
     animation: rp-header-cart-feedback 360ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
   }
-  .rp-site-header__badge {
+  .rp-site-header__cart--feedback .rp-site-header__badge {
     transform-origin: center;
     animation: rp-cart-badge-feedback 420ms 40ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
   }
@@ -69,7 +69,7 @@
   .rp-checkout:not([hidden]) .rp-checkout__items,
   .rp-checkout:not([hidden]) .rp-checkout__total,
   .rp-checkout:not([hidden]) .rp-checkout__form {
-    animation: rp-cart-content-in 300ms ease both;
+    animation: rp-checkout-content-in 300ms ease both;
   }
   .rp-checkout:not([hidden]) .rp-checkout__items {
     animation-delay: 70ms;
@@ -188,6 +188,16 @@
     }
   }
   @keyframes rp-cart-content-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rp-checkout-content-in {
     from {
       opacity: 0;
       transform: translateY(6px);
