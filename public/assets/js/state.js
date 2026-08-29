@@ -1,6 +1,7 @@
 import { productId } from "./utils/product-id.js";
 import { clampQuantity, isProductAvailable } from "./utils/stock.js";
 import { summarizeCartItems } from "./utils/cart-summary.js";
+import { checkoutIsValid } from "./utils/checkout-validity.js";
 
 const listeners = new Set();
 const initialUi = () => ({
@@ -39,6 +40,15 @@ function syncPaymentInteractionLock() {
     if (region.dataset.region === "payment") return;
     region.inert = locked;
   });
+}
+function syncCheckoutSubmitAvailability() {
+  if (typeof document === "undefined") return;
+  const submit = document.querySelector("[data-submit-checkout]");
+  if (!submit) return;
+  const ready = checkoutIsValid(state.checkout);
+  submit.disabled = !ready;
+  if (ready) submit.removeAttribute("aria-disabled");
+  else submit.setAttribute("aria-disabled", "true");
 }
 export function resetTransientState() {
   state.ui = initialUi();
@@ -94,6 +104,7 @@ export function setPartyOpen(open) {
 export function updateCheckout(field, value) {
   if (!(field in state.checkout)) return;
   state.checkout[field] = value;
+  syncCheckoutSubmitAvailability();
 }
 export function setOrderState(patch) {
   state.order = { ...state.order, ...patch };
