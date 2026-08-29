@@ -3,7 +3,8 @@ const listeners = new Set();
 export const state = {
   products: [],
   cart: new Map(),
-  checkout: { name: "", whatsapp: "", note: "", paymentMethod: "PIX" }
+  checkout: { name: "", whatsapp: "", note: "", paymentMethod: "PIX" },
+  ui: { cartOpen: false }
 };
 
 export function subscribe(listener) {
@@ -13,6 +14,11 @@ export function subscribe(listener) {
 
 export function notify() {
   listeners.forEach(listener => listener(state));
+}
+
+export function setCartOpen(open) {
+  state.ui.cartOpen = Boolean(open);
+  notify();
 }
 
 export function getCartQuantity(productId) {
@@ -30,6 +36,7 @@ export function setCartQuantity(productId, quantity) {
 
   if (next <= 0) state.cart.delete(id);
   else state.cart.set(id, next);
+  if (state.cart.size === 0) state.ui.cartOpen = false;
   notify();
 }
 
@@ -48,15 +55,23 @@ export function syncCartWithProducts() {
     if (capped <= 0) state.cart.delete(productId);
     else state.cart.set(productId, capped);
   }
+  if (state.cart.size === 0) state.ui.cartOpen = false;
+}
+
+export function getCartItems() {
+  return [...state.cart.entries()]
+    .map(([productId, quantity]) => {
+      const product = state.products.find(item => String(item.id) === productId);
+      return product ? { product, quantity } : null;
+    })
+    .filter(Boolean);
 }
 
 export function getCartSummary() {
   let items = 0;
   let totalCents = 0;
 
-  for (const [productId, quantity] of state.cart.entries()) {
-    const product = state.products.find(item => String(item.id) === productId);
-    if (!product) continue;
+  for (const { product, quantity } of getCartItems()) {
     items += quantity;
     totalCents += (Number(product.preco_centavos) || 0) * quantity;
   }
