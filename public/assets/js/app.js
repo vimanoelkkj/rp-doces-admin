@@ -92,20 +92,24 @@ function applyPreviewDemo() {
   const mode = new URLSearchParams(location.search).get("demo");
   const previewDisabled =
     document.querySelector('meta[name="rp-payment-mode"]')?.content === "disabled";
-  if (!previewDisabled || mode !== "pix-pending") return false;
+  if (!previewDisabled || !["pix-pending", "card-pending"].includes(mode)) return false;
+  const card = mode === "card-pending";
   const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   state.order = {
     phase: "pending",
-    token: "demo-pix-pending",
+    paymentMethod: card ? "CARD" : "PIX",
+    token: card ? "demo-card-pending" : "demo-pix-pending",
     data: {
-      referencia: "DEMO-PIX",
+      referencia: card ? "DEMO-CARD" : "DEMO-PIX",
       valor_total_centavos: 3100,
       status: "PENDENTE",
-      pix_expira_em: expires
+      pix_expira_em: card ? null : expires
     },
-    pix: {
-      qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation"
-    },
+    pix: card
+      ? null
+      : {
+          qr_code: "00020101021226840014BR.GOV.BCB.PIX0136demo-rp-doces-pix-pending-animation"
+        },
     error: null
   };
   return true;
