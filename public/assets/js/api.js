@@ -25,5 +25,6 @@ function postJson(path, body) {
 export const api = {
   getConfig: () => request("/api/config", { cache: "no-store" }),
   getProducts: () => request("/api/products", { cache: "no-store" }),
-  createPixCheckout: payload => postJson("/api/checkout/pix", payload)
+  createPixCheckout: payload => postJson("/api/checkout/pix", payload),
+  getOrder: token => request(`/api/orders/${encodeURIComponent(token)}`, { cache: "no-store" })
 };
