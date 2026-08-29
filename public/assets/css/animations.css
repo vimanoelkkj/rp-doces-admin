@@ -2,19 +2,19 @@
   .rp-fade-in {
     animation: rp-fade-in 220ms ease both;
   }
-  .rp-hero__copy {
+  .rp-shell:not([data-mounted="true"]) .rp-hero__copy {
     animation: rp-hero-copy 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
-  .rp-hero__media {
+  .rp-shell:not([data-mounted="true"]) .rp-hero__media {
     animation: rp-hero-media 620ms 80ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
-  .rp-product-card {
+  .rp-shell:not([data-mounted="true"]) .rp-product-card {
     animation: rp-card-in 360ms ease both;
   }
-  .rp-product-card:nth-child(2) {
+  .rp-shell:not([data-mounted="true"]) .rp-product-card:nth-child(2) {
     animation-delay: 50ms;
   }
-  .rp-product-card:nth-child(3) {
+  .rp-shell:not([data-mounted="true"]) .rp-product-card:nth-child(3) {
     animation-delay: 100ms;
   }
   @keyframes rp-fade-in {
