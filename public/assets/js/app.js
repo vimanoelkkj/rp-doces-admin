@@ -32,6 +32,8 @@ import { paymentCreationAllowed, paymentDisabledMessage } from "./runtime-policy
 import { checkoutIsValid } from "./utils/checkout-validity.js";
 import { isPixPayment } from "./utils/payment-method.js";
 import { checkoutErrorMessage } from "./utils/checkout-errors.js";
+import { storefrontProducts } from "./utils/product-filter.js";
+import { sortProducts } from "./utils/product-sort.js";
 
 function renderStorefront() {
   const root = document.getElementById("rp-app");
@@ -52,7 +54,8 @@ async function loadProducts() {
   notify();
   try {
     const payload = await api.getProducts();
-    state.products = Array.isArray(payload.produtos) ? payload.produtos : [];
+    const products = Array.isArray(payload.produtos) ? payload.produtos : [];
+    state.products = sortProducts(storefrontProducts(products));
     state.productsStatus = "ready";
     syncCartWithProducts();
   } catch (error) {
