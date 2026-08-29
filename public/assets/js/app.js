@@ -17,7 +17,6 @@ import {
   resetTransientState,
   notify
 } from "./state.js";
-import { renderSiteHeader } from "./components/site-header.js";
 import { renderHero } from "./components/hero.js";
 import { renderHomeLanding } from "./components/home-landing.js";
 import { renderProductList } from "./components/product-list.js";
@@ -48,7 +47,7 @@ const regionMarkup = new Map();
 let storefrontRoute = "home";
 
 function catalogMarkup() {
-  return `<section data-catalog-route><div data-region="header"></div>${renderHero()}<div data-region="products"></div>${renderSiteFooter()}</section>`;
+  return `<section data-catalog-route>${renderHero()}<div data-region="products"></div>${renderSiteFooter()}</section>`;
 }
 function mountStorefront() {
   const root = document.getElementById("rp-app");
@@ -66,20 +65,15 @@ function updateRegion(name, markup) {
 function ensureRouteMarkup() {
   const markup = storefrontRoute === "home" ? renderHomeLanding() : catalogMarkup();
   updateRegion("route", markup);
-  if (storefrontRoute === "catalog") {
-    regionMarkup.delete("header");
-    regionMarkup.delete("products");
-  }
+  if (storefrontRoute === "catalog") regionMarkup.delete("products");
 }
 function renderStorefront() {
   mountStorefront();
   ensureRouteMarkup();
   const summary = getCartSummary();
   const items = getCartItems();
-  if (storefrontRoute === "catalog") {
-    updateRegion("header", renderSiteHeader(summary));
+  if (storefrontRoute === "catalog")
     updateRegion("products", renderProductList(state.products, state.cart, state.productsStatus));
-  }
   updateRegion("cart-bar", storefrontRoute === "catalog" ? renderCartBar(summary) : "");
   updateRegion("cart", renderCart({ open: state.ui.cartOpen, items, summary }));
   updateRegion(
