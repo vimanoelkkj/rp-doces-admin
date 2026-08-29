@@ -29,6 +29,9 @@
   --rp-space-10: 40px;
   --rp-space-12: 48px;
   --rp-space-16: 64px;
+  --rp-duration-fast: 180ms;
+  --rp-duration-base: 260ms;
+  --rp-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
   --rp-container: 1180px;
   --rp-content-narrow: 620px;
 }
