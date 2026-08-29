@@ -12,7 +12,9 @@ const ORDER_PAID_TRANSITION_MS = 220;
 let timer = null;
 let transitionTimer = null;
 let attempts = 0;
+let pollingRun = 0;
 export function stopOrderPolling() {
+  pollingRun += 1;
   if (timer) clearTimeout(timer);
   if (transitionTimer) clearTimeout(transitionTimer);
   timer = null;
@@ -22,10 +24,14 @@ export function stopOrderPolling() {
 export function startOrderPolling(token) {
   stopOrderPolling();
   if (!token) return;
+  const run = pollingRun;
+  const active = () => run === pollingRun;
   const schedule = () => {
+    if (!active()) return;
     timer = setTimeout(poll, ORDER_POLL_INTERVAL_MS);
   };
   const poll = async () => {
+    if (!active()) return;
     if (!pageVisible()) {
       schedule();
       return;
@@ -33,13 +39,16 @@ export function startOrderPolling(token) {
     attempts += 1;
     try {
       const payload = await api.getOrder(token);
+      if (!active()) return;
       const pedido = payload.pedido || {};
       const status = normalizeOrderStatus(pedido.status);
       if (isPaidStatus(status)) {
         stopOrderPolling();
+        const transitionRun = pollingRun;
         setOrderState({ phase: "confirming-paid", token, data: pedido, error: null });
         transitionTimer = setTimeout(() => {
           transitionTimer = null;
+          if (transitionRun !== pollingRun) return;
           setOrderState({ phase: "paid", token, data: pedido, error: null });
         }, ORDER_PAID_TRANSITION_MS);
         return;
@@ -62,6 +71,7 @@ export function startOrderPolling(token) {
       }
       setOrderState({ phase: "pending", token, data: pedido, error: null });
     } catch {
+      if (!active()) return;
       if (pollingExhausted(attempts)) {
         setOrderState({
           phase: "error",
@@ -72,7 +82,7 @@ export function startOrderPolling(token) {
         return;
       }
     }
-    if (attempts < ORDER_POLL_MAX_ATTEMPTS) schedule();
+    if (active() && attempts < ORDER_POLL_MAX_ATTEMPTS) schedule();
   };
   schedule();
 }
