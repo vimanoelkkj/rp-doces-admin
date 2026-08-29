@@ -25,14 +25,14 @@
 .rp-menu .rp-container {
   width: 100%;
   max-width: none;
-  padding: 24px 20px 28px;
+  padding: 20px 20px 26px;
 }
 .rp-menu__head {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 18px;
-  padding-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--rp-color-border);
 }
 .rp-menu__heading-copy {
@@ -67,7 +67,7 @@
 .rp-menu__grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 28px;
+  gap: 24px;
 }
 .rp-menu__empty {
   border: 1px solid var(--rp-color-border);
@@ -83,7 +83,7 @@
 }
 .rp-product-card__media {
   position: relative;
-  height: 260px;
+  height: 220px;
   min-height: 0;
   display: grid;
   place-items: center;
@@ -130,30 +130,30 @@
   letter-spacing: 0.02em;
 }
 .rp-product-card__body {
-  padding: 14px 2px 0;
+  padding: 12px 2px 0;
 }
 .rp-product-card__title {
   margin: 0;
   color: var(--rp-color-text);
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.01em;
 }
 .rp-product-card__description {
-  max-width: 34ch;
-  margin: 6px 0 0;
+  max-width: 38ch;
+  margin: 5px 0 0;
   color: var(--rp-color-muted);
-  font-size: 13.5px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 .rp-product-card__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 .rp-product-card__pricing {
   display: grid;
@@ -168,26 +168,26 @@
   display: block;
   color: var(--rp-color-text);
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 .rp-product-card__stock {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--rp-color-warning);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 800;
 }
 .rp-product-card__add {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   border: 0;
   border-radius: 999px;
   background: var(--rp-color-brand-action);
   color: #fff;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1;
 }
@@ -200,21 +200,21 @@
 .rp-cart-item__stepper {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   border: 1px solid var(--rp-color-border);
   border-radius: 999px;
-  padding: 4px;
+  padding: 3px;
   background: var(--rp-color-surface);
 }
 .rp-product-card__stepper button,
 .rp-cart-item__stepper button {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--rp-color-brand-strong);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
 }
 .rp-product-card__stepper button:last-child,
@@ -224,9 +224,9 @@
 }
 .rp-product-card__stepper strong,
 .rp-cart-item__stepper strong {
-  min-width: 22px;
+  min-width: 20px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 .rp-cart-bar {
   position: fixed;
@@ -236,10 +236,10 @@
   bottom: 20px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   border: 1px solid var(--rp-color-border);
   border-radius: 20px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   background: var(--rp-color-surface);
   box-shadow: var(--rp-shadow-cart-bar);
 }
@@ -250,13 +250,13 @@
 }
 .rp-cart-bar__count {
   color: var(--rp-color-muted);
-  font-size: 11px;
+  font-size: 10.5px;
 }
 .rp-cart-bar__total {
   margin-top: 0;
   color: var(--rp-color-text);
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -264,10 +264,10 @@
   flex: 0 0 auto;
   border: 0;
   border-radius: 14px;
-  padding: 12px 18px;
+  padding: 11px 16px;
   background: var(--rp-color-brand-action);
   color: #fff;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
 }
 .rp-cart-overlay {
