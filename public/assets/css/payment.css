@@ -47,8 +47,13 @@
 }
 .rp-payment__waiting-clock-hand {
   transform-box: view-box;
-  transform-origin: 28.3px 24.3px;
   animation: rp-waiting-clock-hand 1.6s linear infinite;
+}
+.rp-payment__waiting-clock-hand--pix {
+  transform-origin: 28.3px 24.3px;
+}
+.rp-payment__waiting-clock-hand--card {
+  transform-origin: 26.8px 22.8px;
 }
 .rp-payment__total {
   display: block;
