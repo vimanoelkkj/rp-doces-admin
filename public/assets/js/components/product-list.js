@@ -1,11 +1,12 @@
 import { renderProductCard } from "./product-card.js";
 import { storefrontProducts } from "../utils/product-filter.js";
 import { sortProducts } from "../utils/product-sort.js";
+
 function visibleProducts(products = []) {
   return sortProducts(storefrontProducts(products));
 }
 function menuHeading(count = null) {
-  return `<div class="rp-menu__head"><div class="rp-menu__heading-copy"><p class="rp-menu__eyebrow">Cardápio artesanal</p><h2 class="rp-menu__title" id="rp-menu-title">Um carinho em forma de doce</h2><p class="rp-menu__lede">Bolo no pote e mini pudim feitos à mão, prontos para adoçar sua pausa.</p></div>${count === null ? "" : `<span class="rp-menu__count">${count} ${count === 1 ? "doce" : "doces"}</span>`}</div>`;
+  return `<div class="rp-menu__head"><div class="rp-menu__heading-copy"><h2 class="rp-menu__title" id="rp-menu-title">Cardápio</h2></div>${count === null ? "" : `<span class="rp-menu__count">${count} ${count === 1 ? "sabor hoje" : "sabores hoje"}</span>`}</div>`;
 }
 function shell(content) {
   return `<section class="rp-menu rp-section" id="cardapio" aria-labelledby="rp-menu-title"><div class="rp-container">${menuHeading()}${content}</div></section>`;
