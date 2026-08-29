@@ -102,6 +102,17 @@ function showHome() {
   renderStorefront();
   window.scrollTo({ top: 0, behavior: scrollBehavior() });
 }
+function showHomeSection(sectionId) {
+  setMenuOpen(false);
+  storefrontRoute = "home";
+  regionMarkup.delete("route");
+  renderStorefront();
+  requestAnimationFrame(() => {
+    const target = document.getElementById(sectionId);
+    if (target) target.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+    else window.scrollTo({ top: 0, behavior: scrollBehavior() });
+  });
+}
 function applyPreviewDemo() {
   const mode = new URLSearchParams(location.search).get("demo");
   const previewDisabled =
@@ -203,6 +214,8 @@ function bindStorefrontEvents() {
   if (!root || root.dataset.eventsBound === "true") return;
   root.dataset.eventsBound = "true";
   root.addEventListener("click", async event => {
+    const homeSectionButton = event.target.closest("[data-home-section]");
+    if (homeSectionButton) return showHomeSection(homeSectionButton.dataset.homeSection);
     if (event.target.closest("[data-show-catalog]")) return showCatalog();
     if (event.target.closest("[data-home-top]")) return showHome();
     const removeButton = event.target.closest("[data-cart-remove]");
