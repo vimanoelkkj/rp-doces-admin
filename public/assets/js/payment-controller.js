@@ -8,11 +8,15 @@ import {
 import { isPaidStatus, isFailedStatus, normalizeOrderStatus } from "./utils/payment-status.js";
 import { orderStatusCopy } from "./utils/order-copy.js";
 import { pageVisible } from "./utils/visibility.js";
+const ORDER_PAID_TRANSITION_MS = 220;
 let timer = null;
+let transitionTimer = null;
 let attempts = 0;
 export function stopOrderPolling() {
   if (timer) clearTimeout(timer);
+  if (transitionTimer) clearTimeout(transitionTimer);
   timer = null;
+  transitionTimer = null;
   attempts = 0;
 }
 export function startOrderPolling(token) {
@@ -32,8 +36,12 @@ export function startOrderPolling(token) {
       const pedido = payload.pedido || {};
       const status = normalizeOrderStatus(pedido.status);
       if (isPaidStatus(status)) {
-        setOrderState({ phase: "paid", token, data: pedido, error: null });
         stopOrderPolling();
+        setOrderState({ phase: "confirming-paid", token, data: pedido, error: null });
+        transitionTimer = setTimeout(() => {
+          transitionTimer = null;
+          setOrderState({ phase: "paid", token, data: pedido, error: null });
+        }, ORDER_PAID_TRANSITION_MS);
         return;
       }
       if (isFailedStatus(status)) {
