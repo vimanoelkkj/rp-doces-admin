@@ -3,6 +3,7 @@ import { renderDashboard } from "./dashboard.js";
 import { renderProducts } from "./products.js";
 import { renderOrders } from "./orders.js";
 import { renderAdmins } from "./admins.js";
+import { renderStore } from "./store.js";
 
 const app = document.querySelector("[data-admin-app]");
 const collapseButton = document.querySelector("[data-collapse-sidebar]");
@@ -34,11 +35,7 @@ function setCollapsed(collapsed) {
 function initials(name = "") {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "RP";
-  return parts
-    .slice(0, 2)
-    .map(part => part[0])
-    .join("")
-    .toUpperCase();
+  return parts.slice(0, 2).map(part => part[0]).join("").toUpperCase();
 }
 
 function applyUser(user) {
@@ -53,25 +50,10 @@ function redirectToLogin() {
   location.assign(`/admin/?return=${destination}`);
 }
 
-function renderPlaceholder(page) {
-  if (!content) return;
-  const [pageTitle] = pages[page] || pages.dashboard;
-  content.innerHTML = `
-    <section class="admin-panel admin-placeholder">
-      <div>
-        <strong>${pageTitle}</strong>
-        <span>O novo shell já está usando a sessão real. A integração desta tela entra na próxima etapa.</span>
-      </div>
-    </section>`;
-}
-
 async function renderPage(page) {
   if (!content) return;
   if (page === "dashboard") {
-    await renderDashboard(content, {
-      onUnauthorized: redirectToLogin,
-      onNavigate: setPage
-    });
+    await renderDashboard(content, { onUnauthorized: redirectToLogin, onNavigate: setPage });
     return;
   }
   if (page === "produtos") {
@@ -83,13 +65,12 @@ async function renderPage(page) {
     return;
   }
   if (page === "admins") {
-    await renderAdmins(content, {
-      onUnauthorized: redirectToLogin,
-      currentUser
-    });
+    await renderAdmins(content, { onUnauthorized: redirectToLogin, currentUser });
     return;
   }
-  renderPlaceholder(page);
+  if (page === "loja") {
+    await renderStore(content, { onUnauthorized: redirectToLogin });
+  }
 }
 
 function setPage(page) {
@@ -114,9 +95,7 @@ collapseButton?.addEventListener("click", () => {
   setCollapsed(!app?.classList.contains("is-collapsed"));
 });
 
-navItems.forEach(item => {
-  item.addEventListener("click", () => setPage(item.dataset.adminNav));
-});
+navItems.forEach(item => item.addEventListener("click", () => setPage(item.dataset.adminNav)));
 
 const tooltip = document.createElement("div");
 tooltip.className = "admin-tooltip";
@@ -156,8 +135,7 @@ window.addEventListener("hashchange", () => {
 });
 
 async function bootstrap() {
-  const storedCollapsed = localStorage.getItem("rp-admin-sidebar-collapsed") === "1";
-  setCollapsed(storedCollapsed);
+  setCollapsed(localStorage.getItem("rp-admin-sidebar-collapsed") === "1");
 
   try {
     const payload = await adminApi.me();
