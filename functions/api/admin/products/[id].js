@@ -87,8 +87,12 @@ export async function onRequestDelete({ request, env, params }) {
     )
       .bind(id)
       .first();
+    const product = await env.DB.prepare("SELECT image_key FROM produtos WHERE id = ?").bind(id).first();
 
     await env.DB.prepare("DELETE FROM produtos WHERE id = ?").bind(id).run();
+    if (product?.image_key && env.PRODUCT_IMAGES) {
+      await env.PRODUCT_IMAGES.delete(product.image_key).catch(() => {});
+    }
 
     return json({
       ok: true,
