@@ -8,6 +8,40 @@ import { setupProfileMenu } from "./profile-menu.js";
 import { setupSidebarBadges } from "./sidebar-badges.js";
 import { setupNotificationMenu } from "./notifications.js";
 
+function ensureHeadLink(rel, href, extras = {}) {
+  let link = document.head.querySelector(`link[rel="${rel}"]`);
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = rel;
+    document.head.appendChild(link);
+  }
+  link.href = href;
+  Object.assign(link, extras);
+}
+
+function ensureMeta(name, content) {
+  let meta = document.head.querySelector(`meta[name="${name}"]`);
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = name;
+    document.head.appendChild(meta);
+  }
+  meta.content = content;
+}
+
+function setupPwaShell() {
+  ensureHeadLink("manifest", "/admin/manifest.webmanifest");
+  ensureHeadLink("icon", "/admin-favicon.png");
+  ensureHeadLink("apple-touch-icon", "/admin-apple-touch-icon.png");
+  ensureMeta("theme-color", "#fff8f2");
+  ensureMeta("apple-mobile-web-app-capable", "yes");
+  ensureMeta("apple-mobile-web-app-status-bar-style", "default");
+  ensureMeta("apple-mobile-web-app-title", "R&P Admin");
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
+setupPwaShell();
+
 const app = document.querySelector("[data-admin-app]");
 const collapseButton = document.querySelector("[data-collapse-sidebar]");
 const navItems = [...document.querySelectorAll("[data-admin-nav]")];
