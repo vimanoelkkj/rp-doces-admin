@@ -39,6 +39,15 @@ function syncPicker(picker, input) {
   });
 }
 
+function centerSelectedHour(picker) {
+  const hours = picker.querySelector(".store-time-picker__hours");
+  const selected = picker.querySelector("[data-time-hour].is-selected");
+  if (!hours || !selected) return;
+
+  const target = selected.offsetTop - (hours.clientHeight - selected.offsetHeight) / 2;
+  hours.scrollTop = Math.max(0, target);
+}
+
 function setPart(picker, input, part, value) {
   const current = splitTime(input.value);
   current[part] = value;
@@ -88,9 +97,7 @@ function enhanceTimeInput(input) {
     picker.classList.add("is-open");
     trigger.setAttribute("aria-expanded", "true");
     menu.hidden = false;
-    requestAnimationFrame(() => {
-      picker.querySelector("[data-time-hour].is-selected")?.scrollIntoView({ block: "center" });
-    });
+    requestAnimationFrame(() => centerSelectedHour(picker));
   };
 
   const close = () => {
@@ -119,7 +126,7 @@ function enhanceTimeInput(input) {
     button.addEventListener("click", () => {
       setPart(picker, input, "minute", button.dataset.timeMinute);
       close();
-      trigger.focus();
+      trigger.focus({ preventScroll: true });
     });
   });
 
@@ -127,7 +134,7 @@ function enhanceTimeInput(input) {
     if (event.key === "Escape") {
       event.preventDefault();
       close();
-      trigger.focus();
+      trigger.focus({ preventScroll: true });
     }
   });
 
