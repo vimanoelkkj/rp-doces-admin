@@ -1,0 +1,8 @@
+/* Category switches reuse the catalog shell. Do not replay entrance animations. */
+.rp-menu--category-update .rp-menu__head,
+.rp-menu--category-update .rp-menu__filters,
+.rp-menu--category-update .rp-menu__grid,
+.rp-menu--category-update .rp-menu__empty,
+.rp-menu--category-update .rp-menu__skeleton {
+  animation: none !important;
+}
