@@ -5,7 +5,10 @@ function passkeysSupported() {
 }
 
 function fromUrlB64(value) {
-  const padded = String(value).replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(String(value).length / 4) * 4, "=");
+  const padded = String(value)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(Math.ceil(String(value).length / 4) * 4, "=");
   const binary = atob(padded);
   return Uint8Array.from(binary, char => char.charCodeAt(0));
 }
@@ -56,9 +59,15 @@ function esc(value) {
 
 function formatDate(value) {
   if (!value) return "Ainda não usada";
-  const date = new Date(String(value).replace(" ", "T") + (String(value).includes("Z") ? "" : "Z"));
+  const date = new Date(
+    String(value).replace(" ", "T") + (String(value).includes("Z") ? "" : "Z")
+  );
   if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(date);
 }
 
 export function setupProfileMenu(button, user, { onUnauthorized } = {}) {
@@ -116,7 +125,8 @@ export function setupProfileMenu(button, user, { onUnauthorized } = {}) {
   const loadPasskeys = async () => {
     if (!passkeysSupported()) {
       add.disabled = true;
-      list.innerHTML = '<span class="profile-menu__empty">Passkeys não estão disponíveis neste navegador.</span>';
+      list.innerHTML =
+        '<span class="profile-menu__empty">Passkeys não estão disponíveis neste navegador.</span>';
       return;
     }
     try {
@@ -125,7 +135,8 @@ export function setupProfileMenu(button, user, { onUnauthorized } = {}) {
       loaded = true;
     } catch (error) {
       if (error?.status === 401) return onUnauthorized?.();
-      list.innerHTML = '<span class="profile-menu__empty">Não foi possível carregar suas passkeys.</span>';
+      list.innerHTML =
+        '<span class="profile-menu__empty">Não foi possível carregar suas passkeys.</span>';
     }
   };
 
@@ -136,6 +147,9 @@ export function setupProfileMenu(button, user, { onUnauthorized } = {}) {
   };
 
   const open = () => {
+    window.dispatchEvent(
+      new CustomEvent("rp-admin-popover-open", { detail: { source: "profile" } })
+    );
     menu.hidden = false;
     button.classList.add("is-open");
     button.setAttribute("aria-expanded", "true");
@@ -163,7 +177,10 @@ export function setupProfileMenu(button, user, { onUnauthorized } = {}) {
       await loadPasskeys();
     } catch (error) {
       const cancelled = error?.name === "NotAllowedError" || error?.name === "AbortError";
-      showStatus(cancelled ? "Cadastro cancelado." : error?.message || "Não foi possível cadastrar.", true);
+      showStatus(
+        cancelled ? "Cadastro cancelado." : error?.message || "Não foi possível cadastrar.",
+        true
+      );
     } finally {
       add.disabled = false;
     }
@@ -202,5 +219,8 @@ export function setupProfileMenu(button, user, { onUnauthorized } = {}) {
       close();
       button.focus();
     }
+  });
+  window.addEventListener("rp-admin-popover-open", event => {
+    if (event.detail?.source !== "profile") close();
   });
 }
