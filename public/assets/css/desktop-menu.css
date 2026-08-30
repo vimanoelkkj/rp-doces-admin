@@ -13,15 +13,13 @@
   }
 
   .rp-desktop-menu__trigger {
-    transition:
-      background 160ms ease,
-      transform 160ms ease;
+    background: transparent;
+    transition: background-color 140ms ease;
   }
 
   .rp-desktop-menu:hover .rp-desktop-menu__trigger,
   .rp-desktop-menu:focus-within .rp-desktop-menu__trigger {
-    background: color-mix(in oklch, var(--rp-color-brand-soft) 72%, transparent);
-    transform: translateY(-1px);
+    background: var(--rp-color-brand-soft);
   }
 
   .rp-desktop-menu__popover {
