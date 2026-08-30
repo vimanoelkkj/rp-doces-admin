@@ -36,7 +36,8 @@ function stockState(product) {
   const reserved = Number(product.estoque_reservado || 0);
   const available = Math.max(0, stock - reserved);
   if (available <= 0) return { label: "Esgotado", className: "is-danger", available };
-  if (available <= 3) return { label: `${available} em estoque`, className: "is-warning", available };
+  if (available <= 3)
+    return { label: `${available} em estoque`, className: "is-warning", available };
   return { label: `${available} em estoque`, className: "is-ok", available };
 }
 
@@ -82,10 +83,90 @@ function productCard(product) {
 }
 
 function emptyState(filter) {
-  const text = filter === "todos"
-    ? "Nenhum produto cadastrado ainda."
-    : "Nenhum produto corresponde a este filtro.";
+  const text =
+    filter === "todos"
+      ? "Nenhum produto cadastrado ainda."
+      : "Nenhum produto corresponde a este filtro.";
   return `<div class="products-empty"><strong>Nada por aqui</strong><span>${text}</span></div>`;
+}
+
+function productDialog() {
+  return `
+    <div class="products-dialog" data-product-dialog hidden>
+      <button class="products-dialog__backdrop" type="button" data-product-dialog-close aria-label="Fechar cadastro"></button>
+      <section class="products-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="new-product-title">
+        <div class="products-dialog__head">
+          <div>
+            <span class="products-dialog__eyebrow">Catálogo</span>
+            <h2 id="new-product-title">Novo produto</h2>
+            <p>Cadastre um doce e ele já entra no catálogo administrativo.</p>
+          </div>
+          <button class="products-dialog__close" type="button" data-product-dialog-close aria-label="Fechar">×</button>
+        </div>
+
+        <form class="products-form" data-product-form>
+          <div class="products-form__grid">
+            <label class="products-field products-field--wide">
+              <span>Nome</span>
+              <input name="nome" type="text" maxlength="100" required autocomplete="off" placeholder="Ex.: Bolo no pote de morango" />
+            </label>
+
+            <label class="products-field">
+              <span>Categoria</span>
+              <select name="categoria" required>
+                <option value="BOLO_NO_POTE">Bolos no pote</option>
+                <option value="MINI_PUDIM">Mini pudins</option>
+              </select>
+            </label>
+
+            <label class="products-field">
+              <span>Emoji</span>
+              <input name="emoji" type="text" maxlength="16" placeholder="🍰" autocomplete="off" />
+            </label>
+
+            <label class="products-field">
+              <span>Preço</span>
+              <div class="products-money-field"><span>R$</span><input name="preco" type="text" inputmode="decimal" required placeholder="12,00" autocomplete="off" /></div>
+            </label>
+
+            <label class="products-field">
+              <span>Estoque</span>
+              <input name="estoque" type="number" min="0" max="100000" step="1" value="0" required />
+            </label>
+
+            <label class="products-field products-field--wide">
+              <span>Descrição</span>
+              <textarea name="descricao" maxlength="500" rows="4" placeholder="Uma descrição curta do produto."></textarea>
+            </label>
+          </div>
+
+          <div class="products-form__toggles">
+            <label class="products-toggle"><input name="ativo" type="checkbox" checked /><span><strong>Produto ativo</strong><small>Disponível para aparecer no catálogo.</small></span></label>
+            <label class="products-toggle"><input name="destaque" type="checkbox" /><span><strong>Marcar como destaque</strong><small>Exibe o selo de destaque no produto.</small></span></label>
+          </div>
+
+          <div class="products-form__message" data-product-form-message aria-live="polite"></div>
+
+          <div class="products-form__actions">
+            <button class="products-secondary" type="button" data-product-dialog-close>Cancelar</button>
+            <button class="products-primary" type="submit" data-product-submit>Salvar produto</button>
+          </div>
+        </form>
+      </section>
+    </div>`;
+}
+
+function parseMoneyToCents(value) {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/R\$/gi, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const cents = Math.round(amount * 100);
+  return Number.isSafeInteger(cents) ? cents : null;
 }
 
 export async function renderProducts(container, { onUnauthorized } = {}) {
@@ -106,61 +187,157 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
         </div>
         <div class="products-toolbar__actions">
           <button class="products-secondary" type="button" disabled>Gerenciar categorias</button>
-          <button class="products-primary" type="button" disabled>+ Novo produto</button>
+          <button class="products-primary" type="button" data-new-product>+ Novo produto</button>
         </div>
       </div>
       <div class="products-summary" data-products-summary>Carregando catálogo…</div>
       <div class="products-grid" data-products-grid></div>
-    </section>`;
+    </section>
+    ${productDialog()}`;
 
   const view = container.querySelector(".products-view");
   const grid = container.querySelector("[data-products-grid]");
   const summary = container.querySelector("[data-products-summary]");
   const search = container.querySelector("[data-products-search]");
   const filterButtons = [...container.querySelectorAll("[data-products-filter]")];
+  const newProductButton = container.querySelector("[data-new-product]");
+  const dialog = container.querySelector("[data-product-dialog]");
+  const form = container.querySelector("[data-product-form]");
+  const formMessage = container.querySelector("[data-product-form-message]");
+  const submitButton = container.querySelector("[data-product-submit]");
 
-  try {
-    const payload = await adminApi.products();
-    const products = Array.isArray(payload?.produtos) ? payload.produtos : [];
-    let filter = "todos";
-    let query = "";
+  let products = [];
+  let filter = "todos";
+  let query = "";
+  let lastFocused = null;
 
-    function renderList() {
-      const visible = products.filter(product => {
-        const available = stockState(product).available;
-        const matchesQuery = !query || `${product.nome} ${product.descricao || ""}`.toLowerCase().includes(query);
-        if (!matchesQuery) return false;
-        if (filter === "ativos") return Number(product.ativo) === 1;
-        if (filter === "esgotados") return Number(product.ativo) === 1 && available <= 0;
-        if (filter === "arquivados") return Number(product.ativo) === 0;
-        return true;
-      });
+  function renderList() {
+    const visible = products.filter(product => {
+      const available = stockState(product).available;
+      const matchesQuery =
+        !query || `${product.nome} ${product.descricao || ""}`.toLowerCase().includes(query);
+      if (!matchesQuery) return false;
+      if (filter === "ativos") return Number(product.ativo) === 1;
+      if (filter === "esgotados") return Number(product.ativo) === 1 && available <= 0;
+      if (filter === "arquivados") return Number(product.ativo) === 0;
+      return true;
+    });
 
-      const activeCount = products.filter(product => Number(product.ativo) === 1).length;
-      const soldOutCount = products.filter(product => Number(product.ativo) === 1 && stockState(product).available <= 0).length;
+    const activeCount = products.filter(product => Number(product.ativo) === 1).length;
+    const soldOutCount = products.filter(
+      product => Number(product.ativo) === 1 && stockState(product).available <= 0
+    ).length;
+    if (summary)
       summary.textContent = `${products.length} produtos · ${activeCount} ativos · ${soldOutCount} esgotados`;
-      grid.innerHTML = visible.length ? visible.map(productCard).join("") : emptyState(filter);
-    }
+    if (grid) grid.innerHTML = visible.length ? visible.map(productCard).join("") : emptyState(filter);
+  }
 
-    search?.addEventListener("input", event => {
-      query = String(event.target.value || "").trim().toLowerCase();
+  async function refreshProducts() {
+    const payload = await adminApi.products();
+    products = Array.isArray(payload?.produtos) ? payload.produtos : [];
+    renderList();
+  }
+
+  function openDialog() {
+    if (!dialog) return;
+    lastFocused = document.activeElement;
+    dialog.hidden = false;
+    document.body.classList.add("products-dialog-open");
+    form?.reset();
+    const active = form?.elements.namedItem("ativo");
+    if (active instanceof HTMLInputElement) active.checked = true;
+    const stock = form?.elements.namedItem("estoque");
+    if (stock instanceof HTMLInputElement) stock.value = "0";
+    if (formMessage) formMessage.textContent = "";
+    requestAnimationFrame(() => form?.elements.namedItem("nome")?.focus());
+  }
+
+  function closeDialog() {
+    if (!dialog || dialog.hidden) return;
+    dialog.hidden = true;
+    document.body.classList.remove("products-dialog-open");
+    if (formMessage) formMessage.textContent = "";
+    if (lastFocused instanceof HTMLElement) lastFocused.focus();
+  }
+
+  search?.addEventListener("input", event => {
+    query = String(event.target.value || "")
+      .trim()
+      .toLowerCase();
+    renderList();
+  });
+
+  filterButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      filter = button.dataset.productsFilter || "todos";
+      filterButtons.forEach(item => item.classList.toggle("is-active", item === button));
       renderList();
     });
+  });
 
-    filterButtons.forEach(button => {
-      button.addEventListener("click", () => {
-        filter = button.dataset.productsFilter || "todos";
-        filterButtons.forEach(item => item.classList.toggle("is-active", item === button));
-        renderList();
+  newProductButton?.addEventListener("click", openDialog);
+  container.querySelectorAll("[data-product-dialog-close]").forEach(button => {
+    button.addEventListener("click", closeDialog);
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && dialog && !dialog.hidden) closeDialog();
+  });
+
+  form?.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!(form instanceof HTMLFormElement) || !submitButton) return;
+
+    const data = new FormData(form);
+    const price = parseMoneyToCents(data.get("preco"));
+    const stock = Number(data.get("estoque"));
+    const name = String(data.get("nome") || "").trim();
+
+    if (!name || price === null || !Number.isSafeInteger(stock) || stock < 0) {
+      if (formMessage) formMessage.textContent = "Confira nome, preço e estoque antes de salvar.";
+      return;
+    }
+
+    submitButton.disabled = true;
+    submitButton.textContent = "Salvando…";
+    if (formMessage) formMessage.textContent = "";
+
+    try {
+      await adminApi.createProduct({
+        nome: name,
+        categoria: String(data.get("categoria") || "BOLO_NO_POTE"),
+        descricao: String(data.get("descricao") || "").trim(),
+        preco_centavos: price,
+        disponivel: true,
+        ativo: data.get("ativo") === "on",
+        destaque: data.get("destaque") === "on",
+        emoji: String(data.get("emoji") || "").trim(),
+        estoque: stock,
+        promocao_ativa: false,
+        preco_promocional_centavos: null,
+        promocao_inicio: null,
+        promocao_fim: null
       });
-    });
+      await refreshProducts();
+      closeDialog();
+    } catch (error) {
+      if (error?.status === 401) return onUnauthorized?.();
+      if (formMessage)
+        formMessage.textContent = error?.message || "Não foi possível criar o produto agora.";
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = "Salvar produto";
+    }
+  });
 
-    renderList();
+  try {
+    await refreshProducts();
     view?.setAttribute("aria-busy", "false");
   } catch (error) {
     if (error?.status === 401) return onUnauthorized?.();
     if (summary) summary.textContent = "Não foi possível carregar o catálogo.";
-    if (grid) grid.innerHTML = `<div class="products-empty is-error"><strong>Falha ao carregar produtos</strong><span>${esc(error?.message || "Tente novamente em instantes.")}</span></div>`;
+    if (grid)
+      grid.innerHTML = `<div class="products-empty is-error"><strong>Falha ao carregar produtos</strong><span>${esc(error?.message || "Tente novamente em instantes.")}</span></div>`;
     view?.setAttribute("aria-busy", "false");
   }
 }
