@@ -15,10 +15,13 @@ test("aceita e normaliza um produto válido", () => {
   assert.equal(r.produto.disponivel, true);
 });
 test("rejeita categoria, preço e estoque inválidos", () => {
-  assert.equal(validarProduto({ ...valido, categoria: "OUTRA" }).ok, false);
+  assert.equal(validarProduto({ ...valido, categoria: "categoria inválida" }).ok, false);
   assert.equal(validarProduto({ ...valido, preco_centavos: 0 }).ok, false);
   assert.equal(validarProduto({ ...valido, estoque: -1 }).ok, false);
   assert.equal(validarProduto({ ...valido, estoque: 1.5 }).ok, false);
+});
+test("aceita slug de categoria dinâmica válido", () => {
+  assert.equal(validarProduto({ ...valido, categoria: "BROWNIES" }).ok, true);
 });
 test("valida promoção e período", () => {
   assert.equal(validarProduto({ ...valido, promocao_ativa: true }).ok, false);
