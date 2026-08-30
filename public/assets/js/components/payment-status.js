@@ -1,4 +1,9 @@
-import { paymentReference, paymentTotalCents, pixCode, pixQrImageSrc } from "../utils/payment-data.js";
+import {
+  paymentReference,
+  paymentTotalCents,
+  pixCode,
+  pixQrImageSrc
+} from "../utils/payment-data.js";
 import { shortOrderReference } from "../utils/order-reference.js";
 import { formatPixExpiry } from "../utils/pix-expiry.js";
 import { formatMoney } from "../utils/money.js";
