@@ -1,0 +1,35 @@
+.rp-party__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 86px;
+  align-items: center;
+  column-gap: 18px;
+  min-height: 0;
+  padding: 18px;
+}
+
+.rp-party__hero-copy {
+  min-width: 0;
+}
+
+.rp-party__cake {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: 86px;
+  height: 100px;
+  align-self: center;
+  justify-self: center;
+}
+
+@media (max-width: 420px) {
+  .rp-party__hero {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    column-gap: 14px;
+    padding: 16px;
+  }
+
+  .rp-party__cake {
+    width: 76px;
+    height: 92px;
+  }
+}
