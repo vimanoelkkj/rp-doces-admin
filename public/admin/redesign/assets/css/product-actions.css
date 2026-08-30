@@ -17,7 +17,7 @@
   z-index: 12;
   top: 214px;
   right: 14px;
-  min-width: 168px;
+  min-width: 176px;
   border: 1px solid var(--rp-line);
   border-radius: 12px;
   padding: 6px;
@@ -49,6 +49,31 @@
   outline: 0;
   background: var(--rp-pink-wash);
   color: var(--rp-pink-strong);
+}
+
+.products-actions-menu [data-toggle-product-state]:not(.is-reactivate) {
+  color: var(--rp-danger);
+}
+
+.products-actions-menu [data-toggle-product-state]:not(.is-reactivate):hover,
+.products-actions-menu [data-toggle-product-state]:not(.is-reactivate):focus-visible {
+  background: color-mix(in oklch, var(--rp-danger) 9%, var(--rp-surface));
+  color: var(--rp-danger);
+}
+
+.products-actions-menu [data-toggle-product-state].is-reactivate {
+  color: var(--rp-success);
+}
+
+.products-actions-menu [data-toggle-product-state].is-reactivate:hover,
+.products-actions-menu [data-toggle-product-state].is-reactivate:focus-visible {
+  background: color-mix(in oklch, var(--rp-success) 9%, var(--rp-surface));
+  color: var(--rp-success);
+}
+
+.products-actions-menu button:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 @media (max-width: 640px) {
