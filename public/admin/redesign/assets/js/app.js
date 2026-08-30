@@ -34,6 +34,8 @@ let currentUser = null;
 function setCollapsed(collapsed) {
   app?.classList.toggle("is-collapsed", collapsed);
   collapseButton?.setAttribute("aria-expanded", String(!collapsed));
+  collapseButton?.setAttribute("aria-label", collapsed ? "Expandir sidebar" : "Recolher sidebar");
+  collapseButton?.setAttribute("title", collapsed ? "Expandir" : "Recolher");
   localStorage.setItem("rp-admin-sidebar-collapsed", collapsed ? "1" : "0");
 }
 
