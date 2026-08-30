@@ -80,13 +80,44 @@ function itemSummary(order) {
   return `${Number(first.quantidade || 0)}× ${first.produto_nome}${rest > 0 ? ` + ${rest} item(ns)` : ""}`;
 }
 
+function statusControl(order, paid, status) {
+  const final = status === "ENTREGUE" || status === "CANCELADO";
+
+  if (!paid) {
+    return `<span class="orders-status-final is-locked" title="Disponível após a confirmação do pagamento">${esc(ORDER_STATUS_LABELS[status] || status)}</span>`;
+  }
+
+  if (final) {
+    return `<span class="orders-status-final ${orderClass(status)}">${esc(ORDER_STATUS_LABELS[status] || status)}</span>`;
+  }
+
+  return `
+    <div class="orders-status-menu" data-order-status-menu>
+      <button class="orders-status-trigger" type="button" data-order-status-trigger aria-haspopup="listbox" aria-expanded="false">
+        <span>${esc(ORDER_STATUS_LABELS[status] || status)}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
+      </button>
+      <div class="orders-status-options" role="listbox" aria-label="Alterar andamento do pedido" hidden>
+        ${Object.entries(ORDER_STATUS_LABELS)
+          .map(
+            ([value, label]) => `
+              <button type="button" role="option" data-order-status-value="${value}" aria-selected="${value === status}">
+                <span>${esc(label)}</span>${value === status ? "<strong>✓</strong>" : ""}
+              </button>`
+          )
+          .join("")}
+      </div>
+    </div>`;
+}
+
 function orderCard(order) {
   const payment = String(order.status_pagamento || "PENDENTE").toUpperCase();
   const status = String(order.status_pedido || "NOVO").toUpperCase();
   const paid = payment === "PAGO";
+  const pendingClass = payment === "PENDENTE" ? " is-payment-pending" : "";
 
   return `
-    <article class="orders-card" data-order-id="${Number(order.id)}">
+    <article class="orders-card${pendingClass}" data-order-id="${Number(order.id)}">
       <div class="orders-card__top">
         <div>
           <span class="orders-card__number">Pedido #${Number(order.id)}</span>
@@ -108,15 +139,8 @@ function orderCard(order) {
       </div>
 
       <div class="orders-card__actions">
-        <button class="orders-secondary" type="button" data-order-details>Ver detalhes</button>
-        <label class="orders-status-control${paid ? "" : " is-disabled"}">
-          <span class="sr-only">Andamento do pedido</span>
-          <select data-order-status ${paid ? "" : "disabled"} aria-label="Alterar andamento do pedido #${Number(order.id)}">
-            ${Object.entries(ORDER_STATUS_LABELS)
-              .map(([value, label]) => `<option value="${value}"${value === status ? " selected" : ""}>${label}</option>`)
-              .join("")}
-          </select>
-        </label>
+        <button class="orders-secondary orders-details-button" type="button" data-order-details>Ver detalhes</button>
+        ${statusControl(order, paid, status)}
       </div>
     </article>`;
 }
@@ -252,6 +276,17 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
     document.body.classList.remove("orders-dialog-open");
   }
 
+  function closeStatusMenus(except = null) {
+    list?.querySelectorAll("[data-order-status-menu]").forEach(menu => {
+      if (menu === except) return;
+      const trigger = menu.querySelector("[data-order-status-trigger]");
+      const options = menu.querySelector(".orders-status-options");
+      trigger?.setAttribute("aria-expanded", "false");
+      if (options) options.hidden = true;
+      menu.classList.remove("is-open");
+    });
+  }
+
   function openDetails(order) {
     closeDialog();
     container.insertAdjacentHTML("beforeend", detailDialog(order));
@@ -269,21 +304,40 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
 
       card.querySelector("[data-order-details]")?.addEventListener("click", () => openDetails(order));
 
-      const statusSelect = card.querySelector("[data-order-status]");
-      statusSelect?.addEventListener("change", async event => {
-        const previous = order.status_pedido || "NOVO";
-        const next = event.target.value;
-        event.target.disabled = true;
-        try {
-          await adminApi.updateOrderStatus(id, next);
-          order.status_pedido = next;
-          renderSummary();
-          renderList();
-        } catch (error) {
-          event.target.value = previous;
-          event.target.disabled = false;
-          window.alert(error?.message || "Não foi possível atualizar o pedido.");
-        }
+      const menu = card.querySelector("[data-order-status-menu]");
+      const trigger = card.querySelector("[data-order-status-trigger]");
+      const options = menu?.querySelector(".orders-status-options");
+
+      trigger?.addEventListener("click", event => {
+        event.stopPropagation();
+        const opening = options?.hidden ?? false;
+        closeStatusMenus(opening ? menu : null);
+        if (!options || !menu) return;
+        options.hidden = !opening;
+        menu.classList.toggle("is-open", opening);
+        trigger.setAttribute("aria-expanded", String(opening));
+      });
+
+      menu?.querySelectorAll("[data-order-status-value]").forEach(option => {
+        option.addEventListener("click", async event => {
+          event.stopPropagation();
+          const next = option.dataset.orderStatusValue;
+          const previous = order.status_pedido || "NOVO";
+          if (!next || next === previous) return closeStatusMenus();
+
+          trigger.disabled = true;
+          closeStatusMenus();
+          try {
+            await adminApi.updateOrderStatus(id, next);
+            order.status_pedido = next;
+            renderSummary();
+            renderList();
+          } catch (error) {
+            order.status_pedido = previous;
+            trigger.disabled = false;
+            window.alert(error?.message || "Não foi possível atualizar o pedido.");
+          }
+        });
       });
     });
   }
@@ -319,8 +373,11 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
   });
 
   refresh?.addEventListener("click", loadOrders);
+  document.addEventListener("click", () => closeStatusMenus());
   document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && container.querySelector("[data-orders-dialog]")) closeDialog();
+    if (event.key !== "Escape") return;
+    if (container.querySelector("[data-orders-dialog]")) closeDialog();
+    closeStatusMenus();
   });
 
   await loadOrders();
