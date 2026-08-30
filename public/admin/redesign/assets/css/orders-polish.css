@@ -63,9 +63,10 @@
 
 .orders-status-options {
   position: absolute;
+  top: calc(100% + 6px);
   right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 20;
+  bottom: auto;
+  z-index: 40;
   width: 100%;
   min-width: 142px;
   padding: 5px;
@@ -73,6 +74,11 @@
   border-radius: 12px;
   background: #fffaf8;
   box-shadow: 0 18px 46px rgba(68, 39, 31, 0.14);
+}
+
+.orders-status-menu.is-up .orders-status-options {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 
 .orders-status-options[hidden] {
@@ -238,11 +244,6 @@
   .orders-status-menu {
     width: 100%;
     flex-basis: auto;
-  }
-
-  .orders-status-options {
-    top: calc(100% + 6px);
-    bottom: auto;
   }
 
   .orders-card {
