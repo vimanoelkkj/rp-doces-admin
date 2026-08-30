@@ -33,6 +33,7 @@ function setupPwaShell() {
   ensureHeadLink("manifest", "/admin/manifest.webmanifest");
   ensureHeadLink("icon", "/admin-favicon.png");
   ensureHeadLink("apple-touch-icon", "/admin-apple-touch-icon.png");
+  ensureHeadLink("stylesheet", "/admin/redesign/assets/css/pwa-shell.css");
   ensureMeta("theme-color", "#fff8f2");
   ensureMeta("apple-mobile-web-app-capable", "yes");
   ensureMeta("apple-mobile-web-app-status-bar-style", "default");
