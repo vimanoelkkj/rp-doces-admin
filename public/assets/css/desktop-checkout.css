@@ -49,6 +49,7 @@
     grid-column: 1;
     grid-row: 2;
     min-height: 0;
+    align-content: start;
     overflow-y: auto;
     overscroll-behavior: contain;
     margin-right: -8px;
