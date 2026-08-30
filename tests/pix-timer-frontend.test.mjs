@@ -120,10 +120,7 @@ test("timestamp Pix válido é formatado para apresentação", () => {
 });
 
 test("helper de dados aceita QR base64 cru e data URL", () => {
-  assert.equal(
-    pixQrImageSrc({ pix: { qr_code_base64: "QUJD" } }),
-    "data:image/png;base64,QUJD"
-  );
+  assert.equal(pixQrImageSrc({ pix: { qr_code_base64: "QUJD" } }), "data:image/png;base64,QUJD");
   assert.equal(
     pixQrImageSrc({ pix: { qr_code_base64: "data:image/png;base64,REVG" } }),
     "data:image/png;base64,REVG"
@@ -131,10 +128,7 @@ test("helper de dados aceita QR base64 cru e data URL", () => {
 });
 
 test("helper de dados rejeita QR em formato incompatível", () => {
-  assert.equal(
-    pixQrImageSrc({ pix: { qr_code_base64: "data:image/jpeg;base64,QUJD" } }),
-    ""
-  );
+  assert.equal(pixQrImageSrc({ pix: { qr_code_base64: "data:image/jpeg;base64,QUJD" } }), "");
   assert.equal(pixQrImageSrc({ pix: { qr_code_base64: "" } }), "");
 });
 
