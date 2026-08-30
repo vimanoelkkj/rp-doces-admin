@@ -83,5 +83,11 @@ export const adminApi = {
       acao: "alterar_papel",
       papel: role
     });
+  },
+  storeConfig() {
+    return request("/api/admin/config");
+  },
+  updateStoreConfig(config) {
+    return jsonRequest("/api/admin/config", "PUT", config);
   }
 };
