@@ -126,22 +126,69 @@ body:has(.auth:not(.hidden)) {
 
 .auth.card .btn {
   min-height: 46px;
+  border: 1px solid transparent;
   border-radius: 14px;
   padding: 11px 17px;
   background: var(--rp-auth-pink);
+  color: #fff;
   box-shadow: 0 8px 18px rgb(201 67 94 / 16%);
   font-weight: 800;
-  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
-.auth.card .btn:hover {
+.auth.card .btn:hover:not(:disabled) {
   background: var(--rp-auth-pink-strong);
   box-shadow: 0 10px 24px rgb(201 67 94 / 20%);
   transform: translateY(-1px);
 }
 
-.auth.card .btn:active {
+.auth.card .btn:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.auth.card .btn.secondary {
+  border-color: var(--rp-auth-line-strong);
+  background: #fffdfa;
+  color: var(--rp-auth-ink-2);
+  box-shadow: none;
+}
+
+.auth.card .btn.secondary:hover:not(:disabled) {
+  border-color: var(--rp-auth-pink-soft);
+  background: var(--rp-auth-pink-wash);
+  color: var(--rp-auth-pink-strong);
+  box-shadow: none;
+}
+
+.auth.card .btn:disabled,
+.auth.card .btn[aria-disabled="true"] {
+  border-color: var(--rp-auth-line);
+  background: #f5eeeb;
+  color: #b7a39b;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+  transform: none;
+}
+
+.auth.card .login-actions {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.auth.card .login-actions > .btn {
+  width: 100%;
+  min-width: 0;
+}
+
+.auth.card .login-actions > .btn:nth-child(3) {
+  grid-column: 1 / -1;
+  justify-self: start;
+  width: auto;
+  min-height: 42px;
+  padding-inline: 14px;
 }
 
 .auth.card .msg {
@@ -166,7 +213,13 @@ body:has(.auth:not(.hidden)) {
     border-radius: 13px;
   }
 
-  .auth.card .btn {
+  .auth.card .login-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .auth.card .login-actions > .btn,
+  .auth.card .login-actions > .btn:nth-child(3) {
+    grid-column: auto;
     width: 100%;
   }
 }
