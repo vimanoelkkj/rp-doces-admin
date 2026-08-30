@@ -21,6 +21,14 @@ async function request(path, options = {}) {
   return payload;
 }
 
+function jsonRequest(path, method, body) {
+  return request(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+}
+
 export const adminApi = {
   me() {
     return request("/api/auth/me");
@@ -29,11 +37,7 @@ export const adminApi = {
     return request("/api/admin/orders");
   },
   updateOrderStatus(id, status) {
-    return request(`/api/admin/orders/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status_pedido: status })
-    });
+    return jsonRequest(`/api/admin/orders/${id}`, "PUT", { status_pedido: status });
   },
   products() {
     return request("/api/admin/products");
@@ -42,34 +46,42 @@ export const adminApi = {
     return request("/api/admin/categories");
   },
   createCategory(category) {
-    return request("/api/admin/categories", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(category)
-    });
+    return jsonRequest("/api/admin/categories", "POST", category);
   },
   createProduct(product) {
-    return request("/api/admin/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(product)
-    });
+    return jsonRequest("/api/admin/products", "POST", product);
   },
   updateProduct(id, product) {
-    return request(`/api/admin/products/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(product)
-    });
+    return jsonRequest(`/api/admin/products/${id}`, "PUT", product);
   },
   archiveProduct(id) {
     return request(`/api/admin/products/${id}`, { method: "DELETE" });
   },
   reactivateProduct(id, product) {
-    return request(`/api/admin/products/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(product)
+    return jsonRequest(`/api/admin/products/${id}`, "PUT", product);
+  },
+  users() {
+    return request("/api/admin/users");
+  },
+  createUser(user) {
+    return jsonRequest("/api/admin/users", "POST", user);
+  },
+  resetUserPassword(id, password) {
+    return jsonRequest(`/api/admin/users/${id}`, "PUT", {
+      acao: "resetar_senha",
+      senha: password
+    });
+  },
+  toggleUser(id, active) {
+    return jsonRequest(`/api/admin/users/${id}`, "PUT", {
+      acao: "toggle_ativo",
+      ativo: Boolean(active)
+    });
+  },
+  changeUserRole(id, role) {
+    return jsonRequest(`/api/admin/users/${id}`, "PUT", {
+      acao: "alterar_papel",
+      papel: role
     });
   }
 };
