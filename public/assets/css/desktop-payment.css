@@ -1,0 +1,10 @@
+@media (min-width: 1024px) {
+  .rp-payment .rp-sheet-handle {
+    display: none;
+  }
+
+  .rp-payment__sheet,
+  .rp-payment__sheet--state {
+    padding-top: 28px;
+  }
+}

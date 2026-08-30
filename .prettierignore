@@ -1,8 +1,3 @@
-node_modules
-.git
-.wrangler
-.private-backups
-dist
+public/assets/js/assets/temponi-logo-full.js
 *.min.js
 *.min.css
-migrations

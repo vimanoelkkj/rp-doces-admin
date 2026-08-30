@@ -408,6 +408,114 @@ test("Caso 2: retry sequencial com mesmo client_request_id retorna mesmo pedido/
   assert.equal(count.total, 1);
 });
 
+test("Caso 2b: retry idempotente ignora a própria reserva mesmo sem estoque livre", async t => {
+  const DB = createRealSqliteDb();
+
+  DB.raw
+    .prepare(
+      "INSERT INTO produtos (id, nome, preco_centavos, estoque, estoque_reservado) VALUES (1, 'Pudim', 1500, 1, 1)"
+    )
+    .run();
+
+  const clientId = "c2222222-2222-4222-8222-333333333333";
+
+  DB.raw
+    .prepare(
+      `
+      INSERT INTO pedidos (
+        token_publico,
+        produto_id,
+        produto_nome,
+        quantidade,
+        valor_unitario_centavos,
+        valor_total_centavos,
+        cliente_nome,
+        cliente_email,
+        cliente_whatsapp,
+        tipo_entrega,
+        observacao,
+        status_pagamento,
+        mp_order_id,
+        mp_qr_code,
+        idempotency_key,
+        reserva_status
+      )
+      VALUES (
+        'token-reservado',
+        1,
+        'Pudim',
+        1,
+        1500,
+        1500,
+        'Maria Silva',
+        'maria@example.com',
+        '5533999999999',
+        'RETIRADA',
+        '',
+        'PENDENTE',
+        'mp-order-reservado',
+        'PIX-RESERVADO',
+        ?,
+        'ATIVA'
+      )
+    `
+    )
+    .run(clientId);
+
+  DB.raw
+    .prepare(
+      `
+      INSERT INTO pedido_itens (
+        pedido_id,
+        produto_id,
+        produto_nome,
+        quantidade,
+        valor_unitario_centavos,
+        valor_total_centavos
+      )
+      VALUES (1, 1, 'Pudim', 1, 1500, 1500)
+    `
+    )
+    .run();
+
+  const oldFetch = globalThis.fetch;
+  let calls = 0;
+
+  globalThis.fetch = async () => {
+    calls++;
+    throw new Error("Mercado Pago não deveria ser chamado no replay");
+  };
+
+  t.after(() => (globalThis.fetch = oldFetch));
+
+  const response = await onRequestPost({
+    request: req({
+      client_request_id: clientId,
+      ...cliente,
+      itens: [{ produto_id: 1, quantidade: 1 }]
+    }),
+    env: { DB, MP_ACCESS_TOKEN: "teste", RATE_LIMIT_SECRET }
+  });
+
+  const body = await responseJson(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.pedido.token, "token-reservado");
+  assert.equal(body.pedido.status, "PENDENTE");
+  assert.equal(body.pix.qr_code, "PIX-RESERVADO");
+  assert.equal(calls, 0);
+
+  const produtoAtual = DB.raw
+    .prepare("SELECT estoque, estoque_reservado FROM produtos WHERE id = 1")
+    .get();
+
+  assert.equal(produtoAtual.estoque, 1);
+  assert.equal(produtoAtual.estoque_reservado, 1);
+
+  const pedidos = DB.raw.prepare("SELECT count(*) AS total FROM pedidos").get();
+  assert.equal(pedidos.total, 1);
+});
+
 test("Caso 3: concorrência real com mesmo client_request_id cria exatamente 1 registro no banco e converge para o mesmo Pix", async t => {
   const DB = createRealSqliteDb();
   DB.raw

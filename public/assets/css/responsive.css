@@ -1,0 +1,28 @@
+@media (min-width: 768px) {
+  .rp-container {
+    width: min(calc(100% - 48px), var(--rp-container));
+  }
+  .rp-section {
+    padding-block: 72px;
+  }
+}
+@media (min-width: 1180px) {
+  .rp-container {
+    width: min(calc(100% - 64px), var(--rp-container));
+  }
+  .rp-section {
+    padding-block: 88px;
+  }
+}
+@media (max-width: 420px) {
+  .rp-container {
+    width: min(calc(100% - 28px), var(--rp-container));
+  }
+  .rp-menu__head {
+    align-items: baseline;
+    flex-direction: row;
+  }
+  .rp-menu__count {
+    align-self: auto;
+  }
+}

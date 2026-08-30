@@ -1,0 +1,3 @@
+export function renderHero() {
+  return `<section class="rp-hero" id="inicio" aria-labelledby="rp-hero-title"><div class="rp-container rp-hero__grid"><div class="rp-hero__copy"><p class="rp-hero__eyebrow">Dentro da Temponi Concept</p><h1 class="rp-hero__title" id="rp-hero-title"><span>Um docinho</span><span>enquanto você</span><em>se cuida</em></h1><p class="rp-hero__lede">Bolo no pote e mini pudim, feitos à mão.</p><a class="rp-btn rp-btn--primary rp-hero__cta" href="#cardapio">Ver o cardápio <span aria-hidden="true">→</span></a></div><div class="rp-hero__media" role="img" aria-label="Bolo no pote de morango"><span class="rp-hero__media-label">bolo no pote · morango</span></div></div></section>`;
+}

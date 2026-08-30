@@ -1,0 +1,590 @@
+.rp-payment {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.rp-payment__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(59 34 32 / 48%);
+}
+.rp-payment__sheet {
+  position: relative;
+  width: min(100%, 560px);
+  max-height: min(88vh, 760px);
+  overflow: auto;
+  padding: 12px 20px 28px;
+  border-radius: 26px 26px 0 0;
+  background: var(--rp-color-surface);
+  box-shadow: 0 -18px 40px rgb(59 34 32 / 18%);
+}
+.rp-payment__sheet h2 {
+  margin: 8px 0 10px;
+  color: var(--rp-color-text);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+.rp-payment__sheet > p:not(.rp-kicker):not(.rp-payment__hint),
+.rp-payment__state > p:not(.rp-kicker) {
+  color: var(--rp-color-muted-strong);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.rp-payment__waiting-mark {
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 10px;
+}
+.rp-payment__waiting-icon {
+  width: 34px;
+  height: 30px;
+  overflow: visible;
+}
+.rp-payment__waiting-clock-hand {
+  transform-box: view-box;
+  animation: rp-waiting-clock-hand 1.6s linear infinite;
+}
+.rp-payment__waiting-clock-hand--pix {
+  transform-origin: 28.3px 24.3px;
+}
+.rp-payment__waiting-clock-hand--card {
+  transform-origin: 26.8px 22.8px;
+}
+.rp-payment__total {
+  display: block;
+  width: fit-content;
+  margin: 18px 0;
+  color: var(--rp-color-text);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.rp-payment__code {
+  width: 100%;
+  min-height: 108px;
+  resize: none;
+  margin: 8px 0 12px;
+  padding: 11px 13px;
+  border: 1.5px solid var(--rp-color-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--rp-color-text);
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.rp-payment__code:focus {
+  border-color: var(--rp-color-brand);
+  box-shadow: 0 0 0 3px #fbdce7;
+}
+.rp-payment__hint {
+  margin-top: 12px;
+  color: var(--rp-color-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rp-payment__copied {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--rp-color-brand-soft);
+  color: var(--rp-color-brand-strong);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.rp-payment__sheet .rp-btn {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 13px;
+}
+.rp-payment__sheet .rp-btn + .rp-btn {
+  margin-top: 9px;
+}
+.rp-payment__sheet--state {
+  padding-top: 12px;
+}
+.rp-payment__state {
+  text-align: center;
+  padding: 12px 0 2px;
+}
+.rp-payment__state .rp-kicker {
+  margin: 14px 0 6px;
+}
+.rp-payment__state h2 {
+  margin-top: 0;
+}
+.rp-payment__state > p:not(.rp-kicker) {
+  max-width: 36ch;
+  margin: 0 auto 20px;
+}
+.rp-payment__state-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin: 8px auto 0;
+  place-items: center;
+  border-radius: 999px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+}
+.rp-payment__state-icon--success {
+  background: #dff3e4;
+  color: #287a45;
+}
+.rp-payment__state-icon--failure {
+  background: var(--rp-color-neutral-bg);
+  color: var(--rp-color-muted-strong);
+}
+.rp-payment__state-icon--warning {
+  background: #f7ecd1;
+  color: #9a6c18;
+}
+.rp-payment__state-icon--card-declined {
+  width: 72px;
+  height: 64px;
+  background: transparent;
+  color: #b65252;
+  border-radius: 0;
+}
+.rp-payment__state-icon--card-declined svg {
+  width: 72px;
+  height: 64px;
+  overflow: visible;
+}
+.rp-payment__declined-card-body {
+  fill: #fff5f5;
+  stroke: currentcolor;
+  stroke-width: 2.4;
+}
+.rp-payment__declined-card-stripe,
+.rp-payment__declined-card-detail {
+  stroke: currentcolor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.rp-payment__declined-card-x-ring {
+  fill: var(--rp-color-surface);
+  stroke: currentcolor;
+  stroke-width: 3;
+}
+.rp-payment__declined-card-x {
+  stroke: currentcolor;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+}
+.rp-payment__state-icon--muted {
+  background: #f3eee9;
+  color: var(--rp-color-muted-strong);
+  font-size: 24px;
+}
+.rp-payment__reference {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 20px;
+  padding: 13px 15px;
+  border: 1px solid var(--rp-color-border);
+  border-radius: 13px;
+  background: #fff;
+  text-align: left;
+}
+.rp-payment__reference span {
+  color: var(--rp-color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.rp-payment__reference strong {
+  color: var(--rp-color-text);
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+}
+.rp-payment__next-step {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 20px;
+  padding: 14px 15px;
+  border-radius: 13px;
+  background: var(--rp-color-neutral-bg);
+  text-align: left;
+}
+.rp-payment__next-step span {
+  color: var(--rp-color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.rp-payment__next-step strong {
+  color: var(--rp-color-text);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 15px;
+  line-height: 1.3;
+}
+.rp-payment__next-step small {
+  color: var(--rp-color-muted-strong);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rp-payment__secondary {
+  border: 0;
+  background: transparent;
+  color: var(--rp-color-brand-strong);
+}
+.rp-payment__secondary[disabled] {
+  cursor: not-allowed;
+  color: var(--rp-color-muted);
+  opacity: 0.48;
+}
+.rp-payment__sheet .rp-btn--danger {
+  border-color: #b65252;
+  background: #b65252;
+  color: #fff;
+}
+.rp-payment__sheet .rp-btn--danger[disabled] {
+  cursor: wait;
+  opacity: 0.86;
+}
+.rp-payment__cancel-progress {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.rp-payment__cancel-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 2px solid rgb(255 255 255 / 38%);
+  border-top-color: currentcolor;
+  border-radius: 999px;
+  animation: rp-payment-cancel-spin 720ms linear infinite;
+}
+@keyframes rp-payment-cancel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rp-waiting-clock-hand {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rp-payment-pending-mark {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes rp-payment-pending-content {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes rp-payment-success-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+    box-shadow: 0 0 0 0 rgb(40 122 69 / 24%);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(1.08);
+    box-shadow: 0 0 0 12px rgb(40 122 69 / 0%);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(40 122 69 / 0%);
+  }
+}
+@keyframes rp-payment-success-content {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes rp-payment-failure-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  72% {
+    transform: translateX(-2px) scale(1);
+  }
+  86% {
+    transform: translateX(2px) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+@keyframes rp-payment-failure-content {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes rp-payment-cancelled-icon {
+  from {
+    opacity: 0;
+    transform: scale(0.86) rotate(-8deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+@keyframes rp-payment-cancelled-content {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes rp-payment-card-declined-icon {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.78);
+  }
+  52% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06);
+  }
+  70% {
+    transform: translateX(-3px) rotate(-2deg) scale(1);
+  }
+  84% {
+    transform: translateX(3px) rotate(2deg) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) rotate(0deg) scale(1);
+  }
+}
+@keyframes rp-payment-card-declined-content {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes rp-payment-warning-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.07);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rp-payment__waiting-mark {
+    animation: rp-payment-pending-mark 430ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+  .rp-payment__waiting-mark ~ h2,
+  .rp-payment__waiting-mark ~ p,
+  .rp-payment__waiting-mark ~ .rp-payment__total,
+  .rp-payment__waiting-mark ~ .rp-payment__code,
+  .rp-payment__waiting-mark ~ .rp-btn,
+  .rp-payment__waiting-mark ~ .rp-payment__hint {
+    animation: rp-payment-pending-content 320ms ease both;
+  }
+  .rp-payment__waiting-mark ~ h2 {
+    animation-delay: 90ms;
+  }
+  .rp-payment__waiting-mark ~ p:not(.rp-payment__hint) {
+    animation-delay: 135ms;
+  }
+  .rp-payment__waiting-mark ~ .rp-payment__total {
+    animation-delay: 180ms;
+  }
+  .rp-payment__waiting-mark ~ .rp-payment__code {
+    animation-delay: 225ms;
+  }
+  .rp-payment__waiting-mark ~ .rp-btn {
+    animation-delay: 270ms;
+  }
+  .rp-payment__waiting-mark ~ .rp-payment__hint {
+    animation-delay: 315ms;
+  }
+  .rp-payment__state-icon--success {
+    animation: rp-payment-success-pop 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+  .rp-payment__state-icon--success ~ .rp-kicker,
+  .rp-payment__state-icon--success ~ h2,
+  .rp-payment__state-icon--success ~ p,
+  .rp-payment__state-icon--success ~ .rp-payment__reference,
+  .rp-payment__state-icon--success ~ .rp-payment__next-step,
+  .rp-payment__state-icon--success ~ .rp-btn {
+    animation: rp-payment-success-content 340ms ease both;
+  }
+  .rp-payment__state-icon--success ~ .rp-kicker {
+    animation-delay: 120ms;
+  }
+  .rp-payment__state-icon--success ~ h2 {
+    animation-delay: 170ms;
+  }
+  .rp-payment__state-icon--success ~ p {
+    animation-delay: 220ms;
+  }
+  .rp-payment__state-icon--success ~ .rp-payment__reference {
+    animation-delay: 270ms;
+  }
+  .rp-payment__state-icon--success ~ .rp-payment__next-step {
+    animation-delay: 310ms;
+  }
+  .rp-payment__state-icon--success ~ .rp-btn {
+    animation-delay: 350ms;
+  }
+  .rp-payment__state-icon--failure {
+    animation: rp-payment-failure-pop 430ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+  .rp-payment__state-icon--failure ~ .rp-kicker,
+  .rp-payment__state-icon--failure ~ h2,
+  .rp-payment__state-icon--failure ~ p,
+  .rp-payment__state-icon--failure ~ .rp-btn {
+    animation: rp-payment-failure-content 300ms ease both;
+  }
+  .rp-payment__state-icon--failure ~ .rp-kicker {
+    animation-delay: 90ms;
+  }
+  .rp-payment__state-icon--failure ~ h2 {
+    animation-delay: 135ms;
+  }
+  .rp-payment__state-icon--failure ~ p {
+    animation-delay: 180ms;
+  }
+  .rp-payment__state-icon--failure ~ .rp-btn {
+    animation-delay: 225ms;
+  }
+  .rp-payment__state-icon--muted {
+    animation: rp-payment-cancelled-icon 360ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+  }
+  .rp-payment__state-icon--muted ~ .rp-kicker,
+  .rp-payment__state-icon--muted ~ h2,
+  .rp-payment__state-icon--muted ~ p,
+  .rp-payment__state-icon--muted ~ .rp-btn {
+    animation: rp-payment-cancelled-content 280ms ease both;
+  }
+  .rp-payment__state-icon--muted ~ .rp-kicker {
+    animation-delay: 80ms;
+  }
+  .rp-payment__state-icon--muted ~ h2 {
+    animation-delay: 120ms;
+  }
+  .rp-payment__state-icon--muted ~ p {
+    animation-delay: 160ms;
+  }
+  .rp-payment__state-icon--muted ~ .rp-btn {
+    animation-delay: 200ms;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure {
+    animation: rp-payment-card-declined-icon 470ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ .rp-kicker,
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ h2,
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ p,
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ .rp-btn {
+    animation: rp-payment-card-declined-content 310ms ease both;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ .rp-kicker {
+    animation-delay: 105ms;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ h2 {
+    animation-delay: 150ms;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ p {
+    animation-delay: 195ms;
+  }
+  .rp-payment__state--card-declined .rp-payment__state-icon--failure ~ .rp-btn {
+    animation-delay: 240ms;
+  }
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning {
+    animation: rp-payment-warning-pop 390ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning ~ .rp-kicker,
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning ~ h2,
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning ~ p,
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning ~ .rp-btn {
+    animation: rp-payment-cancelled-content 280ms ease both;
+  }
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning ~ .rp-kicker {
+    animation-delay: 90ms;
+  }
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning ~ h2 {
+    animation-delay: 135ms;
+  }
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning ~ p {
+    animation-delay: 180ms;
+  }
+  .rp-payment__state--cancel-confirm .rp-payment__state-icon--warning ~ .rp-btn {
+    animation-delay: 225ms;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-payment__waiting-clock-hand,
+  .rp-payment__cancel-spinner {
+    animation: none;
+  }
+}
+@media (min-width: 760px) {
+  .rp-payment {
+    align-items: center;
+    padding: 24px;
+  }
+  .rp-payment__sheet {
+    border-radius: 26px;
+    padding: 18px 26px 30px;
+  }
+  .rp-payment__sheet--state {
+    max-width: 440px;
+  }
+}

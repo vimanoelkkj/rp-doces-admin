@@ -1,0 +1,33 @@
+function dismissDesktopMenu(menu) {
+  if (!menu) return;
+  menu.classList.add("is-dismissed");
+  menu.querySelector(".rp-desktop-menu__trigger")?.blur();
+}
+
+function dismissOpenDesktopMenus() {
+  document.querySelectorAll(".rp-desktop-menu").forEach(dismissDesktopMenu);
+}
+
+document.addEventListener(
+  "click",
+  event => {
+    if (event.target.closest("[data-open-party], [data-open-menu], [data-open-cart]")) {
+      dismissOpenDesktopMenus();
+    }
+  },
+  true
+);
+
+document.addEventListener("click", event => {
+  const item = event.target.closest(
+    ".rp-desktop-menu__popover button, .rp-desktop-menu__popover a"
+  );
+  if (!item) return;
+  dismissDesktopMenu(item.closest(".rp-desktop-menu"));
+});
+
+document.addEventListener("pointerover", event => {
+  const menu = event.target.closest?.(".rp-desktop-menu");
+  if (!menu || menu.contains(event.relatedTarget)) return;
+  menu.classList.remove("is-dismissed");
+});

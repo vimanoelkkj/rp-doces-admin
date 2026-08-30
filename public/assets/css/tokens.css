@@ -1,0 +1,57 @@
+:root {
+  --rp-color-bg: oklch(97% 0.014 55);
+  --rp-color-surface: oklch(99% 0.006 55);
+  --rp-color-text: oklch(33% 0.045 40);
+  --rp-color-muted: oklch(54% 0.035 42);
+  --rp-color-brand: oklch(68% 0.14 12);
+  --rp-color-brand-strong: oklch(56% 0.145 10);
+  --rp-color-brand-action: oklch(68% 0.14 12);
+  --rp-color-brand-soft: oklch(90% 0.045 18);
+  --rp-color-brand-soft-strong: oklch(90% 0.045 18);
+  --rp-color-on-brand: #fff;
+  --rp-color-chip-surface: rgb(255 255 255 / 90%);
+  --rp-color-border: oklch(85% 0.018 40);
+  --rp-color-border-strong: oklch(85% 0.018 40);
+  --rp-color-neutral-bg: oklch(93% 0.008 40);
+  --rp-color-success: oklch(68% 0.1 150);
+  --rp-color-success-bg: oklch(95% 0.035 150);
+  --rp-color-warning: oklch(74% 0.11 80);
+  --rp-color-warning-bg: oklch(95% 0.04 85);
+  --rp-color-danger: oklch(66% 0.12 25);
+  --rp-color-danger-bg: oklch(95% 0.03 20);
+  --rp-shadow-soft:
+    0 1px 2px oklch(33% 0.045 40 / 0.04), 0 12px 32px -16px oklch(33% 0.045 40 / 0.14);
+  --rp-shadow-card:
+    0 1px 2px oklch(33% 0.045 40 / 0.04), 0 12px 32px -16px oklch(33% 0.045 40 / 0.14);
+  --rp-shadow-sheet: 0 -12px 40px -18px oklch(33% 0.045 40 / 0.28);
+  --rp-shadow-cart: 0 12px 28px -12px oklch(33% 0.045 40 / 0.25);
+  --rp-radius-sm: 11px;
+  --rp-radius-md: 14px;
+  --rp-radius-lg: 18px;
+  --rp-radius-xl: 20px;
+  --rp-radius-2xl: 24px;
+  --rp-radius-media: 22px;
+  --rp-radius-shell: 28px;
+  --rp-radius-pill: 999px;
+  --rp-space-1: 4px;
+  --rp-space-2: 8px;
+  --rp-space-3: 12px;
+  --rp-space-4: 16px;
+  --rp-space-5: 20px;
+  --rp-space-6: 24px;
+  --rp-space-7: 28px;
+  --rp-space-8: 32px;
+  --rp-space-10: 40px;
+  --rp-space-14: 56px;
+  --rp-duration-fast: 0.3s;
+  --rp-duration-base: 0.4s;
+  --rp-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --rp-container: 1280px;
+  --rp-content-narrow: 620px;
+  --rp-gutter-mobile: 20px;
+  --rp-gutter-desktop: 56px;
+  --rp-sheet-max: 520px;
+  --rp-swatch-berry-a: oklch(93% 0.035 18);
+  --rp-swatch-berry-b: oklch(96% 0.02 18);
+  --rp-swatch-berry-ink: oklch(50% 0.03 20);
+}

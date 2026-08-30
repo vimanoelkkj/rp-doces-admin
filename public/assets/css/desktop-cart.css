@@ -1,0 +1,128 @@
+@media (min-width: 1024px) {
+  .rp-cart-overlay {
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0;
+  }
+
+  .rp-cart-sheet {
+    width: min(520px, 42vw);
+    max-height: none;
+    height: 100dvh;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 28px 0 0 28px;
+    padding: 30px 32px 28px;
+    box-shadow: -24px 0 70px rgb(42 24 19 / 18%);
+  }
+
+  .rp-cart-sheet__handle {
+    display: none;
+  }
+
+  .rp-cart-sheet__head {
+    flex: 0 0 auto;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--rp-color-border);
+  }
+
+  .rp-cart-sheet__head h2 {
+    font-size: 24px;
+  }
+
+  .rp-cart-sheet__close {
+    transition:
+      background-color 140ms ease,
+      transform 140ms ease;
+  }
+
+  .rp-cart-sheet__close:hover,
+  .rp-cart-sheet__close:focus-visible {
+    background: var(--rp-color-brand-soft);
+    outline: none;
+    transform: rotate(4deg);
+  }
+
+  .rp-cart-sheet__items {
+    min-height: 0;
+    flex: 1 1 auto;
+    align-content: start;
+    grid-auto-rows: max-content;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: 0 -10px 0 0;
+    padding-right: 10px;
+    border-top: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--rp-color-border) transparent;
+  }
+
+  .rp-cart-item {
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    gap: 14px;
+    min-height: 96px;
+    padding: 14px 0;
+  }
+
+  .rp-cart-item__main {
+    align-self: center;
+  }
+
+  .rp-cart-item__name {
+    font-size: 14px;
+  }
+
+  .rp-cart-item__unit {
+    font-size: 12px;
+  }
+
+  .rp-cart-item__controls {
+    gap: 8px;
+    margin-top: 7px;
+  }
+
+  .rp-cart-item__price {
+    align-self: center;
+    padding-top: 0;
+    font-size: 15px;
+  }
+
+  .rp-cart-total {
+    flex: 0 0 auto;
+    margin-top: 0;
+    padding: 22px 0 16px;
+    border-top: 1px solid var(--rp-color-border);
+    background: var(--rp-color-surface);
+  }
+
+  .rp-cart-total strong {
+    font-size: 28px;
+  }
+
+  .rp-cart-sheet__actions {
+    flex: 0 0 auto;
+    gap: 10px;
+    background: var(--rp-color-surface);
+  }
+
+  .rp-cart-sheet__primary {
+    min-height: 52px;
+    border-radius: 16px;
+    font-size: 14px;
+  }
+
+  .rp-cart-sheet__actions .rp-btn--ghost,
+  .rp-cart-sheet__actions button:not(.rp-cart-sheet__primary) {
+    min-height: 42px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .rp-cart-sheet {
+    width: 540px;
+    padding-right: 36px;
+    padding-left: 36px;
+  }
+}

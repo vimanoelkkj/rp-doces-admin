@@ -11,7 +11,7 @@ export async function onRequestGet({ params, env }) {
     `
     SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos,
            status_pagamento, mp_order_id, mp_status, mp_status_detail, pago_em,
-           pix_expira_em
+           pix_expira_em, mp_qr_code, mp_qr_code_base64, mp_ticket_url
     FROM pedidos WHERE token_publico = ? LIMIT 1
   `
   )
@@ -66,6 +66,13 @@ export async function onRequestGet({ params, env }) {
       mp_status_detail: pedido.mp_status_detail,
       pago_em: pedido.pago_em,
       pix_expira_em: pedido.pix_expira_em || null
-    }
+    },
+    pix: pedido.mp_qr_code
+      ? {
+          qr_code: pedido.mp_qr_code,
+          qr_code_base64: pedido.mp_qr_code_base64 || null,
+          ticket_url: pedido.mp_ticket_url || null
+        }
+      : null
   });
 }

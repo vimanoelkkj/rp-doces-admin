@@ -140,6 +140,71 @@ export async function onRequestPost({ request, env }) {
   if (!validEmail(email)) return json({ erro: "Informe um e-mail válido." }, 400);
   if (!validWhatsapp(whatsapp)) return json({ erro: "Informe um WhatsApp válido com DDD." }, 400);
 
+  // 1. Resolve idempotência antes de validar estoque.
+  // Um retry do mesmo checkout não pode falhar por causa da reserva
+  // que pertence ao próprio pedido já existente.
+  let pedidoExistente = await env.DB.prepare(
+    `
+    SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos, cliente_email,
+           cliente_whatsapp, observacao, status_pagamento, mp_order_id, mp_payment_id, mp_status,
+           mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key,
+           reserva_status, reserva_expira_em, pix_expira_em, criado_em
+    FROM pedidos WHERE idempotency_key = ? LIMIT 1
+  `
+  )
+    .bind(idempotencyKey)
+    .first();
+
+  if (pedidoExistente) {
+    try {
+      await assertPayloadCompatibility(env, pedidoExistente, {
+        email,
+        whatsapp,
+        observacao,
+        itensNovos: solicitados
+      });
+    } catch (err) {
+      if (err.status === 409) return json({ erro: err.message }, 409);
+      throw err;
+    }
+
+    // Pedido já possui Pix completo: replay imediato.
+    // Não consulta estoque, não cria nova reserva e não chama o Mercado Pago novamente.
+    if (pedidoExistente.mp_qr_code) {
+      const { results: itensSalvos } = await env.DB.prepare(
+        `
+        SELECT produto_id, produto_nome AS produto, quantidade,
+               valor_unitario_centavos, valor_total_centavos
+        FROM pedido_itens WHERE pedido_id = ? ORDER BY id
+      `
+      )
+        .bind(pedidoExistente.id)
+        .all();
+
+      return json(
+        {
+          pedido: {
+            token: pedidoExistente.token_publico,
+            referencia: `RP-${pedidoExistente.id}`,
+            produto: pedidoExistente.produto_nome,
+            quantidade: pedidoExistente.quantidade,
+            quantidade_total: pedidoExistente.quantidade,
+            itens: itensSalvos || [],
+            valor_total_centavos: pedidoExistente.valor_total_centavos,
+            status: pedidoExistente.status_pagamento,
+            pix_expira_em: pedidoExistente.pix_expira_em || null
+          },
+          pix: {
+            qr_code: pedidoExistente.mp_qr_code,
+            qr_code_base64: pedidoExistente.mp_qr_code_base64,
+            ticket_url: pedidoExistente.mp_ticket_url
+          }
+        },
+        200
+      );
+    }
+  }
+
   const placeholders = solicitados.map(() => "?").join(",");
   const { results } = await env.DB.prepare(
     `
@@ -185,68 +250,6 @@ export async function onRequestPost({ request, env }) {
   const quantidadeTotal = itens.reduce((sum, item) => sum + item.quantidade, 0);
   if (!Number.isSafeInteger(total) || total <= 0)
     return json({ erro: "Valor do pedido inválido." }, 400);
-
-  // 1. Verifica se já existe um pedido para esta idempotencyKey
-  let pedidoExistente = await env.DB.prepare(
-    `
-    SELECT id, token_publico, produto_nome, quantidade, valor_total_centavos, cliente_email,
-           cliente_whatsapp, observacao, status_pagamento, mp_order_id, mp_payment_id, mp_status,
-           mp_status_detail, mp_ticket_url, mp_qr_code, mp_qr_code_base64, idempotency_key,
-           reserva_status, reserva_expira_em, pix_expira_em, criado_em
-    FROM pedidos WHERE idempotency_key = ? LIMIT 1
-  `
-  )
-    .bind(idempotencyKey)
-    .first();
-
-  if (pedidoExistente) {
-    try {
-      await assertPayloadCompatibility(env, pedidoExistente, {
-        email,
-        whatsapp,
-        observacao,
-        itensNovos: itens
-      });
-    } catch (err) {
-      if (err.status === 409) return json({ erro: err.message }, 409);
-      throw err;
-    }
-
-    // Estado A: Pedido existente com Pix completo -> Replay imediato (não consome rate limit nem reserva adicional)
-    if (pedidoExistente.mp_qr_code) {
-      const { results: itensSalvos } = await env.DB.prepare(
-        `
-        SELECT produto_id, produto_nome AS produto, quantidade,
-               valor_unitario_centavos, valor_total_centavos
-        FROM pedido_itens WHERE pedido_id = ? ORDER BY id
-      `
-      )
-        .bind(pedidoExistente.id)
-        .all();
-
-      return json(
-        {
-          pedido: {
-            token: pedidoExistente.token_publico,
-            referencia: `RP-${pedidoExistente.id}`,
-            produto: pedidoExistente.produto_nome,
-            quantidade: pedidoExistente.quantidade,
-            quantidade_total: pedidoExistente.quantidade,
-            itens: itensSalvos || [],
-            valor_total_centavos: pedidoExistente.valor_total_centavos,
-            status: pedidoExistente.status_pagamento,
-            pix_expira_em: pedidoExistente.pix_expira_em || null
-          },
-          pix: {
-            qr_code: pedidoExistente.mp_qr_code,
-            qr_code_base64: pedidoExistente.mp_qr_code_base64,
-            ticket_url: pedidoExistente.mp_ticket_url
-          }
-        },
-        200
-      );
-    }
-  }
 
   // 2. Rate limit de negócio aplicado apenas para novas criações / retries incompletos
   const rateLimit = await checkCheckoutRateLimit(env, request);
