@@ -106,8 +106,10 @@ export function renderProductList(
 
   if (sameStructure && stableMarkup && patchChangedCards(list, cart)) return stableMarkup;
 
+  const categoryChanged = renderedCategory !== null && renderedCategory !== activeCategory;
+  const menuClass = `rp-menu rp-section${categoryChanged ? " rp-menu--category-update" : ""}`;
   const emptyCategory = `<div class="rp-menu__empty"><strong>Nenhum doce desta categoria disponível agora.</strong><p>Você pode conferir as outras opções do cardápio.</p></div>`;
-  const markup = `<section class="rp-menu rp-section" id="cardapio" aria-labelledby="rp-menu-title"><div class="rp-container">${menuHeading(list.length)}${categoryFilters(activeCategory)}${list.length ? `<div class="rp-menu__grid">${list.map(product => renderProductCard(product, cartQuantity(cart, product))).join("")}</div>` : emptyCategory}</div></section>`;
+  const markup = `<section class="${menuClass}" id="cardapio" aria-labelledby="rp-menu-title"><div class="rp-container">${menuHeading(list.length)}${categoryFilters(activeCategory)}${list.length ? `<div class="rp-menu__grid">${list.map(product => renderProductCard(product, cartQuantity(cart, product))).join("")}</div>` : emptyCategory}</div></section>`;
 
   return rememberRender(products, status, activeCategory, list, cart, markup);
 }
