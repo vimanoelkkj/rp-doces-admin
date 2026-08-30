@@ -7,10 +7,14 @@ export async function onRequestGet({ env }) {
 
     const { results } = await env.DB.prepare(
       `
-      SELECT id, nome, categoria, descricao, preco_centavos, disponivel, destaque, ordem, emoji,
-             estoque, estoque_reservado, promocao_ativa, preco_promocional_centavos,
-             promocao_inicio, promocao_fim
-      FROM produtos WHERE ativo = 1 ORDER BY categoria, ordem, nome
+      SELECT p.id, p.nome, p.categoria, p.descricao, p.preco_centavos, p.disponivel, p.destaque,
+             p.ordem, p.emoji, p.estoque, p.estoque_reservado, p.promocao_ativa,
+             p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim,
+             c.nome AS categoria_nome, c.emoji AS categoria_emoji, c.ordem AS categoria_ordem
+      FROM produtos p
+      LEFT JOIN categorias c ON c.id = p.categoria
+      WHERE p.ativo = 1 AND COALESCE(c.ativo, 1) = 1
+      ORDER BY COALESCE(c.ordem, 9999), p.ordem, p.nome
     `
     ).all();
 
