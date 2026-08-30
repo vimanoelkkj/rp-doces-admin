@@ -1,0 +1,110 @@
+.rp-desktop-menu {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .rp-home-header__menu--mobile {
+    display: none;
+  }
+
+  .rp-desktop-menu {
+    position: relative;
+    display: block;
+  }
+
+  .rp-desktop-menu::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 300px;
+    height: 12px;
+  }
+
+  .rp-desktop-menu__trigger {
+    transition:
+      background 160ms ease,
+      transform 160ms ease;
+  }
+
+  .rp-desktop-menu:hover .rp-desktop-menu__trigger,
+  .rp-desktop-menu:focus-within .rp-desktop-menu__trigger {
+    background: color-mix(in oklch, var(--rp-color-brand-soft) 72%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .rp-desktop-menu__popover {
+    position: absolute;
+    z-index: 140;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 300px;
+    padding: 8px;
+    border: 1px solid var(--rp-color-border);
+    border-radius: 18px;
+    background: color-mix(in oklch, var(--rp-color-surface) 96%, white);
+    box-shadow: 0 18px 50px rgb(42 24 19 / 16%);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px) scale(0.985);
+    transform-origin: top right;
+    transition:
+      opacity 150ms ease,
+      transform 150ms ease;
+  }
+
+  .rp-desktop-menu:hover .rp-desktop-menu__popover,
+  .rp-desktop-menu:focus-within .rp-desktop-menu__popover {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+  }
+
+  .rp-desktop-menu__popover button {
+    display: grid;
+    width: 100%;
+    gap: 2px;
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: transparent;
+    color: var(--rp-color-text);
+    font: inherit;
+    text-align: left;
+    transition:
+      background 130ms ease,
+      transform 130ms ease;
+  }
+
+  .rp-desktop-menu__popover button:hover,
+  .rp-desktop-menu__popover button:focus-visible {
+    background: var(--rp-color-brand-soft);
+    outline: none;
+    transform: translateX(2px);
+  }
+
+  .rp-desktop-menu__popover strong {
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .rp-desktop-menu__popover small {
+    color: var(--rp-color-muted);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .rp-desktop-menu__divider {
+    height: 1px;
+    margin: 5px 8px;
+    background: var(--rp-color-border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-desktop-menu__trigger,
+  .rp-desktop-menu__popover,
+  .rp-desktop-menu__popover button {
+    transition: none;
+  }
+}
