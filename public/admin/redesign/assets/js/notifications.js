@@ -53,6 +53,7 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
     const active = Boolean(subscription);
     button.classList.toggle("has-notifications", active);
     if (dot) dot.hidden = !active;
+    action.classList.toggle("is-danger", active);
 
     if (!supported()) {
       state.innerHTML = "<strong>Indisponível neste navegador</strong><span>Este navegador não oferece Web Push.</span>";
@@ -76,13 +77,11 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
       state.innerHTML = "<strong>Ativas neste navegador</strong><span>Você receberá avisos de novos pedidos pagos.</span>";
       action.disabled = false;
       action.textContent = "Desativar notificações";
-      action.classList.add("is-danger");
       return;
     }
     state.innerHTML = "<strong>Desativadas neste navegador</strong><span>Ative para receber avisos mesmo com o painel fechado.</span>";
     action.disabled = false;
     action.textContent = "Ativar notificações";
-    action.classList.remove("is-danger");
   };
 
   const refresh = async () => {
@@ -110,7 +109,6 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
     button.setAttribute("aria-expanded", "false");
   };
   const open = () => {
-    window.dispatchEvent(new CustomEvent("rp-admin-popover-open", { detail: { source: "notifications" } }));
     menu.hidden = false;
     button.classList.add("is-open");
     button.setAttribute("aria-expanded", "true");
@@ -124,11 +122,12 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
 
   action.addEventListener("click", async () => {
     if (loading || !supported()) return;
+    const wasActive = Boolean(subscription);
     loading = true;
     action.disabled = true;
     setMessage("");
     try {
-      if (subscription) {
+      if (wasActive) {
         const endpoint = subscription.endpoint;
         await adminApi.unsubscribePush(endpoint);
         await subscription.unsubscribe();
@@ -149,11 +148,15 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
         await adminApi.subscribePush({ endpoint: payload.endpoint, keys: payload.keys });
         setMessage("Notificações ativadas neste navegador.");
       }
-      render();
     } catch (error) {
       if (error?.status === 401) return onUnauthorized?.();
+      if (!wasActive && subscription) {
+        try {
+          await subscription.unsubscribe();
+        } catch {}
+        subscription = null;
+      }
       setMessage(error?.message || "Não foi possível alterar as notificações.", true);
-      await refresh();
     } finally {
       loading = false;
       render();
@@ -168,9 +171,6 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
       close();
       button.focus();
     }
-  });
-  window.addEventListener("rp-admin-popover-open", event => {
-    if (event.detail?.source !== "notifications") close();
   });
 
   refresh();
