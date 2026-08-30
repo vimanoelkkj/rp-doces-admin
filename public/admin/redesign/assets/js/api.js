@@ -28,6 +28,13 @@ export const adminApi = {
   orders() {
     return request("/api/admin/orders");
   },
+  updateOrderStatus(id, status) {
+    return request(`/api/admin/orders/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status_pedido: status })
+    });
+  },
   products() {
     return request("/api/admin/products");
   },
