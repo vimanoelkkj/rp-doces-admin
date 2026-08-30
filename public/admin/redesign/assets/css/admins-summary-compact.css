@@ -1,0 +1,22 @@
+@media (min-width: 721px) {
+  .admins-summary {
+    width: max-content;
+    max-width: 100%;
+    grid-template-columns: repeat(3, minmax(112px, 138px));
+    justify-self: start;
+  }
+
+  .admins-summary > div {
+    min-width: 112px;
+    padding: 8px 11px;
+  }
+
+  .admins-summary span {
+    font-size: 9px;
+  }
+
+  .admins-summary strong {
+    font-size: 16px;
+    line-height: 1;
+  }
+}
