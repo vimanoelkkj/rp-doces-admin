@@ -465,21 +465,29 @@ body.orders-dialog-open {
     display: none;
   }
 
-  .products-filters {
+  .products-filters,
+  .orders-filters {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     width: 100%;
     margin-inline: 0;
-    padding-inline: 0;
+    padding: 0;
     overflow: visible;
   }
 
-  .products-filters button {
+  .products-filters button,
+  .orders-filters button {
     width: 100%;
     min-width: 0;
     justify-content: center;
     white-space: nowrap;
+  }
+
+  .orders-filters button {
+    min-height: 42px;
+    padding-inline: 8px;
+    font-size: 0.82rem;
   }
 
   .admins-card {
