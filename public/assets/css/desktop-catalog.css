@@ -22,7 +22,15 @@
 
   .rp-menu__filters {
     gap: 10px;
-    margin-bottom: 28px;
+    margin: -2px 0 26px;
+    padding: 2px 0;
+  }
+
+  .rp-menu--category-update .rp-menu__head,
+  .rp-menu--category-update .rp-menu__filters,
+  .rp-menu--category-update .rp-menu__grid,
+  .rp-menu--category-update .rp-menu__empty {
+    animation: none !important;
   }
 
   .rp-menu__filter {
