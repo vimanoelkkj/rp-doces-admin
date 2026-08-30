@@ -80,17 +80,7 @@ function itemSummary(order) {
   return `${Number(first.quantidade || 0)}× ${first.produto_nome}${rest > 0 ? ` + ${rest} item(ns)` : ""}`;
 }
 
-function statusControl(order, paid, status) {
-  const final = status === "ENTREGUE" || status === "CANCELADO";
-
-  if (!paid) {
-    return `<span class="orders-status-final is-locked" title="Disponível após a confirmação do pagamento">${esc(ORDER_STATUS_LABELS[status] || status)}</span>`;
-  }
-
-  if (final) {
-    return `<span class="orders-status-final ${orderClass(status)}">${esc(ORDER_STATUS_LABELS[status] || status)}</span>`;
-  }
-
+function statusControl(status) {
   return `
     <div class="orders-status-menu" data-order-status-menu>
       <button class="orders-status-trigger" type="button" data-order-status-trigger aria-haspopup="listbox" aria-expanded="false">
@@ -113,7 +103,6 @@ function statusControl(order, paid, status) {
 function orderCard(order) {
   const payment = String(order.status_pagamento || "PENDENTE").toUpperCase();
   const status = String(order.status_pedido || "NOVO").toUpperCase();
-  const paid = payment === "PAGO";
   const pendingClass = payment === "PENDENTE" ? " is-payment-pending" : "";
 
   return `
@@ -140,7 +129,7 @@ function orderCard(order) {
 
       <div class="orders-card__actions">
         <button class="orders-secondary orders-details-button" type="button" data-order-details>Ver detalhes</button>
-        ${statusControl(order, paid, status)}
+        ${statusControl(status)}
       </div>
     </article>`;
 }
@@ -257,7 +246,7 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
       if (query && !haystack.includes(query)) return false;
       if (filter === "pendentes") return order.status_pagamento === "PENDENTE";
       if (filter === "em-andamento") {
-        return order.status_pagamento === "PAGO" && ["NOVO", "PREPARANDO", "PRONTO"].includes(order.status_pedido);
+        return ["NOVO", "PREPARANDO", "PRONTO"].includes(order.status_pedido);
       }
       if (filter === "concluidos") return ["ENTREGUE", "CANCELADO"].includes(order.status_pedido);
       return true;
