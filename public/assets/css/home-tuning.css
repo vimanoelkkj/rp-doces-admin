@@ -85,57 +85,110 @@
 
 @media (min-width: 1024px) {
   .rp-home {
-    width: calc(100% - 64px);
-    max-width: 1180px;
-    margin: 28px auto;
+    width: calc(100% - 32px);
+    max-width: 1600px;
+    margin: 16px auto 32px;
+    border-radius: 32px;
+  }
+
+  .rp-home-header {
+    min-height: 82px;
+    padding: 24px clamp(56px, 5vw, 88px);
+  }
+
+  .rp-home-hero {
+    min-height: calc(100svh - 114px);
   }
 
   .rp-home-hero__body {
-    min-height: clamp(560px, 72vh, 680px);
-    padding-top: 20px;
-    padding-bottom: 36px;
+    min-height: calc(100svh - 114px);
+    grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
+    gap: clamp(64px, 7vw, 112px);
+    padding: 48px clamp(56px, 6vw, 104px) 72px;
     align-items: center;
   }
 
+  .rp-home-hero__copy {
+    max-width: 620px;
+  }
+
   .rp-home-hero__title {
-    font-size: 54px;
+    max-width: 11ch;
+    font-size: clamp(56px, 4.3vw, 74px);
+  }
+
+  .rp-home-hero__lede {
+    max-width: 38ch;
+    font-size: 17px;
   }
 
   .rp-home-media--hero {
-    height: 390px;
+    width: 100%;
+    height: min(58vh, 560px);
+    min-height: 400px;
+    border-radius: 32px;
   }
 
   .rp-home-section {
+    min-height: min(920px, calc(100svh - 32px));
+    display: grid;
+    align-items: center;
     border-top: 0;
-    padding: 40px 56px;
+    padding: clamp(72px, 8vh, 112px) clamp(64px, 7vw, 120px);
   }
 
-  .rp-home-footer {
-    border-top: 0;
-    padding: 36px 56px 40px;
+  .rp-home-section__inner {
+    width: 100%;
+    max-width: 1160px;
   }
 
-  .rp-home-section + .rp-home-section {
-    padding-top: 20px;
+  .rp-home-section--about .rp-home-section__inner {
+    gap: clamp(64px, 7vw, 112px);
+  }
+
+  .rp-home-media--about {
+    height: min(48vh, 480px);
+    min-height: 340px;
+    border-radius: 30px;
+  }
+
+  .rp-home-location-grid {
+    gap: 22px;
+  }
+
+  .rp-home-location,
+  .rp-home-map {
+    min-height: min(42vh, 430px);
+    border-radius: 28px;
   }
 
   .rp-home-section--tinted {
+    min-height: 72vh;
     background: transparent;
   }
 
   .rp-home-contact {
-    max-width: 900px;
+    width: min(980px, 100%);
     margin: 0 auto;
-    padding: 32px 40px;
-    border-radius: 28px;
+    padding: clamp(48px, 6vh, 72px) clamp(44px, 6vw, 80px);
+    border-radius: 32px;
     background: var(--rp-color-surface);
   }
 
   .rp-home-contact .rp-home-section__title {
-    font-size: 26px;
+    font-size: clamp(30px, 2.5vw, 40px);
   }
 
   .rp-home-contact .rp-home-section__text {
-    max-width: 34ch;
+    max-width: 38ch;
+  }
+
+  .rp-home-footer {
+    border-top: 0;
+    padding: 52px clamp(64px, 7vw, 120px) 64px;
+  }
+
+  .rp-home-footer__inner {
+    max-width: 1160px;
   }
 }
