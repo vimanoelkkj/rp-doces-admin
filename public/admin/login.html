@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#fff8f2" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="R&P Admin" />
+    <title>Entrar · R&P Doces Admin</title>
+    <link rel="manifest" href="/admin/manifest.webmanifest" />
+    <link rel="icon" href="/admin-favicon.png" />
+    <link rel="apple-touch-icon" href="/admin-apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Nunito+Sans:opsz,wght@6..12,400..800&display=swap"
+    />
+    <link rel="stylesheet" href="/admin/assets/css/pwa-login.css" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="login-card" aria-labelledby="login-title">
+        <div class="login-brand" aria-hidden="true">R&P</div>
+        <div class="login-heading">
+          <span>Painel administrativo</span>
+          <h1 id="login-title">Bem-vindo de volta</h1>
+          <p>Entre para gerenciar pedidos, produtos e a loja.</p>
+        </div>
+
+        <button class="login-passkey" type="button" data-passkey-login>
+          <span class="login-passkey__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3a5 5 0 0 0-5 5v2M17 10V8a5 5 0 0 0-5-5M5 13v2a7 7 0 0 0 14 0v-2M9 12v3a3 3 0 0 0 6 0v-3M12 8v4" />
+            </svg>
+          </span>
+          <span><strong>Entrar com biometria</strong><small>Digital, rosto ou passkey do aparelho</small></span>
+        </button>
+
+        <div class="login-separator"><span>ou use sua senha</span></div>
+
+        <form data-password-form>
+          <label>
+            <span>Usuário</span>
+            <input name="username" autocomplete="username" required maxlength="80" />
+          </label>
+          <label>
+            <span>Senha</span>
+            <input name="senha" type="password" autocomplete="current-password" required maxlength="256" />
+          </label>
+          <button class="login-submit" type="submit">Entrar</button>
+        </form>
+
+        <p class="login-status" role="status" aria-live="polite" data-login-status></p>
+        <p class="login-foot">A biometria permanece no seu dispositivo e não é enviada à R&P Doces.</p>
+      </section>
+    </main>
+    <script type="module" src="/admin/assets/js/pwa-login.js"></script>
+  </body>
+</html>
