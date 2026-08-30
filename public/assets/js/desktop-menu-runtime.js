@@ -26,18 +26,8 @@ document.addEventListener("click", event => {
   dismissDesktopMenu(item.closest(".rp-desktop-menu"));
 });
 
-document.addEventListener("pointerout", event => {
+document.addEventListener("pointerover", event => {
   const menu = event.target.closest?.(".rp-desktop-menu");
   if (!menu || menu.contains(event.relatedTarget)) return;
   menu.classList.remove("is-dismissed");
-});
-
-document.addEventListener("focusout", event => {
-  const menu = event.target.closest?.(".rp-desktop-menu");
-  if (!menu) return;
-  requestAnimationFrame(() => {
-    if (!menu.contains(document.activeElement) && !menu.matches(":hover")) {
-      menu.classList.remove("is-dismissed");
-    }
-  });
 });
