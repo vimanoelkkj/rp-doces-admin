@@ -1,0 +1,43 @@
+/* Keep the storefront header anchored to the same mobile gutter on every route. */
+@media (max-width: 819px) {
+  .rp-home-header,
+  .rp-site-header__inner {
+    box-sizing: border-box;
+    width: 100%;
+    margin-inline: 0;
+    padding: 18px 20px 8px;
+  }
+
+  .rp-home-header__brand,
+  .rp-site-header__brand {
+    margin: 0;
+    padding: 0;
+  }
+
+  .rp-home-header__actions,
+  .rp-site-header__actions {
+    margin: 0;
+  }
+}
+
+/* The catalog route used to scale the entire section on entry, including its
+   header. Keep the header as a visual anchor and fade the route without
+   changing its geometry. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-catalog-route] {
+    animation: rp-catalog-route-stable-in 260ms ease both;
+  }
+
+  [data-catalog-route] .rp-site-header {
+    animation: none;
+  }
+
+  @keyframes rp-catalog-route-stable-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
