@@ -2,6 +2,12 @@ import { json, bodyJson, sameOrigin } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
 import { validarProduto } from "../../../lib/productValidation.js";
 
+async function categoryExists(env, id) {
+  return Boolean(
+    await env.DB.prepare("SELECT id FROM categorias WHERE id = ? AND ativo = 1").bind(id).first()
+  );
+}
+
 export async function onRequestPut({ request, env, params }) {
   if (!sameOrigin(request)) return json({ erro: "Origem inválida." }, 403);
   const auth = await requireUser(env, request);
@@ -13,6 +19,10 @@ export async function onRequestPut({ request, env, params }) {
   const validacao = validarProduto(payload);
   if (!validacao.ok) return json({ erro: "Dados inválidos." }, 400);
   const p = validacao.produto;
+
+  if (!(await categoryExists(env, p.categoria))) {
+    return json({ erro: "Categoria inexistente ou inativa." }, 400);
+  }
 
   const atual = await env.DB.prepare("SELECT estoque_reservado FROM produtos WHERE id = ?")
     .bind(id)
