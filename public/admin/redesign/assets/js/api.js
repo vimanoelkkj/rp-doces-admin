@@ -30,5 +30,12 @@ export const adminApi = {
   },
   products() {
     return request("/api/admin/products");
+  },
+  createProduct(product) {
+    return request("/api/admin/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(product)
+    });
   }
 };
