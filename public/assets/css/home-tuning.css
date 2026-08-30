@@ -1,12 +1,139 @@
 @media (max-width: 767px) {
   .rp-home {
-    background: var(--rp-color-bg);
+    min-height: 100svh;
+    background: var(--rp-color-surface);
   }
+
+  .rp-home-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 14px 18px 10px;
+    background: color-mix(in srgb, var(--rp-color-surface) 92%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
+  .rp-home-header__brand {
+    font-size: 17px;
+  }
+
+  .rp-home-hero__body {
+    padding: 22px 20px 20px;
+  }
+
+  .rp-home-hero__eyebrow {
+    font-size: 11.5px;
+  }
+
+  .rp-home-hero__title {
+    max-width: 9.8ch;
+    margin-top: 12px;
+    font-size: clamp(38px, 12vw, 52px);
+    line-height: 0.98;
+  }
+
+  .rp-home-hero__lede {
+    max-width: 31ch;
+    margin-top: 16px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
   .rp-home-hero .rp-home-btn {
     margin-top: 18px;
+    padding: 13px 22px;
   }
+
   .rp-home-media--hero {
-    margin-top: 24px;
+    height: clamp(260px, 42vh, 360px);
+    margin: 22px 20px 26px;
+    border-radius: 22px;
+  }
+
+  .rp-home-section {
+    border-top: 0;
+    padding: 44px 20px;
+  }
+
+  .rp-home-section--about {
+    padding-top: 36px;
+  }
+
+  .rp-home-section__inner {
+    gap: 24px;
+  }
+
+  .rp-home-section__title {
+    font-size: 24px;
+    line-height: 1.1;
+  }
+
+  .rp-home-section__text,
+  .rp-home-section__highlight {
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .rp-home-values {
+    gap: 9px;
+    margin-top: 18px;
+  }
+
+  .rp-home-media--about {
+    height: 220px;
+    border-radius: 20px;
+  }
+
+  .rp-home-location-grid {
+    gap: 12px;
+  }
+
+  .rp-home-location,
+  .rp-home-map {
+    min-height: 0;
+    border-radius: 18px;
+  }
+
+  .rp-home-location {
+    padding: 20px;
+  }
+
+  .rp-home-map {
+    gap: 8px;
+    padding: 24px 20px;
+    background: #fff;
+    background-image: none;
+  }
+
+  .rp-home-map__logo {
+    width: min(74%, 220px);
+    height: 112px;
+  }
+
+  .rp-home-section--tinted {
+    background: transparent;
+    padding-top: 26px;
+    padding-bottom: 34px;
+  }
+
+  .rp-home-contact {
+    border: 1px solid var(--rp-color-border);
+    border-radius: 22px;
+    padding: 28px 22px;
+    background: var(--rp-color-surface);
+  }
+
+  .rp-home-contact .rp-home-section__title {
+    font-size: 26px;
+  }
+
+  .rp-home-footer {
+    border-top: 0;
+    padding: 34px 20px calc(36px + env(safe-area-inset-bottom));
+  }
+
+  .rp-home-footer__inner {
+    gap: 26px;
   }
 }
 
