@@ -272,8 +272,21 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
       const options = menu.querySelector(".orders-status-options");
       trigger?.setAttribute("aria-expanded", "false");
       if (options) options.hidden = true;
-      menu.classList.remove("is-open");
+      menu.classList.remove("is-open", "is-up");
     });
+  }
+
+  function positionStatusMenu(menu, trigger, options) {
+    menu.classList.remove("is-up");
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const optionsHeight = options.getBoundingClientRect().height || options.scrollHeight;
+    const bottomReserve = window.innerWidth <= 860 ? 78 : 12;
+    const spaceBelow = window.innerHeight - bottomReserve - triggerRect.bottom;
+    const spaceAbove = triggerRect.top - 12;
+    const shouldOpenUp = spaceBelow < optionsHeight + 8 && spaceAbove > spaceBelow;
+
+    menu.classList.toggle("is-up", shouldOpenUp);
   }
 
   function openDetails(order) {
@@ -302,9 +315,13 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
         const opening = options?.hidden ?? false;
         closeStatusMenus(opening ? menu : null);
         if (!options || !menu) return;
+
         options.hidden = !opening;
         menu.classList.toggle("is-open", opening);
         trigger.setAttribute("aria-expanded", String(opening));
+
+        if (opening) positionStatusMenu(menu, trigger, options);
+        else menu.classList.remove("is-up");
       });
 
       menu?.querySelectorAll("[data-order-status-value]").forEach(option => {
@@ -341,7 +358,8 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
       renderList();
     } catch (error) {
       if (error?.status === 401 && typeof onUnauthorized === "function") return onUnauthorized();
-      if (list) list.innerHTML = `<div class="orders-empty"><strong>Não foi possível carregar os pedidos</strong><span>${esc(error?.message || "Tente novamente em instantes.")}</span></div>`;
+      if (list)
+        list.innerHTML = `<div class="orders-empty"><strong>Não foi possível carregar os pedidos</strong><span>${esc(error?.message || "Tente novamente em instantes.")}</span></div>`;
     } finally {
       if (view) view.setAttribute("aria-busy", "false");
       if (refresh instanceof HTMLButtonElement) refresh.disabled = false;
@@ -349,7 +367,9 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
   }
 
   search?.addEventListener("input", event => {
-    query = String(event.target.value || "").trim().toLowerCase();
+    query = String(event.target.value || "")
+      .trim()
+      .toLowerCase();
     renderList();
   });
 
@@ -362,11 +382,15 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
   });
 
   refresh?.addEventListener("click", loadOrders);
-  document.addEventListener("click", () => closeStatusMenus());
+
+  document.addEventListener("click", event => {
+    if (!event.target.closest("[data-order-status-menu]")) closeStatusMenus();
+  });
+
   document.addEventListener("keydown", event => {
     if (event.key !== "Escape") return;
     if (container.querySelector("[data-orders-dialog]")) closeDialog();
-    closeStatusMenus();
+    else closeStatusMenus();
   });
 
   await loadOrders();
