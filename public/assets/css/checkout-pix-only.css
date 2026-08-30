@@ -1,0 +1,48 @@
+.rp-checkout__payment:has(.rp-checkout__payment-label) {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.rp-checkout__payment-label {
+  grid-column: 1 / -1;
+  color: #4b302b;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.rp-checkout__payment:has(.rp-checkout__payment-label) .rp-checkout__pay-option {
+  min-height: 58px;
+  grid-template-columns: auto minmax(0, 1fr);
+  place-items: center start;
+  gap: 10px;
+  padding: 0 15px;
+  background: #fff;
+  color: #4b302b;
+  cursor: default;
+}
+
+.rp-checkout__payment:has(.rp-checkout__payment-label) .rp-checkout__pay-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--rp-color-brand-strong);
+}
+
+.rp-checkout__payment:has(.rp-checkout__payment-label) .rp-checkout__pay-option strong {
+  font-size: 12px;
+}
+
+@media (min-width: 1024px) {
+  .rp-checkout__payment:has(.rp-checkout__payment-label) {
+    gap: 9px;
+  }
+
+  .rp-checkout__payment-label {
+    font-size: 10px;
+  }
+
+  .rp-checkout__payment:has(.rp-checkout__payment-label) .rp-checkout__pay-option {
+    min-height: 64px;
+    padding: 0 17px;
+    border-radius: 14px;
+  }
+}
