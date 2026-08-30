@@ -2,10 +2,19 @@ import { json, bodyJson, sameOrigin } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
 import { validarProduto } from "../../../lib/productValidation.js";
 
+const LEGACY_CATEGORIES = new Set(["BOLO_NO_POTE", "MINI_PUDIM"]);
+
 async function categoryExists(env, id) {
-  return Boolean(
-    await env.DB.prepare("SELECT id FROM categorias WHERE id = ? AND ativo = 1").bind(id).first()
-  );
+  try {
+    return Boolean(
+      await env.DB.prepare("SELECT id FROM categorias WHERE id = ? AND ativo = 1").bind(id).first()
+    );
+  } catch (error) {
+    if (String(error?.message || "").includes("no such table: categorias")) {
+      return LEGACY_CATEGORIES.has(id);
+    }
+    throw error;
+  }
 }
 
 export async function onRequestPut({ request, env, params }) {
