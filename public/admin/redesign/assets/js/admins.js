@@ -28,6 +28,31 @@ function roleBadge(user) {
   return `<span class="admins-badge ${user.papel === "OWNER" ? "is-owner" : "is-admin"}">${user.papel === "OWNER" ? "Mestre" : "Administrador"}</span>`;
 }
 
+function passwordPanel(user) {
+  return `
+    <div class="admins-password-panel" data-admin-password-panel="${user.id}" hidden>
+      <form class="admins-password-inline" data-admin-password-form="${user.id}">
+        <div class="admins-password-inline__heading">
+          <strong>Nova senha</strong>
+          <span>Mínimo de 8 caracteres, com letra e número.</span>
+        </div>
+        <label>
+          <span>Senha</span>
+          <input name="senha" required type="password" minlength="8" autocomplete="new-password" />
+        </label>
+        <label>
+          <span>Confirmar</span>
+          <input name="confirmacao" required type="password" minlength="8" autocomplete="new-password" />
+        </label>
+        <p class="admins-form-error" data-admin-password-error hidden></p>
+        <div class="admins-password-inline__actions">
+          <button type="button" class="admins-secondary" data-admin-password-cancel="${user.id}">Cancelar</button>
+          <button type="submit" class="admins-primary">Salvar senha</button>
+        </div>
+      </form>
+    </div>`;
+}
+
 function userCard(user, viewer) {
   const isViewer = Number(user.id) === Number(viewer?.id);
   const viewerIsOwner = viewer?.papel === "OWNER";
@@ -57,10 +82,11 @@ function userCard(user, viewer) {
       </div>
 
       <div class="admins-card__actions">
-        ${canResetPassword ? `<button type="button" class="admins-secondary" data-admin-password="${user.id}" data-admin-name="${esc(user.nome || user.username)}">Alterar senha</button>` : ""}
+        ${canResetPassword ? `<button type="button" class="admins-secondary" data-admin-password="${user.id}" aria-expanded="false">Alterar senha</button>` : ""}
         ${canManage ? `<button type="button" class="admins-secondary" data-admin-role="${user.id}" data-admin-next-role="${nextRole}">${nextRoleLabel}</button>` : ""}
         ${canManage ? `<button type="button" class="admins-secondary ${Number(user.ativo) === 1 ? "is-danger" : "is-success"}" data-admin-toggle="${user.id}" data-admin-active="${Number(user.ativo) === 1 ? "true" : "false"}">${Number(user.ativo) === 1 ? "Desativar" : "Reativar"}</button>` : ""}
       </div>
+      ${canResetPassword ? passwordPanel(user) : ""}
     </article>`;
 }
 
@@ -82,15 +108,28 @@ function dialogShell() {
         </div>
         <div class="admins-dialog__footer"><button type="button" class="admins-secondary" data-admin-dialog-close>Cancelar</button><button type="submit" class="admins-primary">Criar administrador</button></div>
       </form>
-    </dialog>
-
-    <dialog class="admins-dialog" data-admin-password-dialog>
-      <form method="dialog" class="admins-dialog__card is-compact" data-admin-password-form>
-        <div class="admins-dialog__head"><div><span>Segurança</span><h2>Alterar senha</h2><p data-admin-password-target></p></div><button type="button" class="admins-dialog__close" data-admin-password-close aria-label="Fechar">×</button></div>
-        <div class="admins-dialog__body"><input type="hidden" name="id" /><label><span>Nova senha</span><input name="senha" required type="password" minlength="8" autocomplete="new-password" /><small>Mínimo de 8 caracteres, com pelo menos uma letra e um número.</small></label><label><span>Confirmar senha</span><input name="confirmacao" required type="password" minlength="8" autocomplete="new-password" /></label><p class="admins-form-error" data-admin-password-error hidden></p></div>
-        <div class="admins-dialog__footer"><button type="button" class="admins-secondary" data-admin-password-close>Cancelar</button><button type="submit" class="admins-primary">Salvar nova senha</button></div>
-      </form>
     </dialog>`;
+}
+
+function setPasswordPanel(root, id, open) {
+  const panel = root.querySelector(`[data-admin-password-panel="${id}"]`);
+  const button = root.querySelector(`[data-admin-password="${id}"]`);
+  const card = root.querySelector(`[data-admin-card="${id}"]`);
+  if (!panel || !button) return;
+
+  panel.hidden = !open;
+  button.setAttribute("aria-expanded", String(open));
+  button.textContent = open ? "Fechar" : "Alterar senha";
+  card?.classList.toggle("is-password-open", open);
+
+  if (open) {
+    requestAnimationFrame(() => panel.querySelector('input[name="senha"]')?.focus());
+  } else {
+    const form = panel.querySelector("form");
+    form?.reset();
+    const error = panel.querySelector("[data-admin-password-error]");
+    if (error) error.hidden = true;
+  }
 }
 
 export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
@@ -133,22 +172,57 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
   const createDialog = root.querySelector("[data-admin-create-dialog]");
   const createForm = root.querySelector("[data-admin-create-form]");
   const createError = root.querySelector("[data-admin-create-error]");
-  const passwordDialog = root.querySelector("[data-admin-password-dialog]");
-  const passwordForm = root.querySelector("[data-admin-password-form]");
-  const passwordError = root.querySelector("[data-admin-password-error]");
 
   root.querySelector("[data-admin-create]")?.addEventListener("click", () => createDialog?.showModal());
-  root.querySelectorAll("[data-admin-dialog-close]").forEach(button => button.addEventListener("click", () => createDialog?.close()));
-  root.querySelectorAll("[data-admin-password-close]").forEach(button => button.addEventListener("click", () => passwordDialog?.close()));
+  root.querySelectorAll("[data-admin-dialog-close]").forEach(button =>
+    button.addEventListener("click", () => createDialog?.close())
+  );
 
   root.querySelectorAll("[data-admin-password]").forEach(button => {
     button.addEventListener("click", () => {
-      passwordForm?.reset();
-      passwordForm.elements.id.value = button.dataset.adminPassword;
-      const target = root.querySelector("[data-admin-password-target]");
-      if (target) target.textContent = button.dataset.adminName || "Administrador";
-      if (passwordError) passwordError.hidden = true;
-      passwordDialog?.showModal();
+      const id = button.dataset.adminPassword;
+      const open = button.getAttribute("aria-expanded") !== "true";
+      root.querySelectorAll("[data-admin-password][aria-expanded=\"true\"]").forEach(other => {
+        if (other !== button) setPasswordPanel(root, other.dataset.adminPassword, false);
+      });
+      setPasswordPanel(root, id, open);
+    });
+  });
+
+  root.querySelectorAll("[data-admin-password-cancel]").forEach(button => {
+    button.addEventListener("click", () => setPasswordPanel(root, button.dataset.adminPasswordCancel, false));
+  });
+
+  root.querySelectorAll("[data-admin-password-form]").forEach(form => {
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const id = form.dataset.adminPasswordForm;
+      const errorBox = form.querySelector("[data-admin-password-error]");
+      if (errorBox) errorBox.hidden = true;
+      const data = Object.fromEntries(new FormData(form).entries());
+
+      if (data.senha !== data.confirmacao) {
+        if (errorBox) {
+          errorBox.textContent = "As senhas não coincidem.";
+          errorBox.hidden = false;
+        }
+        return;
+      }
+
+      const submit = form.querySelector('[type="submit"]');
+      submit.disabled = true;
+      try {
+        await adminApi.resetUserPassword(id, data.senha);
+        if (Number(id) === Number(viewer?.id)) return onUnauthorized?.();
+        await renderAdmins(root, { onUnauthorized, currentUser: viewer });
+      } catch (error) {
+        if (error?.status === 401) return onUnauthorized?.();
+        if (errorBox) {
+          errorBox.textContent = error?.message || "Não foi possível alterar a senha.";
+          errorBox.hidden = false;
+        }
+        submit.disabled = false;
+      }
     });
   });
 
@@ -165,31 +239,10 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
       await renderAdmins(root, { onUnauthorized, currentUser: viewer });
     } catch (error) {
       if (error?.status === 401) return onUnauthorized?.();
-      if (createError) { createError.textContent = error?.message || "Não foi possível criar o administrador."; createError.hidden = false; }
-      submit.disabled = false;
-    }
-  });
-
-  passwordForm?.addEventListener("submit", async event => {
-    event.preventDefault();
-    if (passwordError) passwordError.hidden = true;
-    const data = Object.fromEntries(new FormData(passwordForm).entries());
-    if (data.senha !== data.confirmacao) {
-      passwordError.textContent = "As senhas não coincidem.";
-      passwordError.hidden = false;
-      return;
-    }
-    const submit = passwordForm.querySelector('[type="submit"]');
-    submit.disabled = true;
-    try {
-      await adminApi.resetUserPassword(data.id, data.senha);
-      passwordDialog?.close();
-      if (Number(data.id) === Number(viewer?.id)) return onUnauthorized?.();
-      await renderAdmins(root, { onUnauthorized, currentUser: viewer });
-    } catch (error) {
-      if (error?.status === 401) return onUnauthorized?.();
-      passwordError.textContent = error?.message || "Não foi possível alterar a senha.";
-      passwordError.hidden = false;
+      if (createError) {
+        createError.textContent = error?.message || "Não foi possível criar o administrador.";
+        createError.hidden = false;
+      }
       submit.disabled = false;
     }
   });
