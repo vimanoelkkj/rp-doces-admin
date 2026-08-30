@@ -108,7 +108,11 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
     button.classList.remove("is-open");
     button.setAttribute("aria-expanded", "false");
   };
+
   const open = () => {
+    window.dispatchEvent(
+      new CustomEvent("rp-admin-popover-open", { detail: { source: "notifications" } })
+    );
     menu.hidden = false;
     button.classList.add("is-open");
     button.setAttribute("aria-expanded", "true");
@@ -171,6 +175,9 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
       close();
       button.focus();
     }
+  });
+  window.addEventListener("rp-admin-popover-open", event => {
+    if (event.detail?.source !== "notifications") close();
   });
 
   refresh();
