@@ -136,7 +136,7 @@ passwordForm?.addEventListener("submit", async event => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  navigator.serviceWorker.register("/admin/sw.js", { scope: "/admin/" }).catch(() => {});
 }
 
 alreadyAuthenticated();
