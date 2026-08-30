@@ -1,0 +1,291 @@
+/* Camada final de QA responsivo. Mantém o desktop aprovado e corrige apenas bordas de viewport. */
+
+.admin-main,
+.admin-content,
+.dashboard,
+.products-view,
+.orders-view,
+.admins-view,
+.store-view {
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .admin-topbar {
+    min-height: 64px;
+    gap: 10px;
+  }
+
+  .admin-page-title {
+    min-width: 0;
+  }
+
+  .admin-page-title h1 {
+    overflow: hidden;
+    font-size: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-topbar__actions {
+    flex: 0 0 auto;
+    gap: 5px;
+  }
+
+  .admin-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .admin-profile {
+    padding: 4px;
+  }
+
+  .admin-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .profile-menu,
+  .notifications-menu {
+    max-height: calc(100dvh - 82px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .orders-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: -14px;
+    padding: 0 14px 4px;
+    scrollbar-width: none;
+  }
+
+  .orders-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .orders-filters button {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 720px) {
+  /* O resumo administrativo continua compacto em vez de virar três cards empilhados. */
+  .admins-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admins-summary > div + div {
+    border-top: 0;
+    border-left: 1px solid var(--rp-line);
+  }
+
+  .admins-summary > div {
+    min-width: 0;
+    padding: 9px 10px;
+  }
+
+  .admins-summary span,
+  .admins-summary strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admins-summary span {
+    white-space: nowrap;
+  }
+
+  .dashboard-section__head {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .store-toolbar__actions {
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .store-toolbar__actions > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .store-card {
+    min-width: 0;
+  }
+
+  .store-public-preview__row strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .store-time-picker__menu {
+    max-width: calc(100vw - 28px);
+  }
+}
+
+@media (max-width: 520px) {
+  .orders-summary {
+    gap: 8px;
+  }
+
+  .orders-summary article {
+    padding: 12px;
+  }
+
+  .orders-summary strong {
+    font-size: 1.35rem;
+  }
+
+  .orders-card__top {
+    gap: 8px;
+  }
+
+  .orders-card__actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .orders-dialog__panel {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+  }
+
+  .dashboard-section__head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-section__head .dashboard-link,
+  .dashboard-section__head .dashboard-retry {
+    align-self: stretch;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-topbar {
+    padding-inline: 10px;
+  }
+
+  .admin-page-title h1 {
+    font-size: 18px;
+  }
+
+  .admin-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .admin-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .admin-content {
+    padding-inline: 12px;
+  }
+
+  .admin-nav {
+    padding-inline: 4px;
+  }
+
+  .admin-nav__item {
+    min-width: 0;
+  }
+
+  .admin-nav__label {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 8.5px;
+    text-overflow: ellipsis;
+  }
+
+  .products-toolbar__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .products-toolbar__actions button {
+    width: 100%;
+  }
+
+  .products-filters {
+    margin-inline: -12px;
+    padding-inline: 12px;
+  }
+
+  .admins-card {
+    padding: 12px;
+  }
+
+  .admins-card__head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .admins-card__meta > div {
+    gap: 8px;
+  }
+
+  .admins-card__meta strong {
+    max-width: 64%;
+  }
+
+  .admins-summary > div {
+    padding-inline: 8px;
+  }
+
+  .admins-summary span {
+    font-size: 8px;
+  }
+
+  .admins-summary strong {
+    font-size: 15px;
+  }
+
+  .store-days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 360px) {
+  .admin-page-title h1 {
+    max-width: 112px;
+  }
+
+  .admin-topbar__actions {
+    gap: 2px;
+  }
+
+  .orders-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .orders-card__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .orders-details-button,
+  .orders-status-menu {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .orders-details-button {
+    grid-row: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .products-primary:hover:not(:disabled),
+  .admins-primary:hover:not(:disabled),
+  .store-primary:hover:not(:disabled) {
+    transform: none;
+  }
+}
