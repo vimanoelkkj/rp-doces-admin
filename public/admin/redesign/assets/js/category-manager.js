@@ -1,50 +1,37 @@
 import { adminApi } from "./api.js";
 
-const CATEGORIES = [
-  {
-    id: "BOLO_NO_POTE",
-    label: "Bolos no pote",
-    description: "Categoria estrutural usada pela seção de bolos do cardápio público.",
-    emoji: "🍰"
-  },
-  {
-    id: "MINI_PUDIM",
-    label: "Mini pudins",
-    description: "Categoria estrutural usada pela seção de mini pudins do cardápio público.",
-    emoji: "🍮"
-  }
-];
-
-function categoryStats(products, categoryId) {
-  const categoryProducts = products.filter(product => product.categoria === categoryId);
-  const active = categoryProducts.filter(product => Number(product.ativo) === 1).length;
-  const archived = categoryProducts.length - active;
-  return { total: categoryProducts.length, active, archived };
+function esc(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-function categoryCard(category, stats) {
+function categoryCard(category) {
   return `
     <article class="category-manager__card">
-      <div class="category-manager__icon" aria-hidden="true">${category.emoji}</div>
+      <div class="category-manager__icon" aria-hidden="true">${esc(category.emoji || "🍰")}</div>
       <div class="category-manager__copy">
         <div class="category-manager__title-row">
           <div>
-            <strong>${category.label}</strong>
-            <code>${category.id}</code>
+            <strong>${esc(category.nome)}</strong>
+            <code>${esc(category.id)}</code>
           </div>
-          <span class="category-manager__system-badge">Sistema</span>
+          ${Number(category.sistema) ? '<span class="category-manager__system-badge">Sistema</span>' : '<span class="category-manager__system-badge is-custom">Personalizada</span>'}
         </div>
-        <p>${category.description}</p>
-        <div class="category-manager__stats" aria-label="Resumo da categoria ${category.label}">
-          <span><strong>${stats.total}</strong> produtos</span>
-          <span><strong>${stats.active}</strong> ativos</span>
-          <span><strong>${stats.archived}</strong> arquivados</span>
+        <p>${esc(category.descricao || "Categoria personalizada do cardápio.")}</p>
+        <div class="category-manager__stats" aria-label="Resumo da categoria ${esc(category.nome)}">
+          <span><strong>${Number(category.produtos || 0)}</strong> produtos</span>
+          <span><strong>${Number(category.ativos || 0)}</strong> ativos</span>
+          <span><strong>${Number(category.arquivados || 0)}</strong> arquivados</span>
         </div>
       </div>
     </article>`;
 }
 
-function createDialog(products) {
+function createDialog(categories) {
   const dialog = document.createElement("div");
   dialog.className = "category-manager";
   dialog.dataset.categoryManager = "";
@@ -55,26 +42,42 @@ function createDialog(products) {
         <div>
           <span>Catálogo</span>
           <h2 id="category-manager-title">Gerenciar categorias</h2>
-          <p>As categorias atuais ainda são estruturais no cardápio público.</p>
+          <p>Crie categorias e use-as imediatamente nos produtos do cardápio.</p>
         </div>
         <button class="category-manager__close" type="button" data-category-manager-close aria-label="Fechar">×</button>
       </div>
 
-      <div class="category-manager__notice">
-        <strong>Por enquanto, estas categorias são fixas.</strong>
-        <span>O storefront ainda possui seções específicas para bolos no pote e mini pudins. Criar uma terceira categoria só será liberado quando o cardápio público passar a renderizar categorias dinamicamente.</span>
-      </div>
+      <form class="category-manager__create" data-category-create-form>
+        <div class="category-manager__create-copy">
+          <strong>Nova categoria</strong>
+          <span>O identificador é criado automaticamente a partir do nome.</span>
+        </div>
+        <div class="category-manager__create-grid">
+          <label><span>Nome</span><input name="nome" maxlength="60" required placeholder="Ex.: Brownies" autocomplete="off" /></label>
+          <label class="is-emoji"><span>Emoji</span><input name="emoji" maxlength="16" value="🍰" required /></label>
+          <label class="is-wide"><span>Descrição</span><input name="descricao" maxlength="240" placeholder="Ex.: Brownies artesanais da R&P" autocomplete="off" /></label>
+        </div>
+        <div class="category-manager__create-actions">
+          <span data-category-create-message aria-live="polite"></span>
+          <button class="products-primary" type="submit" data-category-create-submit>+ Criar categoria</button>
+        </div>
+      </form>
 
-      <div class="category-manager__list">
-        ${CATEGORIES.map(category => categoryCard(category, categoryStats(products, category.id))).join("")}
+      <div class="category-manager__list" data-category-list>
+        ${categories.map(categoryCard).join("")}
       </div>
 
       <div class="category-manager__footer">
-        <span>2 categorias do sistema</span>
+        <span>${categories.length} ${categories.length === 1 ? "categoria" : "categorias"} no catálogo</span>
         <button class="products-secondary" type="button" data-category-manager-close>Fechar</button>
       </div>
     </section>`;
   return dialog;
+}
+
+async function loadCategories() {
+  const payload = await adminApi.categories();
+  return Array.isArray(payload?.categorias) ? payload.categorias : [];
 }
 
 async function openCategoryManager(button) {
@@ -83,29 +86,66 @@ async function openCategoryManager(button) {
   button.textContent = "Carregando…";
 
   try {
-    const payload = await adminApi.products();
-    const products = Array.isArray(payload?.produtos) ? payload.produtos : [];
+    let categories = await loadCategories();
     document.querySelector("[data-category-manager]")?.remove();
-    const dialog = createDialog(products);
+    const dialog = createDialog(categories);
     document.body.append(dialog);
     document.body.classList.add("category-manager-open");
 
     const close = () => {
       dialog.remove();
       document.body.classList.remove("category-manager-open");
+      document.removeEventListener("keydown", onKeydown);
       button.focus();
+    };
+    const onKeydown = event => {
+      if (event.key === "Escape") close();
     };
 
     dialog.querySelectorAll("[data-category-manager-close]").forEach(item => {
       item.addEventListener("click", close);
     });
-
-    const onKeydown = event => {
-      if (event.key !== "Escape") return;
-      document.removeEventListener("keydown", onKeydown);
-      close();
-    };
     document.addEventListener("keydown", onKeydown);
+
+    const form = dialog.querySelector("[data-category-create-form]");
+    const list = dialog.querySelector("[data-category-list]");
+    const message = dialog.querySelector("[data-category-create-message]");
+    const submit = dialog.querySelector("[data-category-create-submit]");
+
+    form?.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!(form instanceof HTMLFormElement) || !(submit instanceof HTMLButtonElement)) return;
+      const data = new FormData(form);
+      const nome = String(data.get("nome") || "").trim();
+      if (!nome) return;
+
+      submit.disabled = true;
+      submit.textContent = "Criando…";
+      if (message) message.textContent = "";
+
+      try {
+        await adminApi.createCategory({
+          nome,
+          emoji: String(data.get("emoji") || "🍰").trim(),
+          descricao: String(data.get("descricao") || "").trim()
+        });
+        categories = await loadCategories();
+        if (list) list.innerHTML = categories.map(categoryCard).join("");
+        const footer = dialog.querySelector(".category-manager__footer > span");
+        if (footer)
+          footer.textContent = `${categories.length} ${categories.length === 1 ? "categoria" : "categorias"} no catálogo`;
+        form.reset();
+        const emoji = form.elements.namedItem("emoji");
+        if (emoji instanceof HTMLInputElement) emoji.value = "🍰";
+        if (message) message.textContent = "Categoria criada.";
+        document.dispatchEvent(new CustomEvent("rp-categories-changed"));
+      } catch (error) {
+        if (message) message.textContent = error?.message || "Não foi possível criar a categoria.";
+      } finally {
+        submit.disabled = false;
+        submit.textContent = "+ Criar categoria";
+      }
+    });
   } catch (error) {
     console.warn("R&P Admin: não foi possível carregar as categorias.", error);
   } finally {
