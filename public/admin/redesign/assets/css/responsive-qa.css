@@ -10,6 +10,21 @@
   min-width: 0;
 }
 
+/* O documento de fundo nunca deve rolar enquanto um modal administrativo estiver aberto. */
+html:has(body.products-dialog-open),
+html:has(body.orders-dialog-open),
+body.products-dialog-open,
+body.orders-dialog-open {
+  height: 100%;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.products-dialog,
+.orders-dialog {
+  overscroll-behavior: contain;
+}
+
 @media (max-width: 860px) {
   html,
   body {
@@ -152,6 +167,95 @@
   .dashboard-section__head {
     min-width: 0;
   }
+
+  /* No mobile, pedidos recentes deixam de tentar imitar a tabela desktop. */
+  .dashboard-orders {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .dashboard-order {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 14px;
+    min-height: 0;
+    border: 1px solid var(--rp-line);
+    border-radius: 14px;
+    padding: 12px;
+    background: var(--rp-surface);
+  }
+
+  .dashboard-order + .dashboard-order {
+    border-top: 1px solid var(--rp-line);
+  }
+
+  .dashboard-order > div {
+    min-width: 0;
+  }
+
+  .dashboard-order > div::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    color: var(--rp-ink-3);
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .dashboard-order__id {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .dashboard-order__total {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+  }
+
+  .dashboard-order__customer {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 9px;
+    align-items: center;
+  }
+
+  .dashboard-order__customer::before {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+  }
+
+  .dashboard-order__customer strong,
+  .dashboard-order__customer small {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard-order > [data-label="Itens"] {
+    display: none;
+  }
+
+  .dashboard-order > [data-label="Pagamento"] {
+    grid-column: 1;
+    grid-row: 3;
+    justify-self: start;
+  }
+
+  .dashboard-order > [data-label="Andamento"] {
+    display: block;
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+    text-align: right;
+  }
 }
 
 @media (max-width: 620px) {
@@ -200,9 +304,17 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .orders-dialog__panel {
+  .orders-dialog__panel,
+  .products-dialog__panel {
     width: 100%;
     max-height: calc(100dvh - 20px);
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  .orders-dialog__panel::-webkit-scrollbar,
+  .products-dialog__panel::-webkit-scrollbar {
+    display: none;
   }
 
   .dashboard-section__head {
