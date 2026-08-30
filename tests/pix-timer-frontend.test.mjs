@@ -6,12 +6,20 @@ import path from "node:path";
 import { renderPaymentStatus } from "../public/assets/js/components/payment-status.js";
 import { formatPixExpiry } from "../public/assets/js/utils/pix-expiry.js";
 import { pixCode, pixQrImageSrc } from "../public/assets/js/utils/payment-data.js";
-import { normalizeOrderStatus, isPaidStatus, isFailedStatus } from "../public/assets/js/utils/payment-status.js";
+import {
+  normalizeOrderStatus,
+  isPaidStatus,
+  isFailedStatus
+} from "../public/assets/js/utils/payment-status.js";
 
 const root = process.cwd();
 const read = relativePath => fs.readFileSync(path.resolve(root, relativePath), "utf8");
 
 function pendingOrder(overrides = {}) {
+  const dataOverrides = overrides.data || {};
+  const pixOverrides = overrides.pix || {};
+  const hasPixOverride = Object.prototype.hasOwnProperty.call(overrides, "pix");
+
   return {
     phase: "pending",
     paymentMethod: "PIX",
@@ -21,11 +29,18 @@ function pendingOrder(overrides = {}) {
       status: "PENDENTE",
       valor_total_centavos: 2500,
       pix_expira_em: "2026-08-30T04:00:00.000Z",
-      qr_code: "000201PIX-COPIA-E-COLA",
-      qr_code_base64: "data:image/png;base64,QUJD",
-      ...overrides.data
+      ...dataOverrides
     },
-    ...overrides
+    pix: hasPixOverride
+      ? overrides.pix
+      : {
+          qr_code: "000201PIX-COPIA-E-COLA",
+          qr_code_base64: "data:image/png;base64,QUJD",
+          ...pixOverrides
+        },
+    ...Object.fromEntries(
+      Object.entries(overrides).filter(([key]) => !["data", "pix"].includes(key))
+    )
   };
 }
 
@@ -70,10 +85,15 @@ test("QR Code Pix aparece sempre no desktop e opcionalmente no mobile", () => {
 });
 
 test("Pix sem QR de imagem preserva copia e cola sem renderizar frame vazio", () => {
-  const order = pendingOrder({ data: { qr_code_base64: null } });
+  const order = pendingOrder({
+    pix: {
+      qr_code: "000201PIX-COPIA-E-COLA",
+      qr_code_base64: null
+    }
+  });
   const html = renderPaymentStatus(order);
 
-  assert.doesNotMatch(html, /rp-payment__qr-desktop/);
+  assert.doesNotMatch(html, /class="rp-payment__qr-desktop"/);
   assert.match(html, /000201PIX-COPIA-E-COLA/);
   assert.match(html, /data-copy-pix/);
 });
@@ -101,18 +121,21 @@ test("timestamp Pix válido é formatado para apresentação", () => {
 
 test("helper de dados aceita QR base64 cru e data URL", () => {
   assert.equal(
-    pixQrImageSrc({ data: { qr_code_base64: "QUJD" } }),
+    pixQrImageSrc({ pix: { qr_code_base64: "QUJD" } }),
     "data:image/png;base64,QUJD"
   );
   assert.equal(
-    pixQrImageSrc({ data: { qr_code_base64: "data:image/png;base64,REVG" } }),
+    pixQrImageSrc({ pix: { qr_code_base64: "data:image/png;base64,REVG" } }),
     "data:image/png;base64,REVG"
   );
 });
 
 test("helper de dados rejeita QR em formato incompatível", () => {
-  assert.equal(pixQrImageSrc({ data: { qr_code_base64: "data:image/jpeg;base64,QUJD" } }), "");
-  assert.equal(pixQrImageSrc({ data: { qr_code_base64: "" } }), "");
+  assert.equal(
+    pixQrImageSrc({ pix: { qr_code_base64: "data:image/jpeg;base64,QUJD" } }),
+    ""
+  );
+  assert.equal(pixQrImageSrc({ pix: { qr_code_base64: "" } }), "");
 });
 
 test("helper de dados expõe o Pix copia e cola do pedido", () => {
@@ -253,23 +276,25 @@ test("recovery busca o pedido canônico e reinicia polling", () => {
 test("recovery limpa identidade de checkout ao encontrar pedido terminal", () => {
   const source = read("public/assets/js/pending-order-recovery.js");
 
-  assert.match(source, /clearPendingOrderToken/);
-  assert.match(source, /resetCheckoutIdentity/);
+  assert.match(source, /clearTerminalOrderIdentity/);
+  assert.match(source, /resetCheckoutRequestId\(\)/);
 });
 
 test("checkout-service mantém identidade idempotente por tentativa", () => {
   const source = read("public/assets/js/checkout-service.js");
 
   assert.match(source, /client_request_id/);
-  assert.match(source, /sessionStorage/);
-  assert.match(source, /crypto\.randomUUID|randomUUID/);
+  assert.match(source, /REQUEST_KEY = "rp_checkout_request_id"/);
+  assert.match(source, /CART_KEY = "rp_checkout_cart_signature"/);
+  assert.match(source, /newIdempotencyId\(\)/);
 });
 
 test("checkout-service expõe limpeza explícita da identidade da tentativa", () => {
   const source = read("public/assets/js/checkout-service.js");
 
-  assert.match(source, /resetCheckoutIdentity/);
-  assert.match(source, /removeItem/);
+  assert.match(source, /export function resetCheckoutRequestId\(\)/);
+  assert.match(source, /sessionRemove\(REQUEST_KEY\)/);
+  assert.match(source, /sessionRemove\(CART_KEY\)/);
 });
 
 test("storefront produtivo não habilita o atraso artificial de cancelamento do preview", () => {
