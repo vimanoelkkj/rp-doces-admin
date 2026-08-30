@@ -5,6 +5,19 @@ const CATEGORY_LABELS = {
   MINI_PUDIM: "Mini pudins"
 };
 
+const EMOJI_OPTIONS = [
+  ["🍰", "Bolo"],
+  ["🧁", "Cupcake"],
+  ["🍮", "Pudim"],
+  ["🎂", "Bolo de festa"],
+  ["🍓", "Morango"],
+  ["🍫", "Chocolate"],
+  ["🥥", "Coco"],
+  ["🍋", "Limão"],
+  ["🍯", "Mel"],
+  ["🍪", "Biscoito"]
+];
+
 function money(cents) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -90,6 +103,28 @@ function emptyState(filter) {
   return `<div class="products-empty"><strong>Nada por aqui</strong><span>${text}</span></div>`;
 }
 
+function emojiPicker() {
+  return `
+    <fieldset class="products-field products-field--wide products-emoji-field">
+      <legend>Emoji</legend>
+      <input name="emoji" type="hidden" value="${EMOJI_OPTIONS[0][0]}" data-emoji-value />
+      <div class="products-emoji-picker" role="radiogroup" aria-label="Escolha um emoji para o produto">
+        ${EMOJI_OPTIONS.map(
+          ([emoji, label], index) => `
+            <button
+              class="products-emoji-option${index === 0 ? " is-selected" : ""}"
+              type="button"
+              role="radio"
+              aria-checked="${index === 0 ? "true" : "false"}"
+              aria-label="${label}"
+              title="${label}"
+              data-emoji-option="${emoji}"
+            ><span aria-hidden="true">${emoji}</span><small>${label}</small></button>`
+        ).join("")}
+      </div>
+    </fieldset>`;
+}
+
 function productDialog() {
   return `
     <div class="products-dialog" data-product-dialog hidden>
@@ -120,29 +155,15 @@ function productDialog() {
             </label>
 
             <label class="products-field">
-              <span>Emoji</span>
-              <select name="emoji" required>
-                <option value="🍰">🍰 Bolo</option>
-                <option value="🧁">🧁 Cupcake</option>
-                <option value="🍮">🍮 Pudim</option>
-                <option value="🎂">🎂 Bolo de festa</option>
-                <option value="🍓">🍓 Morango</option>
-                <option value="🍫">🍫 Chocolate</option>
-                <option value="🥥">🥥 Coco</option>
-                <option value="🍋">🍋 Limão</option>
-                <option value="🍯">🍯 Mel</option>
-                <option value="🍪">🍪 Biscoito</option>
-              </select>
-            </label>
-
-            <label class="products-field">
-              <span>Preço</span>
-              <div class="products-money-field"><span>R$</span><input name="preco" type="text" inputmode="decimal" required placeholder="12,00" autocomplete="off" /></div>
-            </label>
-
-            <label class="products-field">
               <span>Estoque</span>
               <input name="estoque" type="number" min="0" max="100000" step="1" value="0" required />
+            </label>
+
+            ${emojiPicker()}
+
+            <label class="products-field products-field--wide">
+              <span>Preço</span>
+              <div class="products-money-field"><span>R$</span><input name="preco" type="text" inputmode="decimal" required placeholder="12,00" autocomplete="off" /></div>
             </label>
 
             <label class="products-field products-field--wide">
@@ -216,11 +237,22 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
   const form = container.querySelector("[data-product-form]");
   const formMessage = container.querySelector("[data-product-form-message]");
   const submitButton = container.querySelector("[data-product-submit]");
+  const emojiValue = container.querySelector("[data-emoji-value]");
+  const emojiOptions = [...container.querySelectorAll("[data-emoji-option]")];
 
   let products = [];
   let filter = "todos";
   let query = "";
   let lastFocused = null;
+
+  function selectEmoji(value) {
+    if (emojiValue instanceof HTMLInputElement) emojiValue.value = value;
+    emojiOptions.forEach(button => {
+      const selected = button.dataset.emojiOption === value;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-checked", String(selected));
+    });
+  }
 
   function renderList() {
     const visible = products.filter(product => {
@@ -256,6 +288,7 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
     dialog.hidden = false;
     document.body.classList.add("products-dialog-open");
     form?.reset();
+    selectEmoji(EMOJI_OPTIONS[0][0]);
     const active = form?.elements.namedItem("ativo");
     if (active instanceof HTMLInputElement) active.checked = true;
     const stock = form?.elements.namedItem("estoque");
@@ -285,6 +318,10 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
       filterButtons.forEach(item => item.classList.toggle("is-active", item === button));
       renderList();
     });
+  });
+
+  emojiOptions.forEach(button => {
+    button.addEventListener("click", () => selectEmoji(button.dataset.emojiOption || EMOJI_OPTIONS[0][0]));
   });
 
   newProductButton?.addEventListener("click", openDialog);
@@ -323,7 +360,7 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
         disponivel: true,
         ativo: data.get("ativo") === "on",
         destaque: data.get("destaque") === "on",
-        emoji: String(data.get("emoji") || "").trim(),
+        emoji: String(data.get("emoji") || EMOJI_OPTIONS[0][0]).trim(),
         estoque: stock,
         promocao_ativa: false,
         preco_promocional_centavos: null,
