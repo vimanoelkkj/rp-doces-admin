@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { resetCheckoutRequestId } from "./checkout-service.js";
 import { state, setOrderState, subscribe } from "./state.js";
 import { startOrderPolling } from "./payment-controller.js";
 import { paymentSimulationEnabled } from "./runtime-policy.js";
@@ -16,16 +17,31 @@ function clearPendingOrder() {
   sessionRemove(PENDING_ORDER_KEY);
 }
 
+function clearTerminalOrderIdentity() {
+  clearPendingOrder();
+  resetCheckoutRequestId();
+}
+
 function rememberCurrentOrder(currentState) {
   const order = currentState?.order || {};
   const token = String(order.token || "");
+  const status = normalizeOrderStatus(order.data?.status);
+  const terminal = isPaidStatus(status) || isFailedStatus(status);
 
-  if (order.demoState === "cancelled" || order.phase === "paid" || order.phase === "idle") {
+  if (order.demoState === "cancelled" || terminal || order.phase === "paid") {
+    clearTerminalOrderIdentity();
+    return;
+  }
+
+  if (order.phase === "idle") {
     clearPendingOrder();
     return;
   }
 
-  if (validOrderToken(token) && ["creating", "pending", "confirming-paid", "error"].includes(order.phase)) {
+  if (
+    validOrderToken(token) &&
+    ["creating", "pending", "confirming-paid", "error"].includes(order.phase)
+  ) {
     sessionSet(PENDING_ORDER_KEY, token);
   }
 }
@@ -51,7 +67,7 @@ async function recoverPendingOrder() {
     const status = normalizeOrderStatus(pedido.status);
 
     if (isPaidStatus(status)) {
-      clearPendingOrder();
+      clearTerminalOrderIdentity();
       showCatalogRoute();
       setOrderState({
         phase: "paid",
@@ -67,8 +83,8 @@ async function recoverPendingOrder() {
       return;
     }
 
-    if (isFailedStatus(status) || status === "CANCELADO") {
-      clearPendingOrder();
+    if (isFailedStatus(status)) {
+      clearTerminalOrderIdentity();
       return;
     }
 
@@ -88,7 +104,9 @@ async function recoverPendingOrder() {
     });
     startOrderPolling(token);
   } catch (error) {
-    if (error?.status === 404 || error?.status === 400) clearPendingOrder();
+    if (error?.status === 404 || error?.status === 400) {
+      clearPendingOrder();
+    }
   }
 }
 
