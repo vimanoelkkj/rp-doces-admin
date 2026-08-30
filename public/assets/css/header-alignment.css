@@ -19,3 +19,25 @@
     margin: 0;
   }
 }
+
+/* The catalog route used to scale the entire section on entry, including its
+   header. Keep the header as a visual anchor and fade the route without
+   changing its geometry. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-catalog-route] {
+    animation: rp-catalog-route-stable-in 260ms ease both;
+  }
+
+  [data-catalog-route] .rp-site-header {
+    animation: none;
+  }
+
+  @keyframes rp-catalog-route-stable-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
