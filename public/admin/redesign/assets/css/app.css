@@ -199,6 +199,10 @@ button {
 .admin-collapse:hover {
   background: var(--rp-pink-wash);
 }
+.admin-collapse .admin-nav__icon svg {
+  transition: transform 180ms ease;
+  transform-origin: 50% 50%;
+}
 
 .admin-main {
   min-width: 0;
@@ -341,7 +345,7 @@ button {
 .admin-app.is-collapsed .admin-brand__copy,
 .admin-app.is-collapsed .admin-nav__label,
 .admin-app.is-collapsed .admin-nav__badge,
-.admin-app.is-collapsed .admin-collapse span {
+.admin-app.is-collapsed .admin-collapse > span:not(.admin-nav__icon) {
   display: none;
 }
 .admin-app.is-collapsed .admin-brand {
@@ -352,6 +356,12 @@ button {
 .admin-app.is-collapsed .admin-collapse {
   justify-content: center;
   padding-inline: 0;
+}
+.admin-app.is-collapsed .admin-collapse .admin-nav__icon {
+  display: grid;
+}
+.admin-app.is-collapsed .admin-collapse .admin-nav__icon svg {
+  transform: rotate(180deg);
 }
 
 @media (max-width: 860px) {
@@ -420,7 +430,8 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .admin-app,
-  .admin-tooltip {
+  .admin-tooltip,
+  .admin-collapse .admin-nav__icon svg {
     transition: none;
   }
 }
