@@ -4,6 +4,20 @@ function dismissDesktopMenu(menu) {
   menu.querySelector(".rp-desktop-menu__trigger")?.blur();
 }
 
+function dismissOpenDesktopMenus() {
+  document.querySelectorAll(".rp-desktop-menu").forEach(dismissDesktopMenu);
+}
+
+document.addEventListener(
+  "click",
+  event => {
+    if (event.target.closest("[data-open-party], [data-open-menu], [data-open-cart]")) {
+      dismissOpenDesktopMenus();
+    }
+  },
+  true
+);
+
 document.addEventListener("click", event => {
   const item = event.target.closest(
     ".rp-desktop-menu__popover button, .rp-desktop-menu__popover a"
