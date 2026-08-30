@@ -121,7 +121,18 @@ function productDialog() {
 
             <label class="products-field">
               <span>Emoji</span>
-              <input name="emoji" type="text" maxlength="16" placeholder="🍰" autocomplete="off" />
+              <select name="emoji" required>
+                <option value="🍰">🍰 Bolo</option>
+                <option value="🧁">🧁 Cupcake</option>
+                <option value="🍮">🍮 Pudim</option>
+                <option value="🎂">🎂 Bolo de festa</option>
+                <option value="🍓">🍓 Morango</option>
+                <option value="🍫">🍫 Chocolate</option>
+                <option value="🥥">🥥 Coco</option>
+                <option value="🍋">🍋 Limão</option>
+                <option value="🍯">🍯 Mel</option>
+                <option value="🍪">🍪 Biscoito</option>
+              </select>
             </label>
 
             <label class="products-field">
