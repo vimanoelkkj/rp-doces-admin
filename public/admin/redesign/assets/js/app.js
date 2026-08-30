@@ -57,8 +57,8 @@ function applyUser(user) {
 }
 
 function redirectToLogin() {
-  const destination = encodeURIComponent("/admin/redesign/");
-  location.assign(`/admin/?return=${destination}`);
+  const destination = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
+  location.replace(`/admin/login.html?return=${destination}`);
 }
 
 async function renderPage(page) {
