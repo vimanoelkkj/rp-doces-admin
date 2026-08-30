@@ -1,21 +1,29 @@
-/* Keep the storefront header anchored to the same mobile gutter on every route. */
+/* Keep the storefront header anchored to the exact same mobile coordinates on every route. */
 @media (max-width: 819px) {
   .rp-home-header,
   .rp-site-header__inner {
+    position: relative;
     box-sizing: border-box;
     width: 100%;
+    min-height: 56px;
     margin-inline: 0;
-    padding: 18px 20px 8px;
+    padding: 0;
   }
 
   .rp-home-header__brand,
   .rp-site-header__brand {
+    position: absolute;
+    top: 18px;
+    left: 20px;
     margin: 0;
     padding: 0;
   }
 
   .rp-home-header__actions,
   .rp-site-header__actions {
+    position: absolute;
+    top: 18px;
+    right: 20px;
     margin: 0;
   }
 }
