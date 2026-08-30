@@ -52,6 +52,15 @@ export const adminApi = {
   removePasskey(id) {
     return jsonRequest("/api/admin/passkeys", "DELETE", { id });
   },
+  pushConfig() {
+    return request("/api/admin/push/config");
+  },
+  subscribePush(subscription) {
+    return jsonRequest("/api/admin/push/subscribe", "POST", subscription);
+  },
+  unsubscribePush(endpoint) {
+    return jsonRequest("/api/admin/push/subscribe", "DELETE", { endpoint });
+  },
   orders() {
     return request("/api/admin/orders");
   },
