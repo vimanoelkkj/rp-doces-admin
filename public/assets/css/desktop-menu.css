@@ -3,7 +3,8 @@
 }
 
 @media (min-width: 768px) {
-  .rp-home-header__menu--mobile {
+  .rp-home-header__menu--mobile,
+  .rp-site-header__menu--mobile {
     display: none;
   }
 
@@ -28,6 +29,10 @@
     transition:
       background-color 140ms ease,
       color 140ms ease;
+  }
+
+  .rp-desktop-menu--catalog .rp-desktop-menu__trigger {
+    color: var(--rp-color-text);
   }
 
   .rp-desktop-menu__trigger-chevron {
@@ -83,6 +88,10 @@
     transition:
       opacity 120ms ease,
       transform 120ms ease;
+  }
+
+  .rp-desktop-menu--catalog .rp-desktop-menu__popover {
+    width: 290px;
   }
 
   .rp-desktop-menu__popover::before {
