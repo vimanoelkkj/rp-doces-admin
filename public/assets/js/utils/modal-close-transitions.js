@@ -68,7 +68,12 @@ function closeAfterAnimation(root, callback) {
 
 function handoffCartToCheckout(trigger) {
   const root = trigger.closest(".rp-cart-overlay") || document.querySelector(".rp-cart-overlay");
-  finishAfterAnimation(root, "is-checkout-handoff", () => replayClick(trigger), CHECKOUT_HANDOFF_MS);
+  finishAfterAnimation(
+    root,
+    "is-checkout-handoff",
+    () => replayClick(trigger),
+    CHECKOUT_HANDOFF_MS
+  );
 }
 
 function handoffCheckoutToPayment(form) {
@@ -123,7 +128,8 @@ document.addEventListener(
 
     const finishOrderTrigger = event.target.closest?.("[data-finish-order]");
     if (finishOrderTrigger && !finishOrderTrigger.disabled) {
-      const root = finishOrderTrigger.closest(".rp-payment") || document.querySelector(".rp-payment");
+      const root =
+        finishOrderTrigger.closest(".rp-payment") || document.querySelector(".rp-payment");
       if (!root) return;
 
       event.preventDefault();

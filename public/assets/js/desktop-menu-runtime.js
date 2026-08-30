@@ -5,7 +5,9 @@ function dismissDesktopMenu(menu) {
 }
 
 document.addEventListener("click", event => {
-  const item = event.target.closest(".rp-desktop-menu__popover button, .rp-desktop-menu__popover a");
+  const item = event.target.closest(
+    ".rp-desktop-menu__popover button, .rp-desktop-menu__popover a"
+  );
   if (!item) return;
   dismissDesktopMenu(item.closest(".rp-desktop-menu"));
 });

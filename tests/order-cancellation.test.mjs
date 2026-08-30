@@ -60,7 +60,12 @@ function cancellationDb(initialStatus = "PENDENTE") {
       return {
         first: () => ({
           status_pagamento: status,
-          mp_status: status === "PAGO" ? "processed" : status === "CANCELADO" ? "canceled" : "action_required",
+          mp_status:
+            status === "PAGO"
+              ? "processed"
+              : status === "CANCELADO"
+                ? "canceled"
+                : "action_required",
           mp_status_detail: null,
           pago_em: status === "PAGO" ? "2026-08-29 20:00:00" : null
         })
@@ -106,7 +111,10 @@ test("cancela Pix pendente no Mercado Pago", async t => {
 
   assert.equal(response.status, 200);
   assert.equal(body.pedido.status, "CANCELADO");
-  assert.deepEqual(calls.map(call => call.method), ["GET", "POST"]);
+  assert.deepEqual(
+    calls.map(call => call.method),
+    ["GET", "POST"]
+  );
   assert.equal(memory.status(), "CANCELADO");
 });
 
@@ -155,6 +163,9 @@ test("pagamento confirmado antes do cancelamento vence a corrida", async t => {
 
   assert.equal(response.status, 409);
   assert.match(body.erro, /pagamento já foi confirmado/i);
-  assert.deepEqual(calls.map(call => call.method), ["GET"]);
+  assert.deepEqual(
+    calls.map(call => call.method),
+    ["GET"]
+  );
   assert.equal(memory.status(), "PAGO");
 });

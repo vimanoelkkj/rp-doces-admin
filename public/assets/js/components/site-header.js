@@ -9,10 +9,7 @@ function syncHeaderCart(summary = {}) {
   const increased = count > previousCartCount;
 
   cart.hidden = count <= 0;
-  cart.setAttribute(
-    "aria-label",
-    `Abrir carrinho com ${count} ${count === 1 ? "item" : "itens"}`
-  );
+  cart.setAttribute("aria-label", `Abrir carrinho com ${count} ${count === 1 ? "item" : "itens"}`);
   if (badge) badge.textContent = String(count);
 
   cart.classList.remove("rp-site-header__cart--feedback");

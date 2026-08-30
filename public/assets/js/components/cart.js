@@ -43,11 +43,8 @@ function patchOpenCart(items, summary) {
     const addButton = row.querySelector('[data-cart-delta="1"]');
     if (quantity) quantity.textContent = String(item.quantity);
     if (price)
-      price.textContent = formatMoney(
-        (Number(item.product.preco_centavos) || 0) * item.quantity
-      );
-    if (addButton)
-      addButton.disabled = item.quantity >= Number(item.product.estoque || 0);
+      price.textContent = formatMoney((Number(item.product.preco_centavos) || 0) * item.quantity);
+    if (addButton) addButton.disabled = item.quantity >= Number(item.product.estoque || 0);
   });
 
   const total = sheet.querySelector("[data-cart-total]");

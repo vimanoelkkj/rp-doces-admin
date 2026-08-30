@@ -59,7 +59,10 @@ export async function onRequestPost({ request, params, env }) {
     const current = await syncCurrentOrder(env, pedido);
     if (current.status_pagamento === "CANCELADO") return canceledResponse(pedido);
     if (current.status_pagamento === "PAGO") {
-      return json({ erro: "O pagamento já foi confirmado e o pedido não pode ser cancelado." }, 409);
+      return json(
+        { erro: "O pagamento já foi confirmado e o pedido não pode ser cancelado." },
+        409
+      );
     }
     if (current.status_pagamento !== "PENDENTE") {
       return json({ erro: "Este Pix já foi encerrado e não pode mais ser cancelado." }, 409);
@@ -98,7 +101,9 @@ export async function onRequestPost({ request, params, env }) {
         if (current.status_pagamento === "CANCELADO") return canceledResponse(pedido);
         if (current.status_pagamento === "PAGO") {
           return json(
-            { erro: "O pagamento foi confirmado antes do cancelamento e o pedido continua válido." },
+            {
+              erro: "O pagamento foi confirmado antes do cancelamento e o pedido continua válido."
+            },
             409
           );
         }

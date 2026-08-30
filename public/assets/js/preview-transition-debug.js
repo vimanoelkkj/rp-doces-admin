@@ -155,11 +155,13 @@ if (params.get("debug") === "transitions") {
     let catalogChanged = false;
 
     for (const mutation of mutations) {
-      if (mutation.target === document.body && mutation.attributeName === "class") bodyChanged = true;
+      if (mutation.target === document.body && mutation.attributeName === "class")
+        bodyChanged = true;
       const element = mutation.target.nodeType === Node.ELEMENT_NODE ? mutation.target : null;
       if (element?.matches?.(".rp-payment, [data-region='payment']")) paymentChanged = true;
       if (element?.matches?.(".rp-checkout, [data-region='checkout']")) checkoutChanged = true;
-      if (element?.matches?.("[data-catalog-route], [data-region='products']")) catalogChanged = true;
+      if (element?.matches?.("[data-catalog-route], [data-region='products']"))
+        catalogChanged = true;
       if (mutation.type === "childList") {
         if (element?.matches?.("[data-region='payment']")) paymentChanged = true;
         if (element?.matches?.("[data-region='checkout']")) checkoutChanged = true;

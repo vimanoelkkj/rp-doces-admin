@@ -2,7 +2,9 @@ import "./modal-close-transitions.js";
 
 function paymentInteractionLocked() {
   if (typeof document === "undefined") return false;
-  return Boolean(document.querySelector('#rp-app > [data-region]:not([data-region="payment"])[inert]'));
+  return Boolean(
+    document.querySelector('#rp-app > [data-region]:not([data-region="payment"])[inert]')
+  );
 }
 export function isEscapeKey(event) {
   return event?.key === "Escape" && !paymentInteractionLocked();
