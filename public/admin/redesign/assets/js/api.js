@@ -33,6 +33,25 @@ export const adminApi = {
   me() {
     return request("/api/auth/me");
   },
+  logout() {
+    return jsonRequest("/api/auth/logout", "POST", {});
+  },
+  passkeys() {
+    return request("/api/admin/passkeys");
+  },
+  beginPasskeyRegistration() {
+    return jsonRequest("/api/admin/passkeys", "POST", { acao: "opcoes" });
+  },
+  finishPasskeyRegistration(challengeId, response) {
+    return jsonRequest("/api/admin/passkeys", "POST", {
+      acao: "verificar",
+      challenge_id: challengeId,
+      response
+    });
+  },
+  removePasskey(id) {
+    return jsonRequest("/api/admin/passkeys", "DELETE", { id });
+  },
   orders() {
     return request("/api/admin/orders");
   },
