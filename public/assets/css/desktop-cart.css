@@ -48,6 +48,8 @@
   .rp-cart-sheet__items {
     min-height: 0;
     flex: 1 1 auto;
+    align-content: start;
+    grid-auto-rows: max-content;
     overflow-y: auto;
     overscroll-behavior: contain;
     margin: 0 -10px 0 0;
