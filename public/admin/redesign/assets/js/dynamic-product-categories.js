@@ -32,6 +32,7 @@ async function populateCategorySelect(select, force = false) {
 
   const replacement = select.cloneNode(false);
   replacement.removeAttribute("data-custom-category");
+  replacement.classList.remove("category-select__native");
   replacement.dataset.dynamicCategories = "true";
 
   categories.forEach(category => {
@@ -45,7 +46,9 @@ async function populateCategorySelect(select, force = false) {
     ? currentValue
     : categories[0].id;
 
-  select.closest(".category-select")?.remove();
+  if (select.nextElementSibling?.classList.contains("category-select")) {
+    select.nextElementSibling.remove();
+  }
   select.replaceWith(replacement);
   replacement.dispatchEvent(new Event("change", { bubbles: true }));
 }
