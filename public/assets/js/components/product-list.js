@@ -93,12 +93,10 @@ export function renderProductList(
   const resolvedCategory = validCategories.has(activeCategory) ? activeCategory : "ALL";
 
   if (status === "loading") {
-    const markup = shell(
-      `<div class="rp-menu__skeleton" aria-label="Carregando cardápio"><span></span><span></span><span></span></div>`,
-      all,
-      resolvedCategory
-    );
-    return rememberRender(products, status, resolvedCategory, [], cart, markup);
+    // Evita a antiga atualização dupla do cardápio: durante refresh mantém o
+    // último markup estável; no bootstrap inicial aguarda os dados reais antes
+    // de montar a região de produtos.
+    return stableMarkup || "";
   }
   if (status === "error") {
     const markup = shell(
