@@ -1,4 +1,3 @@
-const CATEGORIAS = new Set(["BOLO_NO_POTE", "MINI_PUDIM"]);
 const CAMPOS_PERMITIDOS = new Set([
   "nome",
   "categoria",
@@ -14,6 +13,8 @@ const CAMPOS_PERMITIDOS = new Set([
   "promocao_inicio",
   "promocao_fim"
 ]);
+
+const CATEGORIA_ID = /^[A-Z0-9][A-Z0-9_]{1,47}$/;
 
 function isPlainObject(value) {
   return (
@@ -41,7 +42,7 @@ export function validarProduto(payload) {
   if (payload.emoji !== undefined && typeof payload.emoji !== "string") return { ok: false };
 
   const nome = payload.nome.trim();
-  const categoria = payload.categoria;
+  const categoria = payload.categoria.trim().toUpperCase();
   const descricao = (payload.descricao ?? "").trim();
   const emoji = (payload.emoji ?? "").trim();
   const preco = payload.preco_centavos;
@@ -52,7 +53,7 @@ export function validarProduto(payload) {
   const promocaoFim = payload.promocao_fim || null;
 
   if (nome.length < 1 || nome.length > 100) return { ok: false };
-  if (!CATEGORIAS.has(categoria)) return { ok: false };
+  if (!CATEGORIA_ID.test(categoria)) return { ok: false };
   if (descricao.length > 500) return { ok: false };
   if ([...emoji].length > 16) return { ok: false };
   if (typeof preco !== "number" || !Number.isSafeInteger(preco) || preco < 1 || preco > 10_000_000)
