@@ -1,0 +1,156 @@
+/* Densidade de fila operacional inspirada no mockup aprovado. */
+
+.orders-list {
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.orders-card {
+  padding: 10px 11px 9px;
+  border-radius: 14px;
+}
+
+.orders-card__top {
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.orders-card__number {
+  font-size: 0.6rem;
+  line-height: 1.1;
+}
+
+.orders-card h3 {
+  margin: 2px 0 1px;
+  font-size: 0.9rem;
+  line-height: 1.08;
+}
+
+.orders-card p {
+  margin: 0;
+  font-size: 0.64rem;
+  line-height: 1.15;
+}
+
+.orders-card__total {
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+/* No card, mostramos um único estado principal. Os detalhes continuam no modal. */
+.orders-card__badges {
+  margin: 6px 0 7px;
+}
+
+.orders-card__badges .orders-status {
+  display: none;
+}
+
+.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-new,
+.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-preparing,
+.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-ready,
+.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-delivered,
+.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-cancelled {
+  display: inline-flex;
+}
+
+.orders-card.is-payment-pending .orders-card__badges .orders-status.is-pending {
+  display: inline-flex;
+}
+
+.orders-card:has(.orders-status.is-refunded) .orders-card__badges .orders-status.is-refunded,
+.orders-card:has(.orders-status.is-failed) .orders-card__badges .orders-status.is-failed {
+  display: inline-flex;
+}
+
+.orders-status {
+  min-height: 19px;
+  padding: 0 7px;
+  font-size: 0.57rem;
+}
+
+.orders-card__meta {
+  display: block;
+  padding: 6px 0 7px;
+  border-top: 1px solid rgba(150, 105, 90, 0.18);
+}
+
+.orders-card__meta span {
+  display: block;
+  margin: 0;
+  font-size: 0.6rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orders-card__meta strong {
+  display: inline;
+  margin: 0 4px 0 0;
+  font-size: 0.58rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.orders-card__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.orders-details-button,
+.orders-status-trigger {
+  min-height: 30px;
+  border-radius: 9px;
+  font-size: 0.68rem;
+}
+
+.orders-details-button {
+  grid-column: 2;
+  grid-row: 1;
+  padding-inline: 10px;
+  white-space: nowrap;
+}
+
+.orders-status-menu {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  width: 100%;
+  flex: none;
+}
+
+.orders-status-trigger {
+  padding-inline: 9px;
+}
+
+.orders-status-options {
+  left: 0;
+  right: auto;
+  width: max(100%, 142px);
+}
+
+@media (max-width: 1180px) {
+  .orders-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .orders-list {
+    grid-template-columns: 1fr;
+  }
+
+  .orders-card__actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+    flex-direction: initial;
+  }
+
+  .orders-status-menu {
+    width: 100%;
+  }
+}
