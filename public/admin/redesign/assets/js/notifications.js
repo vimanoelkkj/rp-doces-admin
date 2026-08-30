@@ -8,7 +8,9 @@ function urlBase64ToUint8Array(value) {
 }
 
 function supported() {
-  return Boolean("serviceWorker" in navigator && "PushManager" in window && "Notification" in window);
+  return Boolean(
+    "serviceWorker" in navigator && "PushManager" in window && "Notification" in window
+  );
 }
 
 export function setupNotificationMenu(button, { onUnauthorized } = {}) {
@@ -56,30 +58,35 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
     action.classList.toggle("is-danger", active);
 
     if (!supported()) {
-      state.innerHTML = "<strong>Indisponível neste navegador</strong><span>Este navegador não oferece Web Push.</span>";
+      state.innerHTML =
+        "<strong>Indisponível neste navegador</strong><span>Este navegador não oferece Web Push.</span>";
       action.disabled = true;
       action.textContent = "Indisponível";
       return;
     }
     if (config && !config.supported) {
-      state.innerHTML = "<strong>Push não configurado</strong><span>As chaves VAPID ainda não estão disponíveis no servidor.</span>";
+      state.innerHTML =
+        "<strong>Push não configurado</strong><span>As chaves VAPID ainda não estão disponíveis no servidor.</span>";
       action.disabled = true;
       action.textContent = "Indisponível";
       return;
     }
     if (permission === "denied") {
-      state.innerHTML = "<strong>Bloqueadas pelo navegador</strong><span>Libere as notificações nas permissões deste site.</span>";
+      state.innerHTML =
+        "<strong>Bloqueadas pelo navegador</strong><span>Libere as notificações nas permissões deste site.</span>";
       action.disabled = true;
       action.textContent = "Bloqueadas";
       return;
     }
     if (active) {
-      state.innerHTML = "<strong>Ativas neste navegador</strong><span>Você receberá avisos de novos pedidos pagos.</span>";
+      state.innerHTML =
+        "<strong>Ativas neste navegador</strong><span>Você receberá avisos de novos pedidos pagos.</span>";
       action.disabled = false;
       action.textContent = "Desativar notificações";
       return;
     }
-    state.innerHTML = "<strong>Desativadas neste navegador</strong><span>Ative para receber avisos mesmo com o painel fechado.</span>";
+    state.innerHTML =
+      "<strong>Desativadas neste navegador</strong><span>Ative para receber avisos mesmo com o painel fechado.</span>";
     action.disabled = false;
     action.textContent = "Ativar notificações";
   };
@@ -139,7 +146,8 @@ export function setupNotificationMenu(button, { onUnauthorized } = {}) {
         setMessage("Notificações desativadas neste navegador.");
       } else {
         config ||= await adminApi.pushConfig();
-        if (!config?.supported || !config?.publicKey) throw new Error("Web Push não está configurado.");
+        if (!config?.supported || !config?.publicKey)
+          throw new Error("Web Push não está configurado.");
         const permission = await Notification.requestPermission();
         if (permission !== "granted") throw new Error("Permissão de notificações não concedida.");
         const registration = await navigator.serviceWorker.register("/sw.js");

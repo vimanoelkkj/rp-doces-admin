@@ -10,7 +10,12 @@ const esc = value =>
 
 function initials(name = "") {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
-  return (parts.slice(0, 2).map(part => part[0]).join("") || "RP").toUpperCase();
+  return (
+    parts
+      .slice(0, 2)
+      .map(part => part[0])
+      .join("") || "RP"
+  ).toUpperCase();
 }
 
 function dateLabel(value) {
@@ -145,7 +150,8 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
     return;
   }
 
-  const viewer = currentUser || users.find(user => Number(user.id) === Number(currentUser?.id)) || null;
+  const viewer =
+    currentUser || users.find(user => Number(user.id) === Number(currentUser?.id)) || null;
   const isOwner = viewer?.papel === "OWNER";
   const active = users.filter(user => Number(user.ativo) === 1).length;
   const owners = users.filter(user => user.papel === "OWNER" && Number(user.ativo) === 1).length;
@@ -173,16 +179,18 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
   const createForm = root.querySelector("[data-admin-create-form]");
   const createError = root.querySelector("[data-admin-create-error]");
 
-  root.querySelector("[data-admin-create]")?.addEventListener("click", () => createDialog?.showModal());
-  root.querySelectorAll("[data-admin-dialog-close]").forEach(button =>
-    button.addEventListener("click", () => createDialog?.close())
-  );
+  root
+    .querySelector("[data-admin-create]")
+    ?.addEventListener("click", () => createDialog?.showModal());
+  root
+    .querySelectorAll("[data-admin-dialog-close]")
+    .forEach(button => button.addEventListener("click", () => createDialog?.close()));
 
   root.querySelectorAll("[data-admin-password]").forEach(button => {
     button.addEventListener("click", () => {
       const id = button.dataset.adminPassword;
       const open = button.getAttribute("aria-expanded") !== "true";
-      root.querySelectorAll("[data-admin-password][aria-expanded=\"true\"]").forEach(other => {
+      root.querySelectorAll('[data-admin-password][aria-expanded="true"]').forEach(other => {
         if (other !== button) setPasswordPanel(root, other.dataset.adminPassword, false);
       });
       setPasswordPanel(root, id, open);
@@ -190,7 +198,9 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
   });
 
   root.querySelectorAll("[data-admin-password-cancel]").forEach(button => {
-    button.addEventListener("click", () => setPasswordPanel(root, button.dataset.adminPasswordCancel, false));
+    button.addEventListener("click", () =>
+      setPasswordPanel(root, button.dataset.adminPasswordCancel, false)
+    );
   });
 
   root.querySelectorAll("[data-admin-password-form]").forEach(form => {
@@ -233,7 +243,9 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
     submit.disabled = true;
     try {
       const data = Object.fromEntries(new FormData(createForm).entries());
-      data.username = String(data.username || "").trim().toLowerCase();
+      data.username = String(data.username || "")
+        .trim()
+        .toLowerCase();
       await adminApi.createUser(data);
       createDialog?.close();
       await renderAdmins(root, { onUnauthorized, currentUser: viewer });
@@ -251,7 +263,8 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
     button.addEventListener("click", async () => {
       const id = button.dataset.adminToggle;
       const currentlyActive = button.dataset.adminActive === "true";
-      if (!confirm(`${currentlyActive ? "Desativar" : "Reativar"} esta conta administrativa?`)) return;
+      if (!confirm(`${currentlyActive ? "Desativar" : "Reativar"} esta conta administrativa?`))
+        return;
       button.disabled = true;
       try {
         await adminApi.toggleUser(id, !currentlyActive);
@@ -269,7 +282,12 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
       const id = button.dataset.adminRole;
       const nextRole = button.dataset.adminNextRole;
       const label = nextRole === "OWNER" ? "Mestre" : "Administrador";
-      if (!confirm(`Alterar o nível desta conta para ${label}? As sessões atuais dela serão encerradas.`)) return;
+      if (
+        !confirm(
+          `Alterar o nível desta conta para ${label}? As sessões atuais dela serão encerradas.`
+        )
+      )
+        return;
       button.disabled = true;
       try {
         await adminApi.changeUserRole(id, nextRole);

@@ -35,7 +35,9 @@ function money(cents) {
 
 function dateTime(value) {
   if (!value) return "—";
-  const parsed = new Date(String(value).replace(" ", "T") + (String(value).includes("T") ? "" : "Z"));
+  const parsed = new Date(
+    String(value).replace(" ", "T") + (String(value).includes("T") ? "" : "Z")
+  );
   if (Number.isNaN(parsed.getTime())) return value;
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
@@ -242,7 +244,8 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
 
   function visibleOrders() {
     return orders.filter(order => {
-      const haystack = `${order.id} ${order.cliente_nome || ""} ${order.cliente_email || ""} ${order.cliente_whatsapp || ""} ${itemSummary(order)}`.toLowerCase();
+      const haystack =
+        `${order.id} ${order.cliente_nome || ""} ${order.cliente_email || ""} ${order.cliente_whatsapp || ""} ${itemSummary(order)}`.toLowerCase();
       if (query && !haystack.includes(query)) return false;
       if (filter === "pendentes") return order.status_pagamento === "PENDENTE";
       if (filter === "em-andamento") {
@@ -304,7 +307,9 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
       const order = orders.find(item => Number(item.id) === id);
       if (!order) return;
 
-      card.querySelector("[data-order-details]")?.addEventListener("click", () => openDetails(order));
+      card
+        .querySelector("[data-order-details]")
+        ?.addEventListener("click", () => openDetails(order));
 
       const menu = card.querySelector("[data-order-status-menu]");
       const trigger = card.querySelector("[data-order-status-trigger]");

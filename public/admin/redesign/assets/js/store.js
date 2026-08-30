@@ -70,8 +70,7 @@ function parseLegacySchedule(text = "") {
     ).map(([key]) => key);
 
   const times = [...String(text).matchAll(/(\d{1,2})h(?:(\d{2}))?/g)];
-  const normalize = match =>
-    `${String(match?.[1] || "10").padStart(2, "0")}:${match?.[2] || "00"}`;
+  const normalize = match => `${String(match?.[1] || "10").padStart(2, "0")}:${match?.[2] || "00"}`;
   return { days, open: normalize(times[0]), close: times[1] ? normalize(times[1]) : "19:00" };
 }
 
@@ -93,7 +92,8 @@ function updateSchedulePreview(root) {
 }
 
 function updatePublicPreview(root, selectedDelivery) {
-  const local = root.querySelector('[name="local_retirada"]')?.value.trim() || "Local não informado";
+  const local =
+    root.querySelector('[name="local_retirada"]')?.value.trim() || "Local não informado";
   const address = root.querySelector('[name="endereco"]')?.value.trim() || "Endereço não informado";
   const phone = root.querySelector('[name="whatsapp"]')?.value.trim() || "WhatsApp não informado";
 
@@ -131,9 +131,7 @@ export async function renderStore(root, { onUnauthorized } = {}) {
     return;
   }
 
-  const legacy = parseLegacySchedule(
-    config.horario_atendimento || "Seg a sáb, 10h às 19h"
-  );
+  const legacy = parseLegacySchedule(config.horario_atendimento || "Seg a sáb, 10h às 19h");
   const days = String(config.horario_dias || "")
     .split(",")
     .filter(Boolean);
@@ -232,7 +230,9 @@ export async function renderStore(root, { onUnauthorized } = {}) {
 
   root
     .querySelectorAll('[name="local_retirada"],[name="endereco"]')
-    .forEach(input => input.addEventListener("input", () => updatePublicPreview(root, selectedDelivery)));
+    .forEach(input =>
+      input.addEventListener("input", () => updatePublicPreview(root, selectedDelivery))
+    );
 
   deliveryGroup?.querySelectorAll("[data-store-delivery]").forEach(button => {
     button.addEventListener("click", () => {

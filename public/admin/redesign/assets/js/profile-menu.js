@@ -59,9 +59,7 @@ function esc(value) {
 
 function formatDate(value) {
   if (!value) return "Ainda não usada";
-  const date = new Date(
-    String(value).replace(" ", "T") + (String(value).includes("Z") ? "" : "Z")
-  );
+  const date = new Date(String(value).replace(" ", "T") + (String(value).includes("Z") ? "" : "Z"));
   if (Number.isNaN(date.getTime())) return String(value);
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
