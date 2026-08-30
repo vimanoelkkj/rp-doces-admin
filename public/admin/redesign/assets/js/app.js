@@ -7,15 +7,16 @@ import { renderStore } from "./store.js";
 import { setupProfileMenu } from "./profile-menu.js";
 import { setupSidebarBadges } from "./sidebar-badges.js";
 import { setupNotificationMenu } from "./notifications.js";
+import "./product-images.js";
 
 function ensureHeadLink(rel, href, extras = {}) {
-  let link = document.head.querySelector(`link[rel="${rel}"]`);
+  let link = document.head.querySelector(`link[rel="${rel}"][href="${href}"]`);
   if (!link) {
     link = document.createElement("link");
     link.rel = rel;
+    link.href = href;
     document.head.appendChild(link);
   }
-  link.href = href;
   Object.assign(link, extras);
 }
 
@@ -34,6 +35,7 @@ function setupPwaShell() {
   ensureHeadLink("icon", "/admin-favicon.png");
   ensureHeadLink("apple-touch-icon", "/admin-apple-touch-icon.png");
   ensureHeadLink("stylesheet", "/admin/redesign/assets/css/pwa-shell.css");
+  ensureHeadLink("stylesheet", "/admin/redesign/assets/css/product-images.css");
   ensureMeta("theme-color", "#fff8f2");
   ensureMeta("apple-mobile-web-app-capable", "yes");
   ensureMeta("apple-mobile-web-app-status-bar-style", "default");
