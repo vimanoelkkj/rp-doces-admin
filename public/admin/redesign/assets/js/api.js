@@ -31,6 +31,16 @@ export const adminApi = {
   products() {
     return request("/api/admin/products");
   },
+  categories() {
+    return request("/api/admin/categories");
+  },
+  createCategory(category) {
+    return request("/api/admin/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(category)
+    });
+  },
   createProduct(product) {
     return request("/api/admin/products", {
       method: "POST",
@@ -46,8 +56,13 @@ export const adminApi = {
     });
   },
   archiveProduct(id) {
+    return request(`/api/admin/products/${id}`, { method: "DELETE" });
+  },
+  reactivateProduct(id, product) {
     return request(`/api/admin/products/${id}`, {
-      method: "DELETE"
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(product)
     });
   }
 };
