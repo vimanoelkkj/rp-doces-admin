@@ -6,15 +6,36 @@
     <meta name="robots" content="noindex,nofollow" />
     <meta http-equiv="Cache-Control" content="no-store" />
     <title>R&P Doces Admin</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #fff8f2;
+      }
+    </style>
     <script>
-      const target = `/admin/redesign/${window.location.search}${window.location.hash}`;
-      window.location.replace(target);
+      (async () => {
+        try {
+          const response = await fetch("/admin/redesign/index.html", { cache: "no-store" });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          let html = await response.text();
+          html = html.replace(
+            "<head>",
+            '<head><base href="/admin/redesign/" />'
+          );
+
+          document.open();
+          document.write(html);
+          document.close();
+        } catch (error) {
+          console.error("Falha ao carregar o painel redesenhado.", error);
+          document.body.innerHTML =
+            '<p style="font-family:system-ui;padding:24px">Não foi possível carregar o painel administrativo. <a href="/admin/redesign/">Tentar abrir diretamente</a>.</p>';
+        }
+      })();
     </script>
   </head>
-  <body>
-    <p>Redirecionando para o novo painel administrativo…</p>
-    <noscript>
-      <p><a href="/admin/redesign/">Abrir novo painel administrativo</a></p>
-    </noscript>
-  </body>
+  <body></body>
 </html>
