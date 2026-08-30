@@ -37,5 +37,12 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(product)
     });
+  },
+  updateProduct(id, product) {
+    return request(`/api/admin/products/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(product)
+    });
   }
 };
