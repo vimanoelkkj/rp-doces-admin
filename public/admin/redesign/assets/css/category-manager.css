@@ -1,0 +1,230 @@
+body.category-manager-open {
+  overflow: hidden;
+}
+
+.category-manager {
+  position: fixed;
+  z-index: 340;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.category-manager__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(42 24 19 / 45%);
+  backdrop-filter: blur(5px);
+}
+
+.category-manager__panel {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border: 1px solid var(--rp-line);
+  border-radius: 22px;
+  padding: 22px;
+  background: var(--rp-surface);
+  box-shadow: 0 28px 70px rgb(68 40 32 / 22%);
+}
+
+.category-manager__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rp-line);
+}
+
+.category-manager__head > div > span {
+  color: var(--rp-pink-strong);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.category-manager__head h2 {
+  margin: 4px 0 0;
+  color: var(--rp-ink);
+  font-family: var(--rp-display);
+  font-size: 25px;
+  line-height: 1.05;
+}
+
+.category-manager__head p {
+  margin: 6px 0 0;
+  color: var(--rp-ink-3);
+  font-size: 12px;
+}
+
+.category-manager__close {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  background: var(--rp-surface);
+  color: var(--rp-ink-2);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.category-manager__notice {
+  display: grid;
+  gap: 3px;
+  margin-top: 16px;
+  border: 1px solid color-mix(in oklch, var(--rp-warning) 28%, var(--rp-line));
+  border-radius: 14px;
+  padding: 12px 13px;
+  background: #fff9ee;
+}
+
+.category-manager__notice strong {
+  color: var(--rp-ink);
+  font-size: 12px;
+}
+
+.category-manager__notice span {
+  color: var(--rp-ink-3);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.category-manager__list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.category-manager__card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  border: 1px solid var(--rp-line);
+  border-radius: 15px;
+  padding: 13px;
+  background: #fffdfb;
+}
+
+.category-manager__icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--rp-pink-soft);
+  font-size: 25px;
+}
+
+.category-manager__copy {
+  min-width: 0;
+}
+
+.category-manager__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.category-manager__title-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.category-manager__title-row strong {
+  color: var(--rp-ink);
+  font-size: 13px;
+}
+
+.category-manager__title-row code {
+  color: var(--rp-ink-3);
+  font-size: 9.5px;
+}
+
+.category-manager__system-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: var(--rp-pink-wash);
+  color: var(--rp-pink-strong);
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.category-manager__card p {
+  margin: 8px 0 0;
+  color: var(--rp-ink-3);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.category-manager__stats {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.category-manager__stats span {
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: color-mix(in oklch, var(--rp-surface) 90%, var(--rp-pink-wash));
+  color: var(--rp-ink-3);
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.category-manager__stats strong {
+  color: var(--rp-ink);
+}
+
+.category-manager__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rp-line);
+}
+
+.category-manager__footer > span {
+  color: var(--rp-ink-3);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .category-manager {
+    align-items: end;
+    padding: 0;
+  }
+
+  .category-manager__panel {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 22px 22px 0 0;
+    padding: 18px;
+  }
+
+  .category-manager__card {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .category-manager__icon {
+    width: 42px;
+    height: 42px;
+    font-size: 22px;
+  }
+
+  .category-manager__title-row {
+    align-items: center;
+  }
+}
