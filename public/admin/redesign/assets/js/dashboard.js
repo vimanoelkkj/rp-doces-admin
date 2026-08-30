@@ -22,9 +22,9 @@ function parseDate(value) {
 function sameLocalDay(date, reference = new Date()) {
   return Boolean(
     date &&
-      date.getFullYear() === reference.getFullYear() &&
-      date.getMonth() === reference.getMonth() &&
-      date.getDate() === reference.getDate()
+    date.getFullYear() === reference.getFullYear() &&
+    date.getMonth() === reference.getMonth() &&
+    date.getDate() === reference.getDate()
   );
 }
 
@@ -37,9 +37,7 @@ function money(cents = 0) {
 
 function time(value) {
   const date = parseDate(value);
-  return date
-    ? date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-    : "—";
+  return date ? date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
 }
 
 function paymentTone(status) {
@@ -68,7 +66,7 @@ function humanOrderStatus(status) {
     PREPARANDO: "Em preparo",
     PRONTO: "Pronto",
     CONCLUIDO: "Concluído",
-    "CONCLUÍDO": "Concluído",
+    CONCLUÍDO: "Concluído",
     CANCELADO: "Cancelado",
     ARQUIVADO: "Arquivado"
   };
@@ -140,27 +138,48 @@ function dashboardMarkup({ orders, products }) {
   const now = new Date();
   const today = orders.filter(order => sameLocalDay(parseDate(order.criado_em), now));
   const paidToday = orders.filter(
-    order => String(order.status_pagamento).toUpperCase() === "PAGO" && sameLocalDay(parseDate(order.pago_em || order.atualizado_em), now)
+    order =>
+      String(order.status_pagamento).toUpperCase() === "PAGO" &&
+      sameLocalDay(parseDate(order.pago_em || order.atualizado_em), now)
   );
-  const pendingPayment = orders.filter(order => String(order.status_pagamento).toUpperCase() === "PENDENTE");
+  const pendingPayment = orders.filter(
+    order => String(order.status_pagamento).toUpperCase() === "PENDENTE"
+  );
   const waitingPreparation = orders.filter(order => {
     const operational = String(order.status_pedido || "NOVO").toUpperCase();
     const payment = String(order.status_pagamento || "").toUpperCase();
     return operational === "NOVO" && payment === "PAGO";
   });
-  const soldOut = products.filter(product => Number(product.estoque || 0) - Number(product.estoque_reservado || 0) <= 0);
+  const soldOut = products.filter(
+    product => Number(product.estoque || 0) - Number(product.estoque_reservado || 0) <= 0
+  );
   const lowStock = products.filter(product => {
     const available = Number(product.estoque || 0) - Number(product.estoque_reservado || 0);
     return available > 0 && available <= 2 && Number(product.ativo) !== 0;
   });
-  const paidRevenue = paidToday.reduce((total, order) => total + Number(order.valor_total_centavos || 0), 0);
+  const paidRevenue = paidToday.reduce(
+    (total, order) => total + Number(order.valor_total_centavos || 0),
+    0
+  );
   const recent = orders.slice(0, 6);
 
   const attention = [];
-  if (pendingPayment.length) attention.push(`${pendingPayment.length} pedido${pendingPayment.length === 1 ? "" : "s"} aguardando pagamento`);
-  if (waitingPreparation.length) attention.push(`${waitingPreparation.length} pedido${waitingPreparation.length === 1 ? "" : "s"} aguardando preparação`);
-  if (soldOut.length) attention.push(`${soldOut.length} produto${soldOut.length === 1 ? "" : "s"} sem estoque disponível`);
-  if (lowStock.length) attention.push(`${lowStock.length} produto${lowStock.length === 1 ? "" : "s"} com estoque baixo`);
+  if (pendingPayment.length)
+    attention.push(
+      `${pendingPayment.length} pedido${pendingPayment.length === 1 ? "" : "s"} aguardando pagamento`
+    );
+  if (waitingPreparation.length)
+    attention.push(
+      `${waitingPreparation.length} pedido${waitingPreparation.length === 1 ? "" : "s"} aguardando preparação`
+    );
+  if (soldOut.length)
+    attention.push(
+      `${soldOut.length} produto${soldOut.length === 1 ? "" : "s"} sem estoque disponível`
+    );
+  if (lowStock.length)
+    attention.push(
+      `${lowStock.length} produto${lowStock.length === 1 ? "" : "s"} com estoque baixo`
+    );
 
   return `
     <section class="dashboard" aria-label="Resumo da operação">
@@ -180,9 +199,11 @@ function dashboardMarkup({ orders, products }) {
 
         <aside class="admin-panel dashboard-section dashboard-attention">
           <header class="dashboard-section__head"><div><strong>Precisa de atenção</strong><span>Pontos que podem exigir uma ação</span></div></header>
-          ${attention.length
-            ? `<ul>${attention.map(item => `<li><span class="dashboard-attention__dot"></span>${escapeHtml(item)}</li>`).join("")}</ul>`
-            : `<div class="dashboard-attention__ok"><span>✓</span><div><strong>Tudo tranquilo por aqui</strong><small>Nenhuma pendência operacional detectada.</small></div></div>`}
+          ${
+            attention.length
+              ? `<ul>${attention.map(item => `<li><span class="dashboard-attention__dot"></span>${escapeHtml(item)}</li>`).join("")}</ul>`
+              : `<div class="dashboard-attention__ok"><span>✓</span><div><strong>Tudo tranquilo por aqui</strong><small>Nenhuma pendência operacional detectada.</small></div></div>`
+          }
         </aside>
       </div>
     </section>`;
@@ -210,13 +231,18 @@ export async function renderDashboard(container, { onUnauthorized, onNavigate } 
   container.innerHTML = loadingMarkup();
 
   try {
-    const [ordersPayload, productsPayload] = await Promise.all([adminApi.orders(), adminApi.products()]);
+    const [ordersPayload, productsPayload] = await Promise.all([
+      adminApi.orders(),
+      adminApi.products()
+    ]);
     container.innerHTML = dashboardMarkup({
       orders: ordersPayload?.pedidos || [],
       products: productsPayload?.produtos || []
     });
 
-    container.querySelector('[data-go-page="pedidos"]')?.addEventListener("click", () => onNavigate?.("pedidos"));
+    container
+      .querySelector('[data-go-page="pedidos"]')
+      ?.addEventListener("click", () => onNavigate?.("pedidos"));
   } catch (error) {
     if (error?.status === 401) {
       onUnauthorized?.();

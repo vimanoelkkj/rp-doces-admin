@@ -1,9 +1,9 @@
 (() => {
-  if (!document.querySelector('link[data-rp-auth-redesign]')) {
-    const authStyles = document.createElement('link');
-    authStyles.rel = 'stylesheet';
-    authStyles.href = '/admin/assets/css/auth-redesign.css';
-    authStyles.dataset.rpAuthRedesign = '1';
+  if (!document.querySelector("link[data-rp-auth-redesign]")) {
+    const authStyles = document.createElement("link");
+    authStyles.rel = "stylesheet";
+    authStyles.href = "/admin/assets/css/auth-redesign.css";
+    authStyles.dataset.rpAuthRedesign = "1";
     document.head.appendChild(authStyles);
   }
 

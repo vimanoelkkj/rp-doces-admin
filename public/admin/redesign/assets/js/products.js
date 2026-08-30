@@ -229,7 +229,8 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
     ).length;
     if (summary)
       summary.textContent = `${products.length} produtos · ${activeCount} ativos · ${soldOutCount} esgotados`;
-    if (grid) grid.innerHTML = visible.length ? visible.map(productCard).join("") : emptyState(filter);
+    if (grid)
+      grid.innerHTML = visible.length ? visible.map(productCard).join("") : emptyState(filter);
   }
 
   async function refreshProducts() {

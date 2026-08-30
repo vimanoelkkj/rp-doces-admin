@@ -38,7 +38,7 @@
 
 .dashboard-metric__label {
   color: var(--rp-ink-2);
-  letter-spacing: .015em;
+  letter-spacing: 0.015em;
   text-transform: none;
 }
 
@@ -64,7 +64,10 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .dashboard-metric {
-    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      transform 150ms ease;
   }
 
   .dashboard-metric:hover {
@@ -73,5 +76,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dashboard-metric { transition: none; }
+  .dashboard-metric {
+    transition: none;
+  }
 }
