@@ -1,0 +1,21 @@
+@media (display-mode: standalone) {
+  html,
+  body {
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
+  }
+
+  .admin-topbar {
+    padding-top: max(var(--admin-topbar-padding-y, 0px), env(safe-area-inset-top));
+  }
+}
+
+@media (display-mode: standalone) and (max-width: 860px) {
+  .admin-main {
+    padding-bottom: calc(74px + env(safe-area-inset-bottom));
+  }
+
+  .admin-sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
