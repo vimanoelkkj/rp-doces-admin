@@ -5,33 +5,29 @@
 }
 
 .orders-details-button {
-  padding-inline: 14px;
+  padding-inline: 10px;
 }
 
 .orders-status-menu {
   position: relative;
-  flex: 0 0 176px;
-}
-
-.orders-status-trigger,
-.orders-status-final {
-  width: 100%;
-  min-height: 42px;
-  border: 1px solid #e8cfc6;
-  border-radius: 13px;
-  background: #fff;
-  color: #654238;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 800;
+  flex: 0 0 142px;
 }
 
 .orders-status-trigger {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid #e8cfc6;
+  border-radius: 10px;
+  background: #fff;
+  color: #654238;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 0 12px;
+  gap: 8px;
+  padding: 0 9px;
   cursor: pointer;
 }
 
@@ -53,8 +49,8 @@
 }
 
 .orders-status-trigger svg {
-  width: 17px;
-  height: 17px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -68,13 +64,13 @@
 .orders-status-options {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 7px);
+  bottom: calc(100% + 6px);
   z-index: 20;
   width: 100%;
-  min-width: 176px;
-  padding: 6px;
+  min-width: 142px;
+  padding: 5px;
   border: 1px solid #e8cfc6;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #fffaf8;
   box-shadow: 0 18px 46px rgba(68, 39, 31, 0.14);
 }
@@ -85,18 +81,18 @@
 
 .orders-status-options button {
   width: 100%;
-  min-height: 37px;
+  min-height: 33px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   border: 0;
-  border-radius: 10px;
-  padding: 0 10px;
+  border-radius: 9px;
+  padding: 0 9px;
   background: transparent;
   color: #654238;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 800;
   text-align: left;
   cursor: pointer;
@@ -112,128 +108,103 @@
   color: #e65372;
 }
 
-.orders-status-final {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 176px;
-  padding: 0 14px;
-}
-
-.orders-status-final.is-delivered {
-  border-color: #cce7d4;
-  background: #edf8f0;
-  color: #2f7f4f;
-}
-
-.orders-status-final.is-cancelled {
-  border-color: #f1ccd4;
-  background: #fff0f3;
-  color: #c9435d;
-}
-
-.orders-status-final.is-locked {
-  border-color: #eadfd8;
-  background: #f7f2ef;
-  color: #a18b82;
-}
-
 /* O card inteiro acompanha o estado do pedido. */
 .orders-card:has(.orders-status.is-paid):has(.orders-status.is-new) {
   border-color: #edcbd3;
   background: linear-gradient(180deg, rgba(255, 247, 249, 0.94), rgba(255, 255, 255, 0.8));
-  box-shadow: 0 12px 34px rgba(185, 79, 105, 0.055);
+  box-shadow: 0 10px 26px rgba(185, 79, 105, 0.05);
 }
 
 .orders-card:has(.orders-status.is-preparing) {
   border-color: #bfd4ef;
   background: linear-gradient(180deg, rgba(245, 249, 255, 0.96), rgba(255, 255, 255, 0.8));
-  box-shadow: 0 12px 34px rgba(61, 104, 165, 0.065);
+  box-shadow: 0 10px 26px rgba(61, 104, 165, 0.06);
 }
 
 .orders-card:has(.orders-status.is-ready) {
   border-color: #e9c77f;
   background: linear-gradient(180deg, rgba(255, 250, 238, 0.96), rgba(255, 255, 255, 0.8));
-  box-shadow: 0 12px 34px rgba(166, 110, 20, 0.065);
+  box-shadow: 0 10px 26px rgba(166, 110, 20, 0.06);
 }
 
 .orders-card:has(.orders-status.is-delivered) {
   border-color: #bcdcc7;
   background: linear-gradient(180deg, rgba(244, 252, 247, 0.96), rgba(255, 255, 255, 0.8));
-  box-shadow: 0 12px 34px rgba(46, 130, 80, 0.06);
+  box-shadow: 0 10px 26px rgba(46, 130, 80, 0.055);
 }
 
 .orders-card:has(.orders-status.is-refunded) {
   border-color: #d9c9ef;
   background: linear-gradient(180deg, rgba(250, 247, 255, 0.96), rgba(255, 255, 255, 0.8));
-  box-shadow: 0 12px 34px rgba(115, 83, 173, 0.06);
+  box-shadow: 0 10px 26px rgba(115, 83, 173, 0.055);
 }
 
 .orders-card:has(.orders-status.is-failed),
 .orders-card:has(.orders-status.is-cancelled) {
   border-color: #edc1cb;
   background: linear-gradient(180deg, rgba(255, 246, 248, 0.96), rgba(255, 255, 255, 0.8));
-  box-shadow: 0 12px 34px rgba(201, 67, 93, 0.06);
+  box-shadow: 0 10px 26px rgba(201, 67, 93, 0.055);
 }
 
-/* Pagamento pendente tem prioridade sobre o estado operacional "Novo". */
 .orders-card.is-payment-pending {
   border-color: #e8c477;
   background: linear-gradient(180deg, rgba(255, 252, 241, 0.96), rgba(255, 255, 255, 0.8));
-  box-shadow: 0 12px 34px rgba(169, 118, 30, 0.07);
+  box-shadow: 0 10px 26px rgba(169, 118, 30, 0.065);
 }
 
-/* Versão mais compacta dos cards, mantendo legibilidade e ações confortáveis. */
+/* Cards operacionais: mais informação visível por viewport. */
 .orders-list {
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
 }
 
 .orders-card {
-  padding: 14px 15px;
-  border-radius: 17px;
+  padding: 11px 12px;
+  border-radius: 15px;
 }
 
 .orders-card__top {
-  gap: 10px;
+  gap: 8px;
 }
 
 .orders-card__number {
-  font-size: 0.66rem;
+  font-size: 0.61rem;
 }
 
 .orders-card h3 {
-  margin: 2px 0 1px;
-  font-size: 0.98rem;
+  margin: 1px 0;
+  font-size: 0.92rem;
+  line-height: 1.15;
 }
 
 .orders-card p {
-  font-size: 0.72rem;
-  line-height: 1.3;
+  font-size: 0.66rem;
+  line-height: 1.2;
 }
 
 .orders-card__total {
-  font-size: 0.98rem;
+  font-size: 0.9rem;
 }
 
 .orders-card__badges {
-  gap: 5px;
-  margin: 10px 0;
+  gap: 4px;
+  margin: 7px 0;
 }
 
 .orders-status {
-  min-height: 23px;
-  padding: 0 8px;
-  font-size: 0.63rem;
+  min-height: 20px;
+  padding: 0 6px;
+  font-size: 0.58rem;
 }
 
 .orders-card__meta {
-  gap: 8px;
-  padding: 9px 0 10px;
+  gap: 6px;
+  padding: 7px 0;
 }
 
 .orders-card__meta span {
-  font-size: 0.67rem;
-  line-height: 1.3;
+  font-size: 0.61rem;
+  line-height: 1.2;
 }
 
 .orders-card__meta strong {
@@ -241,52 +212,40 @@
 }
 
 .orders-card__actions {
-  gap: 8px;
-}
-
-.orders-details-button,
-.orders-status-trigger,
-.orders-status-final {
-  min-height: 36px;
+  gap: 6px;
 }
 
 .orders-details-button {
-  padding-inline: 12px;
-  font-size: 0.76rem;
+  min-height: 32px;
+  padding-inline: 10px;
+  border-radius: 10px;
+  font-size: 0.7rem;
 }
 
-.orders-status-menu,
-.orders-status-final {
-  flex-basis: 160px;
+@media (max-width: 1320px) {
+  .orders-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-.orders-status-trigger,
-.orders-status-final {
-  border-radius: 11px;
-  font-size: 0.73rem;
-}
-
-.orders-status-trigger {
-  padding: 0 10px;
-}
-
-.orders-status-options {
-  min-width: 160px;
+@media (max-width: 860px) {
+  .orders-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 680px) {
-  .orders-status-menu,
-  .orders-status-final {
+  .orders-status-menu {
     width: 100%;
     flex-basis: auto;
   }
 
   .orders-status-options {
-    top: calc(100% + 7px);
+    top: calc(100% + 6px);
     bottom: auto;
   }
 
   .orders-card {
-    padding: 13px;
+    padding: 11px;
   }
 }
