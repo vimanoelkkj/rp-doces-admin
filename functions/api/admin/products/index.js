@@ -15,8 +15,8 @@ export async function onRequestGet({ request, env }) {
     `
     SELECT p.id, p.nome, p.categoria, p.descricao, p.preco_centavos, p.disponivel, p.ativo,
            p.destaque, p.ordem, p.emoji, p.estoque, p.estoque_reservado, p.promocao_ativa,
-           p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim, p.criado_em,
-           p.atualizado_em, c.nome AS categoria_nome, c.emoji AS categoria_emoji,
+           p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim, p.image_key,
+           p.criado_em, p.atualizado_em, c.nome AS categoria_nome, c.emoji AS categoria_emoji,
            c.ordem AS categoria_ordem
     FROM produtos p
     LEFT JOIN categorias c ON c.id = p.categoria
