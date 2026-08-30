@@ -38,7 +38,9 @@ function setupPwaShell() {
   ensureMeta("apple-mobile-web-app-capable", "yes");
   ensureMeta("apple-mobile-web-app-status-bar-style", "default");
   ensureMeta("apple-mobile-web-app-title", "R&P Admin");
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/admin/sw.js", { scope: "/admin/" }).catch(() => {});
+  }
 }
 
 setupPwaShell();
