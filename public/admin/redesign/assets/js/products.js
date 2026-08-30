@@ -321,7 +321,9 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
   });
 
   emojiOptions.forEach(button => {
-    button.addEventListener("click", () => selectEmoji(button.dataset.emojiOption || EMOJI_OPTIONS[0][0]));
+    button.addEventListener("click", () =>
+      selectEmoji(button.dataset.emojiOption || EMOJI_OPTIONS[0][0])
+    );
   });
 
   newProductButton?.addEventListener("click", openDialog);

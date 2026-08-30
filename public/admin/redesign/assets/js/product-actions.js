@@ -89,7 +89,8 @@ function setDialogMode(form, product = null) {
     delete form._editingProduct;
     if (title) title.textContent = "Novo produto";
     if (eyebrow) eyebrow.textContent = "Catálogo";
-    if (subtitle) subtitle.textContent = "Cadastre um doce e ele já entra no catálogo administrativo.";
+    if (subtitle)
+      subtitle.textContent = "Cadastre um doce e ele já entra no catálogo administrativo.";
     if (submit) submit.textContent = "Salvar produto";
   }
 }

@@ -35,31 +35,75 @@
         </div>
 
         <nav class="admin-nav">
-          <button class="admin-nav__item" type="button" data-admin-nav="dashboard" data-label="Dashboard">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg></span>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-admin-nav="dashboard"
+            data-label="Dashboard"
+          >
+            <span class="admin-nav__icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24">
+                <rect x="4" y="4" width="6" height="6" rx="1" />
+                <rect x="14" y="4" width="6" height="6" rx="1" />
+                <rect x="4" y="14" width="6" height="6" rx="1" />
+                <rect x="14" y="14" width="6" height="6" rx="1" /></svg
+            ></span>
             <span class="admin-nav__label">Dashboard</span>
           </button>
-          <button class="admin-nav__item" type="button" data-admin-nav="produtos" data-label="Produtos">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 7 4v10l-7 4-7-4V7l7-4Z" /><path d="m5 7 7 4 7-4M12 11v10" /></svg></span>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-admin-nav="produtos"
+            data-label="Produtos"
+          >
+            <span class="admin-nav__icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24">
+                <path d="m12 3 7 4v10l-7 4-7-4V7l7-4Z" />
+                <path d="m5 7 7 4 7-4M12 11v10" /></svg
+            ></span>
             <span class="admin-nav__label">Produtos</span><span class="admin-nav__badge">4</span>
           </button>
-          <button class="admin-nav__item" type="button" data-admin-nav="pedidos" data-label="Pedidos">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10l2 3v15H5V6l2-3Z" /><path d="M5 8h14M9 12h6M9 16h4" /></svg></span>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-admin-nav="pedidos"
+            data-label="Pedidos"
+          >
+            <span class="admin-nav__icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24">
+                <path d="M7 3h10l2 3v15H5V6l2-3Z" />
+                <path d="M5 8h14M9 12h6M9 16h4" /></svg
+            ></span>
             <span class="admin-nav__label">Pedidos</span><span class="admin-nav__badge">4</span>
           </button>
-          <button class="admin-nav__item" type="button" data-admin-nav="admins" data-label="Administradores">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.8-3.2 2.6-4.8 5.5-4.8s4.7 1.6 5.5 4.8M17 7h4M19 5v4" /></svg></span>
+          <button
+            class="admin-nav__item"
+            type="button"
+            data-admin-nav="admins"
+            data-label="Administradores"
+          >
+            <span class="admin-nav__icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24">
+                <circle cx="9" cy="8" r="3" />
+                <path d="M3.5 19c.8-3.2 2.6-4.8 5.5-4.8s4.7 1.6 5.5 4.8M17 7h4M19 5v4" /></svg
+            ></span>
             <span class="admin-nav__label">Administradores</span>
           </button>
           <button class="admin-nav__item" type="button" data-admin-nav="loja" data-label="Loja">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10h16v10H4zM3 10l2-6h14l2 6" /><path d="M8 14h4v6" /></svg></span>
+            <span class="admin-nav__icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24">
+                <path d="M4 10h16v10H4zM3 10l2-6h14l2 6" />
+                <path d="M8 14h4v6" /></svg
+            ></span>
             <span class="admin-nav__label">Loja</span>
           </button>
         </nav>
 
         <div class="admin-sidebar__footer">
           <button class="admin-collapse" type="button" data-collapse-sidebar aria-expanded="true">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14 7-5 5 5 5" /></svg></span>
+            <span class="admin-nav__icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24"><path d="m14 7-5 5 5 5" /></svg
+            ></span>
             <span>Recolher</span>
           </button>
         </div>
@@ -67,11 +111,35 @@
 
       <main class="admin-main">
         <header class="admin-topbar">
-          <div class="admin-page-title"><h1 data-page-title>Dashboard</h1><p data-page-subtitle>Visão geral da operação</p></div>
+          <div class="admin-page-title">
+            <h1 data-page-title>Dashboard</h1>
+            <p data-page-subtitle>Visão geral da operação</p>
+          </div>
           <div class="admin-topbar__actions">
-            <a class="admin-icon" href="/" target="_blank" rel="noopener noreferrer" aria-label="Abrir site público" title="Abrir site público"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8" /><path d="M19 13v6H5V5h6" /></svg></a>
-            <button class="admin-icon" type="button" aria-label="Notificações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v5L6 17Z" /><path d="M10 20h4" /></svg></button>
-            <button class="admin-profile" type="button" aria-label="Abrir menu da conta"><span class="admin-avatar" data-profile-avatar aria-hidden="true">RP</span><span class="admin-profile__copy"><strong data-profile-name>Administrador</strong><span data-profile-role>ADMIN</span></span><span aria-hidden="true">⌄</span></button>
+            <a
+              class="admin-icon"
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Abrir site público"
+              title="Abrir site público"
+              ><svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 5h5v5M19 5l-8 8" />
+                <path d="M19 13v6H5V5h6" /></svg
+            ></a>
+            <button class="admin-icon" type="button" aria-label="Notificações">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 17h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v5L6 17Z" />
+                <path d="M10 20h4" />
+              </svg>
+            </button>
+            <button class="admin-profile" type="button" aria-label="Abrir menu da conta">
+              <span class="admin-avatar" data-profile-avatar aria-hidden="true">RP</span
+              ><span class="admin-profile__copy"
+                ><strong data-profile-name>Administrador</strong
+                ><span data-profile-role>ADMIN</span></span
+              ><span aria-hidden="true">⌄</span>
+            </button>
           </div>
         </header>
         <div class="admin-content" data-admin-content></div>

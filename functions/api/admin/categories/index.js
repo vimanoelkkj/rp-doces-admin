@@ -18,7 +18,8 @@ export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
 
-  const { results } = await env.DB.prepare(`
+  const { results } = await env.DB.prepare(
+    `
     SELECT c.id, c.nome, c.emoji, c.descricao, c.ordem, c.ativo, c.sistema,
            COUNT(p.id) AS produtos,
            SUM(CASE WHEN p.ativo = 1 THEN 1 ELSE 0 END) AS ativos,
@@ -27,7 +28,8 @@ export async function onRequestGet({ request, env }) {
     LEFT JOIN produtos p ON p.categoria = c.id
     GROUP BY c.id
     ORDER BY c.ordem, c.nome
-  `).all();
+  `
+  ).all();
 
   return json({ categorias: results || [] });
 }
