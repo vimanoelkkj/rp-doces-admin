@@ -1,6 +1,9 @@
 function fromUrlB64(value) {
   const source = String(value || "");
-  const padded = source.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(source.length / 4) * 4, "=");
+  const padded = source
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(Math.ceil(source.length / 4) * 4, "=");
   const binary = atob(padded);
   return Uint8Array.from(binary, char => char.charCodeAt(0));
 }
@@ -89,7 +92,9 @@ passkeyButton?.addEventListener("click", async () => {
   setStatus("Aguardando a verificação do aparelho…");
   try {
     const begin = await api("/api/auth/passkey", { acao: "opcoes" });
-    const credential = await navigator.credentials.get({ publicKey: requestOptionsFromJSON(begin.options) });
+    const credential = await navigator.credentials.get({
+      publicKey: requestOptionsFromJSON(begin.options)
+    });
     if (!credential) throw new Error("A autenticação não foi concluída.");
     await api("/api/auth/passkey", {
       acao: "verificar",
@@ -100,7 +105,12 @@ passkeyButton?.addEventListener("click", async () => {
     goToAdmin();
   } catch (error) {
     const cancelled = error?.name === "NotAllowedError" || error?.name === "AbortError";
-    setStatus(cancelled ? "Autenticação cancelada." : error?.message || "Não foi possível usar a biometria.", true);
+    setStatus(
+      cancelled
+        ? "Autenticação cancelada."
+        : error?.message || "Não foi possível usar a biometria.",
+      true
+    );
   } finally {
     passkeyButton.disabled = false;
   }

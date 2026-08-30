@@ -33,10 +33,15 @@
         <button class="login-passkey" type="button" data-passkey-login>
           <span class="login-passkey__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
-              <path d="M12 3a5 5 0 0 0-5 5v2M17 10V8a5 5 0 0 0-5-5M5 13v2a7 7 0 0 0 14 0v-2M9 12v3a3 3 0 0 0 6 0v-3M12 8v4" />
+              <path
+                d="M12 3a5 5 0 0 0-5 5v2M17 10V8a5 5 0 0 0-5-5M5 13v2a7 7 0 0 0 14 0v-2M9 12v3a3 3 0 0 0 6 0v-3M12 8v4"
+              />
             </svg>
           </span>
-          <span><strong>Entrar com biometria</strong><small>Digital, rosto ou passkey do aparelho</small></span>
+          <span
+            ><strong>Entrar com biometria</strong
+            ><small>Digital, rosto ou passkey do aparelho</small></span
+          >
         </button>
 
         <div class="login-separator"><span>ou use sua senha</span></div>
@@ -48,13 +53,21 @@
           </label>
           <label>
             <span>Senha</span>
-            <input name="senha" type="password" autocomplete="current-password" required maxlength="256" />
+            <input
+              name="senha"
+              type="password"
+              autocomplete="current-password"
+              required
+              maxlength="256"
+            />
           </label>
           <button class="login-submit" type="submit">Entrar</button>
         </form>
 
         <p class="login-status" role="status" aria-live="polite" data-login-status></p>
-        <p class="login-foot">A biometria permanece no seu dispositivo e não é enviada à R&P Doces.</p>
+        <p class="login-foot">
+          A biometria permanece no seu dispositivo e não é enviada à R&P Doces.
+        </p>
       </section>
     </main>
     <script type="module" src="/admin/assets/js/pwa-login.js"></script>
