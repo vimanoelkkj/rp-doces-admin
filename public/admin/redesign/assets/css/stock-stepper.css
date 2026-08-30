@@ -1,0 +1,96 @@
+.products-stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: stretch;
+  width: 100%;
+  min-height: 44px;
+  overflow: hidden;
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  background: #fffdfb;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.products-stepper:focus-within {
+  border-color: var(--rp-pink);
+  box-shadow: 0 0 0 4px rgb(233 102 125 / 10%);
+}
+
+.products-stepper__button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border: 0;
+  background: color-mix(in oklch, var(--rp-surface) 88%, var(--rp-pink-wash));
+  color: var(--rp-pink-strong);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.12s ease;
+}
+
+.products-stepper__button:first-child {
+  border-right: 1px solid var(--rp-line);
+}
+
+.products-stepper__button:last-child {
+  border-left: 1px solid var(--rp-line);
+}
+
+.products-stepper__button:hover:not(:disabled) {
+  background: var(--rp-pink-soft);
+  color: var(--rp-pink-strong);
+}
+
+.products-stepper__button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.products-stepper__button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--rp-pink);
+  outline-offset: -3px;
+}
+
+.products-stepper__button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.products-field .products-stepper input[type="number"] {
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0;
+  padding: 0 10px;
+  background: transparent;
+  text-align: center;
+  font-weight: 800;
+  box-shadow: none;
+  appearance: textfield;
+}
+
+.products-field .products-stepper input[type="number"]:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.products-stepper input[type="number"]::-webkit-outer-spin-button,
+.products-stepper input[type="number"]::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+@media (max-width: 640px) {
+  .products-stepper {
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
+  }
+}
