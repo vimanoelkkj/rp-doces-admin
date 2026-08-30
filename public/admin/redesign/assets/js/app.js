@@ -5,6 +5,8 @@ import { renderOrders } from "./orders.js";
 import { renderAdmins } from "./admins.js";
 import { renderStore } from "./store.js";
 import { setupProfileMenu } from "./profile-menu.js";
+import { setupSidebarBadges } from "./sidebar-badges.js";
+import { setupNotificationMenu } from "./notifications.js";
 
 const app = document.querySelector("[data-admin-app]");
 const collapseButton = document.querySelector("[data-collapse-sidebar]");
@@ -12,6 +14,7 @@ const navItems = [...document.querySelectorAll("[data-admin-nav]")];
 const title = document.querySelector("[data-page-title]");
 const subtitle = document.querySelector("[data-page-subtitle]");
 const content = document.querySelector("[data-admin-content]");
+const notificationButton = document.querySelector("[data-notifications-button]");
 const profileButton = document.querySelector(".admin-profile");
 const profileName = document.querySelector("[data-profile-name]");
 const profileRole = document.querySelector("[data-profile-role]");
@@ -144,6 +147,8 @@ async function bootstrap() {
     if (!payload?.autenticado || !payload?.usuario) return redirectToLogin();
     applyUser(payload.usuario);
     setupProfileMenu(profileButton, payload.usuario, { onUnauthorized: redirectToLogin });
+    setupNotificationMenu(notificationButton, { onUnauthorized: redirectToLogin });
+    setupSidebarBadges({ onUnauthorized: redirectToLogin });
   } catch (error) {
     if (error?.status === 401) return redirectToLogin();
     console.warn("R&P Admin: não foi possível validar a sessão do redesign.", error);
