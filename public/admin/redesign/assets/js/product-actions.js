@@ -26,6 +26,14 @@ function closeAllMenus(except = null) {
   });
 }
 
+function refreshProductsView() {
+  const close = document.querySelector("[data-product-dialog-close]");
+  if (close instanceof HTMLButtonElement) close.click();
+
+  const productsNav = document.querySelector('[data-admin-nav="produtos"]');
+  if (productsNav instanceof HTMLButtonElement) productsNav.click();
+}
+
 async function getProduct(id) {
   const payload = await adminApi.products();
   const products = Array.isArray(payload?.produtos) ? payload.produtos : [];
@@ -73,7 +81,8 @@ function setDialogMode(form, product = null) {
     form._editingProduct = product;
     if (title) title.textContent = "Editar produto";
     if (eyebrow) eyebrow.textContent = "Catálogo · edição";
-    if (subtitle) subtitle.textContent = "Atualize os dados do produto sem alterar o histórico dos pedidos.";
+    if (subtitle)
+      subtitle.textContent = "Atualize os dados do produto sem alterar o histórico dos pedidos.";
     if (submit) submit.textContent = "Salvar alterações";
   } else {
     delete form.dataset.editProductId;
@@ -83,6 +92,25 @@ function setDialogMode(form, product = null) {
     if (subtitle) subtitle.textContent = "Cadastre um doce e ele já entra no catálogo administrativo.";
     if (submit) submit.textContent = "Salvar produto";
   }
+}
+
+function productPayload(product, overrides = {}) {
+  return {
+    nome: product.nome,
+    categoria: product.categoria,
+    descricao: product.descricao || "",
+    preco_centavos: Number(product.preco_centavos || 0),
+    disponivel: Boolean(Number(product.disponivel)),
+    ativo: Boolean(Number(product.ativo)),
+    destaque: Boolean(Number(product.destaque)),
+    emoji: product.emoji || "🍰",
+    estoque: Number(product.estoque || 0),
+    promocao_ativa: Boolean(Number(product.promocao_ativa)),
+    preco_promocional_centavos: product.preco_promocional_centavos ?? null,
+    promocao_inicio: product.promocao_inicio ?? null,
+    promocao_fim: product.promocao_fim ?? null,
+    ...overrides
+  };
 }
 
 function enhanceForm(form) {
@@ -118,25 +146,24 @@ function enhanceForm(form) {
       if (message) message.textContent = "";
 
       try {
-        await adminApi.updateProduct(id, {
-          nome: name,
-          categoria: String(data.get("categoria") || "BOLO_NO_POTE"),
-          descricao: String(data.get("descricao") || "").trim(),
-          preco_centavos: price,
-          disponivel: product.disponivel !== undefined ? Boolean(Number(product.disponivel)) : true,
-          ativo: data.get("ativo") === "on",
-          destaque: data.get("destaque") === "on",
-          emoji: String(data.get("emoji") || product.emoji || "🍰").trim(),
-          estoque: stock,
-          promocao_ativa: Boolean(Number(product.promocao_ativa)),
-          preco_promocional_centavos: product.preco_promocional_centavos ?? null,
-          promocao_inicio: product.promocao_inicio ?? null,
-          promocao_fim: product.promocao_fim ?? null
-        });
+        await adminApi.updateProduct(
+          id,
+          productPayload(product, {
+            nome: name,
+            categoria: String(data.get("categoria") || "BOLO_NO_POTE"),
+            descricao: String(data.get("descricao") || "").trim(),
+            preco_centavos: price,
+            ativo: data.get("ativo") === "on",
+            destaque: data.get("destaque") === "on",
+            emoji: String(data.get("emoji") || product.emoji || "🍰").trim(),
+            estoque: stock
+          })
+        );
 
-        location.reload();
+        refreshProductsView();
       } catch (error) {
-        if (message) message.textContent = error?.message || "Não foi possível salvar as alterações.";
+        if (message)
+          message.textContent = error?.message || "Não foi possível salvar as alterações.";
         if (submit instanceof HTMLButtonElement) submit.disabled = false;
         if (submit) submit.textContent = "Salvar alterações";
       }
@@ -160,15 +187,31 @@ function enhanceCard(card) {
   menu.dataset.productActionsMenu = "";
   menu.setAttribute("role", "menu");
   menu.hidden = true;
-  menu.innerHTML = '<button type="button" role="menuitem" data-edit-product>Editar produto</button>';
+  menu.innerHTML = `
+    <button type="button" role="menuitem" data-edit-product>Editar produto</button>
+    <button type="button" role="menuitem" data-toggle-product-state>Arquivar produto</button>
+  `;
   card.append(menu);
 
-  button.addEventListener("click", event => {
+  const stateButton = menu.querySelector("[data-toggle-product-state]");
+
+  button.addEventListener("click", async event => {
     event.stopPropagation();
     const opening = menu.hidden;
     closeAllMenus(opening ? menu : null);
     menu.hidden = !opening;
     button.setAttribute("aria-expanded", String(opening));
+
+    if (opening && stateButton instanceof HTMLButtonElement) {
+      const id = Number(card.dataset.productId || 0);
+      const product = await getProduct(id);
+      if (product) {
+        card._productActionProduct = product;
+        const archived = Number(product.ativo) === 0;
+        stateButton.textContent = archived ? "Reativar produto" : "Arquivar produto";
+        stateButton.classList.toggle("is-reactivate", archived);
+      }
+    }
   });
 
   menu.querySelector("[data-edit-product]")?.addEventListener("click", async () => {
@@ -176,7 +219,7 @@ function enhanceCard(card) {
     button.setAttribute("aria-expanded", "false");
 
     const id = Number(card.dataset.productId || 0);
-    const product = await getProduct(id);
+    const product = card._productActionProduct || (await getProduct(id));
     if (!product) return;
 
     const newButton = document.querySelector("[data-new-product]");
@@ -189,6 +232,42 @@ function enhanceCard(card) {
       setDialogMode(form, product);
       fillEditForm(form, product);
     });
+  });
+
+  stateButton?.addEventListener("click", async () => {
+    menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+
+    const id = Number(card.dataset.productId || 0);
+    const product = card._productActionProduct || (await getProduct(id));
+    if (!product) return;
+
+    const archived = Number(product.ativo) === 0;
+    if (stateButton instanceof HTMLButtonElement) {
+      stateButton.disabled = true;
+      stateButton.textContent = archived ? "Reativando…" : "Arquivando…";
+    }
+
+    try {
+      if (archived) {
+        await adminApi.updateProduct(
+          id,
+          productPayload(product, {
+            ativo: true,
+            disponivel: true
+          })
+        );
+      } else {
+        await adminApi.archiveProduct(id);
+      }
+      refreshProductsView();
+    } catch (error) {
+      console.error("R&P Admin: falha ao alterar estado do produto.", error);
+      if (stateButton instanceof HTMLButtonElement) {
+        stateButton.disabled = false;
+        stateButton.textContent = archived ? "Reativar produto" : "Arquivar produto";
+      }
+    }
   });
 }
 
