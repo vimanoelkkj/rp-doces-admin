@@ -1,4 +1,3 @@
-const DESKTOP_HOME_QUERY = "(min-width: 1024px)";
 const REVEAL_SELECTOR = ".rp-home > .rp-home-section, .rp-home > .rp-home-footer";
 
 let observer = null;
@@ -24,7 +23,7 @@ function setupReveal() {
     return;
   }
 
-  if (!matchMedia(DESKTOP_HOME_QUERY).matches || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
     cleanupReveal();
     revealAll(home);
     return;
@@ -41,6 +40,7 @@ function setupReveal() {
   sections.forEach(section => section.classList.add("rp-home-reveal-item"));
   home.classList.add("rp-home-reveal-ready");
 
+  const mobile = matchMedia("(max-width: 767px)").matches;
   observer = new IntersectionObserver(
     entries => {
       entries.forEach(entry => {
@@ -50,16 +50,16 @@ function setupReveal() {
       });
     },
     {
-      threshold: 0.12,
-      rootMargin: "0px 0px -8% 0px"
+      threshold: mobile ? 0.08 : 0.12,
+      rootMargin: mobile ? "0px 0px -4% 0px" : "0px 0px -8% 0px"
     }
   );
 
   sections.forEach(section => observer.observe(section));
 }
 
-const media = matchMedia(DESKTOP_HOME_QUERY);
-media.addEventListener?.("change", setupReveal);
+const mobileMedia = matchMedia("(max-width: 767px)");
+mobileMedia.addEventListener?.("change", setupReveal);
 
 const root = document.getElementById("rp-app");
 if (root) {
