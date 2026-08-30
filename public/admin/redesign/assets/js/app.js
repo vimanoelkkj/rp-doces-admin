@@ -1,6 +1,7 @@
 import { adminApi } from "./api.js";
 import { renderDashboard } from "./dashboard.js";
 import { renderProducts } from "./products.js";
+import { renderOrders } from "./orders.js";
 
 const app = document.querySelector("[data-admin-app]");
 const collapseButton = document.querySelector("[data-collapse-sidebar]");
@@ -74,6 +75,10 @@ async function renderPage(page) {
   }
   if (page === "produtos") {
     await renderProducts(content, { onUnauthorized: redirectToLogin });
+    return;
+  }
+  if (page === "pedidos") {
+    await renderOrders(content, { onUnauthorized: redirectToLogin });
     return;
   }
   renderPlaceholder(page);
