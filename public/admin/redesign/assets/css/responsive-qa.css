@@ -207,6 +207,18 @@
     text-overflow: ellipsis;
   }
 
+  /* "Administradores" não cabe em 1/5 de uma tela de 360px. Mantém o nome completo
+     para acessibilidade/desktop e usa uma legenda curta apenas na bottom nav. */
+  .admin-nav__item[data-admin-nav="admins"] .admin-nav__label {
+    font-size: 0;
+    text-overflow: clip;
+  }
+
+  .admin-nav__item[data-admin-nav="admins"] .admin-nav__label::after {
+    content: "Admins";
+    font-size: 8.5px;
+  }
+
   .products-toolbar__actions {
     grid-template-columns: 1fr;
   }
