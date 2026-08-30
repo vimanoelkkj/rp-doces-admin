@@ -52,6 +52,17 @@
     height: 34px;
   }
 
+  /* O estado recolhido é uma preferência exclusiva do desktop. No mobile a sidebar
+     vira bottom nav e seus rótulos precisam permanecer sempre visíveis. */
+  .admin-app.is-collapsed .admin-nav__label,
+  .admin-nav__label {
+    display: block !important;
+    max-width: 100% !important;
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+  }
+
   .profile-menu,
   .notifications-menu {
     max-height: calc(100dvh - 82px);
@@ -201,10 +212,13 @@
   }
 
   .admin-nav__label {
-    max-width: 100%;
+    max-width: 100% !important;
     overflow: hidden;
     font-size: 8.5px;
+    line-height: 1.1;
+    text-align: center;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* "Administradores" não cabe em 1/5 de uma tela de 360px. Mantém o nome completo
