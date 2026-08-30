@@ -52,7 +52,7 @@ button {
   min-height: 100vh;
   display: grid;
   grid-template-columns: var(--rp-sidebar) minmax(0, 1fr);
-  transition: grid-template-columns 180ms ease;
+  transition: grid-template-columns 220ms ease;
 }
 .admin-app.is-collapsed {
   grid-template-columns: var(--rp-sidebar-collapsed) minmax(0, 1fr);
@@ -89,10 +89,20 @@ button {
   font-family: var(--rp-display);
   font-size: 12px;
   font-weight: 800;
+  transition: transform 220ms ease;
 }
 .admin-brand__copy {
   min-width: 0;
+  max-width: 142px;
+  overflow: hidden;
   white-space: nowrap;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 220ms ease,
+    opacity 150ms ease,
+    transform 220ms ease,
+    visibility 0s linear 0s;
 }
 .admin-brand__copy strong {
   display: block;
@@ -150,6 +160,7 @@ button {
   flex: 0 0 22px;
   display: grid;
   place-items: center;
+  transition: transform 220ms ease;
 }
 .admin-nav__icon svg,
 .admin-icon svg {
@@ -162,20 +173,40 @@ button {
   stroke-linejoin: round;
 }
 .admin-nav__label {
+  max-width: 120px;
+  overflow: hidden;
   white-space: nowrap;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 220ms ease,
+    opacity 150ms ease,
+    transform 220ms ease,
+    visibility 0s linear 0s;
 }
 .admin-nav__badge {
   margin-left: auto;
   min-width: 20px;
+  max-width: 40px;
   height: 20px;
   display: grid;
   place-items: center;
+  overflow: hidden;
   border-radius: 999px;
   padding: 0 6px;
   background: var(--rp-pink);
   color: #fff;
   font-size: 10px;
   font-weight: 900;
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    max-width 220ms ease,
+    min-width 220ms ease,
+    padding 220ms ease,
+    opacity 120ms ease,
+    transform 180ms ease,
+    visibility 0s linear 0s;
 }
 
 .admin-sidebar__footer {
@@ -199,8 +230,20 @@ button {
 .admin-collapse:hover {
   background: var(--rp-pink-wash);
 }
+.admin-collapse > span:not(.admin-nav__icon) {
+  max-width: 90px;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 220ms ease,
+    opacity 150ms ease,
+    transform 220ms ease,
+    visibility 0s linear 0s;
+}
 .admin-collapse .admin-nav__icon svg {
-  transition: transform 180ms ease;
+  transition: transform 220ms ease;
   transform-origin: 50% 50%;
 }
 
@@ -344,21 +387,36 @@ button {
 
 .admin-app.is-collapsed .admin-brand__copy,
 .admin-app.is-collapsed .admin-nav__label,
-.admin-app.is-collapsed .admin-nav__badge,
 .admin-app.is-collapsed .admin-collapse > span:not(.admin-nav__icon) {
-  display: none;
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  visibility: hidden;
+  transition:
+    max-width 220ms ease,
+    opacity 120ms ease,
+    transform 220ms ease,
+    visibility 0s linear 220ms;
 }
-.admin-app.is-collapsed .admin-brand {
-  justify-content: center;
+.admin-app.is-collapsed .admin-nav__badge {
+  min-width: 0;
+  max-width: 0;
   padding-inline: 0;
+  opacity: 0;
+  transform: scale(0.72);
+  visibility: hidden;
+  transition:
+    max-width 220ms ease,
+    min-width 220ms ease,
+    padding 220ms ease,
+    opacity 100ms ease,
+    transform 180ms ease,
+    visibility 0s linear 220ms;
 }
-.admin-app.is-collapsed .admin-nav__item,
-.admin-app.is-collapsed .admin-collapse {
-  justify-content: center;
-  padding-inline: 0;
-}
-.admin-app.is-collapsed .admin-collapse .admin-nav__icon {
-  display: grid;
+.admin-app.is-collapsed .admin-brand__mark,
+.admin-app.is-collapsed .admin-nav__item > .admin-nav__icon,
+.admin-app.is-collapsed .admin-collapse > .admin-nav__icon {
+  transform: translateX(3px);
 }
 .admin-app.is-collapsed .admin-collapse .admin-nav__icon svg {
   transform: rotate(180deg);
@@ -408,6 +466,11 @@ button {
   }
   .admin-nav__label {
     display: block !important;
+    max-width: none;
+    overflow: visible;
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
     font-size: 9px;
   }
   .admin-nav__badge {
@@ -415,6 +478,12 @@ button {
     top: 5px;
     right: calc(50% - 22px);
     margin: 0;
+    min-width: 20px !important;
+    max-width: 40px !important;
+    padding: 0 6px !important;
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
   }
   .admin-topbar {
     padding-inline: 14px;
@@ -430,6 +499,12 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .admin-app,
+  .admin-brand__mark,
+  .admin-brand__copy,
+  .admin-nav__icon,
+  .admin-nav__label,
+  .admin-nav__badge,
+  .admin-collapse > span,
   .admin-tooltip,
   .admin-collapse .admin-nav__icon svg {
     transition: none;
