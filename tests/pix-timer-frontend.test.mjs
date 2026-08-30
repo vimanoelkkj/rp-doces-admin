@@ -143,17 +143,21 @@ test("helper de dados expõe o Pix copia e cola do pedido", () => {
 });
 
 test("feedback de cópia aparece sem remover o código Pix", () => {
-  const html = renderPaymentStatus(pendingOrder({ copied: true }));
+  const html = renderPaymentStatus(pendingOrder({ demoState: "pix-copied" }));
 
   assert.match(html, /Código Pix copiado/);
   assert.match(html, /data-copy-pix/);
   assert.match(html, /000201PIX-COPIA-E-COLA/);
 });
 
-test("cancelamento pendente remove ação duplicada de desistência", () => {
-  const html = renderPaymentStatus(pendingOrder({ cancelPending: true }));
+test("cancelamento pendente bloqueia as ações da confirmação", () => {
+  const html = renderPaymentStatus(
+    pendingOrder({ demoState: "cancel-confirm", cancelPending: true })
+  );
 
-  assert.match(html, /cancel/i);
+  assert.match(html, /Cancelando…/);
+  assert.match(html, /data-confirm-cancel-order disabled aria-busy="true"/);
+  assert.match(html, /data-keep-order disabled/);
   assert.doesNotMatch(html, />Desistir da compra<\/button>/);
 });
 
