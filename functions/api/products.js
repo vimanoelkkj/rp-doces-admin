@@ -7,7 +7,7 @@ async function loadProducts(env) {
       `
       SELECT p.id, p.nome, p.categoria, p.descricao, p.preco_centavos, p.disponivel, p.destaque,
              p.ordem, p.emoji, p.estoque, p.estoque_reservado, p.promocao_ativa,
-             p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim,
+             p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim, p.image_key,
              c.nome AS categoria_nome, c.emoji AS categoria_emoji, c.ordem AS categoria_ordem
       FROM produtos p
       LEFT JOIN categorias c ON c.id = p.categoria
@@ -23,7 +23,7 @@ async function loadProducts(env) {
       `
       SELECT id, nome, categoria, descricao, preco_centavos, disponivel, destaque, ordem, emoji,
              estoque, estoque_reservado, promocao_ativa, preco_promocional_centavos,
-             promocao_inicio, promocao_fim
+             promocao_inicio, promocao_fim, image_key
       FROM produtos
       WHERE ativo = 1
       ORDER BY categoria, ordem, nome
@@ -37,8 +37,8 @@ export async function onRequestGet({ env }) {
   try {
     await limparReservasExpiradas(env);
     const results = await loadProducts(env);
-
     const agora = Date.now();
+
     return json(
       {
         produtos: results.map(p => {
@@ -54,6 +54,7 @@ export async function onRequestGet({ env }) {
 
           return {
             ...p,
+            image_url: p.image_key ? `/api/images/${p.image_key}` : null,
             preco_original_centavos: normal,
             preco_centavos: promo ? Number(p.preco_promocional_centavos) : normal,
             promocao_vigente: promo,
