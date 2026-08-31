@@ -12,6 +12,15 @@
   background: var(--rp-color-surface);
 }
 
+.rp-product-card__image.is-transparent-art {
+  object-fit: contain;
+  padding: 14px;
+}
+
+.rp-product-card__media.has-transparent-art {
+  background: var(--rp-color-bg);
+}
+
 .rp-product-card__media:has(.rp-product-card__image) .rp-product-card__media-label,
 .rp-product-card__media:has(.rp-product-card__image) .rp-product-card__media-name {
   display: none;
