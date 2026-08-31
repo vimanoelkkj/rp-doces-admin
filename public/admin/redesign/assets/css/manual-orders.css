@@ -1,3 +1,6 @@
+@import url("./manual-orders-rescue.css");
+@import url("./sidebar-badges-help.css");
+
 .orders-toolbar__actions {
   display: flex;
   align-items: center;
