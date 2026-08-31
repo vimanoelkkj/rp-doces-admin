@@ -29,7 +29,8 @@ export async function onRequestPost({ request, env, params }) {
 
   const id = validId(params.id);
   if (!id) return json({ erro: "ID inválido." }, 400);
-  if (!canManageAvatar(auth.user, id)) return json({ erro: "Sem permissão para alterar esta foto." }, 403);
+  if (!canManageAvatar(auth.user, id))
+    return json({ erro: "Sem permissão para alterar esta foto." }, 403);
 
   const user = await env.DB.prepare("SELECT id, avatar_key FROM usuarios_admin WHERE id = ?")
     .bind(id)
@@ -57,7 +58,9 @@ export async function onRequestPost({ request, env, params }) {
   });
 
   try {
-    await env.DB.prepare("UPDATE usuarios_admin SET avatar_key = ? WHERE id = ?").bind(key, id).run();
+    await env.DB.prepare("UPDATE usuarios_admin SET avatar_key = ? WHERE id = ?")
+      .bind(key, id)
+      .run();
   } catch (error) {
     await env.PRODUCT_IMAGES.delete(key).catch(() => {});
     throw error;
@@ -78,7 +81,8 @@ export async function onRequestDelete({ request, env, params }) {
 
   const id = validId(params.id);
   if (!id) return json({ erro: "ID inválido." }, 400);
-  if (!canManageAvatar(auth.user, id)) return json({ erro: "Sem permissão para alterar esta foto." }, 403);
+  if (!canManageAvatar(auth.user, id))
+    return json({ erro: "Sem permissão para alterar esta foto." }, 403);
 
   const user = await env.DB.prepare("SELECT id, avatar_key FROM usuarios_admin WHERE id = ?")
     .bind(id)
