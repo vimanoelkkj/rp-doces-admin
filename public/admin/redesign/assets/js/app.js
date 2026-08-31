@@ -8,6 +8,7 @@ import { setupProfileMenu } from "./profile-menu.js";
 import { setupSidebarBadges } from "./sidebar-badges.js";
 import { setupNotificationMenu } from "./notifications.js";
 import "./product-images.js";
+import "./store-home-images.js";
 
 function ensureHeadLink(rel, href, extras = {}) {
   let link = document.head.querySelector(`link[rel="${rel}"][href="${href}"]`);
@@ -36,6 +37,7 @@ function setupPwaShell() {
   ensureHeadLink("apple-touch-icon", "/admin-apple-touch-icon.png");
   ensureHeadLink("stylesheet", "/admin/redesign/assets/css/pwa-shell.css");
   ensureHeadLink("stylesheet", "/admin/redesign/assets/css/product-images.css");
+  ensureHeadLink("stylesheet", "/admin/redesign/assets/css/store-home-images.css");
   ensureMeta("theme-color", "#fff8f2");
   ensureMeta("apple-mobile-web-app-capable", "yes");
   ensureMeta("apple-mobile-web-app-status-bar-style", "default");
