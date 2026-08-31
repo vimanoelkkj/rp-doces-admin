@@ -1,35 +1,69 @@
 import { json } from "../lib/http.js";
 import { limparReservasExpiradas } from "../lib/stock.js";
 
+async function queryProducts(env, { withCategories = true, withImage = true } = {}) {
+  const imageColumn = withImage ? ", p.image_key" : "";
+  const categoryColumns = withCategories
+    ? ", c.nome AS categoria_nome, c.emoji AS categoria_emoji, c.ordem AS categoria_ordem"
+    : "";
+  const join = withCategories ? "LEFT JOIN categorias c ON c.id = p.categoria" : "";
+  const where = withCategories
+    ? "WHERE p.ativo = 1 AND COALESCE(c.ativo, 1) = 1"
+    : "WHERE p.ativo = 1";
+  const order = withCategories
+    ? "ORDER BY COALESCE(c.ordem, 9999), p.ordem, p.nome"
+    : "ORDER BY p.categoria, p.ordem, p.nome";
+
+  const { results } = await env.DB.prepare(
+    `
+    SELECT p.id, p.nome, p.categoria, p.descricao, p.preco_centavos, p.disponivel, p.destaque,
+           p.ordem, p.emoji, p.estoque, p.estoque_reservado, p.promocao_ativa,
+           p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim${imageColumn}${categoryColumns}
+    FROM produtos p
+    ${join}
+    ${where}
+    ${order}
+  `
+  ).all();
+
+  return (results || []).map(product => ({
+    ...product,
+    image_key: withImage ? product.image_key ?? null : null
+  }));
+}
+
 async function loadProducts(env) {
   try {
-    const { results } = await env.DB.prepare(
-      `
-      SELECT p.id, p.nome, p.categoria, p.descricao, p.preco_centavos, p.disponivel, p.destaque,
-             p.ordem, p.emoji, p.estoque, p.estoque_reservado, p.promocao_ativa,
-             p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim, p.image_key,
-             c.nome AS categoria_nome, c.emoji AS categoria_emoji, c.ordem AS categoria_ordem
-      FROM produtos p
-      LEFT JOIN categorias c ON c.id = p.categoria
-      WHERE p.ativo = 1 AND COALESCE(c.ativo, 1) = 1
-      ORDER BY COALESCE(c.ordem, 9999), p.ordem, p.nome
-    `
-    ).all();
-    return results || [];
+    return await queryProducts(env, { withCategories: true, withImage: true });
   } catch (error) {
-    if (!String(error?.message || "").includes("no such table: categorias")) throw error;
+    const message = String(error?.message || "");
 
-    const { results } = await env.DB.prepare(
-      `
-      SELECT id, nome, categoria, descricao, preco_centavos, disponivel, destaque, ordem, emoji,
-             estoque, estoque_reservado, promocao_ativa, preco_promocional_centavos,
-             promocao_inicio, promocao_fim, image_key
-      FROM produtos
-      WHERE ativo = 1
-      ORDER BY categoria, ordem, nome
-    `
-    ).all();
-    return results || [];
+    if (message.includes("no such column: p.image_key") || message.includes("no such column: image_key")) {
+      try {
+        return await queryProducts(env, { withCategories: true, withImage: false });
+      } catch (categoryError) {
+        if (!String(categoryError?.message || "").includes("no such table: categorias")) {
+          throw categoryError;
+        }
+        return queryProducts(env, { withCategories: false, withImage: false });
+      }
+    }
+
+    if (message.includes("no such table: categorias")) {
+      try {
+        return await queryProducts(env, { withCategories: false, withImage: true });
+      } catch (imageError) {
+        if (
+          !String(imageError?.message || "").includes("no such column: p.image_key") &&
+          !String(imageError?.message || "").includes("no such column: image_key")
+        ) {
+          throw imageError;
+        }
+        return queryProducts(env, { withCategories: false, withImage: false });
+      }
+    }
+
+    throw error;
   }
 }
 
