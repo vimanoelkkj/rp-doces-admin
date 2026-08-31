@@ -317,6 +317,12 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
   let filter = "todos";
   let query = "";
 
+  function liveContainer() {
+    if (container.isConnected) return container;
+    if (view?.isConnected && view.parentElement) return view.parentElement;
+    return document.querySelector("[data-admin-content]") || container;
+  }
+
   function renderSummary() {
     if (!summary) return;
     const pending = orders.filter(order => order.status_pagamento === "PENDENTE").length;
@@ -355,12 +361,12 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
   }
 
   function closeDialog() {
-    container.querySelector("[data-orders-dialog]")?.remove();
+    liveContainer().querySelector("[data-orders-dialog]")?.remove();
     document.body.classList.remove("orders-dialog-open");
   }
 
   function closeManualDialog() {
-    container.querySelector("[data-manual-order-dialog]")?.remove();
+    liveContainer().querySelector("[data-manual-order-dialog]")?.remove();
     document.body.classList.remove("orders-dialog-open");
   }
 
@@ -386,11 +392,12 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
   }
 
   function openDetails(order) {
+    const host = liveContainer();
     closeDialog();
-    container.insertAdjacentHTML("beforeend", detailDialog(order));
+    host.insertAdjacentHTML("beforeend", detailDialog(order));
     document.body.classList.add("orders-dialog-open");
-    container.querySelectorAll("[data-orders-dialog-close]").forEach(button => button.addEventListener("click", closeDialog));
-    container.querySelectorAll("[data-manual-payment]").forEach(button => {
+    host.querySelectorAll("[data-orders-dialog-close]").forEach(button => button.addEventListener("click", closeDialog));
+    host.querySelectorAll("[data-manual-payment]").forEach(button => {
       button.addEventListener("click", async () => {
         const status = button.dataset.manualPayment;
         if (!status) return;
@@ -412,11 +419,12 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
     try {
       const payload = await adminApi.products();
       const products = Array.isArray(payload?.produtos) ? payload.produtos : [];
+      const host = liveContainer();
       closeManualDialog();
-      container.insertAdjacentHTML("beforeend", manualOrderDialog(products));
+      host.insertAdjacentHTML("beforeend", manualOrderDialog(products));
       document.body.classList.add("orders-dialog-open");
 
-      const dialog = container.querySelector("[data-manual-order-dialog]");
+      const dialog = host.querySelector("[data-manual-order-dialog]");
       const form = dialog?.querySelector("[data-manual-order-form]");
       const itemsRoot = dialog?.querySelector("[data-manual-items]");
       const firstItem = itemsRoot?.querySelector("[data-manual-item]");
@@ -571,8 +579,9 @@ export async function renderOrders(container, { onUnauthorized } = {}) {
 
   document.addEventListener("keydown", event => {
     if (event.key !== "Escape") return;
-    if (container.querySelector("[data-manual-order-dialog]")) closeManualDialog();
-    else if (container.querySelector("[data-orders-dialog]")) closeDialog();
+    const host = liveContainer();
+    if (host.querySelector("[data-manual-order-dialog]")) closeManualDialog();
+    else if (host.querySelector("[data-orders-dialog]")) closeDialog();
     else closeStatusMenus();
   });
 
