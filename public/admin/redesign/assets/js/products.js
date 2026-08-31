@@ -234,6 +234,7 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
   const filterButtons = [...container.querySelectorAll("[data-products-filter]")];
   const newProductButton = container.querySelector("[data-new-product]");
   const dialog = container.querySelector("[data-product-dialog]");
+  const dialogPanel = dialog?.querySelector(".products-dialog__panel");
   const form = container.querySelector("[data-product-form]");
   const formMessage = container.querySelector("[data-product-form-message]");
   const submitButton = container.querySelector("[data-product-submit]");
@@ -282,6 +283,11 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
     renderList();
   }
 
+  function resetDialogScroll() {
+    if (dialog instanceof HTMLElement) dialog.scrollTop = 0;
+    if (dialogPanel instanceof HTMLElement) dialogPanel.scrollTop = 0;
+  }
+
   function openDialog() {
     if (!dialog) return;
     lastFocused = document.activeElement;
@@ -294,11 +300,19 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
     const stock = form?.elements.namedItem("estoque");
     if (stock instanceof HTMLInputElement) stock.value = "0";
     if (formMessage) formMessage.textContent = "";
-    requestAnimationFrame(() => form?.elements.namedItem("nome")?.focus());
+
+    resetDialogScroll();
+    requestAnimationFrame(() => {
+      resetDialogScroll();
+      const name = form?.elements.namedItem("nome");
+      if (name instanceof HTMLElement) name.focus({ preventScroll: true });
+      resetDialogScroll();
+    });
   }
 
   function closeDialog() {
     if (!dialog || dialog.hidden) return;
+    resetDialogScroll();
     dialog.hidden = true;
     document.body.classList.remove("products-dialog-open");
     if (formMessage) formMessage.textContent = "";
@@ -359,7 +373,7 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
         categoria: String(data.get("categoria") || "BOLO_NO_POTE"),
         descricao: String(data.get("descricao") || "").trim(),
         preco_centavos: price,
-        disponivel: true,
+        disponivel: data.get("ativo") === "on",
         ativo: data.get("ativo") === "on",
         destaque: data.get("destaque") === "on",
         emoji: String(data.get("emoji") || EMOJI_OPTIONS[0][0]).trim(),
@@ -369,12 +383,15 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
         promocao_inicio: null,
         promocao_fim: null
       });
-      await refreshProducts();
       closeDialog();
+      await refreshProducts();
     } catch (error) {
-      if (error?.status === 401) return onUnauthorized?.();
+      if (error?.status === 401 && typeof onUnauthorized === "function") {
+        onUnauthorized();
+        return;
+      }
       if (formMessage)
-        formMessage.textContent = error?.message || "Não foi possível criar o produto agora.";
+        formMessage.textContent = error?.message || "Não foi possível salvar o produto.";
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = "Salvar produto";
@@ -385,10 +402,13 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
     await refreshProducts();
     view?.setAttribute("aria-busy", "false");
   } catch (error) {
-    if (error?.status === 401) return onUnauthorized?.();
-    if (summary) summary.textContent = "Não foi possível carregar o catálogo.";
+    if (error?.status === 401 && typeof onUnauthorized === "function") {
+      onUnauthorized();
+      return;
+    }
     if (grid)
-      grid.innerHTML = `<div class="products-empty is-error"><strong>Falha ao carregar produtos</strong><span>${esc(error?.message || "Tente novamente em instantes.")}</span></div>`;
+      grid.innerHTML = `<div class="products-empty is-error"><strong>Não foi possível carregar o catálogo</strong><span>Tente atualizar a página em instantes.</span></div>`;
+    if (summary) summary.textContent = "Erro ao carregar produtos";
     view?.setAttribute("aria-busy", "false");
   }
 }
