@@ -1,4 +1,5 @@
 import "./product-transparency.js";
+import "./pix-qr-toggle.js";
 import { api } from "./api.js";
 import { state, syncCartWithProducts, notify } from "./state.js";
 import { storefrontProducts } from "./utils/product-filter.js";
