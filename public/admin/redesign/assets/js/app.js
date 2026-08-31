@@ -73,6 +73,7 @@ const pages = {
 
 let currentPage = null;
 let currentUser = null;
+let navigationId = 0;
 
 function setCollapsed(collapsed) {
   app?.classList.toggle("is-collapsed", collapsed);
@@ -137,10 +138,53 @@ async function renderPage(page) {
   }
 }
 
+function waitForTransition(element, timeout = 140) {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      element.removeEventListener("transitionend", onEnd);
+      resolve();
+    };
+    const onEnd = event => {
+      if (event.target === element && event.propertyName === "opacity") finish();
+    };
+    element.addEventListener("transitionend", onEnd);
+    setTimeout(finish, timeout);
+  });
+}
+
+async function transitionToPage(page, id) {
+  if (!content) return;
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (!reducedMotion && content.childElementCount) {
+    content.classList.remove("is-page-entering");
+    content.classList.add("is-page-leaving");
+    await waitForTransition(content);
+    if (id !== navigationId) return;
+  }
+
+  content.classList.remove("is-page-leaving");
+  await renderPage(page);
+  if (id !== navigationId || reducedMotion) return;
+
+  content.classList.add("is-page-entering");
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (id === navigationId) content.classList.remove("is-page-entering");
+    });
+  });
+}
+
 function setPage(page) {
   const resolvedPage = Object.hasOwn(pages, page) ? page : "dashboard";
+  if (resolvedPage === currentPage) return;
+
   const meta = pages[resolvedPage];
   currentPage = resolvedPage;
+  const id = ++navigationId;
 
   navItems.forEach(item => {
     const active = item.dataset.adminNav === resolvedPage;
@@ -152,7 +196,9 @@ function setPage(page) {
   if (title) title.textContent = meta[0];
   if (subtitle) subtitle.textContent = meta[1];
   history.replaceState(null, "", `#${resolvedPage}`);
-  renderPage(resolvedPage);
+  transitionToPage(resolvedPage, id).catch(error => {
+    console.error("R&P Admin: falha ao trocar de página.", error);
+  });
 }
 
 collapseButton?.addEventListener("click", () => {
