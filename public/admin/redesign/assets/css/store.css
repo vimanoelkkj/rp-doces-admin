@@ -1,6 +1,6 @@
 .store-view {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 .store-loading,
 .store-error {
@@ -28,9 +28,9 @@
   max-width: 640px;
 }
 .store-kicker {
-  margin: 0 0 3px;
+  margin: 0 0 4px;
   color: var(--rp-pink-strong);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -38,14 +38,14 @@
 .store-toolbar h2 {
   margin: 0;
   font-family: var(--rp-display);
-  font-size: 22px;
+  font-size: 23px;
   line-height: 1.05;
 }
 .store-toolbar p:not(.store-kicker) {
-  margin: 5px 0 0;
+  margin: 6px 0 0;
   color: var(--rp-ink-3);
-  font-size: 11.5px;
-  line-height: 1.4;
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 .store-toolbar__actions {
   display: flex;
@@ -53,7 +53,7 @@
   gap: 10px;
 }
 .store-toolbar__actions > span {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   color: var(--rp-ink-3);
 }
@@ -64,12 +64,13 @@
   color: var(--rp-danger);
 }
 .store-primary {
-  min-height: 38px;
+  min-height: 40px;
   border: 1px solid var(--rp-pink);
   border-radius: 11px;
-  padding: 0 13px;
+  padding: 0 14px;
   background: var(--rp-pink);
   color: #fff;
+  font-size: 12.5px;
   font-weight: 900;
   box-shadow: 0 8px 18px rgb(201 67 94 / 14%);
 }
@@ -84,15 +85,16 @@
 .store-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
   align-items: start;
 }
 .store-card {
   display: grid;
-  gap: 14px;
+  align-content: start;
+  gap: 15px;
   border: 1px solid var(--rp-line);
   border-radius: 18px;
-  padding: 16px;
+  padding: 18px;
   background: var(--rp-surface);
   box-shadow: 0 10px 26px rgb(68 40 32 / 4%);
 }
@@ -107,21 +109,22 @@
 .store-card__head h3 {
   margin: 1px 0 0;
   font-family: var(--rp-display);
-  font-size: 16px;
+  font-size: 18px;
 }
 .store-card__head p {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
   color: var(--rp-ink-3);
-  font-size: 10.5px;
+  font-size: 11.5px;
+  line-height: 1.4;
 }
 .store-field {
   display: grid;
-  gap: 6px;
+  gap: 7px;
 }
 .store-field > span,
 .store-time-row label > span {
   color: var(--rp-ink-2);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
 }
 .store-field input,
@@ -133,14 +136,15 @@
   outline: 0;
   background: #fff;
   color: var(--rp-ink);
+  font-size: 12.5px;
 }
 .store-field input,
 .store-time-row input {
-  min-height: 40px;
+  min-height: 42px;
   padding: 0 11px;
 }
 .store-field textarea {
-  min-height: 92px;
+  min-height: 96px;
   padding: 10px 11px;
   resize: vertical;
 }
@@ -153,7 +157,7 @@
 .store-days {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
+  gap: 7px;
 }
 .store-day,
 .store-choice {
@@ -163,9 +167,9 @@
   font-weight: 900;
 }
 .store-day {
-  min-height: 36px;
+  min-height: 38px;
   border-radius: 10px;
-  font-size: 9.5px;
+  font-size: 10.5px;
 }
 .store-day:hover,
 .store-choice:hover {
@@ -182,43 +186,43 @@
 .store-time-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 .store-time-row label {
   display: grid;
-  gap: 6px;
+  gap: 7px;
 }
 .store-preview,
 .store-help {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   border-radius: 12px;
-  padding: 10px 11px;
+  padding: 11px 12px;
   background: var(--rp-surface-2);
 }
 .store-preview small,
 .store-help span {
   color: var(--rp-ink-3);
-  font-size: 9.5px;
+  font-size: 10.5px;
 }
 .store-preview strong,
 .store-help strong {
   color: var(--rp-ink-2);
-  font-size: 11px;
+  font-size: 12px;
 }
 .store-choices {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: 8px;
 }
 .store-choice {
-  min-height: 38px;
+  min-height: 40px;
   border-radius: 11px;
   padding: 0 8px;
-  font-size: 9.5px;
+  font-size: 10.5px;
 }
 .store-card--contact {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 .store-card--contact .store-field:last-child {
   max-width: 100%;
@@ -235,11 +239,11 @@
 }
 .store-public-preview {
   display: grid;
-  gap: 10px;
+  gap: 0;
 }
 .store-public-preview__row {
   display: block;
-  padding: 10px 0;
+  padding: 11px 0;
   border-bottom: 1px solid var(--rp-line);
 }
 .store-public-preview__row:last-child {
@@ -251,11 +255,11 @@
 .store-public-preview__row div {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 .store-public-preview__row small {
   color: var(--rp-ink-3);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
 }
 .store-public-preview__row strong {
@@ -264,31 +268,34 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--rp-ink-2);
-  font-size: 11px;
+  font-size: 12px;
 }
 .store-public-preview__note {
-  margin: 0;
+  margin: 2px 0 0;
   border-radius: 11px;
-  padding: 10px 11px;
+  padding: 11px 12px;
   background: #fff;
   color: var(--rp-ink-3);
-  font-size: 9.5px;
-  line-height: 1.45;
+  font-size: 10.5px;
+  line-height: 1.5;
 }
 @media (min-width: 1600px) {
   .store-grid {
-    grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr) minmax(360px, 1.05fr);
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 16px;
   }
   .store-card--schedule {
-    grid-column: auto;
+    grid-column: span 5;
+  }
+  .store-card:not(.store-card--schedule):not(.store-card--contact):not(.store-card--public-preview):not(.store-card--home-images) {
+    grid-column: span 3;
   }
   .store-card--contact {
-    grid-column: 1 / span 2;
+    grid-column: span 8;
   }
   .store-card--public-preview {
-    grid-column: 3;
-    grid-row: 2;
+    grid-column: span 4;
+    grid-row: auto;
   }
   .store-card {
     padding: 18px;
@@ -301,72 +308,65 @@
     min-height: 42px;
   }
   .store-card__head h3 {
-    font-size: 17.5px;
+    font-size: 18px;
   }
   .store-card__head p {
-    font-size: 11.25px;
-  }
-  .store-field > span,
-  .store-time-row label > span {
-    font-size: 10.25px;
-  }
-  .store-field input,
-  .store-field textarea,
-  .store-time-row input {
-    font-size: 11.5px;
-  }
-  .store-public-preview__row strong {
-    font-size: 11.5px;
-  }
-  .store-public-preview__row small {
-    font-size: 9.25px;
-  }
-}
-@media (min-width: 2400px) {
-  .store-grid {
-    grid-template-columns: minmax(0, 1.45fr) minmax(460px, 1fr) minmax(560px, 1.15fr);
-    gap: 18px;
-  }
-  .store-card {
-    padding: 20px;
-    gap: 16px;
-  }
-  .store-card--contact {
-    grid-column: 1 / span 2;
-  }
-  .store-card__head h3 {
-    font-size: 19px;
-  }
-  .store-card__head p {
-    font-size: 12px;
+    font-size: 11.75px;
   }
   .store-field > span,
   .store-time-row label > span {
     font-size: 11px;
   }
   .store-field input,
+  .store-field textarea,
   .store-time-row input {
-    min-height: 48px;
     font-size: 12.5px;
   }
-  .store-field textarea {
+  .store-public-preview__row strong {
     font-size: 12.5px;
+  }
+  .store-public-preview__row small {
+    font-size: 10.25px;
+  }
+}
+@media (min-width: 2400px) {
+  .store-grid {
+    gap: 18px;
+  }
+  .store-card {
+    padding: 20px;
+    gap: 16px;
+  }
+  .store-card__head h3 {
+    font-size: 19px;
+  }
+  .store-card__head p {
+    font-size: 12.5px;
+  }
+  .store-field > span,
+  .store-time-row label > span {
+    font-size: 11.5px;
+  }
+  .store-field input,
+  .store-time-row input {
+    min-height: 48px;
+    font-size: 13px;
+  }
+  .store-field textarea {
+    font-size: 13px;
     min-height: 112px;
   }
   .store-day {
     min-height: 42px;
-    font-size: 10.5px;
+    font-size: 11px;
   }
   .store-choice {
     min-height: 46px;
-    font-size: 10.5px;
+    font-size: 11px;
   }
   .store-card--public-preview {
     min-height: 292px;
     padding: 22px;
-  }
-  .store-card--public-preview .store-card__head {
-    gap: 0;
   }
   .store-card--public-preview .store-card__head h3 {
     font-size: 20px;
@@ -375,15 +375,11 @@
     font-size: 12.5px;
     color: var(--rp-ink-2);
   }
-  .store-public-preview {
-    gap: 13px;
-  }
   .store-public-preview__row {
-    display: block;
     padding: 13px 0;
   }
   .store-public-preview__row small {
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--rp-ink-2);
     font-weight: 900;
   }
@@ -394,7 +390,7 @@
   }
   .store-public-preview__note {
     padding: 12px 13px;
-    font-size: 10.75px;
+    font-size: 11px;
     line-height: 1.55;
     color: var(--rp-ink-2);
   }
