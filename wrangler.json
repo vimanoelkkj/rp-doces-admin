@@ -16,5 +16,12 @@
       "database_id": "c2e15599-3d68-4801-9a1c-96a84977dd7c",
       "migrations_dir": "migrations"
     }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "PRODUCT_IMAGES",
+      "bucket_name": "rp-doces-images"
+    }
   ]
 }

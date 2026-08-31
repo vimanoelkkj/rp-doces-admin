@@ -92,7 +92,8 @@ async function refreshDecorations() {
 }
 
 function ensureImageField(form) {
-  if (!(form instanceof HTMLFormElement) || form.querySelector("[data-product-image-field]")) return;
+  if (!(form instanceof HTMLFormElement) || form.querySelector("[data-product-image-field]"))
+    return;
   const grid = form.querySelector(".products-form__grid");
   if (!grid) return;
 
@@ -237,7 +238,8 @@ async function handleImageSubmit(event, form) {
 
     document.querySelector('[data-admin-nav="produtos"]')?.click();
   } catch (error) {
-    if (message) message.textContent = error?.message || "Não foi possível salvar a foto do produto.";
+    if (message)
+      message.textContent = error?.message || "Não foi possível salvar a foto do produto.";
     if (submit instanceof HTMLButtonElement) submit.disabled = false;
     if (submit) submit.textContent = editId ? "Salvar alterações" : "Salvar produto";
   }
@@ -275,7 +277,8 @@ const observer = new MutationObserver(records => {
       if (!(node instanceof Element)) continue;
       if (node.matches?.("[data-product-form]")) ensureImageField(node);
       node.querySelectorAll?.("[data-product-form]").forEach(ensureImageField);
-      if (node.matches?.(".products-card") || node.querySelector?.(".products-card")) hasProductUi = true;
+      if (node.matches?.(".products-card") || node.querySelector?.(".products-card"))
+        hasProductUi = true;
     }
   }
   if (hasProductUi) refreshDecorations();

@@ -28,7 +28,7 @@ async function queryProducts(env, { withCategories = true, withImage = true } = 
 
   return (results || []).map(product => ({
     ...product,
-    image_key: withImage ? product.image_key ?? null : null
+    image_key: withImage ? (product.image_key ?? null) : null
   }));
 }
 
@@ -38,7 +38,10 @@ async function loadProducts(env) {
   } catch (error) {
     const message = String(error?.message || "");
 
-    if (message.includes("no such column: p.image_key") || message.includes("no such column: image_key")) {
+    if (
+      message.includes("no such column: p.image_key") ||
+      message.includes("no such column: image_key")
+    ) {
       try {
         return await queryProducts(env, { withCategories: true, withImage: false });
       } catch (categoryError) {
