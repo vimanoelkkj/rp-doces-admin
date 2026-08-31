@@ -31,3 +31,8 @@ jobs:
 
       - name: Executar testes
         run: npm test
+
+      - name: Verificar drift do schema
+        run: |
+          npm run schema:generate
+          git diff --exit-code -- schema_full.sql
