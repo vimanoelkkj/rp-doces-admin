@@ -1,0 +1,28 @@
+.admin-content {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 120ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.admin-content.is-page-leaving {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.admin-content.is-page-entering {
+  opacity: 0;
+  transform: translateY(7px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-content,
+  .admin-content.is-page-leaving,
+  .admin-content.is-page-entering {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
