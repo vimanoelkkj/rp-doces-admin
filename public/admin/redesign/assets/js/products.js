@@ -139,7 +139,7 @@ function productDialog() {
           <button class="products-dialog__close" type="button" data-product-dialog-close aria-label="Fechar">×</button>
         </div>
 
-        <form class="products-form" data-product-form>
+        <form class="products-form" data-product-form autocomplete="off">
           <div class="products-form__grid">
             <label class="products-field products-field--wide">
               <span>Nome</span>
@@ -156,7 +156,7 @@ function productDialog() {
 
             <label class="products-field">
               <span>Estoque</span>
-              <input name="estoque" type="number" min="0" max="100000" step="1" value="0" required />
+              <input name="estoque" type="number" min="0" max="100000" step="1" value="0" required autocomplete="off" />
             </label>
 
             ${emojiPicker()}
@@ -168,7 +168,7 @@ function productDialog() {
 
             <label class="products-field products-field--wide">
               <span>Descrição</span>
-              <textarea name="descricao" maxlength="500" rows="4" placeholder="Uma descrição curta do produto."></textarea>
+              <textarea name="descricao" maxlength="500" rows="4" placeholder="Uma descrição curta do produto." autocomplete="off"></textarea>
             </label>
           </div>
 
@@ -304,9 +304,6 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
     resetDialogScroll();
     requestAnimationFrame(() => {
       resetDialogScroll();
-      const name = form?.elements.namedItem("nome");
-      if (name instanceof HTMLElement) name.focus({ preventScroll: true });
-      resetDialogScroll();
     });
   }
 
@@ -351,15 +348,30 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
 
   form?.addEventListener("submit", async event => {
     event.preventDefault();
-    if (!(form instanceof HTMLFormElement) || !submitButton) return;
+    if (!form || !submitButton) return;
 
     const data = new FormData(form);
-    const price = parseMoneyToCents(data.get("preco"));
-    const stock = Number(data.get("estoque"));
-    const name = String(data.get("nome") || "").trim();
+    const nome = String(data.get("nome") || "").trim();
+    const categoria = String(data.get("categoria") || "").trim();
+    const estoque = Number(data.get("estoque"));
+    const precoCentavos = parseMoneyToCents(data.get("preco"));
+    const descricao = String(data.get("descricao") || "").trim();
+    const emoji = String(data.get("emoji") || "").trim();
 
-    if (!name || price === null || !Number.isSafeInteger(stock) || stock < 0) {
-      if (formMessage) formMessage.textContent = "Confira nome, preço e estoque antes de salvar.";
+    if (!nome) {
+      if (formMessage) formMessage.textContent = "Informe o nome do produto.";
+      return;
+    }
+    if (!categoria) {
+      if (formMessage) formMessage.textContent = "Selecione uma categoria.";
+      return;
+    }
+    if (!Number.isInteger(estoque) || estoque < 0) {
+      if (formMessage) formMessage.textContent = "Informe um estoque válido.";
+      return;
+    }
+    if (!precoCentavos) {
+      if (formMessage) formMessage.textContent = "Informe um preço válido.";
       return;
     }
 
@@ -369,25 +381,20 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
 
     try {
       await adminApi.createProduct({
-        nome: name,
-        categoria: String(data.get("categoria") || "BOLO_NO_POTE"),
-        descricao: String(data.get("descricao") || "").trim(),
-        preco_centavos: price,
-        disponivel: data.get("ativo") === "on",
-        ativo: data.get("ativo") === "on",
-        destaque: data.get("destaque") === "on",
-        emoji: String(data.get("emoji") || EMOJI_OPTIONS[0][0]).trim(),
-        estoque: stock,
-        promocao_ativa: false,
-        preco_promocional_centavos: null,
-        promocao_inicio: null,
-        promocao_fim: null
+        nome,
+        categoria,
+        estoque,
+        preco_centavos: precoCentavos,
+        descricao: descricao || null,
+        emoji: emoji || null,
+        ativo: data.get("ativo") ? 1 : 0,
+        destaque: data.get("destaque") ? 1 : 0
       });
-      closeDialog();
       await refreshProducts();
+      closeDialog();
     } catch (error) {
-      if (error?.status === 401 && typeof onUnauthorized === "function") {
-        onUnauthorized();
+      if (error?.status === 401) {
+        onUnauthorized?.();
         return;
       }
       if (formMessage)
@@ -402,13 +409,13 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
     await refreshProducts();
     view?.setAttribute("aria-busy", "false");
   } catch (error) {
-    if (error?.status === 401 && typeof onUnauthorized === "function") {
-      onUnauthorized();
+    if (error?.status === 401) {
+      onUnauthorized?.();
       return;
     }
+    if (summary) summary.textContent = "Não foi possível carregar o catálogo.";
     if (grid)
-      grid.innerHTML = `<div class="products-empty is-error"><strong>Não foi possível carregar o catálogo</strong><span>Tente atualizar a página em instantes.</span></div>`;
-    if (summary) summary.textContent = "Erro ao carregar produtos";
+      grid.innerHTML = `<div class="products-empty is-error"><strong>Erro ao carregar</strong><span>${esc(error?.message || "Tente novamente em instantes.")}</span></div>`;
     view?.setAttribute("aria-busy", "false");
   }
 }
