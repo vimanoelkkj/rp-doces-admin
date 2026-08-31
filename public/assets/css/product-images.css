@@ -1,0 +1,18 @@
+.rp-product-card__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.rp-product-card__media:has(.rp-product-card__image) {
+  background: var(--rp-color-surface);
+}
+
+.rp-product-card__media:has(.rp-product-card__image) .rp-product-card__media-label,
+.rp-product-card__media:has(.rp-product-card__image) .rp-product-card__media-name {
+  display: none;
+}
