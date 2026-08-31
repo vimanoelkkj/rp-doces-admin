@@ -201,6 +201,75 @@
   font-weight: 800;
 }
 
+/* Em desktops com pouca altura útil, o modal inteiro precisa caber na viewport.
+   O painel fica ancorado no topo, com rolagem interna, em vez de ser centralizado
+   com parte do cabeçalho acima da tela. */
+@media (min-width: 701px) and (max-height: 820px) {
+  .manual-order-dialog {
+    place-items: start center;
+    padding: 8px 14px;
+    overflow: hidden;
+  }
+
+  .manual-order-dialog .manual-order-panel {
+    width: min(760px, calc(100vw - 28px));
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .manual-order-dialog .orders-dialog__head {
+    padding: 16px 24px 12px;
+  }
+
+  .manual-order-dialog .orders-dialog__head h2 {
+    font-size: 1.45rem;
+  }
+
+  .manual-order-dialog .orders-dialog__head p {
+    font-size: 0.82rem;
+  }
+
+  .manual-order-dialog .manual-order-form {
+    gap: 12px;
+    padding: 14px 24px 18px;
+  }
+
+  .manual-order-dialog label,
+  .manual-order-dialog .manual-order-note {
+    gap: 5px;
+  }
+
+  .manual-order-dialog input,
+  .manual-order-dialog select,
+  .manual-order-dialog textarea,
+  .manual-order-dialog .manual-select__trigger {
+    min-height: 38px;
+  }
+
+  .manual-order-dialog .manual-order-section {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .manual-order-dialog .manual-remove-item {
+    height: 38px;
+  }
+
+  .manual-order-dialog textarea {
+    min-height: 64px;
+    max-height: 72px;
+  }
+
+  .manual-order-dialog .orders-secondary,
+  .manual-order-dialog .manual-order-button {
+    min-height: 38px;
+  }
+}
+
 @media (max-width: 700px) {
   .manual-order-dialog {
     place-items: start center;
