@@ -507,14 +507,21 @@ body.products-dialog-open {
     grid-template-columns: 1fr 1fr;
   }
   .products-dialog {
+    inset: auto 0 auto;
+    top: var(--products-visual-offset-top, 0px);
+    height: var(--products-visual-height, 100dvh);
     align-items: end;
     padding: 0;
+    overflow: hidden;
   }
   .products-dialog__panel {
     width: 100%;
-    max-height: 92dvh;
+    max-height: 100%;
     border-radius: 22px 22px 0 0;
     padding: 18px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: 24px;
   }
   .products-form__grid,
   .products-form__toggles {
@@ -526,6 +533,7 @@ body.products-dialog-open {
   .products-form__actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
   }
   .products-form__actions button {
     min-width: 0;
