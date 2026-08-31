@@ -5,19 +5,10 @@ import path from "node:path";
 const root = process.cwd();
 const persistDir = path.join(root, ".tmp", "schema-full-d1");
 const outputPath = path.join(root, "schema_full.sql");
-const wranglerBin = path.join(
-  root,
-  "node_modules",
-  ".bin",
-  process.platform === "win32" ? "wrangler.cmd" : "wrangler"
-);
+const wranglerCli = path.join(root, "node_modules", "wrangler", "bin", "wrangler.js");
 
 function runWrangler(args, { input } = {}) {
-  const command = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : wranglerBin;
-  const commandArgs =
-    process.platform === "win32" ? ["/d", "/s", "/c", wranglerBin, ...args] : args;
-
-  const result = spawnSync(command, commandArgs, {
+  const result = spawnSync(process.execPath, [wranglerCli, ...args], {
     cwd: root,
     encoding: "utf8",
     input,
@@ -58,14 +49,14 @@ const migrationOutput = runWrangler(
 if (migrationOutput.trim()) process.stdout.write(migrationOutput);
 
 const query = `
-SELECT "type" AS object_type, name, tbl_name, sql
+SELECT type AS object_type, name, tbl_name, sql
 FROM sqlite_master
 WHERE sql IS NOT NULL
   AND name NOT LIKE 'sqlite_%'
   AND name NOT LIKE '_cf_%'
   AND name <> 'd1_migrations'
 ORDER BY
-  CASE "type"
+  CASE type
     WHEN 'table' THEN 0
     WHEN 'index' THEN 1
     WHEN 'trigger' THEN 2
