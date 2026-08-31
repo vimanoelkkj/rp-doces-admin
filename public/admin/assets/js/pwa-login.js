@@ -70,6 +70,7 @@ const switchUserButton = document.querySelector("[data-switch-user]");
 const loginAvatar = document.querySelector("[data-login-avatar]");
 const loginName = document.querySelector("[data-login-name]");
 const loginUsername = document.querySelector("[data-login-username]");
+const mobileInput = matchMedia("(max-width: 520px), (pointer: coarse)");
 const returnParam = new URLSearchParams(location.search).get("return");
 const destination = returnParam?.startsWith("/admin/") ? returnParam : "/admin/";
 
@@ -113,7 +114,10 @@ function showPasswordStage(user) {
   usernameStage.hidden = true;
   passwordStage.hidden = false;
   card.classList.add("is-password-stage");
-  requestAnimationFrame(() => passwordForm.elements.senha?.focus());
+
+  if (!mobileInput.matches) {
+    requestAnimationFrame(() => passwordForm.elements.senha?.focus());
+  }
 }
 
 function showUsernameStage({ preserveUsername = true } = {}) {
@@ -188,6 +192,12 @@ usernameForm?.addEventListener("submit", async event => {
       setStatus("Não encontramos uma conta ativa com esse usuário.", true);
       return;
     }
+
+    if (mobileInput.matches) {
+      usernameForm.elements.username?.blur();
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    }
+
     setStatus();
     showPasswordStage(payload.usuario);
   } catch (error) {
