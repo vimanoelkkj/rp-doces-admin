@@ -1,0 +1,39 @@
+.admin-nav__item[data-badge-tooltip] {
+  position: relative;
+}
+
+.admin-nav__item[data-badge-tooltip]::after {
+  content: attr(data-badge-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 40;
+  width: max-content;
+  max-width: 220px;
+  transform: translate(4px, -50%);
+  border: 1px solid rgba(102, 61, 52, 0.12);
+  border-radius: 11px;
+  padding: 8px 10px;
+  background: #fffaf7;
+  box-shadow: 0 10px 26px rgba(64, 34, 42, 0.14);
+  color: #5b342b;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .14s ease, transform .14s ease;
+}
+
+.admin-nav__item[data-badge-tooltip]:hover::after,
+.admin-nav__item[data-badge-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+@media (max-width: 860px) {
+  .admin-nav__item[data-badge-tooltip]::after {
+    display: none;
+  }
+}
