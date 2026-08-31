@@ -151,9 +151,7 @@ async function injectHomeImagesCard(storeView) {
   card.innerHTML = `<div class="store-card__head"><div><h3>Imagens da página inicial</h3><p>Gerencie as duas fotos principais da home.</p></div></div>
     <div class="store-home-images">${SLOTS.map(slot => slotMarkup(slot, config[slot.key])).join("")}</div>`;
 
-  const previewCard = grid.querySelector(".store-card--public-preview");
-  if (previewCard) grid.insertBefore(card, previewCard);
-  else grid.appendChild(card);
+  grid.appendChild(card);
   card.querySelectorAll("[data-home-image-slot]").forEach(bindSlot);
 }
 
