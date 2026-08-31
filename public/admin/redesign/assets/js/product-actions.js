@@ -194,7 +194,8 @@ function enhanceForm(form) {
 function enhanceCard(card) {
   if (!(card instanceof HTMLElement) || card.dataset.productActionsEnhanced === "true") return;
   const button = card.querySelector(".products-card__menu");
-  if (!(button instanceof HTMLButtonElement)) return;
+  const heading = button?.closest(".products-card__heading");
+  if (!(button instanceof HTMLButtonElement) || !(heading instanceof HTMLElement)) return;
 
   card.dataset.productActionsEnhanced = "true";
   button.disabled = false;
@@ -210,7 +211,7 @@ function enhanceCard(card) {
     <button type="button" role="menuitem" data-edit-product>Editar produto</button>
     <button type="button" role="menuitem" data-toggle-product-state>Arquivar produto</button>
   `;
-  card.append(menu);
+  heading.append(menu);
 
   const stateButton = menu.querySelector("[data-toggle-product-state]");
 
