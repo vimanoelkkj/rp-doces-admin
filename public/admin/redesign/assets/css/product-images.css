@@ -12,6 +12,15 @@
   overflow: hidden;
 }
 
+.products-card__image.is-transparent-art {
+  object-fit: contain;
+  padding: 14px;
+}
+
+.products-card__media.has-transparent-art {
+  background: #fff8f2;
+}
+
 .products-card__flags,
 .products-card__promo {
   position: relative;
@@ -35,7 +44,7 @@
   border: 1px dashed rgba(92, 53, 62, 0.2);
   border-radius: 16px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 248, 242, 0.86);
   display: grid;
   place-items: center;
   color: rgba(92, 53, 62, 0.56);
@@ -46,6 +55,15 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.product-image-preview img.is-transparent-art {
+  object-fit: contain;
+  padding: 10px;
+}
+
+.product-image-preview.has-transparent-art {
+  background: #fff8f2;
 }
 
 .product-image-actions {
