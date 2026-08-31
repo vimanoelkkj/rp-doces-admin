@@ -64,8 +64,14 @@ export const adminApi = {
   orders() {
     return request("/api/admin/orders");
   },
+  createManualOrder(order) {
+    return jsonRequest("/api/admin/orders", "POST", order);
+  },
   updateOrderStatus(id, status) {
     return jsonRequest(`/api/admin/orders/${id}`, "PUT", { status_pedido: status });
+  },
+  updateManualPayment(id, status) {
+    return jsonRequest(`/api/admin/orders/${id}`, "PUT", { status_pagamento: status });
   },
   products() {
     return request("/api/admin/products");
