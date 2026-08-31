@@ -3,7 +3,7 @@ import { mpRequest } from "../../lib/mercadoPago.js";
 import { syncOrderPayment } from "../../lib/paymentSync.js";
 import { logEvent } from "../../lib/logger.js";
 
-export async function onRequestGet({ params, env }) {
+export async function onRequestGet({ params, env, waitUntil }) {
   const token = String(params.token || "");
   if (!/^[0-9a-f-]{36}$/i.test(token)) return json({ erro: "Pedido inválido." }, 400);
 
@@ -34,11 +34,15 @@ export async function onRequestGet({ params, env }) {
   if (pedido.mp_order_id && pedido.status_pagamento === "PENDENTE" && env.MP_ACCESS_TOKEN) {
     try {
       const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(pedido.mp_order_id)}`);
-      const synced = await syncOrderPayment(env, {
-        pedidoId: pedido.id,
-        order,
-        mpOrderId: pedido.mp_order_id
-      });
+      const synced = await syncOrderPayment(
+        env,
+        {
+          pedidoId: pedido.id,
+          order,
+          mpOrderId: pedido.mp_order_id
+        },
+        { waitUntil }
+      );
       pedido.status_pagamento = synced.status_pagamento;
       pedido.mp_status = synced.mp_status;
       pedido.mp_status_detail = synced.mp_status_detail;
