@@ -2,9 +2,9 @@ export async function onRequestGet({ env, params }) {
   if (!env.PRODUCT_IMAGES) return new Response("Not found", { status: 404 });
 
   const key = String(params.key || "");
-  if (!/^product-\d+-[0-9a-f-]+\.(?:jpg|png|webp)$/i.test(key)) {
-    return new Response("Not found", { status: 404 });
-  }
+  const productImage = /^product-\d+-[0-9a-f-]+\.(?:jpg|png|webp)$/i.test(key);
+  const siteImage = /^site-(?:hero|about)-[0-9a-f-]+\.(?:jpg|png|webp)$/i.test(key);
+  if (!productImage && !siteImage) return new Response("Not found", { status: 404 });
 
   const object = await env.PRODUCT_IMAGES.get(key);
   if (!object) return new Response("Not found", { status: 404 });
