@@ -1,4 +1,4 @@
-const CACHE = "rp-admin-shell-v1";
+const CACHE = "rp-admin-shell-v2";
 const SHELL = [
   "/admin/",
   "/admin/login.html",
@@ -10,6 +10,8 @@ const SHELL = [
   "/admin/redesign/assets/css/app.css",
   "/admin/redesign/assets/css/responsive-qa.css",
   "/admin/redesign/assets/css/pwa-shell.css",
+  "/admin/redesign/assets/css/manual-orders-rescue.css",
+  "/admin/redesign/assets/css/sidebar-badges-help.css",
   "/admin/redesign/assets/js/app.js"
 ];
 
@@ -68,6 +70,23 @@ self.addEventListener("fetch", event => {
             (await caches.match("/admin/login.html"))
           );
         })
+    );
+    return;
+  }
+
+  // O redesign muda com frequência durante o desenvolvimento. CSS e JS precisam
+  // consultar a rede primeiro para não manter uma interface antiga presa no cache.
+  if (url.pathname.startsWith("/admin/redesign/assets/")) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
