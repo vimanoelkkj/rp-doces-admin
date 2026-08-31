@@ -36,4 +36,13 @@
   .admin-nav__item[data-badge-tooltip]::after {
     display: none;
   }
+
+  .admin-app a,
+  .admin-app button,
+  .admin-app [role="button"],
+  .admin-app [role="menuitem"],
+  .admin-app summary,
+  .admin-app label {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
