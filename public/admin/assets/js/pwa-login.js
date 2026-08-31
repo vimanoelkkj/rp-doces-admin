@@ -60,8 +60,16 @@ async function api(path, body) {
 }
 
 const status = document.querySelector("[data-login-status]");
+const card = document.querySelector("[data-login-card]");
 const passkeyButton = document.querySelector("[data-passkey-login]");
+const usernameForm = document.querySelector("[data-username-form]");
 const passwordForm = document.querySelector("[data-password-form]");
+const usernameStage = document.querySelector('[data-login-stage="username"]');
+const passwordStage = document.querySelector('[data-login-stage="password"]');
+const switchUserButton = document.querySelector("[data-switch-user]");
+const loginAvatar = document.querySelector("[data-login-avatar]");
+const loginName = document.querySelector("[data-login-name]");
+const loginUsername = document.querySelector("[data-login-username]");
 const returnParam = new URLSearchParams(location.search).get("return");
 const destination = returnParam?.startsWith("/admin/") ? returnParam : "/admin/";
 
@@ -72,6 +80,54 @@ function setStatus(message = "", error = false) {
 
 function goToAdmin() {
   location.replace(destination);
+}
+
+function initials(name = "") {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  return (
+    parts
+      .slice(0, 2)
+      .map(part => part[0])
+      .join("") || "RP"
+  ).toUpperCase();
+}
+
+function renderIdentity(user) {
+  loginAvatar.replaceChildren();
+  if (user?.avatar_url) {
+    const image = document.createElement("img");
+    image.src = user.avatar_url;
+    image.alt = "";
+    loginAvatar.appendChild(image);
+  } else {
+    loginAvatar.textContent = initials(user?.nome || user?.username);
+  }
+  loginName.textContent = user?.nome || user?.username || "Administrador";
+  loginUsername.textContent = `@${user?.username || "usuario"}`;
+}
+
+function showPasswordStage(user) {
+  const username = String(user?.username || "").trim();
+  renderIdentity(user);
+  passwordForm.elements.username.value = username;
+  usernameStage.hidden = true;
+  passwordStage.hidden = false;
+  card.classList.add("is-password-stage");
+  requestAnimationFrame(() => passwordForm.elements.senha?.focus());
+}
+
+function showUsernameStage({ preserveUsername = true } = {}) {
+  const previous = preserveUsername ? passwordForm.elements.username.value : "";
+  passwordForm.reset();
+  passwordStage.hidden = true;
+  usernameStage.hidden = false;
+  card.classList.remove("is-password-stage");
+  if (previous) usernameForm.elements.username.value = previous;
+  setStatus();
+  requestAnimationFrame(() => {
+    usernameForm.elements.username?.focus();
+    usernameForm.elements.username?.select();
+  });
 }
 
 async function alreadyAuthenticated() {
@@ -116,6 +172,31 @@ passkeyButton?.addEventListener("click", async () => {
   }
 });
 
+usernameForm?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const submit = usernameForm.querySelector('button[type="submit"]');
+  const username = String(new FormData(usernameForm).get("username") || "")
+    .trim()
+    .toLowerCase();
+  if (!username) return;
+
+  submit.disabled = true;
+  setStatus("Procurando sua conta…");
+  try {
+    const payload = await api("/api/auth/identify", { username });
+    if (!payload?.encontrado || !payload?.usuario) {
+      setStatus("Não encontramos uma conta ativa com esse usuário.", true);
+      return;
+    }
+    setStatus();
+    showPasswordStage(payload.usuario);
+  } catch (error) {
+    setStatus(error?.message || "Não foi possível localizar a conta.", true);
+  } finally {
+    submit.disabled = false;
+  }
+});
+
 passwordForm?.addEventListener("submit", async event => {
   event.preventDefault();
   const submit = passwordForm.querySelector('button[type="submit"]');
@@ -130,10 +211,13 @@ passwordForm?.addEventListener("submit", async event => {
     goToAdmin();
   } catch (error) {
     setStatus(error?.message || "Não foi possível entrar.", true);
+    passwordForm.elements.senha?.select();
   } finally {
     submit.disabled = false;
   }
 });
+
+switchUserButton?.addEventListener("click", () => showUsernameStage());
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/admin/sw.js", { scope: "/admin/" }).catch(() => {});
