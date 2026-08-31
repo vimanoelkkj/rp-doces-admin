@@ -61,6 +61,7 @@ const profileButton = document.querySelector(".admin-profile");
 const profileName = document.querySelector("[data-profile-name]");
 const profileRole = document.querySelector("[data-profile-role]");
 const profileAvatar = document.querySelector("[data-profile-avatar]");
+const publicSiteLink = document.querySelector('.admin-topbar__actions a.admin-icon[href="/"]');
 
 const pages = {
   dashboard: ["Dashboard", "Visão geral da operação"],
@@ -156,6 +157,11 @@ function setPage(page) {
 
 collapseButton?.addEventListener("click", () => {
   setCollapsed(!app?.classList.contains("is-collapsed"));
+});
+
+publicSiteLink?.addEventListener("click", event => {
+  event.preventDefault();
+  location.assign("/");
 });
 
 navItems.forEach(item => item.addEventListener("click", () => setPage(item.dataset.adminNav)));
