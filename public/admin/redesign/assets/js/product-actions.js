@@ -20,9 +20,25 @@ function parseMoneyToCents(value) {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
+function isTouchInteraction() {
+  return window.matchMedia?.("(hover: none), (pointer: coarse)")?.matches === true;
+}
+
+function closeMenu(menu) {
+  if (!(menu instanceof HTMLElement)) return;
+  menu.hidden = true;
+
+  const card = menu.closest(".products-card");
+  const trigger = card?.querySelector(".products-card__menu");
+  if (trigger instanceof HTMLButtonElement) {
+    trigger.setAttribute("aria-expanded", "false");
+    if (isTouchInteraction()) trigger.blur();
+  }
+}
+
 function closeAllMenus(except = null) {
   document.querySelectorAll("[data-product-actions-menu]").forEach(menu => {
-    if (menu !== except) menu.hidden = true;
+    if (menu !== except) closeMenu(menu);
   });
 }
 
@@ -202,10 +218,17 @@ function enhanceCard(card) {
     event.stopPropagation();
     const opening = menu.hidden;
     closeAllMenus(opening ? menu : null);
-    menu.hidden = !opening;
-    button.setAttribute("aria-expanded", String(opening));
 
-    if (opening && stateButton instanceof HTMLButtonElement) {
+    if (!opening) {
+      closeMenu(menu);
+      return;
+    }
+
+    menu.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+    if (isTouchInteraction()) button.blur();
+
+    if (stateButton instanceof HTMLButtonElement) {
       const id = Number(card.dataset.productId || 0);
       const product = await getProduct(id);
       if (product) {
@@ -218,8 +241,7 @@ function enhanceCard(card) {
   });
 
   menu.querySelector("[data-edit-product]")?.addEventListener("click", async () => {
-    menu.hidden = true;
-    button.setAttribute("aria-expanded", "false");
+    closeMenu(menu);
 
     const id = Number(card.dataset.productId || 0);
     const product = card._productActionProduct || (await getProduct(id));
@@ -238,8 +260,7 @@ function enhanceCard(card) {
   });
 
   stateButton?.addEventListener("click", async () => {
-    menu.hidden = true;
-    button.setAttribute("aria-expanded", "false");
+    closeMenu(menu);
 
     const id = Number(card.dataset.productId || 0);
     const product = card._productActionProduct || (await getProduct(id));
@@ -290,6 +311,11 @@ document.addEventListener("click", event => {
       if (form instanceof HTMLFormElement) setDialogMode(form, null);
     });
   }
+});
+
+document.addEventListener("pointerdown", event => {
+  if (event.pointerType !== "touch") return;
+  if (!event.target.closest(".products-card__menu, [data-product-actions-menu]")) closeAllMenus();
 });
 
 enhanceProducts();
