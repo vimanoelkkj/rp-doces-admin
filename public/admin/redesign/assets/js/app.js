@@ -1,6 +1,6 @@
 import "/assets/js/product-transparency.js";
 import { adminApi } from "./api.js";
-import { renderDashboard } from "./dashboard.js";
+import { renderDashboard, invalidateDashboardCache } from "./dashboard.js";
 import { renderProducts } from "./products.js";
 import { renderOrders } from "./orders.js";
 import { renderAdmins } from "./admins.js";
@@ -71,7 +71,13 @@ const pages = {
   loja: ["Loja", "Configurações operacionais do cardápio público"]
 };
 
+const pageViews = new Map();
+const pageRefreshes = new Map();
+const PAGE_VIEW_TTL = 30_000;
+const ORDERS_VIEW_TTL = 15_000;
+
 let currentPage = null;
+let mountedPage = null;
 let currentUser = null;
 let navigationId = 0;
 
@@ -115,28 +121,131 @@ function redirectToLogin() {
   location.replace(`/admin/login.html?return=${destination}`);
 }
 
-async function renderPage(page) {
-  if (!content) return;
+function pageTtl(page) {
+  return page === "pedidos" ? ORDERS_VIEW_TTL : PAGE_VIEW_TTL;
+}
+
+function isViewFresh(page, view) {
+  return Boolean(view && !view.invalidated && Date.now() - view.updatedAt < pageTtl(page));
+}
+
+function cacheMountedView() {
+  if (!content || !mountedPage || !content.childNodes.length) return;
+  const existing = pageViews.get(mountedPage) || {};
+  pageViews.set(mountedPage, {
+    ...existing,
+    nodes: [...content.childNodes],
+    updatedAt: existing.updatedAt || Date.now(),
+    invalidated: Boolean(existing.invalidated)
+  });
+}
+
+function restoreView(page, view) {
+  if (!content || !view?.nodes?.length) return false;
+  content.replaceChildren(...view.nodes);
+  mountedPage = page;
+  return true;
+}
+
+function looksLikeRefreshError(target) {
+  const text = String(target?.textContent || "").toLowerCase();
+  return (
+    text.includes("não foi possível carregar") ||
+    text.includes("falha ao carregar") ||
+    text.includes("tente novamente em instantes")
+  );
+}
+
+async function renderPage(page, target = content, { isActive = () => currentPage === page } = {}) {
+  if (!target) return;
   if (page === "dashboard") {
-    await renderDashboard(content, { onUnauthorized: redirectToLogin, onNavigate: setPage });
+    await renderDashboard(target, { onUnauthorized: redirectToLogin, onNavigate: setPage, isActive });
     return;
   }
   if (page === "produtos") {
-    await renderProducts(content, { onUnauthorized: redirectToLogin });
+    await renderProducts(target, { onUnauthorized: redirectToLogin });
     return;
   }
   if (page === "pedidos") {
-    await renderOrders(content, { onUnauthorized: redirectToLogin });
+    await renderOrders(target, { onUnauthorized: redirectToLogin });
     return;
   }
   if (page === "admins") {
-    await renderAdmins(content, { onUnauthorized: redirectToLogin, currentUser });
+    await renderAdmins(target, { onUnauthorized: redirectToLogin, currentUser });
     return;
   }
   if (page === "loja") {
-    await renderStore(content, { onUnauthorized: redirectToLogin });
+    await renderStore(target, { onUnauthorized: redirectToLogin });
   }
 }
+
+function rememberRenderedView(page, target = content) {
+  if (!target) return;
+  pageViews.set(page, {
+    nodes: [...target.childNodes],
+    updatedAt: Date.now(),
+    invalidated: false
+  });
+}
+
+function refreshViewInBackground(page) {
+  if (pageRefreshes.has(page)) return pageRefreshes.get(page);
+
+  const staging = document.createElement("div");
+  const refresh = renderPage(page, staging, { isActive: () => currentPage === page })
+    .then(() => {
+      if (looksLikeRefreshError(staging)) return;
+      const nodes = [...staging.childNodes];
+      if (!nodes.length) return;
+
+      const freshView = { nodes, updatedAt: Date.now(), invalidated: false };
+      pageViews.set(page, freshView);
+
+      if (currentPage === page && mountedPage === page && content) {
+        content.replaceChildren(...nodes);
+        freshView.nodes = [...content.childNodes];
+      }
+    })
+    .catch(error => {
+      if (error?.status === 401) redirectToLogin();
+      else console.warn(`R&P Admin: atualização silenciosa de ${page} falhou.`, error);
+    })
+    .finally(() => {
+      pageRefreshes.delete(page);
+    });
+
+  pageRefreshes.set(page, refresh);
+  return refresh;
+}
+
+async function showPage(page, id) {
+  if (!content) return;
+  const cached = pageViews.get(page);
+
+  if (cached?.nodes?.length) {
+    restoreView(page, cached);
+    if (!isViewFresh(page, cached)) refreshViewInBackground(page);
+    return;
+  }
+
+  await renderPage(page, content, { isActive: () => id === navigationId && currentPage === page });
+  if (id !== navigationId || currentPage !== page) return;
+  mountedPage = page;
+  rememberRenderedView(page);
+}
+
+function invalidateViews(pageNames = []) {
+  for (const page of pageNames) {
+    const view = pageViews.get(page);
+    if (view) view.invalidated = true;
+    if (page === "dashboard") invalidateDashboardCache();
+  }
+}
+
+window.addEventListener("rp-admin-data-changed", event => {
+  const changed = Array.isArray(event.detail?.pages) ? event.detail.pages : [];
+  invalidateViews(changed);
+});
 
 function waitForTransition(element, timeout = 140) {
   return new Promise(resolve => {
@@ -166,16 +275,22 @@ async function transitionToPage(page, id) {
     if (id !== navigationId) return;
   }
 
+  cacheMountedView();
+  content.replaceChildren();
   content.classList.remove("is-page-leaving");
-  await renderPage(page);
-  if (id !== navigationId || reducedMotion) return;
 
-  content.classList.add("is-page-entering");
-  requestAnimationFrame(() => {
+  const showPromise = showPage(page, id);
+
+  if (!reducedMotion) {
+    content.classList.add("is-page-entering");
     requestAnimationFrame(() => {
-      if (id === navigationId) content.classList.remove("is-page-entering");
+      requestAnimationFrame(() => {
+        if (id === navigationId) content.classList.remove("is-page-entering");
+      });
     });
-  });
+  }
+
+  await showPromise;
 }
 
 function setPage(page) {
