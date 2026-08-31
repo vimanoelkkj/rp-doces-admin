@@ -2,6 +2,10 @@
   position: relative;
 }
 
+.products-card__heading {
+  position: relative;
+}
+
 .products-card__menu:not(:disabled) {
   cursor: pointer;
 }
@@ -20,9 +24,9 @@
 
 .products-actions-menu {
   position: absolute;
-  z-index: 12;
-  top: 214px;
-  right: 14px;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
   min-width: 176px;
   border: 1px solid var(--rp-line);
   border-radius: 12px;
@@ -98,11 +102,4 @@
 .products-actions-menu button:disabled {
   opacity: 0.55;
   cursor: wait;
-}
-
-@media (max-width: 640px) {
-  .products-actions-menu {
-    top: 214px;
-    right: 14px;
-  }
 }
