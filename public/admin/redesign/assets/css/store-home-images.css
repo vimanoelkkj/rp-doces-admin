@@ -4,16 +4,16 @@
 .store-home-images {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 .store-home-image {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
   border: 1px solid var(--rp-line);
   border-radius: 14px;
-  padding: 13px;
+  padding: 11px;
   background: var(--rp-surface-2);
 }
 .store-home-image__preview {
@@ -25,7 +25,7 @@
   border-radius: 12px;
   background: #fff;
   color: var(--rp-ink-3);
-  font-size: 11px;
+  font-size: 10.5px;
   text-align: center;
 }
 .store-home-image__preview img {
@@ -36,36 +36,36 @@
 .store-home-image__body {
   min-width: 0;
   display: grid;
-  gap: 9px;
+  gap: 7px;
 }
 .store-home-image__body strong {
   display: block;
   color: var(--rp-ink);
   font-family: var(--rp-display);
-  font-size: 14px;
+  font-size: 13.5px;
 }
 .store-home-image__body p {
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   color: var(--rp-ink-3);
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 10.5px;
+  line-height: 1.35;
 }
 .store-home-image__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 6px;
 }
 .store-home-image__button {
-  min-height: 36px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--rp-line-2);
-  border-radius: 10px;
-  padding: 0 12px;
+  border-radius: 9px;
+  padding: 0 10px;
   background: #fff;
   color: var(--rp-ink-2);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
@@ -81,16 +81,44 @@
 }
 .store-home-image__body small {
   color: var(--rp-ink-3);
-  font-size: 10.5px;
+  font-size: 10px;
 }
+
+/* Desktop largo: a prévia fica na coluna direita e ocupa as duas linhas.
+   Contato e imagens formam uma pilha na esquerda, aproveitando o espaço que antes
+   ficava vazio abaixo do formulário de contato. */
 @media (min-width: 1600px) {
+  .store-card--contact {
+    grid-column: 1 / span 8;
+    grid-row: 2;
+  }
+
+  .store-card--public-preview {
+    grid-column: 9 / span 4;
+    grid-row: 2 / span 2;
+    height: 100%;
+  }
+
   .store-card--home-images {
-    grid-column: 1 / -1;
+    grid-column: 1 / span 8;
+    grid-row: 3;
+    padding: 14px 16px;
+    gap: 10px;
+  }
+
+  .store-card--home-images .store-card__head h3 {
+    font-size: 16px;
+  }
+
+  .store-card--home-images .store-card__head p {
+    margin-top: 2px;
+    font-size: 10.5px;
   }
 }
 @media (max-width: 900px) {
   .store-card--home-images {
     grid-column: auto;
+    grid-row: auto;
   }
   .store-home-images {
     grid-template-columns: 1fr;
