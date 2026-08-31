@@ -25,71 +25,120 @@
       <section class="login-card" aria-labelledby="login-title" data-login-card>
         <div class="login-brand" aria-hidden="true">R&P</div>
         <div class="login-heading">
-          <span>Painel administrativo</span>
-          <h1 id="login-title">Bem-vindo de volta</h1>
-          <p>Entre para gerenciar pedidos, produtos e a loja.</p>
+          <span data-login-kicker>Painel administrativo</span>
+          <h1 id="login-title" data-login-title>Bem-vindo de volta</h1>
+          <p data-login-description>Entre para gerenciar pedidos, produtos e a loja.</p>
         </div>
 
-        <button class="login-passkey" type="button" data-passkey-login>
-          <span class="login-passkey__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M12 3a5 5 0 0 0-5 5v2M17 10V8a5 5 0 0 0-5-5M5 13v2a7 7 0 0 0 14 0v-2M9 12v3a3 3 0 0 0 6 0v-3M12 8v4"
-              />
-            </svg>
-          </span>
-          <span
-            ><strong>Entrar com biometria</strong
-            ><small>Digital, rosto ou passkey do aparelho</small></span
-          >
-        </button>
-
-        <div class="login-separator"><span>ou use sua senha</span></div>
-
-        <div class="login-stage" data-login-stage="username">
-          <form data-username-form>
+        <div class="login-stage" data-login-stage="setup" hidden>
+          <form data-setup-form>
+            <label>
+              <span>Nome</span>
+              <input name="nome" autocomplete="name" required minlength="2" maxlength="80" />
+            </label>
             <label>
               <span>Usuário</span>
               <input
                 name="username"
                 autocomplete="username"
                 required
-                maxlength="80"
+                minlength="3"
+                maxlength="30"
                 autocapitalize="none"
                 spellcheck="false"
+                pattern="[a-z0-9._-]{3,30}"
               />
             </label>
-            <button class="login-submit" type="submit">Continuar</button>
-          </form>
-        </div>
-
-        <div class="login-stage login-stage--password" data-login-stage="password" hidden>
-          <div class="login-identity">
-            <div class="login-identity__avatar" data-login-avatar aria-hidden="true">RP</div>
-            <strong data-login-name>Administrador</strong>
-            <span data-login-username>@usuario</span>
-          </div>
-
-          <form data-password-form>
-            <input type="hidden" name="username" />
+            <label>
+              <span>E-mail</span>
+              <input name="email" type="email" autocomplete="email" required maxlength="160" />
+            </label>
             <label>
               <span>Senha</span>
               <input
                 name="senha"
                 type="password"
-                autocomplete="current-password"
+                autocomplete="new-password"
                 required
                 maxlength="256"
               />
             </label>
-            <button class="login-submit" type="submit">Entrar</button>
+            <label>
+              <span>Chave de configuração</span>
+              <input
+                name="setupKey"
+                type="password"
+                autocomplete="off"
+                required
+                maxlength="256"
+              />
+            </label>
+            <button class="login-submit" type="submit">Criar administrador</button>
           </form>
+        </div>
 
-          <button class="login-switch-user" type="button" data-switch-user>Trocar usuário</button>
+        <div data-login-existing>
+          <button class="login-passkey" type="button" data-passkey-login>
+            <span class="login-passkey__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 3a5 5 0 0 0-5 5v2M17 10V8a5 5 0 0 0-5-5M5 13v2a7 7 0 0 0 14 0v-2M9 12v3a3 3 0 0 0 6 0v-3M12 8v4"
+                />
+              </svg>
+            </span>
+            <span
+              ><strong>Entrar com biometria</strong
+              ><small>Digital, rosto ou passkey do aparelho</small></span
+            >
+          </button>
+
+          <div class="login-separator"><span>ou use sua senha</span></div>
+
+          <div class="login-stage" data-login-stage="username">
+            <form data-username-form>
+              <label>
+                <span>Usuário</span>
+                <input
+                  name="username"
+                  autocomplete="username"
+                  required
+                  maxlength="80"
+                  autocapitalize="none"
+                  spellcheck="false"
+                />
+              </label>
+              <button class="login-submit" type="submit">Continuar</button>
+            </form>
+          </div>
+
+          <div class="login-stage login-stage--password" data-login-stage="password" hidden>
+            <div class="login-identity">
+              <div class="login-identity__avatar" data-login-avatar aria-hidden="true">RP</div>
+              <strong data-login-name>Administrador</strong>
+              <span data-login-username>@usuario</span>
+            </div>
+
+            <form data-password-form>
+              <input type="hidden" name="username" />
+              <label>
+                <span>Senha</span>
+                <input
+                  name="senha"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  maxlength="256"
+                />
+              </label>
+              <button class="login-submit" type="submit">Entrar</button>
+            </form>
+
+            <button class="login-switch-user" type="button" data-switch-user>Trocar usuário</button>
+          </div>
         </div>
 
         <p class="login-status" role="status" aria-live="polite" data-login-status></p>
-        <p class="login-foot">
+        <p class="login-foot" data-login-foot>
           A biometria permanece no seu dispositivo e não é enviada à R&P Doces.
         </p>
       </section>
