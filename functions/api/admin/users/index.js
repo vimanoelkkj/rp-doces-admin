@@ -3,23 +3,55 @@ import { requireUser, hashPassword, validatePassword } from "../../../lib/auth.j
 
 const PAPEIS = new Set(["OWNER", "ADMIN"]);
 const isOwner = user => user?.papel === "OWNER";
+const withAvatarUrl = user =>
+  user
+    ? {
+        ...user,
+        avatar_url: user.avatar_key ? `/api/images/${encodeURIComponent(user.avatar_key)}` : null
+      }
+    : null;
+
+async function selectSelf(env, id) {
+  try {
+    return await env.DB.prepare(
+      "SELECT id, nome, username, email, ativo, papel, criado_em, avatar_key FROM usuarios_admin WHERE id=? LIMIT 1"
+    )
+      .bind(id)
+      .first();
+  } catch (error) {
+    if (!String(error?.message || "").includes("no such column: avatar_key")) throw error;
+    return env.DB.prepare(
+      "SELECT id, nome, username, email, ativo, papel, criado_em FROM usuarios_admin WHERE id=? LIMIT 1"
+    )
+      .bind(id)
+      .first();
+  }
+}
+
+async function selectAll(env) {
+  try {
+    const { results } = await env.DB.prepare(
+      "SELECT id, nome, username, email, ativo, papel, criado_em, avatar_key FROM usuarios_admin ORDER BY nome"
+    ).all();
+    return results || [];
+  } catch (error) {
+    if (!String(error?.message || "").includes("no such column: avatar_key")) throw error;
+    const { results } = await env.DB.prepare(
+      "SELECT id, nome, username, email, ativo, papel, criado_em FROM usuarios_admin ORDER BY nome"
+    ).all();
+    return results || [];
+  }
+}
 
 export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
   if (!isOwner(auth.user)) {
-    const self = await env.DB.prepare(
-      "SELECT id, nome, username, email, ativo, papel, criado_em FROM usuarios_admin WHERE id=? LIMIT 1"
-    )
-      .bind(auth.user.id)
-      .first();
+    const self = withAvatarUrl(await selectSelf(env, auth.user.id));
     return json({ usuarios: self ? [self] : [] });
   }
 
-  const { results } = await env.DB.prepare(
-    "SELECT id, nome, username, email, ativo, papel, criado_em FROM usuarios_admin ORDER BY nome"
-  ).all();
-  return json({ usuarios: results || [] });
+  return json({ usuarios: (await selectAll(env)).map(withAvatarUrl) });
 }
 
 export async function onRequestPost({ request, env }) {
