@@ -168,14 +168,14 @@ export async function renderStore(root, { onUnauthorized } = {}) {
           <div class="store-preview"><small>Como aparece no site</small><strong data-store-schedule-preview>${esc(initialSchedule)}</strong></div>
         </section>
 
-        <section class="store-card">
+        <section class="store-card store-card--pickup">
           <div class="store-card__head"><span class="store-card__icon">⌖</span><div><h3>Retirada</h3><p>Local e endereço mostrados ao cliente.</p></div></div>
           <label class="store-field"><span>Nome do local</span><input name="local_retirada" value="${esc(config.local_retirada || "")}" placeholder="Ex.: Temponi Concept" /></label>
           <label class="store-field"><span>Endereço</span><input name="endereco" value="${esc(config.endereco || "")}" placeholder="Rua, número, bairro e cidade" /></label>
           <label class="store-field"><span>Link do Google Maps</span><input name="maps_url" type="url" value="${esc(config.maps_url || "")}" placeholder="https://maps.google.com/..." /></label>
         </section>
 
-        <section class="store-card">
+        <section class="store-card store-card--delivery">
           <div class="store-card__head"><span class="store-card__icon">↗</span><div><h3>Entregas</h3><p>Defina o estado exibido no cardápio.</p></div></div>
           <div class="store-choices" data-store-delivery-group>${renderDelivery(delivery)}</div>
           <div class="store-help"><strong data-store-delivery-label>${DELIVERY[delivery]}</strong><span>Essa alteração afeta a comunicação pública sobre entregas.</span></div>
@@ -184,7 +184,7 @@ export async function renderStore(root, { onUnauthorized } = {}) {
         <section class="store-card store-card--contact">
           <div class="store-card__head"><span class="store-card__icon">✆</span><div><h3>Contato</h3><p>WhatsApp e mensagem padrão do pedido.</p></div></div>
           <label class="store-field"><span>WhatsApp</span><input name="whatsapp" inputmode="tel" autocomplete="tel" value="${esc(phoneDisplay(config.whatsapp || ""))}" placeholder="(31) 99999-9999" /></label>
-          <label class="store-field"><span>Mensagem padrão</span><textarea name="mensagem_whatsapp" rows="4" placeholder="Mensagem usada ao iniciar o contato pelo WhatsApp">${esc(config.mensagem_whatsapp || "")}</textarea></label>
+          <label class="store-field"><span>Mensagem padrão</span><textarea name="mensagem_whatsapp" rows="3" placeholder="Mensagem usada ao iniciar o contato pelo WhatsApp">${esc(config.mensagem_whatsapp || "")}</textarea></label>
         </section>
 
         <section class="store-card store-card--public-preview">
@@ -228,11 +228,9 @@ export async function renderStore(root, { onUnauthorized } = {}) {
     updatePublicPreview(root, selectedDelivery);
   });
 
-  root
-    .querySelectorAll('[name="local_retirada"],[name="endereco"]')
-    .forEach(input =>
-      input.addEventListener("input", () => updatePublicPreview(root, selectedDelivery))
-    );
+  root.querySelectorAll('[name="local_retirada"],[name="endereco"]').forEach(input => {
+    input.addEventListener("input", () => updatePublicPreview(root, selectedDelivery));
+  });
 
   deliveryGroup?.querySelectorAll("[data-store-delivery]").forEach(button => {
     button.addEventListener("click", () => {
@@ -243,43 +241,39 @@ export async function renderStore(root, { onUnauthorized } = {}) {
         item.setAttribute("aria-pressed", String(active));
       });
       const label = root.querySelector("[data-store-delivery-label]");
-      if (label) label.textContent = DELIVERY[selectedDelivery];
+      if (label) label.textContent = DELIVERY[selectedDelivery] || DELIVERY.EM_BREVE;
       updatePublicPreview(root, selectedDelivery);
     });
   });
 
   save?.addEventListener("click", async () => {
+    if (!save || save.disabled) return;
     save.disabled = true;
     if (status) {
       status.textContent = "Salvando…";
       status.className = "";
     }
-    const activeDays = selectedDays(root);
-    const opening = root.querySelector('[name="horario_abre"]')?.value || "10:00";
-    const closing = root.querySelector('[name="horario_fecha"]')?.value || "19:00";
-    const phoneDigits = root.querySelector('[name="whatsapp"]')?.value.replace(/\D/g, "") || "";
-    const body = {
-      whatsapp: phoneDigits ? `55${phoneDigits}` : "",
-      local_retirada: root.querySelector('[name="local_retirada"]')?.value.trim() || "",
-      endereco: root.querySelector('[name="endereco"]')?.value.trim() || "",
-      maps_url: root.querySelector('[name="maps_url"]')?.value.trim() || "",
-      entregas_status: selectedDelivery,
-      horario_atendimento: scheduleText(activeDays, opening, closing),
-      horario_dias: activeDays.join(","),
-      horario_abre: opening,
-      horario_fecha: closing,
-      mensagem_whatsapp: root.querySelector('[name="mensagem_whatsapp"]')?.value.trim() || ""
-    };
-
     try {
-      await adminApi.updateStoreConfig(body);
+      const selected = selectedDays(root);
+      const payload = {
+        local_retirada: root.querySelector('[name="local_retirada"]')?.value.trim() || "",
+        endereco: root.querySelector('[name="endereco"]')?.value.trim() || "",
+        maps_url: root.querySelector('[name="maps_url"]')?.value.trim() || "",
+        whatsapp: root.querySelector('[name="whatsapp"]')?.value.trim() || "",
+        mensagem_whatsapp:
+          root.querySelector('[name="mensagem_whatsapp"]')?.value.trim() || "",
+        horario_dias: selected.join(","),
+        horario_abre: root.querySelector('[name="horario_abre"]')?.value || "10:00",
+        horario_fecha: root.querySelector('[name="horario_fecha"]')?.value || "19:00",
+        horario_atendimento: currentSchedule(root),
+        entregas_status: selectedDelivery
+      };
+      await adminApi.updateStoreConfig(payload);
       if (status) {
         status.textContent = "Alterações salvas";
         status.className = "is-success";
       }
-      setTimeout(() => {
-        if (status?.textContent === "Alterações salvas") status.textContent = "";
-      }, 2400);
+      window.dispatchEvent(new CustomEvent("rp-admin-data-changed", { detail: { pages: ["store"] } }));
     } catch (error) {
       if (error?.status === 401) return onUnauthorized?.();
       if (status) {
