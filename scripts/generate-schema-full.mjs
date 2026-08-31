@@ -58,14 +58,14 @@ const migrationOutput = runWrangler(
 if (migrationOutput.trim()) process.stdout.write(migrationOutput);
 
 const query = `
-SELECT type, name, tbl_name, sql
+SELECT "type" AS object_type, name, tbl_name, sql
 FROM sqlite_master
 WHERE sql IS NOT NULL
   AND name NOT LIKE 'sqlite_%'
   AND name NOT LIKE '_cf_%'
   AND name <> 'd1_migrations'
 ORDER BY
-  CASE type
+  CASE "type"
     WHEN 'table' THEN 0
     WHEN 'index' THEN 1
     WHEN 'trigger' THEN 2
@@ -109,7 +109,7 @@ const header = `-- AUTO-GERADO. NÃO EDITE MANUALMENTE.\n-- Fonte de verdade: mi
 const body = rows
   .map(row => {
     const sql = String(row.sql || "").trim().replace(/;\s*$/, "");
-    return `-- ${row.type}: ${row.name}\n${sql};`;
+    return `-- ${row.object_type}: ${row.name}\n${sql};`;
   })
   .join("\n\n");
 
