@@ -118,8 +118,6 @@
   background: #fff;
 }
 
-/* O menu nativo do <select> não aceita um hover consistente entre browsers.
-   Mantemos as opções limpas e com a paleta do admin, evitando o cinza pesado onde houver suporte. */
 .manual-order-form select option {
   background: #fffafa;
   color: #382f35;
@@ -129,6 +127,20 @@
 .manual-order-form select option:checked {
   background: #f3dfe5;
   color: #6f1f36;
+}
+
+.manual-qty input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+  text-align: center;
+  padding-inline: 10px;
+}
+
+.manual-qty input[type="number"]::-webkit-inner-spin-button,
+.manual-qty input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
 }
 
 .manual-order-section {
