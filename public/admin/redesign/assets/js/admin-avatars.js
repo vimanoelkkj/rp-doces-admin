@@ -1,5 +1,12 @@
 import { adminApi } from "./api.js";
 
+if (!document.head.querySelector('link[href="/admin/redesign/assets/css/admin-avatars.css"]')) {
+  const stylesheet = document.createElement("link");
+  stylesheet.rel = "stylesheet";
+  stylesheet.href = "/admin/redesign/assets/css/admin-avatars.css";
+  document.head.appendChild(stylesheet);
+}
+
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 let usersById = new Map();
