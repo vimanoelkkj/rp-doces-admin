@@ -13,6 +13,7 @@
     "deploy:production": "node scripts/deploy-production.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.6",
     "wrangler": "^4.0.0"
   },
