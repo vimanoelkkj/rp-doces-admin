@@ -32,11 +32,7 @@ function syncMedia(selector, key, alt) {
 
 function applyConfig() {
   if (!config) return;
-  syncMedia(
-    ".rp-home-media--hero",
-    config.home_hero_image_key,
-    "Foto principal da R&P Doces"
-  );
+  syncMedia(".rp-home-media--hero", config.home_hero_image_key, "Foto principal da R&P Doces");
   syncMedia(
     ".rp-home-media--about",
     config.home_about_image_key,

@@ -131,7 +131,8 @@ function bindSlot(root) {
 }
 
 async function injectHomeImagesCard(storeView) {
-  if (!(storeView instanceof HTMLElement) || storeView.querySelector("[data-store-home-images]")) return;
+  if (!(storeView instanceof HTMLElement) || storeView.querySelector("[data-store-home-images]"))
+    return;
   const grid = storeView.querySelector(".store-grid");
   if (!grid) return;
 
