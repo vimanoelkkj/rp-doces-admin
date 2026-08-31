@@ -58,7 +58,7 @@ export async function onRequestPut({ request, env, params }) {
       p.categoria,
       p.descricao,
       p.preco_centavos,
-      p.disponivel ? 1 : 0,
+      p.ativo ? 1 : 0,
       p.ativo ? 1 : 0,
       p.destaque ? 1 : 0,
       p.emoji,
