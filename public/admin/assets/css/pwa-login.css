@@ -306,6 +306,17 @@ input:focus {
   }
 }
 
+@keyframes login-stage-in-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (max-width: 520px) {
   .login-shell {
     align-items: center;
@@ -315,6 +326,17 @@ input:focus {
     padding: 24px 20px;
     border-radius: 24px;
     box-shadow: 0 18px 50px rgba(97, 57, 48, 0.08);
+  }
+  .login-card.is-password-stage {
+    transform: none;
+    box-shadow: 0 18px 50px rgba(97, 57, 48, 0.08);
+  }
+  .login-stage {
+    animation-name: login-stage-in-mobile;
+    animation-duration: 180ms;
+  }
+  .login-stage--password {
+    transform-origin: initial;
   }
   .login-identity__avatar {
     width: 78px;
