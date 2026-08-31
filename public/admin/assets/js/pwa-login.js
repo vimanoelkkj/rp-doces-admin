@@ -61,6 +61,9 @@ async function api(path, body) {
 
 const status = document.querySelector("[data-login-status]");
 const card = document.querySelector("[data-login-card]");
+const setupStage = document.querySelector('[data-login-stage="setup"]');
+const setupForm = document.querySelector("[data-setup-form]");
+const existingLogin = document.querySelector("[data-login-existing]");
 const passkeyButton = document.querySelector("[data-passkey-login]");
 const usernameForm = document.querySelector("[data-username-form]");
 const passwordForm = document.querySelector("[data-password-form]");
@@ -70,6 +73,10 @@ const switchUserButton = document.querySelector("[data-switch-user]");
 const loginAvatar = document.querySelector("[data-login-avatar]");
 const loginName = document.querySelector("[data-login-name]");
 const loginUsername = document.querySelector("[data-login-username]");
+const loginKicker = document.querySelector("[data-login-kicker]");
+const loginTitle = document.querySelector("[data-login-title]");
+const loginDescription = document.querySelector("[data-login-description]");
+const loginFoot = document.querySelector("[data-login-foot]");
 const mobileInput = matchMedia("(max-width: 520px), (pointer: coarse)");
 const returnParam = new URLSearchParams(location.search).get("return");
 const destination = returnParam?.startsWith("/admin/") ? returnParam : "/admin/";
@@ -91,6 +98,27 @@ function initials(name = "") {
       .map(part => part[0])
       .join("") || "RP"
   ).toUpperCase();
+}
+
+function showSetupStage() {
+  setupStage.hidden = false;
+  existingLogin.hidden = true;
+  card.classList.remove("is-password-stage");
+  loginKicker.textContent = "Configuração inicial";
+  loginTitle.textContent = "Crie o primeiro acesso";
+  loginDescription.textContent = "Cadastre o administrador principal para começar a usar o painel.";
+  loginFoot.textContent = "Esta etapa só aparece enquanto ainda não existe nenhum administrador.";
+  setStatus();
+  requestAnimationFrame(() => setupForm.elements.nome?.focus());
+}
+
+function showLoginStage() {
+  setupStage.hidden = true;
+  existingLogin.hidden = false;
+  loginKicker.textContent = "Painel administrativo";
+  loginTitle.textContent = "Bem-vindo de volta";
+  loginDescription.textContent = "Entre para gerenciar pedidos, produtos e a loja.";
+  loginFoot.textContent = "A biometria permanece no seu dispositivo e não é enviada à R&P Doces.";
 }
 
 function renderIdentity(user) {
@@ -134,6 +162,25 @@ function showUsernameStage({ preserveUsername = true } = {}) {
   });
 }
 
+async function checkInitialSetup() {
+  try {
+    const response = await fetch("/api/setup", {
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+    if (!response.ok) return false;
+    const payload = await response.json().catch(() => ({}));
+    if (payload?.needsSetup) {
+      showSetupStage();
+      return true;
+    }
+    showLoginStage();
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function alreadyAuthenticated() {
   try {
     const response = await fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" });
@@ -142,6 +189,35 @@ async function alreadyAuthenticated() {
     if (payload?.autenticado) goToAdmin();
   } catch (_) {}
 }
+
+setupForm?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const submit = setupForm.querySelector('button[type="submit"]');
+  const data = new FormData(setupForm);
+  submit.disabled = true;
+  setStatus("Criando administrador…");
+
+  try {
+    await api("/api/setup", {
+      nome: String(data.get("nome") || "").trim(),
+      username: String(data.get("username") || "").trim().toLowerCase(),
+      email: String(data.get("email") || "").trim().toLowerCase(),
+      senha: String(data.get("senha") || ""),
+      setupKey: String(data.get("setupKey") || "")
+    });
+
+    const username = String(data.get("username") || "").trim().toLowerCase();
+    setupForm.reset();
+    showLoginStage();
+    usernameForm.elements.username.value = username;
+    setStatus("Administrador criado. Agora entre com sua senha.");
+    requestAnimationFrame(() => usernameForm.elements.username?.focus());
+  } catch (error) {
+    setStatus(error?.message || "Não foi possível concluir a configuração inicial.", true);
+  } finally {
+    submit.disabled = false;
+  }
+});
 
 if (!window.PublicKeyCredential || !navigator.credentials) {
   passkeyButton.hidden = true;
@@ -233,4 +309,7 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/admin/sw.js", { scope: "/admin/" }).catch(() => {});
 }
 
-alreadyAuthenticated();
+(async () => {
+  const needsSetup = await checkInitialSetup();
+  if (!needsSetup) await alreadyAuthenticated();
+})();
