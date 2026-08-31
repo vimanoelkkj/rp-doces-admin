@@ -5,10 +5,19 @@ import path from "node:path";
 const root = process.cwd();
 const persistDir = path.join(root, ".tmp", "schema-full-d1");
 const outputPath = path.join(root, "schema_full.sql");
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const wranglerBin = path.join(
+  root,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "wrangler.cmd" : "wrangler"
+);
 
 function runWrangler(args, { input } = {}) {
-  const result = spawnSync(npx, ["wrangler", ...args], {
+  const command = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : wranglerBin;
+  const commandArgs =
+    process.platform === "win32" ? ["/d", "/s", "/c", wranglerBin, ...args] : args;
+
+  const result = spawnSync(command, commandArgs, {
     cwd: root,
     encoding: "utf8",
     input,
