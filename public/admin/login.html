@@ -22,7 +22,7 @@
   </head>
   <body>
     <main class="login-shell">
-      <section class="login-card" aria-labelledby="login-title">
+      <section class="login-card" aria-labelledby="login-title" data-login-card>
         <div class="login-brand" aria-hidden="true">R&P</div>
         <div class="login-heading">
           <span>Painel administrativo</span>
@@ -46,23 +46,47 @@
 
         <div class="login-separator"><span>ou use sua senha</span></div>
 
-        <form data-password-form>
-          <label>
-            <span>Usuário</span>
-            <input name="username" autocomplete="username" required maxlength="80" />
-          </label>
-          <label>
-            <span>Senha</span>
-            <input
-              name="senha"
-              type="password"
-              autocomplete="current-password"
-              required
-              maxlength="256"
-            />
-          </label>
-          <button class="login-submit" type="submit">Entrar</button>
-        </form>
+        <div class="login-stage" data-login-stage="username">
+          <form data-username-form>
+            <label>
+              <span>Usuário</span>
+              <input
+                name="username"
+                autocomplete="username"
+                required
+                maxlength="80"
+                autocapitalize="none"
+                spellcheck="false"
+              />
+            </label>
+            <button class="login-submit" type="submit">Continuar</button>
+          </form>
+        </div>
+
+        <div class="login-stage login-stage--password" data-login-stage="password" hidden>
+          <div class="login-identity">
+            <div class="login-identity__avatar" data-login-avatar aria-hidden="true">RP</div>
+            <strong data-login-name>Administrador</strong>
+            <span data-login-username>@usuario</span>
+          </div>
+
+          <form data-password-form>
+            <input type="hidden" name="username" />
+            <label>
+              <span>Senha</span>
+              <input
+                name="senha"
+                type="password"
+                autocomplete="current-password"
+                required
+                maxlength="256"
+              />
+            </label>
+            <button class="login-submit" type="submit">Entrar</button>
+          </form>
+
+          <button class="login-switch-user" type="button" data-switch-user>Trocar usuário</button>
+        </div>
 
         <p class="login-status" role="status" aria-live="polite" data-login-status></p>
         <p class="login-foot">
