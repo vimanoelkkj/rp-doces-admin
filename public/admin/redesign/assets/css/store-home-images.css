@@ -1,0 +1,113 @@
+.store-card--home-images {
+  grid-column: span 2;
+}
+.store-home-images {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.store-home-image {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--rp-line);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--rp-surface-2);
+}
+.store-home-image__preview {
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px dashed var(--rp-line-2);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--rp-ink-3);
+  font-size: 10px;
+  text-align: center;
+}
+.store-home-image__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.store-home-image__body {
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+}
+.store-home-image__body strong {
+  display: block;
+  color: var(--rp-ink);
+  font-family: var(--rp-display);
+  font-size: 13px;
+}
+.store-home-image__body p {
+  margin: 3px 0 0;
+  color: var(--rp-ink-3);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.store-home-image__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.store-home-image__button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rp-line-2);
+  border-radius: 10px;
+  padding: 0 11px;
+  background: #fff;
+  color: var(--rp-ink-2);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+.store-home-image__button:hover:not(:disabled) {
+  border-color: var(--rp-pink);
+  background: var(--rp-pink-wash);
+  color: var(--rp-pink-strong);
+}
+.store-home-image__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.store-home-image__body small {
+  color: var(--rp-ink-3);
+  font-size: 9.5px;
+}
+@media (min-width: 1600px) {
+  .store-card--home-images {
+    grid-column: 1 / span 2;
+  }
+}
+@media (max-width: 900px) {
+  .store-card--home-images {
+    grid-column: auto;
+  }
+  .store-home-images {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 520px) {
+  .store-home-image {
+    grid-template-columns: 1fr;
+  }
+  .store-home-image__preview {
+    width: 100%;
+    max-width: 240px;
+  }
+  .store-home-image__actions {
+    flex-direction: column;
+  }
+  .store-home-image__button {
+    width: 100%;
+  }
+}
