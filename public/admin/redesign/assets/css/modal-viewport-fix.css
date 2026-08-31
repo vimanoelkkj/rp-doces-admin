@@ -1,0 +1,17 @@
+/* Modais administrativos precisam usar a viewport real. A animacao entre abas usa
+   transform/will-change em .admin-content; essas propriedades criam um containing
+   block para descendentes position: fixed e faziam o modal ficar preso a area de
+   conteudo abaixo do topbar. Removemos esse containing block apenas enquanto um
+   modal estiver aberto. */
+body.products-dialog-open .admin-content,
+body.orders-dialog-open .admin-content {
+  transform: none !important;
+  will-change: auto !important;
+  transition: none !important;
+}
+
+body.products-dialog-open .products-dialog,
+body.orders-dialog-open .orders-dialog {
+  position: fixed;
+  inset: 0;
+}
