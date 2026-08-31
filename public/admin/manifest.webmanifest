@@ -4,7 +4,7 @@
   "short_name": "R&P Admin",
   "description": "Painel administrativo da R&P Doces.",
   "start_url": "/admin/?source=pwa",
-  "scope": "/admin/",
+  "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "background_color": "#fff9f6",
