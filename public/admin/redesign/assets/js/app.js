@@ -92,11 +92,7 @@ function setCollapsed(collapsed) {
 function initials(name = "") {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "RP";
-  return parts
-    .slice(0, 2)
-    .map(part => part[0])
-    .join("")
-    .toUpperCase();
+  return parts.slice(0, 2).map(part => part[0]).join("").toUpperCase();
 }
 
 function applyUser(user) {
@@ -149,58 +145,33 @@ function restoreView(page, view) {
 
 function looksLikeRefreshError(target) {
   const text = String(target?.textContent || "").toLowerCase();
-  return (
-    text.includes("não foi possível carregar") ||
-    text.includes("falha ao carregar") ||
-    text.includes("tente novamente em instantes")
-  );
+  return text.includes("não foi possível carregar") || text.includes("falha ao carregar") || text.includes("tente novamente em instantes");
 }
 
 async function renderPage(page, target = content, { isActive = () => currentPage === page } = {}) {
   if (!target) return;
-  if (page === "dashboard") {
-    await renderDashboard(target, { onUnauthorized: redirectToLogin, onNavigate: setPage, isActive });
-    return;
-  }
-  if (page === "produtos") {
-    await renderProducts(target, { onUnauthorized: redirectToLogin });
-    return;
-  }
-  if (page === "pedidos") {
-    await renderOrders(target, { onUnauthorized: redirectToLogin });
-    return;
-  }
-  if (page === "admins") {
-    await renderAdmins(target, { onUnauthorized: redirectToLogin, currentUser });
-    return;
-  }
-  if (page === "loja") {
-    await renderStore(target, { onUnauthorized: redirectToLogin });
-  }
+  if (page === "dashboard") return renderDashboard(target, { onUnauthorized: redirectToLogin, onNavigate: setPage, isActive });
+  if (page === "produtos") return renderProducts(target, { onUnauthorized: redirectToLogin });
+  if (page === "pedidos") return renderOrders(target, { onUnauthorized: redirectToLogin });
+  if (page === "admins") return renderAdmins(target, { onUnauthorized: redirectToLogin, currentUser });
+  if (page === "loja") return renderStore(target, { onUnauthorized: redirectToLogin });
 }
 
 function rememberRenderedView(page, target = content) {
   if (!target) return;
-  pageViews.set(page, {
-    nodes: [...target.childNodes],
-    updatedAt: Date.now(),
-    invalidated: false
-  });
+  pageViews.set(page, { nodes: [...target.childNodes], updatedAt: Date.now(), invalidated: false });
 }
 
 function refreshViewInBackground(page) {
   if (pageRefreshes.has(page)) return pageRefreshes.get(page);
-
   const staging = document.createElement("div");
   const refresh = renderPage(page, staging, { isActive: () => currentPage === page })
     .then(() => {
       if (looksLikeRefreshError(staging)) return;
       const nodes = [...staging.childNodes];
       if (!nodes.length) return;
-
       const freshView = { nodes, updatedAt: Date.now(), invalidated: false };
       pageViews.set(page, freshView);
-
       if (currentPage === page && mountedPage === page && content) {
         content.replaceChildren(...nodes);
         freshView.nodes = [...content.childNodes];
@@ -210,10 +181,7 @@ function refreshViewInBackground(page) {
       if (error?.status === 401) redirectToLogin();
       else console.warn(`R&P Admin: atualização silenciosa de ${page} falhou.`, error);
     })
-    .finally(() => {
-      pageRefreshes.delete(page);
-    });
-
+    .finally(() => pageRefreshes.delete(page));
   pageRefreshes.set(page, refresh);
   return refresh;
 }
@@ -221,15 +189,23 @@ function refreshViewInBackground(page) {
 async function showPage(page, id) {
   if (!content) return;
   const cached = pageViews.get(page);
-
   if (cached?.nodes?.length) {
     restoreView(page, cached);
     if (!isViewFresh(page, cached)) refreshViewInBackground(page);
     return;
   }
 
-  await renderPage(page, content, { isActive: () => id === navigationId && currentPage === page });
+  // Renderiza a primeira visita fora do DOM visível. Assim uma resposta lenta de uma
+  // aba antiga nunca consegue sobrescrever a aba para a qual o usuário já navegou.
+  const staging = document.createElement("div");
+  await renderPage(page, staging, { isActive: () => id === navigationId && currentPage === page });
   if (id !== navigationId || currentPage !== page) return;
+  if (looksLikeRefreshError(staging)) {
+    content.replaceChildren(...staging.childNodes);
+    mountedPage = page;
+    return;
+  }
+  content.replaceChildren(...staging.childNodes);
   mountedPage = page;
   rememberRenderedView(page);
 }
@@ -267,64 +243,45 @@ function waitForTransition(element, timeout = 140) {
 async function transitionToPage(page, id) {
   if (!content) return;
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-
   if (!reducedMotion && content.childElementCount) {
     content.classList.remove("is-page-entering");
     content.classList.add("is-page-leaving");
     await waitForTransition(content);
     if (id !== navigationId) return;
   }
-
   cacheMountedView();
   content.replaceChildren();
   content.classList.remove("is-page-leaving");
-
   const showPromise = showPage(page, id);
-
   if (!reducedMotion) {
     content.classList.add("is-page-entering");
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (id === navigationId) content.classList.remove("is-page-entering");
-      });
-    });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (id === navigationId) content.classList.remove("is-page-entering");
+    }));
   }
-
   await showPromise;
 }
 
 function setPage(page) {
   const resolvedPage = Object.hasOwn(pages, page) ? page : "dashboard";
   if (resolvedPage === currentPage) return;
-
   const meta = pages[resolvedPage];
   currentPage = resolvedPage;
   const id = ++navigationId;
-
   navItems.forEach(item => {
     const active = item.dataset.adminNav === resolvedPage;
     item.classList.toggle("is-active", active);
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
-
   if (title) title.textContent = meta[0];
   if (subtitle) subtitle.textContent = meta[1];
   history.replaceState(null, "", `#${resolvedPage}`);
-  transitionToPage(resolvedPage, id).catch(error => {
-    console.error("R&P Admin: falha ao trocar de página.", error);
-  });
+  transitionToPage(resolvedPage, id).catch(error => console.error("R&P Admin: falha ao trocar de página.", error));
 }
 
-collapseButton?.addEventListener("click", () => {
-  setCollapsed(!app?.classList.contains("is-collapsed"));
-});
-
-publicSiteLink?.addEventListener("click", event => {
-  event.preventDefault();
-  location.assign("/");
-});
-
+collapseButton?.addEventListener("click", () => setCollapsed(!app?.classList.contains("is-collapsed")));
+publicSiteLink?.addEventListener("click", event => { event.preventDefault(); location.assign("/"); });
 navItems.forEach(item => item.addEventListener("click", () => setPage(item.dataset.adminNav)));
 
 const tooltip = document.createElement("div");
@@ -332,12 +289,7 @@ tooltip.className = "admin-tooltip";
 tooltip.setAttribute("role", "tooltip");
 document.body.appendChild(tooltip);
 let tooltipTarget = null;
-
-function hideTooltip() {
-  tooltipTarget = null;
-  tooltip.classList.remove("is-visible");
-}
-
+function hideTooltip() { tooltipTarget = null; tooltip.classList.remove("is-visible"); }
 function showTooltip(item) {
   if (!app?.classList.contains("is-collapsed") || matchMedia("(max-width: 860px)").matches) return;
   const label = item.dataset.label;
@@ -350,14 +302,12 @@ function showTooltip(item) {
   tooltip.style.left = `${Math.round(rect.right + 10)}px`;
   tooltip.style.top = `${Math.round(rect.top + (rect.height - tipRect.height) / 2)}px`;
 }
-
 navItems.forEach(item => {
   item.addEventListener("mouseenter", () => showTooltip(item));
   item.addEventListener("mouseleave", hideTooltip);
   item.addEventListener("focus", () => showTooltip(item));
   item.addEventListener("blur", hideTooltip);
 });
-
 window.addEventListener("resize", hideTooltip);
 window.addEventListener("hashchange", () => {
   const requested = location.hash.slice(1);
@@ -366,7 +316,6 @@ window.addEventListener("hashchange", () => {
 
 async function bootstrap() {
   setCollapsed(localStorage.getItem("rp-admin-sidebar-collapsed") === "1");
-
   try {
     const payload = await adminApi.me();
     if (!payload?.autenticado || !payload?.usuario) return redirectToLogin();
@@ -378,7 +327,6 @@ async function bootstrap() {
     if (error?.status === 401) return redirectToLogin();
     console.warn("R&P Admin: não foi possível validar a sessão do redesign.", error);
   }
-
   const initialPage = location.hash.slice(1);
   setPage(Object.hasOwn(pages, initialPage) ? initialPage : "dashboard");
 }
