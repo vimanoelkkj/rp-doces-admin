@@ -1,0 +1,13 @@
+.rp-cart-item__thumb {
+  overflow: hidden;
+  background: transparent;
+}
+.rp-cart-item__thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.rp-cart-item--no-thumb {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
