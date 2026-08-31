@@ -91,7 +91,18 @@
   padding: 10px 12px;
   font: 700 0.9rem/1.35 "Nunito Sans", sans-serif;
   outline: none;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.manual-order-form select {
+  cursor: pointer;
+}
+
+.manual-order-form input:hover,
+.manual-order-form select:hover,
+.manual-order-form textarea:hover {
+  border-color: rgba(123, 36, 59, 0.32);
+  background: #fffdfd;
 }
 
 .manual-order-form textarea {
@@ -104,6 +115,20 @@
 .manual-order-form textarea:focus {
   border-color: rgba(123, 36, 59, 0.52);
   box-shadow: 0 0 0 3px rgba(123, 36, 59, 0.09);
+  background: #fff;
+}
+
+/* O menu nativo do <select> não aceita um hover consistente entre browsers.
+   Mantemos as opções limpas e com a paleta do admin, evitando o cinza pesado onde houver suporte. */
+.manual-order-form select option {
+  background: #fffafa;
+  color: #382f35;
+  font-weight: 700;
+}
+
+.manual-order-form select option:checked {
+  background: #f3dfe5;
+  color: #6f1f36;
 }
 
 .manual-order-section {
