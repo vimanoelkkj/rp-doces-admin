@@ -15,6 +15,11 @@ function runWrangler(args, { input } = {}) {
     stdio: ["pipe", "pipe", "pipe"]
   });
 
+  if (result.error) {
+    console.error(`Falha ao iniciar Wrangler: ${result.error.message}`);
+    process.exit(1);
+  }
+
   if (result.status !== 0) {
     process.stderr.write(result.stdout || "");
     process.stderr.write(result.stderr || "");
@@ -28,7 +33,7 @@ rmSync(persistDir, { recursive: true, force: true });
 mkdirSync(persistDir, { recursive: true });
 
 console.log("Aplicando migrations em um D1 local isolado...");
-runWrangler(
+const migrationOutput = runWrangler(
   [
     "d1",
     "migrations",
@@ -40,6 +45,8 @@ runWrangler(
   ],
   { input: "y\n" }
 );
+
+if (migrationOutput.trim()) process.stdout.write(migrationOutput);
 
 const query = `
 SELECT type, name, tbl_name, sql
