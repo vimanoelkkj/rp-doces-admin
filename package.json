@@ -8,6 +8,7 @@
     "format:check": "prettier --check .",
     "audit:frontend": "node scripts/audit-frontend-bundling.mjs",
     "build:storefront:experiment": "node scripts/build-storefront-experiment.mjs",
+    "preview:storefront:bundle": "node scripts/build-storefront-preview.mjs",
     "backup:production": "node scripts/backup-production.mjs",
     "backup:verify": "node scripts/verify-backup.mjs",
     "deploy:preview": "wrangler pages deploy public --project-name=rp-doces",
