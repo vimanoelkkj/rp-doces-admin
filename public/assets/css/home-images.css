@@ -10,12 +10,24 @@
   display: none;
 }
 
+/* A arte da seção Sobre pode ser PNG transparente.
+   O container não deve desenhar uma placa própria atrás da logo. */
+.rp-home-media--about.has-image {
+  background: transparent;
+  overflow: visible;
+}
+
+.rp-home-media--about.has-image > img {
+  object-fit: contain;
+  object-position: center;
+}
+
 @media (max-width: 767px) {
   .rp-home-media--about.has-image {
     height: auto;
     min-height: 0;
     aspect-ratio: auto;
-    background: var(--rp-color-surface);
+    background: transparent;
   }
 
   .rp-home-media--about.has-image > img {
