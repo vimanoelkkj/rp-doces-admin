@@ -84,35 +84,95 @@
   font-size: 10px;
 }
 
-/* Desktop largo: a prévia fica na coluna direita e ocupa as duas linhas.
-   Contato e imagens formam uma pilha na esquerda, aproveitando o espaço que antes
-   ficava vazio abaixo do formulário de contato. */
+/* Desktop largo: fecha o grid em 12 colunas sem buracos.
+   Linha 1: atendimento 5 + retirada 3 + entregas 4.
+   Linha 2: contato 5 + imagens 3 + previa 4. */
 @media (min-width: 1600px) {
-  .store-card--contact {
-    grid-column: 1 / span 8;
-    grid-row: 2;
+  .store-card--schedule {
+    grid-column: 1 / span 5;
+    grid-row: 1;
   }
 
-  .store-card--public-preview {
+  .store-card--pickup {
+    grid-column: 6 / span 3;
+    grid-row: 1;
+  }
+
+  .store-card--delivery {
     grid-column: 9 / span 4;
-    grid-row: 2 / span 2;
-    height: 100%;
+    grid-row: 1;
+  }
+
+  .store-card--contact {
+    grid-column: 1 / span 5;
+    grid-row: 2;
+    gap: 11px;
+    padding: 16px;
+  }
+
+  .store-card--contact .store-field {
+    gap: 5px;
+  }
+
+  .store-card--contact .store-field textarea {
+    min-height: 64px;
+    max-height: 78px;
   }
 
   .store-card--home-images {
-    grid-column: 1 / span 8;
-    grid-row: 3;
-    padding: 14px 16px;
-    gap: 10px;
+    grid-column: 6 / span 3;
+    grid-row: 2;
+    padding: 14px;
+    gap: 9px;
   }
 
   .store-card--home-images .store-card__head h3 {
-    font-size: 16px;
+    font-size: 15.5px;
   }
 
   .store-card--home-images .store-card__head p {
     margin-top: 2px;
-    font-size: 10.5px;
+    font-size: 10px;
+  }
+
+  .store-home-images {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .store-home-image {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 9px;
+    padding: 9px;
+  }
+
+  .store-home-image__body {
+    gap: 5px;
+  }
+
+  .store-home-image__body strong {
+    font-size: 12.5px;
+  }
+
+  .store-home-image__body p {
+    font-size: 9.5px;
+    line-height: 1.25;
+  }
+
+  .store-home-image__button {
+    min-height: 28px;
+    padding-inline: 8px;
+    font-size: 9.5px;
+  }
+
+  .store-home-image__body small {
+    font-size: 9px;
+  }
+
+  .store-card--public-preview {
+    grid-column: 9 / span 4;
+    grid-row: 2;
+    height: 100%;
   }
 }
 @media (max-width: 900px) {
