@@ -4,11 +4,46 @@ import { escapeHtml } from "../utils/html.js";
 let cartMounted = false;
 let stableMarkup = "";
 
+function thumbMarkup(product) {
+  const url = String(product?.image_url || "");
+  if (!url) return "";
+  return `<div class="rp-cart-item__thumb"><img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async" /></div>`;
+}
+
 function cartItemMarkup({ product, quantity }) {
   const name = escapeHtml(product.nome || "Produto");
   const id = escapeHtml(product.id);
   const unit = Number(product.preco_centavos) || 0;
-  return `<article class="rp-cart-item" data-cart-item="${id}"><div class="rp-cart-item__thumb" aria-hidden="true"></div><div class="rp-cart-item__main"><strong class="rp-cart-item__name">${name}</strong><span class="rp-cart-item__unit">${formatMoney(unit)} cada</span><div class="rp-cart-item__controls"><div class="rp-cart-item__stepper" aria-label="Quantidade de ${name}"><button type="button" data-cart-delta="-1" data-product-id="${id}" aria-label="Remover uma unidade">−</button><strong data-cart-item-quantity>${quantity}</strong><button type="button" data-cart-delta="1" data-product-id="${id}" ${quantity >= Number(product.estoque || 0) ? "disabled" : ""} aria-label="Adicionar uma unidade">+</button></div><button class="rp-cart-item__trash" type="button" data-cart-remove data-product-id="${id}" aria-label="Remover ${name} do pedido"><span class="rp-cart-item__trash-can" aria-hidden="true"></span><span class="rp-cart-item__trash-lid" aria-hidden="true"></span><span class="rp-cart-item__trash-grip" aria-hidden="true"></span></button></div></div><strong class="rp-cart-item__price" data-cart-item-price>${formatMoney(unit * quantity)}</strong></article>`;
+  const hasThumb = Boolean(product.image_url);
+  return `<article class="rp-cart-item${hasThumb ? "" : " rp-cart-item--no-thumb"}" data-cart-item="${id}">${thumbMarkup(product)}<div class="rp-cart-item__main"><strong class="rp-cart-item__name">${name}</strong><span class="rp-cart-item__unit">${formatMoney(unit)} cada</span><div class="rp-cart-item__controls"><div class="rp-cart-item__stepper" aria-label="Quantidade de ${name}"><button type="button" data-cart-delta="-1" data-product-id="${id}" aria-label="Remover uma unidade">−</button><strong data-cart-item-quantity>${quantity}</strong><button type="button" data-cart-delta="1" data-product-id="${id}" ${quantity >= Number(product.estoque || 0) ? "disabled" : ""} aria-label="Adicionar uma unidade">+</button></div><button class="rp-cart-item__trash" type="button" data-cart-remove data-product-id="${id}" aria-label="Remover ${name} do pedido"><span class="rp-cart-item__trash-can" aria-hidden="true"></span><span class="rp-cart-item__trash-lid" aria-hidden="true"></span><span class="rp-cart-item__trash-grip" aria-hidden="true"></span></button></div></div><strong class="rp-cart-item__price" data-cart-item-price>${formatMoney(unit * quantity)}</strong></article>`;
+}
+
+function syncThumb(row, product) {
+  const url = String(product?.image_url || "");
+  let thumb = row.querySelector(".rp-cart-item__thumb");
+
+  if (!url) {
+    thumb?.remove();
+    row.classList.add("rp-cart-item--no-thumb");
+    return;
+  }
+
+  row.classList.remove("rp-cart-item--no-thumb");
+  if (!thumb) {
+    thumb = document.createElement("div");
+    thumb.className = "rp-cart-item__thumb";
+    row.prepend(thumb);
+  }
+
+  let image = thumb.querySelector("img");
+  if (!image) {
+    image = document.createElement("img");
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    thumb.appendChild(image);
+  }
+  if (image.getAttribute("src") !== url) image.src = url;
 }
 
 function cartMarkup(items, summary) {
@@ -38,6 +73,7 @@ function patchOpenCart(items, summary) {
       return;
     }
 
+    syncThumb(row, item.product);
     const quantity = row.querySelector("[data-cart-item-quantity]");
     const price = row.querySelector("[data-cart-item-price]");
     const addButton = row.querySelector('[data-cart-delta="1"]');
