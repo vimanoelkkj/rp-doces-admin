@@ -202,26 +202,53 @@
 }
 
 @media (max-width: 700px) {
+  .manual-order-dialog {
+    place-items: start center;
+    padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+
   .manual-order-dialog .manual-order-panel {
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 16px);
+    width: 100%;
+    max-height: none;
+    min-width: 0;
+    margin: 0;
+    overflow: visible;
     border-radius: 20px;
   }
 
   .manual-order-dialog .orders-dialog__head {
-    padding: 20px 18px 16px;
+    gap: 12px;
+    padding: 18px 16px 14px;
+  }
+
+  .manual-order-dialog .orders-dialog__head h2 {
+    font-size: clamp(1.35rem, 7vw, 1.65rem);
+  }
+
+  .manual-order-dialog .orders-dialog__head p {
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .manual-order-dialog .orders-dialog__close {
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
   }
 
   .manual-order-dialog .manual-order-form {
-    padding: 18px;
+    gap: 16px;
+    padding: 16px;
   }
 
   .manual-order-dialog .manual-order-fields.two-cols {
     grid-template-columns: 1fr;
   }
 
-  .manual-order-dialog .manual-order-item {
-    grid-template-columns: minmax(0, 1fr) 72px 40px;
+  .manual-order-dialog .manual-order-section {
+    min-width: 0;
+    padding: 14px;
   }
 
   .manual-order-dialog .manual-order-section__head {
@@ -229,8 +256,67 @@
     flex-direction: column;
   }
 
+  .manual-order-dialog .manual-order-section__head .orders-secondary {
+    width: 100%;
+  }
+
+  .manual-order-dialog .manual-order-item {
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 10px;
+  }
+
+  .manual-order-dialog .manual-order-item > label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .manual-order-dialog .manual-order-item .manual-qty {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .manual-order-dialog .manual-order-item .manual-remove-item {
+    grid-column: 2;
+    align-self: end;
+    width: 48px;
+  }
+
+  .manual-order-dialog .manual-order-item .manual-select,
+  .manual-order-dialog .manual-order-item .manual-select__trigger {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .manual-order-dialog .manual-order-item .manual-select__value {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .manual-order-dialog .manual-order-item input[data-manual-qty] {
+    width: 100%;
+  }
+
   .manual-order-dialog .manual-order-footer {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+  }
+
+  .manual-order-dialog .manual-order-footer button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .manual-order-dialog .manual-order-form,
+  .manual-order-dialog .orders-dialog__head {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .manual-order-dialog .manual-order-section {
+    padding: 12px;
   }
 }
