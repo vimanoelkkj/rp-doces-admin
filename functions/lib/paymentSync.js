@@ -11,6 +11,8 @@ import { logEvent } from "./logger.js";
  * @param {number} params.pedidoId - ID primário do pedido local
  * @param {object} params.order - Objeto Order retornado pelo Mercado Pago
  * @param {string|null} [params.mpOrderId] - ID de fallback da Order caso order.id esteja ausente
+ * @param {object} [options]
+ * @param {(promise: Promise<unknown>) => void} [options.waitUntil] - Agenda trabalho secundário após a resposta
  * @returns {Promise<{
  *   ok: boolean,
  *   pedidoId: number,
@@ -21,7 +23,7 @@ import { logEvent } from "./logger.js";
  *   order: object
  * }>}
  */
-export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null }) {
+export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null }, options = {}) {
   if (!pedidoId) throw new Error("pedidoId é obrigatório para sincronização.");
   if (!order) throw new Error("order do Mercado Pago é obrigatória para sincronização.");
 
@@ -101,7 +103,10 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
     });
   }
 
-  // Efeitos colaterais pós-pagamento só são disparados quando a Order atual representar PAGO
+  // Estoque e reserva são parte crítica da consistência do pedido e continuam aguardados.
+  // Push é efeito secundário: quando o runtime fornece waitUntil, ele pode terminar
+  // depois da resposta sem atrasar webhook/polling. Sem waitUntil, mantemos o fallback
+  // aguardado para preservar compatibilidade com testes e outros chamadores.
   if (localStatus === "PAGO") {
     const estoque = await baixarEstoquePedido(env, pedidoId);
     if (!estoque.ok) {
@@ -110,7 +115,19 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
         reason: "STOCK_CONVERSION_FAILED"
       });
     }
-    await notifyPaidOrder(env, pedidoId);
+
+    const pushTask = notifyPaidOrder(env, pedidoId).catch(() => {
+      logEvent("warn", "push.failed", {
+        pedido_id: pedidoId,
+        reason: "PUSH_FAILED"
+      });
+    });
+
+    if (typeof options.waitUntil === "function") {
+      options.waitUntil(pushTask);
+    } else {
+      await pushTask;
+    }
   } else if (["EXPIRADO", "CANCELADO", "FALHOU"].includes(localStatus)) {
     await liberarReservaPedido(env, pedidoId, { novoStatus: localStatus });
   }
