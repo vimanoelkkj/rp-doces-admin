@@ -9,3 +9,21 @@
 .rp-home-media.has-image > span {
   display: none;
 }
+
+@media (max-width: 767px) {
+  .rp-home-media--about.has-image {
+    height: auto;
+    min-height: 0;
+    aspect-ratio: auto;
+    background: var(--rp-color-surface);
+  }
+
+  .rp-home-media--about.has-image > img {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: center;
+  }
+}
