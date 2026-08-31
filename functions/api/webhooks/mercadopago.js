@@ -13,7 +13,7 @@ function pedidoIdFromExternalReference(value) {
   return match ? Number(match[1]) : null;
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, waitUntil }) {
   const url = new URL(request.url);
 
   let body = null;
@@ -105,7 +105,11 @@ export async function onRequestPost({ request, env }) {
       order = await mpRequest(env, `/v1/orders/${encodeURIComponent(orderId)}`);
     }
 
-    await syncOrderPayment(env, { pedidoId: local.id, order, mpOrderId: orderId });
+    await syncOrderPayment(
+      env,
+      { pedidoId: local.id, order, mpOrderId: orderId },
+      { waitUntil }
+    );
 
     return json({ ok: true });
   } catch (err) {
