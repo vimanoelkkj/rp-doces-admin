@@ -94,7 +94,17 @@ function applyUser(user) {
   currentUser = user;
   if (profileName) profileName.textContent = user?.nome || user?.username || "Administrador";
   if (profileRole) profileRole.textContent = String(user?.papel || "ADMIN").toUpperCase();
-  if (profileAvatar) profileAvatar.textContent = initials(user?.nome || user?.username);
+  if (profileAvatar) {
+    profileAvatar.replaceChildren();
+    if (user?.avatar_url) {
+      const image = document.createElement("img");
+      image.src = user.avatar_url;
+      image.alt = "";
+      profileAvatar.appendChild(image);
+    } else {
+      profileAvatar.textContent = initials(user?.nome || user?.username);
+    }
+  }
 }
 
 function redirectToLogin() {
