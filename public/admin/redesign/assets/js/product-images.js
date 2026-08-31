@@ -4,6 +4,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_SOURCE_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 1600;
 const WEBP_QUALITY = 0.88;
+const IMAGE_REQUEST_TIMEOUT_MS = 30_000;
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 let productsById = new Map();
 let decorating = false;
@@ -87,7 +88,7 @@ async function optimizeImageForStorefront(file) {
     canvas.width = width;
     canvas.height = height;
 
-    const context = canvas.getContext("2d", { alpha: false });
+    const context = canvas.getContext("2d");
     if (!context) throw new Error("Não foi possível preparar a imagem.");
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
@@ -107,15 +108,35 @@ async function optimizeImageForStorefront(file) {
   }
 }
 
+async function requestImage(url, options, timeoutMessage) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), IMAGE_REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error(timeoutMessage);
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function uploadImage(id, file) {
   const form = new FormData();
   form.set("image", file);
-  const response = await fetch(`/api/admin/products/${id}/image`, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { Accept: "application/json" },
-    body: form
-  });
+  const response = await requestImage(
+    `/api/admin/products/${id}/image`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+      body: form
+    },
+    "O envio da foto demorou demais. Verifique a conexão e tente novamente."
+  );
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(payload?.erro || "Não foi possível enviar a imagem.");
@@ -126,11 +147,15 @@ async function uploadImage(id, file) {
 }
 
 async function deleteImage(id) {
-  const response = await fetch(`/api/admin/products/${id}/image`, {
-    method: "DELETE",
-    credentials: "same-origin",
-    headers: { Accept: "application/json" }
-  });
+  const response = await requestImage(
+    `/api/admin/products/${id}/image`,
+    {
+      method: "DELETE",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    },
+    "A remoção da foto demorou demais. Tente novamente."
+  );
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.erro || "Não foi possível remover a imagem.");
   return payload;
@@ -350,6 +375,7 @@ async function handleImageSubmit(event, form) {
   if (submit) submit.textContent = file ? "Enviando foto…" : "Salvando…";
   if (message) message.textContent = "";
 
+  let completed = false;
   try {
     let id = editId;
     const payload = baseProductPayload(product, data, price, stock, name);
@@ -364,12 +390,23 @@ async function handleImageSubmit(event, form) {
     if (file) await uploadImage(id, file);
     else if (removeRequested && id) await deleteImage(id);
 
-    document.querySelector('[data-admin-nav="produtos"]')?.click();
+    completed = true;
+
+    const close = form.closest("[data-product-dialog]")?.querySelector("[data-product-dialog-close]");
+    if (close instanceof HTMLButtonElement) close.click();
+
+    requestAnimationFrame(() => {
+      document.querySelector('[data-admin-nav="produtos"]')?.click();
+      refreshDecorations();
+    });
   } catch (error) {
     if (message)
       message.textContent = error?.message || "Não foi possível salvar a foto do produto.";
-    if (submit instanceof HTMLButtonElement) submit.disabled = false;
-    if (submit) submit.textContent = editId ? "Salvar alterações" : "Salvar produto";
+  } finally {
+    if (!completed && submit instanceof HTMLButtonElement) {
+      submit.disabled = false;
+      submit.textContent = editId ? "Salvar alterações" : "Salvar produto";
+    }
   }
   return true;
 }
