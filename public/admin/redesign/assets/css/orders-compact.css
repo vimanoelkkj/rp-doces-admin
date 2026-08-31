@@ -53,36 +53,55 @@
   line-height: 1;
 }
 
-/* No card, mostramos um único estado principal. Os detalhes continuam no modal. */
+/* Dois eixos diferentes precisam continuar legíveis:
+   pagamento = financeiro; Novo/Preparando/Pronto/Entregue = operação. */
 .orders-card__badges {
   margin: 6px 0 7px;
+  gap: 5px;
 }
 
 .orders-card__badges .orders-status {
   display: none;
 }
 
-.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-new,
-.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-preparing,
-.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-ready,
-.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-delivered,
-.orders-card:not(.is-payment-pending) .orders-card__badges .orders-status.is-cancelled {
+/* Sempre mostramos o status financeiro relevante. */
+.orders-card__badges .orders-status.is-paid,
+.orders-card__badges .orders-status.is-pending,
+.orders-card__badges .orders-status.is-refunded,
+.orders-card__badges .orders-status.is-failed {
   display: inline-flex;
 }
 
-.orders-card.is-payment-pending .orders-card__badges .orders-status.is-pending {
+/* E também o status operacional, preservando a hierarquia de cores existente. */
+.orders-card__badges .orders-status.is-new,
+.orders-card__badges .orders-status.is-preparing,
+.orders-card__badges .orders-status.is-ready,
+.orders-card__badges .orders-status.is-delivered,
+.orders-card__badges .orders-status.is-cancelled {
   display: inline-flex;
 }
 
-.orders-card:has(.orders-status.is-refunded) .orders-card__badges .orders-status.is-refunded,
-.orders-card:has(.orders-status.is-failed) .orders-card__badges .orders-status.is-failed {
-  display: inline-flex;
+/* Se o pagamento já está cancelado e o pedido também, um único vermelho basta. */
+.orders-card:has(.orders-status.is-failed):has(.orders-status.is-cancelled)
+  .orders-card__badges .orders-status.is-failed {
+  display: none;
 }
 
 .orders-status {
-  min-height: 19px;
+  min-height: 20px;
   padding: 0 7px;
   font-size: 0.57rem;
+}
+
+/* O financeiro ganha um pouco mais de peso sem atropelar o andamento. */
+.orders-card__badges .orders-status.is-paid,
+.orders-card__badges .orders-status.is-pending,
+.orders-card__badges .orders-status.is-refunded,
+.orders-card__badges .orders-status.is-failed {
+  min-height: 21px;
+  font-weight: 900;
+  box-shadow: inset 0 0 0 1px currentColor;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
 }
 
 .orders-card__meta {

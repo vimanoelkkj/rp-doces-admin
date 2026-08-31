@@ -1,0 +1,185 @@
+.manual-select {
+  position: relative;
+  width: 100%;
+}
+
+.manual-select__native {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.manual-select__trigger {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(73, 53, 64, 0.14);
+  border-radius: 12px;
+  background: #fff;
+  color: #382f35;
+  font: 700 0.9rem/1.35 "Nunito Sans", sans-serif;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+.manual-select__trigger:hover:not(:disabled) {
+  border-color: rgba(123, 36, 59, 0.34);
+  background: #fffafb;
+}
+
+.manual-select__trigger:focus-visible,
+.manual-select.is-open .manual-select__trigger {
+  border-color: rgba(123, 36, 59, 0.58);
+  box-shadow: 0 0 0 3px rgba(123, 36, 59, 0.09);
+  background: #fff;
+}
+
+.manual-select__trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.manual-select__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manual-select__chevron {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: #7b243b;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 160ms ease;
+}
+
+.manual-select.is-open .manual-select__chevron {
+  transform: rotate(180deg);
+}
+
+.manual-select__menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  left: 0;
+  right: 0;
+  max-height: 238px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid rgba(123, 36, 59, 0.13);
+  border-radius: 13px;
+  background: rgba(255, 252, 252, 0.99);
+  box-shadow:
+    0 18px 42px rgba(59, 35, 46, 0.16),
+    0 4px 12px rgba(59, 35, 46, 0.08);
+  transform-origin: top center;
+  animation: manual-select-in 120ms ease-out;
+}
+
+.manual-select__menu[hidden] {
+  display: none;
+}
+
+.manual-select__option {
+  width: 100%;
+  min-height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #44383f;
+  font: 700 0.88rem/1.3 "Nunito Sans", sans-serif;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+
+.manual-select__option:hover:not(:disabled),
+.manual-select__option:focus-visible {
+  background: #f8e9ee;
+  color: #72223a;
+}
+
+.manual-select__option:active:not(:disabled) {
+  transform: scale(0.995);
+}
+
+.manual-select__option.is-selected {
+  background: #f3dfe6;
+  color: #6d1f36;
+  font-weight: 800;
+}
+
+.manual-select__option.is-selected:hover,
+.manual-select__option.is-selected:focus-visible {
+  background: #efd5df;
+}
+
+.manual-select__option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.manual-select__option svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.manual-select__menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.manual-select__menu::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(123, 36, 59, 0.24);
+  background-clip: padding-box;
+}
+
+@keyframes manual-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
