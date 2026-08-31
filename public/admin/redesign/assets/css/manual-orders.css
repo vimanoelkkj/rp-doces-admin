@@ -1,0 +1,232 @@
+.orders-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.manual-order-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #7b243b;
+  color: #fff;
+  font: 800 0.92rem/1 "Nunito Sans", sans-serif;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(123, 36, 59, 0.18);
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.manual-order-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(123, 36, 59, 0.24);
+}
+
+.manual-order-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.manual-order-button.is-confirm {
+  background: #276749;
+}
+
+.orders-status.is-manual {
+  color: #6d3850;
+  background: #f7e8ef;
+  border-color: #eed4df;
+}
+
+.manual-order-panel {
+  width: min(760px, calc(100vw - 28px));
+  max-height: min(86vh, 820px);
+  overflow: auto;
+}
+
+.manual-order-form {
+  display: grid;
+  gap: 18px;
+  padding: 20px 24px 24px;
+}
+
+.manual-order-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.manual-order-fields.two-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manual-order-form label,
+.manual-order-item label,
+.manual-order-note {
+  display: grid;
+  gap: 7px;
+}
+
+.manual-order-form label > span,
+.manual-order-item label > span,
+.manual-order-note > span {
+  color: var(--text-muted, #6e6570);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.manual-order-form label small,
+.manual-order-note small {
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.manual-order-form input,
+.manual-order-form select,
+.manual-order-form textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(73, 53, 64, 0.14);
+  border-radius: 12px;
+  background: #fff;
+  color: #382f35;
+  padding: 10px 12px;
+  font: 700 0.9rem/1.35 "Nunito Sans", sans-serif;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.manual-order-form textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.manual-order-form input:focus,
+.manual-order-form select:focus,
+.manual-order-form textarea:focus {
+  border-color: rgba(123, 36, 59, 0.52);
+  box-shadow: 0 0 0 3px rgba(123, 36, 59, 0.09);
+}
+
+.manual-order-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(73, 53, 64, 0.1);
+  border-radius: 16px;
+  background: rgba(250, 247, 248, 0.82);
+}
+
+.manual-order-section__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.manual-order-section__head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.manual-order-section__head strong {
+  color: #342b31;
+  font-size: 0.94rem;
+}
+
+.manual-order-section__head span {
+  color: #7a7076;
+  font-size: 0.76rem;
+}
+
+.manual-order-items {
+  display: grid;
+  gap: 9px;
+}
+
+.manual-order-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 38px;
+  align-items: end;
+  gap: 9px;
+}
+
+.manual-remove-item {
+  width: 38px;
+  height: 42px;
+  border: 1px solid rgba(146, 55, 55, 0.16);
+  border-radius: 11px;
+  background: #fff5f5;
+  color: #9b3d3d;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.manual-order-feedback {
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #fff2f2;
+  color: #8c3232;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.manual-order-footer,
+.manual-payment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.manual-payment-actions {
+  padding-top: 18px;
+  margin-top: 18px;
+  border-top: 1px solid rgba(73, 53, 64, 0.1);
+}
+
+.orders-secondary.is-danger {
+  color: #9b3d3d;
+  border-color: rgba(155, 61, 61, 0.2);
+  background: #fff8f8;
+}
+
+@media (max-width: 700px) {
+  .orders-toolbar {
+    align-items: stretch;
+  }
+
+  .orders-toolbar__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .manual-order-panel {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .manual-order-form {
+    padding: 16px;
+  }
+
+  .manual-order-fields.two-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-order-item {
+    grid-template-columns: minmax(0, 1fr) 74px 38px;
+  }
+
+  .manual-order-section__head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .manual-order-section__head .orders-secondary {
+    width: 100%;
+  }
+
+  .manual-order-footer,
+  .manual-payment-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
