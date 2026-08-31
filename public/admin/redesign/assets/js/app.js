@@ -1,3 +1,4 @@
+import "/assets/js/product-transparency.js";
 import { adminApi } from "./api.js";
 import { renderDashboard } from "./dashboard.js";
 import { renderProducts } from "./products.js";
