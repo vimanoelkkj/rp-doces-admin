@@ -29,6 +29,34 @@ function jsonRequest(path, method, body) {
   });
 }
 
+const PRODUCTS_CACHE_TTL_MS = 15000;
+let productsCache = null;
+let productsCacheAt = 0;
+let productsRequest = null;
+
+function invalidateProductsCache() {
+  productsCache = null;
+  productsCacheAt = 0;
+}
+
+async function getProductsCached() {
+  const now = Date.now();
+  if (productsCache && now - productsCacheAt < PRODUCTS_CACHE_TTL_MS) return productsCache;
+  if (productsRequest) return productsRequest;
+
+  productsRequest = request("/api/admin/products")
+    .then(payload => {
+      productsCache = payload;
+      productsCacheAt = Date.now();
+      return payload;
+    })
+    .finally(() => {
+      productsRequest = null;
+    });
+
+  return productsRequest;
+}
+
 export const adminApi = {
   me() {
     return request("/api/auth/me");
@@ -65,16 +93,22 @@ export const adminApi = {
     return request("/api/admin/orders");
   },
   createManualOrder(order) {
-    return jsonRequest("/api/admin/orders", "POST", order);
+    return jsonRequest("/api/admin/orders", "POST", order).then(payload => {
+      invalidateProductsCache();
+      return payload;
+    });
   },
   updateOrderStatus(id, status) {
     return jsonRequest(`/api/admin/orders/${id}`, "PUT", { status_pedido: status });
   },
   updateManualPayment(id, status) {
-    return jsonRequest(`/api/admin/orders/${id}`, "PUT", { status_pagamento: status });
+    return jsonRequest(`/api/admin/orders/${id}`, "PUT", { status_pagamento: status }).then(payload => {
+      invalidateProductsCache();
+      return payload;
+    });
   },
   products() {
-    return request("/api/admin/products");
+    return getProductsCached();
   },
   categories() {
     return request("/api/admin/categories");
@@ -83,16 +117,28 @@ export const adminApi = {
     return jsonRequest("/api/admin/categories", "POST", category);
   },
   createProduct(product) {
-    return jsonRequest("/api/admin/products", "POST", product);
+    return jsonRequest("/api/admin/products", "POST", product).then(payload => {
+      invalidateProductsCache();
+      return payload;
+    });
   },
   updateProduct(id, product) {
-    return jsonRequest(`/api/admin/products/${id}`, "PUT", product);
+    return jsonRequest(`/api/admin/products/${id}`, "PUT", product).then(payload => {
+      invalidateProductsCache();
+      return payload;
+    });
   },
   archiveProduct(id) {
-    return request(`/api/admin/products/${id}`, { method: "DELETE" });
+    return request(`/api/admin/products/${id}`, { method: "DELETE" }).then(payload => {
+      invalidateProductsCache();
+      return payload;
+    });
   },
   reactivateProduct(id, product) {
-    return jsonRequest(`/api/admin/products/${id}`, "PUT", product);
+    return jsonRequest(`/api/admin/products/${id}`, "PUT", product).then(payload => {
+      invalidateProductsCache();
+      return payload;
+    });
   },
   users() {
     return request("/api/admin/users");
