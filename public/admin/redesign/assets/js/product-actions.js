@@ -136,6 +136,7 @@ function enhanceForm(form) {
       const name = String(data.get("nome") || "").trim();
       const message = form.querySelector("[data-product-form-message]");
       const submit = form.querySelector("[data-product-submit]");
+      const active = data.get("ativo") === "on";
 
       if (!name || price === null || !Number.isSafeInteger(stock) || stock < 0) {
         if (message) message.textContent = "Confira nome, preço e estoque antes de salvar.";
@@ -154,7 +155,8 @@ function enhanceForm(form) {
             categoria: String(data.get("categoria") || "BOLO_NO_POTE"),
             descricao: String(data.get("descricao") || "").trim(),
             preco_centavos: price,
-            ativo: data.get("ativo") === "on",
+            disponivel: active,
+            ativo: active,
             destaque: data.get("destaque") === "on",
             emoji: String(data.get("emoji") || product.emoji || "🍰").trim(),
             estoque: stock
