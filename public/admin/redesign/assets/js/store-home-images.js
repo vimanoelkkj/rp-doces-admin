@@ -1,4 +1,5 @@
 import { adminApi } from "./api.js";
+import "./admin-avatars.js";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
