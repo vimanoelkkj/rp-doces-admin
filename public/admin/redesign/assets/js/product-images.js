@@ -1,6 +1,9 @@
 import { adminApi } from "./api.js";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_SOURCE_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 1600;
+const WEBP_QUALITY = 0.88;
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 let productsById = new Map();
 let decorating = false;
@@ -20,6 +23,88 @@ function parseMoneyToCents(value) {
   if (!Number.isFinite(amount) || amount <= 0) return null;
   const cents = Math.round(amount * 100);
   return Number.isSafeInteger(cents) ? cents : null;
+}
+
+function productImageFileName(file) {
+  const base = String(file?.name || "foto-produto")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "") || "foto-produto";
+  return `${base}.webp`;
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob);
+      else reject(new Error("Não foi possível preparar a imagem."));
+    }, type, quality);
+  });
+}
+
+async function loadImageSource(file) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        close: () => bitmap.close?.()
+      };
+    } catch (_) {}
+  }
+
+  const localUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error("Não foi possível ler a imagem selecionada."));
+      image.src = localUrl;
+    });
+    return {
+      source: image,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      close: () => URL.revokeObjectURL(localUrl)
+    };
+  } catch (error) {
+    URL.revokeObjectURL(localUrl);
+    throw error;
+  }
+}
+
+async function optimizeImageForStorefront(file) {
+  const loaded = await loadImageSource(file);
+  try {
+    const largestSide = Math.max(loaded.width, loaded.height);
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / largestSide);
+    const width = Math.max(1, Math.round(loaded.width * scale));
+    const height = Math.max(1, Math.round(loaded.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Não foi possível preparar a imagem.");
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(loaded.source, 0, 0, width, height);
+
+    const blob = await canvasToBlob(canvas, "image/webp", WEBP_QUALITY);
+    if (blob.size > MAX_IMAGE_BYTES) {
+      throw new Error("A foto ficou grande demais mesmo após a otimização. Tente outra imagem.");
+    }
+
+    return new File([blob], productImageFileName(file), {
+      type: "image/webp",
+      lastModified: Date.now()
+    });
+  } finally {
+    loaded.close?.();
+  }
 }
 
 async function uploadImage(id, file) {
@@ -91,6 +176,22 @@ async function refreshDecorations() {
   }
 }
 
+function revokePreviewUrl(preview) {
+  const previous = preview?.dataset?.localObjectUrl;
+  if (previous) URL.revokeObjectURL(previous);
+  if (preview?.dataset) delete preview.dataset.localObjectUrl;
+}
+
+function showLocalPreview(preview, empty, remove, file) {
+  revokePreviewUrl(preview);
+  const localUrl = URL.createObjectURL(file);
+  preview.dataset.localObjectUrl = localUrl;
+  preview.src = localUrl;
+  preview.hidden = false;
+  empty.hidden = true;
+  remove.hidden = false;
+}
+
 function ensureImageField(form) {
   if (!(form instanceof HTMLFormElement) || form.querySelector("[data-product-image-field]"))
     return;
@@ -113,7 +214,7 @@ function ensureImageField(form) {
           <input type="file" name="product_image" accept="image/jpeg,image/png,image/webp" data-product-image-input hidden />
         </label>
         <button class="products-secondary" type="button" data-product-image-remove hidden>Remover foto</button>
-        <small>JPG, PNG ou WebP · até 5 MB</small>
+        <small data-product-image-info>A prévia usa o enquadramento do card do site. A foto é redimensionada automaticamente e enviada em WebP.</small>
       </div>
     </div>`;
 
@@ -125,31 +226,53 @@ function ensureImageField(form) {
   const remove = field.querySelector("[data-product-image-remove]");
   const preview = field.querySelector("[data-product-image-preview-img]");
   const empty = field.querySelector("[data-product-image-empty]");
+  const info = field.querySelector("[data-product-image-info]");
 
-  input?.addEventListener("change", () => {
-    const file = input.files?.[0];
+  input?.addEventListener("change", async () => {
+    const sourceFile = input.files?.[0];
+    input._optimizedProductImage = null;
     form.dataset.removeProductImage = "0";
-    if (!file) return;
-    if (!ACCEPTED_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES) {
+    if (!sourceFile) return;
+
+    const message = form.querySelector("[data-product-form-message]");
+    if (!ACCEPTED_TYPES.has(sourceFile.type) || sourceFile.size > MAX_SOURCE_IMAGE_BYTES) {
       input.value = "";
-      const message = form.querySelector("[data-product-form-message]");
-      if (message) message.textContent = "Use JPG, PNG ou WebP com no máximo 5 MB.";
+      if (message)
+        message.textContent = "Use JPG, PNG ou WebP com no máximo 20 MB. A foto será otimizada antes do envio.";
       return;
     }
-    const localUrl = URL.createObjectURL(file);
-    preview.src = localUrl;
-    preview.hidden = false;
-    empty.hidden = true;
-    remove.hidden = false;
+
+    if (message) message.textContent = "";
+    if (info) info.textContent = "Ajustando a foto para a moldura do site…";
+
+    try {
+      const optimized = await optimizeImageForStorefront(sourceFile);
+      input._optimizedProductImage = optimized;
+      showLocalPreview(preview, empty, remove, optimized);
+      if (info) {
+        const kb = Math.max(1, Math.round(optimized.size / 1024));
+        info.textContent = `Prévia do enquadramento do site · imagem otimizada em WebP (${kb} KB, até ${MAX_IMAGE_DIMENSION}px).`;
+      }
+    } catch (error) {
+      input.value = "";
+      input._optimizedProductImage = null;
+      if (message) message.textContent = error?.message || "Não foi possível preparar a foto.";
+      if (info)
+        info.textContent = "A prévia usa o enquadramento do card do site. A foto é redimensionada automaticamente e enviada em WebP.";
+    }
   });
 
   remove?.addEventListener("click", () => {
     input.value = "";
+    input._optimizedProductImage = null;
     form.dataset.removeProductImage = "1";
+    revokePreviewUrl(preview);
     preview.removeAttribute("src");
     preview.hidden = true;
     empty.hidden = false;
     remove.hidden = true;
+    if (info)
+      info.textContent = "A prévia usa o enquadramento do card do site. A foto é redimensionada automaticamente e enviada em WebP.";
   });
 }
 
@@ -160,10 +283,15 @@ function syncFormImage(form) {
   const empty = form.querySelector("[data-product-image-empty]");
   const remove = form.querySelector("[data-product-image-remove]");
   const input = form.querySelector("[data-product-image-input]");
+  const info = form.querySelector("[data-product-image-info]");
   if (!(preview instanceof HTMLImageElement) || !empty || !remove || !input) return;
 
+  revokePreviewUrl(preview);
   input.value = "";
+  input._optimizedProductImage = null;
   form.dataset.removeProductImage = "0";
+  if (info)
+    info.textContent = "A prévia usa o enquadramento do card do site. A foto é redimensionada automaticamente e enviada em WebP.";
   if (product?.image_key) {
     preview.src = imageUrl(product);
     preview.hidden = false;
@@ -197,7 +325,7 @@ function baseProductPayload(product, data, price, stock, name) {
 
 async function handleImageSubmit(event, form) {
   const input = form.querySelector("[data-product-image-input]");
-  const file = input?.files?.[0] || null;
+  const file = input?._optimizedProductImage || input?.files?.[0] || null;
   const removeRequested = form.dataset.removeProductImage === "1";
   if (!file && !removeRequested) return false;
 
