@@ -1,0 +1,108 @@
+.manual-payment-state {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(123, 36, 59, 0.12);
+  border-radius: 16px;
+  background: rgba(252, 247, 249, 0.9);
+}
+
+.manual-payment-state__head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.manual-payment-state__head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.manual-payment-state__head span {
+  color: #8c6673;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.manual-payment-state__head strong {
+  color: #35272d;
+  font-size: 0.95rem;
+}
+
+.manual-payment-state__head small {
+  color: #8b7a80;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.manual-payment-state__options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.manual-payment-state__option {
+  min-height: 40px;
+  border: 1px solid rgba(123, 36, 59, 0.14);
+  border-radius: 11px;
+  background: #fff;
+  color: #5f3b47;
+  font: 800 0.82rem/1 "Nunito Sans", sans-serif;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.manual-payment-state__option:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(123, 36, 59, 0.3);
+  background: #fff8fa;
+  box-shadow: 0 6px 14px rgba(123, 36, 59, 0.08);
+}
+
+.manual-payment-state__option.is-active {
+  border-color: rgba(123, 36, 59, 0.26);
+  background: #f3dfe5;
+  color: #781f3a;
+  box-shadow: inset 0 0 0 1px rgba(123, 36, 59, 0.04);
+}
+
+.manual-payment-state__option[data-manual-payment-state="PAGO"].is-active {
+  border-color: rgba(39, 103, 73, 0.2);
+  background: #e5f5eb;
+  color: #276749;
+}
+
+.manual-payment-state__option[data-manual-payment-state="CANCELADO"].is-active {
+  border-color: rgba(155, 61, 61, 0.2);
+  background: #fff0f0;
+  color: #9b3d3d;
+}
+
+.manual-payment-state__option:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.manual-payment-state__feedback {
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #fff0f0;
+  color: #903838;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+@media (max-width: 620px) {
+  .manual-payment-state__head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .manual-payment-state__options {
+    grid-template-columns: 1fr;
+  }
+}
