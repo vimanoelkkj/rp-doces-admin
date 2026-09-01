@@ -119,12 +119,18 @@ function OrderCard({
   order,
   onDetails,
   onStatusChange,
+  pendingCancelConfirmation,
+  onConfirmCancel,
+  onDismissCancel,
   saving,
   statusError
 }: {
   order: Order;
   onDetails: () => void;
   onStatusChange: (status: OrderStatus) => void;
+  pendingCancelConfirmation: boolean;
+  onConfirmCancel: () => void;
+  onDismissCancel: () => void;
   saving: boolean;
   statusError: string | null;
 }) {
@@ -160,11 +166,22 @@ function OrderCard({
         <OrderStatusSelect
           orderId={order.id}
           value={status}
-          disabled={saving}
+          disabled={saving || pendingCancelConfirmation}
           onChange={onStatusChange}
         />
-        {statusError ? <p className={styles.inlineError} role="alert">{statusError}</p> : null}
       </div>
+
+      {pendingCancelConfirmation ? (
+        <div className={styles.paymentConfirm} role="alertdialog" aria-label="Confirmar cancelamento do pedido">
+          <p><strong>Cancelar pedido?</strong> O pagamento também será cancelado e o estoque será liberado ou restaurado.</p>
+          <div className={styles.paymentConfirmActions}>
+            <button className={styles.paymentSecondary} type="button" onClick={onDismissCancel}>Manter pedido</button>
+            <button className={styles.paymentDanger} type="button" onClick={onConfirmCancel}>Sim, cancelar</button>
+          </div>
+        </div>
+      ) : null}
+
+      {statusError ? <p className={styles.inlineError} role="alert">{statusError}</p> : null}
     </article>
   );
 }
@@ -186,19 +203,29 @@ function OrderDetails({
   const status = String(order.status_pedido || "NOVO").toUpperCase();
   const manual = order.origem_pedido === "MANUAL";
   const items = itemsOf(order);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+
+  useEffect(() => {
+    setConfirmingCancel(false);
+  }, [order.id, payment]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !paymentSaving) onClose();
+      if (event.key !== "Escape" || paymentSaving) return;
+      if (confirmingCancel) {
+        setConfirmingCancel(false);
+        return;
+      }
+      onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose, paymentSaving]);
+  }, [onClose, paymentSaving, confirmingCancel]);
 
   return (
     <div className={styles.dialog}>
@@ -261,38 +288,53 @@ function OrderDetails({
               <strong>Pagamento manual</strong>
               <span>Alterações aqui também podem reservar, baixar ou restaurar estoque.</span>
             </div>
-            <div className={styles.manualPaymentActions}>
-              {payment !== "PAGO" ? (
-                <button
-                  className={styles.paymentPrimary}
-                  type="button"
-                  disabled={paymentSaving}
-                  onClick={() => onPaymentChange("PAGO")}
-                >
-                  {paymentSaving ? "Salvando…" : "Confirmar pagamento"}
-                </button>
-              ) : null}
-              {payment !== "PENDENTE" ? (
-                <button
-                  className={styles.paymentSecondary}
-                  type="button"
-                  disabled={paymentSaving}
-                  onClick={() => onPaymentChange("PENDENTE")}
-                >
-                  {paymentSaving ? "Salvando…" : "Voltar para pendente"}
-                </button>
-              ) : null}
-              {payment !== "CANCELADO" ? (
-                <button
-                  className={styles.paymentDanger}
-                  type="button"
-                  disabled={paymentSaving}
-                  onClick={() => onPaymentChange("CANCELADO")}
-                >
-                  {paymentSaving ? "Salvando…" : "Cancelar pedido"}
-                </button>
-              ) : null}
-            </div>
+
+            {confirmingCancel ? (
+              <div className={styles.paymentConfirm} role="alertdialog" aria-label="Confirmar cancelamento do pagamento">
+                <p><strong>Cancelar pedido?</strong> O pagamento será cancelado, o pedido também será cancelado e o estoque será liberado ou restaurado.</p>
+                <div className={styles.paymentConfirmActions}>
+                  <button className={styles.paymentSecondary} type="button" disabled={paymentSaving} onClick={() => setConfirmingCancel(false)}>
+                    Manter pedido
+                  </button>
+                  <button className={styles.paymentDanger} type="button" disabled={paymentSaving} onClick={() => onPaymentChange("CANCELADO")}>
+                    {paymentSaving ? "Cancelando…" : "Sim, cancelar"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.manualPaymentActions}>
+                {payment !== "PAGO" ? (
+                  <button
+                    className={styles.paymentPrimary}
+                    type="button"
+                    disabled={paymentSaving}
+                    onClick={() => onPaymentChange("PAGO")}
+                  >
+                    {paymentSaving ? "Salvando…" : "Confirmar pagamento"}
+                  </button>
+                ) : null}
+                {payment !== "PENDENTE" ? (
+                  <button
+                    className={styles.paymentSecondary}
+                    type="button"
+                    disabled={paymentSaving}
+                    onClick={() => onPaymentChange("PENDENTE")}
+                  >
+                    {paymentSaving ? "Salvando…" : "Voltar para pendente"}
+                  </button>
+                ) : null}
+                {payment !== "CANCELADO" ? (
+                  <button
+                    className={styles.paymentDanger}
+                    type="button"
+                    disabled={paymentSaving}
+                    onClick={() => setConfirmingCancel(true)}
+                  >
+                    Cancelar pedido
+                  </button>
+                ) : null}
+              </div>
+            )}
             {paymentError ? <p className={styles.paymentError} role="alert">{paymentError}</p> : null}
           </div>
         ) : null}
@@ -311,6 +353,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
   const [savingOrderId, setSavingOrderId] = useState<number | null>(null);
   const [statusError, setStatusError] = useState<{ id: number; message: string } | null>(null);
+  const [statusConfirmOrderId, setStatusConfirmOrderId] = useState<number | null>(null);
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -333,21 +376,28 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const summary = useMemo(() => buildOrdersSummary(orders), [orders]);
   const visible = useMemo(() => filterOrders(orders, filter, query), [orders, filter, query]);
 
+  function requestStatusChange(order: Order, nextStatus: OrderStatus) {
+    const currentStatus = String(order.status_pedido || "NOVO").toUpperCase();
+    if (nextStatus === currentStatus || savingOrderId !== null) return;
+
+    const needsCancelConfirmation =
+      nextStatus === "CANCELADO" &&
+      order.origem_pedido === "MANUAL" &&
+      String(order.status_pagamento || "PENDENTE").toUpperCase() !== "CANCELADO";
+
+    if (needsCancelConfirmation) {
+      setStatusConfirmOrderId(order.id);
+      return;
+    }
+
+    void changeStatus(order, nextStatus);
+  }
+
   async function changeStatus(order: Order, nextStatus: OrderStatus) {
     const currentStatus = String(order.status_pedido || "NOVO").toUpperCase();
     if (nextStatus === currentStatus || savingOrderId !== null) return;
 
-    if (
-      nextStatus === "CANCELADO" &&
-      order.origem_pedido === "MANUAL" &&
-      String(order.status_pagamento || "PENDENTE").toUpperCase() !== "CANCELADO" &&
-      !window.confirm(
-        "Cancelar este pedido manual também cancela o pagamento e libera ou restaura o estoque. Deseja continuar?"
-      )
-    ) {
-      return;
-    }
-
+    setStatusConfirmOrderId(null);
     setSavingOrderId(order.id);
     setStatusError(null);
     try {
@@ -371,15 +421,6 @@ export function OrdersPage({ session, onNavigate }: Props) {
     if (!selected || selected.origem_pedido !== "MANUAL" || paymentSaving) return;
     const currentStatus = String(selected.status_pagamento || "PENDENTE").toUpperCase();
     if (nextStatus === currentStatus) return;
-
-    if (
-      nextStatus === "CANCELADO" &&
-      !window.confirm(
-        "Cancelar este pagamento também cancela o pedido e libera ou restaura o estoque. Deseja continuar?"
-      )
-    ) {
-      return;
-    }
 
     setPaymentSaving(true);
     setPaymentError(null);
@@ -471,7 +512,10 @@ export function OrdersPage({ session, onNavigate }: Props) {
                     setPaymentError(null);
                     setSelected(order);
                   }}
-                  onStatusChange={status => void changeStatus(order, status)}
+                  onStatusChange={status => requestStatusChange(order, status)}
+                  pendingCancelConfirmation={statusConfirmOrderId === order.id}
+                  onConfirmCancel={() => void changeStatus(order, "CANCELADO")}
+                  onDismissCancel={() => setStatusConfirmOrderId(null)}
                   saving={savingOrderId === order.id}
                   statusError={statusError?.id === order.id ? statusError.message : null}
                 />
