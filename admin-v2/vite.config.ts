@@ -18,7 +18,7 @@ export default defineConfig({
           });
         }
       },
-      "/admin": {
+      "/admin/": {
         target: apiTarget,
         changeOrigin: true
       }
