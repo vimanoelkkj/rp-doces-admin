@@ -1,4 +1,76 @@
-import { financialStatus } from "./orderLedger.js";
+import { financialStatus, ledgerPaymentMethod, ledgerPaymentStatus } from "./orderLedger.js";
+
+export async function ensureLegacyPaymentMaterialized(env, pedidoId) {
+  const existing = await env.DB.prepare(
+    "SELECT id FROM pedido_pagamentos WHERE pedido_id = ? LIMIT 1"
+  )
+    .bind(pedidoId)
+    .first();
+  if (existing) return { ok: true, materialized: false, paymentId: Number(existing.id) };
+
+  const pedido = await env.DB.prepare("SELECT * FROM pedidos WHERE id = ? LIMIT 1")
+    .bind(pedidoId)
+    .first();
+  if (!pedido || Number(pedido.valor_total_centavos || 0) <= 0) {
+    return { ok: true, materialized: false, paymentId: null };
+  }
+
+  const status = ledgerPaymentStatus(pedido.status_pagamento);
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO pedido_pagamentos (
+       pedido_id, metodo, origem, valor_centavos, status,
+       mp_order_id, mp_payment_id, mp_status, mp_status_detail,
+       mp_ticket_url, mp_qr_code, mp_qr_code_base64,
+       idempotency_key, criado_em, atualizado_em, pago_em, cancelado_em,
+       pix_expira_em
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+       COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?)`
+  )
+    .bind(
+      pedidoId,
+      ledgerPaymentMethod(pedido.metodo_pagamento),
+      pedido.origem_pedido === "SITE" ? "SITE" : "ADMIN",
+      Number(pedido.valor_total_centavos),
+      status,
+      pedido.mp_order_id || null,
+      pedido.mp_payment_id || null,
+      pedido.mp_status || null,
+      pedido.mp_status_detail || null,
+      pedido.mp_ticket_url || null,
+      pedido.mp_qr_code || null,
+      pedido.mp_qr_code_base64 || null,
+      pedido.idempotency_key || `legacy:${pedidoId}`,
+      pedido.criado_em || null,
+      pedido.atualizado_em || null,
+      status === "PAGO" ? pedido.pago_em || pedido.atualizado_em || null : null,
+      status === "CANCELADO" ? pedido.atualizado_em || null : null,
+      pedido.pix_expira_em || null
+    )
+    .run();
+
+  let paymentId = Number(inserted?.meta?.last_row_id || 0);
+  if (!paymentId) {
+    const found = await env.DB.prepare(
+      "SELECT id FROM pedido_pagamentos WHERE pedido_id = ? ORDER BY id LIMIT 1"
+    )
+      .bind(pedidoId)
+      .first();
+    paymentId = Number(found?.id || 0);
+  }
+
+  if (paymentId) {
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
+       SELECT ?, id, valor_total_centavos
+       FROM pedido_itens
+       WHERE pedido_id = ? AND valor_total_centavos > 0`
+    )
+      .bind(paymentId, pedidoId)
+      .run();
+  }
+
+  return { ok: true, materialized: Boolean(paymentId), paymentId: paymentId || null };
+}
 
 export async function getComandaFinancialState(env, pedidoId) {
   const pedido = await env.DB.prepare(
@@ -22,7 +94,7 @@ export async function getComandaFinancialState(env, pedidoId) {
   const { results: pagamentos } = await env.DB.prepare(
     `SELECT id, pedido_id, metodo, origem, valor_centavos, status,
             mp_order_id, mp_payment_id, mp_status, mp_status_detail,
-            mp_ticket_url, mp_qr_code, mp_qr_code_base64,
+            mp_ticket_url, mp_qr_code, mp_qr_code_base64, pix_expira_em,
             idempotency_key, substitui_pagamento_id, registrado_por_usuario_id,
             observacao, criado_em, atualizado_em, pago_em, cancelado_em
      FROM pedido_pagamentos
@@ -157,6 +229,7 @@ export async function registerAdminPayment(env, {
   usuarioId = null,
   observacao = ""
 }) {
+  await ensureLegacyPaymentMaterialized(env, pedidoId);
   const state = await getComandaFinancialState(env, pedidoId);
   if (!state) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
   if (String(state.pedido.status_comanda || "ABERTA") !== "ABERTA") {
