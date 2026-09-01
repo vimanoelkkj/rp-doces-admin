@@ -1,8 +1,5 @@
 import { z } from "zod";
-
-const sqliteBoolean = z
-  .union([z.literal(0), z.literal(1), z.boolean()])
-  .transform((value) => value === 1 || value === true);
+import { sqliteBoolean } from "../shared/sqliteTypes";
 
 export const ProductSchema = z.object({
   id: z.number().int().positive(),
