@@ -1,94 +1,131 @@
 .centered {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 18% 10%, rgb(233 102 125 / 11%), transparent 32rem),
+    linear-gradient(180deg, #fffaf6, #fff8f4);
 }
 
 .statusCard,
 .card {
-  width: min(100%, 420px);
-  border: 1px solid #ead9cf;
-  border-radius: 22px;
-  background: #fffdfb;
-  box-shadow: 0 18px 48px rgba(75, 45, 28, 0.08);
+  width: min(100%, 440px);
+  border: 1px solid rgb(232 204 194 / 82%);
+  border-radius: 28px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 24px 70px rgb(97 57 48 / 10%);
+  backdrop-filter: blur(18px);
 }
 
 .statusCard {
-  padding: 28px;
+  padding: 30px;
+  color: var(--muted);
   text-align: center;
 }
 
 .card {
-  padding: 30px;
   display: grid;
-  gap: 24px;
+  gap: 22px;
+  padding: 30px;
 }
 
 .eyebrow {
   display: inline-block;
-  margin-bottom: 8px;
-  color: #9a644c;
-  font-size: 0.9rem;
+  margin-bottom: 5px;
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .card h1 {
   margin: 0;
-  font-size: clamp(2rem, 6vw, 2.7rem);
+  color: var(--text);
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 7vw, 2.35rem);
+  font-weight: 800;
+  line-height: 1.04;
 }
 
 .card p {
-  margin: 8px 0 0;
-  color: #765f53;
+  margin: 9px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .form {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .form label {
   display: grid;
-  gap: 7px;
-  font-weight: 600;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 0.79rem;
+  font-weight: 800;
 }
 
 .form input {
   width: 100%;
-  min-height: 46px;
-  padding: 0 13px;
-  border: 1px solid #d9c8bd;
-  border-radius: 12px;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid #f1ddd4;
+  border-radius: 15px;
+  outline: 0;
   background: #fff;
-  color: inherit;
-  font: inherit;
+  color: var(--text);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .form input:focus {
-  outline: 3px solid rgba(211, 91, 54, 0.15);
-  border-color: #d35b36;
+  border-color: #efa7c1;
+  box-shadow: 0 0 0 4px rgb(233 102 125 / 11%);
 }
 
 .form button {
-  min-height: 48px;
+  min-height: 50px;
+  margin-top: 3px;
   border: 0;
-  border-radius: 12px;
-  background: #d35b36;
+  border-radius: 15px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
   color: #fff;
   font: inherit;
   font-weight: 800;
-  cursor: pointer;
+  box-shadow: 0 12px 24px rgb(201 67 94 / 18%);
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.form button:active:not(:disabled) {
+  transform: scale(0.985);
 }
 
 .form button:disabled {
-  opacity: 0.65;
+  opacity: 0.58;
   cursor: wait;
 }
 
 .error {
   padding: 12px 14px;
-  border: 1px solid #efb9b9;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
   border-radius: 12px;
-  background: #fff3f3;
-  color: #b42323;
+  background: #fff0f1;
+  color: var(--danger);
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .centered {
+    padding-inline: 14px;
+  }
+
+  .card,
+  .statusCard {
+    padding: 24px 20px;
+    border-radius: 24px;
+    box-shadow: 0 18px 50px rgb(97 57 48 / 8%);
+  }
 }
