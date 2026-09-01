@@ -9,6 +9,7 @@ import {
 } from "./product.api";
 import { availableStock } from "./productDisplay";
 import type { Product, ProductId } from "./product.types";
+import { CategoryManager } from "./CategoryManager";
 import { ProductCard } from "./ProductCard";
 import { ProductDialog } from "./ProductDialog";
 import styles from "./ProductsPage.module.css";
@@ -65,6 +66,7 @@ export function ProductsPage({ session }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null | undefined>(null);
+  const [managingCategories, setManagingCategories] = useState(false);
   const [menu, setMenu] = useState<ProductId | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
@@ -328,8 +330,7 @@ export function ProductsPage({ session }: Props) {
               <button
                 className={styles.secondaryButton}
                 type="button"
-                disabled
-                title="Gerenciamento de categorias será migrado em uma etapa própria"
+                onClick={() => setManagingCategories(true)}
               >
                 Gerenciar categorias
               </button>
@@ -378,6 +379,10 @@ export function ProductsPage({ session }: Props) {
           ) : null}
         </main>
       </div>
+
+      {managingCategories ? (
+        <CategoryManager onClose={() => setManagingCategories(false)} />
+      ) : null}
 
       {editing !== null ? (
         <ProductDialog
