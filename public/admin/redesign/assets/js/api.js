@@ -136,8 +136,12 @@ export const adminApi = {
     });
   },
   updateOrderStatus(id, status) {
-    return jsonRequest(`/api/admin/orders/${id}`, "PUT", { status_pedido: status }).then(payload => {
-      signalDataChanged("pedidos", "dashboard");
+    const action = status === "CANCELADO"
+      ? jsonRequest(`/api/admin/orders/${id}/payments`, "POST", { acao: "CANCELAR_COMANDA" })
+      : jsonRequest(`/api/admin/orders/${id}`, "PUT", { status_pedido: status });
+    return action.then(payload => {
+      invalidateProductsCache();
+      signalDataChanged("pedidos", "produtos", "dashboard");
       return payload;
     });
   },
