@@ -16,6 +16,44 @@ function pedidoIdFromExternalReference(value) {
   return match ? Number(match[1]) : null;
 }
 
+function isMissingPaymentLedgerTable(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("no such table") && message.includes("pedido_pagamentos");
+}
+
+async function findLedgerLink(env, dataId) {
+  try {
+    return await env.DB.prepare(
+      `SELECT pedido_id AS id, mp_order_id
+       FROM pedido_pagamentos
+       WHERE mp_order_id = ? OR mp_payment_id = ?
+       ORDER BY id DESC
+       LIMIT 1`
+    )
+      .bind(dataId, dataId)
+      .first();
+  } catch (error) {
+    if (isMissingPaymentLedgerTable(error)) return null;
+    throw error;
+  }
+}
+
+async function findLedgerCharge(env, pedidoId, orderId) {
+  try {
+    return await env.DB.prepare(
+      `SELECT id, origem
+       FROM pedido_pagamentos
+       WHERE pedido_id = ? AND mp_order_id = ?
+       LIMIT 1`
+    )
+      .bind(pedidoId, orderId)
+      .first();
+  } catch (error) {
+    if (isMissingPaymentLedgerTable(error)) return null;
+    throw error;
+  }
+}
+
 export async function onRequestPost({ request, env, waitUntil }) {
   const url = new URL(request.url);
 
@@ -68,15 +106,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       .first();
 
     if (!local) {
-      const ledgerLink = await env.DB.prepare(
-        `SELECT pedido_id AS id, mp_order_id
-         FROM pedido_pagamentos
-         WHERE mp_order_id = ? OR mp_payment_id = ?
-         ORDER BY id DESC
-         LIMIT 1`
-      )
-        .bind(dataId, dataId)
-        .first();
+      const ledgerLink = await findLedgerLink(env, dataId);
       if (ledgerLink) local = ledgerLink;
     }
 
@@ -105,14 +135,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
     if (!local || !orderId) return json({ ok: true });
     if (!order) order = await mpRequest(env, `/v1/orders/${encodeURIComponent(orderId)}`);
 
-    const ledgerCharge = await env.DB.prepare(
-      `SELECT id, origem
-       FROM pedido_pagamentos
-       WHERE pedido_id = ? AND mp_order_id = ?
-       LIMIT 1`
-    )
-      .bind(local.id, orderId)
-      .first();
+    const ledgerCharge = await findLedgerCharge(env, local.id, orderId);
 
     if (ledgerCharge?.origem === "ADMIN") {
       const payment = paymentFromOrder(order);
