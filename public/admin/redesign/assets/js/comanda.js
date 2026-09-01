@@ -146,7 +146,7 @@ async function openComanda(orderId) {
   const errorBox = dialog.querySelector("[data-comanda-error]");
   const show = (node, message) => { node.textContent = message; node.hidden = false; };
   const busy = value => dialog.querySelectorAll("button,input,select").forEach(control => { control.disabled = value; });
-  const refresh = async message => { const next = await loadState(orderId); dialog.outerHTML = markup(next.order, next.products); close(); await openComanda(orderId); if (message) setTimeout(() => document.querySelector("[data-comanda-feedback]") && show(document.querySelector("[data-comanda-feedback]"), message), 0); };
+  const refresh = async message => { await loadState(orderId); close(); await openComanda(orderId); if (message) setTimeout(() => document.querySelector("[data-comanda-feedback]") && show(document.querySelector("[data-comanda-feedback]"), message), 0); };
   const run = async (task, message) => {
     feedback.hidden = true; errorBox.hidden = true; busy(true);
     try { await task(); window.dispatchEvent(new CustomEvent("rp-admin-data-changed", { detail: { pages: ["pedidos", "produtos", "dashboard"] } })); await refresh(message); }
@@ -192,11 +192,23 @@ async function openComanda(orderId) {
   dialog.querySelector("[data-comanda-copy-pix]")?.addEventListener("click", async () => { const code = state.order.pagamentos?.find(payment => payment.metodo === "PIX_MP" && payment.status === "PENDENTE")?.mp_qr_code; if (code) { await navigator.clipboard.writeText(code); show(feedback, "Código Pix copiado."); } });
 }
 
-function enhanceOrders() {
-  document.querySelectorAll(".orders-details-button").forEach(button => { button.textContent = "Abrir comanda"; });
+function enhanceOrders(root = document) {
+  root.querySelectorAll?.(".orders-details-button").forEach(button => {
+    if (button.dataset.comandaEnhanced === "1") return;
+    button.dataset.comandaEnhanced = "1";
+    if (button.textContent !== "Abrir comanda") button.textContent = "Abrir comanda";
+  });
 }
 
-const observer = new MutationObserver(enhanceOrders);
+const observer = new MutationObserver(records => {
+  for (const record of records) {
+    for (const node of record.addedNodes) {
+      if (!(node instanceof Element)) continue;
+      if (node.matches?.(".orders-details-button")) enhanceOrders(node.parentElement || node);
+      else if (node.querySelector?.(".orders-details-button")) enhanceOrders(node);
+    }
+  }
+});
 observer.observe(document.documentElement, { childList: true, subtree: true });
 enhanceOrders();
 
