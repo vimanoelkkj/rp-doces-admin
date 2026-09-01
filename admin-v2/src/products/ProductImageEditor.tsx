@@ -21,8 +21,14 @@ interface Props {
   onBusyChange?: (busy: boolean) => void;
 }
 
+export type PreparedImageChange =
+  | { kind: "upload"; file: File }
+  | { kind: "remove" }
+  | null;
+
 export type ProductImageEditorHandle = {
   prepareCurrentImage: () => Promise<File | null>;
+  prepareImageChange: () => Promise<PreparedImageChange>;
 };
 
 type DragState = {
@@ -171,6 +177,10 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
         async prepareCurrentImage() {
           if (!dirty || !activeUrl) return null;
           return createCroppedFile();
+        },
+        async prepareImageChange() {
+          if (!dirty || !activeUrl) return null;
+          return { kind: "upload", file: await createCroppedFile() };
         }
       }),
       [activeUrl, dirty, productId, zoom, focalX, focalY]
