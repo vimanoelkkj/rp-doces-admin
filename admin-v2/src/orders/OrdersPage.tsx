@@ -69,6 +69,17 @@ function dateTime(value?: string | null): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(parsed);
 }
 
+function formatWhatsapp(value?: string | null): string {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+  if (!digits) return "—";
+  if (digits.length <= 2) return `(${digits}`;
+  const ddd = digits.slice(0, 2);
+  const number = digits.slice(2);
+  if (number.length <= 4) return `(${ddd}) ${number}`;
+  const split = number.length <= 8 ? 4 : 5;
+  return `(${ddd}) ${number.slice(0, split)}-${number.slice(split)}`;
+}
+
 function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -158,7 +169,7 @@ function OrderCard({
 
       <div className={styles.meta}>
         <span><strong>Criado</strong>{dateTime(order.criado_em)}</span>
-        <span><strong>Contato</strong>{order.cliente_whatsapp || order.cliente_email || "—"}</span>
+        <span><strong>Contato</strong>{order.cliente_whatsapp ? formatWhatsapp(order.cliente_whatsapp) : order.cliente_email || "—"}</span>
       </div>
 
       <div className={styles.actions}>
@@ -269,8 +280,7 @@ function OrderDetails({
         </div>
 
         <div className={styles.detailGrid}>
-          <div><span>WhatsApp</span><strong>{order.cliente_whatsapp || "—"}</strong></div>
-          <div><span>E-mail</span><strong>{order.cliente_email || "—"}</strong></div>
+          <div><span>WhatsApp</span><strong>{formatWhatsapp(order.cliente_whatsapp)}</strong></div>
           <div><span>Recebimento</span><strong>{order.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada"}</strong></div>
           <div><span>Método</span><strong>{PAYMENT_METHOD_LABELS[String(order.metodo_pagamento || "PIX")] || order.metodo_pagamento || "Pix"}</strong></div>
         </div>
