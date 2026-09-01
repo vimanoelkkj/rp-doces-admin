@@ -207,7 +207,7 @@
 }
 
 .v2Badge {
-  display: none;
+  display: inline-flex;
   align-items: center;
   min-height: 20px;
   border: 1px solid color-mix(in oklch, var(--accent) 34%, var(--border));
