@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createProduct,
   listCategories,
@@ -9,7 +9,10 @@ import {
 } from "./product.api";
 import { ProductInputSchema } from "./product.schema";
 import type { Product, ProductId, ProductInput } from "./product.types";
-import { ProductImageEditor } from "./ProductImageEditor";
+import {
+  ProductImageEditor,
+  type ProductImageEditorHandle
+} from "./ProductImageEditor";
 import styles from "./ProductDialog.module.css";
 
 interface Props {
@@ -72,8 +75,8 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preparedImage, setPreparedImage] = useState<File | null>(null);
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
+  const imageEditorRef = useRef<ProductImageEditorHandle>(null);
 
   useEffect(() => {
     listCategories()
@@ -104,8 +107,13 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
     setSaving(true);
     let targetId = product?.id ?? createdProductId;
     let productPersisted = false;
+    let preparedImage: File | null = null;
 
     try {
+      if (!product) {
+        preparedImage = await imageEditorRef.current?.prepareCurrentImage() ?? null;
+      }
+
       if (product) {
         await updateProduct(product.id, parsed.data);
         targetId = product.id;
@@ -121,12 +129,11 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
 
       if (!product && preparedImage && targetId) {
         await uploadProductImage(targetId, preparedImage);
-        setPreparedImage(null);
       }
 
       onSaved();
     } catch (err) {
-      const message = err instanceof ProductApiError ? err.message : "Não foi possível salvar o produto.";
+      const message = err instanceof ProductApiError ? err.message : err instanceof Error ? err.message : "Não foi possível salvar o produto.";
 
       if (!product && productPersisted && preparedImage) {
         setError(`Produto salvo, mas a foto não foi enviada: ${message} Tente salvar novamente.`);
@@ -163,9 +170,9 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
         </header>
 
         <ProductImageEditor
+          ref={imageEditorRef}
           productId={imageProductId}
           currentImageKey={product?.image_key ?? null}
-          onPreparedImage={product ? undefined : setPreparedImage}
         />
 
         <form onSubmit={submit} className={styles.form} autoComplete="off">
@@ -394,11 +401,7 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
               Cancelar
             </button>
             <button type="submit" disabled={saving}>
-              {saving
-                ? "Salvando…"
-                : createdProductId && preparedImage
-                  ? "Tentar salvar foto"
-                  : "Salvar produto"}
+              {saving ? "Salvando…" : "Salvar produto"}
             </button>
           </footer>
         </form>
