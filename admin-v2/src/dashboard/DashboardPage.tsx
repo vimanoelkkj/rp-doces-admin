@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
-import type { Order } from "../orders/order.schema";
+import type { FinancialOrder } from "../orders/order.finance";
 import { ApiClientError } from "../shared/apiClient";
 import { loadDashboardData, type DashboardData } from "./dashboard.api";
 import {
   buildDashboardSummary,
   dashboardOrderItemsCount,
-  parseDashboardDate
+  parseDashboardDate,
+  sameLocalDay
 } from "./dashboard.model";
+import { ReceivablesPanel } from "./ReceivablesPanel";
 import styles from "./DashboardPage.module.css";
 
 type Props = {
@@ -31,7 +33,7 @@ function time(value?: string | null): string {
 function paymentTone(status?: string | null): string {
   const normalized = String(status || "").toUpperCase();
   if (normalized === "PAGO") return styles.pillSuccess;
-  if (normalized === "PENDENTE") return styles.pillWarning;
+  if (["PENDENTE", "PARCIAL"].includes(normalized)) return styles.pillWarning;
   if (["CANCELADO", "FALHA", "REEMBOLSADO"].includes(normalized)) return styles.pillDanger;
   return "";
 }
@@ -48,6 +50,7 @@ function humanPaymentStatus(status?: string | null): string {
   const normalized = String(status || "PENDENTE").toUpperCase();
   const labels: Record<string, string> = {
     PAGO: "Pago",
+    PARCIAL: "Pagamento parcial",
     PENDENTE: "Aguardando pagamento",
     CANCELADO: "Cancelado",
     FALHA: "Falha",
@@ -81,7 +84,7 @@ function CustomerIcon() {
   );
 }
 
-function RecentOrder({ order }: { order: Order }) {
+function RecentOrder({ order }: { order: FinancialOrder }) {
   const itemCount = dashboardOrderItemsCount(order);
 
   return (
@@ -99,8 +102,8 @@ function RecentOrder({ order }: { order: Order }) {
       </div>
       <div data-label="Itens">{itemCount} {itemCount === 1 ? "item" : "itens"}</div>
       <div data-label="Pagamento">
-        <span className={`${styles.pill} ${paymentTone(order.status_pagamento)}`}>
-          {humanPaymentStatus(order.status_pagamento)}
+        <span className={`${styles.pill} ${paymentTone(order.status_financeiro)}`}>
+          {humanPaymentStatus(order.status_financeiro)}
         </span>
       </div>
       <div data-label="Andamento">
@@ -134,10 +137,42 @@ export function DashboardPage({ session, onNavigate }: Props) {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void reload();
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [reload]);
+
   const summary = useMemo(
     () => data ? buildDashboardSummary(data.orders, data.products) : null,
     [data]
   );
+
+  const financial = useMemo(() => {
+    if (!data) return null;
+    const now = new Date();
+    const paidToday = data.orders.flatMap(order =>
+      order.pagamentos.filter(payment =>
+        payment.status === "PAGO" &&
+        sameLocalDay(parseDashboardDate(payment.pago_em || payment.atualizado_em), now)
+      )
+    );
+    const receivables = data.orders.filter(
+      order => order.saldo_centavos > 0 && order.status_pedido !== "CANCELADO"
+    );
+    const openCommands = data.orders.filter(
+      order => !["ENTREGUE", "CANCELADO"].includes(String(order.status_pedido || "").toUpperCase())
+    );
+
+    return {
+      receivedToday: paidToday.reduce((sum, payment) => sum + payment.valor_centavos, 0),
+      receivedTodayCount: paidToday.length,
+      receivableTotal: receivables.reduce((sum, order) => sum + order.saldo_centavos, 0),
+      receivableCount: receivables.length,
+      openCommandsCount: openCommands.length
+    };
+  }, [data]);
 
   return (
     <AdminShell
@@ -160,35 +195,37 @@ export function DashboardPage({ session, onNavigate }: Props) {
           <span>{error}</span>
           <button className={styles.retry} type="button" onClick={() => void reload()}>Tentar novamente</button>
         </section>
-      ) : summary ? (
+      ) : summary && financial && data ? (
         <section className={styles.dashboard} aria-label="Resumo da operação">
           <div className={styles.metrics}>
             <article className={`${styles.metric} ${styles.featured}`}>
-              <span className={styles.metricLabel}>Faturamento pago hoje</span>
-              <strong>{money(summary.paidRevenueToday)}</strong>
-              <small>{summary.paidTodayCount} pedido{summary.paidTodayCount === 1 ? " pago" : "s pagos"}</small>
+              <span className={styles.metricLabel}>Recebido hoje</span>
+              <strong>{money(financial.receivedToday)}</strong>
+              <small>{financial.receivedTodayCount} pagamento{financial.receivedTodayCount === 1 ? " confirmado" : "s confirmados"}</small>
             </article>
-            <article className={`${styles.metric} ${styles.warning}`}>
-              <span className={styles.metricLabel}>Aguardando preparação</span>
+            <article className={`${styles.metric} ${financial.receivableCount ? styles.warning : styles.success}`}>
+              <span className={styles.metricLabel}>A receber</span>
+              <strong>{money(financial.receivableTotal)}</strong>
+              <small>{financial.receivableCount} cliente{financial.receivableCount === 1 ? "" : "s"} com saldo pendente</small>
+            </article>
+            <article className={styles.metric}>
+              <span className={styles.metricLabel}>Comandas abertas</span>
+              <strong>{financial.openCommandsCount}</strong>
+              <small>Clientes ainda em atendimento</small>
+            </article>
+            <article className={`${styles.metric} ${summary.waitingPreparationCount ? styles.warning : styles.success}`}>
+              <span className={styles.metricLabel}>Aguardando preparo</span>
               <strong>{summary.waitingPreparationCount}</strong>
               <small>Pedidos pagos que ainda estão novos</small>
-            </article>
-            <article className={`${styles.metric} ${styles.warning}`}>
-              <span className={styles.metricLabel}>Aguardando pagamento</span>
-              <strong>{summary.pendingPaymentCount}</strong>
-              <small>Pix ainda não confirmado</small>
             </article>
             <article className={`${styles.metric} ${summary.soldOutCount || summary.lowStockCount ? styles.warning : styles.success}`}>
               <span className={styles.metricLabel}>Catálogo</span>
               <strong>{summary.productCount}</strong>
               <small>{summary.soldOutCount} esgotado{summary.soldOutCount === 1 ? "" : "s"} · {summary.lowStockCount} estoque baixo</small>
             </article>
-            <article className={styles.metric}>
-              <span className={styles.metricLabel}>Pedidos hoje</span>
-              <strong>{summary.ordersTodayCount}</strong>
-              <small>Criados desde 00:00</small>
-            </article>
           </div>
+
+          <ReceivablesPanel orders={data.orders} onOpenOrder={() => onNavigate("pedidos")} />
 
           <div className={styles.grid}>
             <section className={styles.panel}>
@@ -205,7 +242,7 @@ export function DashboardPage({ session, onNavigate }: Props) {
                   <div className={styles.ordersHead} aria-hidden="true">
                     <span>Pedido</span><span>Cliente</span><span>Itens</span><span>Pagamento</span><span>Andamento</span><span>Total</span>
                   </div>
-                  {summary.recentOrders.map(order => <RecentOrder key={order.id} order={order} />)}
+                  {data.orders.slice(0, 6).map(order => <RecentOrder key={order.id} order={order} />)}
                 </div>
               ) : (
                 <div className={styles.empty}>
