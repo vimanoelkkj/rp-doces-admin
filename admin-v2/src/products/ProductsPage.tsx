@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
-import { deleteProduct, listProducts, ProductApiError } from "./product.api";
+import { deleteProduct, listProducts, ProductApiError, restoreProduct } from "./product.api";
 import { availableStock } from "./productDisplay";
 import type { Product, ProductId } from "./product.types";
 import { ProductCard } from "./ProductCard";
@@ -83,6 +83,19 @@ export function ProductsPage({ session }: Props) {
     } catch (err) {
       setError(
         err instanceof ProductApiError ? err.message : "Não foi possível arquivar o produto."
+      );
+    }
+  }
+
+  async function restore(product: Product) {
+    setMenu(null);
+
+    try {
+      await restoreProduct(product);
+      await reload();
+    } catch (err) {
+      setError(
+        err instanceof ProductApiError ? err.message : "Não foi possível restaurar o produto."
       );
     }
   }
@@ -183,6 +196,7 @@ export function ProductsPage({ session }: Props) {
               setEditing(product);
             }}
             onArchive={() => void archive(product.id)}
+            onRestore={() => void restore(product)}
           />
         ))}
       </section>
