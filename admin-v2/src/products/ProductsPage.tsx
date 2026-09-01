@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import {
   deleteProduct,
@@ -19,7 +19,17 @@ type Props = {
   session: AuthSession;
 };
 
-type IconName = "dashboard" | "products" | "orders" | "users" | "store" | "search" | "logout" | "collapse";
+type IconName =
+  | "dashboard"
+  | "products"
+  | "orders"
+  | "users"
+  | "store"
+  | "search"
+  | "logout"
+  | "collapse"
+  | "external"
+  | "bell";
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -30,7 +40,9 @@ function Icon({ name }: { name: IconName }) {
     store: <><path d="M4 9h16l-2-5H6L4 9Z"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
     search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
     logout: <><path d="M10 5H5v14h5M13 8l4 4-4 4M17 12H9"/></>,
-    collapse: <><path d="m14 7-5 5 5 5"/></>
+    collapse: <><path d="m14 7-5 5 5 5"/></>,
+    external: <><path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v6H5V5h6"/></>,
+    bell: <><path d="M6 17h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v5L6 17Z"/><path d="M10 20h4"/></>
   };
 
   return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
@@ -57,6 +69,8 @@ export function ProductsPage({ session }: Props) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
   const [collapsed, setCollapsed] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -76,6 +90,27 @@ export function ProductsPage({ session }: Props) {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileOpen(false);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [profileOpen]);
 
   const visible = useMemo(
     () =>
@@ -182,30 +217,70 @@ export function ProductsPage({ session }: Props) {
           </div>
 
           <div className={styles.topbarActions}>
+            <a
+              className={styles.iconButton}
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Abrir site público"
+              aria-label="Abrir site público"
+            >
+              <Icon name="external" />
+            </a>
+
             <button
               className={styles.iconButton}
               type="button"
-              title="Sair"
-              aria-label="Sair"
-              onClick={() => void logout()}
-              disabled={loggingOut}
+              title="Notificações permanecem no Admin atual durante a migração"
+              aria-label="Notificações"
+              disabled
             >
-              <Icon name="logout" />
+              <Icon name="bell" />
             </button>
 
-            <div className={styles.profile} aria-label={`Usuário logado: ${user.nome}`}>
-              {user.avatar_url ? (
-                <img className={styles.avatar} src={user.avatar_url} alt="" />
-              ) : (
-                <span className={styles.avatarFallback} aria-hidden="true">
-                  {initials(user.nome)}
+            <div className={styles.profileWrap} ref={profileRef}>
+              <button
+                className={`${styles.profile} ${profileOpen ? styles.profileOpen : ""}`}
+                type="button"
+                aria-label="Abrir menu da conta"
+                aria-expanded={profileOpen}
+                onClick={() => setProfileOpen(open => !open)}
+              >
+                {user.avatar_url ? (
+                  <img className={styles.avatar} src={user.avatar_url} alt="" />
+                ) : (
+                  <span className={styles.avatarFallback} aria-hidden="true">
+                    {initials(user.nome)}
+                  </span>
+                )}
+                <span className={styles.profileCopy}>
+                  <strong>{user.nome}</strong>
+                  <small>{user.papel}</small>
                 </span>
-              )}
-              <span className={styles.profileCopy}>
-                <strong>{user.nome}</strong>
-                <small>{user.papel}</small>
-              </span>
-              <span className={styles.profileChevron} aria-hidden="true">⌄</span>
+                <span className={styles.profileChevron} aria-hidden="true" />
+              </button>
+
+              {profileOpen ? (
+                <div className={styles.profileMenu} role="menu">
+                  <div className={styles.profileMenuIdentity}>
+                    <strong>{user.nome}</strong>
+                    <span>@{user.username} · {user.papel}</span>
+                    {user.email ? <small>{user.email}</small> : null}
+                  </div>
+                  <div className={styles.profileMenuActions}>
+                    <button
+                      className={styles.profileMenuLogout}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void logout()}
+                      disabled={loggingOut}
+                    >
+                      <Icon name="logout" />
+                      {loggingOut ? "Saindo…" : "Sair da conta"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </header>
