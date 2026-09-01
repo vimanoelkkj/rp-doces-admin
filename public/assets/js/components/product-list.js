@@ -44,6 +44,20 @@ function shell(content, products = [], activeCategory = "ALL") {
 function cartQuantity(cart, product) {
   return Number(cart.get(String(product.id))) || 0;
 }
+function productGrid(products, cart) {
+  return `<div class="rp-menu__grid">${products.map(product => renderProductCard(product, cartQuantity(cart, product))).join("")}</div>`;
+}
+function groupedProductGrids(products, cart) {
+  const groups = categoriesFromProducts(products)
+    .slice(1)
+    .map(([categoryId, label]) => {
+      const categoryProducts = products.filter(product => String(product.categoria || "") === categoryId);
+      if (!categoryProducts.length) return "";
+      return `<section class="rp-menu__category-group"><div class="rp-menu__category-head"><h3 class="rp-menu__category-title">${label}</h3><span class="rp-menu__category-line" aria-hidden="true"></span></div>${productGrid(categoryProducts, cart)}</section>`;
+    })
+    .join("");
+  return `<div class="rp-menu__category-groups">${groups}</div>`;
+}
 function rememberQuantities(list, cart) {
   renderedQuantities = new Map(
     list.map(product => [String(product.id), cartQuantity(cart, product)])
@@ -130,7 +144,10 @@ export function renderProductList(
   const categoryChanged = renderedCategory !== null && renderedCategory !== resolvedCategory;
   const menuClass = `rp-menu rp-section${categoryChanged ? " rp-menu--category-update" : ""}`;
   const emptyCategory = `<div class="rp-menu__empty"><strong>Nenhum doce desta categoria disponível agora.</strong><p>Você pode conferir as outras opções do cardápio.</p></div>`;
-  const markup = `<section class="${menuClass}" id="cardapio" aria-labelledby="rp-menu-title"><div class="rp-container">${menuHeading(list.length)}${categoryFilters(all, resolvedCategory)}${list.length ? `<div class="rp-menu__grid">${list.map(product => renderProductCard(product, cartQuantity(cart, product))).join("")}</div>` : emptyCategory}</div></section>`;
+  const productsMarkup = resolvedCategory === "ALL"
+    ? groupedProductGrids(list, cart)
+    : productGrid(list, cart);
+  const markup = `<section class="${menuClass}" id="cardapio" aria-labelledby="rp-menu-title"><div class="rp-container">${menuHeading(list.length)}${categoryFilters(all, resolvedCategory)}${list.length ? productsMarkup : emptyCategory}</div></section>`;
 
   return rememberRender(products, status, resolvedCategory, list, cart, markup);
 }
