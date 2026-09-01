@@ -165,6 +165,33 @@ export async function syncOrderPaymentLedger(env, {
   }
 }
 
+function legacyPayment(order) {
+  const total = Number(order.valor_total_centavos || 0);
+  if (total <= 0) return null;
+  return {
+    id: null,
+    pedido_id: Number(order.id),
+    metodo: ledgerPaymentMethod(order.metodo_pagamento),
+    origem: order.origem_pedido === "SITE" ? "SITE" : "ADMIN",
+    valor_centavos: total,
+    status: ledgerPaymentStatus(order.status_pagamento),
+    mp_order_id: order.mp_order_id || null,
+    mp_payment_id: order.mp_payment_id || null,
+    mp_status: order.mp_status || null,
+    mp_status_detail: order.mp_status_detail || null,
+    substitui_pagamento_id: null,
+    registrado_por_usuario_id: null,
+    observacao: "",
+    criado_em: order.criado_em || null,
+    atualizado_em: order.atualizado_em || null,
+    pago_em: order.pago_em || null,
+    cancelado_em: String(order.status_pagamento || "").toUpperCase() === "CANCELADO"
+      ? order.atualizado_em || null
+      : null,
+    legado: true
+  };
+}
+
 export async function attachOrderFinancials(env, orders) {
   if (!Array.isArray(orders) || !orders.length) return orders || [];
 
@@ -209,7 +236,13 @@ export async function attachOrderFinancials(env, orders) {
   }
 
   for (const order of orders) {
-    const orderPayments = paymentsByOrder.get(Number(order.id)) || [];
+    let orderPayments = paymentsByOrder.get(Number(order.id)) || [];
+    const usingLegacyFallback = orderPayments.length === 0;
+    if (usingLegacyFallback) {
+      const fallback = legacyPayment(order);
+      if (fallback) orderPayments = [fallback];
+    }
+
     const paid = orderPayments
       .filter(payment => payment.status === PAID_STATUS)
       .reduce((sum, payment) => sum + Number(payment.valor_centavos || 0), 0);
@@ -223,7 +256,10 @@ export async function attachOrderFinancials(env, orders) {
 
     for (const item of order.itens || []) {
       const itemTotal = Number(item.valor_total_centavos || 0);
-      const itemPaid = Math.min(itemTotal, paidByItem.get(Number(item.id)) || 0);
+      const allocated = usingLegacyFallback && orderPayments[0]?.status === PAID_STATUS
+        ? itemTotal
+        : paidByItem.get(Number(item.id)) || 0;
+      const itemPaid = Math.min(itemTotal, allocated);
       item.valor_pago_centavos = itemPaid;
       item.saldo_centavos = Math.max(0, itemTotal - itemPaid);
       item.status_financeiro = financialStatus(itemTotal, itemPaid);
