@@ -1,11 +1,74 @@
 const MP_BASE = "https://api.mercadopago.com";
 
+export function localTestMode(env) {
+  const value = String(env?.LOCAL_TEST_MODE || "").trim().toLowerCase();
+  return value === "1" || value === "true";
+}
+
+export function mercadoPagoConfigured(env) {
+  return Boolean(env?.MP_ACCESS_TOKEN) || localTestMode(env);
+}
+
 export function requireMercadoPago(env) {
-  if (!env.MP_ACCESS_TOKEN) throw new Error("MP_ACCESS_TOKEN não configurado.");
+  if (!mercadoPagoConfigured(env)) throw new Error("MP_ACCESS_TOKEN não configurado.");
+}
+
+function fakeOrderId(idempotencyKey) {
+  const raw = String(idempotencyKey || crypto.randomUUID()).replace(/[^A-Za-z0-9_-]/g, "");
+  return `local_${raw.slice(0, 48)}`;
+}
+
+function fakePixOrder({ id, status = "action_required" }) {
+  const paymentStatus = status === "canceled" ? "canceled" : "pending";
+  return {
+    id,
+    status,
+    status_detail: status === "canceled" ? "canceled_by_user" : "waiting_transfer",
+    transactions: {
+      payments: [
+        {
+          id: `pay_${id}`,
+          status: paymentStatus,
+          payment_method: {
+            id: "pix",
+            type: "bank_transfer",
+            qr_code: `000201LOCALTEST${id}`,
+            qr_code_base64: null,
+            ticket_url: `http://127.0.0.1:8788/pedido/?fake_pix=${encodeURIComponent(id)}`
+          }
+        }
+      ]
+    }
+  };
+}
+
+function fakeMpRequest(path, { method = "GET", idempotencyKey } = {}) {
+  const cancelMatch = path.match(/^\/v1\/orders\/([^/]+)\/cancel$/);
+  if (method === "POST" && cancelMatch) {
+    return fakePixOrder({ id: decodeURIComponent(cancelMatch[1]), status: "canceled" });
+  }
+
+  const orderMatch = path.match(/^\/v1\/orders\/([^/]+)$/);
+  if (method === "GET" && orderMatch) {
+    return fakePixOrder({ id: decodeURIComponent(orderMatch[1]) });
+  }
+
+  if (method === "POST" && path === "/v1/orders") {
+    return fakePixOrder({ id: fakeOrderId(idempotencyKey) });
+  }
+
+  const err = new Error(`Mercado Pago fake não suporta ${method} ${path}`);
+  err.status = 501;
+  throw err;
 }
 
 export async function mpRequest(env, path, { method = "GET", body, idempotencyKey } = {}) {
   requireMercadoPago(env);
+
+  if (localTestMode(env)) {
+    return fakeMpRequest(path, { method, body, idempotencyKey });
+  }
+
   const headers = {
     Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
     Accept: "application/json"
@@ -50,9 +113,6 @@ export function mpOrderToLocalStatus(order) {
   const orderStatus = mapStatus(order?.status);
   if (orderStatus !== "PENDENTE") return orderStatus;
 
-  // No Pix, a transação pode alcançar o estado terminal antes de o status
-  // superior da Order deixar action_required. Sem este fallback, o polling
-  // continuaria persistindo PENDENTE mesmo após processed/expired no pagamento.
   return mapStatus(order?.transactions?.payments?.[0]?.status);
 }
 
@@ -67,20 +127,12 @@ export function paymentFromOrder(order) {
   };
 }
 
-export const PIX_TTL_MS = 30 * 60 * 1000; // 30 minutos
+export const PIX_TTL_MS = 30 * 60 * 1000;
 
-/**
- * Calcula o timestamp de expiração visual do Pix a partir de uma data base segura.
- * Retorna null se baseDateOrIso for ausente ou inválida. Nunca usa Date.now().
- *
- * @param {string|Date|number|null|undefined} baseDateOrIso
- * @returns {string|null} ISO 8601 UTC string ou null
- */
 export function calculatePixExpiration(baseDateOrIso) {
   if (!baseDateOrIso) return null;
   let dateVal = baseDateOrIso;
   if (typeof dateVal === "string") {
-    // Normaliza formato SQLite 'YYYY-MM-DD HH:MM:SS' para ISO UTC
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(dateVal)) {
       dateVal = dateVal.replace(" ", "T") + "Z";
     }

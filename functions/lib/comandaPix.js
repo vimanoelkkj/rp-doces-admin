@@ -2,7 +2,8 @@ import {
   mpRequest,
   mpOrderToLocalStatus,
   paymentFromOrder,
-  calculatePixExpiration
+  calculatePixExpiration,
+  mercadoPagoConfigured
 } from "./mercadoPago.js";
 import { getComandaFinancialState, syncComandaPixCharge } from "./comandaLedger.js";
 
@@ -76,14 +77,13 @@ export async function cancelPendingPixCharge(env, pedidoId, charge) {
   return { ok: true, cancelado: true, status };
 }
 
-export async function createPixCharge(env, {
-  pedidoId,
-  valorCentavos,
-  usuarioId,
-  clientRequestId,
-  substituiPagamentoId = null
-}) {
-  if (!env.MP_ACCESS_TOKEN) return { ok: false, erro: "PIX_NAO_CONFIGURADO", httpStatus: 503 };
+export async function createPixCharge(
+  env,
+  { pedidoId, valorCentavos, usuarioId, clientRequestId, substituiPagamentoId = null }
+) {
+  if (!mercadoPagoConfigured(env)) {
+    return { ok: false, erro: "PIX_NAO_CONFIGURADO", httpStatus: 503 };
+  }
 
   const state = await getComandaFinancialState(env, pedidoId);
   if (!state) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO", httpStatus: 404 };
@@ -93,7 +93,12 @@ export async function createPixCharge(env, {
 
   const valor = Number(valorCentavos || 0);
   if (!Number.isSafeInteger(valor) || valor <= 0 || valor > state.saldo_centavos) {
-    return { ok: false, erro: "VALOR_INVALIDO", saldo_centavos: state.saldo_centavos, httpStatus: 400 };
+    return {
+      ok: false,
+      erro: "VALOR_INVALIDO",
+      saldo_centavos: state.saldo_centavos,
+      httpStatus: 400
+    };
   }
 
   const key = String(clientRequestId || "").trim();
@@ -137,7 +142,8 @@ export async function createPixCharge(env, {
     String(env.MP_TEST_MODE || "").toLowerCase() === "true"
       ? "APRO"
       : payerName.split(/\s+/)[0] || "Cliente";
-  const payerEmail = String(state.pedido.cliente_email || "").trim() || "cliente@rpdoces.com.br";
+  const payerEmail =
+    String(state.pedido.cliente_email || "").trim() || "cliente@rpdoces.com.br";
   const totalAmount = money(valor);
   const externalReference = `RP-${pedidoId}-P${ledger.id}`;
 

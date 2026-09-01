@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "wrangler pages dev public",
+    "dev:test": "node scripts/setup-local-test.mjs --serve",
+    "test:local:setup": "node scripts/setup-local-test.mjs",
     "test": "node --test tests/*.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
