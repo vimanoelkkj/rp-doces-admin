@@ -82,12 +82,14 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   const [formDirty, setFormDirty] = useState(false);
   const [imagePending, setImagePending] = useState(false);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [reloadAfterDiscard, setReloadAfterDiscard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
   const imageEditorRef = useRef<ProductImageEditorHandle>(null);
   const reservedStock = product?.estoque_reservado ?? 0;
   const availableStock = Math.max(0, form.estoque - reservedStock);
   const operationBusy = saving || imageBusy;
+  const hasUnsavedChanges = formDirty || imagePending;
   const productUsesUnavailableCategory = Boolean(
     product && categoriesLoaded && !categories.some(category => category.id === product.categoria)
   );
@@ -113,22 +115,55 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   }, [product]);
 
   useEffect(() => {
-    if (!formDirty && !imagePending) return;
+    if (!hasUnsavedChanges) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
-      event.returnValue = "unsaved-changes";
+      event.returnValue = true;
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [formDirty, imagePending]);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleReloadShortcut = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const isReload = event.key === "F5" || ((event.ctrlKey || event.metaKey) && key === "r");
+      if (!isReload) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      setReloadAfterDiscard(true);
+      setConfirmingDiscard(true);
+    };
+
+    window.addEventListener("keydown", handleReloadShortcut, true);
+    return () => window.removeEventListener("keydown", handleReloadShortcut, true);
+  }, [hasUnsavedChanges]);
 
   function requestClose() {
     if (operationBusy) return;
 
-    if (formDirty || imagePending) {
+    if (hasUnsavedChanges) {
+      setReloadAfterDiscard(false);
       setConfirmingDiscard(true);
+      return;
+    }
+
+    onClose();
+  }
+
+  function continueEditing() {
+    setReloadAfterDiscard(false);
+    setConfirmingDiscard(false);
+  }
+
+  function discardChanges() {
+    if (reloadAfterDiscard) {
+      window.location.reload();
       return;
     }
 
@@ -138,6 +173,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    setReloadAfterDiscard(false);
     setConfirmingDiscard(false);
 
     if (imageBusy) {
@@ -234,15 +270,21 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
         {confirmingDiscard ? (
           <section className={styles.discardConfirm} role="alertdialog" aria-labelledby="discard-title">
             <div className={styles.discardConfirmText}>
-              <strong id="discard-title">Descartar alterações?</strong>
-              <small>As alterações não salvas deste produto serão perdidas.</small>
+              <strong id="discard-title">
+                {reloadAfterDiscard ? "Recarregar e descartar alterações?" : "Descartar alterações?"}
+              </strong>
+              <small>
+                {reloadAfterDiscard
+                  ? "As alterações não salvas serão perdidas se a página for recarregada."
+                  : "As alterações não salvas deste produto serão perdidas."}
+              </small>
             </div>
             <div className={styles.discardConfirmActions}>
-              <button type="button" onClick={() => setConfirmingDiscard(false)}>
+              <button type="button" onClick={continueEditing}>
                 Continuar editando
               </button>
-              <button className={styles.discardButton} type="button" onClick={onClose}>
-                Descartar
+              <button className={styles.discardButton} type="button" onClick={discardChanges}>
+                {reloadAfterDiscard ? "Recarregar" : "Descartar"}
               </button>
             </div>
           </section>
