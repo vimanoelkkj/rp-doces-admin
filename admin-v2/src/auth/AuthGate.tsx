@@ -1,16 +1,31 @@
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { AuthError, AuthUser, getCurrentUser, login } from "./auth.api";
+import { AuthError, AuthUser, getCurrentUser, login, logout } from "./auth.api";
 import styles from "./AuthGate.module.css";
 
-type Props = {
-  children: (user: AuthUser) => ReactNode;
+export type AuthSession = {
+  user: AuthUser;
+  logout: () => Promise<void>;
+  loggingOut: boolean;
+  logoutError: string | null;
 };
+
+type Props = {
+  children: (session: AuthSession) => ReactNode;
+};
+
+function messageFromError(error: unknown, fallback: string): string {
+  if (error instanceof AuthError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
 
 export function AuthGate({ children }: Props) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -20,7 +35,7 @@ export function AuthGate({ children }: Props) {
         if (active) setUser(current);
       })
       .catch(err => {
-        if (active) setError(err instanceof Error ? err.message : "Falha ao verificar a sessão.");
+        if (active) setError(messageFromError(err, "Falha ao verificar a sessão."));
       })
       .finally(() => {
         if (active) setChecking(false);
@@ -45,6 +60,7 @@ export function AuthGate({ children }: Props) {
 
     setSubmitting(true);
     setError(null);
+    setLogoutError(null);
 
     try {
       const authenticated = await login(username, senha);
@@ -52,10 +68,25 @@ export function AuthGate({ children }: Props) {
       setUser(completeUser ?? authenticated);
       form.reset();
     } catch (err) {
-      if (err instanceof AuthError) setError(err.message);
-      else setError(err instanceof Error ? err.message : "Não foi possível entrar.");
+      setError(messageFromError(err, "Não foi possível entrar."));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleLogout() {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+    setLogoutError(null);
+
+    try {
+      await logout();
+      setUser(null);
+    } catch (err) {
+      setLogoutError(messageFromError(err, "Não foi possível sair."));
+    } finally {
+      setLoggingOut(false);
     }
   }
 
@@ -67,7 +98,9 @@ export function AuthGate({ children }: Props) {
     );
   }
 
-  if (user) return <>{children(user)}</>;
+  if (user) {
+    return <>{children({ user, logout: handleLogout, loggingOut, logoutError })}</>;
+  }
 
   return (
     <main className={styles.centered}>

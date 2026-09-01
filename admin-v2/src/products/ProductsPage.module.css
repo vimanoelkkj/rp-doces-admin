@@ -1,1 +1,213 @@
-.page{max-width:1480px;margin:auto;padding:32px}.top{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:24px}.top h1{font-size:clamp(2rem,4vw,3rem);margin:.15rem 0}.top p,.top small,.summary{color:var(--muted)}.top>button,.toolbar button{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:10px 14px}.top>button{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}.toolbar input{flex:1;min-width:220px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:#fff}.toolbar div{display:flex;gap:8px;flex-wrap:wrap}.toolbar .active{background:#2d211d;color:#fff;border-color:#2d211d}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}.error{padding:14px;border:1px solid #e4bcbc;background:#fff0f0;border-radius:12px;color:var(--danger);margin:12px 0}.error button{margin-left:12px}.empty{text-align:center;color:var(--muted);padding:48px}@media(max-width:640px){.page{padding:18px}.top{align-items:stretch;flex-direction:column}.top>button{width:100%}.toolbar{align-items:stretch}.toolbar div{overflow:auto;flex-wrap:nowrap;padding-bottom:2px}.grid{grid-template-columns:1fr}}
+.page {
+  max-width: 1480px;
+  margin: auto;
+  padding: 32px;
+}
+
+.top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.heading h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin: 0.15rem 0;
+}
+
+.heading p,
+.heading small,
+.summary {
+  color: var(--muted);
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.avatar,
+.avatarFallback {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 50%;
+}
+
+.avatar {
+  object-fit: cover;
+}
+
+.avatarFallback {
+  display: grid;
+  place-items: center;
+  background: #f2e6e1;
+  color: #6a4032;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.accountText {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.accountText strong,
+.accountText small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountText strong {
+  max-width: 190px;
+  font-size: 0.9rem;
+}
+
+.accountText small {
+  max-width: 220px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.primaryButton,
+.logoutButton,
+.toolbar button {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px 14px;
+}
+
+.primaryButton {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.logoutButton {
+  color: var(--muted);
+}
+
+.logoutButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.toolbar input {
+  flex: 1;
+  min-width: 220px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.toolbar div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar .active {
+  background: #2d211d;
+  color: #fff;
+  border-color: #2d211d;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.error {
+  padding: 14px;
+  border: 1px solid #e4bcbc;
+  background: #fff0f0;
+  border-radius: 12px;
+  color: var(--danger);
+  margin: 12px 0;
+}
+
+.error button {
+  margin-left: 12px;
+}
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 48px;
+}
+
+@media (max-width: 880px) {
+  .top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 18px;
+  }
+
+  .topActions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .account {
+    grid-column: 1 / -1;
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .toolbar div {
+    overflow: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
