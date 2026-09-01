@@ -17,6 +17,7 @@ import styles from "./ProductImageEditor.module.css";
 interface Props {
   productId: ProductId | null;
   currentImageKey: string | null;
+  onImageChanged?: () => void;
 }
 
 export type ProductImageEditorHandle = {
@@ -49,7 +50,7 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
-  function ProductImageEditor({ productId, currentImageKey }, ref) {
+  function ProductImageEditor({ productId, currentImageKey, onImageChanged }, ref) {
     const [imageKey, setImageKey] = useState(currentImageKey);
     const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
     const [zoom, setZoom] = useState(1);
@@ -244,6 +245,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
         setFocalX(0.5);
         setFocalY(0.5);
         setDirty(false);
+        onImageChanged?.();
       } catch (err) {
         setError(
           err instanceof ProductApiError
@@ -279,6 +281,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
         setFocalX(0.5);
         setFocalY(0.5);
         setDirty(false);
+        onImageChanged?.();
       } catch (err) {
         setError(err instanceof ProductApiError ? err.message : "Falha ao remover imagem.");
       } finally {
