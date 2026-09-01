@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
-import { deleteProduct, listProducts, ProductApiError, restoreProduct } from "./product.api";
+import {
+  deleteProduct,
+  listCategories,
+  listProducts,
+  ProductApiError,
+  restoreProduct
+} from "./product.api";
 import { availableStock } from "./productDisplay";
 import type { Product, ProductId } from "./product.types";
 import { ProductCard } from "./ProductCard";
@@ -91,6 +97,14 @@ export function ProductsPage({ session }: Props) {
     setMenu(null);
 
     try {
+      const categories = await listCategories();
+      const categoryIsActive = categories.some(category => category.id === product.categoria);
+
+      if (!categoryIsActive) {
+        setEditing(product);
+        return;
+      }
+
       await restoreProduct(product);
       await reload();
     } catch (err) {
