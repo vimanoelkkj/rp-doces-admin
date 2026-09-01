@@ -86,6 +86,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   const [error, setError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
   const imageEditorRef = useRef<ProductImageEditorHandle>(null);
+  const skipNextUnloadRef = useRef(false);
   const reservedStock = product?.estoque_reservado ?? 0;
   const availableStock = Math.max(0, form.estoque - reservedStock);
   const operationBusy = saving || imageBusy;
@@ -118,6 +119,8 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
     if (!hasUnsavedChanges) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (skipNextUnloadRef.current) return;
+
       event.preventDefault();
       event.returnValue = true;
     };
@@ -163,6 +166,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
 
   function discardChanges() {
     if (reloadAfterDiscard) {
+      skipNextUnloadRef.current = true;
       window.location.reload();
       return;
     }
