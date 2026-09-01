@@ -357,9 +357,10 @@ export function ProductDialog({
               valueCents={form.preco_centavos || null}
               minCents={1}
               maxCents={10_000_000}
-              onValueCentsChange={value =>
-                setForm({ ...form, preco_centavos: value ?? 0 })
-              }
+              onValueCentsChange={value => {
+                setFormDirty(true);
+                setForm(current => ({ ...current, preco_centavos: value ?? 0 }));
+              }}
             />
           </label>
 
@@ -522,9 +523,10 @@ export function ProductDialog({
                     valueCents={form.preco_promocional_centavos}
                     minCents={1}
                     maxCents={Math.max(1, form.preco_centavos - 1)}
-                    onValueCentsChange={value =>
-                      setForm({ ...form, preco_promocional_centavos: value })
-                    }
+                    onValueCentsChange={value => {
+                      setFormDirty(true);
+                      setForm(current => ({ ...current, preco_promocional_centavos: value }));
+                    }}
                   />
                 </label>
 
