@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { Order } from "../orders/order.schema";
 import type { Product } from "../products/product.types";
-import type { DashboardOrder } from "./dashboard.schema";
 import {
   buildDashboardSummary,
   dashboardOrderItemsCount,
@@ -8,13 +8,14 @@ import {
   sameLocalDay
 } from "./dashboard.model";
 
-function order(overrides: Partial<DashboardOrder> = {}): DashboardOrder {
+function order(overrides: Partial<Order> = {}): Order {
   return {
     id: 1,
     cliente_nome: "Cliente",
     cliente_email: "",
     cliente_whatsapp: "",
     quantidade: 1,
+    valor_unitario_centavos: 2500,
     valor_total_centavos: 2500,
     status_pagamento: "PENDENTE",
     status_pedido: "NOVO",
