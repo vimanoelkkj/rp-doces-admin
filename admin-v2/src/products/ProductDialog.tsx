@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   createProduct,
+  deleteProductImage,
   listCategories,
   ProductApiError,
   updateProduct,
@@ -11,6 +12,7 @@ import { ProductInputSchema } from "./product.schema";
 import type { Product, ProductId, ProductInput } from "./product.types";
 import {
   ProductImageEditor,
+  type PreparedImageChange,
   type ProductImageEditorHandle
 } from "./ProductImageEditor";
 import styles from "./ProductDialog.module.css";
@@ -142,10 +144,10 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
     setSaving(true);
     let targetId = product?.id ?? createdProductId;
     let productPersisted = false;
-    let preparedImage: File | null = null;
+    let imageChange: PreparedImageChange = null;
 
     try {
-      preparedImage = await imageEditorRef.current?.prepareCurrentImage() ?? null;
+      imageChange = await imageEditorRef.current?.prepareImageChange() ?? null;
 
       if (product) {
         await updateProduct(product.id, parsed.data);
@@ -160,16 +162,20 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
 
       productPersisted = true;
 
-      if (preparedImage && targetId) {
-        await uploadProductImage(targetId, preparedImage);
+      if (imageChange && targetId) {
+        if (imageChange.kind === "upload") {
+          await uploadProductImage(targetId, imageChange.file);
+        } else {
+          await deleteProductImage(targetId);
+        }
       }
 
       onSaved();
     } catch (err) {
       const message = err instanceof ProductApiError ? err.message : err instanceof Error ? err.message : "Não foi possível salvar o produto.";
 
-      if (productPersisted && preparedImage) {
-        setError(`Produto salvo, mas a foto não foi enviada: ${message} Tente salvar novamente.`);
+      if (productPersisted && imageChange) {
+        setError(`Produto salvo, mas a foto não foi atualizada: ${message} Tente salvar novamente.`);
       } else {
         setError(message);
       }
