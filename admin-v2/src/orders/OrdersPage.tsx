@@ -338,6 +338,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
     if (
       nextStatus === "CANCELADO" &&
       order.origem_pedido === "MANUAL" &&
+      String(order.status_pagamento || "PENDENTE").toUpperCase() !== "CANCELADO" &&
       !window.confirm(
         "Cancelar este pedido manual também cancela o pagamento e libera ou restaura o estoque. Deseja continuar?"
       )
