@@ -17,6 +17,8 @@ interface Props {
   onSaved: () => void;
 }
 
+const EMOJI_OPTIONS = ["🍰", "🧁", "🍮", "🎂", "🍓", "🍫", "🥥", "🍋", "🍯", "🍪"];
+
 const empty = (): ProductInput => ({
   nome: "",
   categoria: "",
@@ -41,13 +43,28 @@ const fromProduct = (product: Product): ProductInput => ({
   disponivel: product.disponivel,
   ativo: product.ativo,
   destaque: product.destaque,
-  emoji: product.emoji,
+  emoji: product.emoji ?? "",
   estoque: product.estoque,
   promocao_ativa: product.promocao_ativa,
   preco_promocional_centavos: product.preco_promocional_centavos,
   promocao_inicio: product.promocao_inicio,
   promocao_fim: product.promocao_fim
 });
+
+function toLocalDateTime(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function fromLocalDateTime(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
 
 export function ProductDialog({ product, onClose, onSaved }: Props) {
   const [form, setForm] = useState<ProductInput>(product ? fromProduct(product) : empty());
@@ -154,6 +171,7 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
               inputMode="decimal"
               type="number"
               min="0.01"
+              max="100000"
               step="0.01"
               value={form.preco_centavos ? form.preco_centavos / 100 : ""}
               onChange={event =>
@@ -177,6 +195,33 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
             />
           </label>
 
+          <fieldset className={`${styles.wide} ${styles.emojiField}`}>
+            <legend>Emoji</legend>
+            <div className={styles.emojiGrid} role="radiogroup" aria-label="Emoji do produto">
+              {EMOJI_OPTIONS.map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  role="radio"
+                  aria-checked={form.emoji === emoji}
+                  className={form.emoji === emoji ? styles.emojiSelected : ""}
+                  onClick={() => setForm({ ...form, emoji })}
+                >
+                  {emoji}
+                </button>
+              ))}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={form.emoji === ""}
+                className={form.emoji === "" ? styles.emojiSelected : ""}
+                onClick={() => setForm({ ...form, emoji: "" })}
+              >
+                Sem emoji
+              </button>
+            </div>
+          </fieldset>
+
           <label className={styles.wide}>
             Descrição
             <textarea
@@ -187,29 +232,129 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
             />
           </label>
 
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={form.ativo}
-              onChange={event =>
-                setForm({
-                  ...form,
-                  ativo: event.target.checked,
-                  disponivel: event.target.checked
-                })
-              }
-            />
-            Produto ativo
-          </label>
+          <div className={`${styles.wide} ${styles.toggleGrid}`}>
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={form.ativo}
+                onChange={event => setForm({ ...form, ativo: event.target.checked })}
+              />
+              <span>
+                <strong>Produto ativo</strong>
+                <small>Desmarque para arquivar o produto.</small>
+              </span>
+            </label>
 
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={form.destaque}
-              onChange={event => setForm({ ...form, destaque: event.target.checked })}
-            />
-            Destaque
-          </label>
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={form.disponivel}
+                disabled={!form.ativo}
+                onChange={event => setForm({ ...form, disponivel: event.target.checked })}
+              />
+              <span>
+                <strong>Disponível para venda</strong>
+                <small>Controla a disponibilidade sem arquivar.</small>
+              </span>
+            </label>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={form.destaque}
+                onChange={event => setForm({ ...form, destaque: event.target.checked })}
+              />
+              <span>
+                <strong>Destaque</strong>
+                <small>Exibe o selo de destaque no catálogo.</small>
+              </span>
+            </label>
+
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={form.promocao_ativa}
+                onChange={event =>
+                  setForm({
+                    ...form,
+                    promocao_ativa: event.target.checked,
+                    preco_promocional_centavos: event.target.checked
+                      ? form.preco_promocional_centavos
+                      : null,
+                    promocao_inicio: event.target.checked ? form.promocao_inicio : null,
+                    promocao_fim: event.target.checked ? form.promocao_fim : null
+                  })
+                }
+              />
+              <span>
+                <strong>Promoção</strong>
+                <small>Ativa preço promocional e agendamento.</small>
+              </span>
+            </label>
+          </div>
+
+          {form.promocao_ativa && (
+            <section className={`${styles.wide} ${styles.promotionBox}`}>
+              <div className={styles.promotionHeading}>
+                <strong>Configuração da promoção</strong>
+                <small>Início e fim são opcionais. Sem datas, a promoção vale imediatamente.</small>
+              </div>
+
+              <div className={styles.promotionGrid}>
+                <label>
+                  Preço promocional (R$)
+                  <input
+                    inputMode="decimal"
+                    type="number"
+                    min="0.01"
+                    max={Math.max(0.01, (form.preco_centavos - 1) / 100)}
+                    step="0.01"
+                    value={
+                      form.preco_promocional_centavos
+                        ? form.preco_promocional_centavos / 100
+                        : ""
+                    }
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        preco_promocional_centavos: event.target.value
+                          ? Math.round(Number(event.target.value) * 100)
+                          : null
+                      })
+                    }
+                  />
+                </label>
+
+                <label>
+                  Início
+                  <input
+                    type="datetime-local"
+                    value={toLocalDateTime(form.promocao_inicio)}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        promocao_inicio: fromLocalDateTime(event.target.value)
+                      })
+                    }
+                  />
+                </label>
+
+                <label>
+                  Fim
+                  <input
+                    type="datetime-local"
+                    value={toLocalDateTime(form.promocao_fim)}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        promocao_fim: fromLocalDateTime(event.target.value)
+                      })
+                    }
+                  />
+                </label>
+              </div>
+            </section>
+          )}
 
           {error && (
             <p className={styles.error} role="alert">
