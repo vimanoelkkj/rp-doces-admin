@@ -18,6 +18,7 @@ interface Props {
   productId: ProductId | null;
   currentImageKey: string | null;
   onImageChanged?: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }
 
 export type ProductImageEditorHandle = {
@@ -50,7 +51,7 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
-  function ProductImageEditor({ productId, currentImageKey, onImageChanged }, ref) {
+  function ProductImageEditor({ productId, currentImageKey, onImageChanged, onBusyChange }, ref) {
     const [imageKey, setImageKey] = useState(currentImageKey);
     const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
     const [zoom, setZoom] = useState(1);
@@ -67,6 +68,11 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
 
     const storedUrl = imageKey ? `/api/images/${encodeURIComponent(imageKey)}` : null;
     const activeUrl = selectedUrl ?? storedUrl;
+
+    function setOperationBusy(value: boolean) {
+      setBusy(value);
+      onBusyChange?.(value);
+    }
 
     useEffect(() => {
       return () => {
@@ -231,7 +237,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
     }
 
     async function saveCrop() {
-      setBusy(true);
+      setOperationBusy(true);
       setError(null);
 
       try {
@@ -255,7 +261,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
               : "Falha ao salvar o enquadramento."
         );
       } finally {
-        setBusy(false);
+        setOperationBusy(false);
       }
     }
 
@@ -271,7 +277,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
         return;
       }
 
-      setBusy(true);
+      setOperationBusy(true);
 
       try {
         await deleteProductImage(productId);
@@ -285,7 +291,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
       } catch (err) {
         setError(err instanceof ProductApiError ? err.message : "Falha ao remover imagem.");
       } finally {
-        setBusy(false);
+        setOperationBusy(false);
       }
     }
 
