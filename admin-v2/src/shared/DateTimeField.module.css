@@ -51,7 +51,10 @@
   border: 0;
   border-radius: 8px;
   padding: 0;
-  background: transparent;
+  background-color: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
   color: transparent;
   font-size: 0;
   line-height: 0;
@@ -59,63 +62,39 @@
 
 .icon {
   pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239b7c72' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Cpath d='M12 8v4l2.5 1.5'/%3E%3C/svg%3E");
+}
+
+.iconButton {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239b7c72' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5.5' width='16' height='14' rx='2.5'/%3E%3Cpath d='M8 3.5v4M16 3.5v4M4 9.5h16'/%3E%3C/svg%3E");
 }
 
 .iconButton:hover {
-  background: var(--accent-wash);
+  background-color: var(--accent-wash);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c9435e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5.5' width='16' height='14' rx='2.5'/%3E%3Cpath d='M8 3.5v4M16 3.5v4M4 9.5h16'/%3E%3C/svg%3E");
 }
 
-.iconButton::before {
-  content: "";
-  width: 13px;
-  height: 12px;
-  border: 1.6px solid var(--muted);
-  border-radius: 3px;
-  box-shadow: inset 0 3px 0 -1px var(--muted);
-}
-
-.iconButton::after {
-  content: "";
-  position: absolute;
-  top: 7px;
-  left: 9px;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: var(--muted);
-  box-shadow: 5px 0 var(--muted), 0 4px var(--muted), 5px 4px var(--muted);
-}
-
-.icon::before {
-  content: "";
-  width: 13px;
-  height: 13px;
-  border: 1.6px solid var(--muted);
-  border-radius: 50%;
-}
-
+.iconButton::before,
+.iconButton::after,
+.icon::before,
 .icon::after {
-  content: "";
-  position: absolute;
-  width: 1.5px;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--muted);
-  transform: translateY(-2px);
-  box-shadow: 2px 4px 0 -0.2px var(--muted);
+  content: none;
 }
 
 .calendar {
   position: absolute;
   z-index: 80;
-  top: calc(100% + 7px);
+  top: auto;
+  bottom: calc(100% + 8px);
   left: 0;
   width: min(300px, calc(100vw - 40px));
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
-  box-shadow: 0 18px 42px rgb(68 40 32 / 16%);
+  box-shadow: 0 -16px 42px rgb(68 40 32 / 16%);
+  transform-origin: left bottom;
 }
 
 .calendarHeader {
