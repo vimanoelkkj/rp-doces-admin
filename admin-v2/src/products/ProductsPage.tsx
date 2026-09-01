@@ -224,6 +224,7 @@ export function ProductsPage({ session }: Props) {
           product={editing ?? null}
           onClose={() => setEditing(null)}
           onImageChanged={() => void reload()}
+          onProductPersisted={() => void reload()}
           onSaved={async () => {
             setEditing(null);
             await reload();
