@@ -99,9 +99,19 @@ export const CategorySchema = z.object({
   id: z.string(),
   nome: z.string(),
   emoji: z.string(),
-  ativo: sqliteBoolean
+  descricao: z.string().nullable().optional(),
+  ordem: z.number().int().optional(),
+  ativo: sqliteBoolean,
+  sistema: sqliteBoolean.optional(),
+  produtos: z.number().int().nonnegative().optional(),
+  ativos: z.number().int().nonnegative().optional(),
+  arquivados: z.number().int().nonnegative().optional()
 });
 export const CategoriesResponseSchema = z.object({ categorias: z.array(CategorySchema) });
+export const CreateCategoryResponseSchema = z.object({
+  ok: z.literal(true),
+  id: z.string()
+});
 
 export const CreateProductResponseSchema = z.object({
   ok: z.literal(true),
