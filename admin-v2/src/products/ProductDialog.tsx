@@ -22,6 +22,7 @@ interface Props {
   onClose: () => void;
   onSaved: () => void;
   onImageChanged?: () => void;
+  onProductPersisted?: () => void;
 }
 
 const EMOJI_OPTIONS = ["🍰", "🧁", "🍮", "🎂", "🍓", "🍫", "🥥", "🍋", "🍯", "🍪"];
@@ -73,7 +74,13 @@ function fromLocalDateTime(value: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Props) {
+export function ProductDialog({
+  product,
+  onClose,
+  onSaved,
+  onImageChanged,
+  onProductPersisted
+}: Props) {
   const [form, setForm] = useState<ProductInput>(product ? fromProduct(product) : empty());
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
@@ -238,6 +245,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
       const message = err instanceof ProductApiError ? err.message : err instanceof Error ? err.message : "Não foi possível salvar o produto.";
 
       if (productPersisted && imageChange) {
+        onProductPersisted?.();
         setError(`Produto salvo, mas a foto não foi atualizada: ${message} Tente salvar novamente.`);
       } else {
         setError(message);
