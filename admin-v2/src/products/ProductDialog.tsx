@@ -231,6 +231,7 @@ export function ProductDialog({
       }
 
       productPersisted = true;
+      setFormDirty(false);
 
       if (imageChange && targetId) {
         if (imageChange.kind === "upload") {
