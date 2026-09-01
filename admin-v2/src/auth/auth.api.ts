@@ -1,32 +1,43 @@
 import { z } from "zod";
 
-const UserSchema = z.object({
+const sqliteBoolean = z
+  .union([z.literal(0), z.literal(1), z.boolean()])
+  .transform(value => value === 1 || value === true);
+
+const SessionUserSchema = z.object({
   id: z.number(),
   nome: z.string(),
   username: z.string(),
-  email: z.string().nullable().optional(),
-  ativo: z.union([z.literal(0), z.literal(1), z.boolean()]).optional(),
-  papel: z.string().optional(),
-  avatar_key: z.string().nullable().optional(),
-  avatar_url: z.string().nullable().optional()
+  email: z.string().nullable(),
+  ativo: sqliteBoolean,
+  papel: z.string(),
+  avatar_key: z.string().nullable(),
+  avatar_url: z.string().nullable()
+});
+
+const LoginUserSchema = SessionUserSchema.pick({
+  id: true,
+  nome: true,
+  username: true,
+  email: true
 });
 
 const MeSchema = z.object({
   autenticado: z.literal(true),
-  usuario: UserSchema
+  usuario: SessionUserSchema
 });
 
 const LoginSchema = z.object({
   ok: z.literal(true),
-  usuario: UserSchema.pick({
-    id: true,
-    nome: true,
-    username: true,
-    email: true
-  })
+  usuario: LoginUserSchema
 });
 
-export type AuthUser = z.infer<typeof UserSchema>;
+const LogoutSchema = z.object({
+  ok: z.literal(true)
+});
+
+export type AuthUser = z.infer<typeof SessionUserSchema>;
+export type LoginUser = z.infer<typeof LoginUserSchema>;
 
 export class AuthError extends Error {
   constructor(
@@ -70,7 +81,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   return MeSchema.parse(body).usuario;
 }
 
-export async function login(username: string, senha: string): Promise<AuthUser> {
+export async function login(username: string, senha: string): Promise<LoginUser> {
   const response = await fetch("/api/auth/login", {
     method: "POST",
     credentials: "include",
@@ -86,6 +97,20 @@ export async function login(username: string, senha: string): Promise<AuthUser> 
     throw new AuthError(errorMessage(body, "Não foi possível entrar."), response.status);
   }
 
-  const parsed = LoginSchema.parse(body);
-  return parsed.usuario;
+  return LoginSchema.parse(body).usuario;
+}
+
+export async function logout(): Promise<void> {
+  const response = await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "include",
+    headers: { accept: "application/json" }
+  });
+
+  const body = await readJson(response);
+  if (!response.ok) {
+    throw new AuthError(errorMessage(body, "Não foi possível sair."), response.status);
+  }
+
+  LogoutSchema.parse(body);
 }
