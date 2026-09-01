@@ -19,6 +19,7 @@ function order(overrides: Partial<Order> = {}): Order {
     metodo_pagamento: "PIX",
     status_pagamento: "PENDENTE",
     status_pedido: "NOVO",
+    status_comanda: "ABERTA",
     origem_pedido: "SITE",
     mp_order_id: null,
     mp_payment_id: null,

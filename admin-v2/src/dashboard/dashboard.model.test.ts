@@ -19,6 +19,7 @@ function order(overrides: Partial<Order> = {}): Order {
     valor_total_centavos: 2500,
     status_pagamento: "PENDENTE",
     status_pedido: "NOVO",
+    status_comanda: "ABERTA",
     criado_em: "2026-09-01T12:00:00-03:00",
     atualizado_em: "2026-09-01T12:00:00-03:00",
     pago_em: null,
