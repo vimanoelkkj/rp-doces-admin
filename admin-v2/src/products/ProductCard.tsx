@@ -13,12 +13,20 @@ interface Props {
   onToggleMenu: () => void;
   onEdit: () => void;
   onArchive: () => void;
+  onRestore: () => void;
 }
 
 const money = (cents: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 
-export function ProductCard({ product, menuOpen, onToggleMenu, onEdit, onArchive }: Props) {
+export function ProductCard({
+  product,
+  menuOpen,
+  onToggleMenu,
+  onEdit,
+  onArchive,
+  onRestore
+}: Props) {
   const available = availableStock(product);
   const promoState = promotionState(product);
   const promo = promotionLabel(promoState);
@@ -62,7 +70,11 @@ export function ProductCard({ product, menuOpen, onToggleMenu, onEdit, onArchive
             {menuOpen && (
               <div className={styles.menu}>
                 <button type="button" onClick={onEdit}>Editar</button>
-                <button type="button" onClick={onArchive}>Arquivar</button>
+                {product.ativo ? (
+                  <button type="button" onClick={onArchive}>Arquivar</button>
+                ) : (
+                  <button type="button" onClick={onRestore}>Restaurar</button>
+                )}
               </div>
             )}
           </div>
