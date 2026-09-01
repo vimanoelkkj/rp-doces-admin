@@ -2,6 +2,7 @@ import { json, bodyJson, sameOrigin } from "../../../../lib/http.js";
 import { requireUser } from "../../../../lib/auth.js";
 import { baixarEstoquePedido } from "../../../../lib/stock.js";
 import {
+  ensureLegacyPaymentMaterialized,
   getComandaFinancialState,
   registerAdminPayment,
   recalculateComanda
@@ -83,6 +84,8 @@ export async function onRequestPost({ request, env, params }) {
 
   if (!Number.isInteger(pedidoId) || pedidoId < 1) return json({ erro: "Pedido inválido." }, 400);
   if (pixDecisionRaw && !pixDecision) return json({ erro: "Decisão sobre o Pix inválida." }, 400);
+
+  await ensureLegacyPaymentMaterialized(env, pedidoId);
 
   let state = await getComandaFinancialState(env, pedidoId);
   if (!state) return json({ erro: "Pedido não encontrado." }, 404);
