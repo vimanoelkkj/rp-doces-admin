@@ -110,9 +110,7 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
     let preparedImage: File | null = null;
 
     try {
-      if (!product) {
-        preparedImage = await imageEditorRef.current?.prepareCurrentImage() ?? null;
-      }
+      preparedImage = await imageEditorRef.current?.prepareCurrentImage() ?? null;
 
       if (product) {
         await updateProduct(product.id, parsed.data);
@@ -127,7 +125,7 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
 
       productPersisted = true;
 
-      if (!product && preparedImage && targetId) {
+      if (preparedImage && targetId) {
         await uploadProductImage(targetId, preparedImage);
       }
 
@@ -135,7 +133,7 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
     } catch (err) {
       const message = err instanceof ProductApiError ? err.message : err instanceof Error ? err.message : "Não foi possível salvar o produto.";
 
-      if (!product && productPersisted && preparedImage) {
+      if (productPersisted && preparedImage) {
         setError(`Produto salvo, mas a foto não foi enviada: ${message} Tente salvar novamente.`);
       } else {
         setError(message);
