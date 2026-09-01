@@ -15,6 +15,7 @@ interface Props {
   onEdit: () => void;
   onArchive: () => void;
   onRestore: () => void;
+  onDelete?: () => void;
 }
 
 const money = (cents: number) =>
@@ -26,9 +27,11 @@ export function ProductCard({
   onToggleMenu,
   onEdit,
   onArchive,
-  onRestore
+  onRestore,
+  onDelete
 }: Props) {
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const available = availableStock(product);
   const promoState = promotionState(product);
   const promo = promotionLabel(promoState);
@@ -36,12 +39,20 @@ export function ProductCard({
   const hasActivePromo = promoState === "active" && currentPrice !== product.preco_centavos;
 
   useEffect(() => {
-    if (!menuOpen) setConfirmingArchive(false);
+    if (!menuOpen) {
+      setConfirmingArchive(false);
+      setConfirmingDelete(false);
+    }
   }, [menuOpen]);
 
   function archive() {
     setConfirmingArchive(false);
     onArchive();
+  }
+
+  function permanentlyDelete() {
+    setConfirmingDelete(false);
+    onDelete?.();
   }
 
   return (
@@ -94,6 +105,21 @@ export function ProductCard({
                       </button>
                     </div>
                   </div>
+                ) : confirmingDelete ? (
+                  <div className={styles.deleteConfirm}>
+                    <p>
+                      Excluir <strong>{product.nome}</strong> permanentemente?
+                    </p>
+                    <small>Esta ação não pode ser desfeita.</small>
+                    <div className={styles.deleteActions}>
+                      <button type="button" onClick={() => setConfirmingDelete(false)}>
+                        Cancelar
+                      </button>
+                      <button className={styles.deleteDanger} type="button" onClick={permanentlyDelete}>
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <>
                     <button type="button" onClick={onEdit}>Editar</button>
@@ -102,6 +128,15 @@ export function ProductCard({
                     ) : (
                       <button type="button" onClick={onRestore}>Restaurar</button>
                     )}
+                    {onDelete ? (
+                      <button
+                        className={styles.deleteAction}
+                        type="button"
+                        onClick={() => setConfirmingDelete(true)}
+                      >
+                        Excluir permanentemente
+                      </button>
+                    ) : null}
                   </>
                 )}
               </div>
