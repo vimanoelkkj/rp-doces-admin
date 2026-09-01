@@ -65,6 +65,12 @@ async function getProductsCached() {
   return productsRequest;
 }
 
+function comandaChanged(payload) {
+  invalidateProductsCache();
+  signalDataChanged("pedidos", "produtos", "dashboard");
+  return payload;
+}
+
 export const adminApi = {
   me() {
     return request("/api/auth/me");
@@ -101,7 +107,26 @@ export const adminApi = {
     return request("/api/admin/orders");
   },
   financialOrders() {
-    return request("/api/admin/orders/financial");
+    return request("/api/admin/orders/finance");
+  },
+  addComandaItem(id, item) {
+    return jsonRequest(`/api/admin/orders/${id}/items`, "POST", item).then(comandaChanged);
+  },
+  registerComandaPayment(id, payment) {
+    return jsonRequest(`/api/admin/orders/${id}/payments`, "POST", {
+      acao: "REGISTRAR",
+      ...payment
+    }).then(comandaChanged);
+  },
+  generateComandaPix(id, payment = {}) {
+    return jsonRequest(`/api/admin/orders/${id}/payments`, "POST", {
+      acao: "GERAR_PIX",
+      client_request_id: payment.client_request_id || crypto.randomUUID(),
+      ...payment
+    }).then(comandaChanged);
+  },
+  cancelComandaPix(id) {
+    return jsonRequest(`/api/admin/orders/${id}/payments`, "POST", { acao: "CANCELAR_PIX" }).then(comandaChanged);
   },
   createManualOrder(order) {
     return jsonRequest("/api/admin/orders", "POST", order).then(payload => {
