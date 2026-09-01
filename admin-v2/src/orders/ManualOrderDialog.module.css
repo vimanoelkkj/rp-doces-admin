@@ -89,6 +89,15 @@
   gap: 14px;
 }
 
+.itemSection {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgb(105 60 54 / 11%);
+  border-radius: 18px;
+  background: rgb(248 238 235 / 56%);
+}
+
 .sectionHead {
   display: flex;
   align-items: center;
@@ -316,8 +325,13 @@
     min-height: 38px;
   }
 
-  .section {
+  .section,
+  .itemSection {
     gap: 10px;
+  }
+
+  .itemSection {
+    padding: 12px 14px;
   }
 
   .remove {
@@ -380,6 +394,11 @@
     grid-column: auto;
   }
 
+  .itemSection {
+    min-width: 0;
+    padding: 14px;
+  }
+
   .sectionHead {
     align-items: stretch;
     flex-direction: column;
@@ -423,5 +442,9 @@
   .head {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .itemSection {
+    padding: 12px;
   }
 }
