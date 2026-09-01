@@ -17,6 +17,10 @@ export default defineConfig({
             proxyReq.setHeader("Referer", `${apiTarget}/admin-v2/`);
           });
         }
+      },
+      "/admin": {
+        target: apiTarget,
+        changeOrigin: true
       }
     }
   },
