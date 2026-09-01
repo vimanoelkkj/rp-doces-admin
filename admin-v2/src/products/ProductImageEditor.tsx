@@ -9,8 +9,9 @@ import type { ProductId } from "./product.types";
 import styles from "./ProductImageEditor.module.css";
 
 interface Props {
-  productId: ProductId;
+  productId: ProductId | null;
   currentImageKey: string | null;
+  onPreparedImage?: (file: File | null) => void;
 }
 
 type DragState = {
@@ -38,13 +39,14 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
-export function ProductImageEditor({ productId, currentImageKey }: Props) {
+export function ProductImageEditor({ productId, currentImageKey, onPreparedImage }: Props) {
   const [imageKey, setImageKey] = useState(currentImageKey);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [focalX, setFocalX] = useState(0.5);
   const [focalY, setFocalY] = useState(0.5);
   const [dirty, setDirty] = useState(false);
+  const [prepared, setPrepared] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +121,12 @@ export function ProductImageEditor({ productId, currentImageKey }: Props) {
     );
   }, [activeUrl, loadingImage, zoom, focalX, focalY]);
 
+  function invalidatePreparedImage() {
+    if (!prepared) return;
+    setPrepared(false);
+    onPreparedImage?.(null);
+  }
+
   function changeImage(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -134,11 +142,14 @@ export function ProductImageEditor({ productId, currentImageKey }: Props) {
     setFocalX(0.5);
     setFocalY(0.5);
     setDirty(true);
+    setPrepared(false);
+    onPreparedImage?.(null);
     setSelectedUrl(URL.createObjectURL(file));
     event.target.value = "";
   }
 
   function updateZoom(value: number) {
+    invalidatePreparedImage();
     setZoom(clamp(value, 1, 3));
     setDirty(true);
   }
@@ -163,6 +174,7 @@ export function ProductImageEditor({ productId, currentImageKey }: Props) {
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
 
+    invalidatePreparedImage();
     const deltaX = (event.clientX - drag.x) / rect.width;
     const deltaY = (event.clientY - drag.y) / rect.height;
     setFocalX(clamp(drag.focalX - deltaX / zoom, 0, 1));
@@ -211,15 +223,24 @@ export function ProductImageEditor({ productId, currentImageKey }: Props) {
       );
 
       const blob = await canvasToBlob(output);
-      const file = new File([blob], `product-${productId}.webp`, { type: "image/webp" });
-      const result = await uploadProductImage(productId, file);
+      const file = new File([blob], `product-${productId ?? "new"}.webp`, { type: "image/webp" });
 
+      if (productId === null) {
+        onPreparedImage?.(file);
+        setPrepared(true);
+        setDirty(false);
+        return;
+      }
+
+      const result = await uploadProductImage(productId, file);
       setImageKey(result.image_key);
       setSelectedUrl(null);
       setZoom(1);
       setFocalX(0.5);
       setFocalY(0.5);
       setDirty(false);
+      setPrepared(false);
+      onPreparedImage?.(null);
     } catch (err) {
       setError(
         err instanceof ProductApiError
@@ -234,8 +255,20 @@ export function ProductImageEditor({ productId, currentImageKey }: Props) {
   }
 
   async function removeImage() {
-    setBusy(true);
     setError(null);
+
+    if (productId === null) {
+      setSelectedUrl(null);
+      setZoom(1);
+      setFocalX(0.5);
+      setFocalY(0.5);
+      setDirty(false);
+      setPrepared(false);
+      onPreparedImage?.(null);
+      return;
+    }
+
+    setBusy(true);
 
     try {
       await deleteProductImage(productId);
@@ -245,6 +278,8 @@ export function ProductImageEditor({ productId, currentImageKey }: Props) {
       setFocalX(0.5);
       setFocalY(0.5);
       setDirty(false);
+      setPrepared(false);
+      onPreparedImage?.(null);
     } catch (err) {
       setError(err instanceof ProductApiError ? err.message : "Falha ao remover imagem.");
     } finally {
@@ -298,7 +333,11 @@ export function ProductImageEditor({ productId, currentImageKey }: Props) {
             />
             <output>{zoom.toFixed(2)}×</output>
           </label>
-          <small>Arraste a foto dentro da moldura para escolher o foco.</small>
+          <small>
+            {prepared
+              ? "Enquadramento pronto. A foto será enviada ao salvar o produto."
+              : "Arraste a foto dentro da moldura para escolher o foco."}
+          </small>
         </div>
       )}
 
@@ -317,11 +356,11 @@ export function ProductImageEditor({ productId, currentImageKey }: Props) {
 
         {activeUrl && (
           <button type="button" disabled={busy || loadingImage || !dirty} onClick={saveCrop}>
-            Salvar enquadramento
+            {prepared ? "Enquadramento pronto" : "Salvar enquadramento"}
           </button>
         )}
 
-        {imageKey && (
+        {(imageKey || (productId === null && activeUrl)) && (
           <button className={styles.removeButton} type="button" disabled={busy} onClick={removeImage}>
             Remover
           </button>
