@@ -1,5 +1,5 @@
+import type { Order } from "../orders/order.schema";
 import type { Product } from "../products/product.types";
-import type { DashboardOrder } from "./dashboard.schema";
 
 export type DashboardSummary = {
   paidRevenueToday: number;
@@ -10,7 +10,7 @@ export type DashboardSummary = {
   soldOutCount: number;
   lowStockCount: number;
   ordersTodayCount: number;
-  recentOrders: DashboardOrder[];
+  recentOrders: Order[];
   attention: string[];
 };
 
@@ -33,7 +33,7 @@ export function sameLocalDay(date: Date | null, reference: Date): boolean {
   );
 }
 
-export function dashboardOrderItemsCount(order: DashboardOrder): number {
+export function dashboardOrderItemsCount(order: Order): number {
   if (order.itens.length) {
     return order.itens.reduce((total, item) => total + Number(item.quantidade || 0), 0);
   }
@@ -45,7 +45,7 @@ export function dashboardAvailableStock(product: Product): number {
 }
 
 export function buildDashboardSummary(
-  orders: DashboardOrder[],
+  orders: Order[],
   products: Product[],
   now = new Date()
 ): DashboardSummary {
