@@ -193,7 +193,7 @@ export function EditOrderDialog({ order, onClose, onSaved }: Props) {
 
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
 
-          <footer className={styles.actions}>
+          <footer className={styles.footer}>
             <button className={styles.cancel} type="button" disabled={saving} onClick={onClose}>Cancelar</button>
             <button className={styles.submit} type="submit" disabled={saving || loadingProducts}>{saving ? "Salvando…" : "Salvar alterações"}</button>
           </footer>
