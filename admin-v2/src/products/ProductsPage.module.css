@@ -129,7 +129,8 @@
 
 .navIcon svg,
 .iconButton svg,
-.search svg {
+.search svg,
+.profileMenuLogout svg {
   width: 18px;
   height: 18px;
   fill: none;
@@ -208,6 +209,7 @@
 }
 
 .topbarActions {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -222,20 +224,35 @@
   border-radius: 12px;
   background: transparent;
   color: var(--ink-soft);
+  text-decoration: none;
 }
 
-.iconButton:hover {
+.iconButton:hover:not(:disabled) {
   background: var(--accent-wash);
   color: var(--accent-dark);
+}
+
+.profileWrap {
+  position: relative;
 }
 
 .profile {
   display: flex;
   align-items: center;
   gap: 9px;
+  border: 1px solid transparent;
   border-radius: 16px;
   padding: 6px 10px 6px 6px;
   background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.profile:hover,
+.profileOpen {
+  border-color: var(--border-strong);
+  background: var(--accent-wash);
 }
 
 .avatar,
@@ -283,8 +300,92 @@
 }
 
 .profileChevron {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   color: var(--muted);
+  transition: transform 180ms ease;
+}
+
+.profileChevron::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translate(-50%, -62%) rotate(45deg);
+}
+
+.profileOpen .profileChevron {
+  transform: rotate(180deg);
+}
+
+.profileMenu {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(310px, calc(100vw - 28px));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px;
+  background: var(--surface);
+  box-shadow: 0 22px 54px rgb(68 40 32 / 16%);
+}
+
+.profileMenuIdentity {
+  display: grid;
+  gap: 3px;
+  padding: 2px 2px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profileMenuIdentity strong {
+  color: var(--text);
+  font-family: var(--display-font);
   font-size: 15px;
+}
+
+.profileMenuIdentity span {
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.profileMenuIdentity small {
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.profileMenuActions {
+  display: grid;
+  gap: 7px;
+  padding-top: 10px;
+}
+
+.profileMenuLogout {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--danger);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 900;
+}
+
+.profileMenuLogout:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+  background: #fff0f1;
 }
 
 .content {
@@ -508,6 +609,14 @@
   .pageTitle p,
   .profileCopy {
     display: none;
+  }
+
+  .profileMenu {
+    position: fixed;
+    top: 64px;
+    right: 12px;
+    left: 12px;
+    width: auto;
   }
 
   .content {
