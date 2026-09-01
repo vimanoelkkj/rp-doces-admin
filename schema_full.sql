@@ -93,7 +93,7 @@ CREATE TABLE pedido_itens (
   criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
   FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL
-);
+, adicionado_por_usuario_id INTEGER REFERENCES usuarios_admin(id) ON DELETE SET NULL, adicionado_em TEXT);
 
 -- table: pedido_pagamento_alocacoes
 CREATE TABLE pedido_pagamento_alocacoes (
@@ -134,7 +134,7 @@ CREATE TABLE pedido_pagamentos (
   FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
   FOREIGN KEY (substitui_pagamento_id) REFERENCES pedido_pagamentos(id) ON DELETE SET NULL,
   FOREIGN KEY (registrado_por_usuario_id) REFERENCES usuarios_admin(id) ON DELETE SET NULL
-);
+, pix_expira_em TEXT);
 
 -- table: pedidos
 CREATE TABLE "pedidos" (
@@ -169,7 +169,8 @@ CREATE TABLE "pedidos" (
   arquivado_em TEXT, reserva_status TEXT NOT NULL DEFAULT 'SEM_RESERVA' CHECK (reserva_status IN ('SEM_RESERVA', 'ATIVA', 'CONVERTIDA', 'LIBERADA')), reserva_expira_em TEXT, reserva_liberada_em TEXT, pix_expira_em TEXT, origem_pedido TEXT NOT NULL DEFAULT 'SITE'
   CHECK (origem_pedido IN ('SITE', 'MANUAL')),
   FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL
-);
+, status_comanda TEXT NOT NULL DEFAULT 'ABERTA'
+  CHECK (status_comanda IN ('ABERTA','ENCERRADA')));
 
 -- table: produtos
 CREATE TABLE "produtos" (
@@ -266,6 +267,10 @@ CREATE INDEX idx_categorias_ativo_ordem
 CREATE INDEX idx_checkout_rate_limits_expira
 ON checkout_rate_limits(expira_em);
 
+-- index: idx_pedido_itens_adicionado_por
+CREATE INDEX idx_pedido_itens_adicionado_por
+  ON pedido_itens(pedido_id, adicionado_por_usuario_id, id);
+
 -- index: idx_pedido_itens_estoque
 CREATE INDEX idx_pedido_itens_estoque ON pedido_itens(pedido_id, estoque_baixado_em);
 
@@ -308,6 +313,10 @@ CREATE INDEX idx_pedidos_reserva_ativa
 ON pedidos(reserva_expira_em)
 WHERE status_pagamento = 'PENDENTE' AND reserva_status = 'ATIVA';
 
+-- index: idx_pedidos_status_comanda
+CREATE INDEX idx_pedidos_status_comanda
+  ON pedidos(status_comanda, atualizado_em);
+
 -- index: idx_pedidos_status_pagamento
 CREATE INDEX idx_pedidos_status_pagamento ON pedidos(status_pagamento, criado_em);
 
@@ -344,3 +353,14 @@ CREATE UNIQUE INDEX uq_pedido_pagamentos_idempotency
 CREATE UNIQUE INDEX uq_pedido_pagamentos_mp_order
   ON pedido_pagamentos(mp_order_id)
   WHERE mp_order_id IS NOT NULL;
+
+-- trigger: pedidos_encerrar_comanda_status_terminal
+CREATE TRIGGER pedidos_encerrar_comanda_status_terminal
+AFTER UPDATE OF status_pedido ON pedidos
+FOR EACH ROW
+WHEN UPPER(NEW.status_pedido) IN ('ENTREGUE','CANCELADO')
+BEGIN
+  UPDATE pedidos
+  SET status_comanda = 'ENCERRADA'
+  WHERE id = NEW.id AND status_comanda <> 'ENCERRADA';
+END;
