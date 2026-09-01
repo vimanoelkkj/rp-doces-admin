@@ -32,6 +32,21 @@ const PAYMENT_STATUSES: Array<[ManualOrderPaymentStatus, string]> = [
   ["PAGO", "Já pago"]
 ];
 
+function whatsappDigits(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 11);
+}
+
+function formatWhatsapp(value: string): string {
+  const digits = whatsappDigits(value);
+  if (!digits) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  const ddd = digits.slice(0, 2);
+  const number = digits.slice(2);
+  if (number.length <= 4) return `(${ddd}) ${number}`;
+  const split = number.length <= 8 ? 4 : 5;
+  return `(${ddd}) ${number.slice(0, split)}-${number.slice(split)}`;
+}
+
 function availableStock(product: Product): number {
   return Math.max(0, Number(product.estoque || 0) - Number(product.estoque_reservado || 0));
 }
@@ -160,7 +175,7 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
       const id = await createManualOrder({
         itens: items.map(item => ({ produto_id: item.produtoId, quantidade: item.quantidade })),
         cliente_nome: clienteNome.trim(),
-        cliente_whatsapp: clienteWhatsapp.trim(),
+        cliente_whatsapp: whatsappDigits(clienteWhatsapp),
         observacao: observacao.trim(),
         metodo_pagamento: paymentMethod,
         status_pagamento: paymentStatus
@@ -213,12 +228,13 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
               <label htmlFor="manual-client-whatsapp">WhatsApp <small>opcional</small></label>
               <input
                 id="manual-client-whatsapp"
-                value={clienteWhatsapp}
-                maxLength={40}
-                inputMode="tel"
+                value={formatWhatsapp(clienteWhatsapp)}
+                maxLength={15}
+                inputMode="numeric"
+                autoComplete="tel"
                 placeholder="(31) 99999-9999"
                 disabled={saving}
-                onChange={event => setClienteWhatsapp(event.target.value)}
+                onChange={event => setClienteWhatsapp(whatsappDigits(event.target.value))}
               />
             </div>
           </div>
