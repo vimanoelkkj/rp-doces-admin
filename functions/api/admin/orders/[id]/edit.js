@@ -28,6 +28,19 @@ function normalizeItems(rawItems) {
   return items.some(item => item.quantidade > 50) ? null : items;
 }
 
+async function reservedByThisOrder(env, pedido) {
+  const reserved = new Map();
+  if (pedido.reserva_status !== "ATIVA") return reserved;
+  const { results } = await env.DB.prepare(
+    `SELECT produto_id, SUM(quantidade) AS quantidade
+     FROM pedido_itens
+     WHERE pedido_id = ? AND produto_id IS NOT NULL
+     GROUP BY produto_id`
+  ).bind(pedido.id).all();
+  for (const item of results || []) reserved.set(Number(item.produto_id), Number(item.quantidade || 0));
+  return reserved;
+}
+
 async function cancelPendingMercadoPagoOrder(env, pedido) {
   const currentOrder = await mpRequest(env, `/v1/orders/${encodeURIComponent(pedido.mp_order_id)}`);
   const current = await syncOrderPayment(env, { pedidoId: pedido.id, order: currentOrder, mpOrderId: pedido.mp_order_id });
@@ -63,19 +76,7 @@ export async function onRequestPut({ request, env, params }) {
   if (!pedido) return json({ erro: "Pedido não encontrado." }, 404);
   if (pedido.status_pagamento !== "PENDENTE") return json({ erro: "Somente pedidos com pagamento pendente podem ter itens e valor alterados." }, 409);
 
-  try {
-    if (pedido.mp_order_id) {
-      const canceled = await cancelPendingMercadoPagoOrder(env, pedido);
-      if (!canceled.ok) return json({ erro: canceled.erro }, canceled.status);
-    } else if (pedido.reserva_status === "ATIVA") {
-      const released = await liberarReservaPedido(env, id, { novoStatus: "PENDENTE" });
-      if (!released.ok) return json({ erro: "Não foi possível liberar a reserva atual do pedido." }, 409);
-    }
-  } catch (error) {
-    logEvent("warn", "admin_order.edit_payment_cancel_failed", { pedido_id: id, http_status: error?.status || undefined });
-    return json({ erro: "Não foi possível cancelar o pagamento atual antes da edição." }, 502);
-  }
-
+  const ownReservation = await reservedByThisOrder(env, pedido);
   const placeholders = requested.map(() => "?").join(",");
   const { results } = await env.DB.prepare(
     `SELECT id, nome, preco_centavos, disponivel, ativo, estoque, estoque_reservado,
@@ -89,9 +90,10 @@ export async function onRequestPut({ request, env, params }) {
   for (const requestedItem of requested) {
     const product = productMap.get(requestedItem.produto_id);
     if (!product || !product.ativo) return json({ erro: "Um produto não foi encontrado ou está arquivado." }, 404);
-    if (!product.disponivel) return json({ erro: `${product.nome} está indisponível.` }, 409);
-    const available = Number(product.estoque) - Number(product.estoque_reservado || 0);
-    if (available < requestedItem.quantidade) return json({ erro: `${product.nome}: estoque disponível insuficiente.` }, 409);
+    const availableAfterRelease = Number(product.estoque) - Number(product.estoque_reservado || 0) + (ownReservation.get(requestedItem.produto_id) || 0);
+    if ((!product.disponivel && availableAfterRelease <= 0) || availableAfterRelease < requestedItem.quantidade) {
+      return json({ erro: `${product.nome}: estoque disponível insuficiente.` }, 409);
+    }
     const unit = promotionPrice(product, now);
     const subtotal = unit * requestedItem.quantidade;
     if (!Number.isSafeInteger(unit) || unit <= 0 || !Number.isSafeInteger(subtotal)) return json({ erro: "Valor do pedido inválido." }, 400);
@@ -101,6 +103,19 @@ export async function onRequestPut({ request, env, params }) {
   const total = items.reduce((sum, item) => sum + item.valor_total_centavos, 0);
   const quantidadeTotal = items.reduce((sum, item) => sum + item.quantidade, 0);
   if (!Number.isSafeInteger(total) || total <= 0) return json({ erro: "Valor do pedido inválido." }, 400);
+
+  try {
+    if (pedido.mp_order_id) {
+      const canceled = await cancelPendingMercadoPagoOrder(env, pedido);
+      if (!canceled.ok) return json({ erro: canceled.erro }, canceled.status);
+    } else if (pedido.reserva_status === "ATIVA") {
+      const released = await liberarReservaPedido(env, id, { novoStatus: "PENDENTE" });
+      if (!released.ok) return json({ erro: "Não foi possível liberar a reserva atual do pedido." }, 409);
+    }
+  } catch (error) {
+    logEvent("warn", "admin_order.edit_payment_cancel_failed", { pedido_id: id, http_status: error?.status || undefined });
+    return json({ erro: "Não foi possível cancelar o pagamento atual antes da edição." }, 502);
+  }
 
   const productSummary = items.length === 1 ? items[0].produto_nome : `Pedido com ${items.length} itens`;
   const statements = [env.DB.prepare("DELETE FROM pedido_itens WHERE pedido_id = ?").bind(id)];
