@@ -385,10 +385,10 @@ export async function renderProducts(container, { onUnauthorized } = {}) {
         categoria,
         estoque,
         preco_centavos: precoCentavos,
-        descricao: descricao || null,
-        emoji: emoji || null,
-        ativo: data.get("ativo") ? 1 : 0,
-        destaque: data.get("destaque") ? 1 : 0
+        descricao,
+        emoji,
+        ativo: Boolean(data.get("ativo")),
+        destaque: Boolean(data.get("destaque"))
       });
       await refreshProducts();
       closeDialog();
