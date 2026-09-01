@@ -190,7 +190,7 @@
 .meta strong { display: block; margin-bottom: 2px; color: var(--ink-soft); }
 .actions {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 10px;
 }
