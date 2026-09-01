@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DateTimeField } from "../shared/DateTimeField";
 import { MoneyInput } from "../shared/MoneyInput";
 import {
   createProduct,
@@ -59,21 +60,6 @@ const fromProduct = (product: Product): ProductInput => ({
   promocao_inicio: product.promocao_inicio,
   promocao_fim: product.promocao_fim
 });
-
-function toLocalDateTime(value: string | null): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-function fromLocalDateTime(value: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
 
 export function ProductDialog({
   product,
@@ -511,29 +497,23 @@ export function ProductDialog({
 
                 <label>
                   Início
-                  <input
-                    type="datetime-local"
-                    value={toLocalDateTime(form.promocao_inicio)}
-                    onChange={event =>
-                      setForm({
-                        ...form,
-                        promocao_inicio: fromLocalDateTime(event.target.value)
-                      })
-                    }
+                  <DateTimeField
+                    value={form.promocao_inicio}
+                    onChange={value => {
+                      setFormDirty(true);
+                      setForm(current => ({ ...current, promocao_inicio: value }));
+                    }}
                   />
                 </label>
 
                 <label>
                   Fim
-                  <input
-                    type="datetime-local"
-                    value={toLocalDateTime(form.promocao_fim)}
-                    onChange={event =>
-                      setForm({
-                        ...form,
-                        promocao_fim: fromLocalDateTime(event.target.value)
-                      })
-                    }
+                  <DateTimeField
+                    value={form.promocao_fim}
+                    onChange={value => {
+                      setFormDirty(true);
+                      setForm(current => ({ ...current, promocao_fim: value }));
+                    }}
                   />
                 </label>
               </div>
