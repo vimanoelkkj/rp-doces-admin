@@ -5,7 +5,7 @@ import {
   useRef,
   useState
 } from "react";
-import { deleteProductImage, ProductApiError, uploadProductImage } from "./product.api";
+import { ProductApiError, uploadProductImage } from "./product.api";
 import {
   calculateCropRect,
   PRODUCT_IMAGE_HEIGHT,
@@ -60,6 +60,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
   function ProductImageEditor({ productId, currentImageKey, onImageChanged, onBusyChange }, ref) {
     const [imageKey, setImageKey] = useState(currentImageKey);
     const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
+    const [removePending, setRemovePending] = useState(false);
     const [zoom, setZoom] = useState(1);
     const [focalX, setFocalX] = useState(0.5);
     const [focalY, setFocalY] = useState(0.5);
@@ -73,7 +74,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
     const dragRef = useRef<DragState | null>(null);
 
     const storedUrl = imageKey ? `/api/images/${encodeURIComponent(imageKey)}` : null;
-    const activeUrl = selectedUrl ?? storedUrl;
+    const activeUrl = removePending ? null : selectedUrl ?? storedUrl;
 
     function setOperationBusy(value: boolean) {
       setBusy(value);
@@ -175,15 +176,16 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
       ref,
       () => ({
         async prepareCurrentImage() {
-          if (!dirty || !activeUrl) return null;
+          if (removePending || !dirty || !activeUrl) return null;
           return createCroppedFile();
         },
         async prepareImageChange() {
+          if (removePending) return { kind: "remove" };
           if (!dirty || !activeUrl) return null;
           return { kind: "upload", file: await createCroppedFile() };
         }
       }),
-      [activeUrl, dirty, productId, zoom, focalX, focalY]
+      [activeUrl, dirty, productId, removePending, zoom, focalX, focalY]
     );
 
     function changeImage(event: React.ChangeEvent<HTMLInputElement>) {
@@ -197,6 +199,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
       }
 
       setError(null);
+      setRemovePending(false);
       setZoom(1);
       setFocalX(0.5);
       setFocalY(0.5);
@@ -257,6 +260,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
         const result = await uploadProductImage(productId, file);
         setImageKey(result.image_key);
         setSelectedUrl(null);
+        setRemovePending(false);
         setZoom(1);
         setFocalX(0.5);
         setFocalY(0.5);
@@ -275,34 +279,20 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
       }
     }
 
-    async function removeImage() {
+    function removeImage() {
       setError(null);
+      setSelectedUrl(null);
+      setZoom(1);
+      setFocalX(0.5);
+      setFocalY(0.5);
+      setDirty(false);
 
       if (productId === null) {
-        setSelectedUrl(null);
-        setZoom(1);
-        setFocalX(0.5);
-        setFocalY(0.5);
-        setDirty(false);
+        setRemovePending(false);
         return;
       }
 
-      setOperationBusy(true);
-
-      try {
-        await deleteProductImage(productId);
-        setImageKey(null);
-        setSelectedUrl(null);
-        setZoom(1);
-        setFocalX(0.5);
-        setFocalY(0.5);
-        setDirty(false);
-        onImageChanged?.();
-      } catch (err) {
-        setError(err instanceof ProductApiError ? err.message : "Falha ao remover imagem.");
-      } finally {
-        setOperationBusy(false);
-      }
+      setRemovePending(true);
     }
 
     return (
@@ -359,6 +349,10 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
           </div>
         )}
 
+        {removePending && (
+          <small>A remoção da foto será aplicada ao salvar o produto.</small>
+        )}
+
         <div className={styles.actions}>
           <label className={styles.fileButton}>
             {activeUrl ? "Trocar imagem" : "Escolher imagem"}
@@ -378,7 +372,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
             </button>
           )}
 
-          {(imageKey || (productId === null && activeUrl)) && (
+          {activeUrl && (imageKey || productId === null) && (
             <button className={styles.removeButton} type="button" disabled={busy} onClick={removeImage}>
               Remover
             </button>
