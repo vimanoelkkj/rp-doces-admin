@@ -94,6 +94,22 @@ export function ProductsPage({ session, onNavigate }: Props) {
     }
   }
 
+  async function permanentlyDelete(id: ProductId) {
+    setMenu(null);
+    setError(null);
+
+    try {
+      await deleteProduct(id, true);
+      await reload();
+    } catch (err) {
+      setError(
+        err instanceof ProductApiError
+          ? err.message
+          : "Não foi possível excluir o produto permanentemente."
+      );
+    }
+  }
+
   async function restore(product: Product) {
     setMenu(null);
 
@@ -194,6 +210,7 @@ export function ProductsPage({ session, onNavigate }: Props) {
               }}
               onArchive={() => void archive(product.id)}
               onRestore={() => void restore(product)}
+              onDelete={() => void permanentlyDelete(product.id)}
             />
           ))}
         </section>
