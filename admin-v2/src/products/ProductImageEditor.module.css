@@ -1,9 +1,9 @@
 .wrap {
-  margin-bottom: 18px;
+  margin-bottom: 12px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 14px;
-  background: var(--surface-soft);
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent-wash));
 }
 
 .heading {
@@ -11,7 +11,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 9px;
 }
 
 .heading > div {
@@ -21,25 +21,28 @@
 
 .heading strong {
   color: var(--text);
+  font-family: var(--display-font);
+  font-size: 13px;
 }
 
 .heading span,
 .heading small,
 .controls small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 .preview {
   position: relative;
-  width: min(100%, 640px);
+  width: min(100%, 620px);
   aspect-ratio: 4 / 3;
   display: grid;
   place-items: center;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: #eee0d8;
+  background: repeating-linear-gradient(135deg, #fff8f4 0 18px, #f9e9e4 18px 36px);
   color: var(--muted);
 }
 
@@ -61,23 +64,27 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgb(255 255 255 / 78%);
-  font-weight: 800;
+  background: rgb(255 253 251 / 82%);
+  color: var(--ink-soft);
+  font-weight: 900;
+  backdrop-filter: blur(2px);
 }
 
 .controls {
-  width: min(100%, 640px);
+  width: min(100%, 620px);
   display: grid;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 5px;
+  margin-top: 9px;
 }
 
 .controls label {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 10px;
-  font-weight: 700;
+  gap: 9px;
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 900;
 }
 
 .controls input[type="range"] {
@@ -86,8 +93,9 @@
 }
 
 .controls output {
-  min-width: 48px;
+  min-width: 45px;
   color: var(--text);
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -96,19 +104,61 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .actions label,
 .actions button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 9px 12px;
-  background: #fff;
-  color: var(--text);
+  padding: 0 11px;
+  background: var(--surface);
+  color: var(--ink-soft);
   font: inherit;
-  font-weight: 700;
+  font-size: 10.5px;
+  font-weight: 900;
   cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease, transform 120ms ease;
+}
+
+.actions label:hover:not(:has(input:disabled)),
+.actions button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--accent-wash);
+  color: var(--accent-dark);
+}
+
+.actions button:not(.removeButton) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 7px 16px rgb(201 67 94 / 10%);
+}
+
+.actions button:not(.removeButton):hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  filter: brightness(0.985);
+}
+
+.actions .removeButton {
+  color: var(--danger);
+}
+
+.actions .removeButton:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: #fff0f1;
+  color: var(--danger);
+}
+
+.actions button:active:not(:disabled),
+.actions label:active:not(:has(input:disabled)) {
+  transform: translateY(1px);
 }
 
 .actions button:disabled,
@@ -117,19 +167,25 @@
   cursor: not-allowed;
 }
 
-.actions button:not(.removeButton) {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
-}
-
-.actions .removeButton {
-  color: var(--danger);
-}
-
 .error {
-  margin: 10px 0 0;
+  margin: 9px 0 0;
   color: var(--danger);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+@media (min-width: 641px) and (max-height: 820px) {
+  .wrap {
+    padding: 10px 12px;
+  }
+
+  .preview {
+    width: 120px;
+  }
+
+  .controls {
+    width: 100%;
+  }
 }
 
 @media (max-width: 600px) {
@@ -155,6 +211,6 @@
 
   .actions label,
   .actions button {
-    text-align: center;
+    width: 100%;
   }
 }
