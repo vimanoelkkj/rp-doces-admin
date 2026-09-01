@@ -371,6 +371,32 @@
 .paymentSecondary:disabled,
 .paymentDanger:disabled { opacity: .55; cursor: wait; }
 
+.paymentConfirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px 13px;
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, var(--border));
+  border-radius: 14px;
+  background: #fff5f6;
+}
+
+.paymentConfirm p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.paymentConfirm p strong {
+  color: var(--danger);
+}
+
+.paymentConfirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .paymentError {
   margin: 0;
   border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
@@ -393,4 +419,5 @@
   .panel { max-height: 94vh; padding: 18px; border-radius: 20px; }
   .detailGrid, .meta { grid-template-columns: 1fr; }
   .manualPaymentActions { display: grid; }
+  .paymentConfirmActions { display: grid; grid-template-columns: 1fr 1fr; }
 }
