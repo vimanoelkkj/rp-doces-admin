@@ -1,0 +1,135 @@
+.control {
+  position: relative;
+  min-width: 168px;
+  display: grid;
+  gap: 5px;
+}
+
+.label {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.trigger {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 0 11px 0 12px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.trigger:hover:not(:disabled),
+.triggerOpen {
+  border-color: color-mix(in oklch, var(--accent) 48%, var(--border));
+  background: var(--accent-wash);
+  color: var(--accent-dark);
+}
+
+.trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(233 102 125 / 10%);
+}
+
+.trigger:disabled {
+  opacity: .58;
+  cursor: wait;
+}
+
+.chevron {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.triggerOpen .chevron {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 100%;
+  min-width: 168px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 5px;
+  background: var(--surface);
+  box-shadow: 0 16px 34px rgb(68 40 32 / 14%);
+}
+
+.option {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover,
+.option:focus-visible {
+  outline: none;
+  background: var(--accent-wash);
+  color: var(--accent-dark);
+}
+
+.optionCurrent {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+
+.optionDanger {
+  color: var(--danger);
+}
+
+.optionDanger:hover,
+.optionDanger:focus-visible {
+  background: #fff0f1;
+  color: var(--danger);
+}
+
+.check {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+@media (max-width: 680px) {
+  .control,
+  .menu {
+    width: 100%;
+  }
+}
