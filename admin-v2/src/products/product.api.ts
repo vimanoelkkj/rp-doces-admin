@@ -50,6 +50,24 @@ export async function updateProduct(id: ProductId, input: ProductInput): Promise
   await requestJson(`/api/admin/products/${id}`, { method: "PUT", body: JSON.stringify(input) });
 }
 
+export async function restoreProduct(product: Product): Promise<void> {
+  await updateProduct(product.id, {
+    nome: product.nome,
+    categoria: product.categoria,
+    descricao: product.descricao,
+    preco_centavos: product.preco_centavos,
+    disponivel: true,
+    ativo: true,
+    destaque: product.destaque,
+    emoji: product.emoji ?? "",
+    estoque: product.estoque,
+    promocao_ativa: product.promocao_ativa,
+    preco_promocional_centavos: product.preco_promocional_centavos,
+    promocao_inicio: product.promocao_inicio,
+    promocao_fim: product.promocao_fim
+  });
+}
+
 export async function deleteProduct(id: ProductId, permanent = false): Promise<void> {
   await requestJson(`/api/admin/products/${id}${permanent ? "?permanent=1" : ""}`, { method: "DELETE" });
 }
