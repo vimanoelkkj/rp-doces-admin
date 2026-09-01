@@ -17,6 +17,7 @@ import {
   type OrderFilter
 } from "./order.model";
 import type { Order } from "./order.schema";
+import { ManualOrderDialog } from "./ManualOrderDialog";
 import { OrderStatusSelect } from "./OrderStatusSelect";
 import styles from "./OrdersPage.module.css";
 
@@ -307,6 +308,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<OrderFilter>("todos");
   const [selected, setSelected] = useState<Order | null>(null);
+  const [manualOrderOpen, setManualOrderOpen] = useState(false);
   const [savingOrderId, setSavingOrderId] = useState<number | null>(null);
   const [statusError, setStatusError] = useState<{ id: number; message: string } | null>(null);
   const [paymentSaving, setPaymentSaving] = useState(false);
@@ -416,9 +418,14 @@ export function OrdersPage({ session, onNavigate }: Props) {
                 onChange={event => setQuery(event.target.value)}
               />
             </label>
-            <button className={styles.secondary} type="button" onClick={() => void reload()} disabled={loading}>
-              {loading ? "Atualizando…" : "Atualizar"}
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className={styles.secondary} type="button" onClick={() => void reload()} disabled={loading}>
+                {loading ? "Atualizando…" : "Atualizar"}
+              </button>
+              <button className={styles.paymentPrimary} type="button" onClick={() => setManualOrderOpen(true)}>
+                Novo pedido
+              </button>
+            </div>
           </div>
 
           <div className={styles.summary}>
@@ -491,6 +498,18 @@ export function OrdersPage({ session, onNavigate }: Props) {
           onPaymentChange={status => void changeManualPayment(status)}
           paymentSaving={paymentSaving}
           paymentError={paymentError}
+        />
+      ) : null}
+
+      {manualOrderOpen ? (
+        <ManualOrderDialog
+          onClose={() => setManualOrderOpen(false)}
+          onCreated={async () => {
+            setQuery("");
+            setFilter("todos");
+            await reload();
+            setManualOrderOpen(false);
+          }}
         />
       ) : null}
     </>
