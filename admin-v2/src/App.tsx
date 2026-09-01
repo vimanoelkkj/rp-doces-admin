@@ -1,5 +1,6 @@
+import { AuthGate } from "./auth/AuthGate";
 import { ProductsPage } from "./products/ProductsPage";
 
 export function App() {
-  return <ProductsPage />;
+  return <AuthGate>{() => <ProductsPage />}</AuthGate>;
 }
