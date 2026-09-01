@@ -48,19 +48,23 @@ export function MoneyInput({
 }: Props) {
   const [text, setText] = useState(() => formatCents(valueCents));
   const focusedRef = useRef(false);
+  const draftValueRef = useRef<number | null>(valueCents);
 
   useEffect(() => {
+    draftValueRef.current = valueCents;
     if (!focusedRef.current) setText(formatCents(valueCents));
   }, [valueCents]);
 
-  function commit(raw: string) {
+  function parseAndClamp(raw: string): number | null {
     const parsed = parseMoneyInput(raw);
-    if (parsed === null) {
-      onValueCentsChange(null);
-      return;
-    }
+    if (parsed === null) return null;
+    return Math.min(maxCents, Math.max(minCents, parsed));
+  }
 
-    onValueCentsChange(Math.min(maxCents, Math.max(minCents, parsed)));
+  function updateValue(raw: string) {
+    const nextValue = parseAndClamp(raw);
+    draftValueRef.current = nextValue;
+    onValueCentsChange(nextValue);
   }
 
   return (
@@ -70,17 +74,18 @@ export function MoneyInput({
       autoComplete="off"
       placeholder={placeholder}
       value={text}
-      onFocus={() => {
+      onFocus={event => {
         focusedRef.current = true;
+        event.currentTarget.select();
       }}
       onChange={event => {
         const next = event.target.value.replace(/[^\d,.]/g, "");
         setText(next);
-        commit(next);
+        updateValue(next);
       }}
       onBlur={() => {
         focusedRef.current = false;
-        setText(formatCents(valueCents));
+        setText(formatCents(draftValueRef.current));
       }}
     />
   );
