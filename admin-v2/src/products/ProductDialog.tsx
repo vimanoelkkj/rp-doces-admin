@@ -73,17 +73,23 @@ function fromLocalDateTime(value: string): string | null {
 export function ProductDialog({ product, onClose, onSaved }: Props) {
   const [form, setForm] = useState<ProductInput>(product ? fromProduct(product) : empty());
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
   const imageEditorRef = useRef<ProductImageEditorHandle>(null);
   const reservedStock = product?.estoque_reservado ?? 0;
   const availableStock = Math.max(0, form.estoque - reservedStock);
+  const productUsesUnavailableCategory = Boolean(
+    product && categoriesLoaded && !categories.some(category => category.id === product.categoria)
+  );
 
   useEffect(() => {
+    setCategoriesLoaded(false);
     listCategories()
       .then(items => {
         setCategories(items);
+        setCategoriesLoaded(true);
 
         if (!product && items[0]) {
           setForm(current => ({
@@ -92,7 +98,10 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
           }));
         }
       })
-      .catch(() => setError("Não foi possível carregar as categorias."));
+      .catch(() => {
+        setCategoriesLoaded(true);
+        setError("Não foi possível carregar as categorias.");
+      });
   }, [product]);
 
   async function submit(event: React.FormEvent) {
@@ -103,6 +112,11 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
 
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message || "Revise os dados do produto.");
+      return;
+    }
+
+    if (productUsesUnavailableCategory && parsed.data.categoria === product?.categoria) {
+      setError("A categoria atual está inativa. Escolha uma categoria ativa antes de salvar.");
       return;
     }
 
@@ -198,12 +212,20 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
               value={form.categoria}
               onChange={event => setForm({ ...form, categoria: event.target.value })}
             >
+              {productUsesUnavailableCategory && product && (
+                <option value={product.categoria} disabled>
+                  {product.categoria_emoji ?? ""} {product.categoria_nome || product.categoria} (inativa)
+                </option>
+              )}
               {categories.map(category => (
                 <option key={category.id} value={category.id}>
                   {category.emoji} {category.nome}
                 </option>
               ))}
             </select>
+            {productUsesUnavailableCategory && (
+              <small>A categoria atual foi desativada. Escolha outra categoria para salvar alterações.</small>
+            )}
           </label>
 
           <label>
