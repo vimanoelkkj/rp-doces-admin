@@ -19,7 +19,7 @@ type Filter = "todos" | "ativos" | "esgotados" | "arquivados";
 
 type Props = {
   session: AuthSession;
-  onNavigate?: (page: AdminV2Page) => void;
+  onNavigate: (page: AdminV2Page) => void;
 };
 
 function SearchIcon() {
@@ -115,14 +115,6 @@ export function ProductsPage({ session, onNavigate }: Props) {
     }
   }
 
-  function navigate(page: AdminV2Page) {
-    if (onNavigate) {
-      onNavigate(page);
-      return;
-    }
-    if (page === "dashboard") window.location.assign("/admin/#dashboard");
-  }
-
   return (
     <>
       <AdminShell
@@ -130,7 +122,7 @@ export function ProductsPage({ session, onNavigate }: Props) {
         activePage="produtos"
         title="Produtos"
         subtitle="Catálogo, categorias, estoque e promoções"
-        onNavigate={navigate}
+        onNavigate={onNavigate}
       >
         <section className={styles.toolbar}>
           <div className={styles.toolbarLeft}>
