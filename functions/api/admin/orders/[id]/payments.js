@@ -19,6 +19,17 @@ import { logEvent } from "../../../../lib/logger.js";
 const MANUAL_METHODS = new Set(["PIX_EXTERNO", "CARTAO", "DINHEIRO"]);
 const PIX_DECISIONS = new Set(["CANCELAR", "MANTER"]);
 
+async function getActivePendingPixCents(env, pedidoId) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(valor_centavos), 0) AS total_centavos
+     FROM pedido_pagamentos
+     WHERE pedido_id = ? AND metodo = 'PIX_MP' AND status = 'PENDENTE'`
+  )
+    .bind(pedidoId)
+    .first();
+  return Number(row?.total_centavos || 0);
+}
+
 async function settlePendingPixDecision(env, pedidoId, decision) {
   let pending = await findPendingPixCharge(env, pedidoId);
   if (!pending) return { ok: true, pending: null, activePendingCents: 0 };
@@ -28,10 +39,19 @@ async function settlePendingPixDecision(env, pedidoId, decision) {
 
   if (reconciled.status === "PAGO") {
     await recalculateComanda(env, pedidoId);
-    return { ok: true, pending: null, paidDuringReconcile: true, activePendingCents: 0 };
+    return {
+      ok: true,
+      pending: null,
+      paidDuringReconcile: true,
+      activePendingCents: await getActivePendingPixCents(env, pedidoId)
+    };
   }
   if (["CANCELADO", "EXPIRADO", "REEMBOLSADO", "FALHOU"].includes(reconciled.status)) {
-    return { ok: true, pending: null, activePendingCents: 0 };
+    return {
+      ok: true,
+      pending: null,
+      activePendingCents: await getActivePendingPixCents(env, pedidoId)
+    };
   }
 
   pending = await findPendingPixCharge(env, pedidoId);
@@ -53,17 +73,27 @@ async function settlePendingPixDecision(env, pedidoId, decision) {
     if (!canceled.ok) {
       if (canceled.pago) {
         await recalculateComanda(env, pedidoId);
-        return { ok: true, pending: null, paidDuringReconcile: true, activePendingCents: 0 };
+        return {
+          ok: true,
+          pending: null,
+          paidDuringReconcile: true,
+          activePendingCents: await getActivePendingPixCents(env, pedidoId)
+        };
       }
       return { ok: false, erro: canceled.erro || "PIX_CANCELAMENTO_FALHOU", httpStatus: 502 };
     }
-    return { ok: true, pending: null, canceledPaymentId: Number(pending.id), activePendingCents: 0 };
+    return {
+      ok: true,
+      pending: null,
+      canceledPaymentId: Number(pending.id),
+      activePendingCents: await getActivePendingPixCents(env, pedidoId)
+    };
   }
 
   return {
     ok: true,
     pending,
-    activePendingCents: Number(pending?.valor_centavos || 0)
+    activePendingCents: await getActivePendingPixCents(env, pedidoId)
   };
 }
 
