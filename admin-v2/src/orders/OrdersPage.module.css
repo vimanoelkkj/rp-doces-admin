@@ -300,6 +300,83 @@
 .note { margin-top: 12px; }
 .note p { margin: 0; color: var(--ink-soft); font-size: 12px; white-space: pre-wrap; }
 
+.manualPayment {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.manualPaymentCopy {
+  display: grid;
+  gap: 2px;
+}
+
+.manualPaymentCopy strong {
+  color: var(--text);
+  font-family: var(--display-font);
+  font-size: 14px;
+}
+
+.manualPaymentCopy span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.manualPaymentActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.paymentPrimary,
+.paymentSecondary,
+.paymentDanger {
+  min-height: 40px;
+  border-radius: 12px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.paymentPrimary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.paymentSecondary {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+.paymentDanger {
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  background: #fff0f1;
+  color: var(--danger);
+}
+
+.paymentPrimary:hover:not(:disabled) { filter: brightness(.985); }
+.paymentSecondary:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent-dark); }
+.paymentDanger:hover:not(:disabled) { background: #ffe5e8; }
+.paymentPrimary:disabled,
+.paymentSecondary:disabled,
+.paymentDanger:disabled { opacity: .55; cursor: wait; }
+
+.paymentError {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: 12px;
+  padding: 9px 11px;
+  background: #fff0f1;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 @media (max-width: 1120px) { .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 860px) { .list { grid-template-columns: 1fr; } }
 @media (max-width: 680px) {
@@ -309,4 +386,5 @@
   .dialog { padding: 10px; }
   .panel { max-height: 94vh; padding: 18px; border-radius: 20px; }
   .detailGrid, .meta { grid-template-columns: 1fr; }
+  .manualPaymentActions { display: grid; }
 }
