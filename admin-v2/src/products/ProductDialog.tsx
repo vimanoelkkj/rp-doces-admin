@@ -76,11 +76,13 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
   const imageEditorRef = useRef<ProductImageEditorHandle>(null);
   const reservedStock = product?.estoque_reservado ?? 0;
   const availableStock = Math.max(0, form.estoque - reservedStock);
+  const operationBusy = saving || imageBusy;
   const productUsesUnavailableCategory = Boolean(
     product && categoriesLoaded && !categories.some(category => category.id === product.categoria)
   );
@@ -106,12 +108,17 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   }, [product]);
 
   function requestClose() {
-    if (!saving) onClose();
+    if (!operationBusy) onClose();
   }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+
+    if (imageBusy) {
+      setError("Aguarde a operação da imagem terminar antes de salvar o produto.");
+      return;
+    }
 
     const parsed = ProductInputSchema.safeParse(form);
 
@@ -190,7 +197,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
             <small>Catálogo</small>
             <h2 id="product-title">{product ? "Editar produto" : "Novo produto"}</h2>
           </div>
-          <button type="button" onClick={requestClose} aria-label="Fechar" disabled={saving}>
+          <button type="button" onClick={requestClose} aria-label="Fechar" disabled={operationBusy}>
             ×
           </button>
         </header>
@@ -200,6 +207,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
           productId={imageProductId}
           currentImageKey={product?.image_key ?? null}
           onImageChanged={onImageChanged}
+          onBusyChange={setImageBusy}
         />
 
         <form onSubmit={submit} className={styles.form} autoComplete="off">
@@ -443,11 +451,11 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
           )}
 
           <footer>
-            <button type="button" onClick={requestClose} disabled={saving}>
+            <button type="button" onClick={requestClose} disabled={operationBusy}>
               Cancelar
             </button>
-            <button type="submit" disabled={saving}>
-              {saving ? "Salvando…" : "Salvar produto"}
+            <button type="submit" disabled={operationBusy}>
+              {saving ? "Salvando…" : imageBusy ? "Aguarde a imagem…" : "Salvar produto"}
             </button>
           </footer>
         </form>
