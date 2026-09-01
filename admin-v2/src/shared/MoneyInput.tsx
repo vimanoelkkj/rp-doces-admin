@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Props = {
   valueCents: number | null;
@@ -17,28 +17,6 @@ function formatCents(valueCents: number | null): string {
   });
 }
 
-function parseMoneyInput(value: string): number | null {
-  const sanitized = value.replace(/[^\d,.]/g, "");
-  if (!sanitized) return null;
-
-  const comma = sanitized.lastIndexOf(",");
-  const dot = sanitized.lastIndexOf(".");
-  const separator = Math.max(comma, dot);
-
-  if (separator < 0) {
-    const reais = Number(sanitized.replace(/\D/g, ""));
-    return Number.isFinite(reais) ? reais * 100 : null;
-  }
-
-  const integerDigits = sanitized.slice(0, separator).replace(/\D/g, "") || "0";
-  const decimalDigits = sanitized.slice(separator + 1).replace(/\D/g, "").slice(0, 2);
-  const reais = Number(integerDigits);
-  const centavos = Number((decimalDigits + "00").slice(0, 2));
-
-  if (!Number.isFinite(reais) || !Number.isFinite(centavos)) return null;
-  return reais * 100 + centavos;
-}
-
 export function MoneyInput({
   valueCents,
   onValueCentsChange,
@@ -47,45 +25,59 @@ export function MoneyInput({
   placeholder = "0,00"
 }: Props) {
   const [text, setText] = useState(() => formatCents(valueCents));
-  const focusedRef = useRef(false);
-  const draftValueRef = useRef<number | null>(valueCents);
 
   useEffect(() => {
-    draftValueRef.current = valueCents;
-    if (!focusedRef.current) setText(formatCents(valueCents));
+    setText(formatCents(valueCents));
   }, [valueCents]);
 
-  function parseAndClamp(raw: string): number | null {
-    const parsed = parseMoneyInput(raw);
-    if (parsed === null) return null;
-    return Math.min(maxCents, Math.max(minCents, parsed));
-  }
+  function applyCents(nextCents: number | null) {
+    if (nextCents === null) {
+      setText("");
+      onValueCentsChange(null);
+      return;
+    }
 
-  function updateValue(raw: string) {
-    const nextValue = parseAndClamp(raw);
-    draftValueRef.current = nextValue;
-    onValueCentsChange(nextValue);
+    const clamped = Math.min(maxCents, Math.max(0, nextCents));
+    setText(formatCents(clamped));
+    onValueCentsChange(clamped);
   }
 
   return (
     <input
       type="text"
-      inputMode="decimal"
+      inputMode="numeric"
       autoComplete="off"
       placeholder={placeholder}
       value={text}
-      onFocus={event => {
-        focusedRef.current = true;
-        event.currentTarget.select();
+      onFocus={event => event.currentTarget.select()}
+      onKeyDown={event => {
+        if (event.ctrlKey || event.metaKey) return;
+
+        if (/^\d$/.test(event.key)) {
+          event.preventDefault();
+          const current = valueCents ?? 0;
+          applyCents(current * 10 + Number(event.key));
+          return;
+        }
+
+        if (event.key === "Backspace" || event.key === "Delete") {
+          event.preventDefault();
+          const current = valueCents ?? 0;
+          const next = Math.floor(current / 10);
+          applyCents(next > 0 ? next : null);
+        }
       }}
-      onChange={event => {
-        const next = event.target.value.replace(/[^\d,.]/g, "");
-        setText(next);
-        updateValue(next);
+      onPaste={event => {
+        event.preventDefault();
+        const digits = event.clipboardData.getData("text").replace(/\D/g, "");
+        if (!digits) return;
+        applyCents(Number(digits));
       }}
+      onChange={() => {}}
       onBlur={() => {
-        focusedRef.current = false;
-        setText(formatCents(draftValueRef.current));
+        if (valueCents !== null && valueCents < minCents) {
+          applyCents(minCents);
+        }
       }}
     />
   );
