@@ -81,31 +81,52 @@ export async function onRequestDelete({ request, env, params }) {
   const id = Number(params.id);
   if (!Number.isSafeInteger(id) || id < 1) return json({ erro: "ID inválido." }, 400);
   const permanent = new URL(request.url).searchParams.get("permanent") === "1";
+
   if (permanent) {
-    const vinculos = await env.DB.prepare(
-      "SELECT COUNT(*) AS total FROM pedidos WHERE produto_id = ?"
+    const product = await env.DB.prepare(
+      "SELECT image_key, estoque_reservado FROM produtos WHERE id = ?"
     )
       .bind(id)
       .first();
-    const product = await env.DB.prepare("SELECT image_key FROM produtos WHERE id = ?")
-      .bind(id)
+
+    if (!product) return json({ erro: "Produto não encontrado." }, 404);
+
+    const vinculos = await env.DB.prepare(
+      `
+      SELECT
+        (SELECT COUNT(*) FROM pedidos WHERE produto_id = ?) AS pedidos_legacy,
+        (SELECT COUNT(*) FROM pedido_itens WHERE produto_id = ?) AS pedido_itens
+      `
+    )
+      .bind(id, id)
       .first();
 
+    const totalVinculos =
+      Number(vinculos?.pedidos_legacy || 0) + Number(vinculos?.pedido_itens || 0);
+
+    if (totalVinculos > 0 || Number(product.estoque_reservado || 0) > 0) {
+      return json(
+        {
+          erro: "Este produto possui histórico de pedidos e não pode ser excluído permanentemente. Arquive-o para preservar o histórico."
+        },
+        409
+      );
+    }
+
     await env.DB.prepare("DELETE FROM produtos WHERE id = ?").bind(id).run();
-    if (product?.image_key && env.PRODUCT_IMAGES) {
+
+    if (product.image_key && env.PRODUCT_IMAGES) {
       await env.PRODUCT_IMAGES.delete(product.image_key).catch(() => {});
     }
 
-    return json({
-      ok: true,
-      pedidos_preservados: Number(vinculos?.total || 0)
-    });
-  } else {
-    await env.DB.prepare(
-      "UPDATE produtos SET ativo = 0, disponivel = 0, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?"
-    )
-      .bind(id)
-      .run();
+    return json({ ok: true });
   }
+
+  await env.DB.prepare(
+    "UPDATE produtos SET ativo = 0, disponivel = 0, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?"
+  )
+    .bind(id)
+    .run();
+
   return json({ ok: true });
 }
