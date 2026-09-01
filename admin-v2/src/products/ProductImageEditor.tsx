@@ -27,7 +27,6 @@ export type PreparedImageChange =
   | null;
 
 export type ProductImageEditorHandle = {
-  prepareCurrentImage: () => Promise<File | null>;
   prepareImageChange: () => Promise<PreparedImageChange>;
 };
 
@@ -175,10 +174,6 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
     useImperativeHandle(
       ref,
       () => ({
-        async prepareCurrentImage() {
-          if (removePending || !dirty || !activeUrl) return null;
-          return createCroppedFile();
-        },
         async prepareImageChange() {
           if (removePending) return { kind: "remove" };
           if (!dirty || !activeUrl) return null;
