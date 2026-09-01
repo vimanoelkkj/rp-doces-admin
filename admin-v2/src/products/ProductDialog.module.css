@@ -44,6 +44,50 @@
   line-height: 1;
 }
 
+.discardConfirm {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--danger) 5%, #fff);
+}
+
+.discardConfirmText {
+  display: grid;
+  gap: 3px;
+}
+
+.discardConfirmText strong {
+  color: var(--text);
+}
+
+.discardConfirmText small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.discardConfirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.discardConfirmActions button {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.discardConfirmActions .discardButton {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+  font-weight: 700;
+}
+
 .form {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -240,5 +284,13 @@
 
   .form footer {
     bottom: -18px;
+  }
+
+  .discardConfirmActions {
+    flex-direction: column-reverse;
+  }
+
+  .discardConfirmActions button {
+    width: 100%;
   }
 }
