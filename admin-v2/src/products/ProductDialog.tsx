@@ -19,6 +19,7 @@ interface Props {
   product: Product | null;
   onClose: () => void;
   onSaved: () => void;
+  onImageChanged?: () => void;
 }
 
 const EMOJI_OPTIONS = ["🍰", "🧁", "🍮", "🎂", "🍓", "🍫", "🥥", "🍋", "🍯", "🍪"];
@@ -70,7 +71,7 @@ function fromLocalDateTime(value: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-export function ProductDialog({ product, onClose, onSaved }: Props) {
+export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Props) {
   const [form, setForm] = useState<ProductInput>(product ? fromProduct(product) : empty());
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
@@ -194,6 +195,7 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
           ref={imageEditorRef}
           productId={imageProductId}
           currentImageKey={product?.image_key ?? null}
+          onImageChanged={onImageChanged}
         />
 
         <form onSubmit={submit} className={styles.form} autoComplete="off">
