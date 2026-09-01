@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { deleteProduct, listProducts, ProductApiError } from "./product.api";
+import { availableStock } from "./productDisplay";
 import type { Product, ProductId } from "./product.types";
 import { ProductCard } from "./ProductCard";
 import { ProductDialog } from "./ProductDialog";
@@ -13,12 +14,14 @@ type Props = {
 };
 
 function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(part => part[0]?.toUpperCase() ?? "")
-    .join("") || "RP";
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase() ?? "")
+      .join("") || "RP"
+  );
 }
 
 export function ProductsPage({ session }: Props) {
@@ -38,7 +41,9 @@ export function ProductsPage({ session }: Props) {
     try {
       setProducts(await listProducts());
     } catch (err) {
-      setError(err instanceof ProductApiError ? err.message : "Não foi possível carregar os produtos.");
+      setError(
+        err instanceof ProductApiError ? err.message : "Não foi possível carregar os produtos."
+      );
     } finally {
       setLoading(false);
     }
@@ -51,18 +56,23 @@ export function ProductsPage({ session }: Props) {
   const visible = useMemo(
     () =>
       products.filter(product => {
-        const available = Math.max(0, product.estoque - product.estoque_reservado);
         const searchable = `${product.nome} ${product.descricao} ${product.categoria_nome || product.categoria}`;
-        const matches = !query || searchable.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
+        const matches =
+          !query || searchable.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
 
         if (!matches) return false;
         if (filter === "ativos") return product.ativo;
         if (filter === "arquivados") return !product.ativo;
-        if (filter === "esgotados") return available <= 0;
+        if (filter === "esgotados") return product.ativo && availableStock(product) <= 0;
         return true;
       }),
     [products, query, filter]
   );
+
+  const activeCount = products.filter(product => product.ativo).length;
+  const soldOutCount = products.filter(
+    product => product.ativo && availableStock(product) <= 0
+  ).length;
 
   async function archive(id: ProductId) {
     setMenu(null);
@@ -71,7 +81,9 @@ export function ProductsPage({ session }: Props) {
       await deleteProduct(id);
       await reload();
     } catch (err) {
-      setError(err instanceof ProductApiError ? err.message : "Não foi possível arquivar o produto.");
+      setError(
+        err instanceof ProductApiError ? err.message : "Não foi possível arquivar o produto."
+      );
     }
   }
 
@@ -95,15 +107,26 @@ export function ProductsPage({ session }: Props) {
             )}
             <span className={styles.accountText}>
               <strong>{user.nome}</strong>
-              <small>@{user.username} · {user.papel}</small>
+              <small>
+                @{user.username} · {user.papel}
+              </small>
             </span>
           </div>
 
-          <button className={styles.logoutButton} type="button" onClick={() => void logout()} disabled={loggingOut}>
+          <button
+            className={styles.logoutButton}
+            type="button"
+            onClick={() => void logout()}
+            disabled={loggingOut}
+          >
             {loggingOut ? "Saindo…" : "Sair"}
           </button>
 
-          <button className={styles.primaryButton} type="button" onClick={() => setEditing(undefined)}>
+          <button
+            className={styles.primaryButton}
+            type="button"
+            onClick={() => setEditing(undefined)}
+          >
             + Novo produto
           </button>
         </div>
@@ -135,7 +158,11 @@ export function ProductsPage({ session }: Props) {
         </div>
       </section>
 
-      <p className={styles.summary}>{loading ? "Carregando catálogo…" : `${visible.length} de ${products.length} produto(s)`}</p>
+      <p className={styles.summary}>
+        {loading
+          ? "Carregando catálogo…"
+          : `${products.length} produtos · ${activeCount} ativos · ${soldOutCount} esgotados`}
+      </p>
 
       {error ? (
         <div className={styles.error} role="alert">
@@ -160,7 +187,9 @@ export function ProductsPage({ session }: Props) {
         ))}
       </section>
 
-      {!loading && !error && visible.length === 0 ? <p className={styles.empty}>Nenhum produto encontrado.</p> : null}
+      {!loading && !error && visible.length === 0 ? (
+        <p className={styles.empty}>Nenhum produto encontrado.</p>
+      ) : null}
 
       {editing !== null ? (
         <ProductDialog
