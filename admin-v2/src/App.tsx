@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import { AuthGate } from "./auth/AuthGate";
 import { DashboardPage } from "./dashboard/DashboardPage";
 import type { AdminV2Page } from "./layout/AdminShell";
+import { OrdersPage } from "./orders/OrdersPage";
 import { ProductsPage } from "./products/ProductsPage";
 
 function pageFromHash(): AdminV2Page {
-  return window.location.hash.toLowerCase() === "#dashboard" ? "dashboard" : "produtos";
+  const hash = window.location.hash.toLowerCase();
+  if (hash === "#dashboard") return "dashboard";
+  if (hash === "#pedidos") return "pedidos";
+  return "produtos";
 }
 
 export function App() {
@@ -24,13 +28,15 @@ export function App() {
 
   return (
     <AuthGate>
-      {session =>
-        page === "dashboard" ? (
-          <DashboardPage session={session} onNavigate={navigate} />
-        ) : (
-          <ProductsPage session={session} onNavigate={navigate} />
-        )
-      }
+      {session => {
+        if (page === "dashboard") {
+          return <DashboardPage session={session} onNavigate={navigate} />;
+        }
+        if (page === "pedidos") {
+          return <OrdersPage session={session} onNavigate={navigate} />;
+        }
+        return <ProductsPage session={session} onNavigate={navigate} />;
+      }}
     </AuthGate>
   );
 }
