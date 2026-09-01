@@ -46,5 +46,26 @@ export async function onRequestGet({ request, env }) {
   for (const pedido of pedidos) pedido.itens = itemsByOrder.get(Number(pedido.id)) || [];
 
   await attachOrderFinancials(env, pedidos);
+
+  const { results: chargeMetadata } = await env.DB.prepare(
+    `SELECT id, mp_ticket_url, mp_qr_code, mp_qr_code_base64, pix_expira_em
+     FROM pedido_pagamentos
+     WHERE pedido_id IN (${placeholders})`
+  )
+    .bind(...ids)
+    .all();
+  const metadataByPayment = new Map((chargeMetadata || []).map(row => [Number(row.id), row]));
+
+  for (const pedido of pedidos) {
+    for (const pagamento of pedido.pagamentos || []) {
+      const metadata = pagamento.id == null ? null : metadataByPayment.get(Number(pagamento.id));
+      if (!metadata) continue;
+      pagamento.mp_ticket_url = metadata.mp_ticket_url || null;
+      pagamento.mp_qr_code = metadata.mp_qr_code || null;
+      pagamento.mp_qr_code_base64 = metadata.mp_qr_code_base64 || null;
+      pagamento.pix_expira_em = metadata.pix_expira_em || null;
+    }
+  }
+
   return json({ pedidos });
 }
