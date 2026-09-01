@@ -196,34 +196,59 @@
   background: var(--accent-wash);
 }
 
-.archiveConfirm {
+.menu .deleteAction {
+  color: var(--danger);
+}
+
+.menu .deleteAction:hover {
+  background: #fff0f1;
+  color: var(--danger);
+}
+
+.archiveConfirm,
+.deleteConfirm {
   min-width: 220px;
   padding: 8px;
 }
 
-.archiveConfirm p {
+.archiveConfirm p,
+.deleteConfirm p {
   margin: 0 0 8px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
 }
 
-.archiveConfirm strong {
+.archiveConfirm strong,
+.deleteConfirm strong {
   color: var(--text);
 }
 
-.archiveActions {
+.deleteConfirm small {
+  display: block;
+  margin: -2px 0 10px;
+  color: var(--danger);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.archiveActions,
+.deleteActions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
 
-.archiveActions .archiveDanger {
+.archiveActions .archiveDanger,
+.deleteActions .deleteDanger {
   background: var(--danger);
   color: #fff;
   font-weight: 800;
 }
 
-.archiveActions .archiveDanger:hover {
+.archiveActions .archiveDanger:hover,
+.deleteActions .deleteDanger:hover {
   background: var(--danger);
+  color: #fff;
 }
