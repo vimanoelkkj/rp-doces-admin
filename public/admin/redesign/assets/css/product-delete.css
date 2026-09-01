@@ -1,0 +1,106 @@
+.products-card__heading {
+  overflow: visible;
+}
+
+.products-card__actions {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.products-card__menu:not(:disabled) {
+  cursor: pointer;
+}
+
+.products-card__menu:not(:disabled):hover,
+.products-card__menu[aria-expanded="true"] {
+  background: var(--rp-pink-wash);
+  color: var(--rp-pink-strong);
+}
+
+.products-card__actions-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 220px;
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  padding: 6px;
+  background: var(--rp-surface);
+  box-shadow: 0 14px 34px rgb(68 40 32 / 14%);
+}
+
+.products-card__actions-menu[hidden] {
+  display: none;
+}
+
+.products-card__actions-menu > button {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px;
+  background: transparent;
+  color: var(--rp-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.products-card__actions-menu > button:hover {
+  background: var(--rp-pink-wash);
+}
+
+.products-card__actions-menu > .is-danger {
+  color: var(--rp-danger);
+}
+
+.products-card__delete-confirm {
+  display: grid;
+  gap: 9px;
+  padding: 8px;
+}
+
+.products-card__delete-confirm p {
+  margin: 0;
+  color: var(--rp-ink-3);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.products-card__delete-confirm strong {
+  color: var(--rp-ink);
+}
+
+.products-card__delete-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.products-card__delete-actions button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 8px;
+  background: var(--rp-pink-wash);
+  color: var(--rp-ink-2);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.products-card__delete-actions .is-danger {
+  background: var(--rp-danger);
+  color: #fff;
+}
+
+.products-card__delete-error {
+  margin: 0;
+  color: var(--rp-danger);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.35;
+}
