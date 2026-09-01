@@ -202,6 +202,23 @@
   line-height: 1.05;
 }
 
+.pageTitle h1::after {
+  content: "V2";
+  display: none;
+  margin-left: 7px;
+  border: 1px solid color-mix(in oklch, var(--accent) 38%, var(--border));
+  border-radius: 999px;
+  padding: 3px 6px 2px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-family: "Nunito Sans", system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  vertical-align: 3px;
+}
+
 .pageTitle p {
   margin: 4px 0 0;
   color: var(--muted);
@@ -604,6 +621,10 @@
 
   .topbar {
     padding-inline: 14px;
+  }
+
+  .pageTitle h1::after {
+    display: inline-block;
   }
 
   .pageTitle p,
