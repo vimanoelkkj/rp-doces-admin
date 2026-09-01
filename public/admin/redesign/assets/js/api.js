@@ -153,6 +153,13 @@ export const adminApi = {
       return payload;
     });
   },
+  deleteProductPermanently(id) {
+    return request(`/api/admin/products/${id}?permanent=1`, { method: "DELETE" }).then(payload => {
+      invalidateProductsCache();
+      signalDataChanged("produtos", "dashboard");
+      return payload;
+    });
+  },
   reactivateProduct(id, product) {
     return jsonRequest(`/api/admin/products/${id}`, "PUT", product).then(payload => {
       invalidateProductsCache();
