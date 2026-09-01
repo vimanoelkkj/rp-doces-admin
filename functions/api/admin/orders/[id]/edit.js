@@ -90,10 +90,10 @@ export async function onRequestPut({ request, env, params }) {
   for (const requestedItem of requested) {
     const product = productMap.get(requestedItem.produto_id);
     if (!product || !product.ativo) return json({ erro: "Um produto não foi encontrado ou está arquivado." }, 404);
-    const availableAfterRelease = Number(product.estoque) - Number(product.estoque_reservado || 0) + (ownReservation.get(requestedItem.produto_id) || 0);
-    if ((!product.disponivel && availableAfterRelease <= 0) || availableAfterRelease < requestedItem.quantidade) {
-      return json({ erro: `${product.nome}: estoque disponível insuficiente.` }, 409);
-    }
+    const reservedHere = ownReservation.get(requestedItem.produto_id) || 0;
+    if (!product.disponivel && reservedHere <= 0) return json({ erro: `${product.nome} está indisponível.` }, 409);
+    const availableAfterRelease = Number(product.estoque) - Number(product.estoque_reservado || 0) + reservedHere;
+    if (availableAfterRelease < requestedItem.quantidade) return json({ erro: `${product.nome}: estoque disponível insuficiente.` }, 409);
     const unit = promotionPrice(product, now);
     const subtotal = unit * requestedItem.quantidade;
     if (!Number.isSafeInteger(unit) || unit <= 0 || !Number.isSafeInteger(subtotal)) return json({ erro: "Valor do pedido inválido." }, 400);
@@ -126,7 +126,7 @@ export async function onRequestPut({ request, env, params }) {
       env.DB.prepare(
         `UPDATE produtos
          SET estoque_reservado = estoque_reservado + ?,
-             disponivel = CASE WHEN estoque - (estoque_reservado + ?) <= 0 THEN 0 ELSE disponivel END,
+             disponivel = CASE WHEN estoque - (estoque_reservado + ?) <= 0 THEN 0 ELSE 1 END,
              atualizado_em = CURRENT_TIMESTAMP
          WHERE id = ?`
       ).bind(item.quantidade, item.quantidade, item.produto_id)
