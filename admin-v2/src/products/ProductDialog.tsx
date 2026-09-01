@@ -77,6 +77,8 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
   const imageEditorRef = useRef<ProductImageEditorHandle>(null);
+  const reservedStock = product?.estoque_reservado ?? 0;
+  const availableStock = Math.max(0, form.estoque - reservedStock);
 
   useEffect(() => {
     listCategories()
@@ -101,6 +103,13 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
 
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message || "Revise os dados do produto.");
+      return;
+    }
+
+    if (product && parsed.data.estoque < reservedStock) {
+      setError(
+        `O estoque total não pode ser menor que ${reservedStock}, pois ${reservedStock} unidade(s) estão reservadas em compras pendentes.`
+      );
       return;
     }
 
@@ -216,15 +225,20 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
           </label>
 
           <label>
-            Estoque
+            Estoque total
             <input
               type="number"
-              min="0"
+              min={reservedStock}
               max="100000"
               step="1"
               value={form.estoque}
               onChange={event => setForm({ ...form, estoque: Number(event.target.value) })}
             />
+            {product && reservedStock > 0 ? (
+              <small className={styles.stockHelp}>
+                <strong>{reservedStock} reservada(s)</strong> em compras pendentes · {availableStock} disponível(is)
+              </small>
+            ) : null}
           </label>
 
           <fieldset className={`${styles.wide} ${styles.emojiField}`}>
