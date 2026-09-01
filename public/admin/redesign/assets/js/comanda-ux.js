@@ -3,10 +3,18 @@ function moneyFromCents(cents) {
 }
 
 function parseMoney(text) {
-  const normalized = String(text || "")
-    .replace(/[^\d,.-]/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
+  const raw = String(text || "").replace(/[^\d,.-]/g, "").trim();
+  if (!raw) return 0;
+
+  let normalized = raw;
+  if (raw.includes(",")) {
+    normalized = raw.replace(/\./g, "").replace(",", ".");
+  } else if (raw.includes(".")) {
+    const parts = raw.split(".");
+    const decimalPart = parts.at(-1) || "";
+    normalized = parts.length === 2 && decimalPart.length <= 2 ? raw : raw.replace(/\./g, "");
+  }
+
   const value = Number(normalized);
   return Number.isFinite(value) ? Math.round(value * 100) : 0;
 }
