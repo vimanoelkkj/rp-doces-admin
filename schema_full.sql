@@ -95,6 +95,47 @@ CREATE TABLE pedido_itens (
   FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL
 );
 
+-- table: pedido_pagamento_alocacoes
+CREATE TABLE pedido_pagamento_alocacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pagamento_id INTEGER NOT NULL,
+  pedido_item_id INTEGER NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (pagamento_id) REFERENCES pedido_pagamentos(id) ON DELETE CASCADE,
+  FOREIGN KEY (pedido_item_id) REFERENCES pedido_itens(id) ON DELETE CASCADE,
+  UNIQUE (pagamento_id, pedido_item_id)
+);
+
+-- table: pedido_pagamentos
+CREATE TABLE pedido_pagamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pedido_id INTEGER NOT NULL,
+  metodo TEXT NOT NULL CHECK (metodo IN ('PIX_MP','PIX_EXTERNO','CARTAO','DINHEIRO','A_COMBINAR')),
+  origem TEXT NOT NULL CHECK (origem IN ('SITE','ADMIN')),
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  status TEXT NOT NULL DEFAULT 'PENDENTE'
+    CHECK (status IN ('PENDENTE','PAGO','CANCELADO','EXPIRADO','REEMBOLSADO','FALHOU')),
+  mp_order_id TEXT,
+  mp_payment_id TEXT,
+  mp_status TEXT,
+  mp_status_detail TEXT,
+  mp_ticket_url TEXT,
+  mp_qr_code TEXT,
+  mp_qr_code_base64 TEXT,
+  idempotency_key TEXT,
+  substitui_pagamento_id INTEGER,
+  registrado_por_usuario_id INTEGER,
+  observacao TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  pago_em TEXT,
+  cancelado_em TEXT,
+  FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
+  FOREIGN KEY (substitui_pagamento_id) REFERENCES pedido_pagamentos(id) ON DELETE SET NULL,
+  FOREIGN KEY (registrado_por_usuario_id) REFERENCES usuarios_admin(id) ON DELETE SET NULL
+);
+
 -- table: pedidos
 CREATE TABLE "pedidos" (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -234,6 +275,18 @@ CREATE INDEX idx_pedido_itens_pedido ON pedido_itens(pedido_id);
 -- index: idx_pedido_itens_produto
 CREATE INDEX idx_pedido_itens_produto ON pedido_itens(produto_id);
 
+-- index: idx_pedido_pagamento_alocacoes_item
+CREATE INDEX idx_pedido_pagamento_alocacoes_item
+  ON pedido_pagamento_alocacoes(pedido_item_id);
+
+-- index: idx_pedido_pagamento_alocacoes_pagamento
+CREATE INDEX idx_pedido_pagamento_alocacoes_pagamento
+  ON pedido_pagamento_alocacoes(pagamento_id);
+
+-- index: idx_pedido_pagamentos_pedido_status
+CREATE INDEX idx_pedido_pagamentos_pedido_status
+  ON pedido_pagamentos(pedido_id, status, criado_em);
+
 -- index: idx_pedidos_arquivado
 CREATE INDEX idx_pedidos_arquivado ON pedidos(arquivado, criado_em);
 
@@ -281,3 +334,13 @@ CREATE INDEX idx_usuarios_admin_papel_ativo ON usuarios_admin(papel, ativo);
 -- index: idx_usuarios_admin_username
 CREATE UNIQUE INDEX idx_usuarios_admin_username
 ON usuarios_admin(username COLLATE NOCASE);
+
+-- index: uq_pedido_pagamentos_idempotency
+CREATE UNIQUE INDEX uq_pedido_pagamentos_idempotency
+  ON pedido_pagamentos(idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
+-- index: uq_pedido_pagamentos_mp_order
+CREATE UNIQUE INDEX uq_pedido_pagamentos_mp_order
+  ON pedido_pagamentos(mp_order_id)
+  WHERE mp_order_id IS NOT NULL;
