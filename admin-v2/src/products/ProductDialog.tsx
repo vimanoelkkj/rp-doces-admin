@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MoneyInput } from "../shared/MoneyInput";
 import {
   createProduct,
   deleteProductImage,
@@ -351,18 +352,12 @@ export function ProductDialog({
 
           <label>
             Preço (R$)
-            <input
-              inputMode="decimal"
-              type="number"
-              min="0.01"
-              max="100000"
-              step="0.01"
-              value={form.preco_centavos ? form.preco_centavos / 100 : ""}
-              onChange={event =>
-                setForm({
-                  ...form,
-                  preco_centavos: Math.round(Number(event.target.value) * 100)
-                })
+            <MoneyInput
+              valueCents={form.preco_centavos || null}
+              minCents={1}
+              maxCents={10_000_000}
+              onValueCentsChange={value =>
+                setForm({ ...form, preco_centavos: value ?? 0 })
               }
             />
           </label>
@@ -504,24 +499,12 @@ export function ProductDialog({
               <div className={styles.promotionGrid}>
                 <label>
                   Preço promocional (R$)
-                  <input
-                    inputMode="decimal"
-                    type="number"
-                    min="0.01"
-                    max={Math.max(0.01, (form.preco_centavos - 1) / 100)}
-                    step="0.01"
-                    value={
-                      form.preco_promocional_centavos
-                        ? form.preco_promocional_centavos / 100
-                        : ""
-                    }
-                    onChange={event =>
-                      setForm({
-                        ...form,
-                        preco_promocional_centavos: event.target.value
-                          ? Math.round(Number(event.target.value) * 100)
-                          : null
-                      })
+                  <MoneyInput
+                    valueCents={form.preco_promocional_centavos}
+                    minCents={1}
+                    maxCents={Math.max(1, form.preco_centavos - 1)}
+                    onValueCentsChange={value =>
+                      setForm({ ...form, preco_promocional_centavos: value })
                     }
                   />
                 </label>
