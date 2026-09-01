@@ -285,7 +285,10 @@ export function AuthGate({ children }: Props) {
         className={`${styles.card} ${stage === "password" ? styles.passwordStageCard : ""}`}
         aria-labelledby="login-title"
       >
-        <div className={styles.brand} aria-hidden="true">R&amp;P</div>
+        <div className={styles.brandRow}>
+          <div className={styles.brand} aria-hidden="true">R&amp;P</div>
+          <span className={styles.versionBadge} aria-label="Admin versão 2">V2</span>
+        </div>
 
         <div className={styles.heading}>
           <span>Painel administrativo</span>
