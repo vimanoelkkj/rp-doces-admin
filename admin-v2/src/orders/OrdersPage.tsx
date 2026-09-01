@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
 import { ApiClientError } from "../shared/apiClient";
-import { listOrders } from "./order.api";
+import { listOrders, updateOrderStatus, type OrderStatus } from "./order.api";
 import {
   buildOrdersSummary,
   filterOrders,
@@ -18,13 +18,15 @@ type Props = {
   onNavigate: (page: AdminV2Page) => void;
 };
 
-const ORDER_STATUS_LABELS: Record<string, string> = {
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   NOVO: "Novo",
   PREPARANDO: "Preparando",
   PRONTO: "Pronto",
   ENTREGUE: "Entregue",
   CANCELADO: "Cancelado"
 };
+
+const ORDER_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
   PENDENTE: "Aguardando pagamento",
@@ -94,7 +96,7 @@ function paymentLabel(status?: string | null): string {
 
 function orderLabel(status?: string | null): string {
   const value = String(status || "NOVO").toUpperCase();
-  return ORDER_STATUS_LABELS[value] || status || "Novo";
+  return ORDER_STATUS_LABELS[value as OrderStatus] || status || "Novo";
 }
 
 function SummaryCard({ label, value, detail }: { label: string; value: number; detail: string }) {
@@ -107,9 +109,21 @@ function SummaryCard({ label, value, detail }: { label: string; value: number; d
   );
 }
 
-function OrderCard({ order, onDetails }: { order: Order; onDetails: () => void }) {
+function OrderCard({
+  order,
+  onDetails,
+  onStatusChange,
+  saving,
+  statusError
+}: {
+  order: Order;
+  onDetails: () => void;
+  onStatusChange: (status: OrderStatus) => void;
+  saving: boolean;
+  statusError: string | null;
+}) {
   const payment = String(order.status_pagamento || "PENDENTE").toUpperCase();
-  const status = String(order.status_pedido || "NOVO").toUpperCase();
+  const status = String(order.status_pedido || "NOVO").toUpperCase() as OrderStatus;
   const manual = order.origem_pedido === "MANUAL";
 
   return (
@@ -137,6 +151,21 @@ function OrderCard({ order, onDetails }: { order: Order; onDetails: () => void }
 
       <div className={styles.actions}>
         <button className={styles.secondary} type="button" onClick={onDetails}>Ver detalhes</button>
+        <div className={styles.statusControl}>
+          <label htmlFor={`order-status-${order.id}`}>Andamento</label>
+          <select
+            id={`order-status-${order.id}`}
+            value={status}
+            disabled={saving}
+            aria-label={`Alterar andamento do pedido ${order.id}`}
+            onChange={event => onStatusChange(event.target.value as OrderStatus)}
+          >
+            {ORDER_STATUSES.map(value => (
+              <option key={value} value={value}>{ORDER_STATUS_LABELS[value]}</option>
+            ))}
+          </select>
+        </div>
+        {statusError ? <p className={styles.inlineError} role="alert">{statusError}</p> : null}
       </div>
     </article>
   );
@@ -221,6 +250,8 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<OrderFilter>("todos");
   const [selected, setSelected] = useState<Order | null>(null);
+  const [savingOrderId, setSavingOrderId] = useState<number | null>(null);
+  const [statusError, setStatusError] = useState<{ id: number; message: string } | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -240,6 +271,39 @@ export function OrdersPage({ session, onNavigate }: Props) {
 
   const summary = useMemo(() => buildOrdersSummary(orders), [orders]);
   const visible = useMemo(() => filterOrders(orders, filter, query), [orders, filter, query]);
+
+  async function changeStatus(order: Order, nextStatus: OrderStatus) {
+    const currentStatus = String(order.status_pedido || "NOVO").toUpperCase();
+    if (nextStatus === currentStatus || savingOrderId !== null) return;
+
+    if (
+      nextStatus === "CANCELADO" &&
+      order.origem_pedido === "MANUAL" &&
+      !window.confirm(
+        "Cancelar este pedido manual também cancela o pagamento e libera ou restaura o estoque. Deseja continuar?"
+      )
+    ) {
+      return;
+    }
+
+    setSavingOrderId(order.id);
+    setStatusError(null);
+    try {
+      await updateOrderStatus(order.id, nextStatus);
+      const refreshed = await listOrders();
+      setOrders(refreshed);
+      if (selected?.id === order.id) {
+        setSelected(refreshed.find(item => item.id === order.id) ?? null);
+      }
+    } catch (err) {
+      setStatusError({
+        id: order.id,
+        message: err instanceof ApiClientError ? err.message : "Não foi possível atualizar o pedido."
+      });
+    } finally {
+      setSavingOrderId(null);
+    }
+  }
 
   return (
     <>
@@ -302,7 +366,16 @@ export function OrdersPage({ session, onNavigate }: Props) {
             </div>
           ) : (
             <div className={styles.list}>
-              {visible.map(order => <OrderCard key={order.id} order={order} onDetails={() => setSelected(order)} />)}
+              {visible.map(order => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onDetails={() => setSelected(order)}
+                  onStatusChange={status => void changeStatus(order, status)}
+                  saving={savingOrderId === order.id}
+                  statusError={statusError?.id === order.id ? statusError.message : null}
+                />
+              ))}
               {!loading && visible.length === 0 ? (
                 <div className={styles.empty}>
                   <strong>Nenhum pedido encontrado</strong>
