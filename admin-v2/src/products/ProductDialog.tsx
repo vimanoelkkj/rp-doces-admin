@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DateTimeField } from "../shared/DateTimeField";
 import { MoneyInput } from "../shared/MoneyInput";
+import { CategorySelect, type CategorySelectOption } from "./CategorySelect";
 import {
   createProduct,
   deleteProductImage,
@@ -88,6 +89,19 @@ export function ProductDialog({
   const productUsesUnavailableCategory = Boolean(
     product && categoriesLoaded && !categories.some(category => category.id === product.categoria)
   );
+  const categoryOptions: CategorySelectOption[] = [
+    ...(productUsesUnavailableCategory && product
+      ? [{
+          value: product.categoria,
+          label: `${product.categoria_emoji ?? ""} ${product.categoria_nome || product.categoria} (inativa)`.trim(),
+          disabled: true
+        }]
+      : []),
+    ...categories.map(category => ({
+      value: category.id,
+      label: `${category.emoji} ${category.nome}`.trim()
+    }))
+  ];
 
   useEffect(() => {
     setCategoriesLoaded(false);
@@ -324,21 +338,14 @@ export function ProductDialog({
 
           <label>
             Categoria
-            <select
+            <CategorySelect
               value={form.categoria}
-              onChange={event => setForm({ ...form, categoria: event.target.value })}
-            >
-              {productUsesUnavailableCategory && product && (
-                <option value={product.categoria} disabled>
-                  {product.categoria_emoji ?? ""} {product.categoria_nome || product.categoria} (inativa)
-                </option>
-              )}
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.emoji} {category.nome}
-                </option>
-              ))}
-            </select>
+              options={categoryOptions}
+              onChange={value => {
+                setFormDirty(true);
+                setForm(current => ({ ...current, categoria: value }));
+              }}
+            />
             {productUsesUnavailableCategory && (
               <small>A categoria atual foi desativada. Escolha outra categoria para salvar alterações.</small>
             )}
