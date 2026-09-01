@@ -418,7 +418,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
                 onChange={event => setQuery(event.target.value)}
               />
             </label>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className={styles.toolbarActions}>
               <button className={styles.secondary} type="button" onClick={() => void reload()} disabled={loading}>
                 {loading ? "Atualizando…" : "Atualizar"}
               </button>
