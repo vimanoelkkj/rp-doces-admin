@@ -7,6 +7,7 @@ import {
   type ManualOrderPaymentMethod,
   type ManualOrderPaymentStatus
 } from "./order.api";
+import { ManualOrderSelect } from "./ManualOrderSelect";
 import styles from "./ManualOrderDialog.module.css";
 
 type Props = {
@@ -259,22 +260,24 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
               {items.map(item => {
                 const product = productById.get(item.produtoId);
                 const selectedElsewhere = new Set(items.filter(other => other.key !== item.key).map(other => other.produtoId));
+                const productOptions = products.map(option => ({
+                  value: String(option.id),
+                  label: `${option.nome} · ${money(currentUnitPrice(option))} · ${availableStock(option)} disp.`,
+                  disabled: selectedElsewhere.has(option.id)
+                }));
+
                 return (
                   <div className={styles.itemRow} key={item.key}>
                     <div className={styles.field}>
                       <label htmlFor={`manual-product-${item.key}`}>Produto</label>
-                      <select
+                      <ManualOrderSelect
                         id={`manual-product-${item.key}`}
-                        value={item.produtoId}
+                        value={String(item.produtoId)}
+                        options={productOptions}
                         disabled={saving}
-                        onChange={event => updateItem(item.key, { produtoId: Number(event.target.value), quantidade: 1 })}
-                      >
-                        {products.map(option => (
-                          <option key={option.id} value={option.id} disabled={selectedElsewhere.has(option.id)}>
-                            {option.nome} · {money(currentUnitPrice(option))} · {availableStock(option)} disp.
-                          </option>
-                        ))}
-                      </select>
+                        ariaLabel="Selecionar produto"
+                        onChange={value => updateItem(item.key, { produtoId: Number(value), quantidade: 1 })}
+                      />
                     </div>
                     <div className={styles.field}>
                       <label htmlFor={`manual-qty-${item.key}`}>Qtd.</label>
@@ -307,15 +310,25 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
           <div className={styles.grid}>
             <div className={styles.field}>
               <label htmlFor="manual-payment-method">Forma de pagamento</label>
-              <select id="manual-payment-method" value={paymentMethod} disabled={saving} onChange={event => setPaymentMethod(event.target.value as ManualOrderPaymentMethod)}>
-                {PAYMENT_METHODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
+              <ManualOrderSelect
+                id="manual-payment-method"
+                value={paymentMethod}
+                options={PAYMENT_METHODS.map(([value, label]) => ({ value, label }))}
+                disabled={saving}
+                ariaLabel="Forma de pagamento"
+                onChange={setPaymentMethod}
+              />
             </div>
             <div className={styles.field}>
               <label htmlFor="manual-payment-status">Situação do pagamento</label>
-              <select id="manual-payment-status" value={paymentStatus} disabled={saving} onChange={event => setPaymentStatus(event.target.value as ManualOrderPaymentStatus)}>
-                {PAYMENT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
+              <ManualOrderSelect
+                id="manual-payment-status"
+                value={paymentStatus}
+                options={PAYMENT_STATUSES.map(([value, label]) => ({ value, label }))}
+                disabled={saving}
+                ariaLabel="Situação do pagamento"
+                onChange={setPaymentStatus}
+              />
             </div>
           </div>
 
