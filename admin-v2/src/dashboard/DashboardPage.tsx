@@ -197,7 +197,7 @@ export function DashboardPage({ session, onNavigate }: Props) {
                   <strong>Pedidos recentes</strong>
                   <span>Últimas movimentações da loja</span>
                 </div>
-                <button className={styles.link} type="button" onClick={() => window.location.assign("/admin/#pedidos")}>Ver pedidos</button>
+                <button className={styles.link} type="button" onClick={() => onNavigate("pedidos")}>Ver pedidos</button>
               </header>
 
               {summary.recentOrders.length ? (
