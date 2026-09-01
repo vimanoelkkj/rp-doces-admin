@@ -19,6 +19,7 @@ interface Props {
   currentImageKey: string | null;
   onImageChanged?: () => void;
   onBusyChange?: (busy: boolean) => void;
+  onPendingChange?: (pending: boolean) => void;
 }
 
 export type PreparedImageChange =
@@ -56,7 +57,10 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
-  function ProductImageEditor({ productId, currentImageKey, onImageChanged, onBusyChange }, ref) {
+  function ProductImageEditor(
+    { productId, currentImageKey, onImageChanged, onBusyChange, onPendingChange },
+    ref
+  ) {
     const [imageKey, setImageKey] = useState(currentImageKey);
     const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
     const [removePending, setRemovePending] = useState(false);
@@ -79,6 +83,10 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
       setBusy(value);
       onBusyChange?.(value);
     }
+
+    useEffect(() => {
+      onPendingChange?.(dirty || removePending);
+    }, [dirty, removePending, onPendingChange]);
 
     useEffect(() => {
       return () => {
