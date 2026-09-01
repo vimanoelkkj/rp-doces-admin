@@ -13,6 +13,7 @@ export type OrdersSummary = {
 
 const ACTIVE_ORDER_STATUSES = new Set(["NOVO", "PREPARANDO", "PRONTO"]);
 const COMPLETED_ORDER_STATUSES = new Set(["ENTREGUE", "CANCELADO"]);
+const PENDING_FINANCIAL_STATUSES = new Set(["PENDENTE", "PARCIAL"]);
 
 export function itemsOf(order: Order): OrderItem[] {
   if (order.itens.length) return order.itens;
@@ -43,7 +44,7 @@ export function itemSummary(order: Order): string {
 export function buildOrdersSummary(orders: Order[]): OrdersSummary {
   return {
     total: orders.length,
-    pendingPayment: orders.filter(order => order.status_pagamento === "PENDENTE").length,
+    pendingPayment: orders.filter(order => PENDING_FINANCIAL_STATUSES.has(String(order.status_pagamento || "PENDENTE"))).length,
     paid: orders.filter(order => order.status_pagamento === "PAGO").length,
     manual: orders.filter(order => order.origem_pedido === "MANUAL").length,
     active: orders.filter(order => ACTIVE_ORDER_STATUSES.has(order.status_pedido || "NOVO")).length,
@@ -67,7 +68,7 @@ export function filterOrders(orders: Order[], filter: OrderFilter, rawQuery: str
 
     if (query && !haystack.includes(query)) return false;
 
-    if (filter === "pendentes") return order.status_pagamento === "PENDENTE";
+    if (filter === "pendentes") return PENDING_FINANCIAL_STATUSES.has(String(order.status_pagamento || "PENDENTE"));
     if (filter === "em-andamento") return ACTIVE_ORDER_STATUSES.has(order.status_pedido || "NOVO");
     if (filter === "concluidos") return COMPLETED_ORDER_STATUSES.has(order.status_pedido || "NOVO");
     return true;
