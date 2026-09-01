@@ -1,6 +1,9 @@
 import { json, bodyJson, sameOrigin } from "../../../../lib/http.js";
 import { requireUser } from "../../../../lib/auth.js";
-import { recalculateComanda } from "../../../../lib/comandaLedger.js";
+import {
+  ensureLegacyPaymentMaterialized,
+  recalculateComanda
+} from "../../../../lib/comandaLedger.js";
 import { logEvent } from "../../../../lib/logger.js";
 
 function promotionPrice(product, now = Date.now()) {
@@ -48,6 +51,8 @@ export async function onRequestPost({ request, env, params }) {
   if (Number(pedido.quantidade || 0) + quantidade > 50) {
     return json({ erro: "A comanda não pode ultrapassar 50 unidades." }, 400);
   }
+
+  await ensureLegacyPaymentMaterialized(env, pedidoId);
 
   const product = await env.DB.prepare(
     `SELECT id, nome, preco_centavos, disponivel, ativo, estoque, estoque_reservado,
