@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
-import { AuthError } from "../auth/auth.api";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
+import type { Order } from "../orders/order.schema";
+import { ApiClientError } from "../shared/apiClient";
 import { loadDashboardData, type DashboardData } from "./dashboard.api";
 import {
   buildDashboardSummary,
   dashboardOrderItemsCount,
   parseDashboardDate
 } from "./dashboard.model";
-import type { DashboardOrder } from "./dashboard.schema";
 import styles from "./DashboardPage.module.css";
 
 type Props = {
@@ -81,7 +81,7 @@ function CustomerIcon() {
   );
 }
 
-function RecentOrder({ order }: { order: DashboardOrder }) {
+function RecentOrder({ order }: { order: Order }) {
   const itemCount = dashboardOrderItemsCount(order);
 
   return (
@@ -124,7 +124,7 @@ export function DashboardPage({ session, onNavigate }: Props) {
     try {
       setData(await loadDashboardData());
     } catch (err) {
-      setError(err instanceof AuthError ? err.message : "Não foi possível carregar o dashboard.");
+      setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar o dashboard.");
     } finally {
       setLoading(false);
     }
