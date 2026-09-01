@@ -13,7 +13,7 @@ function cancel(message, detail = "") {
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
-    cwd: process.cwd(),
+    cwd: options.cwd ?? process.cwd(),
     encoding: "utf8",
     stdio: options.capture ? "pipe" : "inherit",
     shell: process.platform === "win32"
@@ -48,7 +48,25 @@ console.log("Branch main confirmada. Executando testes...");
 const tests = run("npm", ["test"]);
 if (tests.status !== 0) cancel("Deploy cancelado: os testes falharam.");
 
-// Impede que testes ou hooks deixem artefatos não commitados antes da publicação.
+const adminV2Dir = path.join(process.cwd(), "admin-v2");
+const adminV2Modules = path.join(adminV2Dir, "node_modules");
+if (!existsSync(adminV2Modules)) {
+  cancel(
+    "Deploy cancelado: dependências do Admin V2 não encontradas.",
+    "Execute npm install dentro de admin-v2 antes de publicar."
+  );
+}
+
+console.log("Executando testes do Admin V2...");
+const adminV2Tests = run("npm", ["test"], { cwd: adminV2Dir });
+if (adminV2Tests.status !== 0) cancel("Deploy cancelado: os testes do Admin V2 falharam.");
+
+console.log("Gerando bundle de produção do Admin V2...");
+const adminV2Build = run("npm", ["run", "build"], { cwd: adminV2Dir });
+if (adminV2Build.status !== 0) cancel("Deploy cancelado: o build do Admin V2 falhou.");
+
+// Impede que testes ou hooks deixem artefatos versionados não commitados antes da publicação.
+// O bundle gerado em public/admin-v2 é ignorado pelo Git e é publicado pelo Wrangler logo abaixo.
 assertCleanTree();
 
 if (CHECK_ONLY) {
@@ -62,7 +80,7 @@ if (!existsSync(wrangler)) {
   cancel("Deploy cancelado: Wrangler local não encontrado. Execute npm install.");
 }
 
-console.log("Testes aprovados. Publicando explicitamente a branch main...");
+console.log("Testes e build aprovados. Publicando explicitamente a branch main...");
 const deploy = run(wrangler, [
   "pages",
   "deploy",
