@@ -1,0 +1,94 @@
+.centered {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.statusCard,
+.card {
+  width: min(100%, 420px);
+  border: 1px solid #ead9cf;
+  border-radius: 22px;
+  background: #fffdfb;
+  box-shadow: 0 18px 48px rgba(75, 45, 28, 0.08);
+}
+
+.statusCard {
+  padding: 28px;
+  text-align: center;
+}
+
+.card {
+  padding: 30px;
+  display: grid;
+  gap: 24px;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #9a644c;
+  font-size: 0.9rem;
+}
+
+.card h1 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 2.7rem);
+}
+
+.card p {
+  margin: 8px 0 0;
+  color: #765f53;
+}
+
+.form {
+  display: grid;
+  gap: 16px;
+}
+
+.form label {
+  display: grid;
+  gap: 7px;
+  font-weight: 600;
+}
+
+.form input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid #d9c8bd;
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.form input:focus {
+  outline: 3px solid rgba(211, 91, 54, 0.15);
+  border-color: #d35b36;
+}
+
+.form button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: #d35b36;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.form button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.error {
+  padding: 12px 14px;
+  border: 1px solid #efb9b9;
+  border-radius: 12px;
+  background: #fff3f3;
+  color: #b42323;
+}
