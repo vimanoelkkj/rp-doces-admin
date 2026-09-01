@@ -97,6 +97,7 @@ export function EditOrderDialog({ order, onClose, onSaved }: Props) {
 
   const productById = useMemo(() => new Map(products.map(product => [product.id, product])), [products]);
   const effectiveAvailable = (product: Product) => availableStock(product) + (currentReserved.get(product.id) || 0);
+  const usableProduct = (product: Product) => product.disponivel || currentReserved.has(product.id);
 
   function updateItem(key: number, patch: Partial<Omit<ItemDraft, "key">>) {
     setItems(current => current.map(item => item.key === key ? { ...item, ...patch } : item));
@@ -120,6 +121,7 @@ export function EditOrderDialog({ order, onClose, onSaved }: Props) {
     for (const item of items) {
       const product = productById.get(item.produtoId);
       if (!product) return setError("Selecione um produto válido em todos os itens.");
+      if (!usableProduct(product)) return setError(`${product.nome} está indisponível.`);
       if (!Number.isInteger(item.quantidade) || item.quantidade < 1 || item.quantidade > 50) return setError("A quantidade de cada item deve ficar entre 1 e 50.");
       if (item.quantidade > effectiveAvailable(product)) return setError(`${product.nome}: estoque disponível insuficiente.`);
     }
@@ -166,7 +168,7 @@ export function EditOrderDialog({ order, onClose, onSaved }: Props) {
                 const options = products.map(option => ({
                   value: String(option.id),
                   label: `${option.nome} · ${money(currentUnitPrice(option))} · ${effectiveAvailable(option)} disp.`,
-                  disabled: selectedElsewhere.has(option.id) || effectiveAvailable(option) <= 0
+                  disabled: selectedElsewhere.has(option.id) || effectiveAvailable(option) <= 0 || !usableProduct(option)
                 }));
                 return (
                   <div className={styles.itemRow} key={item.key}>
