@@ -162,11 +162,11 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
       ref,
       () => ({
         async prepareCurrentImage() {
-          if (productId !== null || !selectedUrl) return null;
+          if (!dirty || !activeUrl) return null;
           return createCroppedFile();
         }
       }),
-      [productId, selectedUrl, zoom, focalX, focalY]
+      [activeUrl, dirty, productId, zoom, focalX, focalY]
     );
 
     function changeImage(event: React.ChangeEvent<HTMLInputElement>) {
@@ -335,7 +335,7 @@ export const ProductImageEditor = forwardRef<ProductImageEditorHandle, Props>(
             <small>
               {productId === null
                 ? "A foto será enviada automaticamente ao salvar o produto."
-                : "Arraste a foto dentro da moldura para escolher o foco."}
+                : "Alterações pendentes também serão aplicadas ao salvar o produto."}
             </small>
           </div>
         )}
