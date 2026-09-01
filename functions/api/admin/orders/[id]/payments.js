@@ -1,6 +1,7 @@
 import { json, bodyJson, sameOrigin } from "../../../../lib/http.js";
 import { requireUser } from "../../../../lib/auth.js";
 import { baixarEstoquePedido } from "../../../../lib/stock.js";
+import { releaseOpenComandaReservations } from "../../../../lib/comandaStock.js";
 import {
   ensureLegacyPaymentMaterialized,
   getComandaFinancialState,
@@ -91,6 +92,35 @@ export async function onRequestPost({ request, env, params }) {
   if (!state) return json({ erro: "Pedido não encontrado." }, 404);
   if (String(state.pedido.status_comanda || "ABERTA").toUpperCase() !== "ABERTA") {
     return json({ erro: "Esta comanda já foi encerrada." }, 409);
+  }
+
+  if (action === "CANCELAR_COMANDA") {
+    const pendingDecision = await settlePendingPixDecision(env, pedidoId, "CANCELAR");
+    if (!pendingDecision.ok) {
+      return json({ erro: "Não foi possível cancelar a cobrança Pix antes de encerrar a comanda." }, pendingDecision.httpStatus || 502);
+    }
+
+    state = await getComandaFinancialState(env, pedidoId);
+    if (pendingDecision.paidDuringReconcile && state?.status_financeiro === "PAGO") {
+      await baixarEstoquePedido(env, pedidoId);
+    }
+
+    const released = await releaseOpenComandaReservations(env, pedidoId);
+    if (!released.ok) {
+      return json({ erro: "Não foi possível liberar os itens ainda reservados da comanda." }, 409);
+    }
+
+    await env.DB.prepare(
+      `UPDATE pedidos SET
+         status_pedido = 'CANCELADO', status_comanda = 'ENCERRADA',
+         atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND status_comanda = 'ABERTA'`
+    )
+      .bind(pedidoId)
+      .run();
+
+    logEvent("info", "comanda.cancelled", { pedido_id: pedidoId });
+    return json({ ok: true, pedido_id: pedidoId });
   }
 
   if (action === "REGISTRAR") {
