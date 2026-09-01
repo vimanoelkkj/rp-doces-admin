@@ -29,12 +29,11 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
   if (!pedidoId) throw new Error("pedidoId é obrigatório para sincronização.");
   if (!order) throw new Error("order do Mercado Pago é obrigatória para sincronização.");
 
+  // SELECT * é intencional: alguns testes e bancos legados usam uma tabela pedidos
+  // mínima. O ledger novo aproveita os campos adicionais quando eles existem, sem
+  // transformar a sincronização de pagamento antiga em dependente do schema novo.
   const pedidoAnterior = await env.DB.prepare(
-    `
-    SELECT id, status_pagamento, valor_total_centavos, metodo_pagamento,
-           origem_pedido, idempotency_key
-    FROM pedidos WHERE id = ? LIMIT 1
-  `
+    "SELECT * FROM pedidos WHERE id = ? LIMIT 1"
   )
     .bind(pedidoId)
     .first();
