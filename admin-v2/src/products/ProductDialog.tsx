@@ -81,6 +81,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   const [imageBusy, setImageBusy] = useState(false);
   const [formDirty, setFormDirty] = useState(false);
   const [imagePending, setImagePending] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
   const imageEditorRef = useRef<ProductImageEditorHandle>(null);
@@ -114,10 +115,8 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   function requestClose() {
     if (operationBusy) return;
 
-    if (
-      (formDirty || imagePending) &&
-      !window.confirm("Descartar alterações não salvas deste produto?")
-    ) {
+    if (formDirty || imagePending) {
+      setConfirmingDiscard(true);
       return;
     }
 
@@ -127,6 +126,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    setConfirmingDiscard(false);
 
     if (imageBusy) {
       setError("Aguarde a operação da imagem terminar antes de salvar o produto.");
@@ -218,6 +218,23 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
             ×
           </button>
         </header>
+
+        {confirmingDiscard ? (
+          <section className={styles.discardConfirm} role="alertdialog" aria-labelledby="discard-title">
+            <div className={styles.discardConfirmText}>
+              <strong id="discard-title">Descartar alterações?</strong>
+              <small>As alterações não salvas deste produto serão perdidas.</small>
+            </div>
+            <div className={styles.discardConfirmActions}>
+              <button type="button" onClick={() => setConfirmingDiscard(false)}>
+                Continuar editando
+              </button>
+              <button className={styles.discardButton} type="button" onClick={onClose}>
+                Descartar
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <ProductImageEditor
           ref={imageEditorRef}
