@@ -209,6 +209,7 @@ export function ProductsPage({ session }: Props) {
         <ProductDialog
           product={editing ?? null}
           onClose={() => setEditing(null)}
+          onImageChanged={() => void reload()}
           onSaved={async () => {
             setEditing(null);
             await reload();
