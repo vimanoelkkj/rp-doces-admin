@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
 import { ApiClientError } from "../shared/apiClient";
-import { listOrders, updateOrderStatus, type OrderStatus } from "./order.api";
+import {
+  listOrders,
+  updateManualPayment,
+  updateOrderStatus,
+  type ManualPaymentStatus,
+  type OrderStatus
+} from "./order.api";
 import {
   buildOrdersSummary,
   filterOrders,
@@ -162,7 +168,19 @@ function OrderCard({
   );
 }
 
-function OrderDetails({ order, onClose }: { order: Order; onClose: () => void }) {
+function OrderDetails({
+  order,
+  onClose,
+  onPaymentChange,
+  paymentSaving,
+  paymentError
+}: {
+  order: Order;
+  onClose: () => void;
+  onPaymentChange: (status: ManualPaymentStatus) => void;
+  paymentSaving: boolean;
+  paymentError: string | null;
+}) {
   const payment = String(order.status_pagamento || "PENDENTE").toUpperCase();
   const status = String(order.status_pedido || "NOVO").toUpperCase();
   const manual = order.origem_pedido === "MANUAL";
@@ -172,18 +190,24 @@ function OrderDetails({ order, onClose }: { order: Order; onClose: () => void })
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !paymentSaving) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, paymentSaving]);
 
   return (
     <div className={styles.dialog}>
-      <button className={styles.backdrop} type="button" onClick={onClose} aria-label="Fechar detalhes" />
+      <button
+        className={styles.backdrop}
+        type="button"
+        onClick={paymentSaving ? undefined : onClose}
+        aria-label="Fechar detalhes"
+        disabled={paymentSaving}
+      />
       <section className={styles.panel} role="dialog" aria-modal="true" aria-labelledby="order-detail-title">
         <header className={styles.dialogHead}>
           <div>
@@ -191,7 +215,7 @@ function OrderDetails({ order, onClose }: { order: Order; onClose: () => void })
             <h2 id="order-detail-title">{order.cliente_nome || "Cliente não informado"}</h2>
             <p>{dateTime(order.criado_em)}</p>
           </div>
-          <button className={styles.close} type="button" onClick={onClose} aria-label="Fechar">×</button>
+          <button className={styles.close} type="button" onClick={onClose} aria-label="Fechar" disabled={paymentSaving}>×</button>
         </header>
 
         <div className={styles.dialogStatus}>
@@ -229,6 +253,48 @@ function OrderDetails({ order, onClose }: { order: Order; onClose: () => void })
             <p>{order.observacao}</p>
           </div>
         ) : null}
+
+        {manual ? (
+          <div className={styles.manualPayment}>
+            <div className={styles.manualPaymentCopy}>
+              <strong>Pagamento manual</strong>
+              <span>Alterações aqui também podem reservar, baixar ou restaurar estoque.</span>
+            </div>
+            <div className={styles.manualPaymentActions}>
+              {payment !== "PAGO" ? (
+                <button
+                  className={styles.paymentPrimary}
+                  type="button"
+                  disabled={paymentSaving}
+                  onClick={() => onPaymentChange("PAGO")}
+                >
+                  {paymentSaving ? "Salvando…" : "Confirmar pagamento"}
+                </button>
+              ) : null}
+              {payment !== "PENDENTE" ? (
+                <button
+                  className={styles.paymentSecondary}
+                  type="button"
+                  disabled={paymentSaving}
+                  onClick={() => onPaymentChange("PENDENTE")}
+                >
+                  {paymentSaving ? "Salvando…" : "Voltar para pendente"}
+                </button>
+              ) : null}
+              {payment !== "CANCELADO" ? (
+                <button
+                  className={styles.paymentDanger}
+                  type="button"
+                  disabled={paymentSaving}
+                  onClick={() => onPaymentChange("CANCELADO")}
+                >
+                  {paymentSaving ? "Salvando…" : "Cancelar pedido"}
+                </button>
+              ) : null}
+            </div>
+            {paymentError ? <p className={styles.paymentError} role="alert">{paymentError}</p> : null}
+          </div>
+        ) : null}
       </section>
     </div>
   );
@@ -243,6 +309,8 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [selected, setSelected] = useState<Order | null>(null);
   const [savingOrderId, setSavingOrderId] = useState<number | null>(null);
   const [statusError, setStatusError] = useState<{ id: number; message: string } | null>(null);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -293,6 +361,36 @@ export function OrdersPage({ session, onNavigate }: Props) {
       });
     } finally {
       setSavingOrderId(null);
+    }
+  }
+
+  async function changeManualPayment(nextStatus: ManualPaymentStatus) {
+    if (!selected || selected.origem_pedido !== "MANUAL" || paymentSaving) return;
+    const currentStatus = String(selected.status_pagamento || "PENDENTE").toUpperCase();
+    if (nextStatus === currentStatus) return;
+
+    if (
+      nextStatus === "CANCELADO" &&
+      !window.confirm(
+        "Cancelar este pagamento também cancela o pedido e libera ou restaura o estoque. Deseja continuar?"
+      )
+    ) {
+      return;
+    }
+
+    setPaymentSaving(true);
+    setPaymentError(null);
+    try {
+      await updateManualPayment(selected.id, nextStatus);
+      const refreshed = await listOrders();
+      setOrders(refreshed);
+      setSelected(refreshed.find(item => item.id === selected.id) ?? null);
+    } catch (err) {
+      setPaymentError(
+        err instanceof ApiClientError ? err.message : "Não foi possível atualizar o pagamento."
+      );
+    } finally {
+      setPaymentSaving(false);
     }
   }
 
@@ -361,7 +459,10 @@ export function OrdersPage({ session, onNavigate }: Props) {
                 <OrderCard
                   key={order.id}
                   order={order}
-                  onDetails={() => setSelected(order)}
+                  onDetails={() => {
+                    setPaymentError(null);
+                    setSelected(order);
+                  }}
                   onStatusChange={status => void changeStatus(order, status)}
                   saving={savingOrderId === order.id}
                   statusError={statusError?.id === order.id ? statusError.message : null}
@@ -378,7 +479,19 @@ export function OrdersPage({ session, onNavigate }: Props) {
         </section>
       </AdminShell>
 
-      {selected ? <OrderDetails order={selected} onClose={() => setSelected(null)} /> : null}
+      {selected ? (
+        <OrderDetails
+          order={selected}
+          onClose={() => {
+            if (paymentSaving) return;
+            setPaymentError(null);
+            setSelected(null);
+          }}
+          onPaymentChange={status => void changeManualPayment(status)}
+          paymentSaving={paymentSaving}
+          paymentError={paymentError}
+        />
+      ) : null}
     </>
   );
 }
