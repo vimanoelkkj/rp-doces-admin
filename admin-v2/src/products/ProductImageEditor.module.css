@@ -1,1 +1,160 @@
-.wrap{border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:18px;background:var(--surface-soft)}.preview{height:180px;border-radius:11px;overflow:hidden;background:#eee0d8;display:grid;place-items:center;position:relative;color:var(--muted)}.preview img{width:100%;height:100%;object-fit:cover}.busy{position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.75);font-weight:800}.actions{display:flex;gap:8px;margin-top:10px}.actions label,.actions button{border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:#fff;cursor:pointer}.error{color:var(--danger);margin:10px 0 0}
+.wrap {
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: var(--surface-soft);
+}
+
+.heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.heading strong {
+  color: var(--text);
+}
+
+.heading span,
+.heading small,
+.controls small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.preview {
+  position: relative;
+  width: min(100%, 640px);
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #eee0d8;
+  color: var(--muted);
+}
+
+.preview canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.preview canvas:active {
+  cursor: grabbing;
+}
+
+.busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(255 255 255 / 78%);
+  font-weight: 800;
+}
+
+.controls {
+  width: min(100%, 640px);
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.controls label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.controls output {
+  min-width: 48px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.actions label,
+.actions button {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.actions button:disabled,
+.fileButton:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.actions button:not(.removeButton) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.actions .removeButton {
+  color: var(--danger);
+}
+
+.error {
+  margin: 10px 0 0;
+  color: var(--danger);
+}
+
+@media (max-width: 600px) {
+  .heading {
+    align-items: flex-start;
+  }
+
+  .heading > small {
+    display: none;
+  }
+
+  .controls label {
+    grid-template-columns: auto 1fr;
+  }
+
+  .controls output {
+    grid-column: 2;
+  }
+
+  .actions {
+    display: grid;
+  }
+
+  .actions label,
+  .actions button {
+    text-align: center;
+  }
+}
