@@ -119,7 +119,7 @@ export async function registerComandaPayment(
 
 export async function generateComandaPix(
   orderId: number,
-  input: { valor_centavos: number; pix_pendente?: PixDecision; client_request_id?: string }
+  input: { valor_centavos?: number; pix_pendente?: PixDecision; client_request_id?: string }
 ): Promise<z.infer<typeof ComandaMutationResponseSchema>> {
   return ComandaMutationResponseSchema.parse(
     await requestJson(
