@@ -100,6 +100,9 @@ export const adminApi = {
   orders() {
     return request("/api/admin/orders");
   },
+  financialOrders() {
+    return request("/api/admin/orders/financial");
+  },
   createManualOrder(order) {
     return jsonRequest("/api/admin/orders", "POST", order).then(payload => {
       invalidateProductsCache();
