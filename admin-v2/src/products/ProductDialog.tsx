@@ -105,6 +105,10 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
       });
   }, [product]);
 
+  function requestClose() {
+    if (!saving) onClose();
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -173,7 +177,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
     <div
       className={styles.overlay}
       role="presentation"
-      onMouseDown={event => event.target === event.currentTarget && onClose()}
+      onMouseDown={event => event.target === event.currentTarget && requestClose()}
     >
       <section
         className={styles.dialog}
@@ -186,7 +190,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
             <small>Catálogo</small>
             <h2 id="product-title">{product ? "Editar produto" : "Novo produto"}</h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fechar">
+          <button type="button" onClick={requestClose} aria-label="Fechar" disabled={saving}>
             ×
           </button>
         </header>
@@ -439,7 +443,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
           )}
 
           <footer>
-            <button type="button" onClick={onClose} disabled={saving}>
+            <button type="button" onClick={requestClose} disabled={saving}>
               Cancelar
             </button>
             <button type="submit" disabled={saving}>
