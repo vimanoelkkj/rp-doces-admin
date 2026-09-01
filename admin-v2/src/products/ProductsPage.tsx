@@ -167,13 +167,18 @@ export function ProductsPage({ session }: Props) {
     }
   }
 
-  const navItems: Array<{ label: string; icon: IconName; active?: boolean }> = [
-    { label: "Dashboard", icon: "dashboard" },
+  const navItems: Array<{ label: string; icon: IconName; active?: boolean; legacyPage?: string }> = [
+    { label: "Dashboard", icon: "dashboard", legacyPage: "dashboard" },
     { label: "Produtos", icon: "products", active: true },
-    { label: "Pedidos", icon: "orders" },
-    { label: "Administradores", icon: "users" },
-    { label: "Loja", icon: "store" }
+    { label: "Pedidos", icon: "orders", legacyPage: "pedidos" },
+    { label: "Administradores", icon: "users", legacyPage: "admins" },
+    { label: "Loja", icon: "store", legacyPage: "loja" }
   ];
+
+  function navigate(item: (typeof navItems)[number]) {
+    if (item.active || !item.legacyPage) return;
+    window.location.assign(`/admin/#${item.legacyPage}`);
+  }
 
   return (
     <div className={`${styles.app} ${collapsed ? styles.collapsed : ""}`}>
@@ -193,7 +198,8 @@ export function ProductsPage({ session }: Props) {
               type="button"
               className={`${styles.navItem} ${item.active ? styles.navActive : ""}`}
               aria-current={item.active ? "page" : undefined}
-              title={item.active ? undefined : `${item.label} permanece no Admin atual durante a migração`}
+              title={item.active ? undefined : `Abrir ${item.label} no Admin atual`}
+              onClick={() => navigate(item)}
             >
               <span className={styles.navIcon}><Icon name={item.icon} /></span>
               <span className={styles.navLabel}>{item.label}</span>
