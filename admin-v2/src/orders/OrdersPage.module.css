@@ -10,6 +10,11 @@
   gap: 12px;
 }
 
+.toolbarActions {
+  display: flex;
+  gap: 8px;
+}
+
 .search {
   width: min(520px, 100%);
   min-height: 46px;
@@ -381,6 +386,7 @@
 @media (max-width: 860px) { .list { grid-template-columns: 1fr; } }
 @media (max-width: 680px) {
   .toolbar, .actions { align-items: stretch; flex-direction: column; }
+  .toolbarActions { display: grid; grid-template-columns: 1fr 1fr; }
   .search, .statusControl { width: 100%; }
   .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dialog { padding: 10px; }
