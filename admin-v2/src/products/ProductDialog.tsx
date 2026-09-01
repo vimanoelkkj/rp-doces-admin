@@ -168,6 +168,14 @@ export function ProductDialog({
     onClose();
   }
 
+  function changeStock(delta: number) {
+    setFormDirty(true);
+    setForm(current => ({
+      ...current,
+      estoque: Math.min(100000, Math.max(reservedStock, current.estoque + delta))
+    }));
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -350,14 +358,32 @@ export function ProductDialog({
 
           <label>
             Estoque total
-            <input
-              type="number"
-              min={reservedStock}
-              max="100000"
-              step="1"
-              value={form.estoque}
-              onChange={event => setForm({ ...form, estoque: Number(event.target.value) })}
-            />
+            <span className={styles.stockStepper}>
+              <button
+                type="button"
+                aria-label="Diminuir estoque"
+                onClick={() => changeStock(-1)}
+                disabled={form.estoque <= reservedStock}
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min={reservedStock}
+                max="100000"
+                step="1"
+                value={form.estoque}
+                onChange={event => setForm({ ...form, estoque: Number(event.target.value) })}
+              />
+              <button
+                type="button"
+                aria-label="Aumentar estoque"
+                onClick={() => changeStock(1)}
+                disabled={form.estoque >= 100000}
+              >
+                +
+              </button>
+            </span>
             {product && reservedStock > 0 ? (
               <small className={styles.stockHelp}>
                 <strong>{reservedStock} reservada(s)</strong> em compras pendentes · {availableStock} disponível(is)
