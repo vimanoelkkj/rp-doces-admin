@@ -107,12 +107,6 @@
   cursor: not-allowed;
 }
 
-.check {
-  flex: 0 0 auto;
-  color: #d64666;
-  font-weight: 900;
-}
-
 @media (max-width: 700px) {
   .options {
     max-height: 220px;
