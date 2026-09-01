@@ -11,6 +11,7 @@ import {
   type OrderFilter
 } from "./order.model";
 import type { Order } from "./order.schema";
+import { OrderStatusSelect } from "./OrderStatusSelect";
 import styles from "./OrdersPage.module.css";
 
 type Props = {
@@ -25,8 +26,6 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   ENTREGUE: "Entregue",
   CANCELADO: "Cancelado"
 };
-
-const ORDER_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
   PENDENTE: "Aguardando pagamento",
@@ -151,20 +150,12 @@ function OrderCard({
 
       <div className={styles.actions}>
         <button className={styles.secondary} type="button" onClick={onDetails}>Ver detalhes</button>
-        <div className={styles.statusControl}>
-          <label htmlFor={`order-status-${order.id}`}>Andamento</label>
-          <select
-            id={`order-status-${order.id}`}
-            value={status}
-            disabled={saving}
-            aria-label={`Alterar andamento do pedido ${order.id}`}
-            onChange={event => onStatusChange(event.target.value as OrderStatus)}
-          >
-            {ORDER_STATUSES.map(value => (
-              <option key={value} value={value}>{ORDER_STATUS_LABELS[value]}</option>
-            ))}
-          </select>
-        </div>
+        <OrderStatusSelect
+          orderId={order.id}
+          value={status}
+          disabled={saving}
+          onChange={onStatusChange}
+        />
         {statusError ? <p className={styles.inlineError} role="alert">{statusError}</p> : null}
       </div>
     </article>
