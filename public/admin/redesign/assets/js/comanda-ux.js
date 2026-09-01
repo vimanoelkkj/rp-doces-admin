@@ -38,7 +38,7 @@ function readFormValue(form) {
 function selectedMethod(form) {
   const select = form?.querySelector('select[name="metodo"]');
   const option = select?.selectedOptions?.[0];
-  return option?.textContent?.trim() || "pagamento";
+  return option?.textContent?.trim() || "Pagamento";
 }
 
 function contextFor(group) {
@@ -48,48 +48,28 @@ function contextFor(group) {
   return "generic";
 }
 
-function optionCopy(context, action, pending) {
-  const value = moneyFromCents(pending);
-
+function optionCopy(context, action) {
   if (context === "payment") {
     return action === "CANCELAR"
-      ? {
-          title: "Cancelar o Pix e usar este pagamento",
-          description: `O Pix de ${value} será cancelado. O pagamento abaixo entra no histórico normalmente.`
-        }
-      : {
-          title: "Manter o Pix e registrar à parte",
-          description: `O Pix de ${value} continua válido. Este pagamento será separado e só poderá usar o saldo ainda livre.`
-        };
+      ? { title: "Cancelar Pix", description: "Usar este pagamento no lugar." }
+      : { title: "Manter Pix", description: "Registrar este pagamento separado." };
   }
 
   if (context === "pix") {
     return action === "CANCELAR"
-      ? {
-          title: "Substituir o Pix atual",
-          description: `Cancela o Pix de ${value} e gera uma nova cobrança com o valor informado abaixo.`
-        }
-      : {
-          title: "Manter o Pix e criar outro",
-          description: `O Pix de ${value} continua válido. A nova cobrança será adicional e limitada ao saldo livre.`
-        };
+      ? { title: "Substituir Pix", description: "Cancelar o atual e gerar outro." }
+      : { title: "Criar outro Pix", description: "Manter o atual e gerar mais um." };
   }
 
   if (context === "add") {
     return action === "CANCELAR"
-      ? {
-          title: "Cancelar o Pix atual",
-          description: `Cancela o Pix de ${value} antes de tratar o pagamento deste novo item.`
-        }
-      : {
-          title: "Manter o Pix atual",
-          description: `O Pix de ${value} continua válido. O novo item será tratado separadamente.`
-        };
+      ? { title: "Cancelar Pix", description: "Cancelar antes de tratar o novo item." }
+      : { title: "Manter Pix", description: "Tratar o novo item separado." };
   }
 
   return action === "CANCELAR"
-    ? { title: "Cancelar o Pix atual", description: `Cancela a cobrança de ${value} antes de continuar.` }
-    : { title: "Manter o Pix atual", description: `Mantém a cobrança de ${value} ativa.` };
+    ? { title: "Cancelar Pix", description: "Cancelar antes de continuar." }
+    : { title: "Manter Pix", description: "Continuar com a cobrança ativa." };
 }
 
 function buildOutcome(group) {
@@ -118,27 +98,27 @@ function updateOutcome(group) {
   if (context === "payment") {
     const method = selectedMethod(form);
     if (selected === "CANCELAR") {
-      outcome.innerHTML = `<span>Depois desta ação</span><strong>Pix atual cancelado · ${method} ${moneyFromCents(value)} registrado</strong><small>Saldo após o pagamento: ${moneyFromCents(Math.max(0, remaining - value))}</small>`;
+      outcome.innerHTML = `<strong>Pix ${moneyFromCents(pending)} cancelado → ${method} ${moneyFromCents(value)} pago → saldo ${moneyFromCents(Math.max(0, remaining - value))}</strong>`;
     } else {
       const freeAfter = Math.max(0, remaining - pending - value);
-      outcome.innerHTML = `<span>Depois desta ação</span><strong>Pix ${moneyFromCents(pending)} continua pendente · ${method} ${moneyFromCents(value)} registrado</strong><small>Saldo ainda sem pagamento ou cobrança: ${moneyFromCents(freeAfter)}</small>`;
+      outcome.innerHTML = `<strong>Pix ${moneyFromCents(pending)} mantido → ${method} ${moneyFromCents(value)} pago → livre ${moneyFromCents(freeAfter)}</strong>`;
     }
     return;
   }
 
   if (context === "pix") {
     if (selected === "CANCELAR") {
-      outcome.innerHTML = `<span>Depois desta ação</span><strong>Pix atual cancelado · novo Pix de ${moneyFromCents(value)}</strong><small>Saldo livre para outra cobrança: ${moneyFromCents(Math.max(0, remaining - value))}</small>`;
+      outcome.innerHTML = `<strong>Pix ${moneyFromCents(pending)} cancelado → novo Pix ${moneyFromCents(value)} → livre ${moneyFromCents(Math.max(0, remaining - value))}</strong>`;
     } else {
       const freeAfter = Math.max(0, remaining - pending - value);
-      outcome.innerHTML = `<span>Depois desta ação</span><strong>Pix ${moneyFromCents(pending)} mantido · novo Pix de ${moneyFromCents(value)}</strong><small>Saldo livre para outra cobrança: ${moneyFromCents(freeAfter)}</small>`;
+      outcome.innerHTML = `<strong>Pix ${moneyFromCents(pending)} mantido → novo Pix ${moneyFromCents(value)} → livre ${moneyFromCents(freeAfter)}</strong>`;
     }
     return;
   }
 
   outcome.innerHTML = selected === "CANCELAR"
-    ? `<span>O que vai acontecer</span><strong>O Pix de ${moneyFromCents(pending)} será cancelado antes de tratar o novo item.</strong>`
-    : `<span>O que vai acontecer</span><strong>O Pix de ${moneyFromCents(pending)} continua ativo e o novo item será tratado separadamente.</strong>`;
+    ? `<strong>Pix ${moneyFromCents(pending)} será cancelado.</strong>`
+    : `<strong>Pix ${moneyFromCents(pending)} será mantido.</strong>`;
 }
 
 function enhanceChoiceGroup(group) {
@@ -153,17 +133,15 @@ function enhanceChoiceGroup(group) {
   group.dataset.pendingCents = String(pending);
   const context = contextFor(group);
   const heading = group.querySelector(":scope > strong");
-  if (heading) heading.textContent = `Já existe um Pix de ${moneyFromCents(pending)} pendente`;
+  if (heading) heading.textContent = `Pix pendente: ${moneyFromCents(pending)}`;
 
   radios.forEach(radio => {
     const label = radio.closest("label");
     if (!label) return;
     label.classList.add("comanda-ux-option");
     const span = label.querySelector("span");
-    const copy = optionCopy(context, radio.value, pending);
-    if (span) {
-      span.innerHTML = `<strong>${copy.title}</strong><small>${copy.description}</small>`;
-    }
+    const copy = optionCopy(context, radio.value);
+    if (span) span.innerHTML = `<strong>${copy.title}</strong><small>${copy.description}</small>`;
     radio.addEventListener("change", () => updateOutcome(group));
   });
 
