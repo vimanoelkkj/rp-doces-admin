@@ -29,7 +29,7 @@ const PAYMENT_METHODS: Array<[ManualOrderPaymentMethod, string]> = [
 
 const PAYMENT_STATUSES: Array<[ManualOrderPaymentStatus, string]> = [
   ["PENDENTE", "Aguardando pagamento"],
-  ["PAGO", "Pagamento confirmado"]
+  ["PAGO", "Já pago"]
 ];
 
 function availableStock(product: Product): number {
@@ -112,14 +112,6 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
     [products]
   );
 
-  const total = useMemo(
-    () => items.reduce((sum, item) => {
-      const product = productById.get(item.produtoId);
-      return sum + (product ? currentUnitPrice(product) * item.quantidade : 0);
-    }, 0),
-    [items, productById]
-  );
-
   function updateItem(key: number, patch: Partial<Omit<ItemDraft, "key">>) {
     setItems(current => current.map(item => item.key === key ? { ...item, ...patch } : item));
   }
@@ -197,28 +189,54 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
       <section className={styles.panel} role="dialog" aria-modal="true" aria-labelledby="manual-order-title">
         <header className={styles.head}>
           <div>
-            <span>Pedido manual</span>
-            <h2 id="manual-order-title">Novo pedido</h2>
-            <p>Registre uma venda feita fora do site.</p>
+            <span>Novo pedido</span>
+            <h2 id="manual-order-title">Registrar venda manual</h2>
+            <p>Balcão, WhatsApp, boca a boca ou pedido feito fora do site.</p>
           </div>
           <button className={styles.close} type="button" onClick={onClose} disabled={saving} aria-label="Fechar">×</button>
         </header>
 
         <form className={styles.form} onSubmit={submit}>
-          <section className={styles.section}>
+          <div className={styles.grid}>
+            <div className={styles.field}>
+              <label htmlFor="manual-client-name">Cliente <small>opcional</small></label>
+              <input
+                id="manual-client-name"
+                value={clienteNome}
+                maxLength={120}
+                placeholder="Nome do cliente"
+                disabled={saving}
+                onChange={event => setClienteNome(event.target.value)}
+              />
+            </div>
+            <div className={styles.field}>
+              <label htmlFor="manual-client-whatsapp">WhatsApp <small>opcional</small></label>
+              <input
+                id="manual-client-whatsapp"
+                value={clienteWhatsapp}
+                maxLength={40}
+                inputMode="tel"
+                placeholder="(31) 99999-9999"
+                disabled={saving}
+                onChange={event => setClienteWhatsapp(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <section className={styles.itemSection}>
             <div className={styles.sectionHead}>
               <div>
                 <h3>Itens</h3>
-                <small>O preço final e o estoque são validados novamente pelo servidor.</small>
+                <small>O estoque será reservado ao salvar.</small>
               </div>
               <button className={styles.add} type="button" onClick={addItem} disabled={saving || loadingProducts || !canAddItem}>
-                Adicionar item
+                + Adicionar item
               </button>
             </div>
 
             {loadingProducts ? <p className={styles.itemMeta}>Carregando produtos...</p> : null}
             {!loadingProducts && !products.length ? (
-              <p className={styles.error}>Não há produtos ativos e disponíveis com estoque para registrar um pedido.</p>
+              <p className={styles.error}>Nenhum produto disponível</p>
             ) : null}
 
             <div className={styles.items}>
@@ -237,13 +255,10 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
                       >
                         {products.map(option => (
                           <option key={option.id} value={option.id} disabled={selectedElsewhere.has(option.id)}>
-                            {option.nome} - {money(currentUnitPrice(option))}
+                            {option.nome} · {money(currentUnitPrice(option))} · {availableStock(option)} disp.
                           </option>
                         ))}
                       </select>
-                      {product ? (
-                        <span className={styles.itemMeta}>{availableStock(product)} disponível(is)</span>
-                      ) : null}
                     </div>
                     <div className={styles.field}>
                       <label htmlFor={`manual-qty-${item.key}`}>Qtd.</label>
@@ -264,7 +279,6 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
                       onClick={() => removeItem(item.key)}
                       disabled={saving || items.length === 1}
                       aria-label="Remover item"
-                      title="Remover item"
                     >
                       ×
                     </button>
@@ -272,48 +286,35 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
                 );
               })}
             </div>
-
-            <div className={styles.total}>
-              <span>Total estimado</span>
-              <strong>{money(total)}</strong>
-            </div>
           </section>
 
-          <section className={styles.section}>
-            <div className={styles.sectionHead}><h3>Cliente</h3><small>Campos opcionais</small></div>
-            <div className={styles.grid}>
-              <div className={styles.field}>
-                <label htmlFor="manual-client-name">Nome</label>
-                <input id="manual-client-name" value={clienteNome} maxLength={120} disabled={saving} onChange={event => setClienteNome(event.target.value)} />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="manual-client-whatsapp">WhatsApp</label>
-                <input id="manual-client-whatsapp" value={clienteWhatsapp} maxLength={40} disabled={saving} onChange={event => setClienteWhatsapp(event.target.value)} />
-              </div>
+          <div className={styles.grid}>
+            <div className={styles.field}>
+              <label htmlFor="manual-payment-method">Forma de pagamento</label>
+              <select id="manual-payment-method" value={paymentMethod} disabled={saving} onChange={event => setPaymentMethod(event.target.value as ManualOrderPaymentMethod)}>
+                {PAYMENT_METHODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
             </div>
-          </section>
+            <div className={styles.field}>
+              <label htmlFor="manual-payment-status">Situação do pagamento</label>
+              <select id="manual-payment-status" value={paymentStatus} disabled={saving} onChange={event => setPaymentStatus(event.target.value as ManualOrderPaymentStatus)}>
+                {PAYMENT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+          </div>
 
-          <section className={styles.section}>
-            <div className={styles.sectionHead}><h3>Pagamento</h3></div>
-            <div className={styles.grid}>
-              <div className={styles.field}>
-                <label htmlFor="manual-payment-method">Forma de pagamento</label>
-                <select id="manual-payment-method" value={paymentMethod} disabled={saving} onChange={event => setPaymentMethod(event.target.value as ManualOrderPaymentMethod)}>
-                  {PAYMENT_METHODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="manual-payment-status">Situação</label>
-                <select id="manual-payment-status" value={paymentStatus} disabled={saving} onChange={event => setPaymentStatus(event.target.value as ManualOrderPaymentStatus)}>
-                  {PAYMENT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </div>
-              <div className={`${styles.field} ${styles.fieldFull}`}>
-                <label htmlFor="manual-note">Observação</label>
-                <textarea id="manual-note" value={observacao} maxLength={500} disabled={saving} onChange={event => setObservacao(event.target.value)} />
-              </div>
-            </div>
-          </section>
+          <div className={`${styles.field} ${styles.fieldFull}`}>
+            <label htmlFor="manual-note">Observação <small>opcional</small></label>
+            <textarea
+              id="manual-note"
+              rows={3}
+              value={observacao}
+              maxLength={500}
+              placeholder="Ex.: buscar amanhã às 15h"
+              disabled={saving}
+              onChange={event => setObservacao(event.target.value)}
+            />
+          </div>
 
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
 
