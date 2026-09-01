@@ -79,6 +79,8 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
+  const [formDirty, setFormDirty] = useState(false);
+  const [imagePending, setImagePending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
   const imageEditorRef = useRef<ProductImageEditorHandle>(null);
@@ -110,7 +112,16 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
   }, [product]);
 
   function requestClose() {
-    if (!operationBusy) onClose();
+    if (operationBusy) return;
+
+    if (
+      (formDirty || imagePending) &&
+      !window.confirm("Descartar alterações não salvas deste produto?")
+    ) {
+      return;
+    }
+
+    onClose();
   }
 
   async function submit(event: React.FormEvent) {
@@ -214,9 +225,15 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
           currentImageKey={product?.image_key ?? null}
           onImageChanged={onImageChanged}
           onBusyChange={setImageBusy}
+          onPendingChange={setImagePending}
         />
 
-        <form onSubmit={submit} className={styles.form} autoComplete="off">
+        <form
+          onSubmit={submit}
+          onChangeCapture={() => setFormDirty(true)}
+          className={styles.form}
+          autoComplete="off"
+        >
           <label>
             Nome
             <input
@@ -293,7 +310,10 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
                   role="radio"
                   aria-checked={form.emoji === emoji}
                   className={form.emoji === emoji ? styles.emojiSelected : ""}
-                  onClick={() => setForm({ ...form, emoji })}
+                  onClick={() => {
+                    setFormDirty(true);
+                    setForm({ ...form, emoji });
+                  }}
                 >
                   {emoji}
                 </button>
@@ -303,7 +323,10 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
                 role="radio"
                 aria-checked={form.emoji === ""}
                 className={form.emoji === "" ? styles.emojiSelected : ""}
-                onClick={() => setForm({ ...form, emoji: "" })}
+                onClick={() => {
+                  setFormDirty(true);
+                  setForm({ ...form, emoji: "" });
+                }}
               >
                 Sem emoji
               </button>
