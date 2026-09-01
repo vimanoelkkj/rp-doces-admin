@@ -83,7 +83,6 @@ export function ManualOrderSelect<T extends string>({
               }}
             >
               <span>{option.label}</span>
-              {option.value === value ? <strong className={styles.check}>✓</strong> : null}
             </button>
           ))}
         </div>
