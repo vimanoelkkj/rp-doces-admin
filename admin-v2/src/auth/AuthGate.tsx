@@ -63,9 +63,14 @@ export function AuthGate({ children }: Props) {
     setLogoutError(null);
 
     try {
-      const authenticated = await login(username, senha);
+      await login(username, senha);
       const completeUser = await getCurrentUser();
-      setUser(completeUser ?? authenticated);
+
+      if (!completeUser) {
+        throw new AuthError("A sessão não foi estabelecida após o login.", 401);
+      }
+
+      setUser(completeUser);
       form.reset();
     } catch (err) {
       setError(messageFromError(err, "Não foi possível entrar."));
