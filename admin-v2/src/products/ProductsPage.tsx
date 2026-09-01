@@ -19,6 +19,23 @@ type Props = {
   session: AuthSession;
 };
 
+type IconName = "dashboard" | "products" | "orders" | "users" | "store" | "search" | "logout" | "collapse";
+
+function Icon({ name }: { name: IconName }) {
+  const paths: Record<IconName, React.ReactNode> = {
+    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+    products: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v9"/></>,
+    orders: <><path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h4"/></>,
+    users: <><circle cx="9" cy="8" r="3"/><path d="M4 20c0-3 2.2-5 5-5s5 2 5 5M17 7v6M14 10h6"/></>,
+    store: <><path d="M4 9h16l-2-5H6L4 9Z"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
+    search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
+    logout: <><path d="M10 5H5v14h5M13 8l4 4-4 4M17 12H9"/></>,
+    collapse: <><path d="m14 7-5 5 5 5"/></>
+  };
+
+  return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
+}
+
 function initials(name: string): string {
   return (
     name
@@ -39,6 +56,7 @@ export function ProductsPage({ session }: Props) {
   const [menu, setMenu] = useState<ProductId | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
+  const [collapsed, setCollapsed] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -114,110 +132,171 @@ export function ProductsPage({ session }: Props) {
     }
   }
 
+  const navItems: Array<{ label: string; icon: IconName; active?: boolean }> = [
+    { label: "Dashboard", icon: "dashboard" },
+    { label: "Produtos", icon: "products", active: true },
+    { label: "Pedidos", icon: "orders" },
+    { label: "Administradores", icon: "users" },
+    { label: "Loja", icon: "store" }
+  ];
+
   return (
-    <main className={styles.page}>
-      <header className={styles.top}>
-        <div className={styles.heading}>
-          <small>R&amp;P Doces · Admin V2</small>
-          <h1>Produtos</h1>
-          <p>Primeiro módulo da nova base React + TypeScript.</p>
+    <div className={`${styles.app} ${collapsed ? styles.collapsed : ""}`}>
+      <aside className={styles.sidebar}>
+        <div className={styles.brand}>
+          <span className={styles.brandMark}>R&amp;P</span>
+          <span className={styles.brandCopy}>
+            <strong>R&amp;P <em>Doces</em></strong>
+            <small>Painel administrativo</small>
+          </span>
         </div>
 
-        <div className={styles.topActions}>
-          <div className={styles.account} aria-label={`Usuário logado: ${user.nome}`}>
-            {user.avatar_url ? (
-              <img className={styles.avatar} src={user.avatar_url} alt="" />
-            ) : (
-              <span className={styles.avatarFallback} aria-hidden="true">
-                {initials(user.nome)}
-              </span>
-            )}
-            <span className={styles.accountText}>
-              <strong>{user.nome}</strong>
-              <small>
-                @{user.username} · {user.papel}
-              </small>
-            </span>
-          </div>
-
-          <button
-            className={styles.logoutButton}
-            type="button"
-            onClick={() => void logout()}
-            disabled={loggingOut}
-          >
-            {loggingOut ? "Saindo…" : "Sair"}
-          </button>
-
-          <button
-            className={styles.primaryButton}
-            type="button"
-            onClick={() => setEditing(undefined)}
-          >
-            + Novo produto
-          </button>
-        </div>
-      </header>
-
-      {logoutError ? (
-        <div className={styles.error} role="alert">
-          {logoutError}
-        </div>
-      ) : null}
-
-      <section className={styles.toolbar}>
-        <input
-          type="search"
-          placeholder="Buscar produto"
-          value={query}
-          onChange={event => setQuery(event.target.value)}
-        />
-        <div>
-          {(["todos", "ativos", "esgotados", "arquivados"] as Filter[]).map(value => (
+        <nav className={styles.nav} aria-label="Navegação principal">
+          {navItems.map(item => (
             <button
-              key={value}
-              className={filter === value ? styles.active : ""}
-              onClick={() => setFilter(value)}
+              key={item.label}
+              type="button"
+              className={`${styles.navItem} ${item.active ? styles.navActive : ""}`}
+              aria-current={item.active ? "page" : undefined}
+              title={item.active ? undefined : `${item.label} permanece no Admin atual durante a migração`}
             >
-              {value[0].toUpperCase() + value.slice(1)}
+              <span className={styles.navIcon}><Icon name={item.icon} /></span>
+              <span className={styles.navLabel}>{item.label}</span>
             </button>
           ))}
+        </nav>
+
+        <div className={styles.sidebarFooter}>
+          <button className={styles.collapseButton} type="button" onClick={() => setCollapsed(value => !value)}>
+            <span className={styles.navIcon}><Icon name="collapse" /></span>
+            <span>Recolher</span>
+          </button>
         </div>
-      </section>
+      </aside>
 
-      <p className={styles.summary}>
-        {loading
-          ? "Carregando catálogo…"
-          : `${products.length} produtos · ${activeCount} ativos · ${soldOutCount} esgotados`}
-      </p>
+      <div className={styles.main}>
+        <header className={styles.topbar}>
+          <div className={styles.pageTitle}>
+            <h1>Produtos</h1>
+            <p>Catálogo, categorias, estoque e promoções</p>
+          </div>
 
-      {error ? (
-        <div className={styles.error} role="alert">
-          {error}
-          <button onClick={() => void reload()}>Tentar novamente</button>
-        </div>
-      ) : null}
+          <div className={styles.topbarActions}>
+            <button
+              className={styles.iconButton}
+              type="button"
+              title="Sair"
+              aria-label="Sair"
+              onClick={() => void logout()}
+              disabled={loggingOut}
+            >
+              <Icon name="logout" />
+            </button>
 
-      <section className={styles.grid}>
-        {visible.map(product => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            menuOpen={menu === product.id}
-            onToggleMenu={() => setMenu(current => (current === product.id ? null : product.id))}
-            onEdit={() => {
-              setMenu(null);
-              setEditing(product);
-            }}
-            onArchive={() => void archive(product.id)}
-            onRestore={() => void restore(product)}
-          />
-        ))}
-      </section>
+            <div className={styles.profile} aria-label={`Usuário logado: ${user.nome}`}>
+              {user.avatar_url ? (
+                <img className={styles.avatar} src={user.avatar_url} alt="" />
+              ) : (
+                <span className={styles.avatarFallback} aria-hidden="true">
+                  {initials(user.nome)}
+                </span>
+              )}
+              <span className={styles.profileCopy}>
+                <strong>{user.nome}</strong>
+                <small>{user.papel}</small>
+              </span>
+              <span className={styles.profileChevron} aria-hidden="true">⌄</span>
+            </div>
+          </div>
+        </header>
 
-      {!loading && !error && visible.length === 0 ? (
-        <p className={styles.empty}>Nenhum produto encontrado.</p>
-      ) : null}
+        <main className={styles.content}>
+          {logoutError ? (
+            <div className={styles.error} role="alert">
+              {logoutError}
+            </div>
+          ) : null}
+
+          <section className={styles.toolbar}>
+            <div className={styles.toolbarLeft}>
+              <label className={styles.search}>
+                <Icon name="search" />
+                <input
+                  type="search"
+                  placeholder="Buscar produto"
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                />
+              </label>
+
+              <div className={styles.filters}>
+                {(["todos", "ativos", "esgotados", "arquivados"] as Filter[]).map(value => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={filter === value ? styles.active : ""}
+                    onClick={() => setFilter(value)}
+                  >
+                    {value[0].toUpperCase() + value.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.toolbarActions}>
+              <button
+                className={styles.secondaryButton}
+                type="button"
+                disabled
+                title="Gerenciamento de categorias será migrado em uma etapa própria"
+              >
+                Gerenciar categorias
+              </button>
+              <button
+                className={styles.primaryButton}
+                type="button"
+                onClick={() => setEditing(undefined)}
+              >
+                + Novo produto
+              </button>
+            </div>
+          </section>
+
+          <p className={styles.summary}>
+            {loading
+              ? "Carregando catálogo…"
+              : `${products.length} produtos · ${activeCount} ativos · ${soldOutCount} esgotados`}
+          </p>
+
+          {error ? (
+            <div className={styles.error} role="alert">
+              {error}
+              <button onClick={() => void reload()}>Tentar novamente</button>
+            </div>
+          ) : null}
+
+          <section className={styles.grid}>
+            {visible.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                menuOpen={menu === product.id}
+                onToggleMenu={() => setMenu(current => (current === product.id ? null : product.id))}
+                onEdit={() => {
+                  setMenu(null);
+                  setEditing(product);
+                }}
+                onArchive={() => void archive(product.id)}
+                onRestore={() => void restore(product)}
+              />
+            ))}
+          </section>
+
+          {!loading && !error && visible.length === 0 ? (
+            <p className={styles.empty}>Nenhum produto encontrado.</p>
+          ) : null}
+        </main>
+      </div>
 
       {editing !== null ? (
         <ProductDialog
@@ -231,6 +310,6 @@ export function ProductsPage({ session }: Props) {
           }}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
