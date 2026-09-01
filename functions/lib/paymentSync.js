@@ -1,5 +1,6 @@
 import { mpOrderToLocalStatus, paymentFromOrder } from "./mercadoPago.js";
 import { baixarEstoquePedido, liberarReservaPedido } from "./stock.js";
+import { syncOrderPaymentLedger } from "./orderLedger.js";
 import { notifyPaidOrder } from "./push.js";
 import { logEvent } from "./logger.js";
 
@@ -20,6 +21,7 @@ import { logEvent } from "./logger.js";
  *   mp_status: string|null,
  *   mp_status_detail: string|null,
  *   pago_em: string|null,
+ *   ledger_synced: boolean,
  *   order: object
  * }>}
  */
@@ -29,7 +31,9 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
 
   const pedidoAnterior = await env.DB.prepare(
     `
-    SELECT status_pagamento FROM pedidos WHERE id = ? LIMIT 1
+    SELECT id, status_pagamento, valor_total_centavos, metodo_pagamento,
+           origem_pedido, idempotency_key
+    FROM pedidos WHERE id = ? LIMIT 1
   `
   )
     .bind(pedidoId)
@@ -82,6 +86,18 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
     .first();
 
   const statusFinal = consolidado?.status_pagamento || localStatus;
+
+  const ledger = await syncOrderPaymentLedger(env, {
+    pedido: pedidoAnterior,
+    status: statusFinal,
+    mpOrderId: resolvedMpOrderId,
+    mpPaymentId: payment.paymentId,
+    mpStatus: consolidado?.mp_status ?? order?.status ?? null,
+    mpStatusDetail: consolidado?.mp_status_detail ?? order?.status_detail ?? null,
+    ticketUrl: payment.ticketUrl,
+    qrCode: payment.qrCode,
+    qrCodeBase64: payment.qrCodeBase64
+  });
 
   // Log de transição financeira efetiva (evita logs duplicados em webhooks repetidos)
   if (statusAnterior !== "PAGO" && statusFinal === "PAGO") {
@@ -139,6 +155,7 @@ export async function syncOrderPayment(env, { pedidoId, order, mpOrderId = null 
     mp_status: consolidado?.mp_status ?? order?.status ?? null,
     mp_status_detail: consolidado?.mp_status_detail ?? order?.status_detail ?? null,
     pago_em: consolidado?.pago_em ?? null,
+    ledger_synced: Boolean(ledger.ok),
     order
   };
 }
