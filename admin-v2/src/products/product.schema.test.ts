@@ -21,7 +21,7 @@ describe("sqliteBoolean", () => {
 describe("CategorySchema", () => {
   it("normaliza o campo ativo vindo do sqlite", () => {
     const category = CategorySchema.parse({
-      id: "pudins",
+      id: "PUDINS",
       nome: "Pudins",
       emoji: "🍮",
       ativo: 1
@@ -35,7 +35,7 @@ describe("ProductSchema", () => {
   const validProduct = {
     id: 1,
     nome: "Pudim tradicional",
-    categoria: "pudins",
+    categoria: "PUDINS",
     categoria_nome: "Pudins",
     categoria_emoji: "🍮",
     categoria_ordem: 1,
@@ -74,7 +74,7 @@ describe("ProductSchema", () => {
 describe("ProductInputSchema", () => {
   const validInput = {
     nome: "Pudim tradicional",
-    categoria: "pudins",
+    categoria: "PUDINS",
     descricao: "Pudim artesanal",
     preco_centavos: 2500,
     disponivel: true,
@@ -98,13 +98,60 @@ describe("ProductInputSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("exige categoria", () => {
-    const result = ProductInputSchema.safeParse({ ...validInput, categoria: "" });
-    expect(result.success).toBe(false);
+  it("exige categoria válida", () => {
+    expect(ProductInputSchema.safeParse({ ...validInput, categoria: "" }).success).toBe(false);
+    expect(ProductInputSchema.safeParse({ ...validInput, categoria: "inválida" }).success).toBe(
+      false
+    );
   });
 
   it("limita estoque a 100000", () => {
     const result = ProductInputSchema.safeParse({ ...validInput, estoque: 100001 });
+    expect(result.success).toBe(false);
+  });
+
+  it("não aceita emoji nulo no payload de escrita", () => {
+    const result = ProductInputSchema.safeParse({ ...validInput, emoji: null });
+    expect(result.success).toBe(false);
+  });
+
+  it("exige preço promocional quando a promoção está ativa", () => {
+    const result = ProductInputSchema.safeParse({
+      ...validInput,
+      promocao_ativa: true,
+      preco_promocional_centavos: null
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("exige preço promocional menor que o preço normal", () => {
+    const result = ProductInputSchema.safeParse({
+      ...validInput,
+      promocao_ativa: true,
+      preco_promocional_centavos: 2500
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("aceita promoção válida", () => {
+    const result = ProductInputSchema.safeParse({
+      ...validInput,
+      promocao_ativa: true,
+      preco_promocional_centavos: 2000,
+      promocao_inicio: "2026-09-01T10:00:00.000Z",
+      promocao_fim: "2026-09-02T10:00:00.000Z"
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejeita promoção que termina antes de começar", () => {
+    const result = ProductInputSchema.safeParse({
+      ...validInput,
+      promocao_ativa: true,
+      preco_promocional_centavos: 2000,
+      promocao_inicio: "2026-09-02T10:00:00.000Z",
+      promocao_fim: "2026-09-01T10:00:00.000Z"
+    });
     expect(result.success).toBe(false);
   });
 });
