@@ -1,9 +1,21 @@
-import { ApiErrorSchema, CategoriesResponseSchema, CreateProductResponseSchema, ImageUploadResponseSchema, ProductsResponseSchema } from "./product.schema";
+import {
+  ApiErrorSchema,
+  CategoriesResponseSchema,
+  CreateCategoryResponseSchema,
+  CreateProductResponseSchema,
+  ImageUploadResponseSchema,
+  ProductsResponseSchema
+} from "./product.schema";
 import type { Product, ProductId, ProductInput, ImageUploadResult } from "./product.types";
 import type { z } from "zod";
 import type { CategorySchema } from "./product.schema";
 
 export type Category = z.infer<typeof CategorySchema>;
+export type CategoryInput = {
+  nome: string;
+  emoji: string;
+  descricao: string;
+};
 
 export class ProductApiError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -37,9 +49,21 @@ export async function listProducts(): Promise<Product[]> {
   return ProductsResponseSchema.parse(await requestJson("/api/admin/products")).produtos;
 }
 
+export async function listAllCategories(): Promise<Category[]> {
+  return CategoriesResponseSchema.parse(await requestJson("/api/admin/categories")).categorias;
+}
+
 export async function listCategories(): Promise<Category[]> {
-  const result = CategoriesResponseSchema.parse(await requestJson("/api/admin/categories"));
-  return result.categorias.filter((category) => category.ativo);
+  return (await listAllCategories()).filter(category => category.ativo);
+}
+
+export async function createCategory(input: CategoryInput): Promise<string> {
+  return CreateCategoryResponseSchema.parse(
+    await requestJson("/api/admin/categories", {
+      method: "POST",
+      body: JSON.stringify(input)
+    })
+  ).id;
 }
 
 export async function createProduct(input: ProductInput): Promise<ProductId> {
