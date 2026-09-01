@@ -7,10 +7,7 @@
     <title>R&P Doces Admin · Redesign</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Nunito+Sans:opsz,wght@6..12,400..800&display=swap"
-    />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Nunito+Sans:opsz,wght@6..12,400..800&display=swap" />
     <link rel="stylesheet" href="./assets/css/app.css" />
     <link rel="stylesheet" href="./assets/css/dashboard.css" />
     <link rel="stylesheet" href="./assets/css/dashboard-polish.css" />
@@ -47,43 +44,17 @@
       <aside class="admin-sidebar" aria-label="Navegação administrativa">
         <div class="admin-brand">
           <div class="admin-brand__mark" aria-hidden="true">R&P</div>
-          <div class="admin-brand__copy">
-            <strong>R&P <em>Doces</em></strong>
-            <span>Painel administrativo</span>
-          </div>
+          <div class="admin-brand__copy"><strong>R&P <em>Doces</em></strong><span>Painel administrativo</span></div>
         </div>
-
         <nav class="admin-nav">
-          <button class="admin-nav__item" type="button" data-admin-nav="dashboard" data-label="Dashboard">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg></span>
-            <span class="admin-nav__label">Dashboard</span>
-          </button>
-          <button class="admin-nav__item" type="button" data-admin-nav="produtos" data-label="Produtos">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 7 4v10l-7 4-7-4V7l7-4Z" /><path d="m5 7 7 4 7-4M12 11v10" /></svg></span>
-            <span class="admin-nav__label">Produtos</span><span class="admin-nav__badge" data-nav-badge="produtos" hidden></span>
-          </button>
-          <button class="admin-nav__item" type="button" data-admin-nav="pedidos" data-label="Pedidos">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10l2 3v15H5V6l2-3Z" /><path d="M5 8h14M9 12h6M9 16h4" /></svg></span>
-            <span class="admin-nav__label">Pedidos</span><span class="admin-nav__badge" data-nav-badge="pedidos" hidden></span>
-          </button>
-          <button class="admin-nav__item" type="button" data-admin-nav="admins" data-label="Administradores">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.8-3.2 2.6-4.8 5.5-4.8s4.7 1.6 5.5 4.8M17 7h4M19 5v4" /></svg></span>
-            <span class="admin-nav__label">Administradores</span>
-          </button>
-          <button class="admin-nav__item" type="button" data-admin-nav="loja" data-label="Loja">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10h16v10H4zM3 10l2-6h14l2 6" /><path d="M8 14h4v6" /></svg></span>
-            <span class="admin-nav__label">Loja</span>
-          </button>
+          <button class="admin-nav__item" type="button" data-admin-nav="dashboard" data-label="Dashboard"><span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg></span><span class="admin-nav__label">Dashboard</span></button>
+          <button class="admin-nav__item" type="button" data-admin-nav="produtos" data-label="Produtos"><span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 7 4v10l-7 4-7-4V7l7-4Z" /><path d="m5 7 7 4 7-4M12 11v10" /></svg></span><span class="admin-nav__label">Produtos</span><span class="admin-nav__badge" data-nav-badge="produtos" hidden></span></button>
+          <button class="admin-nav__item" type="button" data-admin-nav="pedidos" data-label="Pedidos"><span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10l2 3v15H5V6l2-3Z" /><path d="M5 8h14M9 12h6M9 16h4" /></svg></span><span class="admin-nav__label">Pedidos</span><span class="admin-nav__badge" data-nav-badge="pedidos" hidden></span></button>
+          <button class="admin-nav__item" type="button" data-admin-nav="admins" data-label="Administradores"><span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.8-3.2 2.6-4.8 5.5-4.8s4.7 1.6 5.5 4.8M17 7h4M19 5v4" /></svg></span><span class="admin-nav__label">Administradores</span></button>
+          <button class="admin-nav__item" type="button" data-admin-nav="loja" data-label="Loja"><span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10h16v10H4zM3 10l2-6h14l2 6" /><path d="M8 14h4v6" /></svg></span><span class="admin-nav__label">Loja</span></button>
         </nav>
-
-        <div class="admin-sidebar__footer">
-          <button class="admin-collapse" type="button" data-collapse-sidebar aria-expanded="true">
-            <span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14 7-5 5 5 5" /></svg></span>
-            <span>Recolher</span>
-          </button>
-        </div>
+        <div class="admin-sidebar__footer"><button class="admin-collapse" type="button" data-collapse-sidebar aria-expanded="true"><span class="admin-nav__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14 7-5 5 5 5" /></svg></span><span>Recolher</span></button></div>
       </aside>
-
       <main class="admin-main">
         <header class="admin-topbar">
           <div class="admin-page-title"><h1 data-page-title>Dashboard</h1><p data-page-subtitle>Visão geral da operação</p></div>
@@ -108,5 +79,6 @@
     <script type="module" src="./assets/js/time-picker.js"></script>
     <script type="module" src="./assets/js/manual-selects.js"></script>
     <script type="module" src="./assets/js/manual-payment-state.js"></script>
+    <script type="module" src="./assets/js/order-edit.js"></script>
   </body>
 </html>
