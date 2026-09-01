@@ -11,7 +11,7 @@ export async function onRequestGet({ request, env }) {
             valor_unitario_centavos, valor_total_centavos,
             cliente_nome, cliente_email, cliente_whatsapp,
             tipo_entrega, observacao, metodo_pagamento,
-            status_pagamento, status_pedido, origem_pedido,
+            status_pagamento, status_pedido, status_comanda, origem_pedido,
             mp_order_id, mp_payment_id, mp_status, mp_status_detail,
             criado_em, atualizado_em, pago_em
      FROM pedidos
@@ -28,7 +28,8 @@ export async function onRequestGet({ request, env }) {
   const { results: itemRows } = await env.DB.prepare(
     `SELECT id, pedido_id, produto_id, produto_nome, quantidade,
             valor_unitario_centavos, valor_total_centavos,
-            estoque_baixado_em, criado_em
+            estoque_baixado_em, criado_em,
+            adicionado_por_usuario_id, adicionado_em
      FROM pedido_itens
      WHERE pedido_id IN (${placeholders})
      ORDER BY pedido_id DESC, id ASC`
