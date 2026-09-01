@@ -9,17 +9,30 @@ const D1_ID = process.env.RP_D1_ID || "c2e15599-3d68-4801-9a1c-96a84977dd7c";
 const ADMIN_USER = "adminlocal";
 const ADMIN_PASSWORD = "TesteLocal@123";
 const serve = process.argv.includes("--serve");
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const isWindows = process.platform === "win32";
+const npx = "npx";
 
 function run(args, { inherit = true } = {}) {
   const result = spawnSync(npx, args, {
     cwd: process.cwd(),
     stdio: inherit ? "inherit" : "pipe",
     encoding: "utf8",
-    shell: false
+    shell: isWindows
   });
+
+  if (result.error) {
+    console.error(`\nFalha ao executar: npx ${args.join(" ")}`);
+    console.error(result.error.message || result.error);
+    process.exit(1);
+  }
+
   if (result.status !== 0) {
-    if (!inherit && result.stderr) process.stderr.write(result.stderr);
+    if (!inherit) {
+      if (result.stdout) process.stdout.write(result.stdout);
+      if (result.stderr) process.stderr.write(result.stderr);
+    }
+    console.error(`\nComando falhou com código ${result.status ?? "desconhecido"}:`);
+    console.error(`npx ${args.join(" ")}`);
     process.exit(result.status || 1);
   }
   return result;
@@ -184,7 +197,12 @@ if (serve) {
       "--binding",
       "RATE_LIMIT_SECRET=teste-local-rate-limit"
     ],
-    { cwd: process.cwd(), stdio: "inherit", shell: false }
+    { cwd: process.cwd(), stdio: "inherit", shell: isWindows }
   );
+
+  child.on("error", error => {
+    console.error("Falha ao subir o Pages local:", error.message || error);
+    process.exit(1);
+  });
   child.on("exit", code => process.exit(code ?? 0));
 }
