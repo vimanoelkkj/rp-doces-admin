@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { Product } from "./product.types";
 import {
   availableStock,
@@ -27,11 +28,21 @@ export function ProductCard({
   onArchive,
   onRestore
 }: Props) {
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
   const available = availableStock(product);
   const promoState = promotionState(product);
   const promo = promotionLabel(promoState);
   const currentPrice = currentPriceCents(product);
   const hasActivePromo = promoState === "active" && currentPrice !== product.preco_centavos;
+
+  useEffect(() => {
+    if (!menuOpen) setConfirmingArchive(false);
+  }, [menuOpen]);
+
+  function archive() {
+    setConfirmingArchive(false);
+    onArchive();
+  }
 
   return (
     <article className={styles.card}>
@@ -69,11 +80,29 @@ export function ProductCard({
             </button>
             {menuOpen && (
               <div className={styles.menu}>
-                <button type="button" onClick={onEdit}>Editar</button>
-                {product.ativo ? (
-                  <button type="button" onClick={onArchive}>Arquivar</button>
+                {confirmingArchive ? (
+                  <div className={styles.archiveConfirm}>
+                    <p>
+                      Arquivar <strong>{product.nome}</strong>? Ele deixará de aparecer no catálogo ativo.
+                    </p>
+                    <div className={styles.archiveActions}>
+                      <button type="button" onClick={() => setConfirmingArchive(false)}>
+                        Cancelar
+                      </button>
+                      <button className={styles.archiveDanger} type="button" onClick={archive}>
+                        Arquivar
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <button type="button" onClick={onRestore}>Restaurar</button>
+                  <>
+                    <button type="button" onClick={onEdit}>Editar</button>
+                    {product.ativo ? (
+                      <button type="button" onClick={() => setConfirmingArchive(true)}>Arquivar</button>
+                    ) : (
+                      <button type="button" onClick={onRestore}>Restaurar</button>
+                    )}
+                  </>
                 )}
               </div>
             )}
