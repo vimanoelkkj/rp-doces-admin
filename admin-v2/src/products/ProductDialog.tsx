@@ -117,7 +117,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
-      event.returnValue = "";
+      event.returnValue = "unsaved-changes";
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
