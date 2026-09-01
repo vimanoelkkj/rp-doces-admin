@@ -59,16 +59,6 @@ function initials(name: string): string {
   );
 }
 
-function legacyAdminUrl(page: string): string {
-  const runningOnViteDev =
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
-    window.location.port === "5173";
-
-  return runningOnViteDev
-    ? `http://127.0.0.1:8788/admin/#${page}`
-    : `/admin/#${page}`;
-}
-
 export function ProductsPage({ session }: Props) {
   const { user, logout, loggingOut, logoutError } = session;
   const [products, setProducts] = useState<Product[]>([]);
@@ -187,7 +177,7 @@ export function ProductsPage({ session }: Props) {
 
   function navigate(item: (typeof navItems)[number]) {
     if (item.active || !item.legacyPage) return;
-    window.location.assign(legacyAdminUrl(item.legacyPage));
+    window.location.assign(`/admin/#${item.legacyPage}`);
   }
 
   return (
