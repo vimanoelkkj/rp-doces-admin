@@ -165,10 +165,11 @@ async function openComanda(orderId) {
       const productId = Number(addForm.elements.produto_id.value); const quantity = Number(addForm.elements.quantidade.value); const selectedMode = mode.value;
       const product = state.products.find(item => Number(item.id) === productId);
       if (!product || !Number.isInteger(quantity) || quantity < 1) return show(errorBox, "Selecione um produto e uma quantidade válida.");
-      const unit = Number(product.promocao_ativa && product.preco_promocional_centavos ? product.preco_promocional_centavos : product.preco_centavos); const subtotal = unit * quantity;
       const pixDecision = radioValue(dialog, "add_pix");
       run(async () => {
-        await adminApi.addComandaItem(orderId, { produto_id: productId, quantidade: quantity });
+        const added = await adminApi.addComandaItem(orderId, { produto_id: productId, quantidade: quantity });
+        const subtotal = Number(added?.item?.valor_total_centavos || 0);
+        if (selectedMode !== "PENDENTE" && subtotal <= 0) throw new Error("O backend não retornou o valor do item adicionado.");
         if (selectedMode === "PAGO") await adminApi.registerComandaPayment(orderId, { metodo: addForm.elements.metodo.value, valor_centavos: subtotal, ...(pixDecision ? { pix_pendente: pixDecision } : {}) });
         if (selectedMode === "PIX") await adminApi.generateComandaPix(orderId, { ...(pixDecision === "CANCELAR" ? {} : { valor_centavos: subtotal }), ...(pixDecision ? { pix_pendente: pixDecision } : {}) });
       }, selectedMode === "PENDENTE" ? "Item adicionado à comanda." : "Item adicionado e pagamento tratado.");
