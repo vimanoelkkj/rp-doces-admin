@@ -28,6 +28,18 @@ export async function listOrders(): Promise<Order[]> {
 }
 
 export async function updateOrderStatus(id: number, status: OrderStatus): Promise<void> {
+  if (status === "CANCELADO") {
+    await requestJson(
+      `/api/admin/orders/${id}/payments`,
+      {
+        method: "POST",
+        body: JSON.stringify({ acao: "CANCELAR_COMANDA" })
+      },
+      "Não foi possível cancelar a comanda."
+    );
+    return;
+  }
+
   await requestJson(
     `/api/admin/orders/${id}`,
     {
