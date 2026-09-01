@@ -305,7 +305,13 @@ export function ProductDialog({ product, onClose, onSaved }: Props) {
               <input
                 type="checkbox"
                 checked={form.ativo}
-                onChange={event => setForm({ ...form, ativo: event.target.checked })}
+                onChange={event =>
+                  setForm({
+                    ...form,
+                    ativo: event.target.checked,
+                    disponivel: event.target.checked ? form.disponivel : false
+                  })
+                }
               />
               <span>
                 <strong>Produto ativo</strong>
