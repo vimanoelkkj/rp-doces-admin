@@ -133,7 +133,7 @@ function enhanceChoiceGroup(group) {
   group.dataset.pendingCents = String(pending);
   const context = contextFor(group);
   const heading = group.querySelector(":scope > strong");
-  if (heading) heading.textContent = `Pix pendente: ${moneyFromCents(pending)}`;
+  if (heading) heading.textContent = `Já existe um Pix de ${moneyFromCents(pending)}`;
 
   radios.forEach(radio => {
     const label = radio.closest("label");
