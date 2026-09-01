@@ -9,3 +9,4 @@ Thumbs.db
 /.private-backups/
 /backup-*.sql
 /rp-doces-backup-*.sql
+/public/admin-v2/
