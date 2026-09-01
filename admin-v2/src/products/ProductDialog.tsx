@@ -112,6 +112,18 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged }: Pro
       });
   }, [product]);
 
+  useEffect(() => {
+    if (!formDirty && !imagePending) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [formDirty, imagePending]);
+
   function requestClose() {
     if (operationBusy) return;
 
