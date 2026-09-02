@@ -48,6 +48,17 @@ async function findDiagnostic(env, orderId) {
     .first();
 }
 
+async function findLatestDiagnostic(env) {
+  return env.DB.prepare(
+    `SELECT external_reference, mp_order_id, mp_payment_id, status, mp_status, mp_status_detail,
+            criado_em, atualizado_em, pago_em, webhook_recebido_em, webhook_data_id, webhook_request_id
+     FROM pix_diagnosticos
+     WHERE mp_order_id IS NOT NULL
+     ORDER BY criado_em DESC
+     LIMIT 1`
+  ).first();
+}
+
 async function updateDiagnosticFromOrder(env, order) {
   const orderId = order?.id ? String(order.id) : "";
   if (!orderId) return null;
@@ -171,13 +182,21 @@ export async function onRequestGet({ request, env }) {
   }
 
   const url = new URL(request.url);
-  const orderId = String(url.searchParams.get("order_id") || "").trim();
+  let orderId = String(url.searchParams.get("order_id") || "").trim();
+  const latest = url.searchParams.get("latest") === "1";
+
+  if (!orderId && latest) {
+    const diagnostic = await findLatestDiagnostic(env);
+    if (!diagnostic?.mp_order_id) return json({ diagnostico: false }, 200);
+    orderId = String(diagnostic.mp_order_id);
+  }
+
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(orderId)) return json({ erro: "order_id inválido." }, 400);
 
   try {
     const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(orderId)}`, { accessToken });
     const diagnostic = await updateDiagnosticFromOrder(env, order);
-    return json(diagnosticPayload(order, diagnostic), 200);
+    return json({ ...diagnosticPayload(order, diagnostic), diagnostico: true }, 200);
   } catch (error) {
     console.error("Falha ao consultar Pix real de diagnóstico", error?.data || error);
     return json({
