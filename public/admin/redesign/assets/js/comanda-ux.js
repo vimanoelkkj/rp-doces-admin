@@ -188,9 +188,6 @@ document.addEventListener("click", event => {
 
   dialog.classList.add("is-closing");
   dialog.setAttribute("aria-busy", "true");
-  dialog.querySelectorAll("button,input,select").forEach(control => {
-    control.disabled = true;
-  });
 
   window.setTimeout(() => {
     if (!dialog.isConnected) return;
