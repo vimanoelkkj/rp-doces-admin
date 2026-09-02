@@ -52,7 +52,7 @@ function updateExpirationLabel(card) {
     const label = String(item.querySelector("small")?.textContent || "").trim().toLowerCase();
     if (label !== "expiração") return;
     const value = item.querySelector("strong");
-    if (value && value.textContent !== "cerca de 2 min") value.textContent = "cerca de 2 min";
+    if (value && value.textContent !== "cerca de 30 min") value.textContent = "cerca de 30 min";
   });
 }
 
