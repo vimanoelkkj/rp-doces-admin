@@ -135,6 +135,18 @@ export async function onRequestPost({ request, env, params }) {
       await baixarEstoquePedido(env, pedidoId);
     }
 
+    if (Number(state?.pago_centavos || 0) > 0) {
+      logEvent("warn", "comanda.cancel_blocked_paid", {
+        pedido_id: pedidoId,
+        paid_cents: Number(state.pago_centavos || 0)
+      });
+      return json({
+        erro: "Esta comanda já possui pagamento confirmado. Faça o estorno/reembolso antes de cancelar.",
+        codigo: "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO",
+        valor_pago_centavos: Number(state.pago_centavos || 0)
+      }, 409);
+    }
+
     const released = await releaseOpenComandaReservations(env, pedidoId);
     if (!released.ok) {
       return json({ erro: "Não foi possível liberar os itens ainda reservados da comanda." }, 409);
