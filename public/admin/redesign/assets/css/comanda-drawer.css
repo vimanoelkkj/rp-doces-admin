@@ -81,6 +81,12 @@
   padding: 10px 13px;
 }
 
+.comanda-pending-code button,
+.comanda-pending-code .comanda-mini,
+.comanda-pending-qr-toggle {
+  text-decoration: none !important;
+}
+
 .comanda-pending-qr-toggle[aria-expanded="true"] {
   background: rgb(255 255 255 / 72%);
 }
