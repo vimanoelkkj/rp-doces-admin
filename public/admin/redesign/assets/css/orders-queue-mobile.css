@@ -1,0 +1,45 @@
+@media (max-width: 760px) {
+  .orders-queue-row {
+    grid-template-columns: minmax(0, 1fr) auto 34px !important;
+    grid-template-areas:
+      "main value menu"
+      "tags value menu" !important;
+    gap: 5px 10px;
+  }
+
+  .orders-queue-menu {
+    display: block !important;
+    grid-area: menu !important;
+    grid-column: auto !important;
+    align-self: center;
+    justify-self: end;
+    position: relative;
+  }
+
+  .orders-queue-more {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    border-color: #ead3ca;
+    background: rgba(255, 255, 255, 0.72);
+    color: #76564c;
+  }
+
+  .orders-queue-menu.is-open .orders-queue-more {
+    background: #ffebe5;
+    color: #654238;
+  }
+
+  .orders-queue-menu .orders-status-options {
+    right: 0;
+    left: auto;
+    top: calc(100% + 6px);
+    min-width: 176px;
+    z-index: 40;
+  }
+
+  .orders-queue-value {
+    min-width: max-content;
+  }
+}
