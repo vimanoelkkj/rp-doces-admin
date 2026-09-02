@@ -47,6 +47,18 @@ function paidInCard(card) {
   return provider.includes("pagamento confirmado");
 }
 
+function normalizeWebhookCopy(card) {
+  const webhookCheck = card.querySelector("[data-pix-webhook-check]");
+  const webhookText = card.querySelector("[data-pix-webhook-text]");
+  if (!webhookCheck || !webhookText || paidInCard(card)) return;
+
+  const text = String(webhookText.textContent || "").trim();
+  if (!text.includes("Webhook recebido pela R&P")) return;
+
+  webhookText.textContent = "Webhook recebido · pagamento pendente";
+  webhookCheck.className = "pix-real-check";
+}
+
 function mount(card) {
   if (!card || card.dataset.pixRefundMounted === "1") return;
   card.dataset.pixRefundMounted = "1";
@@ -94,6 +106,19 @@ function mount(card) {
   const setRefundCheck = (text, kind = "") => {
     refundText.textContent = text;
     refundCheck.className = `pix-real-check${kind ? ` is-${kind}` : ""}`;
+  };
+
+  const resetForNewOrder = () => {
+    duplicateTested = false;
+    stopPolling();
+    refundButton.hidden = true;
+    refundButton.disabled = false;
+    refundButton.textContent = "Reembolsar teste de R$ 0,10";
+    duplicateButton.hidden = true;
+    duplicateButton.disabled = false;
+    duplicateButton.textContent = "Testar reembolso duplicado";
+    setRefundCheck("Aguardando pagamento");
+    normalizeWebhookCopy(card);
   };
 
   const applyRefund = payload => {
@@ -146,18 +171,17 @@ function mount(card) {
     const orderId = orderIdFromCard(card);
     if (!orderId || busy) {
       if (!orderId) {
-        refundButton.hidden = true;
-        duplicateButton.hidden = true;
-        setRefundCheck("Aguardando pagamento");
+        resetForNewOrder();
       }
       return;
     }
 
     if (lastOrderId !== orderId) {
       lastOrderId = orderId;
-      duplicateTested = false;
-      stopPolling();
+      resetForNewOrder();
     }
+
+    normalizeWebhookCopy(card);
 
     try {
       applyRefund(await request(`${API}?order_id=${encodeURIComponent(orderId)}`));
@@ -246,6 +270,7 @@ function mount(card) {
   });
 
   const observer = new MutationObserver(() => {
+    normalizeWebhookCopy(card);
     const orderId = orderIdFromCard(card);
     if (orderId !== lastOrderId || paidInCard(card)) sync();
   });
