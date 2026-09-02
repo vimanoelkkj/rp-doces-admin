@@ -1,0 +1,85 @@
+/* Mantém a fila de Pedidos coerente com a interface clara.
+   O tema escuro só deve entrar quando data-theme="dark" estiver explícito. */
+
+:root:not([data-theme="dark"]) .orders-queue-summary {
+  border-color: #eadbd6 !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-head {
+  border-color: #eadbd6 !important;
+  background: #fff7f4 !important;
+  color: #9a7569 !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-view .orders-list {
+  border-color: #eadbd6 !important;
+  background: #fffdfc !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row {
+  border-color: #f0dfda !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row.is-row-done {
+  background: #f3fbf7 !important;
+  box-shadow: inset 3px 0 0 #8fd3ba !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row.is-row-due {
+  background: #fffaf0 !important;
+  box-shadow: inset 3px 0 0 #e5c46d !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row.is-row-cancelled {
+  background: #fff5f5 !important;
+  box-shadow: inset 3px 0 0 #dfa0a3 !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row.is-row-progress {
+  background: #fffdfc !important;
+  box-shadow: inset 3px 0 0 #eccfc8 !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-name,
+:root:not([data-theme="dark"]) .orders-queue-value strong {
+  color: #3a211e !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-id,
+:root:not([data-theme="dark"]) .orders-queue-items,
+:root:not([data-theme="dark"]) .orders-queue-created {
+  color: #9a7569 !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row .orders-status.is-fin-paid {
+  background: #e9f8f1 !important;
+  color: #2f8265 !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row .orders-status.is-fin-pending,
+:root:not([data-theme="dark"]) .orders-queue-row .orders-status.is-fin-partial {
+  background: #fff3cf !important;
+  color: #856210 !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row .orders-status.is-delivery-neutral {
+  background: #f7efec !important;
+  color: #7b5a54 !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-row .orders-status.is-delivery-cancelled {
+  background: #fdeeee !important;
+  color: #b4474b !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-more {
+  color: #9a7569 !important;
+}
+
+:root:not([data-theme="dark"]) .orders-queue-more:hover,
+:root:not([data-theme="dark"]) .orders-queue-menu.is-open .orders-queue-more {
+  border-color: #ead3ca !important;
+  background: #fff0ec !important;
+  color: #654238 !important;
+}
