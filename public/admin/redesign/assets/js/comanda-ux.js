@@ -175,6 +175,21 @@ document.querySelectorAll("[data-comanda-dialog]").forEach(enhanceDialog);
 
 const CLOSE_ANIMATION_MS = 200;
 
+function blockInteractionWhileClosing(event) {
+  const closing = document.querySelector("[data-comanda-dialog].is-closing");
+  if (!closing) return;
+
+  const replayClose = event.target.closest?.('[data-comanda-close][data-drawer-close-pass="1"]');
+  if (replayClose) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+window.addEventListener("pointerdown", blockInteractionWhileClosing, true);
+window.addEventListener("click", blockInteractionWhileClosing, true);
+window.addEventListener("touchstart", blockInteractionWhileClosing, { capture: true, passive: false });
+
 document.addEventListener("click", event => {
   const closeButton = event.target.closest?.("[data-comanda-close]");
   if (!closeButton) return;
@@ -187,6 +202,7 @@ document.addEventListener("click", event => {
   if (dialog.classList.contains("is-closing")) return;
 
   dialog.classList.add("is-closing");
+  dialog.setAttribute("aria-busy", "true");
   dialog.querySelectorAll("button,input,select").forEach(control => {
     control.disabled = true;
   });
