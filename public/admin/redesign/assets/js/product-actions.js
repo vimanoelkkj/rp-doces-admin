@@ -92,6 +92,8 @@ function setDialogMode(form, product = null) {
   const subtitle = dialog?.querySelector(".products-dialog__head p");
   const submit = form.querySelector("[data-product-submit]");
 
+  if (submit instanceof HTMLButtonElement) submit.disabled = false;
+
   if (product) {
     form.dataset.editProductId = String(product.id);
     form._editingProduct = product;
@@ -183,6 +185,7 @@ function enhanceForm(form) {
       } catch (error) {
         if (message)
           message.textContent = error?.message || "Não foi possível salvar as alterações.";
+      } finally {
         if (submit instanceof HTMLButtonElement) submit.disabled = false;
         if (submit) submit.textContent = "Salvar alterações";
       }
