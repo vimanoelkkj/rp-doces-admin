@@ -65,9 +65,13 @@ function fakeMpRequest(path, { method = "GET", idempotencyKey } = {}) {
 export async function mpRequest(
   env,
   path,
-  { method = "GET", body, idempotencyKey, forceReal = false } = {}
+  { method = "GET", body, idempotencyKey, forceReal = false, accessToken = null } = {}
 ) {
-  if (forceReal) {
+  const explicitToken = String(accessToken || "").trim();
+
+  if (explicitToken) {
+    forceReal = true;
+  } else if (forceReal) {
     if (!env?.MP_ACCESS_TOKEN) throw new Error("MP_ACCESS_TOKEN não configurado.");
   } else {
     requireMercadoPago(env);
@@ -77,8 +81,9 @@ export async function mpRequest(
     return fakeMpRequest(path, { method, body, idempotencyKey });
   }
 
+  const token = explicitToken || env.MP_ACCESS_TOKEN;
   const headers = {
-    Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
+    Authorization: `Bearer ${token}`,
     Accept: "application/json"
   };
   if (body !== undefined) headers["Content-Type"] = "application/json";
