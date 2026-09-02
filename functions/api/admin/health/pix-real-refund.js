@@ -87,6 +87,17 @@ async function reconcileRefund(env, accessToken, row) {
   return row;
 }
 
+function refundResponse(row, { duplicate = false } = {}) {
+  const status = String(row?.reembolso_status || "").toUpperCase();
+  return json({
+    ...payload(row),
+    ja_reembolsado: status === "REEMBOLSADO",
+    requisicao_duplicada: duplicate,
+    real: true,
+    isolated: true
+  }, status === "REEMBOLSADO" ? 200 : 202);
+}
+
 export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
@@ -121,7 +132,12 @@ export async function onRequestPost({ request, env }) {
   if (!row) return json({ erro: "Diagnóstico não encontrado." }, 404);
 
   if (row.reembolsado_em || row.reembolso_status === "REEMBOLSADO") {
-    return json({ ...payload(row), ja_reembolsado: true }, 200);
+    return refundResponse(row, { duplicate: true });
+  }
+
+  if (row.reembolso_status === "PROCESSANDO") {
+    row = await reconcileRefund(env, accessToken, row);
+    return refundResponse(row, { duplicate: true });
   }
 
   if (row.status !== "PAGO" && row.status !== "REEMBOLSADO") {
@@ -130,13 +146,21 @@ export async function onRequestPost({ request, env }) {
 
   const idempotencyKey = `rpdiag_refund_${orderId.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80)}`;
 
-  await env.DB.prepare(
+  const claim = await env.DB.prepare(
     `UPDATE pix_diagnosticos
      SET reembolso_status = 'PROCESSANDO',
          reembolso_solicitado_em = COALESCE(reembolso_solicitado_em, CURRENT_TIMESTAMP),
          atualizado_em = CURRENT_TIMESTAMP
-     WHERE mp_order_id = ?`
+     WHERE mp_order_id = ?
+       AND (reembolso_status IS NULL OR reembolso_status = 'FALHOU')`
   ).bind(orderId).run();
+
+  if (Number(claim?.meta?.changes || 0) !== 1) {
+    row = await findDiagnostic(env, orderId);
+    if (!row) return json({ erro: "Diagnóstico não encontrado após bloqueio do reembolso." }, 404);
+    if (row.reembolso_status === "PROCESSANDO") row = await reconcileRefund(env, accessToken, row);
+    return refundResponse(row, { duplicate: true });
+  }
 
   try {
     const response = await mpRequest(
@@ -174,6 +198,7 @@ export async function onRequestPost({ request, env }) {
       ...payload(row),
       real: true,
       isolated: true,
+      requisicao_duplicada: false,
       aviso: "Reembolso real do Pix diagnóstico solicitado ao Mercado Pago."
     }, row.reembolso_status === "REEMBOLSADO" ? 200 : 202);
   } catch (error) {
