@@ -287,7 +287,7 @@
   .store-card--schedule {
     grid-column: span 5;
   }
-  .store-card:not(.store-card--schedule):not(.store-card--contact):not(.store-card--public-preview):not(.store-card--home-images) {
+  .store-card:not(.store-card--schedule):not(.store-card--contact):not(.store-card--public-preview):not(.store-card--home-images):not(.pix-real-card) {
     grid-column: span 3;
   }
   .store-card--contact {
