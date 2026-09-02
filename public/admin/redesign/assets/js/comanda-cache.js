@@ -132,7 +132,6 @@ function enhancePendingPix(section) {
   const qrBox = document.createElement("div");
   qrBox.className = "comanda-pending-qr";
   qrBox.hidden = true;
-  qrBox.innerHTML = '<p class="comanda-pending-qr-status">QR Code ainda não carregado.</p>';
 
   actions.append(toggle);
   actions.insertAdjacentElement("afterend", qrBox);
@@ -173,7 +172,7 @@ function enhancePendingPix(section) {
     } catch (error) {
       qrBox.innerHTML = `<p class="comanda-pending-qr-status">${String(error?.message || "Não foi possível carregar o QR Code.")}</p>`;
       toggle.setAttribute("aria-expanded", "true");
-      toggle.textContent = "Tentar QR Code novamente";
+      toggle.textContent = "Tentar novamente";
     } finally {
       loading = false;
       toggle.disabled = false;
