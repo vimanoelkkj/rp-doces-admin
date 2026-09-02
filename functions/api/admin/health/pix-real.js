@@ -120,7 +120,7 @@ export async function onRequestPost({ request, env }) {
             {
               amount: DIAGNOSTIC_AMOUNT,
               payment_method: { id: "pix", type: "bank_transfer" },
-              expiration_time: "PT30M"
+              expiration_time: "PT2M"
             }
           ]
         }
@@ -200,7 +200,7 @@ export async function onRequestGet({ request, env }) {
   } catch (error) {
     console.error("Falha ao consultar Pix real de diagnóstico", error?.data || error);
     return json({
-      erro: "Não foi possível consultar o Pix real de diagnóstico.",
+      erro: "Não foi possível consultar Pix real de diagnóstico.",
       detalhe: error?.data?.message || error?.message || null
     }, Number(error?.status) || 502);
   }
