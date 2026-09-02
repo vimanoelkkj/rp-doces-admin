@@ -52,50 +52,6 @@ async function valorConfirmado(env, pedido) {
     : 0;
 }
 
-async function restaurarBaixaManual(env, pedidoId) {
-  const itens = await itensAgrupados(env, pedidoId);
-  if (!itens.length) return { ok: false };
-
-  const statements = [];
-  for (const item of itens) {
-    statements.push(
-      env.DB.prepare(
-        `UPDATE produtos
-         SET estoque = estoque + ?,
-             disponivel = CASE WHEN ativo = 1 THEN 1 ELSE disponivel END,
-             atualizado_em = CURRENT_TIMESTAMP
-         WHERE id = ?`
-      ).bind(item.quantidade, item.produto_id)
-    );
-  }
-
-  statements.push(
-    env.DB.prepare(
-      `UPDATE pedido_itens
-       SET estoque_baixado_em = NULL
-       WHERE pedido_id = ?`
-    ).bind(pedidoId)
-  );
-
-  statements.push(
-    env.DB.prepare(
-      `UPDATE pedidos
-       SET estoque_baixado_em = NULL,
-           reserva_status = 'LIBERADA',
-           reserva_liberada_em = CURRENT_TIMESTAMP,
-           atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ?`
-    ).bind(pedidoId)
-  );
-
-  try {
-    await env.DB.batch(statements);
-    return { ok: true };
-  } catch {
-    return { ok: false };
-  }
-}
-
 async function reservarPedidoManual(env, pedidoId) {
   const itens = await itensAgrupados(env, pedidoId);
   if (!itens.length) return { ok: false, erro: "ITENS_NAO_ENCONTRADOS" };
@@ -110,7 +66,7 @@ async function reservarPedidoManual(env, pedidoId) {
 
     const disponivel = Number(produto?.estoque || 0) - Number(produto?.estoque_reservado || 0);
     if (!produto || !produto.ativo || disponivel < Number(item.quantidade || 0)) {
-      return { ok: false, erro: "ESTOQUE_INSUFIENTE" };
+      return { ok: false, erro: "ESTOQUE_INSUFICIENTE" };
     }
   }
 
@@ -332,6 +288,21 @@ export async function onRequestPut({ request, env, params }) {
       }, 409);
     }
     return json({ ok: true, id, status_pedido: "CANCELADO", status_pagamento: "CANCELADO" });
+  }
+
+  if (status === "CANCELADO") {
+    const pago = await valorConfirmado(env, pedido);
+    if (pago > 0) {
+      return json({
+        erro: "Este pedido já possui pagamento confirmado. Faça o estorno/reembolso antes de cancelar.",
+        codigo: "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO",
+        valor_pago_centavos: pago
+      }, 409);
+    }
+    return json({
+      erro: "Use o fluxo de cancelamento da comanda para cancelar este pedido e suas cobranças pendentes.",
+      codigo: "CANCELAMENTO_FINANCEIRO_NECESSARIO"
+    }, 409);
   }
 
   await env.DB.prepare(
