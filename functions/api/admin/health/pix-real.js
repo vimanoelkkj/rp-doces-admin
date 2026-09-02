@@ -120,7 +120,7 @@ export async function onRequestPost({ request, env }) {
             {
               amount: DIAGNOSTIC_AMOUNT,
               payment_method: { id: "pix", type: "bank_transfer" },
-              expiration_time: "PT2M"
+              expiration_time: "PT30M"
             }
           ]
         }
