@@ -24,15 +24,38 @@ export async function onRequestGet({ request, env }) {
   const [received, settled, created] = await Promise.all([
     env.DB.prepare(
       `SELECT
-         COALESCE(SUM(pp.valor_centavos), 0) AS recebido_centavos,
+         COALESCE(SUM(valor_centavos), 0) AS recebido_centavos,
          COUNT(*) AS pagamentos_confirmados,
-         COUNT(DISTINCT pp.pedido_id) AS pedidos_com_recebimento
-       FROM pedido_pagamentos pp
-       INNER JOIN pedidos p ON p.id = pp.pedido_id
-       WHERE pp.status = 'PAGO'
-         AND UPPER(COALESCE(p.status_pedido, '')) <> 'CANCELADO'
-         AND COALESCE(pp.pago_em, pp.atualizado_em) >= ?
-         AND COALESCE(pp.pago_em, pp.atualizado_em) < ?`
+         COUNT(DISTINCT pedido_id) AS pedidos_com_recebimento
+       FROM (
+         SELECT
+           pp.pedido_id,
+           pp.valor_centavos,
+           COALESCE(pp.pago_em, pp.atualizado_em) AS recebido_em
+         FROM pedido_pagamentos pp
+         INNER JOIN pedidos p ON p.id = pp.pedido_id
+         WHERE pp.status = 'PAGO'
+           AND UPPER(COALESCE(p.status_pedido, '')) <> 'CANCELADO'
+
+         UNION ALL
+
+         SELECT
+           p.id AS pedido_id,
+           p.valor_total_centavos AS valor_centavos,
+           COALESCE(p.pago_em, p.atualizado_em) AS recebido_em
+         FROM pedidos p
+         WHERE UPPER(COALESCE(p.origem_pedido, '')) = 'MANUAL'
+           AND UPPER(COALESCE(p.status_pagamento, '')) = 'PAGO'
+           AND UPPER(COALESCE(p.status_pedido, '')) <> 'CANCELADO'
+           AND NOT EXISTS (
+             SELECT 1
+             FROM pedido_pagamentos pp2
+             WHERE pp2.pedido_id = p.id
+               AND pp2.status = 'PAGO'
+           )
+       ) recebimentos
+       WHERE recebido_em >= ?
+         AND recebido_em < ?`
     ).bind(bounds.start, bounds.end).first(),
     env.DB.prepare(
       `SELECT
