@@ -30,6 +30,7 @@ function ensureStyles() {
     .pix-real-checks{grid-template-columns:repeat(3,minmax(0,1fr))}
     .pix-real-button--refund{border-color:#e5b8b8;background:#fff8f8;color:#a74047}
     .pix-real-button--refund:hover{background:#fff1f1;border-color:#d99b9f}
+    .pix-real-button--duplicate{border-style:dashed}
     @container(max-width:760px){.pix-real-checks{grid-template-columns:1fr}}
     @media(max-width:900px){.pix-real-checks{grid-template-columns:1fr}}
   `;
@@ -63,6 +64,14 @@ function mount(card) {
   refundButton.dataset.pixRealRefund = "";
   toolbar.appendChild(refundButton);
 
+  const duplicateButton = document.createElement("button");
+  duplicateButton.type = "button";
+  duplicateButton.className = "pix-real-button pix-real-button--secondary pix-real-button--duplicate";
+  duplicateButton.textContent = "Testar reembolso duplicado";
+  duplicateButton.hidden = true;
+  duplicateButton.dataset.pixRealRefundDuplicate = "";
+  toolbar.appendChild(duplicateButton);
+
   const refundCheck = document.createElement("div");
   refundCheck.className = "pix-real-check";
   refundCheck.innerHTML = `
@@ -75,6 +84,7 @@ function mount(card) {
   let timer = null;
   let lastOrderId = null;
   let busy = false;
+  let duplicateTested = false;
 
   const stopPolling = () => {
     if (timer) clearInterval(timer);
@@ -89,12 +99,19 @@ function mount(card) {
   const applyRefund = payload => {
     const status = String(payload?.reembolso_status || "").toUpperCase();
     if (payload?.reembolsado || status === "REEMBOLSADO") {
-      setRefundCheck("Reembolso confirmado ✓", "ok");
+      setRefundCheck(
+        duplicateTested ? "Reembolso confirmado · duplicidade bloqueada ✓" : "Reembolso confirmado ✓",
+        "ok"
+      );
       refundButton.hidden = true;
       refundButton.disabled = false;
+      duplicateButton.hidden = duplicateTested;
+      duplicateButton.disabled = false;
       stopPolling();
       return;
     }
+
+    duplicateButton.hidden = true;
 
     if (status === "PROCESSANDO") {
       setRefundCheck("Reembolso em processamento…");
@@ -130,6 +147,7 @@ function mount(card) {
     if (!orderId || busy) {
       if (!orderId) {
         refundButton.hidden = true;
+        duplicateButton.hidden = true;
         setRefundCheck("Aguardando pagamento");
       }
       return;
@@ -137,6 +155,7 @@ function mount(card) {
 
     if (lastOrderId !== orderId) {
       lastOrderId = orderId;
+      duplicateTested = false;
       stopPolling();
     }
 
@@ -145,6 +164,7 @@ function mount(card) {
     } catch (error) {
       if (error?.status === 404) {
         refundButton.hidden = true;
+        duplicateButton.hidden = true;
         setRefundCheck("Diagnóstico sem rastreio de reembolso", "error");
         return;
       }
@@ -180,6 +200,46 @@ function mount(card) {
       refundButton.hidden = false;
       refundButton.disabled = false;
       refundButton.textContent = "Consultar reembolso";
+    } finally {
+      busy = false;
+    }
+  });
+
+  duplicateButton.addEventListener("click", async () => {
+    const orderId = orderIdFromCard(card);
+    if (!orderId || busy) return;
+
+    const confirmed = window.confirm(
+      "Este teste vai repetir a solicitação de reembolso para provar que o backend bloqueia duplicidade. Nenhum novo reembolso deve ser enviado ao Mercado Pago. Continuar?"
+    );
+    if (!confirmed) return;
+
+    busy = true;
+    duplicateButton.disabled = true;
+    duplicateButton.textContent = "Testando proteção…";
+    setRefundCheck("Testando proteção contra reembolso duplicado…");
+
+    try {
+      const payload = await request(API, {
+        method: "POST",
+        body: JSON.stringify({ order_id: orderId })
+      });
+
+      if (payload?.requisicao_duplicada === true && (payload?.ja_reembolsado === true || payload?.reembolsado === true)) {
+        duplicateTested = true;
+        applyRefund(payload);
+        return;
+      }
+
+      setRefundCheck("Proteção não confirmada: resposta inesperada do backend.", "error");
+      duplicateButton.hidden = false;
+      duplicateButton.disabled = false;
+      duplicateButton.textContent = "Testar reembolso duplicado";
+    } catch (error) {
+      setRefundCheck(error?.message || "Falha ao testar proteção contra duplicidade.", "error");
+      duplicateButton.hidden = false;
+      duplicateButton.disabled = false;
+      duplicateButton.textContent = "Testar reembolso duplicado";
     } finally {
       busy = false;
     }
