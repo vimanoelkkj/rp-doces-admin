@@ -33,7 +33,10 @@ function dateTime(value) {
 }
 
 function cents(value) {
-  const parsed = Number(String(value || "").replace(",", "."));
+  const raw = String(value || "").trim().replace(/\s/g, "").replace(/R\$/gi, "");
+  if (!raw) return 0;
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
 }
 
@@ -55,9 +58,7 @@ async function financialOrder(orderId) {
     credentials: "same-origin",
     headers: { Accept: "application/json" }
   });
-  const payload = (response.headers.get("content-type") || "").includes("application/json")
-    ? await response.json()
-    : null;
+  const payload = (response.headers.get("content-type") || "").includes("application/json") ? await response.json() : null;
   if (!response.ok) throw new Error(payload?.erro || payload?.message || `HTTP ${response.status}`);
   return payload?.pedido || null;
 }
@@ -84,7 +85,6 @@ function lockPageScroll() {
     bodyRight: body.style.right,
     bodyWidth: body.style.width
   };
-
   root.style.overflow = "hidden";
   root.style.overscrollBehavior = "none";
   body.style.overflow = "hidden";
@@ -94,7 +94,6 @@ function lockPageScroll() {
   body.style.left = "0";
   body.style.right = "0";
   body.style.width = "100%";
-
   let released = false;
   return () => {
     if (released) return;
@@ -112,65 +111,92 @@ function lockPageScroll() {
   };
 }
 
-function choices(name, pending, selected = "CANCELAR") {
-  if (!pending) return "";
-  return `<div class="comanda-choice-group">
-    <strong>Existe um Pix pendente de ${money(pending.valor_centavos)}. O que fazer?</strong>
-    <label class="comanda-choice"><input type="radio" name="${name}" value="CANCELAR" ${selected === "CANCELAR" ? "checked" : ""}><span>Cancelar o Pix atual</span></label>
-    <label class="comanda-choice"><input type="radio" name="${name}" value="MANTER" ${selected === "MANTER" ? "checked" : ""}><span>Manter e tratar somente outro valor</span></label>
-  </div>`;
+function findPendingPix(order) {
+  return (order.pagamentos || []).find(payment => payment.metodo === "PIX_MP" && payment.status === "PENDENTE") || null;
+}
+
+function paymentRows(order) {
+  return (order.pagamentos || []).map(payment => `
+    <div class="comanda-line">
+      <div class="comanda-line-name"><strong>${esc(PAYMENT_LABELS[payment.metodo] || payment.metodo)}</strong><small>${payment.origem === "ADMIN" ? "Registrado pelo admin" : "Criado pelo site"} · ${esc(dateTime(payment.pago_em || payment.criado_em))}</small>${payment.substitui_pagamento_id ? `<small>Substitui a cobrança #${Number(payment.substitui_pagamento_id)}</small>` : ""}</div>
+      <span class="comanda-state ${statusClass(payment.status)}">${esc(payment.status)}</span>
+      <strong class="comanda-line-value">${money(payment.valor_centavos)}</strong>
+    </div>`).join("");
+}
+
+function itemRows(order) {
+  return (order.itens || []).map(item => `
+    <div class="comanda-line">
+      <div class="comanda-line-name"><strong>${Number(item.quantidade || 0)}× ${esc(item.produto_nome || "Produto")}</strong><small>${money(item.valor_unitario_centavos)} cada · pago ${money(item.valor_pago_centavos)}</small></div>
+      <span class="comanda-state ${statusClass(item.status_financeiro)}">${esc(financialLabel(item.status_financeiro))}</span>
+      <strong class="comanda-line-value">${money(item.valor_total_centavos)}</strong>
+    </div>`).join("");
 }
 
 function markup(order, products) {
-  const pendingPix = (order.pagamentos || []).find(payment => payment.metodo === "PIX_MP" && payment.status === "PENDENTE") || null;
+  const pendingPix = findPendingPix(order);
   const open = order.status_comanda !== "ENCERRADA";
+  const saldo = Number(order.saldo_centavos || 0);
+  const total = Number(order.valor_total_centavos || 0);
+  const paid = Number(order.valor_pago_centavos || 0);
+  const progress = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
   const productOptions = products.map(product => `<option value="${Number(product.id)}">${esc(product.nome)}</option>`).join("");
-  const items = (order.itens || []).map(item => `<div class="comanda-item">
-    <div><strong>${Number(item.quantidade || 0)}× ${esc(item.produto_nome || "Produto")}</strong><span>${money(item.valor_unitario_centavos)} cada · pago ${money(item.valor_pago_centavos)}</span></div>
-    <div class="comanda-amount">${money(item.valor_total_centavos)}<small class="${statusClass(item.status_financeiro)}">${esc(financialLabel(item.status_financeiro))}</small></div>
-  </div>`).join("");
-  const payments = (order.pagamentos || []).map(payment => `<div class="comanda-payment">
-    <div><strong>${esc(PAYMENT_LABELS[payment.metodo] || payment.metodo)}</strong><span>${payment.origem === "ADMIN" ? "Registrado pelo admin" : "Criado pelo site"} · ${esc(dateTime(payment.pago_em || payment.criado_em))}</span>${payment.substitui_pagamento_id ? `<span>Substitui a cobrança #${Number(payment.substitui_pagamento_id)}</span>` : ""}</div>
-    <div class="comanda-amount">${money(payment.valor_centavos)}<small class="${statusClass(payment.status)}">${esc(payment.status)}</small></div>
-  </div>`).join("");
-  const pix = pendingPix?.mp_qr_code || "";
+  const items = itemRows(order);
+  const payments = paymentRows(order);
+  const pendingCode = pendingPix?.mp_qr_code || "";
 
   return `<div class="comanda-dialog" data-comanda-dialog data-order-id="${Number(order.id)}">
     <button class="comanda-backdrop" type="button" data-comanda-close aria-label="Fechar comanda"></button>
     <section class="comanda-panel" role="dialog" aria-modal="true" aria-labelledby="comanda-title">
-      <header class="comanda-head"><div><span>Pedido #${Number(order.id)} · Comanda</span><h2 id="comanda-title">${esc(order.cliente_nome || "Cliente")}</h2><span>Aberta desde ${esc(dateTime(order.criado_em))}</span></div><button class="comanda-close" type="button" data-comanda-close aria-label="Fechar">×</button></header>
-      <div class="comanda-status-row"><span class="comanda-pill ${open ? "is-open" : "is-closed"}">${open ? "Comanda aberta" : "Comanda encerrada"}</span><span class="comanda-pill ${order.status_financeiro === "PAGO" ? "is-paid" : "is-pending"}">Financeiro: ${esc(financialLabel(order.status_financeiro))}</span>${pendingPix ? `<span class="comanda-pill is-pending">Pix atual pendente · ${money(pendingPix.valor_centavos)}</span>` : ""}</div>
+      <header class="comanda-head">
+        <div class="comanda-head-meta"><span>Pedido #${Number(order.id)} · Comanda</span><h2 id="comanda-title">${esc(order.cliente_nome || "Cliente")}</h2><small>Aberta desde ${esc(dateTime(order.criado_em))}</small></div>
+        <span class="comanda-chip ${open ? "is-open" : "is-closed"}">${open ? (saldo <= 0 ? "Comanda quitada" : "Comanda aberta") : "Comanda encerrada"}</span>
+        <button class="comanda-close" type="button" data-comanda-close aria-label="Fechar">×</button>
+      </header>
+
       <div class="comanda-body">
-        <p class="comanda-feedback" data-comanda-feedback hidden></p><p class="comanda-error" data-comanda-error hidden></p>
-        <section class="comanda-section"><header class="comanda-section-title"><div><strong>Itens</strong><span>Consumo e situação financeira por item</span></div></header>${items || '<div class="comanda-empty">Nenhum item.</div>'}</section>
-        <div class="comanda-summary"><article><span>Total</span><strong>${money(order.valor_total_centavos)}</strong></article><article><span>Pago</span><strong>${money(order.valor_pago_centavos)}</strong></article><article><span>Restante</span><strong>${money(order.saldo_centavos)}</strong></article></div>
-        ${open ? `<div class="comanda-actions-grid">
-          <section class="comanda-action-card"><h3>Adicionar ao pedido</h3><p>Inclui um novo consumo sem alterar pagamentos anteriores.</p><form class="comanda-form" data-comanda-add-form>
-            <div class="comanda-inline-fields"><div class="comanda-field"><label>Produto</label><select name="produto_id" required><option value="">Selecione</option>${productOptions}</select></div><div class="comanda-field"><label>Quantidade</label><input name="quantidade" type="number" min="1" max="50" value="1" required></div></div>
-            <div class="comanda-field"><label>Pagamento deste acréscimo</label><select name="modo"><option value="PENDENTE">Deixar pendente</option><option value="PAGO">Registrar como pago agora</option><option value="PIX">Gerar Pix</option></select></div>
-            <div class="comanda-field" data-comanda-add-method hidden><label>Forma</label><select name="metodo"><option value="CARTAO">Cartão</option><option value="DINHEIRO">Dinheiro</option><option value="PIX_EXTERNO">Pix direto</option></select></div>
-            <div data-comanda-add-pix-choice hidden>${choices("add_pix", pendingPix, "MANTER")}</div>
-            <button class="comanda-primary" type="submit">+ Adicionar ao pedido</button>
-          </form></section>
-          <section class="comanda-action-card"><h3>Registrar pagamento</h3><p>Receba parte ou todo o saldo por outro meio.</p><form class="comanda-form" data-comanda-payment-form>
-            <div class="comanda-inline-fields"><div class="comanda-field"><label>Forma</label><select name="metodo"><option value="CARTAO">Cartão</option><option value="DINHEIRO">Dinheiro</option><option value="PIX_EXTERNO">Pix direto</option></select></div><div class="comanda-field"><label>Valor</label><input name="valor" inputmode="decimal" value="${(Number(order.saldo_centavos || 0) / 100).toFixed(2)}"></div></div>
-            ${choices("payment_pix", pendingPix, "CANCELAR")}
-            <button class="comanda-primary" type="submit" ${order.saldo_centavos <= 0 ? "disabled" : ""}>Registrar pagamento</button>
-          </form></section>
-          <section class="comanda-action-card"><h3>Gerar Pix</h3><p>Cria uma cobrança nova sem apagar cobranças anteriores.</p><form class="comanda-form" data-comanda-pix-form>
-            <div class="comanda-field"><label>Valor da cobrança</label><input name="valor" inputmode="decimal" value="${(Number(order.saldo_centavos || 0) / 100).toFixed(2)}"></div>${choices("new_pix", pendingPix, "CANCELAR")}
-            <button class="comanda-primary" type="submit" ${order.saldo_centavos <= 0 ? "disabled" : ""}>Gerar Pix</button>${pendingPix ? '<button class="comanda-danger" type="button" data-comanda-cancel-pix>Cancelar Pix pendente</button>' : ""}
-          </form></section>
-        </div>` : ""}
-        ${pix ? `<div class="comanda-pix-box"><strong>Pix copia e cola</strong><div class="comanda-pix-code">${esc(pix)}</div><button class="comanda-secondary" type="button" data-comanda-copy-pix>Copiar código</button></div>` : ""}
-        <section class="comanda-section"><header class="comanda-section-title"><div><strong>Pagamentos e cobranças</strong><span>Histórico preservado da comanda</span></div></header>${payments || '<div class="comanda-empty">Nenhum pagamento registrado.</div>'}</section>
+        <p class="comanda-feedback" data-comanda-feedback hidden></p>
+        <p class="comanda-error" data-comanda-error hidden></p>
+
+        <section class="comanda-balance">
+          <div class="comanda-balance-row">
+            <div><span>Falta receber</span><strong class="${saldo <= 0 ? "is-settled" : ""}">${money(saldo)}</strong></div>
+            <p>Total <b>${money(total)}</b> · Pago <b>${money(paid)}</b></p>
+          </div>
+          <div class="comanda-progress"><i style="width:${progress.toFixed(2)}%"></i></div>
+        </section>
+
+        ${pendingPix ? `<section class="comanda-pending-pix">
+          <div class="comanda-pending-top"><span class="comanda-pending-dot"></span><strong>Pix de ${money(pendingPix.valor_centavos)} aguardando pagamento</strong><small>${esc(dateTime(pendingPix.criado_em))}</small></div>
+          <div class="comanda-pending-code"><code>${esc(pendingCode || "Código Pix indisponível")}</code>${pendingCode ? '<button type="button" class="comanda-mini" data-comanda-copy-pix>Copiar</button>' : ""}<button type="button" class="comanda-mini is-ghost" data-comanda-cancel-pix>Cancelar</button></div>
+        </section>` : ""}
+
+        ${open ? `<section class="comanda-receive">
+          <h3>Receber</h3><p>Escolha a forma e o valor. O resto a tela resolve.</p>
+          <div class="comanda-methods" role="group" aria-label="Forma de pagamento">
+            <button type="button" data-comanda-method="PIX" aria-pressed="true">Pix</button>
+            <button type="button" data-comanda-method="DINHEIRO" aria-pressed="false">Dinheiro</button>
+            <button type="button" data-comanda-method="CARTAO" aria-pressed="false">Cartão</button>
+            <button type="button" data-comanda-method="PIX_EXTERNO" aria-pressed="false">Pix direto</button>
+          </div>
+          <div class="comanda-receive-field"><label for="comanda-receive-value">Valor</label><div class="comanda-amount-row"><div class="comanda-money-input"><span>R$</span><input id="comanda-receive-value" data-comanda-receive-value inputmode="decimal" value="${(saldo / 100).toFixed(2).replace(".", ",")}"></div><div class="comanda-quick"><button type="button" data-comanda-quick="all">Tudo</button><button type="button" data-comanda-quick="half">Metade</button></div></div></div>
+          <div class="comanda-consequence" data-comanda-consequence><p></p>${pendingPix ? '<label><input type="checkbox" data-comanda-keep-pix><span data-comanda-keep-label>Manter o Pix atual e gerar uma segunda cobrança</span></label>' : ""}</div>
+          <button type="button" class="comanda-cta" data-comanda-receive-submit ${saldo <= 0 ? "disabled" : ""}>Gerar Pix de ${money(saldo)}</button>
+        </section>` : ""}
+
+        <section class="comanda-block">
+          <header class="comanda-block-head"><h3>Itens</h3><span>${(order.itens || []).length} ${(order.itens || []).length === 1 ? "item" : "itens"}</span>${open ? '<button type="button" class="comanda-linkish" data-comanda-add-toggle>+ Adicionar</button>' : ""}</header>
+          ${open ? `<form class="comanda-add-form" data-comanda-add-form hidden><label>Produto<select name="produto_id" required><option value="">Selecione</option>${productOptions}</select></label><label>Quantidade<input name="quantidade" type="number" min="1" max="50" value="1" required></label><button class="comanda-secondary" type="submit">Adicionar à comanda</button></form>` : ""}
+          <div>${items || '<div class="comanda-empty">Nenhum item.</div>'}</div>
+        </section>
+
+        <details class="comanda-block comanda-history">
+          <summary><span class="comanda-caret">▶</span><h3>Histórico</h3><span>${(order.pagamentos || []).length} ${(order.pagamentos || []).length === 1 ? "registro" : "registros"}</span></summary>
+          <div>${payments || '<div class="comanda-empty">Nenhum pagamento registrado.</div>'}</div>
+        </details>
       </div>
     </section>
   </div>`;
-}
-
-function radioValue(root, name) {
-  return root.querySelector(`input[name="${name}"]:checked`)?.value || undefined;
 }
 
 async function openComanda(orderId) {
@@ -202,52 +228,121 @@ async function openComanda(orderId) {
 
   const feedback = dialog.querySelector("[data-comanda-feedback]");
   const errorBox = dialog.querySelector("[data-comanda-error]");
-  const show = (node, message) => { node.textContent = message; node.hidden = false; };
+  const show = (node, message) => { if (!node) return; node.textContent = message; node.hidden = false; };
   const busy = value => dialog.querySelectorAll("button,input,select").forEach(control => { control.disabled = value; });
-  const refresh = async message => { close(); await openComanda(orderId); if (message) setTimeout(() => document.querySelector("[data-comanda-feedback]") && show(document.querySelector("[data-comanda-feedback]"), message), 0); };
+  const refresh = async message => {
+    close();
+    await openComanda(orderId);
+    if (message) setTimeout(() => {
+      const node = document.querySelector("[data-comanda-feedback]");
+      if (node) show(node, message);
+    }, 0);
+  };
   const run = async (task, message) => {
-    feedback.hidden = true; errorBox.hidden = true; busy(true);
-    try { await task(); window.dispatchEvent(new CustomEvent("rp-admin-data-changed", { detail: { pages: ["pedidos", "produtos", "dashboard"] } })); await refresh(message); }
-    catch (error) { busy(false); show(errorBox, error?.message || "Não foi possível concluir a operação."); }
+    if (feedback) feedback.hidden = true;
+    if (errorBox) errorBox.hidden = true;
+    busy(true);
+    try {
+      await task();
+      window.dispatchEvent(new CustomEvent("rp-admin-data-changed", { detail: { pages: ["pedidos", "produtos", "dashboard"] } }));
+      await refresh(message);
+    } catch (error) {
+      busy(false);
+      show(errorBox, error?.message || "Não foi possível concluir a operação.");
+    }
   };
 
-  const addForm = dialog.querySelector("[data-comanda-add-form]");
-  if (addForm) {
-    const mode = addForm.elements.modo;
-    const methodWrap = dialog.querySelector("[data-comanda-add-method]");
-    const choiceWrap = dialog.querySelector("[data-comanda-add-pix-choice]");
-    const syncMode = () => { methodWrap.hidden = mode.value !== "PAGO"; choiceWrap.hidden = mode.value === "PENDENTE"; };
-    mode.addEventListener("change", syncMode); syncMode();
-    addForm.addEventListener("submit", event => {
-      event.preventDefault();
-      const productId = Number(addForm.elements.produto_id.value); const quantity = Number(addForm.elements.quantidade.value); const selectedMode = mode.value;
-      const product = state.products.find(item => Number(item.id) === productId);
-      if (!product || !Number.isInteger(quantity) || quantity < 1) return show(errorBox, "Selecione um produto e uma quantidade válida.");
-      const pixDecision = radioValue(dialog, "add_pix");
-      run(async () => {
-        const added = await adminApi.addComandaItem(orderId, { produto_id: productId, quantidade: quantity });
-        const subtotal = Number(added?.item?.valor_total_centavos || 0);
-        if (selectedMode !== "PENDENTE" && subtotal <= 0) throw new Error("O backend não retornou o valor do item adicionado.");
-        if (selectedMode === "PAGO") await adminApi.registerComandaPayment(orderId, { metodo: addForm.elements.metodo.value, valor_centavos: subtotal, ...(pixDecision ? { pix_pendente: pixDecision } : {}) });
-        if (selectedMode === "PIX") await adminApi.generateComandaPix(orderId, { ...(pixDecision === "CANCELAR" ? {} : { valor_centavos: subtotal }), ...(pixDecision ? { pix_pendente: pixDecision } : {}) });
-      }, selectedMode === "PENDENTE" ? "Item adicionado à comanda." : "Item adicionado e pagamento tratado.");
-    });
-  }
+  const pendingPix = findPendingPix(state.order);
+  const saldo = Number(state.order.saldo_centavos || 0);
+  let method = "PIX";
 
-  dialog.querySelector("[data-comanda-payment-form]")?.addEventListener("submit", event => {
-    event.preventDefault(); const form = event.currentTarget; const value = cents(form.elements.valor.value); const decision = radioValue(dialog, "payment_pix");
+  const valueInput = dialog.querySelector("[data-comanda-receive-value]");
+  const consequence = dialog.querySelector("[data-comanda-consequence]");
+  const keepPix = dialog.querySelector("[data-comanda-keep-pix]");
+  const keepLabel = dialog.querySelector("[data-comanda-keep-label]");
+  const receiveSubmit = dialog.querySelector("[data-comanda-receive-submit]");
+
+  const renderReceive = () => {
+    if (!valueInput || !receiveSubmit || !consequence) return;
+    const value = cents(valueInput.value);
+    const keep = Boolean(keepPix?.checked);
+    const pendingValue = Number(pendingPix?.valor_centavos || 0);
+    const after = Math.max(0, saldo - value);
+    let text = "";
+
+    if (!pendingPix) {
+      text = method === "PIX"
+        ? `Gera uma cobrança de <b>${money(value)}</b>. O saldo só cai quando o pagamento for confirmado.`
+        : `Registra <b>${money(value)}</b> em ${esc(PAYMENT_LABELS[method] || method)}. Saldo depois: <b>${money(after)}</b>.`;
+    } else if (method === "PIX") {
+      if (keepLabel) keepLabel.textContent = "Manter o Pix atual e gerar uma segunda cobrança";
+      text = keep
+        ? `Ficam <b>duas</b> cobranças abertas: a de <b>${money(pendingValue)}</b> e a nova de <b>${money(value)}</b>.`
+        : `O Pix de <b>${money(pendingValue)}</b> é cancelado e substituído por um novo de <b>${money(value)}</b>.`;
+    } else {
+      if (keepLabel) keepLabel.textContent = "Manter o Pix pendente e registrar este pagamento em separado";
+      text = keep
+        ? `Registra <b>${money(value)}</b> em ${esc(PAYMENT_LABELS[method] || method)} e o Pix de <b>${money(pendingValue)}</b> continua aberto.`
+        : `O Pix de <b>${money(pendingValue)}</b> é cancelado e <b>${money(value)}</b> entra como ${esc(PAYMENT_LABELS[method] || method)}. Saldo depois: <b>${money(after)}</b>.`;
+    }
+
+    const p = consequence.querySelector("p");
+    if (p) p.innerHTML = text;
+    receiveSubmit.disabled = value <= 0 || saldo <= 0;
+    receiveSubmit.textContent = method === "PIX" ? `Gerar Pix de ${money(value)}` : `Registrar ${money(value)} em ${PAYMENT_LABELS[method] || method}`;
+  };
+
+  dialog.querySelectorAll("[data-comanda-method]").forEach(button => {
+    button.addEventListener("click", () => {
+      method = button.dataset.comandaMethod || "PIX";
+      dialog.querySelectorAll("[data-comanda-method]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      renderReceive();
+    });
+  });
+  valueInput?.addEventListener("input", renderReceive);
+  keepPix?.addEventListener("change", renderReceive);
+  dialog.querySelectorAll("[data-comanda-quick]").forEach(button => {
+    button.addEventListener("click", () => {
+      const next = button.dataset.comandaQuick === "half" ? Math.max(1, Math.round(saldo / 2)) : saldo;
+      valueInput.value = (next / 100).toFixed(2).replace(".", ",");
+      renderReceive();
+    });
+  });
+  renderReceive();
+
+  receiveSubmit?.addEventListener("click", () => {
+    const value = cents(valueInput?.value);
     if (value <= 0) return show(errorBox, "Informe um valor válido.");
-    run(() => adminApi.registerComandaPayment(orderId, { metodo: form.elements.metodo.value, valor_centavos: value, ...(decision ? { pix_pendente: decision } : {}) }), "Pagamento registrado.");
+    const pixDecision = pendingPix ? (keepPix?.checked ? "MANTER" : "CANCELAR") : undefined;
+    if (method === "PIX") {
+      run(() => adminApi.generateComandaPix(orderId, { valor_centavos: value, ...(pixDecision ? { pix_pendente: pixDecision } : {}) }), "Cobrança Pix gerada.");
+      return;
+    }
+    run(() => adminApi.registerComandaPayment(orderId, { metodo: method, valor_centavos: value, ...(pixDecision ? { pix_pendente: pixDecision } : {}) }), "Pagamento registrado.");
   });
 
-  dialog.querySelector("[data-comanda-pix-form]")?.addEventListener("submit", event => {
-    event.preventDefault(); const form = event.currentTarget; const value = cents(form.elements.valor.value); const decision = radioValue(dialog, "new_pix");
-    if (value <= 0) return show(errorBox, "Informe um valor válido.");
-    run(() => adminApi.generateComandaPix(orderId, { valor_centavos: value, ...(decision ? { pix_pendente: decision } : {}) }), "Cobrança Pix gerada.");
+  dialog.querySelector("[data-comanda-add-toggle]")?.addEventListener("click", () => {
+    const form = dialog.querySelector("[data-comanda-add-form]");
+    if (form) form.hidden = !form.hidden;
+  });
+
+  dialog.querySelector("[data-comanda-add-form]")?.addEventListener("submit", event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const productId = Number(form.elements.produto_id.value);
+    const quantity = Number(form.elements.quantidade.value);
+    const product = state.products.find(item => Number(item.id) === productId);
+    if (!product || !Number.isInteger(quantity) || quantity < 1) return show(errorBox, "Selecione um produto e uma quantidade válida.");
+    run(() => adminApi.addComandaItem(orderId, { produto_id: productId, quantidade: quantity }), "Item adicionado à comanda.");
   });
 
   dialog.querySelector("[data-comanda-cancel-pix]")?.addEventListener("click", () => run(() => adminApi.cancelComandaPix(orderId), "Cobrança Pix cancelada."));
-  dialog.querySelector("[data-comanda-copy-pix]")?.addEventListener("click", async () => { const code = state.order.pagamentos?.find(payment => payment.metodo === "PIX_MP" && payment.status === "PENDENTE")?.mp_qr_code; if (code) { await navigator.clipboard.writeText(code); show(feedback, "Código Pix copiado."); } });
+  dialog.querySelector("[data-comanda-copy-pix]")?.addEventListener("click", async () => {
+    const code = pendingPix?.mp_qr_code;
+    if (!code) return;
+    await navigator.clipboard.writeText(code);
+    show(feedback, "Código Pix copiado.");
+  });
 }
 
 function enhanceOrders(root = document) {
