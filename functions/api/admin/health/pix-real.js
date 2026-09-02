@@ -6,7 +6,8 @@ const DIAGNOSTIC_CENTS = 10;
 const DIAGNOSTIC_AMOUNT = "0.10";
 
 function adminOnly(auth) {
-  return String(auth?.user?.papel || "").toUpperCase() === "ADMIN";
+  const papel = String(auth?.user?.papel || "").toUpperCase();
+  return papel === "OWNER" || papel === "ADMIN";
 }
 
 function diagnosticToken(env) {
