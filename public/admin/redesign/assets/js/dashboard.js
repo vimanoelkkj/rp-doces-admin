@@ -4,6 +4,7 @@ import { getCachedPage, setCachedPage, invalidatePageCache } from "./page-cache.
 const DASHBOARD_CACHE_KEY = "dashboard";
 const DASHBOARD_TTL = 15_000;
 const DASHBOARD_REFRESH_MS = 15_000;
+const SALES_WINDOW_DAYS = 30;
 let refreshTimer = null;
 
 function escapeHtml(value = "") {
@@ -142,6 +143,64 @@ function recentOrdersMarkup(orders) {
   }).join("")}</div>`;
 }
 
+function cakeSalesRanking(orders, products, now = new Date()) {
+  const cutoff = new Date(now.getTime() - SALES_WINDOW_DAYS * 86_400_000);
+  const productById = new Map(products.map(product => [Number(product.id), product]));
+  const totals = new Map();
+
+  for (const order of orders) {
+    if (String(order.status_financeiro || "").toUpperCase() !== "PAGO") continue;
+    if (String(order.status_pedido || "").toUpperCase() === "CANCELADO") continue;
+    const soldAt = parseDate(order.pago_em || order.atualizado_em || order.criado_em);
+    if (!soldAt || soldAt < cutoff || soldAt > now) continue;
+
+    for (const item of order.itens || []) {
+      const product = productById.get(Number(item.produto_id));
+      const category = String(product?.categoria_nome || "");
+      const productName = String(product?.nome || item.produto_nome || "Produto");
+      if (!/bolo/i.test(category) && !/bolo/i.test(productName)) continue;
+
+      const key = Number(item.produto_id) || productName.toLocaleLowerCase("pt-BR");
+      const current = totals.get(key) || {
+        nome: item.produto_nome || product?.nome || "Produto",
+        categoria: product?.categoria_nome || "Bolos",
+        quantidade: 0
+      };
+      current.quantidade += Number(item.quantidade || 0);
+      totals.set(key, current);
+    }
+  }
+
+  return [...totals.values()]
+    .filter(item => item.quantidade > 0)
+    .sort((a, b) => b.quantidade - a.quantidade || a.nome.localeCompare(b.nome, "pt-BR"))
+    .slice(0, 5);
+}
+
+function cakeSalesMarkup(orders, products, now) {
+  const ranking = cakeSalesRanking(orders, products, now);
+  if (!ranking.length) {
+    return `<section class="admin-panel dashboard-section dashboard-sales"><header class="dashboard-section__head"><div><strong>Sabores de bolo mais vendidos</strong><span>Últimos ${SALES_WINDOW_DAYS} dias · pedidos pagos</span></div></header><div class="dashboard-sales__empty"><strong>Ainda não há vendas de bolo suficientes.</strong><span>Produtos de categorias com “bolo” no nome aparecem aqui assim que houver pedidos pagos.</span></div></section>`;
+  }
+
+  const max = Math.max(...ranking.map(item => item.quantidade), 1);
+  const total = ranking.reduce((sum, item) => sum + item.quantidade, 0);
+  return `<section class="admin-panel dashboard-section dashboard-sales">
+    <header class="dashboard-section__head"><div><strong>Sabores de bolo mais vendidos</strong><span>Últimos ${SALES_WINDOW_DAYS} dias · pedidos pagos · ${total} unidades no Top ${ranking.length}</span></div></header>
+    <div class="dashboard-sales__list">
+      ${ranking.map((item, index) => {
+        const share = (item.quantidade / max) * 100;
+        const weekly = item.quantidade / (SALES_WINDOW_DAYS / 7);
+        return `<article class="dashboard-sales__row">
+          <span class="dashboard-sales__rank">${index + 1}</span>
+          <div class="dashboard-sales__copy"><strong>${escapeHtml(item.nome)}</strong><small>${escapeHtml(item.categoria)}</small><span class="dashboard-sales__track"><i style="width:${share.toFixed(2)}%"></i></span></div>
+          <div class="dashboard-sales__numbers"><strong>${item.quantidade} un.</strong><small>≈ ${weekly.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/sem</small></div>
+        </article>`;
+      }).join("")}
+    </div>
+  </section>`;
+}
+
 function dashboardMarkup({ orders, products }) {
   const now = new Date();
   const paymentsPaidToday = orders.flatMap(order => (order.pagamentos || []).filter(payment => payment.status === "PAGO" && sameLocalDay(parseDate(payment.pago_em || payment.atualizado_em), now)));
@@ -167,6 +226,7 @@ function dashboardMarkup({ orders, products }) {
       ${metric("Aguardando preparo", String(waitingPreparation.length), "Pedidos pagos que ainda estão novos", waitingPreparation.length ? "warning" : "success")}
       ${metric("Catálogo", String(products.length), `${soldOut.length} esgotado${soldOut.length === 1 ? "" : "s"} · ${lowStock.length} estoque baixo`, soldOut.length || lowStock.length ? "warning" : "success")}
     </div>
+    ${cakeSalesMarkup(orders, products, now)}
     ${receivablesMarkup(orders)}
     <div class="dashboard-grid">
       <section class="admin-panel dashboard-section dashboard-section--orders"><header class="dashboard-section__head"><div><strong>Pedidos recentes</strong><span>Últimas movimentações da loja</span></div><button type="button" class="dashboard-link" data-go-page="pedidos">Ver pedidos</button></header>${recentOrdersMarkup(recent)}</section>
