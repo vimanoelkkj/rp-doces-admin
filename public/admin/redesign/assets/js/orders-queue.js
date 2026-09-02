@@ -249,7 +249,7 @@ function enhanceCard(card) {
     card.setAttribute("aria-label", `Abrir comanda do pedido ${id}`);
 
     const open = event => {
-      if (event.target.closest("[data-order-status-menu]")) return;
+      if (event.target.closest("[data-order-status-menu], .orders-details-button")) return;
       if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
       if (event.type === "keydown") event.preventDefault();
       const button = card.querySelector(".orders-details-button");
