@@ -9,6 +9,10 @@ function adminOnly(auth) {
   return String(auth?.user?.papel || "").toUpperCase() === "ADMIN";
 }
 
+function diagnosticToken(env) {
+  return String(env?.MP_DIAGNOSTIC_ACCESS_TOKEN || "").trim();
+}
+
 function diagnosticPayload(order) {
   const payment = paymentFromOrder(order);
   return {
@@ -22,7 +26,8 @@ function diagnosticPayload(order) {
     ticket_url: payment.ticketUrl,
     valor_centavos: DIAGNOSTIC_CENTS,
     valor: DIAGNOSTIC_AMOUNT,
-    real: true
+    real: true,
+    isolated: true
   };
 }
 
@@ -30,7 +35,11 @@ export async function onRequestPost({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
   if (!adminOnly(auth)) return json({ erro: "Apenas administradores podem gerar Pix real de diagnóstico." }, 403);
-  if (!env.MP_ACCESS_TOKEN) return json({ erro: "MP_ACCESS_TOKEN de produção não configurado." }, 503);
+
+  const accessToken = diagnosticToken(env);
+  if (!accessToken) {
+    return json({ erro: "MP_DIAGNOSTIC_ACCESS_TOKEN não configurado. O token comercial não será usado como fallback." }, 503);
+  }
 
   const key = `rpdiag_${crypto.randomUUID().replaceAll("-", "")}`;
   const externalReference = `RP-DIAG-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
@@ -39,7 +48,7 @@ export async function onRequestPost({ request, env }) {
     const order = await mpRequest(env, "/v1/orders", {
       method: "POST",
       idempotencyKey: key,
-      forceReal: true,
+      accessToken,
       body: {
         type: "online",
         processing_mode: "automatic",
@@ -64,7 +73,7 @@ export async function onRequestPost({ request, env }) {
     return json({
       ...diagnosticPayload(order),
       external_reference: externalReference,
-      aviso: "Transação real de R$ 1,00. O valor será efetivamente movimentado."
+      aviso: "Transação real de R$ 1,00 usando exclusivamente a credencial de diagnóstico."
     }, 201);
   } catch (error) {
     console.error("Falha ao gerar Pix real de diagnóstico", error?.data || error);
@@ -79,14 +88,18 @@ export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
   if (!adminOnly(auth)) return json({ erro: "Apenas administradores podem consultar Pix real de diagnóstico." }, 403);
-  if (!env.MP_ACCESS_TOKEN) return json({ erro: "MP_ACCESS_TOKEN de produção não configurado." }, 503);
+
+  const accessToken = diagnosticToken(env);
+  if (!accessToken) {
+    return json({ erro: "MP_DIAGNOSTIC_ACCESS_TOKEN não configurado. O token comercial não será usado como fallback." }, 503);
+  }
 
   const url = new URL(request.url);
   const orderId = String(url.searchParams.get("order_id") || "").trim();
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(orderId)) return json({ erro: "order_id inválido." }, 400);
 
   try {
-    const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(orderId)}`, { forceReal: true });
+    const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(orderId)}`, { accessToken });
     return json(diagnosticPayload(order), 200);
   } catch (error) {
     console.error("Falha ao consultar Pix real de diagnóstico", error?.data || error);
