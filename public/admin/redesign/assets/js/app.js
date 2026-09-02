@@ -10,6 +10,7 @@ import { setupSidebarBadges } from "./sidebar-badges.js";
 import { setupNotificationMenu } from "./notifications.js";
 import "./product-images.js";
 import "./store-home-images.js";
+import "./pix-real-diagnostic.js";
 
 function ensureHeadLink(rel, href, extras = {}) {
   let link = document.head.querySelector(`link[rel="${rel}"][href="${href}"]`);
@@ -195,8 +196,6 @@ async function showPage(page, id) {
     return;
   }
 
-  // Renderiza a primeira visita fora do DOM visível. Assim uma resposta lenta de uma
-  // aba antiga nunca consegue sobrescrever a aba para a qual o usuário já navegou.
   const staging = document.createElement("div");
   await renderPage(page, staging, { isActive: () => id === navigationId && currentPage === page });
   if (id !== navigationId || currentPage !== page) return;
