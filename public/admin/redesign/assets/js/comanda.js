@@ -9,6 +9,8 @@ const PAYMENT_LABELS = {
   A_COMBINAR: "A combinar"
 };
 
+let releasePageScroll = null;
+
 function esc(value = "") {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -48,12 +50,66 @@ function statusClass(status) {
   return "comanda-status-pending";
 }
 
+async function financialOrder(orderId) {
+  const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" }
+  });
+  const payload = (response.headers.get("content-type") || "").includes("application/json")
+    ? await response.json()
+    : null;
+  if (!response.ok) throw new Error(payload?.erro || payload?.message || `HTTP ${response.status}`);
+  return payload?.pedido || null;
+}
+
 async function loadState(orderId) {
-  const [financialPayload, productsPayload] = await Promise.all([adminApi.financialOrders(), adminApi.products()]);
-  const order = (financialPayload?.pedidos || []).find(item => Number(item.id) === Number(orderId));
+  const [order, productsPayload] = await Promise.all([financialOrder(orderId), adminApi.products()]);
   if (!order) throw new Error("Comanda não encontrada.");
   const products = (productsPayload?.produtos || []).filter(product => Boolean(product.ativo) && Boolean(product.disponivel));
   return { order, products };
+}
+
+function lockPageScroll() {
+  const body = document.body;
+  const root = document.documentElement;
+  const scrollY = window.scrollY;
+  const previous = {
+    rootOverflow: root.style.overflow,
+    rootOverscrollBehavior: root.style.overscrollBehavior,
+    bodyOverflow: body.style.overflow,
+    bodyOverscrollBehavior: body.style.overscrollBehavior,
+    bodyPosition: body.style.position,
+    bodyTop: body.style.top,
+    bodyLeft: body.style.left,
+    bodyRight: body.style.right,
+    bodyWidth: body.style.width
+  };
+
+  root.style.overflow = "hidden";
+  root.style.overscrollBehavior = "none";
+  body.style.overflow = "hidden";
+  body.style.overscrollBehavior = "none";
+  body.style.position = "fixed";
+  body.style.top = `-${scrollY}px`;
+  body.style.left = "0";
+  body.style.right = "0";
+  body.style.width = "100%";
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    root.style.overflow = previous.rootOverflow;
+    root.style.overscrollBehavior = previous.rootOverscrollBehavior;
+    body.style.overflow = previous.bodyOverflow;
+    body.style.overscrollBehavior = previous.bodyOverscrollBehavior;
+    body.style.position = previous.bodyPosition;
+    body.style.top = previous.bodyTop;
+    body.style.left = previous.bodyLeft;
+    body.style.right = previous.bodyRight;
+    body.style.width = previous.bodyWidth;
+    window.scrollTo(0, scrollY);
+  };
 }
 
 function choices(name, pending, selected = "CANCELAR") {
@@ -119,14 +175,15 @@ function radioValue(root, name) {
 
 async function openComanda(orderId) {
   document.querySelector("[data-comanda-dialog]")?.remove();
-  const previousOverflow = document.body.style.overflow;
-  document.body.style.overflow = "hidden";
+  releasePageScroll?.();
+  releasePageScroll = lockPageScroll();
 
   let state;
   try {
     state = await loadState(orderId);
   } catch (error) {
-    document.body.style.overflow = previousOverflow;
+    releasePageScroll?.();
+    releasePageScroll = null;
     window.alert(error?.message || "Não foi possível carregar a comanda.");
     return;
   }
@@ -138,7 +195,8 @@ async function openComanda(orderId) {
 
   const close = () => {
     dialog.remove();
-    document.body.style.overflow = previousOverflow;
+    releasePageScroll?.();
+    releasePageScroll = null;
   };
   dialog.querySelectorAll("[data-comanda-close]").forEach(button => button.addEventListener("click", close));
 
@@ -146,7 +204,7 @@ async function openComanda(orderId) {
   const errorBox = dialog.querySelector("[data-comanda-error]");
   const show = (node, message) => { node.textContent = message; node.hidden = false; };
   const busy = value => dialog.querySelectorAll("button,input,select").forEach(control => { control.disabled = value; });
-  const refresh = async message => { await loadState(orderId); close(); await openComanda(orderId); if (message) setTimeout(() => document.querySelector("[data-comanda-feedback]") && show(document.querySelector("[data-comanda-feedback]"), message), 0); };
+  const refresh = async message => { close(); await openComanda(orderId); if (message) setTimeout(() => document.querySelector("[data-comanda-feedback]") && show(document.querySelector("[data-comanda-feedback]"), message), 0); };
   const run = async (task, message) => {
     feedback.hidden = true; errorBox.hidden = true; busy(true);
     try { await task(); window.dispatchEvent(new CustomEvent("rp-admin-data-changed", { detail: { pages: ["pedidos", "produtos", "dashboard"] } })); await refresh(message); }
