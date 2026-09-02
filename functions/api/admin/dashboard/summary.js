@@ -5,6 +5,17 @@ import { attachOrderFinancials } from "../../../lib/orderLedger.js";
 const SALES_WINDOW_DAYS = 30;
 const MAX_DASHBOARD_ORDERS = 80;
 
+async function loadProducts(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT p.id, p.nome, p.categoria, p.estoque, p.estoque_reservado,
+            p.ativo, p.disponivel, c.nome AS categoria_nome
+     FROM produtos p
+     LEFT JOIN categorias c ON c.id = p.categoria
+     ORDER BY COALESCE(c.ordem, 9999), p.ordem, p.nome`
+  ).all();
+  return results || [];
+}
+
 export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
@@ -23,7 +34,7 @@ export async function onRequestGet({ request, env }) {
        WHERE arquivado = 0
          AND UPPER(COALESCE(status_pedido, '')) <> 'CANCELADO'
          AND (
-           UPPER(COALESCE(status_pedido, 'NOVO')) NOT IN ('ENTREGUE')
+           UPPER(COALESCE(status_pedido, 'NOVO')) <> 'ENTREGUE'
            OR UPPER(COALESCE(status_pagamento, 'PENDENTE')) <> 'PAGO'
          )
      ),
@@ -62,19 +73,13 @@ export async function onRequestGet({ request, env }) {
 
   const pedidos = results || [];
   if (!pedidos.length) {
-    const { results: produtos } = await env.DB.prepare(
-      `SELECT id, nome, categoria_id, categoria_nome, estoque, estoque_reservado, ativo, disponivel
-       FROM produtos
-       WHERE ativo = 1
-       ORDER BY nome COLLATE NOCASE`
-    ).all();
-    return json({ pedidos: [], produtos: produtos || [] });
+    return json({ pedidos: [], produtos: await loadProducts(env) });
   }
 
   const ids = pedidos.map(pedido => Number(pedido.id));
   const placeholders = ids.map(() => "?").join(",");
 
-  const [itemsResult, productsResult] = await Promise.all([
+  const [itemsResult, produtos] = await Promise.all([
     env.DB.prepare(
       `SELECT id, pedido_id, produto_id, produto_nome, quantidade,
               valor_unitario_centavos, valor_total_centavos,
@@ -86,12 +91,7 @@ export async function onRequestGet({ request, env }) {
     )
       .bind(...ids)
       .all(),
-    env.DB.prepare(
-      `SELECT id, nome, categoria_id, categoria_nome, estoque, estoque_reservado, ativo, disponivel
-       FROM produtos
-       WHERE ativo = 1
-       ORDER BY nome COLLATE NOCASE`
-    ).all()
+    loadProducts(env)
   ]);
 
   const itemsByOrder = new Map();
@@ -104,8 +104,5 @@ export async function onRequestGet({ request, env }) {
 
   await attachOrderFinancials(env, pedidos);
 
-  return json({
-    pedidos,
-    produtos: productsResult.results || []
-  });
+  return json({ pedidos, produtos });
 }
