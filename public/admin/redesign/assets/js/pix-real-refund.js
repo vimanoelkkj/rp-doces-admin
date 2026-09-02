@@ -47,6 +47,15 @@ function paidInCard(card) {
   return provider.includes("pagamento confirmado");
 }
 
+function updateExpirationLabel(card) {
+  card.querySelectorAll(".pix-real-meta-item").forEach(item => {
+    const label = String(item.querySelector("small")?.textContent || "").trim().toLowerCase();
+    if (label !== "expiração") return;
+    const value = item.querySelector("strong");
+    if (value) value.textContent = "cerca de 2 min";
+  });
+}
+
 function normalizeWebhookCopy(card) {
   const webhookCheck = card.querySelector("[data-pix-webhook-check]");
   const webhookText = card.querySelector("[data-pix-webhook-text]");
@@ -63,6 +72,7 @@ function mount(card) {
   if (!card || card.dataset.pixRefundMounted === "1") return;
   card.dataset.pixRefundMounted = "1";
   ensureStyles();
+  updateExpirationLabel(card);
 
   const toolbar = card.querySelector(".pix-real-toolbar");
   const checks = card.querySelector("[data-pix-real-checks]");
@@ -287,6 +297,7 @@ function mount(card) {
   });
 
   const observer = new MutationObserver(() => {
+    updateExpirationLabel(card);
     normalizeWebhookCopy(card);
     const orderId = orderIdFromCard(card);
     if (orderId !== lastOrderId || paidInCard(card)) sync();
