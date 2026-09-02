@@ -9,6 +9,7 @@ const PAYMENT_LABELS = {
   A_COMBINAR: "A combinar"
 };
 
+const CLOSE_ANIMATION_MS = 200;
 let releasePageScroll = null;
 
 function esc(value = "") {
@@ -199,45 +200,64 @@ function markup(order, products) {
   </div>`;
 }
 
-async function openComanda(orderId) {
-  document.querySelector("[data-comanda-dialog]")?.remove();
-  releasePageScroll?.();
-  releasePageScroll = lockPageScroll();
-
-  let state;
-  try {
-    state = await loadState(orderId);
-  } catch (error) {
-    releasePageScroll?.();
-    releasePageScroll = null;
-    window.alert(error?.message || "Não foi possível carregar a comanda.");
-    return;
-  }
-
+function buildDialog(order, products) {
   const wrapper = document.createElement("div");
-  wrapper.innerHTML = markup(state.order, state.products);
-  const dialog = wrapper.firstElementChild;
-  document.body.append(dialog);
+  wrapper.innerHTML = markup(order, products);
+  return wrapper.firstElementChild;
+}
 
-  const close = () => {
+function replaceDialogContent(dialog, state) {
+  const currentPanel = dialog.querySelector(".comanda-panel");
+  const currentBody = dialog.querySelector(".comanda-body");
+  const historyWasOpen = Boolean(dialog.querySelector(".comanda-history")?.open);
+  const scrollTop = currentBody?.scrollTop || 0;
+  const nextDialog = buildDialog(state.order, state.products);
+  const nextPanel = nextDialog?.querySelector(".comanda-panel");
+  if (!currentPanel || !nextPanel) return false;
+
+  currentPanel.replaceChildren(...nextPanel.childNodes);
+  dialog.dataset.orderId = String(Number(state.order.id));
+  const nextHistory = dialog.querySelector(".comanda-history");
+  if (nextHistory) nextHistory.open = historyWasOpen;
+  const nextBody = dialog.querySelector(".comanda-body");
+  if (nextBody) nextBody.scrollTop = scrollTop;
+  return true;
+}
+
+function bindDialog(dialog, orderId, state) {
+  let closing = false;
+  const close = async () => {
+    if (closing || !dialog.isConnected) return;
+    closing = true;
+    dialog.classList.add("is-closing");
+    dialog.style.pointerEvents = "none";
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : CLOSE_ANIMATION_MS;
+    if (delay) await new Promise(resolve => window.setTimeout(resolve, delay));
     dialog.remove();
     releasePageScroll?.();
     releasePageScroll = null;
   };
-  dialog.querySelectorAll("[data-comanda-close]").forEach(button => button.addEventListener("click", close));
+
+  dialog.querySelectorAll("[data-comanda-close]").forEach(button => {
+    button.onclick = event => {
+      event.preventDefault();
+      void close();
+    };
+  });
 
   const feedback = dialog.querySelector("[data-comanda-feedback]");
   const errorBox = dialog.querySelector("[data-comanda-error]");
   const show = (node, message) => { if (!node) return; node.textContent = message; node.hidden = false; };
   const busy = value => dialog.querySelectorAll("button,input,select").forEach(control => { control.disabled = value; });
+
   const refresh = async message => {
-    close();
-    await openComanda(orderId);
-    if (message) setTimeout(() => {
-      const node = document.querySelector("[data-comanda-feedback]");
-      if (node) show(node, message);
-    }, 0);
+    const nextState = await loadState(orderId);
+    if (!dialog.isConnected) return;
+    if (!replaceDialogContent(dialog, nextState)) return;
+    bindDialog(dialog, orderId, nextState);
+    if (message) show(dialog.querySelector("[data-comanda-feedback]"), message);
   };
+
   const run = async (task, message) => {
     if (feedback) feedback.hidden = true;
     if (errorBox) errorBox.hidden = true;
@@ -293,56 +313,89 @@ async function openComanda(orderId) {
   };
 
   dialog.querySelectorAll("[data-comanda-method]").forEach(button => {
-    button.addEventListener("click", () => {
+    button.onclick = () => {
       method = button.dataset.comandaMethod || "PIX";
       dialog.querySelectorAll("[data-comanda-method]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
       renderReceive();
-    });
+    };
   });
-  valueInput?.addEventListener("input", renderReceive);
-  keepPix?.addEventListener("change", renderReceive);
+  if (valueInput) valueInput.oninput = renderReceive;
+  if (keepPix) keepPix.onchange = renderReceive;
   dialog.querySelectorAll("[data-comanda-quick]").forEach(button => {
-    button.addEventListener("click", () => {
+    button.onclick = () => {
       const next = button.dataset.comandaQuick === "half" ? Math.max(1, Math.round(saldo / 2)) : saldo;
       valueInput.value = (next / 100).toFixed(2).replace(".", ",");
       renderReceive();
-    });
+    };
   });
   renderReceive();
 
-  receiveSubmit?.addEventListener("click", () => {
-    const value = cents(valueInput?.value);
-    if (value <= 0) return show(errorBox, "Informe um valor válido.");
-    const pixDecision = pendingPix ? (keepPix?.checked ? "MANTER" : "CANCELAR") : undefined;
-    if (method === "PIX") {
-      run(() => adminApi.generateComandaPix(orderId, { valor_centavos: value, ...(pixDecision ? { pix_pendente: pixDecision } : {}) }), "Cobrança Pix gerada.");
-      return;
-    }
-    run(() => adminApi.registerComandaPayment(orderId, { metodo: method, valor_centavos: value, ...(pixDecision ? { pix_pendente: pixDecision } : {}) }), "Pagamento registrado.");
-  });
+  if (receiveSubmit) {
+    receiveSubmit.onclick = () => {
+      const value = cents(valueInput?.value);
+      if (value <= 0) return show(errorBox, "Informe um valor válido.");
+      const pixDecision = pendingPix ? (keepPix?.checked ? "MANTER" : "CANCELAR") : undefined;
+      if (method === "PIX") {
+        void run(() => adminApi.generateComandaPix(orderId, { valor_centavos: value, ...(pixDecision ? { pix_pendente: pixDecision } : {}) }), "Cobrança Pix gerada.");
+        return;
+      }
+      void run(() => adminApi.registerComandaPayment(orderId, { metodo: method, valor_centavos: value, ...(pixDecision ? { pix_pendente: pixDecision } : {}) }), "Pagamento registrado.");
+    };
+  }
 
-  dialog.querySelector("[data-comanda-add-toggle]")?.addEventListener("click", () => {
-    const form = dialog.querySelector("[data-comanda-add-form]");
-    if (form) form.hidden = !form.hidden;
-  });
+  const addToggle = dialog.querySelector("[data-comanda-add-toggle]");
+  if (addToggle) {
+    addToggle.onclick = () => {
+      const form = dialog.querySelector("[data-comanda-add-form]");
+      if (form) form.hidden = !form.hidden;
+    };
+  }
 
-  dialog.querySelector("[data-comanda-add-form]")?.addEventListener("submit", event => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const productId = Number(form.elements.produto_id.value);
-    const quantity = Number(form.elements.quantidade.value);
-    const product = state.products.find(item => Number(item.id) === productId);
-    if (!product || !Number.isInteger(quantity) || quantity < 1) return show(errorBox, "Selecione um produto e uma quantidade válida.");
-    run(() => adminApi.addComandaItem(orderId, { produto_id: productId, quantidade: quantity }), "Item adicionado à comanda.");
-  });
+  const addForm = dialog.querySelector("[data-comanda-add-form]");
+  if (addForm) {
+    addForm.onsubmit = event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const productId = Number(form.elements.produto_id.value);
+      const quantity = Number(form.elements.quantidade.value);
+      const product = state.products.find(item => Number(item.id) === productId);
+      if (!product || !Number.isInteger(quantity) || quantity < 1) return show(errorBox, "Selecione um produto e uma quantidade válida.");
+      void run(() => adminApi.addComandaItem(orderId, { produto_id: productId, quantidade: quantity }), "Item adicionado à comanda.");
+    };
+  }
 
-  dialog.querySelector("[data-comanda-cancel-pix]")?.addEventListener("click", () => run(() => adminApi.cancelComandaPix(orderId), "Cobrança Pix cancelada."));
-  dialog.querySelector("[data-comanda-copy-pix]")?.addEventListener("click", async () => {
-    const code = pendingPix?.mp_qr_code;
-    if (!code) return;
-    await navigator.clipboard.writeText(code);
-    show(feedback, "Código Pix copiado.");
-  });
+  const cancelPix = dialog.querySelector("[data-comanda-cancel-pix]");
+  if (cancelPix) cancelPix.onclick = () => void run(() => adminApi.cancelComandaPix(orderId), "Cobrança Pix cancelada.");
+
+  const copyPix = dialog.querySelector("[data-comanda-copy-pix]");
+  if (copyPix) {
+    copyPix.onclick = async () => {
+      const code = pendingPix?.mp_qr_code;
+      if (!code) return;
+      await navigator.clipboard.writeText(code);
+      show(feedback, "Código Pix copiado.");
+    };
+  }
+}
+
+async function openComanda(orderId) {
+  document.querySelector("[data-comanda-dialog]")?.remove();
+  releasePageScroll?.();
+  releasePageScroll = lockPageScroll();
+
+  let state;
+  try {
+    state = await loadState(orderId);
+  } catch (error) {
+    releasePageScroll?.();
+    releasePageScroll = null;
+    window.alert(error?.message || "Não foi possível carregar a comanda.");
+    return;
+  }
+
+  const dialog = buildDialog(state.order, state.products);
+  document.body.append(dialog);
+  bindDialog(dialog, orderId, state);
 }
 
 function enhanceOrders(root = document) {
