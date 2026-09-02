@@ -115,8 +115,16 @@ function lockPageScroll() {
   };
 }
 
+function pendingPixCharges(order) {
+  return (order.pagamentos || []).filter(payment => payment.metodo === "PIX_MP" && payment.status === "PENDENTE");
+}
+
 function findPendingPix(order) {
-  return (order.pagamentos || []).find(payment => payment.metodo === "PIX_MP" && payment.status === "PENDENTE") || null;
+  return pendingPixCharges(order)[0] || null;
+}
+
+function pendingPixTotalCents(order) {
+  return pendingPixCharges(order).reduce((total, payment) => total + Number(payment.valor_centavos || 0), 0);
 }
 
 function orderPollSignature(order) {
@@ -164,8 +172,10 @@ function itemRows(order) {
 
 function markup(order, products) {
   const pendingPix = findPendingPix(order);
+  const pendingPixTotal = pendingPixTotalCents(order);
   const open = order.status_comanda !== "ENCERRADA";
   const saldo = Number(order.saldo_centavos || 0);
+  const saldoLivre = Math.max(0, saldo - pendingPixTotal);
   const total = Number(order.valor_total_centavos || 0);
   const paid = Number(order.valor_pago_centavos || 0);
   const progress = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
@@ -201,16 +211,16 @@ function markup(order, products) {
         </section>` : ""}
 
         ${open ? `<section class="comanda-receive">
-          <h3>Receber</h3><p>Escolha a forma e o valor. O resto a tela resolve.</p>
+          <h3>Receber</h3><p>${pendingPixTotal > 0 ? `${money(pendingPixTotal)} já aguardando em Pix · ${money(saldoLivre)} livres para cobrar.` : "Escolha a forma e o valor. O resto a tela resolve."}</p>
           <div class="comanda-methods" role="group" aria-label="Forma de pagamento">
             <button type="button" data-comanda-method="PIX" aria-pressed="true">Pix</button>
             <button type="button" data-comanda-method="DINHEIRO" aria-pressed="false">Dinheiro</button>
             <button type="button" data-comanda-method="CARTAO" aria-pressed="false">Cartão</button>
             <button type="button" data-comanda-method="PIX_EXTERNO" aria-pressed="false">Pix direto</button>
           </div>
-          <div class="comanda-receive-field"><label for="comanda-receive-value">Valor</label><div class="comanda-amount-row"><div class="comanda-money-input"><span>R$</span><input id="comanda-receive-value" data-comanda-receive-value inputmode="decimal" value="${(saldo / 100).toFixed(2).replace(".", ",")}"></div><div class="comanda-quick"><button type="button" data-comanda-quick="all">Tudo</button><button type="button" data-comanda-quick="half">Metade</button></div></div></div>
-          <div class="comanda-consequence" data-comanda-consequence><p></p>${pendingPix ? '<label><input type="checkbox" data-comanda-keep-pix><span data-comanda-keep-label>Manter o Pix atual e gerar uma segunda cobrança</span></label>' : ""}</div>
-          <button type="button" class="comanda-cta" data-comanda-receive-submit ${saldo <= 0 ? "disabled" : ""}>Gerar Pix de ${money(saldo)}</button>
+          <div class="comanda-receive-field"><label for="comanda-receive-value">Valor</label><div class="comanda-amount-row"><div class="comanda-money-input"><span>R$</span><input id="comanda-receive-value" data-comanda-receive-value inputmode="decimal" value="${(saldoLivre / 100).toFixed(2).replace(".", ",")}"></div><div class="comanda-quick"><button type="button" data-comanda-quick="all">Tudo</button><button type="button" data-comanda-quick="half">Metade</button></div></div></div>
+          <div class="comanda-consequence" data-comanda-consequence><p></p>${pendingPix ? '<label><input type="checkbox" data-comanda-keep-pix checked><span data-comanda-keep-label>Manter o Pix atual e cobrar apenas o restante</span></label>' : ""}</div>
+          <button type="button" class="comanda-cta" data-comanda-receive-submit ${saldoLivre <= 0 ? "disabled" : ""}>Gerar Pix de ${money(saldoLivre)}</button>
         </section>` : ""}
 
         <section class="comanda-block">
@@ -312,7 +322,9 @@ function bindDialog(dialog, orderId, state) {
   };
 
   const pendingPix = findPendingPix(state.order);
+  const pendingPixTotal = pendingPixTotalCents(state.order);
   const saldo = Number(state.order.saldo_centavos || 0);
+  const saldoLivre = Math.max(0, saldo - pendingPixTotal);
   let method = "PIX";
 
   const valueInput = dialog.querySelector("[data-comanda-receive-value]");
@@ -321,12 +333,15 @@ function bindDialog(dialog, orderId, state) {
   const keepLabel = dialog.querySelector("[data-comanda-keep-label]");
   const receiveSubmit = dialog.querySelector("[data-comanda-receive-submit]");
 
+  const maxReceivable = () => pendingPix && keepPix?.checked ? saldoLivre : saldo;
+
   const renderReceive = () => {
     if (!valueInput || !receiveSubmit || !consequence) return;
     const value = cents(valueInput.value);
     const keep = Boolean(keepPix?.checked);
     const pendingValue = Number(pendingPix?.valor_centavos || 0);
-    const after = Math.max(0, saldo - value);
+    const maxValue = maxReceivable();
+    const after = Math.max(0, saldo - (keep ? pendingPixTotal : 0) - value);
     let text = "";
 
     if (!pendingPix) {
@@ -334,20 +349,20 @@ function bindDialog(dialog, orderId, state) {
         ? `Gera uma cobrança de <b>${money(value)}</b>. O saldo só cai quando o pagamento for confirmado.`
         : `Registra <b>${money(value)}</b> em ${esc(PAYMENT_LABELS[method] || method)}. Saldo depois: <b>${money(after)}</b>.`;
     } else if (method === "PIX") {
-      if (keepLabel) keepLabel.textContent = "Manter o Pix atual e gerar uma segunda cobrança";
+      if (keepLabel) keepLabel.textContent = "Manter o Pix atual e cobrar apenas o restante";
       text = keep
-        ? `Ficam <b>duas</b> cobranças abertas: a de <b>${money(pendingValue)}</b> e a nova de <b>${money(value)}</b>.`
-        : `O Pix de <b>${money(pendingValue)}</b> é cancelado e substituído por um novo de <b>${money(value)}</b>.`;
+        ? `O Pix pendente reserva <b>${money(pendingPixTotal)}</b>. A nova cobrança usa só o saldo livre e restam <b>${money(after)}</b> sem cobrança.`
+        : `O Pix de <b>${money(pendingValue)}</b> será cancelado e substituído por um novo de <b>${money(value)}</b>.`;
     } else {
-      if (keepLabel) keepLabel.textContent = "Manter o Pix pendente e registrar este pagamento em separado";
+      if (keepLabel) keepLabel.textContent = "Manter o Pix pendente e receber apenas o restante";
       text = keep
-        ? `Registra <b>${money(value)}</b> em ${esc(PAYMENT_LABELS[method] || method)} e o Pix de <b>${money(pendingValue)}</b> continua aberto.`
+        ? `O Pix pendente reserva <b>${money(pendingPixTotal)}</b>. Registra <b>${money(value)}</b> em ${esc(PAYMENT_LABELS[method] || method)} e restam <b>${money(after)}</b> livres.`
         : `O Pix de <b>${money(pendingValue)}</b> é cancelado e <b>${money(value)}</b> entra como ${esc(PAYMENT_LABELS[method] || method)}. Saldo depois: <b>${money(after)}</b>.`;
     }
 
     const p = consequence.querySelector("p");
     if (p) p.innerHTML = text;
-    receiveSubmit.disabled = value <= 0 || saldo <= 0;
+    receiveSubmit.disabled = value <= 0 || maxValue <= 0 || value > maxValue;
     receiveSubmit.textContent = method === "PIX" ? `Gerar Pix de ${money(value)}` : `Registrar ${money(value)} em ${PAYMENT_LABELS[method] || method}`;
   };
 
@@ -359,10 +374,19 @@ function bindDialog(dialog, orderId, state) {
     };
   });
   if (valueInput) valueInput.oninput = renderReceive;
-  if (keepPix) keepPix.onchange = renderReceive;
+  if (keepPix) {
+    keepPix.onchange = () => {
+      const maxValue = maxReceivable();
+      if (cents(valueInput?.value) > maxValue && valueInput) {
+        valueInput.value = (maxValue / 100).toFixed(2).replace(".", ",");
+      }
+      renderReceive();
+    };
+  }
   dialog.querySelectorAll("[data-comanda-quick]").forEach(button => {
     button.onclick = () => {
-      const next = button.dataset.comandaQuick === "half" ? Math.max(1, Math.round(saldo / 2)) : saldo;
+      const available = maxReceivable();
+      const next = button.dataset.comandaQuick === "half" ? Math.max(1, Math.round(available / 2)) : available;
       valueInput.value = (next / 100).toFixed(2).replace(".", ",");
       renderReceive();
     };
@@ -372,7 +396,9 @@ function bindDialog(dialog, orderId, state) {
   if (receiveSubmit) {
     receiveSubmit.onclick = () => {
       const value = cents(valueInput?.value);
+      const maxValue = maxReceivable();
       if (value <= 0) return show(errorBox, "Informe um valor válido.");
+      if (value > maxValue) return show(errorBox, `O máximo disponível para esta cobrança é ${money(maxValue)}.`);
       const pixDecision = pendingPix ? (keepPix?.checked ? "MANTER" : "CANCELAR") : undefined;
       if (method === "PIX") {
         void run(() => adminApi.generateComandaPix(orderId, { valor_centavos: value, ...(pixDecision ? { pix_pendente: pixDecision } : {}) }), "Cobrança Pix gerada.");
