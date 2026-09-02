@@ -172,6 +172,24 @@ CREATE TABLE "pedidos" (
 , status_comanda TEXT NOT NULL DEFAULT 'ABERTA'
   CHECK (status_comanda IN ('ABERTA','ENCERRADA')));
 
+-- table: pix_diagnosticos
+CREATE TABLE pix_diagnosticos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  external_reference TEXT NOT NULL UNIQUE,
+  mp_order_id TEXT UNIQUE,
+  mp_payment_id TEXT,
+  valor_centavos INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDENTE',
+  mp_status TEXT,
+  mp_status_detail TEXT,
+  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  pago_em TEXT,
+  webhook_recebido_em TEXT,
+  webhook_data_id TEXT,
+  webhook_request_id TEXT
+);
+
 -- table: produtos
 CREATE TABLE "produtos" (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -322,6 +340,12 @@ CREATE INDEX idx_pedidos_status_pagamento ON pedidos(status_pagamento, criado_em
 
 -- index: idx_pedidos_status_pedido
 CREATE INDEX idx_pedidos_status_pedido ON pedidos(status_pedido, criado_em);
+
+-- index: idx_pix_diagnosticos_order
+CREATE INDEX idx_pix_diagnosticos_order ON pix_diagnosticos(mp_order_id);
+
+-- index: idx_pix_diagnosticos_payment
+CREATE INDEX idx_pix_diagnosticos_payment ON pix_diagnosticos(mp_payment_id);
 
 -- index: idx_produtos_ativo_disponivel
 CREATE INDEX idx_produtos_ativo_disponivel
