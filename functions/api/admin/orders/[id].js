@@ -1,6 +1,7 @@
 import { json, bodyJson, sameOrigin } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
 import { baixarEstoquePedido, liberarReservaPedido } from "../../../lib/stock.js";
+import { syncManualPaidOrder } from "../../../lib/comandaLedger.js";
 
 const VALIDOS = new Set(["NOVO", "PREPARANDO", "PRONTO", "ENTREGUE", "CANCELADO"]);
 const PAGAMENTOS_MANUAIS = new Set(["PENDENTE", "PAGO", "CANCELADO"]);
@@ -142,9 +143,12 @@ async function reservarPedidoManual(env, pedidoId) {
   }
 }
 
-async function confirmarPagamentoManual(env, pedido) {
+async function confirmarPagamentoManual(env, pedido, usuarioId) {
   if (pedido.status_pagamento === "PAGO") {
-    return { ok: true, status_pagamento: "PAGO" };
+    const ledger = await syncManualPaidOrder(env, pedido.id, usuarioId);
+    return ledger.ok
+      ? { ok: true, status_pagamento: "PAGO" }
+      : { ok: false, erro: ledger.erro || "ERRO_FINANCEIRO" };
   }
 
   if (pedido.status_pagamento === "CANCELADO") {
@@ -162,6 +166,18 @@ async function confirmarPagamentoManual(env, pedido) {
   )
     .bind(pedido.id)
     .run();
+
+  const ledger = await syncManualPaidOrder(env, pedido.id, usuarioId);
+  if (!ledger.ok) {
+    await env.DB.prepare(
+      `UPDATE pedidos
+       SET status_pagamento = 'PENDENTE', pago_em = NULL, atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+      .bind(pedido.id)
+      .run();
+    return { ok: false, erro: ledger.erro || "ERRO_FINANCEIRO" };
+  }
 
   const stock = await baixarEstoquePedido(env, pedido.id);
   if (!stock.ok) {
@@ -247,7 +263,7 @@ export async function onRequestPut({ request, env, params }) {
     }
 
     let result;
-    if (nextPayment === "PAGO") result = await confirmarPagamentoManual(env, pedido);
+    if (nextPayment === "PAGO") result = await confirmarPagamentoManual(env, pedido, auth.user.id);
     else if (nextPayment === "CANCELADO") result = await cancelarPagamentoManual(env, pedido);
     else result = await tornarPendenteManual(env, pedido);
 
@@ -255,7 +271,9 @@ export async function onRequestPut({ request, env, params }) {
       const mensagem =
         result.erro === "ESTOQUE_INSUFICIENTE"
           ? "Não há estoque disponível para reabrir este pedido."
-          : "Não foi possível atualizar o pagamento por inconsistência no estoque.";
+          : result.erro === "ERRO_FINANCEIRO" || result.erro === "PAGAMENTO_NAO_REGISTRADO"
+            ? "Não foi possível registrar a quitação no financeiro."
+            : "Não foi possível atualizar o pagamento por inconsistência no estoque.";
       return json({ erro: mensagem }, 409);
     }
 
