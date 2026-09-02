@@ -24,13 +24,15 @@ export async function onRequestGet({ request, env }) {
   const [received, settled, created] = await Promise.all([
     env.DB.prepare(
       `SELECT
-         COALESCE(SUM(valor_centavos), 0) AS recebido_centavos,
+         COALESCE(SUM(pp.valor_centavos), 0) AS recebido_centavos,
          COUNT(*) AS pagamentos_confirmados,
-         COUNT(DISTINCT pedido_id) AS pedidos_com_recebimento
-       FROM pedido_pagamentos
-       WHERE status = 'PAGO'
-         AND COALESCE(pago_em, atualizado_em) >= ?
-         AND COALESCE(pago_em, atualizado_em) < ?`
+         COUNT(DISTINCT pp.pedido_id) AS pedidos_com_recebimento
+       FROM pedido_pagamentos pp
+       INNER JOIN pedidos p ON p.id = pp.pedido_id
+       WHERE pp.status = 'PAGO'
+         AND UPPER(COALESCE(p.status_pedido, '')) <> 'CANCELADO'
+         AND COALESCE(pp.pago_em, pp.atualizado_em) >= ?
+         AND COALESCE(pp.pago_em, pp.atualizado_em) < ?`
     ).bind(bounds.start, bounds.end).first(),
     env.DB.prepare(
       `SELECT
