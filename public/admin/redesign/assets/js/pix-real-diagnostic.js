@@ -60,9 +60,9 @@ function cardMarkup() {
       <div class="store-card__head"><span class="store-card__icon">⌁</span><div><h3>Diagnóstico Pix real</h3><p>Teste a integração bancária com uma cobrança real e isolada.</p></div></div>
       <div class="pix-real-card__body">
         <div>
-          <p class="pix-real-warning"><strong>Movimenta dinheiro de verdade.</strong> O teste gera um Pix de <strong>R$ 1,00</strong> usando a credencial real do Mercado Pago. Ele não cria pedido, não baixa estoque e não entra no faturamento da loja.</p>
+          <p class="pix-real-warning"><strong>Movimenta dinheiro de verdade.</strong> O teste gera um Pix de <strong>R$ 0,10</strong> usando a credencial real do Mercado Pago. Ele não cria pedido, não baixa estoque e não entra no faturamento da loja.</p>
           <div class="pix-real-actions">
-            <button type="button" class="pix-real-button" data-pix-real-generate>Gerar Pix real de R$ 1,00</button>
+            <button type="button" class="pix-real-button" data-pix-real-generate>Gerar Pix real de R$ 0,10</button>
             <button type="button" class="pix-real-secondary" data-pix-real-check hidden>Consultar agora</button>
           </div>
           <div class="pix-real-status" data-pix-real-status>Aguardando geração</div>
@@ -148,7 +148,7 @@ function mount(storeView) {
 
   generate.addEventListener("click", async () => {
     if (generate.disabled) return;
-    const confirmed = window.confirm("Este teste vai criar uma cobrança Pix REAL de R$ 1,00. O dinheiro será movimentado de verdade. Deseja continuar?");
+    const confirmed = window.confirm("Este teste vai criar uma cobrança Pix REAL de R$ 0,10. O dinheiro será movimentado de verdade. Deseja continuar?");
     if (!confirmed) return;
     generate.disabled = true;
     setStatus("Gerando cobrança real…");
