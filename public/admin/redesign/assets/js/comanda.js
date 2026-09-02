@@ -10,6 +10,7 @@ const PAYMENT_LABELS = {
 };
 
 const CLOSE_ANIMATION_MS = 200;
+const PIX_POLL_MS = 5_000;
 let releasePageScroll = null;
 
 function esc(value = "") {
@@ -54,18 +55,20 @@ function statusClass(status) {
   return "comanda-status-pending";
 }
 
-async function financialOrder(orderId) {
-  const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, {
+async function financialOrder(orderId, { fresh = false } = {}) {
+  const query = fresh ? "?fresh=1" : "";
+  const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/finance${query}`, {
     credentials: "same-origin",
-    headers: { Accept: "application/json" }
+    headers: { Accept: "application/json" },
+    cache: fresh ? "no-store" : "default"
   });
   const payload = (response.headers.get("content-type") || "").includes("application/json") ? await response.json() : null;
   if (!response.ok) throw new Error(payload?.erro || payload?.message || `HTTP ${response.status}`);
   return payload?.pedido || null;
 }
 
-async function loadState(orderId) {
-  const [order, productsPayload] = await Promise.all([financialOrder(orderId), adminApi.products()]);
+async function loadState(orderId, { fresh = false } = {}) {
+  const [order, productsPayload] = await Promise.all([financialOrder(orderId, { fresh }), adminApi.products()]);
   if (!order) throw new Error("Comanda não encontrada.");
   const products = (productsPayload?.produtos || []).filter(product => Boolean(product.ativo) && Boolean(product.disponivel));
   return { order, products };
@@ -114,6 +117,31 @@ function lockPageScroll() {
 
 function findPendingPix(order) {
   return (order.pagamentos || []).find(payment => payment.metodo === "PIX_MP" && payment.status === "PENDENTE") || null;
+}
+
+function orderPollSignature(order) {
+  return JSON.stringify({
+    status_comanda: order?.status_comanda || null,
+    status_financeiro: order?.status_financeiro || null,
+    status_pedido: order?.status_pedido || null,
+    valor_total_centavos: Number(order?.valor_total_centavos || 0),
+    valor_pago_centavos: Number(order?.valor_pago_centavos || 0),
+    saldo_centavos: Number(order?.saldo_centavos || 0),
+    pagamentos: (order?.pagamentos || []).map(payment => [
+      Number(payment.id || 0),
+      payment.status || null,
+      payment.mp_payment_id || null,
+      payment.pago_em || null,
+      payment.atualizado_em || null
+    ]),
+    itens: (order?.itens || []).map(item => [
+      Number(item.id || 0),
+      item.status_financeiro || null,
+      Number(item.valor_pago_centavos || 0),
+      Number(item.saldo_centavos || 0),
+      Number(item.quantidade || 0)
+    ])
+  });
 }
 
 function paymentRows(order) {
@@ -208,9 +236,8 @@ function buildDialog(order, products) {
 
 function replaceDialogContent(dialog, state) {
   const currentPanel = dialog.querySelector(".comanda-panel");
-  const currentBody = dialog.querySelector(".comanda-body");
   const historyWasOpen = Boolean(dialog.querySelector(".comanda-history")?.open);
-  const scrollTop = currentBody?.scrollTop || 0;
+  const scrollTop = currentPanel?.scrollTop || 0;
   const nextDialog = buildDialog(state.order, state.products);
   const nextPanel = nextDialog?.querySelector(".comanda-panel");
   if (!currentPanel || !nextPanel) return false;
@@ -219,16 +246,25 @@ function replaceDialogContent(dialog, state) {
   dialog.dataset.orderId = String(Number(state.order.id));
   const nextHistory = dialog.querySelector(".comanda-history");
   if (nextHistory) nextHistory.open = historyWasOpen;
-  const nextBody = dialog.querySelector(".comanda-body");
-  if (nextBody) nextBody.scrollTop = scrollTop;
+  currentPanel.scrollTop = scrollTop;
   return true;
 }
 
 function bindDialog(dialog, orderId, state) {
+  if (dialog._comandaPollTimer) {
+    window.clearTimeout(dialog._comandaPollTimer);
+    dialog._comandaPollTimer = null;
+  }
+  dialog.dataset.comandaBusy = "0";
+
   let closing = false;
   const close = async () => {
     if (closing || !dialog.isConnected) return;
     closing = true;
+    if (dialog._comandaPollTimer) {
+      window.clearTimeout(dialog._comandaPollTimer);
+      dialog._comandaPollTimer = null;
+    }
     dialog.classList.add("is-closing");
     dialog.style.pointerEvents = "none";
     const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : CLOSE_ANIMATION_MS;
@@ -248,10 +284,13 @@ function bindDialog(dialog, orderId, state) {
   const feedback = dialog.querySelector("[data-comanda-feedback]");
   const errorBox = dialog.querySelector("[data-comanda-error]");
   const show = (node, message) => { if (!node) return; node.textContent = message; node.hidden = false; };
-  const busy = value => dialog.querySelectorAll("button,input,select").forEach(control => { control.disabled = value; });
+  const busy = value => {
+    dialog.dataset.comandaBusy = value ? "1" : "0";
+    dialog.querySelectorAll("button,input,select").forEach(control => { control.disabled = value; });
+  };
 
   const refresh = async message => {
-    const nextState = await loadState(orderId);
+    const nextState = await loadState(orderId, { fresh: true });
     if (!dialog.isConnected) return;
     if (!replaceDialogContent(dialog, nextState)) return;
     bindDialog(dialog, orderId, nextState);
@@ -375,6 +414,42 @@ function bindDialog(dialog, orderId, state) {
       await navigator.clipboard.writeText(code);
       show(feedback, "Código Pix copiado.");
     };
+  }
+
+  if (pendingPix) {
+    const currentSignature = orderPollSignature(state.order);
+    const poll = async () => {
+      if (!dialog.isConnected || closing) return;
+      if (document.visibilityState !== "visible" || dialog.dataset.comandaBusy === "1") {
+        dialog._comandaPollTimer = window.setTimeout(poll, PIX_POLL_MS);
+        return;
+      }
+
+      try {
+        const nextOrder = await financialOrder(orderId, { fresh: true });
+        if (!nextOrder || !dialog.isConnected) return;
+        if (orderPollSignature(nextOrder) !== currentSignature) {
+          const pixWasPending = Boolean(findPendingPix(state.order));
+          const nextState = { order: nextOrder, products: state.products };
+          if (replaceDialogContent(dialog, nextState)) {
+            window.dispatchEvent(new CustomEvent("rp-admin-data-changed", { detail: { pages: ["pedidos", "dashboard"] } }));
+            bindDialog(dialog, orderId, nextState);
+            if (pixWasPending && !findPendingPix(nextOrder)) {
+              show(dialog.querySelector("[data-comanda-feedback]"), "Pagamento Pix confirmado automaticamente.");
+            }
+            return;
+          }
+        }
+      } catch {
+        // Falha transitória de polling não deve interromper o uso da comanda.
+      }
+
+      if (dialog.isConnected && findPendingPix(state.order)) {
+        dialog._comandaPollTimer = window.setTimeout(poll, PIX_POLL_MS);
+      }
+    };
+
+    dialog._comandaPollTimer = window.setTimeout(poll, PIX_POLL_MS);
   }
 }
 
