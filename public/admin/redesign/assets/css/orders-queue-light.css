@@ -63,14 +63,15 @@
   color: #856210 !important;
 }
 
-:root .orders-queue-view .orders-queue-row .orders-status.is-delivery-neutral {
-  background: #f7efec !important;
-  color: #7b5a54 !important;
-}
-
+:root .orders-queue-view .orders-queue-row .orders-status.is-fin-cancelled,
 :root .orders-queue-view .orders-queue-row .orders-status.is-delivery-cancelled {
   background: #fdeeee !important;
   color: #b4474b !important;
+}
+
+:root .orders-queue-view .orders-queue-row .orders-status.is-delivery-neutral {
+  background: #f7efec !important;
+  color: #7b5a54 !important;
 }
 
 :root .orders-queue-view .orders-queue-more {
