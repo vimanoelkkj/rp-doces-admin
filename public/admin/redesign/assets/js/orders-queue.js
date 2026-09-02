@@ -3,7 +3,8 @@ import { adminApi } from "./api.js";
 const FINANCEIRO = Object.freeze({
   PENDENTE: { label: "Pendente", className: "is-fin-pending" },
   PARCIAL: { label: "Parcial", className: "is-fin-partial" },
-  PAGO: { label: "Pago", className: "is-fin-paid" }
+  PAGO: { label: "Pago", className: "is-fin-paid" },
+  CANCELADO: { label: "Cancelado", className: "is-fin-cancelled" }
 });
 
 const ENTREGA = Object.freeze({
@@ -76,11 +77,15 @@ function itemSummary(order) {
 }
 
 function orderFinancialState(order) {
+  const delivery = upper(order.status_pedido, "NOVO");
+  if (delivery === "CANCELADO") return "CANCELADO";
+
   const explicit = upper(order.status_financeiro);
   if (FINANCEIRO[explicit]) return explicit;
 
   const payment = upper(order.status_pagamento, "PENDENTE");
   if (payment === "PAGO") return "PAGO";
+  if (payment === "CANCELADO") return "CANCELADO";
 
   const paid = Number(order.valor_pago_centavos);
   const total = Number(order.valor_total_centavos || 0);
@@ -89,12 +94,14 @@ function orderFinancialState(order) {
 }
 
 function orderPaidCents(order) {
+  if (orderFinancialState(order) === "CANCELADO") return 0;
   const explicit = Number(order.valor_pago_centavos);
   if (Number.isFinite(explicit)) return Math.max(0, explicit);
   return orderFinancialState(order) === "PAGO" ? Number(order.valor_total_centavos || 0) : 0;
 }
 
 function orderBalanceCents(order) {
+  if (orderFinancialState(order) === "CANCELADO") return 0;
   const explicit = Number(order.saldo_centavos);
   if (Number.isFinite(explicit)) return Math.max(0, explicit);
   return Math.max(0, Number(order.valor_total_centavos || 0) - orderPaidCents(order));
