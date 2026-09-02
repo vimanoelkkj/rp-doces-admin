@@ -40,6 +40,7 @@ function setupPwaShell() {
   ensureHeadLink("stylesheet", "/admin/redesign/assets/css/pwa-shell.css");
   ensureHeadLink("stylesheet", "/admin/redesign/assets/css/product-images.css");
   ensureHeadLink("stylesheet", "/admin/redesign/assets/css/store-home-images.css");
+  ensureHeadLink("stylesheet", "/admin/redesign/assets/css/orders-queue-mobile.css");
   ensureMeta("theme-color", "#fff8f2");
   ensureMeta("apple-mobile-web-app-capable", "yes");
   ensureMeta("apple-mobile-web-app-status-bar-style", "default");
