@@ -2,8 +2,8 @@ import { json } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
 import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../../lib/mercadoPago.js";
 
-const DIAGNOSTIC_CENTS = 100;
-const DIAGNOSTIC_AMOUNT = "1.00";
+const DIAGNOSTIC_CENTS = 10;
+const DIAGNOSTIC_AMOUNT = "0.10";
 
 function adminOnly(auth) {
   return String(auth?.user?.papel || "").toUpperCase() === "ADMIN";
@@ -73,7 +73,7 @@ export async function onRequestPost({ request, env }) {
     return json({
       ...diagnosticPayload(order),
       external_reference: externalReference,
-      aviso: "Transação real de R$ 1,00 usando exclusivamente a credencial de diagnóstico."
+      aviso: "Transação real de R$ 0,10 usando exclusivamente a credencial de diagnóstico."
     }, 201);
   } catch (error) {
     console.error("Falha ao gerar Pix real de diagnóstico", error?.data || error);
