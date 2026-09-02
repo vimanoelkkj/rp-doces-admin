@@ -1,55 +1,6 @@
 import { json } from "../../../../lib/http.js";
 import { requireUser } from "../../../../lib/auth.js";
 import { attachOrderFinancials } from "../../../../lib/orderLedger.js";
-import { syncComandaPixCharge } from "../../../../lib/comandaLedger.js";
-import { mpRequest, mpOrderToLocalStatus, paymentFromOrder } from "../../../../lib/mercadoPago.js";
-import { baixarEstoquePedido } from "../../../../lib/stock.js";
-import { logEvent } from "../../../../lib/logger.js";
-
-async function reconcilePendingPix(env, pedidoId) {
-  if (!env.MP_ACCESS_TOKEN) return;
-
-  const { results } = await env.DB.prepare(
-    `SELECT id, mp_order_id
-     FROM pedido_pagamentos
-     WHERE pedido_id = ?
-       AND metodo = 'PIX_MP'
-       AND origem = 'ADMIN'
-       AND status = 'PENDENTE'
-       AND mp_order_id IS NOT NULL
-     ORDER BY atualizado_em ASC, id ASC`
-  )
-    .bind(pedidoId)
-    .all();
-
-  await Promise.allSettled((results || []).map(async charge => {
-    try {
-      const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(charge.mp_order_id)}`);
-      const payment = paymentFromOrder(order);
-      const synced = await syncComandaPixCharge(env, {
-        pedidoId,
-        mpOrderId: String(charge.mp_order_id),
-        status: mpOrderToLocalStatus(order),
-        mpPaymentId: payment.paymentId,
-        mpStatus: order?.status || null,
-        mpStatusDetail: order?.status_detail || null,
-        ticketUrl: payment.ticketUrl,
-        qrCode: payment.qrCode,
-        qrCodeBase64: payment.qrCodeBase64
-      });
-      if (synced.ok && synced.status_financeiro === "PAGO") {
-        await baixarEstoquePedido(env, pedidoId);
-      }
-    } catch (error) {
-      logEvent("warn", "payment.sync_failed", {
-        pedido_id: pedidoId,
-        mp_order_id: String(charge.mp_order_id),
-        http_status: error?.status || undefined,
-        reason: error?.status ? "MP_HTTP_ERROR" : "MP_RECONCILIATION_FAILED"
-      });
-    }
-  }));
-}
 
 export async function onRequestGet({ request, env, params }) {
   const auth = await requireUser(env, request);
@@ -59,8 +10,6 @@ export async function onRequestGet({ request, env, params }) {
   if (!Number.isInteger(pedidoId) || pedidoId <= 0) {
     return json({ erro: "Pedido inválido." }, 400);
   }
-
-  await reconcilePendingPix(env, pedidoId);
 
   const pedido = await env.DB.prepare(
     `SELECT id, token_publico, produto_id, produto_nome, quantidade,
