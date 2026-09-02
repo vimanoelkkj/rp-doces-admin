@@ -3,6 +3,7 @@ import { requireUser } from "../../../lib/auth.js";
 import { mpRequest } from "../../../lib/mercadoPago.js";
 import { baixarEstoquePedido } from "../../../lib/stock.js";
 import { syncOrderPayment } from "../../../lib/paymentSync.js";
+import { syncManualPaidOrder } from "../../../lib/comandaLedger.js";
 import { logEvent } from "../../../lib/logger.js";
 
 const RECONCILE_AFTER_SECONDS = 15;
@@ -300,6 +301,12 @@ export async function onRequestPost({ request, env }) {
   if (!pedidoId) return json({ erro: "Não foi possível registrar o pedido." }, 500);
 
   if (paymentStatus === "PAGO") {
+    const ledger = await syncManualPaidOrder(env, pedidoId, auth.user.id);
+    if (!ledger.ok) {
+      logEvent("error", "manual_order.ledger_sync_failed", { pedido_id: pedidoId, reason: ledger.erro });
+      return json({ erro: "Pedido criado, mas o pagamento não pôde ser registrado no financeiro.", id: pedidoId }, 500);
+    }
+
     const stock = await baixarEstoquePedido(env, pedidoId);
     if (!stock.ok) {
       logEvent("error", "manual_order.stock_conversion_failed", { pedido_id: pedidoId });
