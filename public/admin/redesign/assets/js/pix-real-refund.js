@@ -1,0 +1,203 @@
+const API = "/api/admin/health/pix-real-refund";
+const POLL_MS = 3000;
+
+async function request(path, options = {}) {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {})
+    },
+    ...options
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.erro || payload?.detalhe || `HTTP ${response.status}`);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+
+function ensureStyles() {
+  if (document.getElementById("rp-pix-real-refund-style")) return;
+  const style = document.createElement("style");
+  style.id = "rp-pix-real-refund-style";
+  style.textContent = `
+    .pix-real-checks{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .pix-real-button--refund{border-color:#e5b8b8;background:#fff8f8;color:#a74047}
+    .pix-real-button--refund:hover{background:#fff1f1;border-color:#d99b9f}
+    @container(max-width:760px){.pix-real-checks{grid-template-columns:1fr}}
+    @media(max-width:900px){.pix-real-checks{grid-template-columns:1fr}}
+  `;
+  document.head.appendChild(style);
+}
+
+function orderIdFromCard(card) {
+  const value = String(card.querySelector("[data-pix-real-order]")?.textContent || "").trim();
+  return /^[A-Za-z0-9_-]{3,120}$/.test(value) ? value : null;
+}
+
+function paidInCard(card) {
+  const provider = String(card.querySelector("[data-pix-provider-text]")?.textContent || "").toLowerCase();
+  return provider.includes("pagamento confirmado");
+}
+
+function mount(card) {
+  if (!card || card.dataset.pixRefundMounted === "1") return;
+  card.dataset.pixRefundMounted = "1";
+  ensureStyles();
+
+  const toolbar = card.querySelector(".pix-real-toolbar");
+  const checks = card.querySelector("[data-pix-real-checks]");
+  if (!toolbar || !checks) return;
+
+  const refundButton = document.createElement("button");
+  refundButton.type = "button";
+  refundButton.className = "pix-real-button pix-real-button--secondary pix-real-button--refund";
+  refundButton.textContent = "Reembolsar teste de R$ 0,10";
+  refundButton.hidden = true;
+  refundButton.dataset.pixRealRefund = "";
+  toolbar.appendChild(refundButton);
+
+  const refundCheck = document.createElement("div");
+  refundCheck.className = "pix-real-check";
+  refundCheck.innerHTML = `
+    <span class="pix-real-check__dot"></span>
+    <div><span>Reembolso</span><strong data-pix-refund-text>Aguardando pagamento</strong></div>
+  `;
+  checks.appendChild(refundCheck);
+  const refundText = refundCheck.querySelector("[data-pix-refund-text]");
+
+  let timer = null;
+  let lastOrderId = null;
+  let busy = false;
+
+  const stopPolling = () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+  };
+
+  const setRefundCheck = (text, kind = "") => {
+    refundText.textContent = text;
+    refundCheck.className = `pix-real-check${kind ? ` is-${kind}` : ""}`;
+  };
+
+  const applyRefund = payload => {
+    const status = String(payload?.reembolso_status || "").toUpperCase();
+    if (payload?.reembolsado || status === "REEMBOLSADO") {
+      setRefundCheck("Reembolso confirmado ✓", "ok");
+      refundButton.hidden = true;
+      refundButton.disabled = false;
+      stopPolling();
+      return;
+    }
+
+    if (status === "PROCESSANDO") {
+      setRefundCheck("Reembolso em processamento…");
+      refundButton.hidden = false;
+      refundButton.disabled = true;
+      refundButton.textContent = "Reembolso em processamento…";
+      if (!timer) timer = setInterval(sync, POLL_MS);
+      return;
+    }
+
+    if (status === "FALHOU") {
+      setRefundCheck("Falha no reembolso. Consulte novamente.", "error");
+      refundButton.hidden = true;
+      refundButton.disabled = false;
+      stopPolling();
+      return;
+    }
+
+    if (paidInCard(card)) {
+      setRefundCheck("Disponível para teste");
+      refundButton.hidden = false;
+      refundButton.disabled = false;
+      refundButton.textContent = "Reembolsar teste de R$ 0,10";
+    } else {
+      setRefundCheck("Aguardando pagamento");
+      refundButton.hidden = true;
+      refundButton.disabled = false;
+    }
+  };
+
+  async function sync() {
+    const orderId = orderIdFromCard(card);
+    if (!orderId || busy) {
+      if (!orderId) {
+        refundButton.hidden = true;
+        setRefundCheck("Aguardando pagamento");
+      }
+      return;
+    }
+
+    if (lastOrderId !== orderId) {
+      lastOrderId = orderId;
+      stopPolling();
+    }
+
+    try {
+      applyRefund(await request(`${API}?order_id=${encodeURIComponent(orderId)}`));
+    } catch (error) {
+      if (error?.status === 404) {
+        refundButton.hidden = true;
+        setRefundCheck("Diagnóstico sem rastreio de reembolso", "error");
+        return;
+      }
+      console.warn("R&P Admin: consulta do reembolso diagnóstico falhou.", error);
+    }
+  }
+
+  refundButton.addEventListener("click", async () => {
+    const orderId = orderIdFromCard(card);
+    if (!orderId || busy) return;
+
+    const confirmed = window.confirm(
+      "Este teste vai devolver R$ 0,10 de verdade pelo Mercado Pago. Deseja solicitar o reembolso real?"
+    );
+    if (!confirmed) return;
+
+    busy = true;
+    refundButton.disabled = true;
+    refundButton.textContent = "Solicitando reembolso…";
+    setRefundCheck("Solicitando reembolso real…");
+
+    try {
+      const payload = await request(API, {
+        method: "POST",
+        body: JSON.stringify({ order_id: orderId })
+      });
+      applyRefund(payload);
+      if (!payload?.reembolsado && String(payload?.reembolso_status || "").toUpperCase() === "PROCESSANDO") {
+        if (!timer) timer = setInterval(sync, POLL_MS);
+      }
+    } catch (error) {
+      setRefundCheck(error?.message || "Falha ao solicitar reembolso.", "error");
+      refundButton.hidden = false;
+      refundButton.disabled = false;
+      refundButton.textContent = "Consultar reembolso";
+    } finally {
+      busy = false;
+    }
+  });
+
+  const observer = new MutationObserver(() => {
+    const orderId = orderIdFromCard(card);
+    if (orderId !== lastOrderId || paidInCard(card)) sync();
+  });
+  observer.observe(card, { childList: true, subtree: true, characterData: true });
+
+  sync();
+}
+
+function scan() {
+  document.querySelectorAll("[data-pix-real-card]").forEach(mount);
+}
+
+const observer = new MutationObserver(scan);
+observer.observe(document.documentElement, { childList: true, subtree: true });
+scan();
