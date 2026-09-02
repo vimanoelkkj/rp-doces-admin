@@ -14,7 +14,7 @@ function diagnosticToken(env) {
   return String(env?.MP_DIAGNOSTIC_ACCESS_TOKEN || "").trim();
 }
 
-function diagnosticPayload(order) {
+function diagnosticPayload(order, diagnostic = null) {
   const payment = paymentFromOrder(order);
   return {
     order_id: order?.id ? String(order.id) : null,
@@ -28,8 +28,53 @@ function diagnosticPayload(order) {
     valor_centavos: DIAGNOSTIC_CENTS,
     valor: DIAGNOSTIC_AMOUNT,
     real: true,
-    isolated: true
+    isolated: true,
+    webhook_recebido: Boolean(diagnostic?.webhook_recebido_em),
+    webhook_recebido_em: diagnostic?.webhook_recebido_em || null,
+    webhook_data_id: diagnostic?.webhook_data_id || null,
+    pago_em: diagnostic?.pago_em || null
   };
+}
+
+async function findDiagnostic(env, orderId) {
+  return env.DB.prepare(
+    `SELECT external_reference, mp_order_id, mp_payment_id, status, mp_status, mp_status_detail,
+            criado_em, atualizado_em, pago_em, webhook_recebido_em, webhook_data_id, webhook_request_id
+     FROM pix_diagnosticos
+     WHERE mp_order_id = ?
+     LIMIT 1`
+  )
+    .bind(orderId)
+    .first();
+}
+
+async function updateDiagnosticFromOrder(env, order) {
+  const orderId = order?.id ? String(order.id) : "";
+  if (!orderId) return null;
+
+  const payment = paymentFromOrder(order);
+  const status = mpOrderToLocalStatus(order);
+  await env.DB.prepare(
+    `UPDATE pix_diagnosticos
+     SET mp_payment_id = COALESCE(?, mp_payment_id),
+         status = ?,
+         mp_status = ?,
+         mp_status_detail = ?,
+         pago_em = CASE WHEN ? = 'PAGO' THEN COALESCE(pago_em, CURRENT_TIMESTAMP) ELSE pago_em END,
+         atualizado_em = CURRENT_TIMESTAMP
+     WHERE mp_order_id = ?`
+  )
+    .bind(
+      payment.paymentId,
+      status,
+      order?.status || null,
+      order?.status_detail || null,
+      status,
+      orderId
+    )
+    .run();
+
+  return findDiagnostic(env, orderId);
 }
 
 export async function onRequestPost({ request, env }) {
@@ -71,9 +116,39 @@ export async function onRequestPost({ request, env }) {
       }
     });
 
+    const payment = paymentFromOrder(order);
+    const status = mpOrderToLocalStatus(order);
+    let diagnostic = null;
+    let trackingError = null;
+
+    try {
+      await env.DB.prepare(
+        `INSERT INTO pix_diagnosticos
+          (external_reference, mp_order_id, mp_payment_id, valor_centavos, status, mp_status, mp_status_detail, pago_em)
+         VALUES (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'PAGO' THEN CURRENT_TIMESTAMP ELSE NULL END)`
+      )
+        .bind(
+          externalReference,
+          order?.id ? String(order.id) : null,
+          payment.paymentId,
+          DIAGNOSTIC_CENTS,
+          status,
+          order?.status || null,
+          order?.status_detail || null,
+          status
+        )
+        .run();
+      diagnostic = await findDiagnostic(env, String(order?.id || ""));
+    } catch (dbError) {
+      trackingError = dbError?.message || "Falha ao registrar diagnóstico.";
+      console.error("Pix real criado, mas rastreio diagnóstico falhou", dbError);
+    }
+
     return json({
-      ...diagnosticPayload(order),
+      ...diagnosticPayload(order, diagnostic),
       external_reference: externalReference,
+      webhook_rastreavel: !trackingError,
+      rastreio_erro: trackingError,
       aviso: "Transação real de R$ 0,10 usando exclusivamente a credencial de diagnóstico."
     }, 201);
   } catch (error) {
@@ -101,7 +176,8 @@ export async function onRequestGet({ request, env }) {
 
   try {
     const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(orderId)}`, { accessToken });
-    return json(diagnosticPayload(order), 200);
+    const diagnostic = await updateDiagnosticFromOrder(env, order);
+    return json(diagnosticPayload(order, diagnostic), 200);
   } catch (error) {
     console.error("Falha ao consultar Pix real de diagnóstico", error?.data || error);
     return json({
