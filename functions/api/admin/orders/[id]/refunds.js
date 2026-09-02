@@ -132,9 +132,19 @@ async function finalizeRefund(env, refund, payment, { mpRefundId = null, mpStatu
   }
 
   let estoqueRestaurado = false;
+  let aviso = null;
   if (Number(refund.devolveu_estoque || 0) === 1) {
-    const stock = await restoreStock(env, Number(payment.pedido_id));
-    estoqueRestaurado = Boolean(stock.restored);
+    try {
+      const stock = await restoreStock(env, Number(payment.pedido_id));
+      estoqueRestaurado = Boolean(stock.restored);
+    } catch (error) {
+      aviso = "Reembolso confirmado, mas a devolução ao estoque precisa ser reconciliada.";
+      logEvent("error", "payment.refund_stock_failed", {
+        pedido_id: Number(payment.pedido_id),
+        reason: "REFUND_STOCK_RESTORE_FAILED",
+        error_message: String(error?.message || "REFUND_STOCK_RESTORE_FAILED")
+      });
+    }
   }
 
   logEvent("info", "payment.refunded", {
@@ -143,7 +153,7 @@ async function finalizeRefund(env, refund, payment, { mpRefundId = null, mpStatu
     status: "REEMBOLSADO"
   });
 
-  return { ok: true, estoque_restaurado: estoqueRestaurado };
+  return { ok: true, estoque_restaurado: estoqueRestaurado, aviso };
 }
 
 async function syncPendingRefund(env, refund) {
@@ -302,6 +312,7 @@ export async function onRequestPost({ request, env, params }) {
     return json({ ok: true, reembolso: current, confirmado_por: "ADMIN", ...finalized });
   }
 
+  let providerConfirmed = false;
   try {
     let response;
     if (localTestMode(env)) {
@@ -327,6 +338,7 @@ export async function onRequestPost({ request, env, params }) {
     const confirmed = payment.mp_order_id
       ? orderRefundConfirmed(response)
       : Boolean(response?.id) && CONFIRMED_MP_STATUSES.has(normalizeStatus(response?.status || "processed"));
+    providerConfirmed = confirmed;
     const mpRefundId = payment.mp_order_id
       ? refundIdFromOrder(response)
       : response?.id ? String(response.id) : null;
@@ -354,6 +366,19 @@ export async function onRequestPost({ request, env, params }) {
     const current = await env.DB.prepare("SELECT * FROM pedido_reembolsos WHERE id = ?").bind(refund.id).first();
     return json({ ok: true, reembolso: current, confirmado_por: "MERCADO_PAGO", ...finalized });
   } catch (error) {
+    if (providerConfirmed) {
+      logEvent("error", "payment.refund_local_finalize_failed", {
+        pedido_id: pedidoId,
+        mp_order_id: payment.mp_order_id || undefined,
+        reason: "REFUND_CONFIRMED_LOCAL_FINALIZE_FAILED",
+        error_message: String(error?.message || "REFUND_CONFIRMED_LOCAL_FINALIZE_FAILED")
+      });
+      return json({
+        erro: "O Mercado Pago confirmou o reembolso, mas o registro local ainda precisa ser reconciliado. Não repita o reembolso.",
+        codigo: "REFUND_CONFIRMED_LOCAL_PENDING"
+      }, 500);
+    }
+
     await env.DB.prepare(
       `UPDATE pedido_reembolsos
        SET status = 'FALHOU', mp_status = ?, atualizado_em = CURRENT_TIMESTAMP
