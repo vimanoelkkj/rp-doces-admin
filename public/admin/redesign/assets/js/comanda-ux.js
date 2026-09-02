@@ -1,4 +1,5 @@
 import "./comanda-cache.js";
+import "./comanda-refunds.js";
 
 function moneyFromCents(cents) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(cents || 0) / 100);
