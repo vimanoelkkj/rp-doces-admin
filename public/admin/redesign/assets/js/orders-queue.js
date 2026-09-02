@@ -26,6 +26,15 @@ let latestOrders = [];
 let activeFilter = "todos";
 let scheduled = false;
 
+function esc(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function upper(value, fallback = "") {
   return String(value || fallback).toUpperCase();
 }
@@ -35,6 +44,35 @@ function money(cents = 0) {
     style: "currency",
     currency: "BRL"
   }).format(Number(cents || 0) / 100);
+}
+
+function compactDate(value) {
+  if (!value) return "—";
+  const text = String(value);
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)
+    ? `${text.replace(" ", "T")}Z`
+    : text;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return text;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function itemSummary(order) {
+  const items = Array.isArray(order.itens) ? order.itens : [];
+  if (!items.length) {
+    return order.produto_nome
+      ? `${Number(order.quantidade || 1)}× ${order.produto_nome}`
+      : "Pedido sem itens";
+  }
+  return items
+    .slice(0, 2)
+    .map(item => `${Number(item.quantidade || 0)}× ${item.produto_nome || "Produto"}`)
+    .join(" · ") + (items.length > 2 ? ` · +${items.length - 2}` : "");
 }
 
 function orderFinancialState(order) {
@@ -129,15 +167,9 @@ function renderSummary(view) {
 
   summary.classList.add("orders-queue-summary");
   summary.innerHTML = `
-    <article class="orders-queue-kpi is-entered">
-      <strong>${money(entered)}</strong><span>entraram</span>
-    </article>
-    <button type="button" class="orders-queue-kpi is-due" data-queue-summary-filter="receber">
-      <strong>${money(due)}</strong><span>a receber</span>
-    </button>
-    <button type="button" class="orders-queue-kpi is-deliver" data-queue-summary-filter="entregar">
-      <strong>${toDeliver}</strong><span>a entregar</span>
-    </button>`;
+    <article class="orders-queue-kpi is-entered"><strong>${money(entered)}</strong><span>entraram</span></article>
+    <button type="button" class="orders-queue-kpi is-due" data-queue-summary-filter="receber"><strong>${money(due)}</strong><span>a receber</span></button>
+    <button type="button" class="orders-queue-kpi is-deliver" data-queue-summary-filter="entregar"><strong>${toDeliver}</strong><span>a entregar</span></button>`;
 
   summary.querySelectorAll("[data-queue-summary-filter]").forEach(button => {
     button.addEventListener("click", () => setFilter(view, button.dataset.queueSummaryFilter || "todos"));
@@ -175,21 +207,91 @@ function findOrder(id) {
   return latestOrders.find(order => Number(order.id) === Number(id)) || null;
 }
 
-function enhanceStatusMenu(card, order) {
+function statusMenuMarkup(order) {
+  const current = upper(order.status_pedido, "NOVO");
+  return `
+    <div class="orders-status-menu orders-queue-menu" data-order-status-menu>
+      <button class="orders-queue-more" type="button" data-order-status-trigger aria-haspopup="menu" aria-expanded="false" aria-label="Ações do pedido ${Number(order.id)}">···</button>
+      <div class="orders-status-options" data-queue-status-options role="menu" hidden>
+        ${Object.entries(ENTREGA).map(([value, data]) => `
+          <button type="button" role="menuitem" data-queue-status="${value}" ${value === current ? 'aria-current="true"' : ""}>
+            <span>${esc(data.label)}</span>${value === current ? "<strong>✓</strong>" : ""}
+          </button>`).join("")}
+      </div>
+    </div>`;
+}
+
+function rowMarkup(order) {
+  const id = Number(order.id);
+  const financial = orderFinancialState(order);
+  const delivery = upper(order.status_pedido, "NOVO");
+  const fin = FINANCEIRO[financial] || FINANCEIRO.PENDENTE;
+  const ent = ENTREGA[delivery] || ENTREGA.NOVO;
+  const balance = orderBalanceCents(order);
+  const manual = order.origem_pedido === "MANUAL";
+
+  return `
+    <div class="orders-queue-main">
+      <span class="orders-queue-id">#${id}${manual ? " · manual" : ""}</span>
+      <strong class="orders-queue-name">${esc(order.cliente_nome || "Cliente não informado")}</strong>
+      <span class="orders-queue-items">${esc(itemSummary(order))}</span>
+    </div>
+    <span class="orders-status ${fin.className}" data-queue-financial>${esc(fin.label)}</span>
+    <span class="orders-status ${ent.className}" data-queue-delivery>${esc(ent.label)}</span>
+    <div class="orders-queue-value">
+      <strong>${money(order.valor_total_centavos)}</strong>
+      ${balance > 0 ? `<small>${money(balance)} falta</small>` : ""}
+    </div>
+    <time class="orders-queue-created">${esc(compactDate(order.criado_em))}</time>
+    <button class="orders-details-button orders-queue-open" type="button" aria-label="Abrir comanda do pedido ${id}" tabindex="-1">Abrir comanda</button>
+    ${statusMenuMarkup(order)}`;
+}
+
+function bindStatusMenu(card, order) {
   const menu = card.querySelector("[data-order-status-menu]");
-  const trigger = menu?.querySelector("[data-order-status-trigger]");
-  if (!(trigger instanceof HTMLButtonElement)) return;
+  const trigger = card.querySelector("[data-order-status-trigger]");
+  const options = card.querySelector("[data-queue-status-options]");
+  if (!menu || !(trigger instanceof HTMLButtonElement) || !options) return;
 
-  trigger.classList.add("orders-queue-more");
-  trigger.innerHTML = '<span aria-hidden="true">···</span>';
-  trigger.setAttribute("aria-label", `Ações do pedido ${Number(order.id)}`);
-  trigger.setAttribute("title", "Alterar entrega");
+  trigger.addEventListener("click", event => {
+    event.preventDefault();
+    event.stopPropagation();
+    document.querySelectorAll("[data-queue-status-options]").forEach(other => {
+      if (other !== options) other.hidden = true;
+    });
+    options.hidden = !options.hidden;
+    trigger.setAttribute("aria-expanded", String(!options.hidden));
+    menu.classList.toggle("is-open", !options.hidden);
+  });
 
-  menu.querySelectorAll("[data-order-status-value]").forEach(option => {
-    const status = upper(option.dataset.orderStatusValue);
-    const label = ENTREGA[status]?.label || status;
-    const text = option.querySelector("span");
-    if (text) text.textContent = label;
+  options.querySelectorAll("[data-queue-status]").forEach(button => {
+    button.addEventListener("click", async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const next = upper(button.dataset.queueStatus);
+      const previous = upper(order.status_pedido, "NOVO");
+      if (!next || next === previous) {
+        options.hidden = true;
+        return;
+      }
+
+      trigger.disabled = true;
+      try {
+        await adminApi.updateOrderStatus(Number(order.id), next);
+        order.status_pedido = next;
+        card.dataset.queueRendered = "";
+        enhanceCard(card);
+        const view = card.closest(".orders-view");
+        if (view) {
+          renderSummary(view);
+          renderFilters(view);
+          applyRowVisibility(view);
+        }
+      } catch (error) {
+        trigger.disabled = false;
+        window.alert(error?.message || "Não foi possível atualizar o pedido.");
+      }
+    });
   });
 }
 
@@ -199,65 +301,27 @@ function enhanceCard(card) {
   const order = findOrder(id);
   if (!order) return;
 
-  card.classList.add("orders-queue-row");
-  card.classList.remove("is-payment-pending");
-  card.classList.remove("is-row-done", "is-row-due", "is-row-cancelled", "is-row-progress");
-  card.classList.add(rowState(order));
-  card.dataset.queueFinancial = orderFinancialState(order);
-  card.dataset.queueDelivery = upper(order.status_pedido, "NOVO");
+  const signature = `${orderFinancialState(order)}:${upper(order.status_pedido, "NOVO")}:${order.valor_total_centavos}:${order.valor_pago_centavos}:${order.saldo_centavos}:${order.cliente_nome}:${itemSummary(order)}`;
+  if (card.dataset.queueRendered === signature) return;
 
-  const number = card.querySelector(".orders-card__number");
-  if (number) number.textContent = `#${id}${order.origem_pedido === "MANUAL" ? " · manual" : ""}`;
+  card.dataset.queueRendered = signature;
+  card.className = `orders-card orders-queue-row ${rowState(order)}`;
+  card.innerHTML = rowMarkup(order);
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", `Abrir comanda do pedido ${id}`);
 
-  const total = card.querySelector(".orders-card__total");
-  if (total) {
-    total.innerHTML = `${money(order.valor_total_centavos)}${orderBalanceCents(order) > 0 ? `<small>${money(orderBalanceCents(order))} falta</small>` : ""}`;
-  }
+  const openButton = card.querySelector(".orders-details-button");
+  const open = event => {
+    if (event.target.closest("[data-order-status-menu], .orders-details-button")) return;
+    if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
+    if (event.type === "keydown") event.preventDefault();
+    if (openButton instanceof HTMLButtonElement) openButton.click();
+  };
+  card.addEventListener("click", open);
+  card.addEventListener("keydown", open);
 
-  const badges = card.querySelector(".orders-card__badges");
-  if (badges) {
-    const financial = orderFinancialState(order);
-    const delivery = upper(order.status_pedido, "NOVO");
-    const fin = FINANCEIRO[financial] || FINANCEIRO.PENDENTE;
-    const ent = ENTREGA[delivery] || ENTREGA.NOVO;
-    badges.innerHTML = `
-      <span class="orders-status ${fin.className}" data-queue-financial>${fin.label}</span>
-      <span class="orders-status ${ent.className}" data-queue-delivery>${ent.label}</span>`;
-  }
-
-  const meta = card.querySelector(".orders-card__meta");
-  if (meta) {
-    const created = meta.querySelector("span:first-child");
-    const contact = meta.querySelector("span:nth-child(2)");
-    if (created) created.querySelector("strong")?.remove();
-    if (contact) contact.remove();
-  }
-
-  const details = card.querySelector(".orders-details-button");
-  if (details instanceof HTMLButtonElement) {
-    details.classList.add("orders-queue-open");
-    details.setAttribute("aria-label", `Abrir comanda do pedido ${id}`);
-    details.tabIndex = -1;
-  }
-
-  enhanceStatusMenu(card, order);
-
-  if (card.dataset.queueRowBound !== "1") {
-    card.dataset.queueRowBound = "1";
-    card.tabIndex = 0;
-    card.setAttribute("role", "button");
-    card.setAttribute("aria-label", `Abrir comanda do pedido ${id}`);
-
-    const open = event => {
-      if (event.target.closest("[data-order-status-menu], .orders-details-button")) return;
-      if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
-      if (event.type === "keydown") event.preventDefault();
-      const button = card.querySelector(".orders-details-button");
-      if (button instanceof HTMLButtonElement) button.click();
-    };
-    card.addEventListener("click", open);
-    card.addEventListener("keydown", open);
-  }
+  bindStatusMenu(card, order);
 }
 
 function applyRowVisibility(view) {
@@ -301,6 +365,14 @@ const observer = new MutationObserver(records => {
   }
 });
 observer.observe(document.documentElement, { childList: true, subtree: true });
+
+document.addEventListener("click", event => {
+  if (event.target.closest("[data-order-status-menu]")) return;
+  document.querySelectorAll("[data-queue-status-options]").forEach(options => {
+    options.hidden = true;
+    options.closest("[data-order-status-menu]")?.classList.remove("is-open");
+  });
+});
 
 window.addEventListener("rp-admin-data-changed", event => {
   if (event.detail?.pages?.includes?.("pedidos")) scheduleEnhance();
