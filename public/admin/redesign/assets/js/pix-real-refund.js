@@ -52,7 +52,7 @@ function updateExpirationLabel(card) {
     const label = String(item.querySelector("small")?.textContent || "").trim().toLowerCase();
     if (label !== "expiração") return;
     const value = item.querySelector("strong");
-    if (value) value.textContent = "cerca de 2 min";
+    if (value && value.textContent !== "cerca de 2 min") value.textContent = "cerca de 2 min";
   });
 }
 
@@ -106,7 +106,10 @@ function mount(card) {
   let timer = null;
   let lastOrderId = null;
   let busy = false;
+  let syncInFlight = false;
   let duplicateTested = false;
+  let observedOrderId = orderIdFromCard(card);
+  let observedPaid = paidInCard(card);
 
   const stopPolling = () => {
     if (timer) clearInterval(timer);
@@ -191,7 +194,7 @@ function mount(card) {
 
   async function sync() {
     const orderId = orderIdFromCard(card);
-    if (!orderId || busy) {
+    if (!orderId || busy || syncInFlight) {
       if (!orderId) resetForNewOrder();
       return;
     }
@@ -202,6 +205,7 @@ function mount(card) {
     }
 
     normalizeWebhookCopy(card);
+    syncInFlight = true;
 
     try {
       const payload = await request(`${API}?order_id=${encodeURIComponent(orderId)}`);
@@ -216,6 +220,8 @@ function mount(card) {
         return;
       }
       console.warn("R&P Admin: consulta do reembolso diagnóstico falhou.", error);
+    } finally {
+      syncInFlight = false;
     }
   }
 
@@ -299,8 +305,16 @@ function mount(card) {
   const observer = new MutationObserver(() => {
     updateExpirationLabel(card);
     normalizeWebhookCopy(card);
+
     const orderId = orderIdFromCard(card);
-    if (orderId !== lastOrderId || paidInCard(card)) sync();
+    const paid = paidInCard(card);
+    const orderChanged = orderId !== observedOrderId;
+    const paidChanged = paid !== observedPaid;
+
+    observedOrderId = orderId;
+    observedPaid = paid;
+
+    if (orderChanged || paidChanged) sync();
   });
   observer.observe(card, { childList: true, subtree: true, characterData: true });
 
