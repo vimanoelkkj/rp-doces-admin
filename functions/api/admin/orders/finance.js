@@ -57,7 +57,10 @@ export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
 
-  await reconcilePendingComandaPix(env);
+  const url = new URL(request.url);
+  if (url.searchParams.get("reconcile") === "1") {
+    await reconcilePendingComandaPix(env);
+  }
 
   const { results } = await env.DB.prepare(
     `SELECT id, token_publico, produto_id, produto_nome, quantidade,
