@@ -97,7 +97,7 @@ function renderMetrics(panel, data) {
     metric("Recebido", money(data?.recebido_centavos), `${payments} pagamento${payments === 1 ? " confirmado" : "s confirmados"}`, true),
     metric("Vendas quitadas", money(data?.vendas_quitadas_centavos), `Ticket médio ${money(data?.ticket_medio_centavos)}`),
     metric("Pedidos quitados", String(paidOrders), "Comandas totalmente pagas no dia"),
-    metric("Itens vendidos", String(items), "Unidades em pedidos quitados"),
+    metric("Unidades vendidas", String(items), "Quantidade total de produtos vendidos"),
     metric("Pedidos criados", String(created), "Novos pedidos não cancelados")
   ].join("");
 }
