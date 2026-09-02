@@ -104,7 +104,9 @@ const body = rows
   })
   .join("\n\n");
 
-writeFileSync(outputPath, `${header}${body}\n`, "utf8");
+// O snapshot é comparado byte a byte no CI. Mantemos a saída sem newline
+// terminal para que a geração local e a versão rastreada sejam idênticas.
+writeFileSync(outputPath, `${header}${body}`, "utf8");
 
 console.log(`Schema consolidado gerado em: ${path.relative(root, outputPath)}`);
 console.log(`Objetos exportados: ${rows.length}`);
