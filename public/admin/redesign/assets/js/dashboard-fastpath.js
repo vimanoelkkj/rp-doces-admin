@@ -48,7 +48,6 @@ adminApi.orders = async (...args) => {
 
   dashboardWindowUntil = Date.now() + 2500;
   void getDashboardSummaryShared().catch(() => {});
-  void originalOrders(...args).catch(() => {});
   return { pedidos: [] };
 };
 
