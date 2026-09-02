@@ -154,7 +154,37 @@ function enhanceChoiceGroup(group) {
   updateOutcome(group);
 }
 
+function removeInstantLoader() {
+  document.querySelector("[data-comanda-instant-loader]")?.remove();
+}
+
+function showInstantLoader(button) {
+  if (document.querySelector("[data-comanda-dialog]") || document.querySelector("[data-comanda-instant-loader]")) return;
+  const card = button.closest("[data-order-id]");
+  if (!card) return;
+
+  const client = card.querySelector("h3")?.textContent?.trim() || "Comanda";
+  const orderId = Number(card.dataset.orderId || 0);
+  const loader = document.createElement("div");
+  loader.className = "comanda-dialog";
+  loader.dataset.comandaInstantLoader = "";
+  loader.style.pointerEvents = "none";
+  loader.innerHTML = `
+    <div class="comanda-backdrop" aria-hidden="true"></div>
+    <section class="comanda-panel" role="status" aria-live="polite" aria-label="Carregando comanda">
+      <header class="comanda-head">
+        <div><span>${orderId ? `Pedido #${orderId} · Comanda` : "Comanda"}</span><h2>${client}</h2><span>Carregando dados...</span></div>
+      </header>
+      <div class="comanda-body">
+        <div class="comanda-empty"><strong>Abrindo comanda...</strong><span>Só um instante.</span></div>
+      </div>
+    </section>`;
+  document.body.append(loader);
+  window.setTimeout(() => loader.isConnected && loader.remove(), 12000);
+}
+
 function enhanceDialog(dialog) {
+  removeInstantLoader();
   dialog.querySelectorAll(".comanda-choice-group").forEach(enhanceChoiceGroup);
 }
 
@@ -170,3 +200,9 @@ const observer = new MutationObserver(mutations => {
 
 observer.observe(document.body, { childList: true, subtree: true });
 document.querySelectorAll("[data-comanda-dialog]").forEach(enhanceDialog);
+
+document.addEventListener("pointerdown", event => {
+  const button = event.target.closest?.(".orders-details-button");
+  if (!button) return;
+  showInstantLoader(button);
+}, { capture: true, passive: true });
