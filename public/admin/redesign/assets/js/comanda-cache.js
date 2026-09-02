@@ -30,8 +30,9 @@ window.fetch = async function rpComandaCachedFetch(input, init = {}) {
   const match = url?.origin === window.location.origin && method === "GET"
     ? url.pathname.match(/^\/api\/admin\/orders\/(\d+)\/finance$/)
     : null;
+  const bypassCache = url?.searchParams.get("fresh") === "1";
 
-  if (match) {
+  if (match && !bypassCache) {
     const orderId = Number(match[1]);
     const cached = financeCache.get(orderId);
     if (cached) return cachedFinanceResponse(cached);
