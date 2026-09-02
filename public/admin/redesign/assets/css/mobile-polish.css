@@ -29,6 +29,90 @@
     width: auto;
     flex: 0 0 auto;
   }
+
+  /* No mobile, os estados ficam mais leves para evitar grandes blocos saturados. */
+  .dashboard-metric,
+  .dashboard-section,
+  .dashboard-financial__row,
+  .dashboard-financial__summary > div {
+    border-color: color-mix(in oklch, var(--rp-line) 72%, white);
+    background: color-mix(in oklch, var(--rp-surface) 98%, white);
+    box-shadow: 0 6px 18px rgb(68 40 32 / 3%);
+  }
+
+  .dashboard-metric--featured,
+  .dashboard-history__metric.is-featured {
+    border-color: color-mix(in oklch, var(--rp-pink) 12%, white);
+    background: color-mix(in oklch, var(--rp-pink-wash) 28%, white);
+  }
+
+  .dashboard-metric[data-tone="warning"],
+  .dashboard-attention,
+  .dashboard-financial__details {
+    background: color-mix(in oklch, #fff7e8 38%, white);
+  }
+
+  .dashboard-metric[data-tone="success"] {
+    background: color-mix(in oklch, #eef8f3 35%, white);
+  }
+
+  .dashboard-attention li,
+  .dashboard-financial__item,
+  .dashboard-financial__summary > div {
+    border-color: color-mix(in oklch, var(--rp-line) 62%, white);
+  }
+
+  .dashboard-financial__item-state,
+  .dashboard-financial__item[data-state="PARCIAL"] .dashboard-financial__item-state {
+    background: color-mix(in oklch, #fff0d4 55%, white);
+    color: color-mix(in oklch, #8b5b11 82%, #6f645e);
+  }
+
+  .dashboard-financial__item[data-state="PAGO"] .dashboard-financial__item-state {
+    background: color-mix(in oklch, #e4f4ec 58%, white);
+    color: color-mix(in oklch, #247452 82%, #5d6b64);
+  }
+
+  .status-pill[data-tone="warning"],
+  .orders-status.is-fin-pending,
+  .orders-status.is-fin-partial,
+  .comanda-state.comanda-status-pending,
+  .comanda-state.comanda-status-partial {
+    background: color-mix(in oklch, #fff0d4 52%, white) !important;
+    border-color: color-mix(in oklch, #e4c985 38%, white) !important;
+  }
+
+  .status-pill[data-tone="success"],
+  .orders-status.is-fin-paid,
+  .comanda-state.comanda-status-paid {
+    background: color-mix(in oklch, #e4f4ec 54%, white) !important;
+    border-color: color-mix(in oklch, #9dcdb8 34%, white) !important;
+  }
+
+  .status-pill[data-tone="danger"],
+  .orders-status.is-delivery-cancelled,
+  .comanda-state.comanda-status-cancelled {
+    background: color-mix(in oklch, #f8e8e8 48%, white) !important;
+    border-color: color-mix(in oklch, #ddb0b1 34%, white) !important;
+  }
+
+  .comanda-pending-pix {
+    background: color-mix(in oklch, #fff0c7 42%, white) !important;
+    border-color: color-mix(in oklch, #e9cc7d 36%, white) !important;
+  }
+
+  .orders-card.is-payment-pending,
+  .orders-card.is-row-due {
+    background: color-mix(in oklch, #fff7e8 42%, white) !important;
+  }
+
+  .orders-card.is-row-done {
+    background: color-mix(in oklch, #eef8f3 38%, white) !important;
+  }
+
+  .orders-card.is-row-cancelled {
+    background: color-mix(in oklch, #faeeee 38%, white) !important;
+  }
 }
 
 @media (max-width: 520px) {
