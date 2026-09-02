@@ -220,8 +220,7 @@ function mount(storeView) {
     if (!webhookTrackable) {
       setCheck(webhookCheck, webhookText, "Rastreio indisponível nesta cobrança", "error");
     } else if (webhookReceived) {
-      const suffix = payload.webhook_recebido_em ? " ✓" : " ✓";
-      setCheck(webhookCheck, webhookText, `Webhook recebido pela R&P${suffix}`, "ok");
+      setCheck(webhookCheck, webhookText, "Webhook recebido pela R&P ✓", "ok");
     } else if (paid) {
       setCheck(webhookCheck, webhookText, "Aguardando webhook da aplicação…");
     } else if (terminalError) {
@@ -273,6 +272,28 @@ function mount(storeView) {
     timer = setInterval(poll, POLL_MS);
   };
 
+  const resumePollingIfNeeded = payload => {
+    const terminal = ["CANCELADO", "EXPIRADO", "FALHOU"].includes(payload.status);
+    const complete = payload.status === "PAGO" && payload.webhook_recebido === true;
+    if (!terminal && !complete && webhookTrackable) startPolling();
+    else if (payload.status !== "PAGO" && !terminal) startPolling();
+  };
+
+  const hydrateLatest = async () => {
+    setStatus("Carregando último diagnóstico…");
+    try {
+      const payload = await request(`${API}?latest=1`);
+      if (payload.diagnostico === false) {
+        setStatus("Aguardando geração do diagnóstico");
+        return;
+      }
+      apply(payload);
+      resumePollingIfNeeded(payload);
+    } catch (error) {
+      setStatus(error?.message || "Não foi possível recuperar o último diagnóstico.", "error");
+    }
+  };
+
   generate.addEventListener("click", async () => {
     if (generate.disabled) return;
 
@@ -292,10 +313,7 @@ function mount(storeView) {
     try {
       const payload = await request(API, { method: "POST" });
       apply(payload);
-      const terminal = ["CANCELADO", "EXPIRADO", "FALHOU"].includes(payload.status);
-      const complete = payload.status === "PAGO" && payload.webhook_recebido === true;
-      if (!terminal && !complete && webhookTrackable) startPolling();
-      else if (payload.status !== "PAGO" && !terminal) startPolling();
+      resumePollingIfNeeded(payload);
     } catch (error) {
       setStatus(error?.message || "Não foi possível gerar o Pix real.", "error");
     } finally {
@@ -321,6 +339,8 @@ function mount(storeView) {
       document.execCommand("copy");
     }
   });
+
+  hydrateLatest();
 }
 
 function scan() {
