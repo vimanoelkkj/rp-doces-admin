@@ -121,6 +121,18 @@ function mount(card) {
     normalizeWebhookCopy(card);
   };
 
+  const payloadMatchesCurrentOrder = (payload, expectedOrderId) => {
+    const payloadOrderId = String(payload?.order_id || "").trim();
+    const currentOrderId = orderIdFromCard(card);
+    return Boolean(
+      expectedOrderId &&
+      payloadOrderId &&
+      payloadOrderId === expectedOrderId &&
+      currentOrderId === expectedOrderId &&
+      lastOrderId === expectedOrderId
+    );
+  };
+
   const applyRefund = payload => {
     const status = String(payload?.reembolso_status || "").toUpperCase();
     if (payload?.reembolsado || status === "REEMBOLSADO") {
@@ -170,9 +182,7 @@ function mount(card) {
   async function sync() {
     const orderId = orderIdFromCard(card);
     if (!orderId || busy) {
-      if (!orderId) {
-        resetForNewOrder();
-      }
+      if (!orderId) resetForNewOrder();
       return;
     }
 
@@ -184,8 +194,11 @@ function mount(card) {
     normalizeWebhookCopy(card);
 
     try {
-      applyRefund(await request(`${API}?order_id=${encodeURIComponent(orderId)}`));
+      const payload = await request(`${API}?order_id=${encodeURIComponent(orderId)}`);
+      if (!payloadMatchesCurrentOrder(payload, orderId)) return;
+      applyRefund(payload);
     } catch (error) {
+      if (orderIdFromCard(card) !== orderId || lastOrderId !== orderId) return;
       if (error?.status === 404) {
         refundButton.hidden = true;
         duplicateButton.hidden = true;
@@ -215,11 +228,13 @@ function mount(card) {
         method: "POST",
         body: JSON.stringify({ order_id: orderId })
       });
+      if (!payloadMatchesCurrentOrder(payload, orderId)) return;
       applyRefund(payload);
       if (!payload?.reembolsado && String(payload?.reembolso_status || "").toUpperCase() === "PROCESSANDO") {
         if (!timer) timer = setInterval(sync, POLL_MS);
       }
     } catch (error) {
+      if (orderIdFromCard(card) !== orderId || lastOrderId !== orderId) return;
       setRefundCheck(error?.message || "Falha ao solicitar reembolso.", "error");
       refundButton.hidden = false;
       refundButton.disabled = false;
@@ -248,6 +263,7 @@ function mount(card) {
         method: "POST",
         body: JSON.stringify({ order_id: orderId })
       });
+      if (!payloadMatchesCurrentOrder(payload, orderId)) return;
 
       if (payload?.requisicao_duplicada === true && (payload?.ja_reembolsado === true || payload?.reembolsado === true)) {
         duplicateTested = true;
@@ -260,6 +276,7 @@ function mount(card) {
       duplicateButton.disabled = false;
       duplicateButton.textContent = "Testar reembolso duplicado";
     } catch (error) {
+      if (orderIdFromCard(card) !== orderId || lastOrderId !== orderId) return;
       setRefundCheck(error?.message || "Falha ao testar proteção contra duplicidade.", "error");
       duplicateButton.hidden = false;
       duplicateButton.disabled = false;
