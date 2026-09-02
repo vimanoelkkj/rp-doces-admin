@@ -62,10 +62,18 @@ function fakeMpRequest(path, { method = "GET", idempotencyKey } = {}) {
   throw err;
 }
 
-export async function mpRequest(env, path, { method = "GET", body, idempotencyKey } = {}) {
-  requireMercadoPago(env);
+export async function mpRequest(
+  env,
+  path,
+  { method = "GET", body, idempotencyKey, forceReal = false } = {}
+) {
+  if (forceReal) {
+    if (!env?.MP_ACCESS_TOKEN) throw new Error("MP_ACCESS_TOKEN não configurado.");
+  } else {
+    requireMercadoPago(env);
+  }
 
-  if (localTestMode(env)) {
+  if (localTestMode(env) && !forceReal) {
     return fakeMpRequest(path, { method, body, idempotencyKey });
   }
 
