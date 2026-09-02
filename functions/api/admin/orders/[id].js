@@ -37,6 +37,21 @@ async function reativarProdutosComSaldo(env, pedidoId) {
   );
 }
 
+async function valorConfirmado(env, pedido) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(valor_centavos), 0) AS total_centavos
+     FROM pedido_pagamentos
+     WHERE pedido_id = ? AND status = 'PAGO'`
+  )
+    .bind(pedido.id)
+    .first();
+  const ledger = Number(row?.total_centavos || 0);
+  if (ledger > 0) return ledger;
+  return String(pedido.status_pagamento || "").toUpperCase() === "PAGO"
+    ? Number(pedido.valor_total_centavos || 0)
+    : 0;
+}
+
 async function restaurarBaixaManual(env, pedidoId) {
   const itens = await itensAgrupados(env, pedidoId);
   if (!itens.length) return { ok: false };
@@ -95,7 +110,7 @@ async function reservarPedidoManual(env, pedidoId) {
 
     const disponivel = Number(produto?.estoque || 0) - Number(produto?.estoque_reservado || 0);
     if (!produto || !produto.ativo || disponivel < Number(item.quantidade || 0)) {
-      return { ok: false, erro: "ESTOQUE_INSUFICIENTE" };
+      return { ok: false, erro: "ESTOQUE_INSUFIENTE" };
     }
   }
 
@@ -199,10 +214,16 @@ async function cancelarPagamentoManual(env, pedido) {
     return { ok: true, status_pagamento: "CANCELADO", status_pedido: "CANCELADO" };
   }
 
-  if (pedido.status_pagamento === "PAGO") {
-    const restored = await restaurarBaixaManual(env, pedido.id);
-    if (!restored.ok) return { ok: false, erro: "ERRO_RESTAURAR_ESTOQUE" };
-  } else if (pedido.reserva_status === "ATIVA") {
+  const pago = await valorConfirmado(env, pedido);
+  if (pago > 0) {
+    return {
+      ok: false,
+      erro: "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO",
+      valor_pago_centavos: pago
+    };
+  }
+
+  if (pedido.reserva_status === "ATIVA") {
     const released = await liberarReservaPedido(env, pedido.id, { novoStatus: "CANCELADO" });
     if (!released.ok) return { ok: false, erro: "ERRO_LIBERAR_RESERVA" };
   }
@@ -229,9 +250,13 @@ async function tornarPendenteManual(env, pedido) {
     return { ok: true, status_pagamento: "PENDENTE" };
   }
 
-  if (pedido.status_pagamento === "PAGO") {
-    const restored = await restaurarBaixaManual(env, pedido.id);
-    if (!restored.ok) return { ok: false, erro: "ERRO_RESTAURAR_ESTOQUE" };
+  const pago = await valorConfirmado(env, pedido);
+  if (pago > 0) {
+    return {
+      ok: false,
+      erro: "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO",
+      valor_pago_centavos: pago
+    };
   }
 
   const reserva = await reservarPedidoManual(env, pedido.id);
@@ -249,7 +274,8 @@ export async function onRequestPut({ request, env, params }) {
   if (!Number.isInteger(id) || id < 1) return json({ erro: "Dados inválidos." }, 400);
 
   const pedido = await env.DB.prepare(
-    `SELECT id, origem_pedido, status_pedido, status_pagamento, reserva_status, estoque_baixado_em
+    `SELECT id, origem_pedido, status_pedido, status_pagamento, reserva_status,
+            estoque_baixado_em, valor_total_centavos
      FROM pedidos WHERE id = ? LIMIT 1`
   )
     .bind(id)
@@ -271,10 +297,16 @@ export async function onRequestPut({ request, env, params }) {
       const mensagem =
         result.erro === "ESTOQUE_INSUFICIENTE"
           ? "Não há estoque disponível para reabrir este pedido."
-          : result.erro === "ERRO_FINANCEIRO" || result.erro === "PAGAMENTO_NAO_REGISTRADO"
-            ? "Não foi possível registrar a quitação no financeiro."
-            : "Não foi possível atualizar o pagamento por inconsistência no estoque.";
-      return json({ erro: mensagem }, 409);
+          : result.erro === "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO"
+            ? "Este pedido já possui pagamento confirmado. Faça o estorno/reembolso antes de alterar ou cancelar o pagamento."
+            : result.erro === "ERRO_FINANCEIRO" || result.erro === "PAGAMENTO_NAO_REGISTRADO"
+              ? "Não foi possível registrar a quitação no financeiro."
+              : "Não foi possível atualizar o pagamento por inconsistência no estoque.";
+      return json({
+        erro: mensagem,
+        codigo: result.erro,
+        valor_pago_centavos: result.valor_pago_centavos || undefined
+      }, 409);
     }
 
     return json({ ok: true, id, ...result });
@@ -289,7 +321,16 @@ export async function onRequestPut({ request, env, params }) {
     pedido.status_pagamento !== "CANCELADO"
   ) {
     const result = await cancelarPagamentoManual(env, pedido);
-    if (!result.ok) return json({ erro: "Não foi possível cancelar o pedido." }, 409);
+    if (!result.ok) {
+      const mensagem = result.erro === "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO"
+        ? "Este pedido já possui pagamento confirmado. Faça o estorno/reembolso antes de cancelar."
+        : "Não foi possível cancelar o pedido.";
+      return json({
+        erro: mensagem,
+        codigo: result.erro,
+        valor_pago_centavos: result.valor_pago_centavos || undefined
+      }, 409);
+    }
     return json({ ok: true, id, status_pedido: "CANCELADO", status_pagamento: "CANCELADO" });
   }
 
