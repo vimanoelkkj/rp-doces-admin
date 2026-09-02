@@ -172,27 +172,3 @@ const observer = new MutationObserver(mutations => {
 
 observer.observe(document.body, { childList: true, subtree: true });
 document.querySelectorAll("[data-comanda-dialog]").forEach(enhanceDialog);
-
-const CLOSE_ANIMATION_MS = 200;
-
-document.addEventListener("click", event => {
-  const closeButton = event.target.closest?.("[data-comanda-close]");
-  if (!closeButton) return;
-
-  const dialog = closeButton.closest("[data-comanda-dialog]");
-  if (!dialog || closeButton.dataset.drawerClosePass === "1") return;
-
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  if (dialog.classList.contains("is-closing")) return;
-
-  dialog.classList.add("is-closing");
-  dialog.setAttribute("aria-busy", "true");
-
-  window.setTimeout(() => {
-    if (!dialog.isConnected) return;
-    closeButton.dataset.drawerClosePass = "1";
-    closeButton.click();
-    delete closeButton.dataset.drawerClosePass;
-  }, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : CLOSE_ANIMATION_MS);
-}, true);
