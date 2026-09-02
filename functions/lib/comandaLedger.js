@@ -179,6 +179,94 @@ export async function allocatePaidPayment(env, pagamentoId, pedidoId, valorCenta
   return { ok: true, alocado_centavos: valor };
 }
 
+export async function syncManualPaidOrder(env, pedidoId, usuarioId = null) {
+  const pedido = await env.DB.prepare(
+    `SELECT id, origem_pedido, metodo_pagamento, valor_total_centavos,
+            idempotency_key, pago_em
+     FROM pedidos
+     WHERE id = ? LIMIT 1`
+  )
+    .bind(pedidoId)
+    .first();
+
+  if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
+  if (String(pedido.origem_pedido || "").toUpperCase() !== "MANUAL") {
+    return { ok: false, erro: "PEDIDO_NAO_MANUAL" };
+  }
+
+  const total = Number(pedido.valor_total_centavos || 0);
+  if (!Number.isSafeInteger(total) || total <= 0) return { ok: false, erro: "VALOR_INVALIDO" };
+
+  const { results } = await env.DB.prepare(
+    `SELECT id, status, valor_centavos, idempotency_key, mp_order_id
+     FROM pedido_pagamentos
+     WHERE pedido_id = ?
+     ORDER BY id ASC`
+  )
+    .bind(pedidoId)
+    .all();
+
+  const pagamentos = results || [];
+  const pago = pagamentos
+    .filter(item => String(item.status || "").toUpperCase() === "PAGO")
+    .reduce((sum, item) => sum + Number(item.valor_centavos || 0), 0);
+  const restante = Math.max(0, total - pago);
+
+  const legacyKeys = new Set([String(pedido.idempotency_key || ""), `legacy:${pedidoId}`]);
+  const placeholders = pagamentos.filter(item =>
+    String(item.status || "").toUpperCase() === "PENDENTE" &&
+    !item.mp_order_id &&
+    legacyKeys.has(String(item.idempotency_key || ""))
+  );
+
+  if (placeholders.length) {
+    await env.DB.batch(
+      placeholders.map(item =>
+        env.DB.prepare(
+          `UPDATE pedido_pagamentos
+           SET status = 'CANCELADO', cancelado_em = CURRENT_TIMESTAMP,
+               atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'PENDENTE'`
+        ).bind(item.id)
+      )
+    );
+  }
+
+  if (!restante) {
+    await recalculateComanda(env, pedidoId);
+    return { ok: true, pagamento_id: null, valor_centavos: 0, ja_quitado: true };
+  }
+
+  const inserted = await env.DB.prepare(
+    `INSERT INTO pedido_pagamentos (
+       pedido_id, metodo, origem, valor_centavos, status,
+       registrado_por_usuario_id, observacao, idempotency_key, pago_em
+     ) VALUES (?, ?, 'ADMIN', ?, 'PAGO', ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))`
+  )
+    .bind(
+      pedidoId,
+      ledgerPaymentMethod(pedido.metodo_pagamento),
+      restante,
+      usuarioId,
+      "Quitação de pedido manual",
+      `manual-paid:${pedidoId}:${crypto.randomUUID()}`,
+      pedido.pago_em || null
+    )
+    .run();
+
+  const pagamentoId = Number(inserted?.meta?.last_row_id || 0);
+  if (!pagamentoId) return { ok: false, erro: "PAGAMENTO_NAO_REGISTRADO" };
+
+  const allocation = await allocatePaidPayment(env, pagamentoId, pedidoId, restante);
+  if (!allocation.ok) {
+    await env.DB.prepare("DELETE FROM pedido_pagamentos WHERE id = ?").bind(pagamentoId).run();
+    return allocation;
+  }
+
+  await recalculateComanda(env, pedidoId);
+  return { ok: true, pagamento_id: pagamentoId, valor_centavos: restante, ja_quitado: false };
+}
+
 export async function recalculateComanda(env, pedidoId) {
   const state = await getComandaFinancialState(env, pedidoId);
   if (!state) return null;
