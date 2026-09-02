@@ -212,7 +212,7 @@ CREATE TABLE pix_diagnosticos (
   webhook_recebido_em TEXT,
   webhook_data_id TEXT,
   webhook_request_id TEXT
-);
+, reembolso_status TEXT, mp_refund_id TEXT, mp_refund_status TEXT, reembolso_solicitado_em TEXT, reembolsado_em TEXT);
 
 -- table: produtos
 CREATE TABLE "produtos" (
@@ -378,6 +378,10 @@ CREATE INDEX idx_pix_diagnosticos_order ON pix_diagnosticos(mp_order_id);
 
 -- index: idx_pix_diagnosticos_payment
 CREATE INDEX idx_pix_diagnosticos_payment ON pix_diagnosticos(mp_payment_id);
+
+-- index: idx_pix_diagnosticos_reembolso_status
+CREATE INDEX idx_pix_diagnosticos_reembolso_status
+  ON pix_diagnosticos(reembolso_status, atualizado_em);
 
 -- index: idx_produtos_ativo_disponivel
 CREATE INDEX idx_produtos_ativo_disponivel
