@@ -90,10 +90,10 @@ CREATE TABLE pedido_itens (
   valor_unitario_centavos INTEGER NOT NULL CHECK (valor_unitario_centavos >= 0),
   valor_total_centavos INTEGER NOT NULL CHECK (valor_total_centavos >= 0),
   estoque_baixado_em TEXT,
-  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, adicionado_por_usuario_id INTEGER REFERENCES usuarios_admin(id) ON DELETE SET NULL, adicionado_em TEXT,
   FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
   FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL
-, adicionado_por_usuario_id INTEGER REFERENCES usuarios_admin(id) ON DELETE SET NULL, adicionado_em TEXT);
+);
 
 -- table: pedido_pagamento_alocacoes
 CREATE TABLE pedido_pagamento_alocacoes (
@@ -130,11 +130,35 @@ CREATE TABLE pedido_pagamentos (
   criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   pago_em TEXT,
-  cancelado_em TEXT,
+  cancelado_em TEXT, pix_expira_em TEXT,
   FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
   FOREIGN KEY (substitui_pagamento_id) REFERENCES pedido_pagamentos(id) ON DELETE SET NULL,
   FOREIGN KEY (registrado_por_usuario_id) REFERENCES usuarios_admin(id) ON DELETE SET NULL
-, pix_expira_em TEXT);
+);
+
+-- table: pedido_reembolsos
+CREATE TABLE pedido_reembolsos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pedido_id INTEGER NOT NULL,
+  pagamento_id INTEGER NOT NULL,
+  origem TEXT NOT NULL CHECK (origem IN ('MERCADO_PAGO','MANUAL')),
+  metodo TEXT NOT NULL CHECK (metodo IN ('PIX_MP','PIX_EXTERNO','CARTAO','DINHEIRO','OUTRO')),
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  status TEXT NOT NULL DEFAULT 'PENDENTE'
+    CHECK (status IN ('PENDENTE','REEMBOLSADO','FALHOU')),
+  mp_refund_id TEXT,
+  mp_status TEXT,
+  idempotency_key TEXT NOT NULL,
+  registrado_por_usuario_id INTEGER,
+  motivo TEXT NOT NULL DEFAULT '',
+  devolveu_estoque INTEGER NOT NULL DEFAULT 0 CHECK (devolveu_estoque IN (0,1)),
+  criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  concluido_em TEXT,
+  FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
+  FOREIGN KEY (pagamento_id) REFERENCES pedido_pagamentos(id) ON DELETE CASCADE,
+  FOREIGN KEY (registrado_por_usuario_id) REFERENCES usuarios_admin(id) ON DELETE SET NULL
+);
 
 -- table: pedidos
 CREATE TABLE "pedidos" (
@@ -167,10 +191,10 @@ CREATE TABLE "pedidos" (
   estoque_baixado_em TEXT,
   arquivado INTEGER NOT NULL DEFAULT 0,
   arquivado_em TEXT, reserva_status TEXT NOT NULL DEFAULT 'SEM_RESERVA' CHECK (reserva_status IN ('SEM_RESERVA', 'ATIVA', 'CONVERTIDA', 'LIBERADA')), reserva_expira_em TEXT, reserva_liberada_em TEXT, pix_expira_em TEXT, origem_pedido TEXT NOT NULL DEFAULT 'SITE'
-  CHECK (origem_pedido IN ('SITE', 'MANUAL')),
+  CHECK (origem_pedido IN ('SITE', 'MANUAL')), status_comanda TEXT NOT NULL DEFAULT 'ABERTA'
+  CHECK (status_comanda IN ('ABERTA','ENCERRADA')),
   FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL
-, status_comanda TEXT NOT NULL DEFAULT 'ABERTA'
-  CHECK (status_comanda IN ('ABERTA','ENCERRADA')));
+);
 
 -- table: pix_diagnosticos
 CREATE TABLE pix_diagnosticos (
@@ -310,6 +334,14 @@ CREATE INDEX idx_pedido_pagamento_alocacoes_pagamento
 CREATE INDEX idx_pedido_pagamentos_pedido_status
   ON pedido_pagamentos(pedido_id, status, criado_em);
 
+-- index: idx_pedido_reembolsos_pagamento
+CREATE INDEX idx_pedido_reembolsos_pagamento
+  ON pedido_reembolsos(pagamento_id, status);
+
+-- index: idx_pedido_reembolsos_pedido
+CREATE INDEX idx_pedido_reembolsos_pedido
+  ON pedido_reembolsos(pedido_id, status, criado_em);
+
 -- index: idx_pedidos_arquivado
 CREATE INDEX idx_pedidos_arquivado ON pedidos(arquivado, criado_em);
 
@@ -377,6 +409,15 @@ CREATE UNIQUE INDEX uq_pedido_pagamentos_idempotency
 CREATE UNIQUE INDEX uq_pedido_pagamentos_mp_order
   ON pedido_pagamentos(mp_order_id)
   WHERE mp_order_id IS NOT NULL;
+
+-- index: uq_pedido_reembolsos_idempotency
+CREATE UNIQUE INDEX uq_pedido_reembolsos_idempotency
+  ON pedido_reembolsos(idempotency_key);
+
+-- index: uq_pedido_reembolsos_pagamento_concluido
+CREATE UNIQUE INDEX uq_pedido_reembolsos_pagamento_concluido
+  ON pedido_reembolsos(pagamento_id)
+  WHERE status = 'REEMBOLSADO';
 
 -- trigger: pedidos_encerrar_comanda_status_terminal
 CREATE TRIGGER pedidos_encerrar_comanda_status_terminal
