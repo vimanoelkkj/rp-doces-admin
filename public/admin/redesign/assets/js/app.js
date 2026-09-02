@@ -11,6 +11,7 @@ import { setupNotificationMenu } from "./notifications.js";
 import "./product-images.js";
 import "./store-home-images.js";
 import "./pix-real-diagnostic.js";
+import "./pix-real-refund.js";
 
 function ensureHeadLink(rel, href, extras = {}) {
   let link = document.head.querySelector(`link[rel="${rel}"][href="${href}"]`);
