@@ -80,7 +80,11 @@ button { cursor: pointer; }
 .admin-tooltip.is-visible { opacity: 1; transform: none; }
 .admin-app.is-collapsed .admin-brand__copy, .admin-app.is-collapsed .admin-nav__label, .admin-app.is-collapsed .admin-collapse > span:not(.admin-nav__icon) { max-width: 0; opacity: 0; transform: translateX(-8px); visibility: hidden; transition: max-width 220ms ease, opacity 120ms ease, transform 220ms ease, visibility 0s linear 220ms; }
 .admin-app.is-collapsed .admin-nav__badge { min-width: 0; max-width: 0; padding-inline: 0; opacity: 0; transform: scale(0.72); visibility: hidden; transition: max-width 220ms ease, min-width 220ms ease, padding 220ms ease, opacity 100ms ease, transform 180ms ease, visibility 0s linear 220ms; }
-.admin-app.is-collapsed .admin-brand__mark, .admin-app.is-collapsed .admin-nav__item > .admin-nav__icon, .admin-app.is-collapsed .admin-collapse > .admin-nav__icon { transform: translateX(3px); }
+.admin-app.is-collapsed .admin-brand { justify-content: center; gap: 0; padding-inline: 0; }
+.admin-app.is-collapsed .admin-nav__item, .admin-app.is-collapsed .admin-collapse { justify-content: center; gap: 0; padding-inline: 0; }
+.admin-app.is-collapsed .admin-brand__mark, .admin-app.is-collapsed .admin-nav__item > .admin-nav__icon, .admin-app.is-collapsed .admin-collapse > .admin-nav__icon { transform: none; }
+.admin-app.is-collapsed .admin-nav__item:hover { transform: none; }
+.admin-app.is-collapsed .admin-nav__item:active { transform: scale(0.99); }
 .admin-app.is-collapsed .admin-collapse .admin-nav__icon svg { transform: rotate(180deg); }
 
 @media (max-width: 860px) {
