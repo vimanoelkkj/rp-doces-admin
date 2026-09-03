@@ -1,0 +1,606 @@
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.heading {
+  max-width: 680px;
+}
+
+.kicker {
+  margin: 0 0 5px;
+  color: var(--rp-pink-strong);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.heading h2 {
+  margin: 0;
+  color: var(--rp-ink);
+  font-family: var(--rp-display);
+  font-size: clamp(22px, 2.2vw, 30px);
+}
+
+.heading p:last-child {
+  margin: 7px 0 0;
+  color: var(--rp-ink-3);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton,
+.successButton,
+.closeButton {
+  border: 1px solid var(--rp-line);
+  border-radius: 11px;
+  min-height: 38px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, opacity .16s ease;
+}
+
+.primaryButton {
+  border-color: var(--rp-pink);
+  background: var(--rp-pink);
+  color: #fff;
+}
+
+.secondaryButton,
+.closeButton {
+  background: #fff;
+  color: var(--rp-ink-2);
+}
+
+.dangerButton {
+  border-color: color-mix(in srgb, var(--rp-danger) 34%, var(--rp-line));
+  background: color-mix(in srgb, #fff 90%, #fff0f2);
+  color: var(--rp-danger);
+}
+
+.successButton {
+  border-color: color-mix(in srgb, var(--rp-success) 34%, var(--rp-line));
+  background: color-mix(in srgb, #fff 91%, #effff5);
+  color: var(--rp-success);
+}
+
+.primaryButton:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled),
+.dangerButton:hover:not(:disabled),
+.successButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: var(--rp-pink);
+  background: var(--rp-pink-wash);
+  color: var(--rp-pink-strong);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.successButton:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.summaryCard {
+  border: 1px solid var(--rp-line);
+  border-radius: 16px;
+  padding: 15px 17px;
+  background: var(--rp-surface);
+  box-shadow: 0 7px 20px rgb(68 40 32 / 4%);
+}
+
+.summaryCard span {
+  display: block;
+  color: var(--rp-ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.summaryCard strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--rp-ink);
+  font-family: var(--rp-display);
+  font-size: 25px;
+}
+
+.feedback,
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  border-radius: 13px;
+  padding: 11px 13px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.feedback {
+  border: 1px solid color-mix(in srgb, var(--rp-success) 26%, var(--rp-line));
+  background: color-mix(in srgb, #fff 92%, #effff5);
+  color: var(--rp-success);
+}
+
+.error {
+  border: 1px solid color-mix(in srgb, var(--rp-danger) 28%, var(--rp-line));
+  background: color-mix(in srgb, #fff 91%, #fff0f2);
+  color: var(--rp-danger);
+}
+
+.error button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 16px;
+}
+
+.card {
+  overflow: hidden;
+  border: 1px solid var(--rp-line);
+  border-radius: 18px;
+  background: var(--rp-surface);
+  box-shadow: 0 9px 28px rgb(68 40 32 / 5%);
+  transition: opacity .18s ease, border-color .18s ease;
+}
+
+.cardDisabled {
+  opacity: .72;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 16px 13px;
+}
+
+.avatar,
+.avatarFallback {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 50%;
+}
+
+.avatar {
+  object-fit: cover;
+}
+
+.avatarFallback {
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--rp-pink) 28%, var(--rp-line));
+  background: var(--rp-pink-wash);
+  color: var(--rp-pink-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nameRow h3 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--rp-ink);
+  font-family: var(--rp-display);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity p {
+  margin: 2px 0 0;
+  color: var(--rp-ink-3);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.you,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 7px;
+  font-size: 8.5px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.you {
+  background: var(--rp-pink-wash);
+  color: var(--rp-pink-strong);
+}
+
+.badgeActive {
+  background: color-mix(in srgb, #fff 78%, #e6fff0);
+  color: var(--rp-success);
+}
+
+.badgeInactive {
+  background: color-mix(in srgb, #fff 76%, #f1f0ef);
+  color: var(--rp-ink-3);
+}
+
+.badgeOwner {
+  background: var(--rp-pink-wash);
+  color: var(--rp-pink-strong);
+}
+
+.badgeAdmin {
+  background: var(--rp-surface-2);
+  color: var(--rp-ink-2);
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(105px, .7fr) minmax(100px, .6fr);
+  border-top: 1px solid var(--rp-line);
+  border-bottom: 1px solid var(--rp-line);
+}
+
+.meta > div {
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.meta > div + div {
+  border-left: 1px solid var(--rp-line);
+}
+
+.meta span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--rp-ink-3);
+  font-size: 8.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.meta strong {
+  display: block;
+  overflow: hidden;
+  color: var(--rp-ink-2);
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 13px 14px 15px;
+}
+
+.actions button {
+  min-height: 34px;
+  padding-inline: 11px;
+  font-size: 9.5px;
+}
+
+.passwordPanel {
+  border-top: 1px solid var(--rp-line);
+  padding: 15px;
+  background: var(--rp-surface-2);
+}
+
+.passwordHeading {
+  margin-bottom: 12px;
+}
+
+.passwordHeading strong {
+  display: block;
+  color: var(--rp-ink);
+  font-size: 11px;
+}
+
+.passwordHeading span {
+  display: block;
+  margin-top: 3px;
+  color: var(--rp-ink-3);
+  font-size: 9.5px;
+}
+
+.passwordGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.field > span,
+.roleChoice legend {
+  color: var(--rp-ink-2);
+  font-size: 9.5px;
+  font-weight: 900;
+}
+
+.field input {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  border: 1px solid var(--rp-line);
+  border-radius: 10px;
+  padding: 0 11px;
+  background: #fff;
+  color: var(--rp-ink);
+  font: inherit;
+  font-size: 11px;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: var(--rp-pink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rp-pink) 12%, transparent);
+}
+
+.formError {
+  margin: 9px 0 0;
+  color: var(--rp-danger);
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.passwordActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.loading,
+.empty {
+  border: 1px dashed var(--rp-line-2);
+  border-radius: 16px;
+  padding: 30px 18px;
+  color: var(--rp-ink-3);
+  font-size: 12px;
+  text-align: center;
+}
+
+.overlay {
+  position: fixed;
+  z-index: 500;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(48 31 27 / 38%);
+  backdrop-filter: blur(3px);
+}
+
+.dialog {
+  width: min(560px, 100%);
+  max-height: min(820px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid var(--rp-line);
+  border-radius: 20px;
+  background: var(--rp-surface);
+  box-shadow: 0 30px 80px rgb(50 29 23 / 25%);
+}
+
+.dialogCompact {
+  width: min(480px, 100%);
+}
+
+.dialogHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 19px 15px;
+  border-bottom: 1px solid var(--rp-line);
+}
+
+.dialogHead span {
+  display: block;
+  color: var(--rp-pink-strong);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.dialogHead h2 {
+  margin: 4px 0 0;
+  color: var(--rp-ink);
+  font-family: var(--rp-display);
+  font-size: 21px;
+}
+
+.dialogHead p {
+  margin: 7px 0 0;
+  color: var(--rp-ink-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.closeButton {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.dialogBody {
+  display: grid;
+  gap: 13px;
+  padding: 17px 19px;
+}
+
+.roleChoice {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.roleChoice label {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  padding: 11px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.roleChoice input {
+  margin-top: 2px;
+  accent-color: var(--rp-pink);
+}
+
+.roleChoice strong,
+.roleChoice small {
+  display: block;
+}
+
+.roleChoice strong {
+  color: var(--rp-ink);
+  font-size: 10.5px;
+}
+
+.roleChoice small {
+  margin-top: 2px;
+  color: var(--rp-ink-3);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.dialogFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 14px 19px 18px;
+  border-top: 1px solid var(--rp-line);
+}
+
+@media (max-width: 760px) {
+  .toolbar {
+    flex-direction: column;
+  }
+
+  .toolbar > button {
+    width: 100%;
+  }
+
+  .summary {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .summaryCard {
+    padding: 12px;
+  }
+
+  .summaryCard strong {
+    font-size: 21px;
+  }
+
+  .meta {
+    grid-template-columns: 1fr;
+  }
+
+  .meta > div + div {
+    border-top: 1px solid var(--rp-line);
+    border-left: 0;
+  }
+
+  .passwordGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .summaryCard span {
+    font-size: 7.5px;
+  }
+
+  .summaryCard strong {
+    font-size: 19px;
+  }
+
+  .cardHead {
+    align-items: flex-start;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .actions button,
+  .passwordActions button,
+  .dialogFooter button {
+    width: 100%;
+  }
+
+  .passwordActions,
+  .dialogFooter {
+    flex-direction: column-reverse;
+  }
+
+  .overlay {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .dialog {
+    width: 100%;
+    max-height: calc(100vh - 20px);
+    border-radius: 20px 20px 14px 14px;
+  }
+}
