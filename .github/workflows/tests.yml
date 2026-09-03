@@ -32,6 +32,18 @@ jobs:
       - name: Executar testes
         run: npm test
 
+      - name: Instalar dependências do Admin V2
+        working-directory: admin-v2
+        run: npm ci
+
+      - name: Executar testes do Admin V2
+        working-directory: admin-v2
+        run: npm test
+
+      - name: Compilar Admin V2
+        working-directory: admin-v2
+        run: npm run build
+
       - name: Verificar drift do schema
         run: |
           npm run schema:generate
