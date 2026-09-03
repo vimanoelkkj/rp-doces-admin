@@ -89,6 +89,7 @@
 .pending { background: #fff0d4; color: #8b5b11; }
 .open { background: var(--accent-wash); color: var(--accent-dark); }
 .closed { background: #f1ece9; color: var(--muted); }
+.refundPendingPill { background: #fff0d4; color: #856210; }
 
 .body {
   display: grid;
@@ -144,6 +145,10 @@
   font-size: 10.5px;
 }
 
+.paymentMain {
+  min-width: 0;
+}
+
 .itemAmount,
 .paymentAmount {
   text-align: right;
@@ -164,6 +169,47 @@
 .statusPartial,
 .statusPending { color: var(--warning); }
 .statusCancelled { color: var(--danger); }
+
+.refundButton {
+  margin-top: 6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.refundButton:hover:not(:disabled) {
+  color: #8f3039;
+}
+
+.refundButton:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.payment .refundPendingText {
+  color: #856210;
+  font-weight: 800;
+}
+
+.payment .refundSource {
+  color: #7d3038;
+  font-weight: 700;
+}
+
+.refundEntry {
+  background: #fff8f8;
+}
+
+.refundAmount {
+  color: #a8464e;
+}
 
 .summary {
   display: grid;
