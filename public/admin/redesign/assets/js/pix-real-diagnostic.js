@@ -47,6 +47,9 @@ function ensureStyles() {
     .pix-real-button:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none}
     .pix-real-button--primary{border:0;background:#c94860;color:#fff;cursor:pointer;box-shadow:0 10px 24px rgba(201,72,96,.18)}
     .pix-real-button--secondary,.pix-real-link{border:1px solid #dfbeb3;background:#fff;color:#6b473d;cursor:pointer}
+    .pix-real-refresh-feedback{min-height:18px;color:#2f8265;font-size:.76rem;font-weight:800}
+    .pix-real-refresh-feedback:empty{display:none}
+    .pix-real-refresh-feedback.is-error{color:#b4474b}
     .pix-real-status{display:flex;align-items:center;gap:10px;min-height:22px;color:#76564c;font-size:.86rem;font-weight:800}
     .pix-real-status::before{content:"";width:10px;height:10px;flex:0 0 10px;border-radius:999px;background:#c89f35;box-shadow:0 0 0 4px rgba(200,159,53,.12)}
     .pix-real-status.is-paid{color:#2f8265}.pix-real-status.is-paid::before{background:#2f8265;box-shadow:0 0 0 4px rgba(47,130,101,.12)}
@@ -98,6 +101,7 @@ function cardMarkup() {
           <button type="button" class="pix-real-button pix-real-button--primary" data-pix-real-generate>Gerar Pix real de ${DIAGNOSTIC_LABEL}</button>
           <button type="button" class="pix-real-button pix-real-button--secondary" data-pix-real-check hidden>Consultar agora</button>
         </div>
+        <div class="pix-real-refresh-feedback" data-pix-real-refresh-feedback role="status" aria-live="polite"></div>
 
         <div class="pix-real-status" data-pix-real-status>Aguardando geração do diagnóstico</div>
 
@@ -149,6 +153,7 @@ function mount(storeView) {
   const card = grid.querySelector("[data-pix-real-card]");
   const generate = card.querySelector("[data-pix-real-generate]");
   const check = card.querySelector("[data-pix-real-check]");
+  const refreshFeedback = card.querySelector("[data-pix-real-refresh-feedback]");
   const result = card.querySelector("[data-pix-real-result]");
   const status = card.querySelector("[data-pix-real-status]");
   const checks = card.querySelector("[data-pix-real-checks]");
@@ -176,6 +181,18 @@ function mount(storeView) {
     textElement.textContent = text;
     element.className = `pix-real-check${kind ? ` is-${kind}` : ""}`;
   };
+
+  const setRefreshFeedback = (text = "", error = false) => {
+    if (!refreshFeedback) return;
+    refreshFeedback.textContent = text;
+    refreshFeedback.classList.toggle("is-error", error);
+  };
+
+  const currentTime = () => new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(new Date());
 
   const setGenerateState = payload => {
     const currentStatus = String(payload?.status || "").toUpperCase();
@@ -279,12 +296,30 @@ function mount(storeView) {
     setStatus("Aguardando pagamento real…");
   };
 
-  const poll = async () => {
-    if (!orderId) return;
+  const poll = async ({ manual = false } = {}) => {
+    if (!orderId) return false;
+
+    if (manual) {
+      check.disabled = true;
+      check.setAttribute("aria-busy", "true");
+      check.textContent = "Consultando…";
+      setRefreshFeedback("");
+    }
+
     try {
       apply(await request(`${API}?order_id=${encodeURIComponent(orderId)}`));
+      if (manual) setRefreshFeedback(`Atualizado às ${currentTime()} ✓`);
+      return true;
     } catch (error) {
       setStatus(error?.message || "Falha ao consultar o pagamento.", "error");
+      if (manual) setRefreshFeedback("Falha ao atualizar o diagnóstico.", true);
+      return false;
+    } finally {
+      if (manual) {
+        check.disabled = false;
+        check.removeAttribute("aria-busy");
+        check.textContent = "Consultar agora";
+      }
     }
   };
 
@@ -333,6 +368,7 @@ function mount(storeView) {
     webhookTrackable = true;
     checks.hidden = true;
     result.hidden = true;
+    setRefreshFeedback("");
     setStatus("Gerando cobrança real…");
 
     try {
@@ -346,8 +382,9 @@ function mount(storeView) {
   });
 
   check.addEventListener("click", async () => {
+    if (check.disabled) return;
     paidWithoutWebhookPolls = 0;
-    await poll();
+    await poll({ manual: true });
   });
 
   copy.addEventListener("click", async () => {
