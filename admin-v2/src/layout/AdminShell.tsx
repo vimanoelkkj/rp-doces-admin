@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import styles from "./AdminShell.module.css";
 
-export type AdminV2Page = "dashboard" | "produtos" | "pedidos";
+export type AdminV2Page = "dashboard" | "produtos" | "pedidos" | "admins";
 
 type Props = {
   session: AuthSession;
@@ -84,7 +84,7 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
   ] as const;
 
   function navigate(key: (typeof navItems)[number]["key"]) {
-    if (key === "dashboard" || key === "produtos" || key === "pedidos") {
+    if (key === "dashboard" || key === "produtos" || key === "pedidos" || key === "admins") {
       if (key !== activePage) onNavigate(key);
       return;
     }
@@ -105,7 +105,7 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
         <nav className={styles.nav} aria-label="Navegação principal">
           {navItems.map(item => {
             const active = item.key === activePage;
-            const isV2 = item.key === "dashboard" || item.key === "produtos" || item.key === "pedidos";
+            const isV2 = item.key === "dashboard" || item.key === "produtos" || item.key === "pedidos" || item.key === "admins";
             return (
               <button
                 key={item.key}
