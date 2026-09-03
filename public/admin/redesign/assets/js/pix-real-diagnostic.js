@@ -368,7 +368,7 @@ function mount(storeView) {
 }
 
 function scan() {
-  document.querySelectorAll(".store-view").forEach(mount);
+  document.querySelectorAll("[data-pix-diagnostic-host]").forEach(mount);
 }
 
 const observer = new MutationObserver(scan);
