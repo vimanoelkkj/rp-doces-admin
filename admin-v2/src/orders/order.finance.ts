@@ -45,8 +45,46 @@ export const FinancialOrderSchema = OrderSchema.extend({
   status_financeiro: FinancialStatusSchema
 });
 
+export const OrderRefundSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  pedido_id: z.coerce.number().int().positive(),
+  pagamento_id: z.coerce.number().int().positive(),
+  origem: z.string(),
+  metodo: z.string(),
+  valor_centavos: z.coerce.number().default(0),
+  status: z.string(),
+  mp_refund_id: z.string().nullable().optional(),
+  mp_status: z.string().nullable().optional(),
+  registrado_por_usuario_id: z.coerce.number().nullable().optional(),
+  registrado_por_nome: z.string().nullable().optional(),
+  motivo: z.string().default(""),
+  devolveu_estoque: z.coerce.number().default(0),
+  criado_em: z.string().nullable().optional(),
+  atualizado_em: z.string().nullable().optional(),
+  concluido_em: z.string().nullable().optional()
+});
+
 const FinancialOrdersResponseSchema = z.object({
   pedidos: z.array(FinancialOrderSchema)
+});
+
+const FinancialOrderResponseSchema = z.object({
+  pedido: FinancialOrderSchema
+});
+
+const RefundsResponseSchema = z.object({
+  reembolsos: z.array(OrderRefundSchema).default([])
+});
+
+const RefundMutationResponseSchema = z.object({
+  ok: z.literal(true),
+  reembolso: OrderRefundSchema.nullable().optional(),
+  ja_reembolsado: z.boolean().optional(),
+  pendente: z.boolean().optional(),
+  confirmado_por: z.string().optional(),
+  estoque_restaurado: z.boolean().optional(),
+  aviso: z.string().nullable().optional(),
+  mensagem: z.string().optional()
 });
 
 const ComandaMutationResponseSchema = z.object({
@@ -70,8 +108,18 @@ export type FinancialStatus = z.infer<typeof FinancialStatusSchema>;
 export type OrderPayment = z.infer<typeof OrderPaymentSchema>;
 export type FinancialOrderItem = z.infer<typeof FinancialOrderItemSchema>;
 export type FinancialOrder = z.infer<typeof FinancialOrderSchema>;
+export type OrderRefund = z.infer<typeof OrderRefundSchema>;
+export type RefundMutationResult = z.infer<typeof RefundMutationResponseSchema>;
 export type PixDecision = "CANCELAR" | "MANTER";
 export type ManualComandaPaymentMethod = "PIX_EXTERNO" | "CARTAO" | "DINHEIRO";
+export type ManualRefundMethod = ManualComandaPaymentMethod | "OUTRO";
+export type RefundInput = {
+  pagamento_id: number;
+  origem: "MERCADO_PAGO" | "MANUAL";
+  metodo: "PIX_MP" | ManualRefundMethod;
+  motivo?: string;
+  devolver_estoque?: boolean;
+};
 
 export async function listFinancialOrders(): Promise<FinancialOrder[]> {
   return FinancialOrdersResponseSchema.parse(
@@ -81,6 +129,39 @@ export async function listFinancialOrders(): Promise<FinancialOrder[]> {
       "Não foi possível carregar o financeiro das comandas."
     )
   ).pedidos;
+}
+
+export async function getFinancialOrder(orderId: number): Promise<FinancialOrder> {
+  return FinancialOrderResponseSchema.parse(
+    await requestJson(
+      `/api/admin/orders/${orderId}/finance?fresh=1`,
+      {},
+      "Não foi possível atualizar a comanda."
+    )
+  ).pedido;
+}
+
+export async function listOrderRefunds(orderId: number, sync = true): Promise<OrderRefund[]> {
+  return RefundsResponseSchema.parse(
+    await requestJson(
+      `/api/admin/orders/${orderId}/refunds${sync ? "?sync=1" : ""}`,
+      {},
+      "Não foi possível carregar os reembolsos da comanda."
+    )
+  ).reembolsos;
+}
+
+export async function refundPayment(
+  orderId: number,
+  input: RefundInput
+): Promise<RefundMutationResult> {
+  return RefundMutationResponseSchema.parse(
+    await requestJson(
+      `/api/admin/orders/${orderId}/refunds`,
+      { method: "POST", body: JSON.stringify(input) },
+      "Não foi possível reembolsar o pagamento."
+    )
+  );
 }
 
 export async function addComandaItem(
