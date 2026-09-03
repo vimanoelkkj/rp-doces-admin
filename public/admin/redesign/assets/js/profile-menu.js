@@ -84,6 +84,14 @@ export function setupProfileMenu(button, user, { onUnauthorized } = {}) {
       <strong>${esc(user?.nome || user?.username || "Administrador")}</strong>
       <span>@${esc(user?.username || "admin")} · ${esc(String(user?.papel || "ADMIN").toUpperCase())}</span>
     </div>
+    <a class="profile-menu__v2" href="/admin-v2/#dashboard" aria-label="Abrir Admin V2">
+      <span class="profile-menu__v2-icon" aria-hidden="true">V2</span>
+      <span class="profile-menu__v2-copy">
+        <strong>Experimentar Admin V2</strong>
+        <small>Nova versão em desenvolvimento</small>
+      </span>
+      <span class="profile-menu__v2-arrow" aria-hidden="true">›</span>
+    </a>
     <div class="profile-menu__section">
       <div class="profile-menu__section-head">
         <div><strong>Passkeys</strong><span>Entre com biometria ou chave do dispositivo.</span></div>
