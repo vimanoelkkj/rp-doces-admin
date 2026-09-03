@@ -44,7 +44,7 @@ function ensureStyles() {
     .pix-real-toolbar,.pix-real-copy-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     .pix-real-button,.pix-real-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:12px;font:inherit;font-weight:800;text-decoration:none;white-space:nowrap;transition:transform .12s ease,opacity .12s ease}
     .pix-real-button:hover,.pix-real-link:hover{transform:translateY(-1px)}
-    .pix-real-button:disabled{opacity:.6;cursor:wait;transform:none}
+    .pix-real-button:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none}
     .pix-real-button--primary{border:0;background:#c94860;color:#fff;cursor:pointer;box-shadow:0 10px 24px rgba(201,72,96,.18)}
     .pix-real-button--secondary,.pix-real-link{border:1px solid #dfbeb3;background:#fff;color:#6b473d;cursor:pointer}
     .pix-real-status{display:flex;align-items:center;gap:10px;min-height:22px;color:#76564c;font-size:.86rem;font-weight:800}
@@ -177,6 +177,23 @@ function mount(storeView) {
     element.className = `pix-real-check${kind ? ` is-${kind}` : ""}`;
   };
 
+  const setGenerateState = payload => {
+    const currentStatus = String(payload?.status || "").toUpperCase();
+    const hasOrder = Boolean(payload?.order_id || orderId);
+    const canStartNew = !hasOrder || ["CANCELADO", "EXPIRADO", "FALHOU", "REEMBOLSADO"].includes(currentStatus);
+
+    if (canStartNew) {
+      generate.disabled = false;
+      generate.textContent = `Gerar Pix real de ${DIAGNOSTIC_LABEL}`;
+      return;
+    }
+
+    generate.disabled = true;
+    generate.textContent = currentStatus === "PAGO"
+      ? "Pix pago · finalize o reembolso"
+      : "Pix aguardando pagamento";
+  };
+
   const stopPolling = () => {
     if (timer) clearInterval(timer);
     timer = null;
@@ -188,6 +205,7 @@ function mount(storeView) {
     code.value = payload.qr_code || "";
     check.hidden = false;
     checks.hidden = false;
+    setGenerateState(payload);
 
     const hasPaymentPayload = Boolean(payload.qr_code || payload.qr_code_base64 || payload.ticket_url);
     result.hidden = !hasPaymentPayload;
@@ -288,12 +306,14 @@ function mount(storeView) {
       const payload = await request(`${API}?latest=1`);
       if (payload.diagnostico === false) {
         setStatus("Aguardando geração do diagnóstico");
+        setGenerateState(null);
         return;
       }
       apply(payload);
       resumePollingIfNeeded(payload);
     } catch (error) {
       setStatus(error?.message || "Não foi possível recuperar o último diagnóstico.", "error");
+      setGenerateState(null);
     }
   };
 
@@ -306,6 +326,7 @@ function mount(storeView) {
     if (!confirmed) return;
 
     generate.disabled = true;
+    generate.textContent = "Gerando Pix real…";
     stopPolling();
     orderId = null;
     paidWithoutWebhookPolls = 0;
@@ -320,8 +341,7 @@ function mount(storeView) {
       resumePollingIfNeeded(payload);
     } catch (error) {
       setStatus(error?.message || "Não foi possível gerar o Pix real.", "error");
-    } finally {
-      generate.disabled = false;
+      setGenerateState(null);
     }
   });
 
