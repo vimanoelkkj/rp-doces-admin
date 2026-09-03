@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminsPage } from "./admins/AdminsPage";
 import { AuthGate } from "./auth/AuthGate";
 import { DashboardPage } from "./dashboard/DashboardPage";
 import type { AdminV2Page } from "./layout/AdminShell";
@@ -9,6 +10,7 @@ function pageFromHash(): AdminV2Page {
   const hash = window.location.hash.toLowerCase();
   if (hash === "#dashboard") return "dashboard";
   if (hash === "#pedidos") return "pedidos";
+  if (hash === "#admins") return "admins";
   return "produtos";
 }
 
@@ -34,6 +36,9 @@ export function App() {
         }
         if (page === "pedidos") {
           return <OrdersPage session={session} onNavigate={navigate} />;
+        }
+        if (page === "admins") {
+          return <AdminsPage session={session} onNavigate={navigate} />;
         }
         return <ProductsPage session={session} onNavigate={navigate} />;
       }}
