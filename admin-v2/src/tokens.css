@@ -50,4 +50,20 @@ button:disabled {
   --shadow: 0 14px 34px rgb(68 40 32 / 7%);
   --radius: 18px;
   --display-font: "Bricolage Grotesque", "Nunito Sans", system-ui, sans-serif;
+
+  /* Compatibilidade visual para módulos migrados do Admin V1. */
+  --rp-surface: #fff;
+  --rp-surface-2: var(--surface-soft);
+  --rp-line: var(--border);
+  --rp-line-2: var(--border-strong);
+  --rp-ink: var(--text);
+  --rp-ink-2: var(--ink-soft);
+  --rp-ink-3: var(--muted);
+  --rp-pink: var(--accent);
+  --rp-pink-strong: var(--accent-dark);
+  --rp-pink-soft: var(--accent-soft);
+  --rp-pink-wash: var(--accent-wash);
+  --rp-success: var(--success);
+  --rp-danger: var(--danger);
+  --rp-display: var(--display-font);
 }
