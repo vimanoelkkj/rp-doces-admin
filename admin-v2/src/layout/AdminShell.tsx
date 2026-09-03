@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import styles from "./AdminShell.module.css";
 
-export type AdminV2Page = "dashboard" | "produtos" | "pedidos" | "admins";
+export type AdminV2Page = "dashboard" | "produtos" | "pedidos" | "admins" | "loja";
 
 type Props = {
   session: AuthSession;
@@ -84,11 +84,7 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
   ] as const;
 
   function navigate(key: (typeof navItems)[number]["key"]) {
-    if (key === "dashboard" || key === "produtos" || key === "pedidos" || key === "admins") {
-      if (key !== activePage) onNavigate(key);
-      return;
-    }
-    window.location.assign(`/admin/#${key}`);
+    if (key !== activePage) onNavigate(key);
   }
 
   return (
@@ -105,14 +101,13 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
         <nav className={styles.nav} aria-label="Navegação principal">
           {navItems.map(item => {
             const active = item.key === activePage;
-            const isV2 = item.key === "dashboard" || item.key === "produtos" || item.key === "pedidos" || item.key === "admins";
             return (
               <button
                 key={item.key}
                 type="button"
                 className={`${styles.navItem} ${active ? styles.navActive : ""}`}
                 aria-current={active ? "page" : undefined}
-                title={active ? undefined : isV2 ? `Abrir ${item.label} no Admin V2` : `Abrir ${item.label} no Admin atual`}
+                title={active ? undefined : `Abrir ${item.label} no Admin V2`}
                 onClick={() => navigate(item.key)}
               >
                 <span className={styles.navIcon}><Icon name={item.icon} /></span>
