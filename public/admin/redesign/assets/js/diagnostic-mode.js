@@ -31,7 +31,7 @@ function ensureStyles() {
     .diagnostic-page__toolbar button{min-height:38px;border:1px solid var(--rp-line);border-radius:11px;padding:0 14px;background:#fff;color:var(--rp-ink-2);font:inherit;font-size:10px;font-weight:900;cursor:pointer}
     .diagnostic-page__notice{margin-bottom:18px;border:1px solid var(--rp-line);border-radius:16px;padding:14px 16px;background:var(--rp-surface);color:var(--rp-ink-2);font-size:12px;line-height:1.55}
     .diagnostic-page__notice strong{color:var(--rp-ink)}
-    .diagnostic-page .store-view{padding:0}
+    .diagnostic-pix-host{padding:0}
     .diagnostic-page .store-grid{display:grid;grid-template-columns:1fr;gap:16px}
     @media(max-width:620px){.diagnostic-page{padding:16px 12px 96px}.diagnostic-page__toolbar{align-items:center}.diagnostic-page__toolbar p{font-size:11px}.diagnostic-page__notice{font-size:11px}}
   `;
@@ -64,7 +64,7 @@ function ensureDiagnosticPage() {
         <button type="button" data-diagnostic-close>Voltar</button>
       </div>
       <div class="diagnostic-page__notice"><strong>Área restrita ao OWNER.</strong> As rotas continuam protegidas no backend. O desbloqueio desta tela apenas revela as ferramentas nesta sessão.</div>
-      <section class="store-view" data-pix-diagnostic-host><div class="store-grid"></div></section>
+      <section class="diagnostic-pix-host" data-pix-diagnostic-host><div class="store-grid"></div></section>
     </div>`;
   main.insertBefore(page, content);
   page.querySelector("[data-diagnostic-close]")?.addEventListener("click", () => closeDiagnostics());
