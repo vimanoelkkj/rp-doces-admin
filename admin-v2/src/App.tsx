@@ -5,12 +5,14 @@ import { DashboardPage } from "./dashboard/DashboardPage";
 import type { AdminV2Page } from "./layout/AdminShell";
 import { OrdersPage } from "./orders/OrdersPage";
 import { ProductsPage } from "./products/ProductsPage";
+import { StorePage } from "./store/StorePage";
 
 function pageFromHash(): AdminV2Page {
   const hash = window.location.hash.toLowerCase();
   if (hash === "#dashboard") return "dashboard";
   if (hash === "#pedidos") return "pedidos";
   if (hash === "#admins") return "admins";
+  if (hash === "#loja") return "loja";
   return "produtos";
 }
 
@@ -39,6 +41,9 @@ export function App() {
         }
         if (page === "admins") {
           return <AdminsPage session={session} onNavigate={navigate} />;
+        }
+        if (page === "loja") {
+          return <StorePage session={session} onNavigate={navigate} />;
         }
         return <ProductsPage session={session} onNavigate={navigate} />;
       }}
