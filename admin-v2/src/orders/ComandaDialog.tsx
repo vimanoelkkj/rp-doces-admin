@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiClientError } from "../shared/apiClient";
 import { listProducts } from "../products/product.api";
 import type { Product } from "../products/product.types";
@@ -6,13 +6,18 @@ import {
   addComandaItem,
   cancelComandaPix,
   generateComandaPix,
-  listFinancialOrders,
+  getFinancialOrder,
+  listOrderRefunds,
+  refundPayment,
   registerComandaPayment,
   type FinancialOrder,
   type ManualComandaPaymentMethod,
   type OrderPayment,
-  type PixDecision
+  type OrderRefund,
+  type PixDecision,
+  type RefundInput
 } from "./order.finance";
+import { RefundPanel } from "./RefundPanel";
 import styles from "./ComandaDialog.module.css";
 
 type Props = {
@@ -22,6 +27,8 @@ type Props = {
 };
 
 type AddPaymentMode = "PENDENTE" | "PAGO" | "PIX";
+
+const REFUND_SYNC_MS = 3_000;
 
 const PAYMENT_LABELS: Record<string, string> = {
   PIX_MP: "Pix pelo site",
@@ -67,9 +74,20 @@ function statusClass(value: string): string {
   return styles.statusPending;
 }
 
+function refundSource(refund: OrderRefund): string {
+  if (refund.origem === "MERCADO_PAGO") {
+    if (refund.status === "REEMBOLSADO") return "Confirmado pelo Mercado Pago";
+    if (refund.status === "FALHOU") return "Mercado Pago não confirmou o reembolso";
+    return "Aguardando confirmação do Mercado Pago";
+  }
+  return `Registrado manualmente${refund.registrado_por_nome ? ` por ${refund.registrado_por_nome}` : ""}`;
+}
+
 export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
   const [order, setOrder] = useState<FinancialOrder | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [refunds, setRefunds] = useState<OrderRefund[]>([]);
+  const [refundPaymentId, setRefundPaymentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,13 +107,24 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
   const [pixDecision, setPixDecision] = useState<PixDecision>("CANCELAR");
 
   const load = useCallback(async () => {
-    const [orders, catalog] = await Promise.all([listFinancialOrders(), listProducts()]);
-    const found = orders.find(candidate => candidate.id === orderId) || null;
-    if (!found) throw new Error("Comanda não encontrada.");
+    const [catalog, refundState] = await Promise.all([
+      listProducts(),
+      listOrderRefunds(orderId, true)
+    ]);
+    const found = await getFinancialOrder(orderId);
     setOrder(found);
+    setRefunds(refundState);
     setProducts(catalog.filter(product => Boolean(product.ativo) && Boolean(product.disponivel)));
     setPaymentValue((found.saldo_centavos / 100).toFixed(2));
     setPixValue((found.saldo_centavos / 100).toFixed(2));
+  }, [orderId]);
+
+  const syncRefundState = useCallback(async () => {
+    const refundState = await listOrderRefunds(orderId, true);
+    const found = await getFinancialOrder(orderId);
+    setRefunds(refundState);
+    setOrder(found);
+    return refundState;
   }, [orderId]);
 
   useEffect(() => {
@@ -119,9 +148,42 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
     };
   }, [onClose, saving]);
 
+  const hasPendingRefund = useMemo(
+    () => refunds.some(refund => refund.status === "PENDENTE"),
+    [refunds]
+  );
+
+  useEffect(() => {
+    if (!hasPendingRefund) return;
+    let cancelled = false;
+    let timer = 0;
+
+    const tick = async () => {
+      try {
+        const freshRefunds = await syncRefundState();
+        if (!freshRefunds.some(refund => refund.status === "PENDENTE")) onChanged();
+      } catch (err) {
+        console.warn("R&P Admin V2: falha ao sincronizar reembolso pendente.", err);
+      } finally {
+        if (!cancelled) timer = window.setTimeout(tick, REFUND_SYNC_MS);
+      }
+    };
+
+    timer = window.setTimeout(tick, REFUND_SYNC_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [hasPendingRefund, onChanged, syncRefundState]);
+
   const pendingPix = useMemo(
     () => order?.pagamentos.find(payment => payment.metodo === "PIX_MP" && payment.status === "PENDENTE") || null,
     [order]
+  );
+
+  const refundByPayment = useMemo(
+    () => new Map(refunds.map(refund => [Number(refund.pagamento_id), refund])),
+    [refunds]
   );
 
   const selectedProduct = useMemo(
@@ -207,6 +269,23 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
     setFeedback("Cobrança Pix pendente cancelada.");
   });
 
+  const handleRefund = (input: RefundInput) => run(async () => {
+    const result = await refundPayment(orderId, input);
+    setRefundPaymentId(null);
+
+    let message = result.pendente
+      ? result.mensagem || "Reembolso solicitado. Aguardando confirmação do Mercado Pago."
+      : result.ja_reembolsado
+        ? "Este pagamento já estava reembolsado."
+        : result.confirmado_por === "MERCADO_PAGO"
+          ? "Reembolso confirmado pelo Mercado Pago."
+          : "Reembolso manual registrado.";
+
+    if (result.estoque_restaurado) message += " Itens devolvidos ao estoque.";
+    if (result.aviso) message += ` ${result.aviso}`;
+    setFeedback(message);
+  });
+
   const copyPix = async () => {
     const code = latestPix?.mp_qr_code || pendingPix?.mp_qr_code;
     if (!code) return;
@@ -215,6 +294,7 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
   };
 
   const open = order?.status_comanda !== "ENCERRADA";
+  const historyCount = (order?.pagamentos.length || 0) + refunds.length;
 
   return (
     <div className={styles.dialog}>
@@ -236,6 +316,7 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
               Financeiro: {financialLabel(order.status_financeiro)}
             </span>
             {pendingPix ? <span className={`${styles.pill} ${styles.pending}`}>Pix atual pendente · {money(pendingPix.valor_centavos)}</span> : null}
+            {hasPendingRefund ? <span className={`${styles.pill} ${styles.refundPendingPill}`}>Reembolso em processamento</span> : null}
           </div>
         ) : null}
 
@@ -386,21 +467,76 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
 
               <section className={styles.section}>
                 <header className={styles.sectionTitle}>
-                  <div><strong>Pagamentos e cobranças</strong><span>Histórico preservado da comanda</span></div>
+                  <div><strong>Pagamentos e reembolsos</strong><span>Histórico financeiro preservado da comanda</span></div>
+                  <span>{historyCount} {historyCount === 1 ? "registro" : "registros"}</span>
                 </header>
-                {order.pagamentos.length ? order.pagamentos.map((payment, index) => (
-                  <div className={styles.payment} key={payment.id ?? `legacy-${index}`}>
+
+                {order.pagamentos.map((payment, index) => {
+                  const paymentId = Number(payment.id || 0);
+                  const existingRefund = paymentId ? refundByPayment.get(paymentId) : undefined;
+                  const refundPending = existingRefund?.status === "PENDENTE";
+                  const refundCompleted = existingRefund?.status === "REEMBOLSADO";
+                  const canRefund = payment.status === "PAGO" && paymentId > 0 && !refundPending && !refundCompleted;
+                  const retryRefund = existingRefund?.status === "FALHOU";
+
+                  return (
+                    <Fragment key={payment.id ?? `legacy-${index}`}>
+                      <div className={styles.payment}>
+                        <div className={styles.paymentMain}>
+                          <strong>{PAYMENT_LABELS[payment.metodo] || payment.metodo}</strong>
+                          <span>{payment.origem === "ADMIN" ? "Registrado pelo admin" : "Criado pelo site"} · {dateTime(payment.pago_em || payment.criado_em)}</span>
+                          {payment.substitui_pagamento_id ? <span>Substitui a cobrança #{payment.substitui_pagamento_id}</span> : null}
+                          {refundPending ? <span className={styles.refundPendingText}>Reembolso aguardando confirmação do Mercado Pago.</span> : null}
+                          {canRefund ? (
+                            <button
+                              className={styles.refundButton}
+                              type="button"
+                              onClick={() => setRefundPaymentId(current => current === paymentId ? null : paymentId)}
+                              disabled={saving}
+                            >
+                              {retryRefund ? "Tentar reembolso novamente" : "Reembolsar"}
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className={styles.paymentAmount}>
+                          {money(payment.valor_centavos)}
+                          <small className={statusClass(payment.status)}>{payment.status}</small>
+                        </div>
+                      </div>
+
+                      {refundPaymentId === paymentId && canRefund ? (
+                        <RefundPanel
+                          key={paymentId}
+                          order={order}
+                          payment={payment}
+                          saving={saving}
+                          onCancel={() => setRefundPaymentId(null)}
+                          onConfirm={input => void handleRefund(input)}
+                        />
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+
+                {refunds.map(refund => (
+                  <div className={`${styles.payment} ${styles.refundEntry}`} key={`refund-${refund.id}`}>
                     <div>
-                      <strong>{PAYMENT_LABELS[payment.metodo] || payment.metodo}</strong>
-                      <span>{payment.origem === "ADMIN" ? "Registrado pelo admin" : "Criado pelo site"} · {dateTime(payment.pago_em || payment.criado_em)}</span>
-                      {payment.substitui_pagamento_id ? <span>Substitui a cobrança #{payment.substitui_pagamento_id}</span> : null}
+                      <strong>Reembolso</strong>
+                      <span className={refund.status === "PENDENTE" ? styles.refundPendingText : styles.refundSource}>
+                        {refundSource(refund)} · {dateTime(refund.concluido_em || refund.criado_em)}
+                      </span>
+                      {refund.motivo ? <span>{refund.motivo}</span> : null}
+                      {refund.mp_refund_id ? <span>ID MP: {refund.mp_refund_id}</span> : null}
+                      {Number(refund.devolveu_estoque || 0) === 1 ? <span>Itens devolvidos ao estoque</span> : null}
                     </div>
-                    <div className={styles.paymentAmount}>
-                      {money(payment.valor_centavos)}
-                      <small className={statusClass(payment.status)}>{payment.status}</small>
+                    <div className={`${styles.paymentAmount} ${styles.refundAmount}`}>
+                      −{money(refund.valor_centavos)}
+                      <small className={statusClass(refund.status)}>{refund.status}</small>
                     </div>
                   </div>
-                )) : <div className={styles.empty}>Nenhum pagamento registrado.</div>}
+                ))}
+
+                {!historyCount ? <div className={styles.empty}>Nenhum pagamento registrado.</div> : null}
               </section>
             </>
           ) : null}
