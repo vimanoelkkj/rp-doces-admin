@@ -41,8 +41,8 @@ const CreateAdminInputSchema = z
   })
   .strict();
 
-function validationError(result: z.ZodSafeParseError<unknown>): Error {
-  return new Error(result.error.issues[0]?.message || "Dados do administrador inválidos.");
+function validationError(error: z.ZodError): Error {
+  return new Error(error.issues[0]?.message || "Dados do administrador inválidos.");
 }
 
 function jsonBody(body: unknown): RequestInit {
@@ -57,7 +57,7 @@ export async function listAdmins(): Promise<AdminUser[]> {
 
 export async function createAdmin(input: CreateAdminInput): Promise<void> {
   const parsed = CreateAdminInputSchema.safeParse(input);
-  if (!parsed.success) throw validationError(parsed);
+  if (!parsed.success) throw validationError(parsed.error);
 
   OkSchema.parse(
     await requestJson(
@@ -70,7 +70,7 @@ export async function createAdmin(input: CreateAdminInput): Promise<void> {
 
 export async function resetAdminPassword(id: number, senha: string): Promise<void> {
   const parsed = PasswordSchema.safeParse(senha);
-  if (!parsed.success) throw validationError(parsed);
+  if (!parsed.success) throw validationError(parsed.error);
 
   OkSchema.parse(
     await requestJson(
