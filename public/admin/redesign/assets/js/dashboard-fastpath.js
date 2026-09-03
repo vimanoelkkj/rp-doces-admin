@@ -1,3 +1,4 @@
+import "./diagnostic-mode.js";
 import { adminApi } from "./api.js";
 
 const originalFinancialOrders = adminApi.financialOrders.bind(adminApi);
