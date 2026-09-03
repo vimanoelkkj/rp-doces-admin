@@ -4,9 +4,9 @@ import { mpRequest, mpOrderToLocalStatus } from "../../../lib/mercadoPago.js";
 
 const CONFIRMED_REFUND_STATUSES = new Set(["approved", "processed", "refunded"]);
 
-function adminOnly(auth) {
+function ownerOnly(auth) {
   const papel = String(auth?.user?.papel || "").toUpperCase();
-  return papel === "OWNER" || papel === "ADMIN";
+  return papel === "OWNER";
 }
 
 function diagnosticToken(env) {
@@ -101,7 +101,7 @@ function refundResponse(row, { duplicate = false } = {}) {
 export async function onRequestGet({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
-  if (!adminOnly(auth)) return json({ erro: "Apenas administradores podem consultar o reembolso do diagnóstico." }, 403);
+  if (!ownerOnly(auth)) return json({ erro: "Apenas o OWNER pode consultar o reembolso do diagnóstico." }, 403);
 
   const accessToken = diagnosticToken(env);
   if (!accessToken) return json({ erro: "MP_DIAGNOSTIC_ACCESS_TOKEN não configurado." }, 503);
@@ -119,7 +119,7 @@ export async function onRequestGet({ request, env }) {
 export async function onRequestPost({ request, env }) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth.error;
-  if (!adminOnly(auth)) return json({ erro: "Apenas administradores podem reembolsar o Pix de diagnóstico." }, 403);
+  if (!ownerOnly(auth)) return json({ erro: "Apenas o OWNER pode reembolsar o Pix de diagnóstico." }, 403);
 
   const accessToken = diagnosticToken(env);
   if (!accessToken) return json({ erro: "MP_DIAGNOSTIC_ACCESS_TOKEN não configurado." }, 503);
