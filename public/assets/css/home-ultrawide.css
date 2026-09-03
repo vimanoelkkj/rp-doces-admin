@@ -1,0 +1,19 @@
+@media (min-width: 1800px) {
+  .rp-home-hero__body {
+    grid-template-columns: minmax(480px, 660px) minmax(0, 1040px);
+    justify-content: center;
+    gap: clamp(80px, 5vw, 140px);
+  }
+
+  .rp-home-hero__copy {
+    justify-self: start;
+  }
+
+  .rp-home-media--hero {
+    width: min(100%, clamp(820px, 45vw, 1040px));
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+    justify-self: end;
+  }
+}
