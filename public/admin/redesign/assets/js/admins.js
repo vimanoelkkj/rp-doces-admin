@@ -116,6 +116,10 @@ function dialogShell() {
     </dialog>`;
 }
 
+function liveRoot(element, fallback) {
+  return element?.closest?.("[data-admin-content]") || fallback;
+}
+
 function setPasswordPanel(root, id, open) {
   const panel = root.querySelector(`[data-admin-password-panel="${id}"]`);
   const button = root.querySelector(`[data-admin-password="${id}"]`);
@@ -188,19 +192,21 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
 
   root.querySelectorAll("[data-admin-password]").forEach(button => {
     button.addEventListener("click", () => {
+      const targetRoot = liveRoot(button, root);
       const id = button.dataset.adminPassword;
       const open = button.getAttribute("aria-expanded") !== "true";
-      root.querySelectorAll('[data-admin-password][aria-expanded="true"]').forEach(other => {
-        if (other !== button) setPasswordPanel(root, other.dataset.adminPassword, false);
+      targetRoot.querySelectorAll('[data-admin-password][aria-expanded="true"]').forEach(other => {
+        if (other !== button) setPasswordPanel(targetRoot, other.dataset.adminPassword, false);
       });
-      setPasswordPanel(root, id, open);
+      setPasswordPanel(targetRoot, id, open);
     });
   });
 
   root.querySelectorAll("[data-admin-password-cancel]").forEach(button => {
-    button.addEventListener("click", () =>
-      setPasswordPanel(root, button.dataset.adminPasswordCancel, false)
-    );
+    button.addEventListener("click", () => {
+      const targetRoot = liveRoot(button, root);
+      setPasswordPanel(targetRoot, button.dataset.adminPasswordCancel, false);
+    });
   });
 
   root.querySelectorAll("[data-admin-password-form]").forEach(form => {
@@ -224,7 +230,7 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
       try {
         await adminApi.resetUserPassword(id, data.senha);
         if (Number(id) === Number(viewer?.id)) return onUnauthorized?.();
-        await renderAdmins(root, { onUnauthorized, currentUser: viewer });
+        await renderAdmins(liveRoot(form, root), { onUnauthorized, currentUser: viewer });
       } catch (error) {
         if (error?.status === 401) return onUnauthorized?.();
         if (errorBox) {
@@ -248,7 +254,7 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
         .toLowerCase();
       await adminApi.createUser(data);
       createDialog?.close();
-      await renderAdmins(root, { onUnauthorized, currentUser: viewer });
+      await renderAdmins(liveRoot(createForm, root), { onUnauthorized, currentUser: viewer });
     } catch (error) {
       if (error?.status === 401) return onUnauthorized?.();
       if (createError) {
@@ -268,7 +274,7 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
       button.disabled = true;
       try {
         await adminApi.toggleUser(id, !currentlyActive);
-        await renderAdmins(root, { onUnauthorized, currentUser: viewer });
+        await renderAdmins(liveRoot(button, root), { onUnauthorized, currentUser: viewer });
       } catch (error) {
         if (error?.status === 401) return onUnauthorized?.();
         alert(error?.message || "Não foi possível alterar o estado da conta.");
@@ -291,7 +297,7 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
       button.disabled = true;
       try {
         await adminApi.changeUserRole(id, nextRole);
-        await renderAdmins(root, { onUnauthorized, currentUser: viewer });
+        await renderAdmins(liveRoot(button, root), { onUnauthorized, currentUser: viewer });
       } catch (error) {
         if (error?.status === 401) return onUnauthorized?.();
         alert(error?.message || "Não foi possível alterar o nível de acesso.");
