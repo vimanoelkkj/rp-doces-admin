@@ -113,11 +113,79 @@ function dialogShell() {
         </div>
         <div class="admins-dialog__footer"><button type="button" class="admins-secondary" data-admin-dialog-close>Cancelar</button><button type="submit" class="admins-primary">Criar administrador</button></div>
       </form>
+    </dialog>
+
+    <dialog class="admins-dialog" data-admin-confirm-dialog>
+      <div class="admins-dialog__card is-compact">
+        <div class="admins-dialog__head">
+          <div>
+            <span data-admin-confirm-kicker>Confirmar alteração</span>
+            <h2 data-admin-confirm-title>Confirmar alteração</h2>
+            <p data-admin-confirm-message></p>
+          </div>
+          <button type="button" class="admins-dialog__close" data-admin-confirm-cancel aria-label="Fechar">×</button>
+        </div>
+        <div class="admins-dialog__footer">
+          <button type="button" class="admins-secondary" data-admin-confirm-cancel>Cancelar</button>
+          <button type="button" class="admins-primary" data-admin-confirm-accept>Confirmar</button>
+        </div>
+      </div>
     </dialog>`;
 }
 
 function liveRoot(element, fallback) {
   return element?.closest?.("[data-admin-content]") || fallback;
+}
+
+function accountName(button) {
+  return button?.closest?.("[data-admin-card]")?.querySelector("h3")?.textContent?.trim() || "esta conta";
+}
+
+function confirmAdminAction(
+  dialog,
+  { kicker = "Confirmar alteração", title = "Confirmar alteração", message = "", confirmLabel = "Confirmar", danger = false } = {}
+) {
+  if (!(dialog instanceof HTMLDialogElement)) return Promise.resolve(false);
+
+  const kickerNode = dialog.querySelector("[data-admin-confirm-kicker]");
+  const titleNode = dialog.querySelector("[data-admin-confirm-title]");
+  const messageNode = dialog.querySelector("[data-admin-confirm-message]");
+  const accept = dialog.querySelector("[data-admin-confirm-accept]");
+  const cancels = [...dialog.querySelectorAll("[data-admin-confirm-cancel]")];
+
+  if (!accept) return Promise.resolve(false);
+  if (kickerNode) kickerNode.textContent = kicker;
+  if (titleNode) titleNode.textContent = title;
+  if (messageNode) messageNode.textContent = message;
+  accept.textContent = confirmLabel;
+  accept.className = danger ? "admins-secondary is-danger" : "admins-primary";
+
+  return new Promise(resolve => {
+    let settled = false;
+
+    const finish = confirmed => {
+      if (settled) return;
+      settled = true;
+      accept.removeEventListener("click", onAccept);
+      cancels.forEach(button => button.removeEventListener("click", onCancel));
+      dialog.removeEventListener("cancel", onDialogCancel);
+      if (dialog.open) dialog.close();
+      resolve(confirmed);
+    };
+
+    const onAccept = () => finish(true);
+    const onCancel = () => finish(false);
+    const onDialogCancel = event => {
+      event.preventDefault();
+      finish(false);
+    };
+
+    accept.addEventListener("click", onAccept);
+    cancels.forEach(button => button.addEventListener("click", onCancel));
+    dialog.addEventListener("cancel", onDialogCancel);
+    dialog.showModal();
+    requestAnimationFrame(() => accept.focus());
+  });
 }
 
 function setPasswordPanel(root, id, open) {
@@ -182,6 +250,7 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
   const createDialog = root.querySelector("[data-admin-create-dialog]");
   const createForm = root.querySelector("[data-admin-create-form]");
   const createError = root.querySelector("[data-admin-create-error]");
+  const confirmDialog = root.querySelector("[data-admin-confirm-dialog]");
 
   root
     .querySelector("[data-admin-create]")
@@ -269,8 +338,23 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
     button.addEventListener("click", async () => {
       const id = button.dataset.adminToggle;
       const currentlyActive = button.dataset.adminActive === "true";
-      if (!confirm(`${currentlyActive ? "Desativar" : "Reativar"} esta conta administrativa?`))
-        return;
+      const name = accountName(button);
+      const confirmed = await confirmAdminAction(confirmDialog, currentlyActive
+        ? {
+            kicker: "Controle de acesso",
+            title: `Desativar ${name}?`,
+            message: "A conta perderá acesso ao painel e as sessões atuais serão encerradas.",
+            confirmLabel: "Desativar conta",
+            danger: true
+          }
+        : {
+            kicker: "Controle de acesso",
+            title: `Reativar ${name}?`,
+            message: "A conta poderá acessar o painel novamente com as permissões atuais.",
+            confirmLabel: "Reativar conta"
+          });
+      if (!confirmed) return;
+
       button.disabled = true;
       try {
         await adminApi.toggleUser(id, !currentlyActive);
@@ -287,13 +371,18 @@ export async function renderAdmins(root, { onUnauthorized, currentUser } = {}) {
     button.addEventListener("click", async () => {
       const id = button.dataset.adminRole;
       const nextRole = button.dataset.adminNextRole;
-      const label = nextRole === "OWNER" ? "Mestre" : "Administrador";
-      if (
-        !confirm(
-          `Alterar o nível desta conta para ${label}? As sessões atuais dela serão encerradas.`
-        )
-      )
-        return;
+      const name = accountName(button);
+      const promoting = nextRole === "OWNER";
+      const confirmed = await confirmAdminAction(confirmDialog, {
+        kicker: "Nível de acesso",
+        title: promoting ? `Tornar ${name} mestre?` : `Tornar ${name} administrador?`,
+        message: promoting
+          ? "A conta ganhará permissões de Mestre. As sessões atuais serão encerradas e será necessário entrar novamente."
+          : "A conta deixará de ter permissões de Mestre. As sessões atuais serão encerradas e será necessário entrar novamente.",
+        confirmLabel: promoting ? "Tornar mestre" : "Tornar administrador"
+      });
+      if (!confirmed) return;
+
       button.disabled = true;
       try {
         await adminApi.changeUserRole(id, nextRole);
