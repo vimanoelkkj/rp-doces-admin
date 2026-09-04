@@ -1,0 +1,164 @@
+@keyframes rp-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rp-popover-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rp-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes rp-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rp-select-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rp-active-icon {
+  0% { transform: scale(.9); }
+  65% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+html,
+body {
+  transition:
+    background-color 220ms ease,
+    color 220ms ease;
+}
+
+main {
+  animation: rp-page-enter 220ms cubic-bezier(.2, .7, .2, 1) both;
+}
+
+nav[aria-label="Navegação principal"] button,
+button[aria-label="Notificações"],
+button[aria-label="Abrir menu da conta"] {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+nav[aria-label="Navegação principal"] button:active,
+button[aria-label="Notificações"]:active,
+button[aria-label="Abrir menu da conta"]:active {
+  transform: scale(.965);
+}
+
+nav[aria-label="Navegação principal"] button[aria-current="page"] svg {
+  animation: rp-active-icon 220ms cubic-bezier(.2, .75, .2, 1) both;
+}
+
+[role="dialog"],
+[role="menu"] {
+  transform-origin: top right;
+  animation: rp-popover-enter 180ms cubic-bezier(.2, .75, .2, 1) both;
+}
+
+#drawer {
+  animation: rp-panel-enter 220ms cubic-bezier(.2, .75, .2, 1) both;
+}
+
+.rp-mobile-filter-backdrop {
+  animation: rp-backdrop-enter 140ms ease-out both;
+}
+
+.rp-mobile-filter-menu {
+  transform-origin: top center;
+  animation: rp-select-enter 170ms cubic-bezier(.2, .75, .2, 1) both;
+}
+
+.rp-mobile-filter-option {
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 120ms ease;
+}
+
+.rp-mobile-filter-option:active {
+  transform: scale(.985);
+}
+
+.rp-mobile-filter-radio {
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.rp-mobile-filter-option[aria-selected="true"] .rp-mobile-filter-radio {
+  transform: scale(1.06);
+}
+
+@media (max-width: 760px) {
+  main header:has(h1) {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  nav[aria-label="Navegação principal"] button[aria-current="page"]::before {
+    transition:
+      opacity 180ms ease,
+      transform 220ms cubic-bezier(.2, .75, .2, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  main,
+  nav[aria-label="Navegação principal"] button,
+  button[aria-label="Notificações"],
+  button[aria-label="Abrir menu da conta"],
+  [role="dialog"],
+  [role="menu"],
+  #drawer,
+  .rp-mobile-filter-backdrop,
+  .rp-mobile-filter-menu,
+  .rp-mobile-filter-option,
+  .rp-mobile-filter-radio,
+  main header:has(h1) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
