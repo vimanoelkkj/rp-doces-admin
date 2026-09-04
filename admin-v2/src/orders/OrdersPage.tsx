@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import type { AdminV2Page } from "../layout/AdminShell";
 import { ApiClientError } from "../shared/apiClient";
-import { listOrders } from "./order.api";
+import {
+  listOrders,
+  updateManualPayment,
+  updateOrderStatus,
+  type ManualPaymentStatus,
+  type OrderStatus
+} from "./order.api";
 import { getFinancialOrder, type FinancialOrder } from "./order.finance";
 import { itemsOf } from "./order.model";
 import type { Order } from "./order.schema";
@@ -28,6 +34,33 @@ type IconName =
   | "truck"
   | "receipt"
   | "edit";
+
+const ORDER_STATUS_OPTIONS: Array<[OrderStatus, string]> = [
+  ["NOVO", "Pendente"],
+  ["PREPARANDO", "Em produção"],
+  ["PRONTO", "Pronto"],
+  ["ENTREGUE", "Entregue"],
+  ["CANCELADO", "Cancelado"]
+];
+
+const PAYMENT_STATUS_OPTIONS: Array<[ManualPaymentStatus, string]> = [
+  ["PENDENTE", "Pendente"],
+  ["PAGO", "Pago"],
+  ["CANCELADO", "Cancelado"]
+];
+
+const editSelectStyle: CSSProperties = {
+  width: "100%",
+  height: 40,
+  border: "1px solid var(--line-strong)",
+  borderRadius: 9,
+  padding: "0 12px",
+  background: "var(--surface)",
+  color: "var(--text)",
+  font: "inherit",
+  fontSize: 12,
+  outline: "none"
+};
 
 function Icon({ name, className }: { name: IconName; className?: string }) {
   const paths: Record<IconName, ReactNode> = {
@@ -134,6 +167,16 @@ function comandaNumber(order: Order) {
   return `#${order.id}`;
 }
 
+function normalizeOrderStatus(order: Order): OrderStatus {
+  const value = String(order.status_pedido || "NOVO").toUpperCase();
+  return ORDER_STATUS_OPTIONS.some(([status]) => status === value) ? value as OrderStatus : "NOVO";
+}
+
+function normalizeManualPayment(order: Order): ManualPaymentStatus {
+  const value = String(order.status_pagamento || "PENDENTE").toUpperCase();
+  return PAYMENT_STATUS_OPTIONS.some(([status]) => status === value) ? value as ManualPaymentStatus : "PENDENTE";
+}
+
 function OrderRow({
   order,
   selected,
@@ -221,6 +264,11 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [financial, setFinancial] = useState<FinancialOrder | null>(null);
   const [financialLoading, setFinancialLoading] = useState(false);
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<OrderStatus>("NOVO");
+  const [draftPayment, setDraftPayment] = useState<ManualPaymentStatus>("PENDENTE");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const reload = useCallback(async (preferredOrderId?: number) => {
     setLoading(true);
@@ -293,6 +341,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const selectedComanda = selected ? comandaState(selected) : null;
   const selectedDelivery = selected?.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada";
   const selectedItems = selected ? orderItems(selected) : [];
+  const selectedIsManual = selected?.origem_pedido === "MANUAL";
 
   const financialItems = financial?.itens || [];
   const comandaItems = financialItems.length ? financialItems : selectedItems;
@@ -304,6 +353,48 @@ export function OrdersPage({ session, onNavigate }: Props) {
     setDrawerOpen(true);
     setActiveTab("pedido");
     setFinancial(null);
+    setEditing(false);
+    setEditError(null);
+  }
+
+  function startEditing() {
+    if (!selected) return;
+    setDraftStatus(normalizeOrderStatus(selected));
+    setDraftPayment(normalizeManualPayment(selected));
+    setActiveTab("pedido");
+    setEditError(null);
+    setEditing(true);
+  }
+
+  function cancelEditing() {
+    setEditing(false);
+    setEditError(null);
+  }
+
+  async function saveEditing() {
+    if (!selected || savingEdit) return;
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const currentStatus = normalizeOrderStatus(selected);
+      if (draftStatus !== currentStatus) {
+        await updateOrderStatus(selected.id, draftStatus);
+      }
+
+      if (selected.origem_pedido === "MANUAL") {
+        const currentPayment = normalizeManualPayment(selected);
+        if (draftPayment !== currentPayment) {
+          await updateManualPayment(selected.id, draftPayment);
+        }
+      }
+
+      await reload(selected.id);
+      setEditing(false);
+    } catch (err) {
+      setEditError(err instanceof ApiClientError ? err.message : "Não foi possível salvar as alterações do pedido.");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   function navigate(event: MouseEvent<HTMLAnchorElement>, pageName?: AdminV2Page) {
@@ -470,7 +561,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
                         {selectedStatus ? <span className={cls("tag", selectedStatus.tone)}>{selectedStatus.label}</span> : null}
                       </div>
                     </div>
-                    <button className={styles.close} type="button" aria-label="Fechar" onClick={() => setDrawerOpen(false)}>×</button>
+                    <button className={styles.close} type="button" aria-label="Fechar" onClick={() => { setDrawerOpen(false); setEditing(false); }}>×</button>
                   </div>
 
                   <div className={styles["drawer-meta"]}>
@@ -481,7 +572,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
 
                   <div className={styles.tabs}>
                     <button className={cls("tab", activeTab === "pedido" && "active")} type="button" onClick={() => setActiveTab("pedido")}>Pedido</button>
-                    <button className={cls("tab", activeTab === "comanda" && "active")} type="button" onClick={() => setActiveTab("comanda")}>Comanda</button>
+                    <button className={cls("tab", activeTab === "comanda" && "active")} type="button" onClick={() => { setEditing(false); setActiveTab("comanda"); }}>Comanda</button>
                   </div>
 
                   <div className={cls("pedido-panel", activeTab !== "pedido" && "hidden")}>
@@ -497,24 +588,53 @@ export function OrdersPage({ session, onNavigate }: Props) {
                       <div className={styles["total-row"]}><span>Total do pedido</span><span>{money(selected.valor_total_centavos)}</span></div>
                     </section>
 
-                    <section className={styles["drawer-section"]}>
-                      <h3 className={styles["section-title"]}>Pagamento</h3>
-                      <div className={styles["payment-row"]}>
-                        <div className={styles["payment-left"]}>
-                          {selectedPayment?.paid ? <span className={cls("tag", "green")}>✓ &nbsp; Pago</span> : <span className={cls("tag", "orange")}>Pendente</span>}
-                          <span className={styles.method}>Método</span>
-                        </div>
-                        <div className={cls("payment-left", "payment-left-end")}>
-                          <span>&nbsp;</span>
-                          <span className={styles.method}>{selectedPayment?.paid ? paymentMethod(selected) : "—"}</span>
-                        </div>
-                      </div>
-                    </section>
+                    {editing ? (
+                      <>
+                        <section className={styles["drawer-section"]}>
+                          <h3 className={styles["section-title"]}>Status do pedido</h3>
+                          <select value={draftStatus} onChange={event => setDraftStatus(event.target.value as OrderStatus)} style={editSelectStyle} disabled={savingEdit}>
+                            {ORDER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          </select>
+                        </section>
 
-                    <section className={cls("drawer-section", "last-drawer-section")}>
-                      <h3 className={styles["section-title"]}>Observações</h3>
-                      <div className={styles.note}>{selected.observacao || "—"}</div>
-                    </section>
+                        <section className={styles["drawer-section"]}>
+                          <h3 className={styles["section-title"]}>Pagamento</h3>
+                          {selectedIsManual ? (
+                            <select value={draftPayment} onChange={event => setDraftPayment(event.target.value as ManualPaymentStatus)} style={editSelectStyle} disabled={savingEdit}>
+                              {PAYMENT_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </select>
+                          ) : (
+                            <div className={styles.note}>O pagamento deste pedido é controlado pela comanda financeira.</div>
+                          )}
+                        </section>
+
+                        <section className={cls("drawer-section", "last-drawer-section")}>
+                          <h3 className={styles["section-title"]}>Observações</h3>
+                          <div className={styles.note}>{selected.observacao || "—"}</div>
+                        </section>
+                      </>
+                    ) : (
+                      <>
+                        <section className={styles["drawer-section"]}>
+                          <h3 className={styles["section-title"]}>Pagamento</h3>
+                          <div className={styles["payment-row"]}>
+                            <div className={styles["payment-left"]}>
+                              {selectedPayment?.paid ? <span className={cls("tag", "green")}>✓ &nbsp; Pago</span> : <span className={cls("tag", "orange")}>Pendente</span>}
+                              <span className={styles.method}>Método</span>
+                            </div>
+                            <div className={cls("payment-left", "payment-left-end")}>
+                              <span>&nbsp;</span>
+                              <span className={styles.method}>{selectedPayment?.paid ? paymentMethod(selected) : "—"}</span>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className={cls("drawer-section", "last-drawer-section")}>
+                          <h3 className={styles["section-title"]}>Observações</h3>
+                          <div className={styles.note}>{selected.observacao || "—"}</div>
+                        </section>
+                      </>
+                    )}
                   </div>
 
                   <div className={cls("comanda-panel", activeTab === "comanda" && "active")}>
@@ -539,15 +659,25 @@ export function OrdersPage({ session, onNavigate }: Props) {
                     </section>
                   </div>
 
-                  <div className={styles["drawer-actions"]}>
-                    <button className={styles["primary-btn"]} type="button" onClick={() => setActiveTab("comanda")}>
-                      <Icon name="receipt" className={styles["btn-ico"]}/>Ver comanda
-                    </button>
-                    <div className={styles["secondary-actions"]}>
-                      <button className={styles["secondary-btn"]} type="button"><Icon name="edit" className={styles["btn-ico"]}/>Editar pedido</button>
-                      <button className={styles["more-btn"]} type="button">⋮</button>
+                  {activeTab === "pedido" && editing ? (
+                    <div className={styles["drawer-actions"]}>
+                      {editError ? <div className={styles.note} role="alert" style={{ color: "var(--pink-strong)" }}>{editError}</div> : null}
+                      <button className={styles["primary-btn"]} type="button" disabled={savingEdit} onClick={() => void saveEditing()}>
+                        {savingEdit ? "Salvando..." : "Salvar alterações"}
+                      </button>
+                      <button className={styles["secondary-btn"]} type="button" disabled={savingEdit} onClick={cancelEditing}>Cancelar</button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className={styles["drawer-actions"]}>
+                      <button className={styles["primary-btn"]} type="button" onClick={() => setActiveTab("comanda")}>
+                        <Icon name="receipt" className={styles["btn-ico"]}/>Ver comanda
+                      </button>
+                      <div className={styles["secondary-actions"]}>
+                        <button className={styles["secondary-btn"]} type="button" onClick={startEditing}><Icon name="edit" className={styles["btn-ico"]}/>Editar pedido</button>
+                        <button className={styles["more-btn"]} type="button" aria-label="Mais ações">⋮</button>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : null}
             </aside>
@@ -565,6 +695,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
             await reload(id);
             setDrawerOpen(true);
             setActiveTab("pedido");
+            setEditing(false);
             setManualOrderOpen(false);
           }}
         />
