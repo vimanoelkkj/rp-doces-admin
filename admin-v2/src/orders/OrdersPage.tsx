@@ -47,6 +47,8 @@ const FILTER_OPTIONS: Array<[FilterKey, string]> = [
   ["entregues", "Entregues"]
 ];
 
+let ordersCache: Order[] | null = null;
+
 const editSelectStyle: CSSProperties = {
   width: "100%",
   height: 40,
@@ -268,8 +270,8 @@ function OrderRow({
 }
 
 export function OrdersPage({ session, onNavigate }: Props) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<Order[]>(() => ordersCache ?? []);
+  const [loading, setLoading] = useState(() => ordersCache === null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
@@ -287,10 +289,12 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [editError, setEditError] = useState<string | null>(null);
 
   const reload = useCallback(async (preferredOrderId?: number) => {
-    setLoading(true);
+    const foreground = ordersCache === null;
+    if (foreground) setLoading(true);
     setError(null);
     try {
       const next = await listOrders();
+      ordersCache = next;
       setOrders(next);
       setSelected(current => {
         if (preferredOrderId) return next.find(order => order.id === preferredOrderId) || current;
@@ -299,7 +303,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar os pedidos.");
     } finally {
-      setLoading(false);
+      if (foreground) setLoading(false);
     }
   }, []);
 
