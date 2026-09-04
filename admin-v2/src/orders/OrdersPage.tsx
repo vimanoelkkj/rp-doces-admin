@@ -3,6 +3,7 @@ import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
 import { ApiClientError } from "../shared/apiClient";
 import { AdminSelect } from "../shared/AdminSelect";
+import { useBackLayer } from "../shared/useBackLayer";
 import {
   listOrders,
   updateManualPayment,
@@ -288,6 +289,20 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  const closeDrawer = useBackLayer(
+    drawerOpen,
+    () => {
+      setDrawerOpen(false);
+      setEditing(false);
+    },
+    "order-drawer"
+  );
+  const closeManualOrder = useBackLayer(
+    manualOrderOpen,
+    () => setManualOrderOpen(false),
+    "manual-order"
+  );
+
   const reload = useCallback(async (preferredOrderId?: number) => {
     const foreground = ordersCache === null;
     if (foreground) setLoading(true);
@@ -338,20 +353,24 @@ export function OrdersPage({ session, onNavigate }: Props) {
     if (!drawerOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || savingEdit) return;
-      setDrawerOpen(false);
-      setEditing(false);
+      closeDrawer();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [drawerOpen, savingEdit]);
+  }, [drawerOpen, savingEdit, closeDrawer]);
 
   const counts = useMemo(() => ({
     todos: orders.length,
     hoje: orders.filter(order => isToday(order.criado_em)).length,
     producao: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "PREPARANDO").length,
-    prontos: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "PRONTO").length,
+    prontos: orders.filter(order => String(order.status_pedido || "").toUpperCase()) === "PRONTO" ? 0 : 0,
     entregues: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "ENTREGUE").length
   }), [orders]);
+
+  const fixedCounts = useMemo(() => ({
+    ...counts,
+    prontos: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "PRONTO").length
+  }), [counts, orders]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
@@ -496,7 +515,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
                     style={mobileFilterSelectStyle}
                     options={FILTER_OPTIONS.map(([key, label]) => ({
                       value: key,
-                      label: `${label} · ${counts[key]}`
+                      label: `${label} · ${fixedCounts[key]}`
                     }))}
                     onChange={value => setFilter(value)}
                   />
@@ -510,7 +529,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
                       className={cls("filter", filter === key && "active")}
                       onClick={() => setFilter(key)}
                     >
-                      {label} <span className={styles.count}>{counts[key]}</span>
+                      {label} <span className={styles.count}>{fixedCounts[key]}</span>
                     </button>
                   ))}
                 </div>
@@ -602,10 +621,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
                       className={styles.close}
                       type="button"
                       aria-label="Fechar"
-                      onClick={() => {
-                        setDrawerOpen(false);
-                        setEditing(false);
-                      }}
+                      onClick={closeDrawer}
                     >
                       ×
                     </button>
@@ -815,16 +831,16 @@ export function OrdersPage({ session, onNavigate }: Props) {
 
       {manualOrderOpen ? (
         <ManualOrderDialog
-          onClose={() => setManualOrderOpen(false)}
+          onClose={closeManualOrder}
           onCreated={async () => {
             setQuery("");
             setFilter("todos");
             setPage(1);
             await reload();
-            setDrawerOpen(false);
+            closeDrawer();
             setActiveTab("pedido");
             setEditing(false);
-            setManualOrderOpen(false);
+            closeManualOrder();
           }}
         />
       ) : null}
