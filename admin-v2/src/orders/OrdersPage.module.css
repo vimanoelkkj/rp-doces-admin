@@ -146,7 +146,8 @@
 
 .pageRoot * { box-sizing: border-box; }
 .pageRoot button,
-.pageRoot input { font: inherit; }
+.pageRoot input,
+.pageRoot select { font: inherit; }
 .pageRoot button { cursor: pointer; }
 
 .app {
@@ -259,10 +260,15 @@
   max-width: 1420px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--drawer);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
-  padding: 0 0 0 28px;
+  padding: 0 28px;
+}
+
+.workspace.drawer-open {
+  grid-template-columns: minmax(0, 1fr) var(--drawer);
+  padding-right: 0;
 }
 
 .main {
@@ -331,6 +337,10 @@
   background: var(--surface-veil-2);
   overflow: hidden;
   box-shadow: var(--shadow-card);
+}
+
+.mobile-filter {
+  display: none;
 }
 
 .filters {
@@ -807,6 +817,12 @@
   padding: 8px 12px;
 }
 
+@media (min-width: 1001px) {
+  .drawer:not(.open) {
+    display: none;
+  }
+}
+
 @media (max-width: 1220px) {
   .pageRoot { --sidebar: 190px; --drawer: 370px; }
   .workspace { padding-left: 18px; }
@@ -828,7 +844,8 @@
   .profile-text,
   .profile-caret { display: none; }
   .profile { justify-content: center; }
-  .workspace { grid-template-columns: minmax(0,1fr); padding-right: 18px; }
+  .workspace,
+  .workspace.drawer-open { grid-template-columns: minmax(0,1fr); padding-right: 18px; }
 
   .drawer {
     position: fixed;
@@ -851,7 +868,8 @@
   .app { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   .content { padding: 18px 0 92px; }
-  .workspace { padding: 0 14px; }
+  .workspace,
+  .workspace.drawer-open { padding: 0 14px; }
 
   .page-header {
     margin: 0 2px 18px;
@@ -863,7 +881,49 @@
   .page-title { font-size: 25px; }
   .search { width: 100%; }
   .orders-card { border-radius: 12px; }
-  .filters { padding: 0 11px; min-height: 58px; }
+
+  .filters {
+    display: none;
+  }
+
+  .mobile-filter {
+    min-height: 58px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-veil-4);
+  }
+
+  .mobile-filter > span {
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .mobile-filter select {
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    padding: 0 36px 0 12px;
+    appearance: auto;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .mobile-filter select:focus-visible {
+    border-color: var(--pink-border);
+    box-shadow: 0 0 0 3px var(--pink-soft);
+  }
+
   .thead { display: none; }
 
   .order-row {
