@@ -8,6 +8,11 @@
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: 0 10px 30px rgba(77,56,34,.025);
+  transition:
+    transform 140ms cubic-bezier(.2, .8, .2, 1),
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
 }
 
 .media {
@@ -156,6 +161,7 @@
 }
 
 .menuButton {
+  position: relative;
   width: 26px;
   height: 26px;
   display: grid;
@@ -169,7 +175,13 @@
   font-weight: 800;
   letter-spacing: 1px;
   opacity: 0;
-  transition: opacity .15s ease, background .15s ease, color .15s ease;
+  transition: opacity .15s ease, background .15s ease, color .15s ease, transform .12s ease;
+}
+
+.menuButton::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
 }
 
 .card:hover .menuButton,
@@ -279,6 +291,12 @@
   .card {
     cursor: pointer;
     border-radius: 12px;
+    touch-action: manipulation;
+  }
+
+  .card:active {
+    transform: scale(.985);
+    box-shadow: 0 5px 16px rgba(77,56,34,.045);
   }
 
   .media,
@@ -348,6 +366,14 @@
     opacity: 1;
   }
 
+  .menuButton:active {
+    transform: scale(.88);
+  }
+
+  .menu button {
+    min-height: 40px;
+  }
+
   .flags {
     top: 7px;
     left: 7px;
@@ -363,5 +389,12 @@
     bottom: 7px;
     padding: 3px 6px;
     font-size: 8.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .menuButton {
+    transition: none !important;
   }
 }
