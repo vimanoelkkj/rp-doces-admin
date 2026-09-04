@@ -1,17 +1,35 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { flushSync } from "react-dom";
 import { AdminsPage } from "./admins/AdminsPage";
 import { AuthGate } from "./auth/AuthGate";
 import { DashboardPage } from "./dashboard/DashboardPage";
-import type { AdminV2Page } from "./layout/AdminShell";
+import { AdminShell, type AdminV2Page } from "./layout/AdminShell";
 import { OrdersPage } from "./orders/OrdersPage";
 import { ProductsPage } from "./products/ProductsPage";
 import { StorePage } from "./store/StorePage";
 
 const PAGES: AdminV2Page[] = ["dashboard", "produtos", "pedidos", "admins", "loja"];
-type NavigationDirection = "forward" | "backward";
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (update: () => void) => unknown;
+
+const PAGE_META: Record<AdminV2Page, { title: string; subtitle: string }> = {
+  dashboard: {
+    title: "Dashboard",
+    subtitle: "Visão geral da operação"
+  },
+  produtos: {
+    title: "Produtos",
+    subtitle: "Catálogo, categorias, estoque e promoções"
+  },
+  pedidos: {
+    title: "Pedidos",
+    subtitle: "Acompanhe vendas, pagamentos e andamento"
+  },
+  admins: {
+    title: "Administradores",
+    subtitle: "Contas, níveis de acesso e segurança da equipe"
+  },
+  loja: {
+    title: "Loja",
+    subtitle: "Atendimento, contato e aparência do site público"
+  }
 };
 
 function pageFromHash(): AdminV2Page {
@@ -23,15 +41,10 @@ function pageFromHash(): AdminV2Page {
   return "produtos";
 }
 
-function navigationDirection(from: AdminV2Page, to: AdminV2Page): NavigationDirection {
-  return PAGES.indexOf(to) >= PAGES.indexOf(from) ? "forward" : "backward";
-}
-
 export function App() {
   const initialPage = useRef<AdminV2Page>(pageFromHash()).current;
   const [page, setPage] = useState<AdminV2Page>(initialPage);
   const [visited, setVisited] = useState<Set<AdminV2Page>>(() => new Set([initialPage]));
-  const [direction, setDirection] = useState<NavigationDirection>("forward");
   const [hasNavigated, setHasNavigated] = useState(false);
   const pageRef = useRef<AdminV2Page>(initialPage);
   const scrollPositions = useRef<Record<AdminV2Page, number>>({
@@ -42,13 +55,12 @@ export function App() {
     loja: 0
   });
 
-  function activate(nextPage: AdminV2Page, nextDirection: NavigationDirection) {
+  function activate(nextPage: AdminV2Page) {
     const currentPage = pageRef.current;
     if (nextPage === currentPage) return;
 
     scrollPositions.current[currentPage] = window.scrollY;
     pageRef.current = nextPage;
-    setDirection(nextDirection);
     setHasNavigated(true);
     setVisited(current => {
       if (current.has(nextPage)) return current;
@@ -59,33 +71,8 @@ export function App() {
     setPage(nextPage);
   }
 
-  function transitionTo(nextPage: AdminV2Page) {
-    const currentPage = pageRef.current;
-    if (nextPage === currentPage) return;
-
-    const nextDirection = navigationDirection(currentPage, nextPage);
-    document.documentElement.dataset.adminNavDirection = nextDirection;
-
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const transitionDocument = document as ViewTransitionDocument;
-    const startViewTransition = transitionDocument.startViewTransition;
-
-    if (!reducedMotion && startViewTransition) {
-      try {
-        startViewTransition.call(document, () => {
-          flushSync(() => activate(nextPage, nextDirection));
-        });
-        return;
-      } catch {
-        // Navegação continua imediatamente caso o navegador rejeite uma transição concorrente.
-      }
-    }
-
-    activate(nextPage, nextDirection);
-  }
-
   useEffect(() => {
-    const handleLocationChange = () => transitionTo(pageFromHash());
+    const handleLocationChange = () => activate(pageFromHash());
     window.addEventListener("popstate", handleLocationChange);
     window.addEventListener("hashchange", handleLocationChange);
     return () => {
@@ -101,45 +88,57 @@ export function App() {
   function navigate(nextPage: AdminV2Page) {
     if (nextPage === pageRef.current) return;
     window.history.pushState(null, "", `#${nextPage}`);
-    transitionTo(nextPage);
+    activate(nextPage);
   }
 
   return (
     <AuthGate>
-      {session => (
-        <>
-          {PAGES.map(view => {
-            if (!visited.has(view)) return null;
+      {session => {
+        const meta = PAGE_META[page];
 
-            const active = page === view;
-            let content: ReactNode;
+        return (
+          <AdminShell
+            session={session}
+            activePage={page}
+            title={meta.title}
+            subtitle={meta.subtitle}
+            onNavigate={navigate}
+            hideHeader={page === "pedidos"}
+            fullWidth={page === "pedidos"}
+          >
+            {PAGES.map(view => {
+              if (!visited.has(view)) return null;
 
-            if (view === "dashboard") {
-              content = <DashboardPage session={session} onNavigate={navigate} />;
-            } else if (view === "pedidos") {
-              content = <OrdersPage session={session} onNavigate={navigate} />;
-            } else if (view === "admins") {
-              content = <AdminsPage session={session} onNavigate={navigate} />;
-            } else if (view === "loja") {
-              content = <StorePage session={session} onNavigate={navigate} />;
-            } else {
-              content = <ProductsPage session={session} onNavigate={navigate} />;
-            }
+              const active = page === view;
+              let content: ReactNode;
 
-            return (
-              <div
-                key={view}
-                hidden={!active}
-                aria-hidden={!active}
-                data-admin-view={view}
-                data-transition-direction={active && hasNavigated ? direction : undefined}
-              >
-                {content}
-              </div>
-            );
-          })}
-        </>
-      )}
+              if (view === "dashboard") {
+                content = <DashboardPage session={session} onNavigate={navigate} />;
+              } else if (view === "pedidos") {
+                content = <OrdersPage session={session} onNavigate={navigate} />;
+              } else if (view === "admins") {
+                content = <AdminsPage session={session} onNavigate={navigate} />;
+              } else if (view === "loja") {
+                content = <StorePage session={session} onNavigate={navigate} />;
+              } else {
+                content = <ProductsPage session={session} onNavigate={navigate} />;
+              }
+
+              return (
+                <div
+                  key={view}
+                  hidden={!active}
+                  aria-hidden={!active}
+                  data-admin-view={view}
+                  data-page-enter={active && hasNavigated ? "" : undefined}
+                >
+                  {content}
+                </div>
+              );
+            })}
+          </AdminShell>
+        );
+      }}
     </AuthGate>
   );
 }
