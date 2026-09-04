@@ -85,7 +85,11 @@ export function AdminShell({
   const notificationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const themeColor = theme === "dark" ? "#1b1614" : "#fbf8f4";
     document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document.documentElement.style.backgroundColor = themeColor;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", themeColor);
     window.localStorage.setItem("rp-admin-theme", theme);
   }, [theme]);
 
@@ -110,11 +114,11 @@ export function AdminShell({
   }, [notificationOpen, profileOpen]);
 
   const navItems = [
-    { key: "dashboard", label: "Dashboard", icon: "dashboard" },
-    { key: "produtos", label: "Produtos", icon: "products" },
-    { key: "pedidos", label: "Pedidos", icon: "orders" },
-    { key: "admins", label: "Administradores", icon: "users" },
-    { key: "loja", label: "Loja", icon: "store" }
+    { key: "dashboard", label: "Dashboard", mobileLabel: "Dashboard", icon: "dashboard" },
+    { key: "produtos", label: "Produtos", mobileLabel: "Produtos", icon: "products" },
+    { key: "pedidos", label: "Pedidos", mobileLabel: "Pedidos", icon: "orders" },
+    { key: "admins", label: "Administradores", mobileLabel: "Admins", icon: "users" },
+    { key: "loja", label: "Loja", mobileLabel: "Loja", icon: "store" }
   ] as const;
 
   function navigate(key: (typeof navItems)[number]["key"]) {
@@ -174,10 +178,11 @@ export function AdminShell({
                 type="button"
                 className={`${styles.navItem} ${active ? styles.navActive : ""}`}
                 aria-current={active ? "page" : undefined}
+                aria-label={item.label}
                 onClick={() => navigate(item.key)}
               >
                 <span className={styles.navIcon}><Icon name={item.icon} /></span>
-                <span className={styles.navLabel}>{item.label}</span>
+                <span className={styles.navLabel} data-mobile-label={item.mobileLabel}>{item.label}</span>
               </button>
             );
           })}
@@ -191,7 +196,10 @@ export function AdminShell({
             type="button"
             aria-label="Notificações"
             aria-expanded={notificationOpen}
-            onClick={() => setNotificationOpen(open => !open)}
+            onClick={() => {
+              setProfileOpen(false);
+              setNotificationOpen(open => !open);
+            }}
           >
             <span className={styles.navIcon}><Icon name="bell" /></span>
             <span className={styles.navLabel}>Notificações</span>
@@ -218,7 +226,7 @@ export function AdminShell({
         </div>
 
         <button
-          className={styles.utilityButton}
+          className={`${styles.utilityButton} ${styles.themeButton}`}
           type="button"
           aria-label="Alternar tema claro/escuro"
           onClick={() => setTheme(current => current === "dark" ? "light" : "dark")}
@@ -233,7 +241,10 @@ export function AdminShell({
             type="button"
             aria-label="Abrir menu da conta"
             aria-expanded={profileOpen}
-            onClick={() => setProfileOpen(open => !open)}
+            onClick={() => {
+              setNotificationOpen(false);
+              setProfileOpen(open => !open);
+            }}
           >
             {user.avatar_url
               ? <img className={styles.avatarImage} src={user.avatar_url} alt="" />
@@ -252,6 +263,15 @@ export function AdminShell({
                 <span>@{user.username} · {user.papel}</span>
                 {user.email ? <small>{user.email}</small> : null}
               </div>
+              <button
+                className={styles.profileMenuTheme}
+                type="button"
+                role="menuitem"
+                onClick={() => setTheme(current => current === "dark" ? "light" : "dark")}
+              >
+                <Icon name={theme === "dark" ? "sun" : "moon"} />
+                {theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
+              </button>
               <button className={styles.profileMenuLogout} type="button" role="menuitem" onClick={() => void logout()} disabled={loggingOut}>
                 <Icon name="logout" />
                 {loggingOut ? "Saindo…" : "Sair da conta"}
