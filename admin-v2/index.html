@@ -2,8 +2,9 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#fff8f4" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#e85b79" />
+    <link rel="manifest" href="/admin/manifest.webmanifest" />
     <script>
       (() => {
         try {
@@ -13,11 +14,12 @@
             : window.matchMedia("(prefers-color-scheme: dark)").matches
               ? "dark"
               : "light";
-          const color = theme === "dark" ? "#1b1614" : "#fbf8f4";
+          const pageColor = theme === "dark" ? "#1b1614" : "#fbf8f4";
+          const statusColor = theme === "dark" ? "#1b1614" : "#e85b79";
           document.documentElement.dataset.theme = theme;
           document.documentElement.style.colorScheme = theme;
-          document.documentElement.style.backgroundColor = color;
-          document.querySelector('meta[name="theme-color"]')?.setAttribute("content", color);
+          document.documentElement.style.backgroundColor = pageColor;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute("content", statusColor);
         } catch {
           // O React aplica o tema novamente assim que o shell monta.
         }
