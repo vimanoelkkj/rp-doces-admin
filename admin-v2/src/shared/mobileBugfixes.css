@@ -16,10 +16,8 @@
     overflow: visible !important;
   }
 
-  /* A barra superior mobile precisa existir independentemente do header de
-     conteúdo da página. O sidebar vira a navegação inferior, então usamos seu
-     pseudo-elemento para manter uma faixa fixa no topo atrás de notificações e
-     perfil, inclusive em telas com hideHeader como Pedidos. */
+  /* Uma única faixa superior fixa para todo o Admin mobile. Título fica à
+     esquerda; notificações e perfil permanecem à direita. */
   aside:has(nav[aria-label="Navegação principal"])::before {
     content: "";
     position: fixed;
@@ -27,7 +25,7 @@
     right: 0;
     left: 0;
     z-index: 78;
-    height: calc(64px + env(safe-area-inset-top));
+    height: calc(72px + env(safe-area-inset-top));
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     box-shadow: 0 8px 24px rgba(63, 43, 34, .045);
@@ -41,23 +39,24 @@
     }
   }
 
-  /* Só o header padrão do AdminShell (título + subtítulo) permanece preso no
-     topo. Headers especiais, como Pedidos com busca e Novo pedido, continuam
-     no fluxo normal da página. */
+  /* Páginas que usam o header padrão do AdminShell passam a ter o header
+     realmente fixo. Não é mais sticky dependente do scroll/ancestrais. */
   main:has(header:has(> div > h1):has(> div > p)) {
-    padding-top: 0 !important;
+    padding-top: calc(92px + env(safe-area-inset-top)) !important;
   }
 
   main header:has(> div > h1):has(> div > p) {
-    position: sticky !important;
+    position: fixed !important;
     top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
     z-index: 80 !important;
-    min-height: calc(64px + env(safe-area-inset-top));
-    margin: 0 -12px 18px !important;
+    min-height: calc(72px + env(safe-area-inset-top));
+    margin: 0 !important;
     padding:
-      max(12px, env(safe-area-inset-top))
+      max(11px, env(safe-area-inset-top))
       112px
-      12px
+      10px
       14px !important;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
@@ -71,10 +70,69 @@
     }
   }
 
+  /* Pedidos usa hideHeader e possui um header próprio com busca e CTA.
+     Só o título entra na faixa fixa; busca e Novo pedido continuam rolando no
+     conteúdo para não recriar o antigo header gigante. */
+  main header:has(> h1) > h1:first-child {
+    position: fixed !important;
+    top: max(17px, env(safe-area-inset-top)) !important;
+    left: 14px !important;
+    z-index: 80 !important;
+    max-width: calc(100vw - 132px);
+    margin: 0 !important;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 25px !important;
+    line-height: 40px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   div:has(> button[aria-label="Notificações"]),
   div:has(> button[aria-label="Abrir menu da conta"]) {
     position: fixed !important;
     top: max(12px, env(safe-area-inset-top)) !important;
     z-index: 90 !important;
+  }
+
+  /* O detalhe do pedido é um drawer full-screen no mobile. Antes seu primeiro
+     bloco começava atrás da faixa fixa, escondendo Pedido # e o botão Fechar.
+     Reservamos a altura do header global e mantemos o cabeçalho do drawer
+     preso logo abaixo dele durante o scroll. */
+  #drawer {
+    padding-top: calc(72px + env(safe-area-inset-top)) !important;
+  }
+
+  #drawer > div:first-child {
+    position: sticky;
+    top: calc(72px + env(safe-area-inset-top));
+    z-index: 12;
+    margin: 0 -28px 8px;
+    padding: 14px 28px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  @supports (backdrop-filter: blur(1px)) {
+    #drawer > div:first-child {
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      backdrop-filter: blur(16px);
+    }
+  }
+
+  #drawer > div:first-child > button[aria-label="Fechar"] {
+    width: 40px !important;
+    height: 40px !important;
+    flex: 0 0 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 0 !important;
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+    box-shadow: 0 6px 20px rgba(63, 43, 34, .06);
   }
 }
