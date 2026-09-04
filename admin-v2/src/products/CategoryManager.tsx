@@ -34,20 +34,23 @@ export function CategoryManager({ onClose }: Props) {
 
   usePageScrollLock(true);
 
-  async function reload() {
-    setLoading(true);
-    setError(null);
+  async function reload(silent = false) {
+    if (!silent) setLoading(true);
+    if (!silent) setError(null);
 
     try {
       setCategories(await listAllCategories());
+      setError(null);
     } catch (err) {
-      setError(
-        err instanceof ProductApiError
-          ? err.message
-          : "Não foi possível carregar as categorias."
-      );
+      if (!silent) {
+        setError(
+          err instanceof ProductApiError
+            ? err.message
+            : "Não foi possível carregar as categorias."
+        );
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -88,7 +91,7 @@ export function CategoryManager({ onClose }: Props) {
       await createCategory({ nome, emoji, descricao });
       setForm(emptyForm());
       setMessage("Categoria criada.");
-      await reload();
+      await reload(true);
     } catch (err) {
       setError(
         err instanceof ProductApiError
