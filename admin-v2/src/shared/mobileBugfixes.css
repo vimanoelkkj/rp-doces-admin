@@ -16,9 +16,34 @@
     overflow: visible !important;
   }
 
-  /* Só o header padrão do AdminShell (título + subtítulo) deve ficar preso no
-     topo. Headers especiais, como o de Pedidos com busca e Novo pedido, não
-     podem virar um bloco sticky gigante por cima da lista. */
+  /* A barra superior mobile precisa existir independentemente do header de
+     conteúdo da página. O sidebar vira a navegação inferior, então usamos seu
+     pseudo-elemento para manter uma faixa fixa no topo atrás de notificações e
+     perfil, inclusive em telas com hideHeader como Pedidos. */
+  aside::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 78;
+    height: calc(64px + env(safe-area-inset-top));
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: 0 8px 24px rgba(63, 43, 34, .045);
+    pointer-events: none;
+  }
+
+  @supports (backdrop-filter: blur(1px)) {
+    aside::before {
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(16px);
+    }
+  }
+
+  /* Só o header padrão do AdminShell (título + subtítulo) permanece preso no
+     topo. Headers especiais, como Pedidos com busca e Novo pedido, continuam
+     no fluxo normal da página. */
   main:has(header:has(> div > h1):has(> div > p)) {
     padding-top: 0 !important;
   }
