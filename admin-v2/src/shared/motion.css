@@ -1,11 +1,11 @@
 @keyframes rp-screen-enter {
   from {
     opacity: 0;
-    left: 18px;
+    transform: translateY(7px);
   }
   to {
     opacity: 1;
-    left: 0;
+    transform: translateY(0);
   }
 }
 
@@ -60,12 +60,11 @@ body {
     color 160ms ease;
 }
 
-/* Mesmo princípio da V1: só a view central anima. O deslocamento usa `left`
-   em vez de transform para não criar um containing block novo e não afetar
-   header, bottom nav, drawers ou dialogs position: fixed. */
+/* Mesmo princípio da V1: só a view central anima com propriedades amigáveis
+   ao compositor. Sem fill-mode: ao terminar, transform deixa de existir e a
+   view não vira containing block permanente para drawers/dialogs fixed. */
 [data-admin-view][data-page-enter]:not([hidden]) {
-  position: relative;
-  animation: rp-screen-enter 190ms cubic-bezier(.2, .75, .2, 1) both;
+  animation: rp-screen-enter 190ms cubic-bezier(.22, 1, .36, 1);
 }
 
 nav[aria-label="Navegação principal"] button,
