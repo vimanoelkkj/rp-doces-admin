@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { listProducts } from "../products/product.api";
 import type { Product } from "../products/product.types";
 import { ApiClientError } from "../shared/apiClient";
+import { useBackLayer } from "../shared/useBackLayer";
 import { usePageScrollLock } from "../shared/usePageScrollLock";
 import {
   createManualOrder,
@@ -83,6 +84,22 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
   const [paymentStatus, setPaymentStatus] = useState<ManualOrderPaymentStatus>("PENDENTE");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const savingRef = useRef(false);
+
+  function updateSaving(value: boolean) {
+    savingRef.current = value;
+    setSaving(value);
+  }
+
+  const closeLayer = useBackLayer(
+    true,
+    () => {
+      if (savingRef.current) return false;
+      onClose();
+      return true;
+    },
+    "manual-order"
+  );
 
   usePageScrollLock(true);
 
@@ -115,11 +132,13 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !saving) onClose();
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeLayer();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, saving]);
+  }, [closeLayer]);
 
   const productById = useMemo(
     () => new Map(products.map(product => [product.id, product])),
@@ -145,7 +164,7 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (savingRef.current) return;
     setError(null);
 
     if (!items.length) {
@@ -169,7 +188,7 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
       }
     }
 
-    setSaving(true);
+    updateSaving(true);
     try {
       const id = await createManualOrder({
         itens: items.map(item => ({ produto_id: item.produtoId, quantidade: item.quantidade })),
@@ -180,12 +199,14 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
         status_pagamento: paymentStatus
       });
       await onCreated(id);
+      updateSaving(false);
+      closeLayer();
     } catch (err) {
       setError(
         err instanceof ApiClientError ? err.message : "Não foi possível registrar o pedido manual."
       );
     } finally {
-      setSaving(false);
+      updateSaving(false);
     }
   }
 
@@ -198,7 +219,7 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
         type="button"
         aria-label="Fechar novo pedido"
         disabled={saving}
-        onClick={saving ? undefined : onClose}
+        onClick={closeLayer}
       />
       <section className={styles.panel} role="dialog" aria-modal="true" aria-labelledby="manual-order-title">
         <header className={styles.head}>
@@ -207,7 +228,7 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
             <h2 id="manual-order-title">Registrar venda manual</h2>
             <p>Balcão, WhatsApp, boca a boca ou pedido feito fora do site.</p>
           </div>
-          <button className={styles.close} type="button" onClick={onClose} disabled={saving} aria-label="Fechar">×</button>
+          <button className={styles.close} type="button" onClick={closeLayer} disabled={saving} aria-label="Fechar">×</button>
         </header>
 
         <form className={styles.form} onSubmit={submit}>
@@ -346,7 +367,7 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
 
           <footer className={styles.footer}>
-            <button className={styles.cancel} type="button" onClick={onClose} disabled={saving}>Cancelar</button>
+            <button className={styles.cancel} type="button" onClick={closeLayer} disabled={saving}>Cancelar</button>
             <button className={styles.submit} type="submit" disabled={saving || loadingProducts || !products.length}>
               {saving ? "Registrando..." : "Registrar pedido"}
             </button>
