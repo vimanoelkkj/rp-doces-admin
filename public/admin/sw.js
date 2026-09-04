@@ -1,4 +1,4 @@
-const CACHE = "rp-admin-shell-v2";
+const CACHE = "rp-admin-shell-v3";
 const SHELL = [
   "/admin/",
   "/admin/login.html",
