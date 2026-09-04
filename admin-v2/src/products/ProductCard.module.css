@@ -103,15 +103,10 @@
 }
 
 .body > p {
-  min-height: 34px;
   margin: 0 0 12px;
-  overflow: hidden;
   color: var(--muted);
   font-size: 11.5px;
   line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
 
 .body footer {
