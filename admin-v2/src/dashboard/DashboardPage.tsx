@@ -24,6 +24,8 @@ type CalendarCell = {
   outside: boolean;
 };
 
+let dashboardCache: DashboardData | null = null;
+
 function money(cents: number): string {
   return (Number(cents) / 100).toLocaleString("pt-BR", {
     style: "currency",
@@ -140,8 +142,8 @@ function RecentOrder({ order }: { order: FinancialOrder }) {
 }
 
 export function DashboardPage({ session, onNavigate }: Props) {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData | null>(() => dashboardCache);
+  const [loading, setLoading] = useState(() => dashboardCache === null);
   const [error, setError] = useState<string | null>(null);
   const [dayOffset, setDayOffset] = useState(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -160,14 +162,17 @@ export function DashboardPage({ session, onNavigate }: Props) {
   const calendarRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(async () => {
-    setLoading(true);
+    const foreground = dashboardCache === null;
+    if (foreground) setLoading(true);
     setError(null);
     try {
-      setData(await loadDashboardData());
+      const next = await loadDashboardData();
+      dashboardCache = next;
+      setData(next);
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar o dashboard.");
     } finally {
-      setLoading(false);
+      if (foreground) setLoading(false);
     }
   }, []);
 
