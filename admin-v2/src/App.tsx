@@ -113,7 +113,7 @@ export function App() {
               let content: ReactNode;
 
               if (view === "dashboard") {
-                content = <DashboardPage session={session} onNavigate={navigate} />;
+                content = <DashboardPage session={session} onNavigate={navigate} active={active} />;
               } else if (view === "pedidos") {
                 content = <OrdersPage session={session} onNavigate={navigate} active={active} />;
               } else if (view === "admins") {
