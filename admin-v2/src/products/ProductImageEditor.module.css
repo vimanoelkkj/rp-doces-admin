@@ -5,35 +5,38 @@
 .title {
   display: block;
   margin-bottom: 8px;
-  color: var(--ink-soft);
-  font-size: 10.5px;
-  font-weight: 900;
+  color: var(--muted, #7d8088);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: 1fr 1.1fr;
   gap: 16px;
+  align-items: center;
 }
 
 .preview {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  min-height: 110px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 1px dashed var(--border-strong);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent-wash));
-  color: var(--muted);
-  font-size: 13px;
+  border: 1.5px dashed var(--line-strong, #e7ded8);
+  border-radius: 12px;
+  background: var(--surface-2, #fffaf7);
+  color: var(--muted, #7d8088);
+  font-size: 12px;
 }
 
 .preview canvas {
   width: 100%;
   height: 100%;
+  min-height: 110px;
   display: block;
   cursor: grab;
   touch-action: none;
@@ -49,73 +52,73 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgb(255 253 251 / 82%);
-  color: var(--ink-soft);
-  font-weight: 900;
+  background: rgba(255,253,250,.82);
+  color: var(--muted, #7d8088);
+  font-weight: 700;
   backdrop-filter: blur(2px);
+}
+
+:global(:root[data-theme="dark"]) .busy {
+  background: rgba(36,29,26,.82);
 }
 
 .side {
   min-width: 0;
-  display: grid;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
 }
 
 .actions {
-  display: grid;
-  justify-items: start;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
 }
 
 .actions label,
 .actions button {
-  min-height: 38px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  padding: 0 14px;
-  background: var(--surface);
-  color: var(--ink-soft);
+  justify-content: flex-start;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 7px 2px 6px;
+  background: transparent;
+  color: var(--muted, #7d8088);
   font: inherit;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
 }
 
 .actions label:hover:not(:has(input:disabled)),
 .actions button:hover:not(:disabled) {
-  border-color: var(--border-strong);
-  background: var(--accent-wash);
-  color: var(--accent-dark);
-}
-
-.actions button:not(.removeButton) {
-  background: var(--surface);
-  color: var(--ink-soft);
-  box-shadow: none;
+  border-bottom-color: var(--text, #24252a);
+  color: var(--text, #24252a);
 }
 
 .actions .removeButton {
-  color: var(--danger);
+  color: var(--danger, #b63f53);
 }
 
 .actions .removeButton:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
-  background: #fff0f1;
-  color: var(--danger);
+  border-bottom-color: currentColor;
+  color: var(--danger, #b63f53);
 }
 
 .actions button:disabled,
 .fileButton:has(input:disabled) {
-  opacity: 0.55;
+  opacity: .55;
   cursor: not-allowed;
 }
 
 .controls {
+  width: 100%;
   display: grid;
   gap: 5px;
 }
@@ -124,42 +127,42 @@
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 9px;
-  color: var(--ink-soft);
+  gap: 8px;
+  color: var(--muted, #7d8088);
   font-size: 10.5px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .controls input[type="range"] {
   width: 100%;
-  accent-color: var(--accent);
+  accent-color: var(--accent, #d84c6c);
 }
 
 .controls output {
-  min-width: 45px;
-  color: var(--text);
+  min-width: 44px;
+  color: var(--text, #24252a);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
 .help {
-  margin: 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.45;
+  margin: 4px 0 0;
+  color: var(--muted, #7d8088);
+  font-size: 10.5px;
+  line-height: 1.5;
 }
 
 .side > small {
-  color: var(--muted);
+  color: var(--muted, #7d8088);
   font-size: 10px;
 }
 
 .error {
-  margin: 9px 0 0;
-  color: var(--danger);
+  margin: 8px 0 0;
+  color: var(--danger, #b63f53);
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 @media (max-width: 600px) {
@@ -167,16 +170,8 @@
     grid-template-columns: 1fr;
   }
 
-  .preview {
-    max-width: none;
-  }
-
   .actions {
+    display: grid;
     grid-template-columns: 1fr;
-  }
-
-  .actions label,
-  .actions button {
-    width: 100%;
   }
 }
