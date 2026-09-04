@@ -4,7 +4,6 @@ import { App } from "./App";
 import "./tokens.css";
 import "./shared/mobileBugfixes.css";
 import "./shared/motion.css";
-import "./shared/mobileOverlayScrollLock";
 import "./shared/themeChrome";
 
 const storedTheme = window.localStorage.getItem("rp-admin-theme");
