@@ -1,12 +1,12 @@
 const SELECT_SELECTOR = "select:not([multiple])";
 const OVERLAY_ID = "rp-native-select-menu";
+const TOUCH_CLICK_FALLBACK_MS = 160;
 
 let activeSelect: HTMLSelectElement | null = null;
 let repositionHandler: (() => void) | null = null;
 let pendingTouchSelect: HTMLSelectElement | null = null;
-let touchOpenTimer: number | null = null;
-let suppressSyntheticClickFor: HTMLSelectElement | null = null;
-let suppressSyntheticClickUntil = 0;
+let awaitingTouchClickFor: HTMLSelectElement | null = null;
+let touchFallbackTimer: number | null = null;
 
 function selectLabel(select: HTMLSelectElement): string {
   const ariaLabel = select.getAttribute("aria-label")?.trim();
@@ -22,10 +22,16 @@ function selectLabel(select: HTMLSelectElement): string {
   return wrappingLabel || select.name || "Selecionar opção";
 }
 
-function clearTouchOpenTimer(): void {
-  if (touchOpenTimer === null) return;
-  window.clearTimeout(touchOpenTimer);
-  touchOpenTimer = null;
+function clearTouchFallbackTimer(): void {
+  if (touchFallbackTimer === null) return;
+  window.clearTimeout(touchFallbackTimer);
+  touchFallbackTimer = null;
+}
+
+function resetTouchGesture(): void {
+  pendingTouchSelect = null;
+  awaitingTouchClickFor = null;
+  clearTouchFallbackTimer();
 }
 
 function closeMenu({ restoreFocus = false }: { restoreFocus?: boolean } = {}): void {
@@ -146,40 +152,50 @@ function isEnhancedSelect(target: EventTarget | null): target is HTMLSelectEleme
   return target instanceof HTMLSelectElement && target.matches(SELECT_SELECTOR);
 }
 
-// Em telas touch, impedir o default no touchstart bloqueia o picker nativo.
-// O menu custom só entra no DOM depois do touchend, então o mesmo gesto nunca
-// pode terminar em cima do backdrop ou de uma opção recém-criados.
-function onTouchStart(event: TouchEvent): void {
+// Mouse/trackpad: o select nativo costuma reagir ao pointerdown/mousedown.
+// Cancelamos esse default, mas deixamos o click de alto nível chegar ao handler
+// abaixo, que abre apenas o menu customizado.
+function onPointerDown(event: PointerEvent): void {
+  if (event.pointerType === "touch") return;
   if (!isEnhancedSelect(event.target) || event.target.disabled) return;
-
-  pendingTouchSelect = event.target;
-  suppressSyntheticClickFor = event.target;
-  suppressSyntheticClickUntil = performance.now() + 800;
-  clearTouchOpenTimer();
   event.preventDefault();
   event.stopPropagation();
 }
 
+// Touch: preventDefault no touchstart impede o picker nativo e, nos browsers
+// que seguem Touch Events, também suprime os eventos de mouse sintetizados.
+function onTouchStart(event: TouchEvent): void {
+  if (!isEnhancedSelect(event.target) || event.target.disabled) return;
+
+  resetTouchGesture();
+  pendingTouchSelect = event.target;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+// Não criamos o overlay aqui imediatamente. Alguns browsers ainda podem emitir
+// um click de ativação após o touchend. Mantemos o select original como alvo até
+// esse click ser consumido; se ele não existir, o fallback abre o custom.
 function onTouchEnd(event: TouchEvent): void {
   if (!pendingTouchSelect) return;
 
   const select = pendingTouchSelect;
   pendingTouchSelect = null;
+  awaitingTouchClickFor = select;
   event.preventDefault();
   event.stopPropagation();
 
-  clearTouchOpenTimer();
-  touchOpenTimer = window.setTimeout(() => {
-    touchOpenTimer = null;
+  clearTouchFallbackTimer();
+  touchFallbackTimer = window.setTimeout(() => {
+    touchFallbackTimer = null;
+    if (awaitingTouchClickFor !== select) return;
+    awaitingTouchClickFor = null;
     openMenu(select);
-  }, 0);
+  }, TOUCH_CLICK_FALLBACK_MS);
 }
 
 function onTouchCancel(): void {
-  pendingTouchSelect = null;
-  clearTouchOpenTimer();
-  suppressSyntheticClickFor = null;
-  suppressSyntheticClickUntil = 0;
+  resetTouchGesture();
 }
 
 function onClick(event: MouseEvent): void {
@@ -188,17 +204,17 @@ function onClick(event: MouseEvent): void {
   event.preventDefault();
   event.stopPropagation();
 
-  if (
-    suppressSyntheticClickFor === event.target &&
-    performance.now() <= suppressSyntheticClickUntil
-  ) {
-    suppressSyntheticClickFor = null;
-    suppressSyntheticClickUntil = 0;
+  // Click de ativação gerado pelo toque: ele é consumido enquanto o overlay
+  // ainda NÃO existe. Só depois desse evento terminar criamos o menu custom.
+  if (awaitingTouchClickFor === event.target) {
+    const select = event.target;
+    awaitingTouchClickFor = null;
+    clearTouchFallbackTimer();
+    window.setTimeout(() => openMenu(select), 0);
     return;
   }
 
-  suppressSyntheticClickFor = null;
-  suppressSyntheticClickUntil = 0;
+  // Mouse, trackpad e clicks sintéticos que não vieram de um gesto touch.
   openMenu(event.target);
 }
 
@@ -215,12 +231,13 @@ function onKeyDown(event: KeyboardEvent): void {
   openMenu(event.target);
 }
 
+document.addEventListener("pointerdown", onPointerDown, true);
 document.addEventListener("touchstart", onTouchStart, { capture: true, passive: false });
 document.addEventListener("touchend", onTouchEnd, { capture: true, passive: false });
 document.addEventListener("touchcancel", onTouchCancel, true);
 document.addEventListener("click", onClick, true);
 document.addEventListener("keydown", onKeyDown, true);
 window.addEventListener("pagehide", () => {
-  clearTouchOpenTimer();
+  resetTouchGesture();
   closeMenu();
 });
