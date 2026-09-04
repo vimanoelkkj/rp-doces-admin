@@ -320,11 +320,6 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
     },
     "order-drawer"
   );
-  const closeManualOrder = useBackLayer(
-    manualOrderOpen,
-    () => setManualOrderOpen(false),
-    "manual-order"
-  );
 
   const reload = useCallback(async (
     preferredOrderId?: number,
@@ -911,7 +906,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
 
       {manualOrderOpen ? (
         <ManualOrderDialog
-          onClose={closeManualOrder}
+          onClose={() => setManualOrderOpen(false)}
           onCreated={async () => {
             setQuery("");
             setFilter("todos");
@@ -920,7 +915,6 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
             setDrawerOpen(false);
             setActiveTab("pedido");
             setEditing(false);
-            closeManualOrder();
           }}
         />
       ) : null}
