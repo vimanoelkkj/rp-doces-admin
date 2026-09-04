@@ -3,8 +3,10 @@ const OVERLAY_ID = "rp-native-select-menu";
 
 let activeSelect: HTMLSelectElement | null = null;
 let repositionHandler: (() => void) | null = null;
-let suppressOpeningClick = false;
-let suppressResetTimer: number | null = null;
+let pendingTouchSelect: HTMLSelectElement | null = null;
+let touchOpenTimer: number | null = null;
+let suppressSyntheticClickFor: HTMLSelectElement | null = null;
+let suppressSyntheticClickUntil = 0;
 
 function selectLabel(select: HTMLSelectElement): string {
   const ariaLabel = select.getAttribute("aria-label")?.trim();
@@ -20,18 +22,10 @@ function selectLabel(select: HTMLSelectElement): string {
   return wrappingLabel || select.name || "Selecionar opção";
 }
 
-function clearSuppressResetTimer(): void {
-  if (suppressResetTimer === null) return;
-  window.clearTimeout(suppressResetTimer);
-  suppressResetTimer = null;
-}
-
-function releaseOpeningClickAfterCurrentGesture(): void {
-  clearSuppressResetTimer();
-  suppressResetTimer = window.setTimeout(() => {
-    suppressResetTimer = null;
-    suppressOpeningClick = false;
-  }, 0);
+function clearTouchOpenTimer(): void {
+  if (touchOpenTimer === null) return;
+  window.clearTimeout(touchOpenTimer);
+  touchOpenTimer = null;
 }
 
 function closeMenu({ restoreFocus = false }: { restoreFocus?: boolean } = {}): void {
@@ -99,14 +93,7 @@ function openMenu(select: HTMLSelectElement): void {
   dismiss.type = "button";
   dismiss.className = "rp-mobile-filter-backdrop";
   dismiss.setAttribute("aria-label", "Fechar seletor");
-  dismiss.addEventListener("click", event => {
-    if (suppressOpeningClick) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    closeMenu({ restoreFocus: true });
-  });
+  dismiss.addEventListener("click", () => closeMenu({ restoreFocus: true }));
 
   const menu = document.createElement("div");
   menu.className = "rp-mobile-filter-menu";
@@ -159,28 +146,40 @@ function isEnhancedSelect(target: EventTarget | null): target is HTMLSelectEleme
   return target instanceof HTMLSelectElement && target.matches(SELECT_SELECTOR);
 }
 
-// O picker nativo pode ser disparado antes do click em navegadores mobile.
-// Cancelamos o gesto já no pointerdown e abrimos o menu custom imediatamente.
-// O click gerado pelo mesmo gesto é ignorado pelo backdrop até o próximo task,
-// evitando que o overlay recém-criado se feche sozinho.
-function onPointerDown(event: PointerEvent): void {
+// Em telas touch, impedir o default no touchstart bloqueia o picker nativo.
+// O menu custom só entra no DOM depois do touchend, então o mesmo gesto nunca
+// pode terminar em cima do backdrop ou de uma opção recém-criados.
+function onTouchStart(event: TouchEvent): void {
   if (!isEnhancedSelect(event.target) || event.target.disabled) return;
 
+  pendingTouchSelect = event.target;
+  suppressSyntheticClickFor = event.target;
+  suppressSyntheticClickUntil = performance.now() + 800;
+  clearTouchOpenTimer();
   event.preventDefault();
   event.stopPropagation();
-  clearSuppressResetTimer();
-  suppressOpeningClick = true;
-  openMenu(event.target);
 }
 
-function onPointerUp(): void {
-  if (!suppressOpeningClick) return;
-  releaseOpeningClickAfterCurrentGesture();
+function onTouchEnd(event: TouchEvent): void {
+  if (!pendingTouchSelect) return;
+
+  const select = pendingTouchSelect;
+  pendingTouchSelect = null;
+  event.preventDefault();
+  event.stopPropagation();
+
+  clearTouchOpenTimer();
+  touchOpenTimer = window.setTimeout(() => {
+    touchOpenTimer = null;
+    openMenu(select);
+  }, 0);
 }
 
-function onPointerCancel(): void {
-  clearSuppressResetTimer();
-  suppressOpeningClick = false;
+function onTouchCancel(): void {
+  pendingTouchSelect = null;
+  clearTouchOpenTimer();
+  suppressSyntheticClickFor = null;
+  suppressSyntheticClickUntil = 0;
 }
 
 function onClick(event: MouseEvent): void {
@@ -189,9 +188,18 @@ function onClick(event: MouseEvent): void {
   event.preventDefault();
   event.stopPropagation();
 
-  // Cliques de teclado/sintéticos não passam necessariamente por pointerdown.
-  // O click residual do gesto que já abriu o menu não deve abri-lo de novo.
-  if (!suppressOpeningClick) openMenu(event.target);
+  if (
+    suppressSyntheticClickFor === event.target &&
+    performance.now() <= suppressSyntheticClickUntil
+  ) {
+    suppressSyntheticClickFor = null;
+    suppressSyntheticClickUntil = 0;
+    return;
+  }
+
+  suppressSyntheticClickFor = null;
+  suppressSyntheticClickUntil = 0;
+  openMenu(event.target);
 }
 
 function onKeyDown(event: KeyboardEvent): void {
@@ -207,9 +215,12 @@ function onKeyDown(event: KeyboardEvent): void {
   openMenu(event.target);
 }
 
-document.addEventListener("pointerdown", onPointerDown, true);
-document.addEventListener("pointerup", onPointerUp, true);
-document.addEventListener("pointercancel", onPointerCancel, true);
+document.addEventListener("touchstart", onTouchStart, { capture: true, passive: false });
+document.addEventListener("touchend", onTouchEnd, { capture: true, passive: false });
+document.addEventListener("touchcancel", onTouchCancel, true);
 document.addEventListener("click", onClick, true);
 document.addEventListener("keydown", onKeyDown, true);
-window.addEventListener("pagehide", () => closeMenu());
+window.addEventListener("pagehide", () => {
+  clearTouchOpenTimer();
+  closeMenu();
+});
