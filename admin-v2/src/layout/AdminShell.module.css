@@ -382,10 +382,10 @@
   font-size: 10.5px;
 }
 
+.profileMenuTheme,
 .profileMenuLogout {
   width: 100%;
   min-height: 42px;
-  display: flex;
   align-items: center;
   gap: 9px;
   border: 0;
@@ -398,11 +398,22 @@
   transition: background .16s ease, color .16s ease;
 }
 
+.profileMenuTheme {
+  display: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.profileMenuLogout {
+  display: flex;
+}
+
+.profileMenuTheme:hover,
 .profileMenuLogout:hover {
   background: var(--hover-nav);
   color: var(--text);
 }
 
+.profileMenuTheme svg,
 .profileMenuLogout svg {
   width: 16px;
   height: 16px;
@@ -557,15 +568,193 @@
 
 @media (max-width: 760px) {
   .app {
-    grid-template-columns: 62px minmax(0, 1fr);
+    display: block;
   }
 
   .sidebar {
-    padding: 18px 6px;
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 70;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    display: block;
+    padding: 6px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+    border-top: 1px solid var(--line);
+    border-right: 0;
+    background: color-mix(in srgb, var(--surface) 94%, var(--pink-soft));
+    backdrop-filter: blur(16px);
+    box-shadow: 0 -10px 30px rgba(63, 43, 34, .06);
+  }
+
+  .brand,
+  .navSpacer,
+  .themeButton {
+    display: none;
+  }
+
+  .nav {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+    padding: 0;
+  }
+
+  .navItem {
+    position: relative;
+    min-width: 0;
+    height: 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 12px;
+    padding: 4px 2px;
+    font-size: 0;
+    text-align: center;
+  }
+
+  .navItem::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 24px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--pink);
+    opacity: 0;
+    transform: translateX(-50%) scaleX(.3);
+    transition: opacity .16s ease, transform .16s ease;
+  }
+
+  .navItem:hover {
+    transform: none;
+  }
+
+  .navItem:active {
+    transform: scale(.98);
+  }
+
+  .navActive::before {
+    opacity: 1;
+    transform: translateX(-50%) scaleX(1);
+  }
+
+  .navIcon {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+  }
+
+  .navIcon svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .navLabel {
+    display: block !important;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 0;
+    line-height: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .navLabel::after {
+    content: attr(data-mobile-label);
+    color: currentColor;
+    font-size: 9px;
+    line-height: 12px;
+  }
+
+  .notificationWrap,
+  .profileWrap {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    z-index: 85;
+  }
+
+  .notificationWrap {
+    right: 58px;
+  }
+
+  .profileWrap {
+    right: 12px;
+  }
+
+  .notificationWrap .utilityButton,
+  .profile {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    color: var(--muted);
+    box-shadow: 0 6px 20px rgba(63, 43, 34, .06);
+    backdrop-filter: blur(12px);
+  }
+
+  .notificationWrap .navLabel,
+  .profileText,
+  .profileCaret {
+    display: none !important;
+  }
+
+  .notificationWrap .navIcon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .notificationWrap .navIcon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .notificationDot {
+    top: 6px;
+    right: 6px;
+  }
+
+  .profile {
+    border-top: 1px solid var(--line);
+  }
+
+  .avatar,
+  .avatarImage {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .notificationPopover,
+  .profileMenu {
+    position: fixed;
+    top: calc(max(12px, env(safe-area-inset-top)) + 48px);
+    right: 12px;
+    bottom: auto;
+    left: auto;
+    width: min(300px, calc(100vw - 24px));
+    max-width: none;
+  }
+
+  .profileMenuTheme {
+    display: flex;
   }
 
   .content {
-    padding: 18px 0 24px;
+    min-height: 100dvh;
+    padding: 18px 0 calc(88px + env(safe-area-inset-bottom));
   }
 
   .workspace {
@@ -573,24 +762,23 @@
   }
 
   .pageHeader {
+    min-height: 42px;
     margin: 0 2px 18px;
+    padding-right: 96px;
   }
 
-  .notificationPopover {
-    position: fixed;
-    left: 70px;
-    right: 12px;
-    bottom: 18px;
-    width: auto;
-    max-width: none;
+  .pageTitleBlock h1 {
+    font-size: 25px;
   }
 
-  .profileMenu {
-    position: fixed;
-    left: 70px;
-    right: 12px;
-    bottom: 18px;
-    width: auto;
-    max-width: none;
+  .pageTitleBlock p {
+    max-width: 70vw;
+    font-size: 11.5px;
+  }
+}
+
+@media (max-width: 380px) {
+  .navLabel::after {
+    font-size: 8.5px;
   }
 }
