@@ -20,6 +20,8 @@ type ConfirmState =
   | { kind: "role"; user: AdminUser; nextRole: AdminRole }
   | { kind: "active"; user: AdminUser; nextActive: boolean };
 
+let adminsCache: AdminUser[] | null = null;
+
 function initials(name: string): string {
   return (
     name
@@ -83,8 +85,8 @@ function Modal({
 export function AdminsPage({ session, onNavigate }: Props) {
   const { user: viewer } = session;
   const isOwner = viewer.papel === "OWNER";
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<AdminUser[]>(() => adminsCache ?? []);
+  const [loading, setLoading] = useState(() => adminsCache === null);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -97,14 +99,17 @@ export function AdminsPage({ session, onNavigate }: Props) {
   const [confirmBusy, setConfirmBusy] = useState(false);
 
   const reload = useCallback(async () => {
-    setLoading(true);
+    const foreground = adminsCache === null;
+    if (foreground) setLoading(true);
     setError(null);
     try {
-      setUsers(await listAdmins());
+      const next = await listAdmins();
+      adminsCache = next;
+      setUsers(next);
     } catch (err) {
       setError(errorMessage(err, "Não foi possível carregar os administradores."));
     } finally {
-      setLoading(false);
+      if (foreground) setLoading(false);
     }
   }, []);
 
