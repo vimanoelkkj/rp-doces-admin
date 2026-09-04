@@ -143,6 +143,19 @@ export function StorePage({ session, onNavigate }: Props) {
     () => scheduleText(form.horario_dias, form.horario_abre, form.horario_fecha),
     [form.horario_dias, form.horario_abre, form.horario_fecha]
   );
+  const hasUnsavedFormChanges = formSnapshot(form) !== savedFormSnapshotRef.current;
+
+  useEffect(() => {
+    if (!hasUnsavedFormChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = true;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedFormChanges]);
 
   function patch<K extends keyof StoreFormState>(key: K, value: StoreFormState[K]) {
     setForm(current => ({ ...current, [key]: value }));
