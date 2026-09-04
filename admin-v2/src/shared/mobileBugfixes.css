@@ -15,4 +15,41 @@
   div:has(> button[aria-label="Dia anterior"]):has(> button[aria-label="Próximo dia"]) {
     overflow: visible !important;
   }
+
+  /* No mobile, notificações e perfil ficam no topo. O header precisa permanecer
+     junto deles; caso contrário, ao rolar a página os botões ficam flutuando
+     sozinhos sobre o conteúdo. */
+  main {
+    padding-top: 0 !important;
+  }
+
+  main header:has(h1) {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 80 !important;
+    min-height: calc(64px + env(safe-area-inset-top));
+    margin: 0 -12px 18px !important;
+    padding:
+      max(12px, env(safe-area-inset-top))
+      112px
+      12px
+      14px !important;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: 0 8px 24px rgba(63, 43, 34, .045);
+  }
+
+  @supports (backdrop-filter: blur(1px)) {
+    main header:has(h1) {
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(16px);
+    }
+  }
+
+  div:has(> button[aria-label="Notificações"]),
+  div:has(> button[aria-label="Abrir menu da conta"]) {
+    position: fixed !important;
+    top: max(12px, env(safe-area-inset-top)) !important;
+    z-index: 90 !important;
+  }
 }
