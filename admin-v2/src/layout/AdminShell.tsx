@@ -1,4 +1,11 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+  useState
+} from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import styles from "./AdminShell.module.css";
 
@@ -25,6 +32,8 @@ type IconName =
   | "bell"
   | "sun"
   | "moon";
+
+const AdminShellNestingContext = createContext(false);
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -66,7 +75,13 @@ function readNotificationsEnabled(): boolean {
   return Notification.permission === "granted";
 }
 
-export function AdminShell({
+export function AdminShell(props: Props) {
+  const nested = useContext(AdminShellNestingContext);
+  if (nested) return <>{props.children}</>;
+  return <AdminShellRoot {...props} />;
+}
+
+function AdminShellRoot({
   session,
   activePage,
   title,
@@ -116,6 +131,11 @@ export function AdminShell({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [notificationOpen, profileOpen]);
+
+  useEffect(() => {
+    setProfileOpen(false);
+    setNotificationOpen(false);
+  }, [activePage]);
 
   const navItems = [
     { key: "dashboard", label: "Dashboard", mobileLabel: "Dashboard", icon: "dashboard" },
@@ -189,6 +209,11 @@ export function AdminShell({
   ) : null;
 
   const wide = activePage === "dashboard" || activePage === "produtos";
+  const pageChildren = (
+    <AdminShellNestingContext.Provider value={true}>
+      {children}
+    </AdminShellNestingContext.Provider>
+  );
 
   const body = (
     <>
@@ -202,13 +227,13 @@ export function AdminShell({
       ) : null}
 
       {logoutError ? <div className={styles.logoutError} role="alert">{logoutError}</div> : null}
-      {children}
+      {pageChildren}
     </>
   );
 
   return (
     <div className={styles.app}>
-      <aside className={styles.sidebar} data-admin-navigation-chrome>
+      <aside className={styles.sidebar}>
         <div className={styles.brand} aria-label="R&P Doces">
           <div className={styles.brandRp}>R&amp;P</div>
           <div className={styles.brandDoces}>DOCES</div>
