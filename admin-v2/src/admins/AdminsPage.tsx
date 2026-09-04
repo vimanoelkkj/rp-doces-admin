@@ -1,6 +1,8 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
+import { useBackLayer } from "../shared/useBackLayer";
+import { usePageScrollLock } from "../shared/usePageScrollLock";
 import {
   createAdmin,
   listAdmins,
@@ -55,6 +57,8 @@ function Modal({
   label: string;
   compact?: boolean;
 }) {
+  usePageScrollLock(true);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -66,8 +70,11 @@ function Modal({
   return (
     <div
       className={styles.overlay}
-      onMouseDown={event => {
-        if (event.target === event.currentTarget) onClose();
+      onClick={event => {
+        if (event.target !== event.currentTarget) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
       }}
     >
       <section
@@ -75,6 +82,7 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={label}
+        onClick={event => event.stopPropagation()}
       >
         {children}
       </section>
@@ -97,6 +105,17 @@ export function AdminsPage({ session, onNavigate }: Props) {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+
+  const closeCreate = useBackLayer(
+    createOpen,
+    () => setCreateOpen(false),
+    "admin-create"
+  );
+  const closeConfirm = useBackLayer(
+    confirm !== null,
+    () => setConfirm(null),
+    "admin-confirm"
+  );
 
   const reload = useCallback(async () => {
     const foreground = adminsCache === null;
@@ -151,7 +170,7 @@ export function AdminsPage({ session, onNavigate }: Props) {
         senha,
         papel: data.get("papel") === "OWNER" ? "OWNER" : "ADMIN"
       });
-      setCreateOpen(false);
+      closeCreate();
       setFeedback("Administrador criado com sucesso.");
       form.reset();
       await reload();
@@ -213,11 +232,11 @@ export function AdminsPage({ session, onNavigate }: Props) {
             : `${confirm.user.nome} foi desativado e teve as sessões encerradas.`
         );
       }
-      setConfirm(null);
+      closeConfirm();
       await reload();
     } catch (err) {
       setError(errorMessage(err, "Não foi possível concluir a alteração."));
-      setConfirm(null);
+      closeConfirm();
     } finally {
       setConfirmBusy(false);
     }
@@ -403,11 +422,11 @@ export function AdminsPage({ session, onNavigate }: Props) {
       </AdminShell>
 
       {createOpen ? (
-        <Modal label="Criar administrador" onClose={() => !createBusy && setCreateOpen(false)}>
+        <Modal label="Criar administrador" onClose={() => !createBusy && closeCreate()}>
           <form onSubmit={event => void handleCreate(event)}>
             <div className={styles.dialogHead}>
               <div><span>Novo acesso</span><h2>Criar administrador</h2></div>
-              <button className={styles.closeButton} type="button" onClick={() => setCreateOpen(false)} aria-label="Fechar">×</button>
+              <button className={styles.closeButton} type="button" onClick={closeCreate} aria-label="Fechar" disabled={createBusy}>×</button>
             </div>
             <div className={styles.dialogBody}>
               <label className={styles.field}><span>Nome</span><input name="nome" minLength={2} maxLength={100} autoComplete="name" required autoFocus /></label>
@@ -429,7 +448,7 @@ export function AdminsPage({ session, onNavigate }: Props) {
               {createError ? <p className={styles.formError}>{createError}</p> : null}
             </div>
             <div className={styles.dialogFooter}>
-              <button className={styles.secondaryButton} type="button" onClick={() => setCreateOpen(false)} disabled={createBusy}>Cancelar</button>
+              <button className={styles.secondaryButton} type="button" onClick={closeCreate} disabled={createBusy}>Cancelar</button>
               <button className={styles.primaryButton} type="submit" disabled={createBusy}>{createBusy ? "Criando…" : "Criar administrador"}</button>
             </div>
           </form>
@@ -437,17 +456,17 @@ export function AdminsPage({ session, onNavigate }: Props) {
       ) : null}
 
       {confirm && confirmCopy ? (
-        <Modal label={confirmCopy.title} compact onClose={() => !confirmBusy && setConfirm(null)}>
+        <Modal label={confirmCopy.title} compact onClose={() => !confirmBusy && closeConfirm()}>
           <div className={styles.dialogHead}>
             <div>
               <span>{confirmCopy.kicker}</span>
               <h2>{confirmCopy.title}</h2>
               <p>{confirmCopy.message}</p>
             </div>
-            <button className={styles.closeButton} type="button" onClick={() => setConfirm(null)} aria-label="Fechar">×</button>
+            <button className={styles.closeButton} type="button" onClick={closeConfirm} aria-label="Fechar" disabled={confirmBusy}>×</button>
           </div>
           <div className={styles.dialogFooter}>
-            <button className={styles.secondaryButton} type="button" onClick={() => setConfirm(null)} disabled={confirmBusy}>Cancelar</button>
+            <button className={styles.secondaryButton} type="button" onClick={closeConfirm} disabled={confirmBusy}>Cancelar</button>
             <button
               className={confirmCopy.danger ? styles.dangerButton : styles.primaryButton}
               type="button"
