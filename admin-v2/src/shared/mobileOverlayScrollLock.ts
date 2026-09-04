@@ -5,12 +5,11 @@ const media = window.matchMedia(MOBILE_DRAWER_QUERY);
 let releaseScrollLock: (() => void) | null = null;
 let settleTimer = 0;
 
-function drawerIsVisible(): boolean {
-  if (!media.matches) return false;
-  const drawer = document.getElementById("drawer");
-  if (!drawer || !drawer.hasChildNodes()) return false;
+function elementIsVisible(element: HTMLElement): boolean {
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") return false;
 
-  const rect = drawer.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
   return (
     rect.width > 0 &&
     rect.height > 0 &&
@@ -21,8 +20,15 @@ function drawerIsVisible(): boolean {
   );
 }
 
+function drawerIsVisible(): boolean {
+  if (!media.matches) return false;
+  const drawer = document.getElementById("drawer");
+  if (!drawer || !drawer.hasChildNodes()) return false;
+  return elementIsVisible(drawer);
+}
+
 function modalIsOpen(): boolean {
-  return Boolean(document.querySelector('[aria-modal="true"]'));
+  return Array.from(document.querySelectorAll<HTMLElement>('[aria-modal="true"]')).some(elementIsVisible);
 }
 
 function syncScrollLock(): void {
@@ -50,7 +56,7 @@ function start(): void {
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ["class", "aria-modal"]
+    attributeFilter: ["class", "style", "aria-modal", "hidden"]
   });
   media.addEventListener("change", scheduleSync);
   window.addEventListener("resize", scheduleSync, { passive: true });
