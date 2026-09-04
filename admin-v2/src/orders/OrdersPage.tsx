@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
 import { ApiClientError } from "../shared/apiClient";
@@ -20,6 +20,7 @@ import styles from "./OrdersPage.module.css";
 type Props = {
   session: AuthSession;
   onNavigate: (page: AdminV2Page) => void;
+  active: boolean;
 };
 
 type FilterKey = "todos" | "hoje" | "producao" | "prontos" | "entregues";
@@ -48,6 +49,7 @@ const FILTER_OPTIONS: Array<[FilterKey, string]> = [
   ["entregues", "Entregues"]
 ];
 
+const ORDER_AUTO_REFRESH_MS = 10_000;
 let ordersCache: Order[] | null = null;
 
 const editSelectStyle: CSSProperties = {
@@ -180,6 +182,17 @@ function normalizeManualPayment(order: Order): ManualPaymentStatus {
   return PAYMENT_STATUS_OPTIONS.some(([status]) => status === value) ? value as ManualPaymentStatus : "PENDENTE";
 }
 
+function sameOrder(left?: Order | null, right?: Order | null) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sameOrders(left: Order[] | null, right: Order[]) {
+  if (!left || left.length !== right.length) return false;
+  return left.every((order, index) => sameOrder(order, right[index]));
+}
+
 function OrderRow({
   order,
   selected,
@@ -270,7 +283,7 @@ function OrderRow({
   );
 }
 
-export function OrdersPage({ session, onNavigate }: Props) {
+export function OrdersPage({ session, onNavigate, active }: Props) {
   const [orders, setOrders] = useState<Order[]>(() => ordersCache ?? []);
   const [loading, setLoading] = useState(() => ordersCache === null);
   const [error, setError] = useState<string | null>(null);
@@ -288,6 +301,9 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [draftPayment, setDraftPayment] = useState<ManualPaymentStatus>("PENDENTE");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const editingRef = useRef(false);
+  const savingEditRef = useRef(false);
+  const autoRefreshInFlightRef = useRef(false);
 
   const closeDrawer = useBackLayer(
     drawerOpen,
@@ -303,28 +319,86 @@ export function OrdersPage({ session, onNavigate }: Props) {
     "manual-order"
   );
 
-  const reload = useCallback(async (preferredOrderId?: number) => {
-    const foreground = ordersCache === null;
+  const reload = useCallback(async (
+    preferredOrderId?: number,
+    silent = false,
+    preserveSelected = false
+  ) => {
+    const foreground = !silent && ordersCache === null;
     if (foreground) setLoading(true);
-    setError(null);
+    if (!silent) setError(null);
+
     try {
       const next = await listOrders();
+      const previous = ordersCache;
       ordersCache = next;
-      setOrders(next);
-      setSelected(current => {
-        if (preferredOrderId) return next.find(order => order.id === preferredOrderId) || current;
-        return current ? next.find(order => order.id === current.id) || null : null;
-      });
+
+      if (!sameOrders(previous, next)) {
+        setOrders(next);
+      }
+
+      if (!preserveSelected) {
+        setSelected(current => {
+          if (preferredOrderId) {
+            const preferred = next.find(order => order.id === preferredOrderId);
+            if (!preferred) return current;
+            return sameOrder(current, preferred) ? current : preferred;
+          }
+
+          if (!current) return null;
+          const refreshed = next.find(order => order.id === current.id) || null;
+          return sameOrder(current, refreshed) ? current : refreshed;
+        });
+      }
+
+      setError(null);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar os pedidos.");
+      if (!silent) {
+        setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar os pedidos.");
+      }
     } finally {
       if (foreground) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    editingRef.current = editing;
+    savingEditRef.current = savingEdit;
+  }, [editing, savingEdit]);
+
+  useEffect(() => {
+    if (!active) return;
+    let alive = true;
+
+    const refresh = (silent: boolean) => {
+      if (!alive || document.visibilityState !== "visible" || autoRefreshInFlightRef.current) return;
+      autoRefreshInFlightRef.current = true;
+      void reload(
+        undefined,
+        silent,
+        editingRef.current || savingEditRef.current
+      ).finally(() => {
+        autoRefreshInFlightRef.current = false;
+      });
+    };
+
+    refresh(ordersCache !== null);
+
+    const intervalId = window.setInterval(() => refresh(true), ORDER_AUTO_REFRESH_MS);
+    const handleResume = () => refresh(true);
+
+    window.addEventListener("focus", handleResume);
+    window.addEventListener("online", handleResume);
+    document.addEventListener("visibilitychange", handleResume);
+
+    return () => {
+      alive = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleResume);
+      window.removeEventListener("online", handleResume);
+      document.removeEventListener("visibilitychange", handleResume);
+    };
+  }, [active, reload]);
 
   useEffect(() => {
     setPage(1);
@@ -400,6 +474,10 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const selectedDelivery = selected?.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada";
   const selectedItems = selected ? orderItems(selected) : [];
   const selectedIsManual = selected?.origem_pedido === "MANUAL";
+
+  useEffect(() => {
+    setPage(current => Math.min(current, pages));
+  }, [pages]);
 
   const financialItems = financial?.itens || [];
   const comandaItems = financialItems.length ? financialItems : selectedItems;
