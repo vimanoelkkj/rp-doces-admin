@@ -121,7 +121,7 @@ export function App() {
               } else if (view === "loja") {
                 content = <StorePage session={session} onNavigate={navigate} />;
               } else {
-                content = <ProductsPage session={session} onNavigate={navigate} />;
+                content = <ProductsPage session={session} onNavigate={navigate} active={active} />;
               }
 
               return (
