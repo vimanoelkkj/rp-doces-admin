@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listProducts } from "../products/product.api";
 import type { Product } from "../products/product.types";
 import { ApiClientError } from "../shared/apiClient";
+import { usePageScrollLock } from "../shared/usePageScrollLock";
 import {
   createManualOrder,
   type ManualOrderPaymentMethod,
@@ -83,6 +84,8 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  usePageScrollLock(true);
+
   useEffect(() => {
     let alive = true;
     setLoadingProducts(true);
@@ -111,16 +114,11 @@ export function ManualOrderDialog({ onClose, onCreated }: Props) {
   }, []);
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !saving) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, saving]);
 
   const productById = useMemo(
