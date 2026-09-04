@@ -21,6 +21,7 @@ type Props<T extends string> = {
   onChange: (value: T) => void;
   ariaLabel: string;
   className?: string;
+  style?: CSSProperties;
   disabled?: boolean;
 };
 
@@ -60,6 +61,7 @@ export function AdminSelect<T extends string>({
   onChange,
   ariaLabel,
   className,
+  style,
   disabled = false
 }: Props<T>) {
   const [open, setOpen] = useState(false);
@@ -128,6 +130,7 @@ export function AdminSelect<T extends string>({
         ref={triggerRef}
         type="button"
         className={className}
+        style={style}
         disabled={disabled}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
