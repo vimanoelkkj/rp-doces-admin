@@ -11,6 +11,8 @@ type Props = {
   subtitle: string;
   onNavigate: (page: AdminV2Page) => void;
   children: ReactNode;
+  hideHeader?: boolean;
+  fullWidth?: boolean;
 };
 
 type IconName =
@@ -64,7 +66,16 @@ function readNotificationsEnabled(): boolean {
   return Notification.permission === "granted";
 }
 
-export function AdminShell({ session, activePage, title, subtitle, onNavigate, children }: Props) {
+export function AdminShell({
+  session,
+  activePage,
+  title,
+  subtitle,
+  onNavigate,
+  children,
+  hideHeader = false,
+  fullWidth = false
+}: Props) {
   const { user, logout, loggingOut, logoutError } = session;
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -129,6 +140,22 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
   }
 
   const wide = activePage === "dashboard" || activePage === "produtos";
+
+  const body = (
+    <>
+      {!hideHeader ? (
+        <header className={styles.pageHeader}>
+          <div className={styles.pageTitleBlock}>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
+        </header>
+      ) : null}
+
+      {logoutError ? <div className={styles.logoutError} role="alert">{logoutError}</div> : null}
+      {children}
+    </>
+  );
 
   return (
     <div className={styles.app}>
@@ -235,17 +262,11 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
       </aside>
 
       <main className={styles.content}>
-        <div className={`${styles.workspace} ${wide ? styles.workspaceWide : ""}`}>
-          <header className={styles.pageHeader}>
-            <div className={styles.pageTitleBlock}>
-              <h1>{title}</h1>
-              <p>{subtitle}</p>
-            </div>
-          </header>
-
-          {logoutError ? <div className={styles.logoutError} role="alert">{logoutError}</div> : null}
-          {children}
-        </div>
+        {fullWidth ? body : (
+          <div className={`${styles.workspace} ${wide ? styles.workspaceWide : ""}`}>
+            {body}
+          </div>
+        )}
       </main>
     </div>
   );
