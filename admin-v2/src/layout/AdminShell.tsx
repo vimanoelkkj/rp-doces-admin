@@ -83,6 +83,8 @@ export function AdminShell({
   const [theme, setTheme] = useState<"light" | "dark">(readTheme);
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const mobileProfileRef = useRef<HTMLDivElement>(null);
+  const mobileNotificationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const themeColor = theme === "dark" ? "#1b1614" : "#fbf8f4";
@@ -96,8 +98,10 @@ export function AdminShell({
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (profileOpen && !profileRef.current?.contains(target)) setProfileOpen(false);
-      if (notificationOpen && !notificationRef.current?.contains(target)) setNotificationOpen(false);
+      const insideProfile = profileRef.current?.contains(target) || mobileProfileRef.current?.contains(target);
+      const insideNotification = notificationRef.current?.contains(target) || mobileNotificationRef.current?.contains(target);
+      if (profileOpen && !insideProfile) setProfileOpen(false);
+      if (notificationOpen && !insideNotification) setNotificationOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -142,6 +146,47 @@ export function AdminShell({
     window.localStorage.setItem("rp-admin-notifications-enabled", enabled ? "1" : "0");
     setNotificationsEnabled(enabled);
   }
+
+  const notificationMenu = notificationOpen ? (
+    <div className={styles.notificationPopover} role="dialog" aria-label="Notificações">
+      <h3>Notificações</h3>
+      <p>Receba um aviso quando um novo pedido for pago.</p>
+      <div className={`${styles.notificationStatus} ${notificationsEnabled ? "" : styles.notificationStatusOff}`}>
+        <strong>{notificationsEnabled ? "Ativas neste navegador" : "Desativadas neste navegador"}</strong>
+        <span>
+          {notificationsEnabled
+            ? "Você receberá avisos de novos pedidos pagos."
+            : "Ative para permitir avisos neste navegador."}
+        </span>
+      </div>
+      <button className={styles.notificationAction} type="button" onClick={() => void toggleNotifications()}>
+        {notificationsEnabled ? "Desativar notificações" : "Ativar notificações"}
+      </button>
+    </div>
+  ) : null;
+
+  const profileMenu = profileOpen ? (
+    <div className={styles.profileMenu} role="menu">
+      <div className={styles.profileMenuIdentity}>
+        <strong>{user.nome}</strong>
+        <span>@{user.username} · {user.papel}</span>
+        {user.email ? <small>{user.email}</small> : null}
+      </div>
+      <button
+        className={styles.profileMenuTheme}
+        type="button"
+        role="menuitem"
+        onClick={() => setTheme(current => current === "dark" ? "light" : "dark")}
+      >
+        <Icon name={theme === "dark" ? "sun" : "moon"} />
+        {theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
+      </button>
+      <button className={styles.profileMenuLogout} type="button" role="menuitem" onClick={() => void logout()} disabled={loggingOut}>
+        <Icon name="logout" />
+        {loggingOut ? "Saindo…" : "Sair da conta"}
+      </button>
+    </div>
+  ) : null;
 
   const wide = activePage === "dashboard" || activePage === "produtos";
 
@@ -190,7 +235,7 @@ export function AdminShell({
 
         <div className={styles.navSpacer} />
 
-        <div className={styles.notificationWrap} ref={notificationRef}>
+        <div className={`${styles.notificationWrap} ${styles.desktopOnlyUtility}`} ref={notificationRef}>
           <button
             className={styles.utilityButton}
             type="button"
@@ -205,24 +250,7 @@ export function AdminShell({
             <span className={styles.navLabel}>Notificações</span>
             {notificationsEnabled ? <span className={styles.notificationDot} /> : null}
           </button>
-
-          {notificationOpen ? (
-            <div className={styles.notificationPopover} role="dialog" aria-label="Notificações">
-              <h3>Notificações</h3>
-              <p>Receba um aviso quando um novo pedido for pago.</p>
-              <div className={`${styles.notificationStatus} ${notificationsEnabled ? "" : styles.notificationStatusOff}`}>
-                <strong>{notificationsEnabled ? "Ativas neste navegador" : "Desativadas neste navegador"}</strong>
-                <span>
-                  {notificationsEnabled
-                    ? "Você receberá avisos de novos pedidos pagos."
-                    : "Ative para permitir avisos neste navegador."}
-                </span>
-              </div>
-              <button className={styles.notificationAction} type="button" onClick={() => void toggleNotifications()}>
-                {notificationsEnabled ? "Desativar notificações" : "Ativar notificações"}
-              </button>
-            </div>
-          ) : null}
+          {notificationMenu}
         </div>
 
         <button
@@ -235,7 +263,7 @@ export function AdminShell({
           <span className={styles.navLabel}>Tema</span>
         </button>
 
-        <div className={styles.profileWrap} ref={profileRef}>
+        <div className={`${styles.profileWrap} ${styles.desktopOnlyUtility}`} ref={profileRef}>
           <button
             className={styles.profile}
             type="button"
@@ -255,37 +283,52 @@ export function AdminShell({
             </span>
             <span className={styles.profileCaret}>⌄</span>
           </button>
-
-          {profileOpen ? (
-            <div className={styles.profileMenu} role="menu">
-              <div className={styles.profileMenuIdentity}>
-                <strong>{user.nome}</strong>
-                <span>@{user.username} · {user.papel}</span>
-                {user.email ? <small>{user.email}</small> : null}
-              </div>
-              <button
-                className={styles.profileMenuTheme}
-                type="button"
-                role="menuitem"
-                onClick={() => setTheme(current => current === "dark" ? "light" : "dark")}
-              >
-                <Icon name={theme === "dark" ? "sun" : "moon"} />
-                {theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
-              </button>
-              <button className={styles.profileMenuLogout} type="button" role="menuitem" onClick={() => void logout()} disabled={loggingOut}>
-                <Icon name="logout" />
-                {loggingOut ? "Saindo…" : "Sair da conta"}
-              </button>
-            </div>
-          ) : null}
+          {profileMenu}
         </div>
       </aside>
 
       <main className={styles.content}>
         <header data-mobile-admin-header aria-label={`${title}: ${subtitle}`}>
-          <div>
+          <div className={styles.mobileHeaderTitle}>
             <h1>{title}</h1>
             <p>{subtitle}</p>
+          </div>
+
+          <div className={styles.mobileHeaderActions}>
+            <div className={styles.mobileHeaderNotification} ref={mobileNotificationRef}>
+              <button
+                className={styles.mobileHeaderButton}
+                type="button"
+                aria-label="Notificações"
+                aria-expanded={notificationOpen}
+                onClick={() => {
+                  setProfileOpen(false);
+                  setNotificationOpen(open => !open);
+                }}
+              >
+                <span className={styles.mobileHeaderIcon}><Icon name="bell" /></span>
+                {notificationsEnabled ? <span className={styles.mobileNotificationDot} /> : null}
+              </button>
+              {notificationMenu}
+            </div>
+
+            <div className={styles.mobileHeaderProfile} ref={mobileProfileRef}>
+              <button
+                className={styles.mobileProfileButton}
+                type="button"
+                aria-label="Abrir menu da conta"
+                aria-expanded={profileOpen}
+                onClick={() => {
+                  setNotificationOpen(false);
+                  setProfileOpen(open => !open);
+                }}
+              >
+                {user.avatar_url
+                  ? <img className={styles.mobileAvatarImage} src={user.avatar_url} alt="" />
+                  : <span className={styles.mobileAvatar}>{initials(user.nome)}</span>}
+              </button>
+              {profileMenu}
+            </div>
           </div>
         </header>
 
