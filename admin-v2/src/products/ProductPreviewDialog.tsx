@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   availableStock,
   currentPriceCents,
@@ -41,7 +42,7 @@ export function ProductPreviewDialog({ product, onClose }: Props) {
     };
   }, [onClose]);
 
-  return (
+  const dialog = (
     <div
       className={styles.overlay}
       role="presentation"
@@ -108,4 +109,6 @@ export function ProductPreviewDialog({ product, onClose }: Props) {
       </section>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 }
