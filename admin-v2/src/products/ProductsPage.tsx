@@ -22,9 +22,21 @@ type Filter = "todos" | "ativos" | "esgotados" | "arquivados";
 type Props = {
   session: AuthSession;
   onNavigate: (page: AdminV2Page) => void;
+  active: boolean;
 };
 
 let productsCache: Product[] | null = null;
+
+function sameProduct(left?: Product | null, right?: Product | null) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sameProducts(left: Product[] | null, right: Product[]) {
+  if (!left || left.length !== right.length) return false;
+  return left.every((product, index) => sameProduct(product, right[index]));
+}
 
 function SearchIcon() {
   return (
@@ -35,7 +47,7 @@ function SearchIcon() {
   );
 }
 
-export function ProductsPage({ session, onNavigate }: Props) {
+export function ProductsPage({ session, onNavigate, active }: Props) {
   const [products, setProducts] = useState<Product[]>(() => productsCache ?? []);
   const [loading, setLoading] = useState(() => productsCache === null);
   const [error, setError] = useState<string | null>(null);
@@ -57,28 +69,41 @@ export function ProductsPage({ session, onNavigate }: Props) {
     "product-preview"
   );
 
-  const reload = useCallback(async () => {
-    const foreground = productsCache === null;
+  const reload = useCallback(async (silent = false) => {
+    const foreground = !silent && productsCache === null;
     if (foreground) setLoading(true);
-    setError(null);
+    if (!silent) setError(null);
 
     try {
       const next = await listProducts();
+      const previous = productsCache;
       productsCache = next;
-      setProducts(next);
-      setPreviewing(current => current ? next.find(product => product.id === current.id) ?? null : null);
+
+      if (!sameProducts(previous, next)) {
+        setProducts(next);
+      }
+
+      setPreviewing(current => {
+        if (!current) return null;
+        const refreshed = next.find(product => product.id === current.id) ?? null;
+        return sameProduct(current, refreshed) ? current : refreshed;
+      });
+      setError(null);
     } catch (err) {
-      setError(
-        err instanceof ProductApiError ? err.message : "Não foi possível carregar os produtos."
-      );
+      if (!silent) {
+        setError(
+          err instanceof ProductApiError ? err.message : "Não foi possível carregar os produtos."
+        );
+      }
     } finally {
       if (foreground) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    if (!active) return;
+    void reload(productsCache !== null);
+  }, [active, reload]);
 
   const visible = useMemo(
     () =>
