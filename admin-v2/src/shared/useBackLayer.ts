@@ -39,6 +39,16 @@ function restoreLayer(token: string) {
 }
 
 /**
+ * Se existe uma camada temporária no topo do histórico, consome primeiro essa
+ * camada e impede que uma navegação de aba deixe modal/drawer órfão para trás.
+ */
+export function closeTopBackLayer(): boolean {
+  if (stateLayers().length === 0) return false;
+  window.history.back();
+  return true;
+}
+
+/**
  * Faz dialogs/drawers participarem do histórico do navegador como uma camada
  * temporária. No Android/browser, Voltar fecha a camada antes de navegar para
  * outra tela. Fechar pelo X/backdrop também consome a entrada temporária.
