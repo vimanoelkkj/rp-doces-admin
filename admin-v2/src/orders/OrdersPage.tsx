@@ -305,11 +305,18 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const savingEditRef = useRef(false);
   const autoRefreshInFlightRef = useRef(false);
 
+  function updateSavingEdit(value: boolean) {
+    savingEditRef.current = value;
+    setSavingEdit(value);
+  }
+
   const closeDrawer = useBackLayer(
     drawerOpen,
     () => {
+      if (savingEditRef.current) return false;
       setDrawerOpen(false);
       setEditing(false);
+      return true;
     },
     "order-drawer"
   );
@@ -363,8 +370,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
 
   useEffect(() => {
     editingRef.current = editing;
-    savingEditRef.current = savingEdit;
-  }, [editing, savingEdit]);
+  }, [editing]);
 
   useEffect(() => {
     if (!active) return;
@@ -426,12 +432,12 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   useEffect(() => {
     if (!drawerOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || savingEdit) return;
+      if (event.key !== "Escape" || savingEditRef.current) return;
       closeDrawer();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [drawerOpen, savingEdit, closeDrawer]);
+  }, [drawerOpen, closeDrawer]);
 
   const counts = useMemo(() => ({
     todos: orders.length,
@@ -508,7 +514,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   }
 
   async function saveEditing() {
-    if (!selected || savingEdit) return;
+    if (!selected || savingEditRef.current) return;
 
     const currentStatus = normalizeOrderStatus(selected);
     const currentPayment = selected.origem_pedido === "MANUAL"
@@ -523,7 +529,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
       return;
     }
 
-    setSavingEdit(true);
+    updateSavingEdit(true);
     setEditError(null);
     try {
       if (statusChanged) {
@@ -539,7 +545,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
     } catch (err) {
       setEditError(err instanceof ApiClientError ? err.message : "Não foi possível salvar as alterações do pedido.");
     } finally {
-      setSavingEdit(false);
+      updateSavingEdit(false);
     }
   }
 
@@ -695,6 +701,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                       type="button"
                       aria-label="Fechar"
                       onClick={closeDrawer}
+                      disabled={savingEdit}
                     >
                       ×
                     </button>
