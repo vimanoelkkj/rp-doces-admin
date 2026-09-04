@@ -13,6 +13,7 @@ import type { Product, ProductId } from "./product.types";
 import { CategoryManager } from "./CategoryManager";
 import { ProductCard } from "./ProductCard";
 import { ProductDialog } from "./ProductDialog";
+import { ProductPreviewDialog } from "./ProductPreviewDialog";
 import styles from "./ProductsPage.module.css";
 
 type Filter = "todos" | "ativos" | "esgotados" | "arquivados";
@@ -38,6 +39,7 @@ export function ProductsPage({ session, onNavigate }: Props) {
   const [loading, setLoading] = useState(() => productsCache === null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null | undefined>(null);
+  const [previewing, setPreviewing] = useState<Product | null>(null);
   const [managingCategories, setManagingCategories] = useState(false);
   const [menu, setMenu] = useState<ProductId | null>(null);
   const [query, setQuery] = useState("");
@@ -52,6 +54,7 @@ export function ProductsPage({ session, onNavigate }: Props) {
       const next = await listProducts();
       productsCache = next;
       setProducts(next);
+      setPreviewing(current => current ? next.find(product => product.id === current.id) ?? null : null);
     } catch (err) {
       setError(
         err instanceof ProductApiError ? err.message : "Não foi possível carregar os produtos."
@@ -209,6 +212,10 @@ export function ProductsPage({ session, onNavigate }: Props) {
               product={product}
               menuOpen={menu === product.id}
               onToggleMenu={() => setMenu(current => (current === product.id ? null : product.id))}
+              onPreview={() => {
+                setMenu(null);
+                setPreviewing(product);
+              }}
               onEdit={() => {
                 setMenu(null);
                 setEditing(product);
@@ -227,6 +234,10 @@ export function ProductsPage({ session, onNavigate }: Props) {
 
       {managingCategories ? (
         <CategoryManager onClose={() => setManagingCategories(false)} />
+      ) : null}
+
+      {previewing ? (
+        <ProductPreviewDialog product={previewing} onClose={() => setPreviewing(null)} />
       ) : null}
 
       {editing !== null ? (
