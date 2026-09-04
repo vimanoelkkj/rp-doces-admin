@@ -1,0 +1,18 @@
+@media (max-width: 760px) {
+  /* A busca de Pedidos estava herdando uma escala grande demais no layout mobile. */
+  input[placeholder="Buscar pedido, cliente ou comanda..."] {
+    font-size: 13px !important;
+    line-height: 1.2;
+  }
+
+  input[placeholder="Buscar pedido, cliente ou comanda..."]::placeholder {
+    font-size: 13px;
+  }
+
+  /* O popover do calendário vive dentro da faixa de navegação por dia.
+     overflow-x:auto também recorta o eixo Y no Chromium mobile, então o
+     calendário abria, mas ficava invisível fora da faixa. */
+  div:has(> button[aria-label="Dia anterior"]):has(> button[aria-label="Próximo dia"]) {
+    overflow: visible !important;
+  }
+}
