@@ -115,7 +115,7 @@ export function App() {
               if (view === "dashboard") {
                 content = <DashboardPage session={session} onNavigate={navigate} />;
               } else if (view === "pedidos") {
-                content = <OrdersPage session={session} onNavigate={navigate} />;
+                content = <OrdersPage session={session} onNavigate={navigate} active={active} />;
               } else if (view === "admins") {
                 content = <AdminsPage session={session} onNavigate={navigate} />;
               } else if (view === "loja") {
