@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./tokens.css";
 import "./shared/mobileBugfixes.css";
+import "./shared/motion.css";
 import "./shared/mobileOverlayScrollLock";
 import "./shared/mobileOrderFilter";
 import "./shared/themeChrome";
