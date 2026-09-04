@@ -235,7 +235,7 @@ export function AdminShell({
 
         <div className={styles.navSpacer} />
 
-        <div className={`${styles.notificationWrap} ${styles.desktopOnlyUtility}`} ref={notificationRef}>
+        <div className={styles.notificationWrap} data-desktop-only-utility ref={notificationRef}>
           <button
             className={styles.utilityButton}
             type="button"
@@ -263,7 +263,7 @@ export function AdminShell({
           <span className={styles.navLabel}>Tema</span>
         </button>
 
-        <div className={`${styles.profileWrap} ${styles.desktopOnlyUtility}`} ref={profileRef}>
+        <div className={styles.profileWrap} data-desktop-only-utility ref={profileRef}>
           <button
             className={styles.profile}
             type="button"
@@ -289,15 +289,15 @@ export function AdminShell({
 
       <main className={styles.content}>
         <header data-mobile-admin-header aria-label={`${title}: ${subtitle}`}>
-          <div className={styles.mobileHeaderTitle}>
+          <div data-mobile-header-title>
             <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>
 
-          <div className={styles.mobileHeaderActions}>
-            <div className={styles.mobileHeaderNotification} ref={mobileNotificationRef}>
+          <div data-mobile-header-actions>
+            <div data-mobile-header-notification ref={mobileNotificationRef}>
               <button
-                className={styles.mobileHeaderButton}
+                data-mobile-header-button
                 type="button"
                 aria-label="Notificações"
                 aria-expanded={notificationOpen}
@@ -306,15 +306,15 @@ export function AdminShell({
                   setNotificationOpen(open => !open);
                 }}
               >
-                <span className={styles.mobileHeaderIcon}><Icon name="bell" /></span>
-                {notificationsEnabled ? <span className={styles.mobileNotificationDot} /> : null}
+                <span data-mobile-header-icon><Icon name="bell" /></span>
+                {notificationsEnabled ? <span data-mobile-notification-dot /> : null}
               </button>
               {notificationMenu}
             </div>
 
-            <div className={styles.mobileHeaderProfile} ref={mobileProfileRef}>
+            <div data-mobile-header-profile ref={mobileProfileRef}>
               <button
-                className={styles.mobileProfileButton}
+                data-mobile-profile-button
                 type="button"
                 aria-label="Abrir menu da conta"
                 aria-expanded={profileOpen}
@@ -324,8 +324,8 @@ export function AdminShell({
                 }}
               >
                 {user.avatar_url
-                  ? <img className={styles.mobileAvatarImage} src={user.avatar_url} alt="" />
-                  : <span className={styles.mobileAvatar}>{initials(user.nome)}</span>}
+                  ? <img data-mobile-avatar-image src={user.avatar_url} alt="" />
+                  : <span data-mobile-avatar>{initials(user.nome)}</span>}
               </button>
               {profileMenu}
             </div>
