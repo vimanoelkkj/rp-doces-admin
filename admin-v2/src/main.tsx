@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./tokens.css";
+import "./shared/mobileBugfixes.css";
 import "./shared/mobileOverlayScrollLock";
 import "./shared/mobileOrderFilter";
 import "./shared/themeChrome";
