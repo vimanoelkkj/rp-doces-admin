@@ -4,6 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#fff8f4" />
+    <script>
+      (() => {
+        try {
+          const stored = window.localStorage.getItem("rp-admin-theme");
+          const theme = stored === "light" || stored === "dark"
+            ? stored
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          const color = theme === "dark" ? "#1b1614" : "#fbf8f4";
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+          document.documentElement.style.backgroundColor = color;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute("content", color);
+        } catch {
+          // O React aplica o tema novamente assim que o shell monta.
+        }
+      })();
+    </script>
+    <style>
+      html,
+      body {
+        background: #fbf8f4;
+      }
+
+      html[data-theme="dark"],
+      html[data-theme="dark"] body {
+        background: #1b1614;
+        color: #f1e9e3;
+      }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
