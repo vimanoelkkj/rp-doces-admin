@@ -53,7 +53,7 @@ export function App() {
   }, []);
 
   useLayoutEffect(() => {
-    window.scrollTo({ top: scrollPositions.current[page], behavior: "instant" });
+    window.scrollTo(0, scrollPositions.current[page]);
   }, [page]);
 
   function navigate(nextPage: AdminV2Page) {
