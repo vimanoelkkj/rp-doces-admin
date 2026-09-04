@@ -74,12 +74,18 @@
     white-space: nowrap;
   }
 
-  /* O conteúdo começa depois da barra fixa. Os headers antigos continuam no
-     DOM para desktop, mas no mobile o único título visível é o do shell. */
+  /* O conteúdo começa depois da barra fixa. O header desktop continua no DOM,
+     mas some inteiro no mobile, sem deixar subtítulo ou margem órfãos. */
   main {
     padding-top: calc(92px + env(safe-area-inset-top)) !important;
   }
 
+  main > div > header {
+    display: none !important;
+  }
+
+  /* Pedidos possui um h1 próprio dentro do header de busca/CTA. O título já
+     está no header estrutural do shell, então escondemos apenas esse duplicado. */
   main h1 {
     display: none !important;
   }
@@ -104,7 +110,7 @@
     position: sticky;
     top: 0;
     z-index: 12;
-    margin: -27px -28px 8px;
+    margin: 0 -28px 8px;
     padding: 14px 28px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
