@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 const HISTORY_KEY = "__rp_admin_layers";
 
@@ -60,7 +60,7 @@ export function useBackLayer(open: boolean, onClose: () => void, name: string) {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [open, name]);
 
-  return () => {
+  return useCallback(() => {
     const token = tokenRef.current;
     if (!token) {
       closeRef.current();
@@ -85,5 +85,5 @@ export function useBackLayer(open: boolean, onClose: () => void, name: string) {
         window.location.href
       );
     }
-  };
+  }, []);
 }
