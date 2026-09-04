@@ -2,9 +2,7 @@ const SELECT_SELECTOR = "select:not([multiple])";
 const OVERLAY_ID = "rp-native-select-menu";
 
 let activeSelect: HTMLSelectElement | null = null;
-let pendingPointerSelect: HTMLSelectElement | null = null;
 let repositionHandler: (() => void) | null = null;
-let openTimer: number | null = null;
 
 function selectLabel(select: HTMLSelectElement): string {
   const ariaLabel = select.getAttribute("aria-label")?.trim();
@@ -20,18 +18,10 @@ function selectLabel(select: HTMLSelectElement): string {
   return wrappingLabel || select.name || "Selecionar opção";
 }
 
-function clearOpenTimer(): void {
-  if (openTimer === null) return;
-  window.clearTimeout(openTimer);
-  openTimer = null;
-}
-
 function closeMenu({ restoreFocus = false }: { restoreFocus?: boolean } = {}): void {
   const previousSelect = activeSelect;
-  clearOpenTimer();
   document.getElementById(OVERLAY_ID)?.remove();
   activeSelect = null;
-  pendingPointerSelect = null;
 
   if (repositionHandler) {
     window.removeEventListener("resize", repositionHandler);
@@ -80,7 +70,7 @@ function setSelectValue(select: HTMLSelectElement, value: string): void {
 }
 
 function openMenu(select: HTMLSelectElement): void {
-  if (select.disabled || !document.body.contains(select)) return;
+  if (select.disabled) return;
 
   closeMenu();
   activeSelect = select;
@@ -146,41 +136,14 @@ function isEnhancedSelect(target: EventTarget | null): target is HTMLSelectEleme
   return target instanceof HTMLSelectElement && target.matches(SELECT_SELECTOR);
 }
 
-// No Android o picker nativo do <select> pode ser acionado antes do click.
-// Bloqueamos o gesto no pointerdown e só montamos o menu do R&P depois que
-// pointerup/click do mesmo toque terminaram. Assim nunca existem dois pickers.
-function onPointerDown(event: PointerEvent): void {
-  if (!isEnhancedSelect(event.target) || event.target.disabled) return;
-  pendingPointerSelect = event.target;
-  event.preventDefault();
-  event.stopPropagation();
-}
-
-function onPointerUp(event: PointerEvent): void {
-  if (!pendingPointerSelect) return;
-
-  const select = pendingPointerSelect;
-  pendingPointerSelect = null;
-  event.preventDefault();
-  event.stopPropagation();
-  clearOpenTimer();
-  openTimer = window.setTimeout(() => {
-    openTimer = null;
-    openMenu(select);
-  }, 0);
-}
-
-function onPointerCancel(): void {
-  pendingPointerSelect = null;
-}
-
+// Usamos click, e não pointerdown. Abrir o overlay durante pointerdown fazia o
+// pointerup/click do mesmo toque cair no backdrop recém-criado e fechar o menu
+// imediatamente em alguns Chromiums/Androids.
 function onClick(event: MouseEvent): void {
   if (!isEnhancedSelect(event.target)) return;
   event.preventDefault();
   event.stopPropagation();
-
-  // Clique de teclado/sintético não passa pela sequência de pointer events.
-  if (!openTimer && !activeSelect) openMenu(event.target);
+  openMenu(event.target);
 }
 
 function onKeyDown(event: KeyboardEvent): void {
@@ -196,9 +159,6 @@ function onKeyDown(event: KeyboardEvent): void {
   openMenu(event.target);
 }
 
-document.addEventListener("pointerdown", onPointerDown, true);
-document.addEventListener("pointerup", onPointerUp, true);
-document.addEventListener("pointercancel", onPointerCancel, true);
 document.addEventListener("click", onClick, true);
 document.addEventListener("keydown", onKeyDown, true);
 window.addEventListener("pagehide", () => closeMenu());
