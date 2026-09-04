@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
 import { getStoreConfig, removeSiteImage, updateStoreConfig, uploadSiteImage } from "./store.api";
@@ -83,6 +83,10 @@ function emptyForm(): StoreFormState {
   };
 }
 
+function formSnapshot(form: StoreFormState): string {
+  return JSON.stringify(form);
+}
+
 function initialImages(config: StoreConfig): Record<SiteImageSlot, ImageState> {
   return {
     hero: {
@@ -103,13 +107,15 @@ function initialImages(config: StoreConfig): Record<SiteImageSlot, ImageState> {
 }
 
 export function StorePage({ session, onNavigate }: Props) {
-  const [form, setForm] = useState<StoreFormState>(() => storeCache ? configToForm(storeCache) : emptyForm());
+  const initialForm = storeCache ? configToForm(storeCache) : emptyForm();
+  const [form, setForm] = useState<StoreFormState>(() => initialForm);
   const [images, setImages] = useState<Record<SiteImageSlot, ImageState> | null>(() => storeCache ? initialImages(storeCache) : null);
   const [loading, setLoading] = useState(() => storeCache === null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [saveError, setSaveError] = useState(false);
+  const savedFormSnapshotRef = useRef(formSnapshot(initialForm));
 
   async function load() {
     const foreground = storeCache === null;
@@ -117,8 +123,10 @@ export function StorePage({ session, onNavigate }: Props) {
     setLoadError(null);
     try {
       const config = await getStoreConfig();
+      const nextForm = configToForm(config);
       storeCache = config;
-      setForm(configToForm(config));
+      savedFormSnapshotRef.current = formSnapshot(nextForm);
+      setForm(nextForm);
       setImages(initialImages(config));
     } catch (error) {
       setLoadError(errorMessage(error, "Não foi possível carregar as configurações da loja."));
@@ -154,11 +162,20 @@ export function StorePage({ session, onNavigate }: Props) {
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
+
+    const snapshot = formSnapshot(form);
+    if (snapshot === savedFormSnapshotRef.current) {
+      setSaveStatus("Nenhuma alteração para salvar.");
+      setSaveError(false);
+      return;
+    }
+
     setSaving(true);
     setSaveStatus("Salvando…");
     setSaveError(false);
     try {
       await updateStoreConfig(form, currentSchedule);
+      savedFormSnapshotRef.current = snapshot;
       storeCache = null;
       setSaveStatus("Alterações salvas ✓");
       window.dispatchEvent(
