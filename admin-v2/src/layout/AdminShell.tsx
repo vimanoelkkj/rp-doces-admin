@@ -282,6 +282,13 @@ export function AdminShell({
       </aside>
 
       <main className={styles.content}>
+        <header data-mobile-admin-header aria-label={`${title}: ${subtitle}`}>
+          <div>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
+        </header>
+
         {fullWidth ? body : (
           <div className={`${styles.workspace} ${wide ? styles.workspaceWide : ""}`}>
             {body}
