@@ -131,19 +131,6 @@ a:focus-visible,
   color: var(--text);
 }
 
-[role="dialog"] button[aria-label="Fechar"] {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-[role="dialog"] button[aria-label="Fechar"]:hover:not(:disabled) {
-  border: 0;
-  background: transparent;
-  color: var(--accent-dark);
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
