@@ -2,18 +2,105 @@
   box-sizing: border-box;
 }
 
+:root {
+  color-scheme: light;
+  --app-bg: #fbf8f4;
+  --surface: #fffdfa;
+  --surface-soft: #fffaf7;
+  --border: #eee7e2;
+  --border-strong: #e7ded8;
+  --text: #24252a;
+  --muted: #7d8088;
+  --ink-soft: #6e4f45;
+  --accent: #d84c6c;
+  --accent-dark: #cf3f61;
+  --accent-soft: #fbe9ee;
+  --accent-wash: #fff6f7;
+  --success: #2f9b63;
+  --warning: #ed8a22;
+  --danger: #c7434d;
+  --shadow: 0 18px 50px rgba(63, 43, 34, .05);
+  --radius: 14px;
+  --display-font: "Bricolage Grotesque", "Nunito Sans", system-ui, sans-serif;
+
+  /* Compatibilidade visual para módulos migrados do Admin V1. */
+  --rp-surface: var(--surface);
+  --rp-surface-2: var(--surface-soft);
+  --rp-line: var(--border);
+  --rp-line-2: var(--border-strong);
+  --rp-ink: var(--text);
+  --rp-ink-2: var(--ink-soft);
+  --rp-ink-3: var(--muted);
+  --rp-pink: var(--accent);
+  --rp-pink-strong: var(--accent-dark);
+  --rp-pink-soft: var(--accent-soft);
+  --rp-pink-wash: var(--accent-wash);
+  --rp-success: var(--success);
+  --rp-danger: var(--danger);
+  --rp-display: var(--display-font);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --app-bg: #1b1614;
+    --surface: #241d1a;
+    --surface-soft: #221b18;
+    --border: #362c27;
+    --border-strong: #3d322c;
+    --text: #f1e9e3;
+    --muted: #a89c92;
+    --ink-soft: #c1b4aa;
+    --accent: #ef6f8b;
+    --accent-dark: #f0839c;
+    --accent-soft: #3a232b;
+    --accent-wash: #2c2020;
+    --success: #4bbf85;
+    --warning: #f0a04f;
+    --danger: #ef7489;
+    --shadow: 0 18px 50px rgba(0, 0, 0, .45);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #1b1614;
+  --surface: #241d1a;
+  --surface-soft: #221b18;
+  --border: #362c27;
+  --border-strong: #3d322c;
+  --text: #f1e9e3;
+  --muted: #a89c92;
+  --ink-soft: #c1b4aa;
+  --accent: #ef6f8b;
+  --accent-dark: #f0839c;
+  --accent-soft: #3a232b;
+  --accent-wash: #2c2020;
+  --success: #4bbf85;
+  --warning: #f0a04f;
+  --danger: #ef7489;
+  --shadow: 0 18px 50px rgba(0, 0, 0, .45);
+}
+
 html {
+  min-height: 100%;
   scrollbar-gutter: stable;
   font-family: "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #442820;
-  background: #fff8f4;
+  color: var(--text);
+  background: var(--app-bg);
+}
+
+body,
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
-  background: #fff8f4;
+  color: var(--text);
+  background: var(--app-bg);
 }
 
 button,
@@ -32,40 +119,16 @@ button:disabled {
   opacity: 0.65;
 }
 
-:root {
-  --surface: #fffdfb;
-  --surface-soft: #fff5f1;
-  --border: #ead8d1;
-  --border-strong: #dec6bd;
-  --text: #442820;
-  --muted: #9b7c72;
-  --ink-soft: #6e4f45;
-  --accent: #e9667d;
-  --accent-dark: #c9435e;
-  --accent-soft: #ffd9df;
-  --accent-wash: #fff0f2;
-  --success: #3a9b6f;
-  --warning: #bc7b18;
-  --danger: #c7434d;
-  --shadow: 0 14px 34px rgb(68 40 32 / 7%);
-  --radius: 18px;
-  --display-font: "Bricolage Grotesque", "Nunito Sans", system-ui, sans-serif;
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
-  /* Compatibilidade visual para módulos migrados do Admin V1. */
-  --rp-surface: #fff;
-  --rp-surface-2: var(--surface-soft);
-  --rp-line: var(--border);
-  --rp-line-2: var(--border-strong);
-  --rp-ink: var(--text);
-  --rp-ink-2: var(--ink-soft);
-  --rp-ink-3: var(--muted);
-  --rp-pink: var(--accent);
-  --rp-pink-strong: var(--accent-dark);
-  --rp-pink-soft: var(--accent-soft);
-  --rp-pink-wash: var(--accent-wash);
-  --rp-success: var(--success);
-  --rp-danger: var(--danger);
-  --rp-display: var(--display-font);
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 [role="dialog"] button[aria-label="Fechar"] {
@@ -79,4 +142,15 @@ button:disabled {
   border: 0;
   background: transparent;
   color: var(--accent-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
