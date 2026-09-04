@@ -45,8 +45,11 @@ export function ProductPreviewDialog({ product, onClose }: Props) {
     <div
       className={styles.overlay}
       role="presentation"
-      onPointerDown={event => {
-        if (event.target === event.currentTarget) onClose();
+      onClick={event => {
+        if (event.target !== event.currentTarget) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
       }}
     >
       <section
@@ -54,6 +57,7 @@ export function ProductPreviewDialog({ product, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-preview-title"
+        onClick={event => event.stopPropagation()}
       >
         <button className={styles.close} type="button" aria-label="Fechar" onClick={onClose}>
           ×
