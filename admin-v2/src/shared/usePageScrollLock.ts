@@ -16,7 +16,7 @@ type ScrollSnapshot = {
 let lockCount = 0;
 let snapshot: ScrollSnapshot | null = null;
 
-function acquirePageScrollLock(): () => void {
+export function acquirePageScrollLock(): () => void {
   lockCount += 1;
 
   if (lockCount === 1) {
