@@ -1,30 +1,32 @@
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: visible;
-  border: 1px solid var(--border);
-  border-radius: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 10px 28px rgb(68 40 32 / 5%);
+  box-shadow: 0 10px 30px rgba(77,56,34,.025);
 }
 
 .media {
   position: relative;
-  min-height: 178px;
+  height: 128px;
+  min-height: 128px;
   overflow: hidden;
-  display: grid;
-  place-items: center;
-  border-radius: 18px 18px 0 0;
-  background: repeating-linear-gradient(135deg, #fff8f4 0 18px, #f9e9e4 18px 36px);
-  color: #9c776d;
-  font-size: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--gray-soft);
+  color: var(--muted);
+  font-size: 40px;
 }
 
 .media img {
   width: 100%;
-  height: 100%;
-  min-height: 178px;
+  height: 128px;
   object-fit: cover;
 }
 
@@ -34,27 +36,18 @@
   top: 10px;
   left: 10px;
   display: flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 
-.flags b,
-.promo {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  border-radius: 999px;
-  padding: 0 9px;
-  background: rgb(255 253 251 / 92%);
-  color: var(--ink-soft);
-  box-shadow: 0 4px 12px rgb(68 40 32 / 7%);
-  font-size: 10.5px;
-  font-weight: 900;
-}
-
-.flags b:first-child {
-  background: var(--accent-soft);
-  color: var(--accent-dark);
+.flags b {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--pink-strong);
+  box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  font-size: 9.5px;
+  font-weight: 800;
 }
 
 .promo {
@@ -62,46 +55,60 @@
   z-index: 2;
   right: 10px;
   bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--tag-green-text);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .body {
-  display: grid;
-  grid-template-rows: auto minmax(38px, auto) 1fr auto;
-  gap: 12px;
+  display: flex;
   flex: 1;
-  padding: 15px;
+  flex-direction: column;
+  padding: 14px 16px 16px;
 }
 
 .heading {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
+}
+
+.heading > div:first-child {
+  min-width: 0;
+  flex: 1;
 }
 
 .heading small {
-  color: var(--accent-dark);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .heading h2 {
-  margin: 3px 0 0;
+  margin: 0 0 6px;
   color: var(--text);
-  font-family: var(--display-font);
-  font-size: 17px;
-  line-height: 1.08;
+  font-family: "Manrope", system-ui, sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .body > p {
-  min-height: 38px;
-  margin: 0;
+  min-height: 34px;
+  margin: 0 0 12px;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -109,73 +116,88 @@
 
 .body footer {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin-top: auto;
 }
 
 .price {
-  display: grid;
-  gap: 1px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
 }
 
 .price s {
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: 11px;
 }
 
 .price strong {
   color: var(--text);
-  font-family: var(--display-font);
-  font-size: 18px;
+  font-family: "Manrope", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .body footer > span {
-  border-radius: 999px;
-  padding: 5px 8px;
-  background: #ecf7f1;
-  color: var(--success);
-  font-size: 10px;
-  font-weight: 900;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--tag-green-text);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .body footer > span.lowStock {
-  background: #fff4df;
-  color: var(--warning);
+  background: transparent;
+  color: var(--tag-orange-text);
 }
 
 .menuWrap {
   position: relative;
+  flex: 0 0 auto;
 }
 
 .menuButton {
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 10px;
+  border-radius: 7px;
   padding: 0;
   background: transparent;
   color: var(--muted);
-  font-weight: 900;
+  font-size: 10px;
+  font-weight: 800;
   letter-spacing: 1px;
+  opacity: 0;
+  transition: opacity .15s ease, background .15s ease, color .15s ease;
 }
 
-.menuButton:hover {
-  background: var(--accent-wash);
-  color: var(--accent-dark);
+.card:hover .menuButton,
+.menuButton:focus-visible,
+.menuButton[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.menuButton:hover,
+.menuButton:focus-visible {
+  outline: none;
+  background: var(--surface-2);
+  color: var(--pink-strong);
 }
 
 .menu {
   position: absolute;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 5;
-  min-width: 150px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  z-index: 20;
+  min-width: 160px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   padding: 6px;
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -184,16 +206,18 @@
 .menu button {
   display: block;
   width: 100%;
+  min-height: 34px;
   border: 0;
-  border-radius: 8px;
-  padding: 9px;
+  border-radius: 7px;
+  padding: 7px 9px;
   background: transparent;
   color: var(--text);
+  font-size: 11px;
   text-align: left;
 }
 
 .menu button:hover {
-  background: var(--accent-wash);
+  background: var(--surface-2);
 }
 
 .menu .deleteAction {
@@ -203,6 +227,10 @@
 .menu .deleteAction:hover {
   background: #fff0f1;
   color: var(--danger);
+}
+
+:global(:root[data-theme="dark"]) .menu .deleteAction:hover {
+  background: #3a232b;
 }
 
 .archiveConfirm,
@@ -215,8 +243,8 @@
 .deleteConfirm p {
   margin: 0 0 8px;
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .archiveConfirm strong,
@@ -228,9 +256,8 @@
   display: block;
   margin: -2px 0 10px;
   color: var(--danger);
-  font-size: 10.5px;
-  font-weight: 800;
-  line-height: 1.35;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .archiveActions,
@@ -244,11 +271,17 @@
 .deleteActions .deleteDanger {
   background: var(--danger);
   color: #fff;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .archiveActions .archiveDanger:hover,
 .deleteActions .deleteDanger:hover {
   background: var(--danger);
   color: #fff;
+}
+
+@media (max-width: 760px) {
+  .menuButton {
+    opacity: 1;
+  }
 }
