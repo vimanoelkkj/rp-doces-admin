@@ -44,6 +44,8 @@ const IMAGE_SLOTS: Array<{ slot: SiteImageSlot; title: string; help: string }> =
   }
 ];
 
+let storeCache: StoreConfig | null = null;
+
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
@@ -101,25 +103,27 @@ function initialImages(config: StoreConfig): Record<SiteImageSlot, ImageState> {
 }
 
 export function StorePage({ session, onNavigate }: Props) {
-  const [form, setForm] = useState<StoreFormState>(emptyForm);
-  const [images, setImages] = useState<Record<SiteImageSlot, ImageState> | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState<StoreFormState>(() => storeCache ? configToForm(storeCache) : emptyForm());
+  const [images, setImages] = useState<Record<SiteImageSlot, ImageState> | null>(() => storeCache ? initialImages(storeCache) : null);
+  const [loading, setLoading] = useState(() => storeCache === null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [saveError, setSaveError] = useState(false);
 
   async function load() {
-    setLoading(true);
+    const foreground = storeCache === null;
+    if (foreground) setLoading(true);
     setLoadError(null);
     try {
       const config = await getStoreConfig();
+      storeCache = config;
       setForm(configToForm(config));
       setImages(initialImages(config));
     } catch (error) {
       setLoadError(errorMessage(error, "Não foi possível carregar as configurações da loja."));
     } finally {
-      setLoading(false);
+      if (foreground) setLoading(false);
     }
   }
 
@@ -155,6 +159,7 @@ export function StorePage({ session, onNavigate }: Props) {
     setSaveError(false);
     try {
       await updateStoreConfig(form, currentSchedule);
+      storeCache = null;
       setSaveStatus("Alterações salvas ✓");
       window.dispatchEvent(
         new CustomEvent("rp-admin-data-changed", { detail: { pages: ["loja", "dashboard"] } })
@@ -192,6 +197,7 @@ export function StorePage({ session, onNavigate }: Props) {
     setImageState(slot, { busy: true, status: "Enviando…", error: false });
     try {
       const result = await uploadSiteImage(slot, file);
+      storeCache = null;
       setImageState(slot, {
         key: result.image_key,
         url: result.image_url || imageUrl(result.image_key),
@@ -216,6 +222,7 @@ export function StorePage({ session, onNavigate }: Props) {
     setImageState(slot, { busy: true, status: "Removendo…", error: false });
     try {
       await removeSiteImage(slot);
+      storeCache = null;
       setImageState(slot, {
         key: "",
         url: "",
