@@ -12,6 +12,7 @@ interface Props {
   product: Product;
   menuOpen: boolean;
   onToggleMenu: () => void;
+  onPreview: () => void;
   onEdit: () => void;
   onArchive: () => void;
   onRestore: () => void;
@@ -25,6 +26,7 @@ export function ProductCard({
   product,
   menuOpen,
   onToggleMenu,
+  onPreview,
   onEdit,
   onArchive,
   onRestore,
@@ -59,9 +61,28 @@ export function ProductCard({
     if (window.matchMedia("(max-width: 760px)").matches) onEdit();
   }
 
+  function openPreview(event: React.MouseEvent<HTMLDivElement>) {
+    event.stopPropagation();
+    onPreview();
+  }
+
+  function openPreviewFromKeyboard(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    onPreview();
+  }
+
   return (
     <article className={styles.card} onClick={openFromCard}>
-      <div className={styles.media}>
+      <div
+        className={styles.media}
+        role="button"
+        tabIndex={0}
+        aria-label={`Ver detalhes de ${product.nome}`}
+        onClick={openPreview}
+        onKeyDown={openPreviewFromKeyboard}
+      >
         {product.image_key ? (
           <img src={`/api/images/${encodeURIComponent(product.image_key)}`} alt="" />
         ) : (
