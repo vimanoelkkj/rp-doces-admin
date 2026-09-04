@@ -121,24 +121,52 @@ export type RefundInput = {
   devolver_estoque?: boolean;
 };
 
+type FinancialCacheEntry = {
+  value: FinancialOrder;
+  updatedAt: number;
+};
+
+const FINANCIAL_CACHE_TTL_MS = 15_000;
+const financialOrderCache = new Map<number, FinancialCacheEntry>();
+
+function cacheFinancialOrder(order: FinancialOrder, updatedAt = Date.now()) {
+  financialOrderCache.set(order.id, { value: order, updatedAt });
+}
+
+export function invalidateFinancialOrder(orderId: number) {
+  financialOrderCache.delete(orderId);
+}
+
 export async function listFinancialOrders(): Promise<FinancialOrder[]> {
-  return FinancialOrdersResponseSchema.parse(
+  const orders = FinancialOrdersResponseSchema.parse(
     await requestJson(
       "/api/admin/orders/finance",
       {},
       "Não foi possível carregar o financeiro das comandas."
     )
   ).pedidos;
+
+  const updatedAt = Date.now();
+  orders.forEach(order => cacheFinancialOrder(order, updatedAt));
+  return orders;
 }
 
-export async function getFinancialOrder(orderId: number): Promise<FinancialOrder> {
-  return FinancialOrderResponseSchema.parse(
+export async function getFinancialOrder(orderId: number, fresh = false): Promise<FinancialOrder> {
+  const cached = financialOrderCache.get(orderId);
+  if (!fresh && cached && Date.now() - cached.updatedAt < FINANCIAL_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  const order = FinancialOrderResponseSchema.parse(
     await requestJson(
       `/api/admin/orders/${orderId}/finance?fresh=1`,
       {},
       "Não foi possível atualizar a comanda."
     )
   ).pedido;
+
+  cacheFinancialOrder(order);
+  return order;
 }
 
 export async function listOrderRefunds(orderId: number, sync = true): Promise<OrderRefund[]> {
@@ -155,26 +183,30 @@ export async function refundPayment(
   orderId: number,
   input: RefundInput
 ): Promise<RefundMutationResult> {
-  return RefundMutationResponseSchema.parse(
+  const result = RefundMutationResponseSchema.parse(
     await requestJson(
       `/api/admin/orders/${orderId}/refunds`,
       { method: "POST", body: JSON.stringify(input) },
       "Não foi possível reembolsar o pagamento."
     )
   );
+  invalidateFinancialOrder(orderId);
+  return result;
 }
 
 export async function addComandaItem(
   orderId: number,
   input: { produto_id: number; quantidade: number }
 ): Promise<z.infer<typeof ComandaMutationResponseSchema>> {
-  return ComandaMutationResponseSchema.parse(
+  const result = ComandaMutationResponseSchema.parse(
     await requestJson(
       `/api/admin/orders/${orderId}/items`,
       { method: "POST", body: JSON.stringify(input) },
       "Não foi possível adicionar o item à comanda."
     )
   );
+  invalidateFinancialOrder(orderId);
+  return result;
 }
 
 export async function registerComandaPayment(
@@ -186,7 +218,7 @@ export async function registerComandaPayment(
     observacao?: string;
   }
 ): Promise<z.infer<typeof ComandaMutationResponseSchema>> {
-  return ComandaMutationResponseSchema.parse(
+  const result = ComandaMutationResponseSchema.parse(
     await requestJson(
       `/api/admin/orders/${orderId}/payments`,
       {
@@ -196,13 +228,15 @@ export async function registerComandaPayment(
       "Não foi possível registrar o pagamento."
     )
   );
+  invalidateFinancialOrder(orderId);
+  return result;
 }
 
 export async function generateComandaPix(
   orderId: number,
   input: { valor_centavos?: number; pix_pendente?: PixDecision; client_request_id?: string }
 ): Promise<z.infer<typeof ComandaMutationResponseSchema>> {
-  return ComandaMutationResponseSchema.parse(
+  const result = ComandaMutationResponseSchema.parse(
     await requestJson(
       `/api/admin/orders/${orderId}/payments`,
       {
@@ -216,6 +250,8 @@ export async function generateComandaPix(
       "Não foi possível gerar a cobrança Pix."
     )
   );
+  invalidateFinancialOrder(orderId);
+  return result;
 }
 
 export async function cancelComandaPix(orderId: number): Promise<void> {
@@ -224,4 +260,5 @@ export async function cancelComandaPix(orderId: number): Promise<void> {
     { method: "POST", body: JSON.stringify({ acao: "CANCELAR_PIX" }) },
     "Não foi possível cancelar a cobrança Pix."
   );
+  invalidateFinancialOrder(orderId);
 }
