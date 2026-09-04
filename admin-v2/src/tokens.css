@@ -111,6 +111,36 @@ textarea {
   font: inherit;
 }
 
+/* Todo select nativo do Admin V2 recebe a mesma carcaça visual. A lista aberta
+   é substituída pelo seletor customizado de mobileOrderFilter.ts. */
+select:not([multiple]) {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  color: var(--text);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 34px !important;
+}
+
+select:not([multiple]):focus-visible {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
+  outline: none !important;
+}
+
+select:not([multiple]):disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
 button {
   cursor: pointer;
 }
@@ -139,7 +169,7 @@ a:focus-visible,
 .rp-mobile-filter-overlay {
   position: fixed;
   inset: 0;
-  z-index: 180;
+  z-index: 320;
   pointer-events: none;
 }
 
@@ -150,14 +180,15 @@ a:focus-visible,
   height: 100%;
   border: 0;
   padding: 0;
-  background: transparent;
+  background: rgba(20, 14, 12, .08);
   pointer-events: auto;
 }
 
 .rp-mobile-filter-menu {
   position: fixed;
   z-index: 1;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--border-strong);
   border-radius: 14px;
   padding: 6px;
@@ -165,6 +196,7 @@ a:focus-visible,
   color: var(--text);
   box-shadow: 0 18px 52px rgba(0, 0, 0, .24);
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   pointer-events: auto;
 }
 
@@ -197,6 +229,10 @@ a:focus-visible,
   color: var(--accent-dark);
 }
 
+.rp-mobile-filter-option:disabled {
+  opacity: .45;
+}
+
 .rp-mobile-filter-radio {
   width: 17px;
   height: 17px;
@@ -218,8 +254,20 @@ a:focus-visible,
 }
 
 @media (max-width: 760px) {
-  select[aria-label="Filtrar pedidos"] {
-    cursor: pointer;
+  .rp-mobile-filter-backdrop {
+    background: rgba(20, 14, 12, .14);
+  }
+
+  .rp-mobile-filter-menu {
+    border-radius: 16px;
+    padding: 7px;
+    box-shadow: 0 22px 60px rgba(0, 0, 0, .32);
+  }
+
+  .rp-mobile-filter-option {
+    min-height: 50px;
+    font-size: 13px;
+    padding: 0 14px;
   }
 
   #drawer {
