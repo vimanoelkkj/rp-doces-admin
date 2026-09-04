@@ -1,5 +1,6 @@
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 :root {
@@ -124,6 +125,15 @@ a:focus-visible,
 [role="button"]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* A aba "Comanda" já faz a troca de visão. Remove o CTA duplicado do rodapé do drawer. */
+#drawer [class*="drawer-actions"]:has([class*="secondary-actions"]) > [class*="primary-btn"] {
+  display: none;
+}
+
+#drawer [class*="drawer-actions"]:has([class*="secondary-actions"]) {
+  gap: 0;
 }
 
 ::selection {
