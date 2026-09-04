@@ -47,9 +47,13 @@ export function App() {
   }
 
   useEffect(() => {
-    const handleHashChange = () => activate(pageFromHash());
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    const handleLocationChange = () => activate(pageFromHash());
+    window.addEventListener("popstate", handleLocationChange);
+    window.addEventListener("hashchange", handleLocationChange);
+    return () => {
+      window.removeEventListener("popstate", handleLocationChange);
+      window.removeEventListener("hashchange", handleLocationChange);
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -58,7 +62,8 @@ export function App() {
 
   function navigate(nextPage: AdminV2Page) {
     if (nextPage === pageRef.current) return;
-    window.location.hash = nextPage;
+    activate(nextPage);
+    window.history.pushState(null, "", `#${nextPage}`);
   }
 
   return (
