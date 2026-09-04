@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
+import { useBackLayer } from "../shared/useBackLayer";
 import {
   deleteProduct,
   listCategories,
@@ -44,6 +45,22 @@ export function ProductsPage({ session, onNavigate }: Props) {
   const [menu, setMenu] = useState<ProductId | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
+
+  const closeCategories = useBackLayer(
+    managingCategories,
+    () => setManagingCategories(false),
+    "product-categories"
+  );
+  const closePreview = useBackLayer(
+    previewing !== null,
+    () => setPreviewing(null),
+    "product-preview"
+  );
+  const closeEditing = useBackLayer(
+    editing !== null,
+    () => setEditing(null),
+    "product-editor"
+  );
 
   const reload = useCallback(async () => {
     const foreground = productsCache === null;
@@ -233,21 +250,21 @@ export function ProductsPage({ session, onNavigate }: Props) {
       </AdminShell>
 
       {managingCategories ? (
-        <CategoryManager onClose={() => setManagingCategories(false)} />
+        <CategoryManager onClose={closeCategories} />
       ) : null}
 
       {previewing ? (
-        <ProductPreviewDialog product={previewing} onClose={() => setPreviewing(null)} />
+        <ProductPreviewDialog product={previewing} onClose={closePreview} />
       ) : null}
 
       {editing !== null ? (
         <ProductDialog
           product={editing ?? null}
-          onClose={() => setEditing(null)}
+          onClose={closeEditing}
           onImageChanged={() => void reload()}
           onProductPersisted={() => void reload()}
           onSaved={async () => {
-            setEditing(null);
+            closeEditing();
             await reload();
           }}
         />
