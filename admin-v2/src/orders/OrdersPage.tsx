@@ -1,35 +1,53 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import type { AdminV2Page } from "../layout/AdminShell";
 import { ApiClientError } from "../shared/apiClient";
-import { listOrders, updateOrderStatus, type OrderStatus } from "./order.api";
+import { listOrders } from "./order.api";
 import { getFinancialOrder, type FinancialOrder } from "./order.finance";
 import { itemsOf } from "./order.model";
 import type { Order } from "./order.schema";
-import { ManualOrderDialog } from "./ManualOrderDialog";
 import styles from "./OrdersPage.module.css";
 
-type Props = { session: AuthSession; onNavigate: (page: AdminV2Page) => void };
+type Props = {
+  session: AuthSession;
+  onNavigate: (page: AdminV2Page) => void;
+};
+
 type FilterKey = "todos" | "hoje" | "producao" | "prontos" | "entregues";
-type IconName = "dashboard" | "products" | "orders" | "users" | "store" | "bell" | "sun" | "moon" | "search" | "bag" | "truck" | "receipt" | "edit";
+type DrawerTab = "pedido" | "comanda";
+type IconName =
+  | "home"
+  | "orders"
+  | "products"
+  | "clients"
+  | "payments"
+  | "settings"
+  | "search"
+  | "bag"
+  | "truck"
+  | "receipt"
+  | "edit";
 
 function Icon({ name, className }: { name: IconName; className?: string }) {
   const paths: Record<IconName, ReactNode> = {
-    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
-    products: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v9"/></>,
-    orders: <><rect x="5" y="6" width="14" height="14" rx="2"/><path d="M9 6V4h6v2M9 11h6M9 15h4"/></>,
-    users: <><circle cx="9" cy="8" r="3"/><path d="M4 20c0-3 2.2-5 5-5s5 2 5 5M17 7v6M14 10h6"/></>,
-    store: <><path d="M4 9h16l-2-5H6L4 9Z"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
-    bell: <><path d="M6 17h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v5L6 17Z"/><path d="M10 20h4"/></>,
-    sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></>,
-    moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>,
+    home: <><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9.5 20v-6h5v6"/></>,
+    orders: <><rect x="5" y="6" width="14" height="14" rx="2"/><path d="M9 6V4h6v2"/><path d="M9 11h6"/><path d="M9 15h4"/></>,
+    products: <><path d="M4 8h16"/><path d="M6 8V5h12v3"/><rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 8v11"/></>,
+    clients: <><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.4-3.5 2.3-5.3 5.5-5.3S14 15.5 14.5 19"/><path d="M16 6.5a3 3 0 0 1 0 5.8"/><path d="M17.5 14.2c2 .8 3 2.3 3 4.8"/></>,
+    payments: <><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M4 10h16"/><path d="M15 14h3"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7l2.8-2.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1z"/></>,
     search: <><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></>,
     bag: <><path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></>,
     truck: <><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/></>,
     receipt: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></>,
     edit: <><path d="M4 20h4L18 10l-4-4L4 16v4Z"/><path d="M13 7l4 4"/></>
   };
+
   return <svg className={className} viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
+}
+
+function cls(...names: Array<string | false | null | undefined>) {
+  return names.filter(Boolean).map(name => styles[name as string]).join(" ");
 }
 
 function initials(name: string) {
@@ -49,37 +67,34 @@ function parseDate(value?: string | null) {
 }
 
 function isToday(value?: string | null) {
-  const d = parseDate(value);
-  if (!d) return false;
+  const date = parseDate(value);
+  if (!date) return false;
   const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
 
 function scheduleLabel(order: Order) {
-  const d = parseDate(order.criado_em);
-  if (!d) return "—";
-  const time = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(d);
+  const date = parseDate(order.criado_em);
+  if (!date) return "—";
+  const time = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
   if (isToday(order.criado_em)) return `Hoje, ${time}`;
-  const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(d);
-  return `${date}, ${time}`;
+  return `${new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(date)}, ${time}`;
 }
 
-function orderStatus(order: Order): { label: string; tone: "gray" | "orange" | "green" | "purple" | "pink" } {
+function orderStatus(order: Order): { label: string; tone: "orange" | "green" | "purple" | "pink" } {
   switch (String(order.status_pedido || "NOVO").toUpperCase()) {
     case "PREPARANDO": return { label: "Em produção", tone: "orange" };
     case "PRONTO": return { label: "Pronto", tone: "green" };
     case "ENTREGUE": return { label: "Entregue", tone: "purple" };
     case "CANCELADO": return { label: "Cancelado", tone: "pink" };
-    default: return { label: "Confirmado", tone: "gray" };
+    default: return { label: "Pendente", tone: "orange" };
   }
 }
 
-function paymentStatus(order: Order) {
+function paymentInfo(order: Order) {
   const status = String(order.status_pagamento || "PENDENTE").toUpperCase();
-  if (status === "PAGO") return { label: "Pago", className: styles.paymentOk };
-  if (status === "PARCIAL") return { label: "Parcial", className: styles.paymentPartial };
-  if (status === "REEMBOLSADO") return { label: "Estornado", className: styles.paymentRefunded };
-  return { label: "Pendente", className: styles.paymentPending };
+  if (status === "PAGO") return { paid: true, label: "Pago" };
+  return { paid: false, label: "Pendente" };
 }
 
 function paymentMethod(order: Order) {
@@ -87,18 +102,108 @@ function paymentMethod(order: Order) {
   if (method.includes("PIX")) return "Pix";
   if (method.includes("CART")) return "Cartão";
   if (method.includes("DINHEIRO")) return "Dinheiro";
-  return method ? order.metodo_pagamento : "—";
+  return order.metodo_pagamento || "—";
 }
 
-function itemSummary(order: Order) {
+function orderItems(order: Order) {
   const items = itemsOf(order);
-  const first = items[0]?.produto_nome || order.produto_nome || "Pedido sem itens";
-  return items.length > 1 ? `${first} · +${items.length - 1} itens` : first;
+  if (items.length) return items;
+  return [{
+    produto_id: order.produto_id,
+    produto_nome: order.produto_nome,
+    quantidade: order.quantidade,
+    valor_unitario_centavos: order.valor_unitario_centavos,
+    valor_total_centavos: order.valor_total_centavos
+  }];
+}
+
+function productSummary(order: Order) {
+  const items = orderItems(order);
+  const first = items[0]?.produto_nome || "Pedido sem itens";
+  return { first, extra: Math.max(0, items.length - 1) };
 }
 
 function comandaState(order: Order) {
-  if (!order.status_comanda) return null;
-  return String(order.status_comanda).toUpperCase() === "ENCERRADA" ? "Fechada" : "Aberta";
+  const state = String(order.status_comanda || "").toUpperCase();
+  if (!state) return null;
+  return state === "ENCERRADA" ? "Fechada" : "Aberta";
+}
+
+function comandaNumber(order: Order) {
+  return `#${order.id}`;
+}
+
+function OrderRow({
+  order,
+  selected,
+  onSelect
+}: {
+  order: Order;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const status = orderStatus(order);
+  const payment = paymentInfo(order);
+  const product = productSummary(order);
+  const comanda = comandaState(order);
+  const delivery = order.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada";
+
+  return (
+    <div
+      className={cls("order-row", selected && "selected")}
+      data-order={order.id}
+      onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={event => {
+        if (event.key === "Enter" || event.key === " ") onSelect();
+      }}
+    >
+      <div className={styles["order-id"]}>#{order.id}</div>
+      <div className={styles.stack}><span className={styles.primary}>{order.cliente_nome || "Cliente não informado"}</span></div>
+      <div className={styles.stack}>
+        <span>{product.first}</span>
+        {product.extra > 0 ? <span className={styles.secondary}>+ {product.extra} itens</span> : null}
+      </div>
+      <div className={styles.stack}>
+        {comanda ? (
+          <>
+            <span>Comanda {comandaNumber(order)}</span>
+            <span className={cls("dotline", comanda === "Aberta" ? "open" : "closed")}><span className={styles.dot}/>{comanda}</span>
+          </>
+        ) : (
+          <><span className={styles.secondary} style={{ margin: 0 }}>Sem comanda</span><span className={styles.secondary}>—</span></>
+        )}
+      </div>
+      <div className={styles.stack}>
+        <span><Icon name={delivery === "Entrega" ? "truck" : "bag"} className={styles["row-ico"]}/>{scheduleLabel(order)}</span>
+        <span className={styles.secondary}>{delivery}</span>
+      </div>
+      <div><span className={cls("tag", status.tone)}>{status.label}</span></div>
+      <div className={styles.stack}>
+        {payment.paid ? (
+          <span className={styles["payment-ok"]}><span className={styles.check}>✓</span> Pago</span>
+        ) : (
+          <span className={styles["payment-pending"]}>Pendente</span>
+        )}
+        <span className={styles.secondary}>{payment.paid ? paymentMethod(order) : "—"}</span>
+      </div>
+      <div className={styles.money}>{money(order.valor_total_centavos)}</div>
+      <div className={styles.chev}>›</div>
+
+      <div className={styles["mobile-main"]}>
+        <div className={styles["mobile-title-line"]}><span className={styles["order-id"]}>#{order.id}</span><span className={styles.primary}>{order.cliente_nome || "Cliente não informado"}</span></div>
+        <div className={styles["mobile-meta"]}>{product.first}{product.extra > 0 ? ` · +${product.extra} itens` : ""}</div>
+        <div className={styles["mobile-meta"]}>{scheduleLabel(order)} · {delivery} · {comanda ? `Comanda ${comandaNumber(order)} ${comanda.toLowerCase()}` : "Sem comanda"}</div>
+        <div><span className={cls("tag", status.tone)}>{status.label}</span></div>
+      </div>
+      <div className={styles["mobile-right"]}>
+        <span className={styles.money}>{money(order.valor_total_centavos)}</span>
+        {payment.paid ? <span className={styles["payment-ok"]}><span className={styles.check}>✓</span> Pago</span> : <span className={styles["payment-pending"]}>Pendente</span>}
+        <span className={styles.chev}>›</span>
+      </div>
+    </div>
+  );
 }
 
 export function OrdersPage({ session, onNavigate }: Props) {
@@ -110,178 +215,332 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Order | null>(null);
-  const [activeTab, setActiveTab] = useState<"pedido" | "comanda">("pedido");
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<DrawerTab>("pedido");
   const [financial, setFinancial] = useState<FinancialOrder | null>(null);
   const [financialLoading, setFinancialLoading] = useState(false);
-  const [manualOrderOpen, setManualOrderOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [dark, setDark] = useState(() => document.documentElement.dataset.theme === "dark" || (!document.documentElement.dataset.theme && window.matchMedia?.("(prefers-color-scheme: dark)").matches));
-  const [editing, setEditing] = useState(false);
-  const [editStatus, setEditStatus] = useState<OrderStatus>("NOVO");
-  const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async () => {
-    setLoading(true); setError(null);
-    try { setOrders(await listOrders()); }
-    catch (err) { setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar os pedidos."); }
-    finally { setLoading(false); }
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await listOrders();
+      setOrders(next);
+      setSelected(current => current ? next.find(order => order.id === current.id) || next[0] || null : next[0] || null);
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar os pedidos.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { void reload(); }, [reload]);
-  useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; }, [dark]);
   useEffect(() => { setPage(1); }, [filter, query]);
+
   useEffect(() => {
     if (!selected || activeTab !== "comanda") return;
     let alive = true;
     setFinancialLoading(true);
-    void getFinancialOrder(selected.id).then(value => { if (alive) setFinancial(value); }).catch(() => { if (alive) setFinancial(null); }).finally(() => { if (alive) setFinancialLoading(false); });
+    void getFinancialOrder(selected.id)
+      .then(value => { if (alive) setFinancial(value); })
+      .catch(() => { if (alive) setFinancial(null); })
+      .finally(() => { if (alive) setFinancialLoading(false); });
     return () => { alive = false; };
   }, [selected, activeTab]);
 
   const counts = useMemo(() => ({
     todos: orders.length,
     hoje: orders.filter(order => isToday(order.criado_em)).length,
-    producao: orders.filter(order => String(order.status_pedido).toUpperCase() === "PREPARANDO").length,
-    prontos: orders.filter(order => String(order.status_pedido).toUpperCase() === "PRONTO").length,
-    entregues: orders.filter(order => String(order.status_pedido).toUpperCase() === "ENTREGUE").length
+    producao: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "PREPARANDO").length,
+    prontos: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "PRONTO").length,
+    entregues: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "ENTREGUE").length
   }), [orders]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
     return orders.filter(order => {
       const status = String(order.status_pedido || "").toUpperCase();
-      const filterOk = filter === "todos" ||
+      const filterMatches =
+        filter === "todos" ||
         (filter === "hoje" && isToday(order.criado_em)) ||
         (filter === "producao" && status === "PREPARANDO") ||
         (filter === "prontos" && status === "PRONTO") ||
         (filter === "entregues" && status === "ENTREGUE");
-      if (!filterOk) return false;
+
+      if (!filterMatches) return false;
       if (!term) return true;
-      return [`${order.id}`, order.cliente_nome || "", itemSummary(order), `comanda ${order.id}`].join(" ").toLocaleLowerCase("pt-BR").includes(term);
+
+      const product = productSummary(order);
+      return [
+        String(order.id),
+        order.cliente_nome || "",
+        product.first,
+        `comanda ${order.id}`
+      ].join(" ").toLocaleLowerCase("pt-BR").includes(term);
     });
   }, [orders, filter, query]);
 
   const perPage = 8;
   const pages = Math.max(1, Math.ceil(filtered.length / perPage));
   const visible = filtered.slice((page - 1) * perPage, page * perPage);
+  const selectedStatus = selected ? orderStatus(selected) : null;
+  const selectedPayment = selected ? paymentInfo(selected) : null;
+  const selectedComanda = selected ? comandaState(selected) : null;
+  const selectedDelivery = selected?.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada";
+  const selectedItems = selected ? orderItems(selected) : [];
+
+  const financialItems = financial?.itens || [];
+  const comandaItems = financialItems.length ? financialItems : selectedItems;
+  const paidCents = financial?.valor_pago_centavos ?? (selectedPayment?.paid ? Number(selected?.valor_total_centavos || 0) : 0);
+  const pendingCents = financial?.saldo_centavos ?? (selectedPayment?.paid ? 0 : Number(selected?.valor_total_centavos || 0));
 
   function openOrder(order: Order) {
-    setSelected(order); setActiveTab("pedido"); setFinancial(null); setEditing(false);
-    setEditStatus(String(order.status_pedido || "NOVO").toUpperCase() as OrderStatus);
+    setSelected(order);
+    setDrawerOpen(true);
+    setActiveTab("pedido");
+    setFinancial(null);
   }
 
-  async function saveEdit() {
-    if (!selected || saving) return;
-    const current = String(selected.status_pedido || "NOVO").toUpperCase();
-    if (editStatus === current) { setEditing(false); return; }
-    setSaving(true);
-    try {
-      await updateOrderStatus(selected.id, editStatus);
-      const refreshed = await listOrders();
-      setOrders(refreshed);
-      const updated = refreshed.find(order => order.id === selected.id) || null;
-      setSelected(updated);
-      setEditing(false);
-    } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "Não foi possível atualizar o pedido.");
-    } finally { setSaving(false); }
+  function navigate(event: MouseEvent<HTMLAnchorElement>, pageName?: AdminV2Page) {
+    event.preventDefault();
+    if (pageName) onNavigate(pageName);
   }
-
-  const navItems: Array<{ key: AdminV2Page; label: string; icon: IconName }> = [
-    { key: "dashboard", label: "Dashboard", icon: "dashboard" },
-    { key: "produtos", label: "Produtos", icon: "products" },
-    { key: "pedidos", label: "Pedidos", icon: "orders" },
-    { key: "admins", label: "Administradores", icon: "users" },
-    { key: "loja", label: "Loja", icon: "store" }
-  ];
 
   return (
     <div className={styles.pageRoot}>
       <div className={styles.app}>
         <aside className={styles.sidebar}>
-          <div className={styles.brand}><div className={styles.brandRp}>R&amp;P</div><div className={styles.brandDoces}>DOCES</div></div>
-          <nav className={styles.nav} aria-label="Navegação principal">
-            {navItems.map(item => (
-              <button key={item.key} type="button" className={`${styles.navItem} ${item.key === "pedidos" ? styles.navActive : ""}`} onClick={() => item.key !== "pedidos" && onNavigate(item.key)}>
-                <span className={styles.ico}><Icon name={item.icon}/></span><span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
-          <div className={styles.navSpacer}/>
-          <div className={styles.notifWrap}>
-            <button className={styles.notifToggle} type="button" aria-label="Notificações" onClick={() => setNotifOpen(value => !value)}>
-              <span className={styles.ico}><Icon name="bell"/></span><span>Notificações</span><span className={styles.notifDot}/>
-            </button>
-            {notifOpen ? <div className={styles.notifPopover}><h3>Notificações</h3><p>Receba um aviso quando um novo pedido for pago.</p><div className={styles.notifStatus}><strong>Ativas neste navegador</strong><span>Você receberá avisos de novos pedidos pagos.</span></div><button className={styles.secondaryBtn} type="button">Desativar notificações</button></div> : null}
+          <div className={styles.brand}>
+            <div className={styles["brand-rp"]}>R&amp;P</div>
+            <div className={styles["brand-doces"]}>DOCES</div>
           </div>
-          <button className={`${styles.themeToggle} ${dark ? styles.isDark : ""}`} type="button" aria-label="Alternar tema claro/escuro" onClick={() => setDark(value => !value)}>
-            <span className={styles.ico}><Icon name={dark ? "moon" : "sun"}/></span><span>Tema</span>
-          </button>
+
+          <nav className={styles.nav}>
+            <a className={styles["nav-item"]} href="#dashboard" onClick={event => navigate(event, "dashboard")}>
+              <span className={styles.ico}><Icon name="home"/></span><span>Início</span>
+            </a>
+            <a className={cls("nav-item", "active")} href="#pedidos" onClick={event => event.preventDefault()}>
+              <span className={styles.ico}><Icon name="orders"/></span><span>Pedidos</span>
+            </a>
+            <a className={styles["nav-item"]} href="#produtos" onClick={event => navigate(event, "produtos")}>
+              <span className={styles.ico}><Icon name="products"/></span><span>Produtos</span>
+            </a>
+            <a className={styles["nav-item"]} href="#" onClick={event => event.preventDefault()}>
+              <span className={styles.ico}><Icon name="clients"/></span><span>Clientes</span>
+            </a>
+            <a className={styles["nav-item"]} href="#" onClick={event => event.preventDefault()}>
+              <span className={styles.ico}><Icon name="payments"/></span><span>Pagamentos</span>
+            </a>
+
+            <div className={styles["nav-divider"]}/>
+
+            <a className={styles["nav-item"]} href="#" onClick={event => event.preventDefault()}>
+              <span className={styles.ico}><Icon name="settings"/></span><span>Configurações</span>
+            </a>
+          </nav>
+
+          <div className={styles["nav-spacer"]}/>
+
           <div className={styles.profile}>
-            {user.avatar_url ? <img className={styles.avatarImage} src={user.avatar_url} alt=""/> : <div className={styles.avatar}>{initials(user.nome)}</div>}
-            <div className={styles.profileText}><div className={styles.profileName}>{user.nome}</div><div className={styles.profileRole}>{user.papel}</div></div><div className={styles.profileCaret}>⌄</div>
+            <div className={styles.avatar}>{initials(user.nome)}</div>
+            <div className={styles["profile-text"]}>
+              <div className={styles["profile-name"]}>{user.nome}</div>
+              <div className={styles["profile-role"]}>Administrador</div>
+            </div>
+            <div className={styles["profile-caret"]}>⌄</div>
           </div>
         </aside>
 
         <main className={styles.content}>
           <div className={styles.workspace}>
-            <section className={styles.main} aria-busy={loading}>
-              <header className={styles.pageHeader}>
-                <h1 className={styles.pageTitle}>Pedidos</h1>
-                <div className={styles.pageHeaderActions}>
-                  <label className={styles.search}><span className={styles.searchIcon}><Icon name="search"/></span><input type="search" placeholder="Buscar pedido, cliente ou comanda..." value={query} onChange={event => setQuery(event.target.value)}/></label>
-                  <button className={styles.primaryBtn} type="button" onClick={() => setManualOrderOpen(true)}>+ Novo pedido</button>
-                </div>
+            <section className={styles.main}>
+              <header className={styles["page-header"]}>
+                <h1 className={styles["page-title"]}>Pedidos</h1>
+                <label className={styles.search}>
+                  <span className={cls("icon", "ico")}><Icon name="search"/></span>
+                  <input
+                    type="search"
+                    placeholder="Buscar pedido, cliente ou comanda..."
+                    value={query}
+                    onChange={event => setQuery(event.target.value)}
+                  />
+                  <span className={styles.shortcut}>⌘ K</span>
+                </label>
               </header>
 
-              <div className={styles.ordersCard}>
+              <div className={styles["orders-card"]} aria-busy={loading}>
                 <div className={styles.filters}>
-                  {([['todos','Todos'],['hoje','Hoje'],['producao','Em produção'],['prontos','Prontos'],['entregues','Entregues']] as Array<[FilterKey,string]>).map(([key,label]) => <button key={key} className={`${styles.filter} ${filter === key ? styles.filterActive : ""}`} type="button" onClick={() => setFilter(key)}>{label} <span className={styles.count}>{counts[key]}</span></button>)}
+                  {([
+                    ["todos", "Todos"],
+                    ["hoje", "Hoje"],
+                    ["producao", "Em produção"],
+                    ["prontos", "Prontos"],
+                    ["entregues", "Entregues"]
+                  ] as Array<[FilterKey, string]>).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={cls("filter", filter === key && "active")}
+                      onClick={() => setFilter(key)}
+                    >
+                      {label} <span className={styles.count}>{counts[key]}</span>
+                    </button>
+                  ))}
                 </div>
 
-                {error ? <div className={styles.error}><strong>Não foi possível carregar os pedidos</strong><span>{error}</span><button className={styles.secondaryBtn} type="button" onClick={() => void reload()}>Tentar novamente</button></div> : <div className={styles.table}>
-                  <div className={styles.thead}><div>Pedido</div><div>Cliente</div><div>Comanda</div><div>Retirada / Entrega</div><div>Status</div><div>Pagamento</div><div>Total</div><div/></div>
-                  {visible.map(order => {
-                    const status = orderStatus(order); const payment = paymentStatus(order); const comanda = comandaState(order); const selectedRow = selected?.id === order.id;
-                    return <div key={order.id} className={`${styles.orderRow} ${selectedRow ? styles.selected : ""}`} onClick={() => openOrder(order)}>
-                      <div className={styles.orderId}>#{order.id}</div>
-                      <div className={styles.stack}><span className={styles.primary}>{order.cliente_nome || "Cliente não informado"}</span><span className={styles.secondary}>{itemSummary(order)}</span></div>
-                      <div className={styles.stack}>{comanda ? <><span>Comanda #{order.id}</span><span className={`${styles.dotline} ${comanda === "Aberta" ? styles.open : styles.closed}`}><span className={styles.dot}/>{comanda}</span></> : <><span className={styles.secondary}>Sem comanda</span><span className={styles.secondary}>—</span></>}</div>
-                      <div className={styles.stack}><span><Icon name={order.tipo_entrega === "ENTREGA" ? "truck" : "bag"} className={styles.rowIco}/>{scheduleLabel(order)}</span><span className={styles.secondary}>{order.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada"}</span></div>
-                      <div><span className={`${styles.tag} ${styles[`tag${status.tone[0].toUpperCase()}${status.tone.slice(1)}`]}`}>{status.label}</span></div>
-                      <div className={styles.stack}>{payment.label === "Pago" ? <span className={styles.paymentOk}><span className={styles.check}>✓</span> Pago</span> : <span className={payment.className}>{payment.label}</span>}<span className={styles.secondary}>{payment.label === "Pendente" ? "—" : paymentMethod(order)}</span></div>
-                      <div className={styles.money}>{money(order.valor_total_centavos)}</div><div className={styles.chev}>›</div>
-                      <div className={styles.mobileMain}><div className={styles.mobileTitleLine}><span className={styles.orderId}>#{order.id}</span><span className={styles.primary}>{order.cliente_nome || "Cliente não informado"}</span></div><div className={styles.mobileMeta}>{itemSummary(order)}</div><div className={styles.mobileMeta}>{scheduleLabel(order)} · {order.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada"}{comanda ? ` · Comanda #${order.id} ${comanda.toLowerCase()}` : " · Sem comanda"}</div><div><span className={`${styles.tag} ${styles[`tag${status.tone[0].toUpperCase()}${status.tone.slice(1)}`]}`}>{status.label}</span></div></div>
-                      <div className={styles.mobileRight}><span className={styles.money}>{money(order.valor_total_centavos)}</span>{payment.label === "Pago" ? <span className={styles.paymentOk}><span className={styles.check}>✓</span> Pago</span> : <span className={payment.className}>{payment.label}</span>}<span className={styles.chev}>›</span></div>
-                    </div>;
-                  })}
-                  {!loading && visible.length === 0 ? <div className={styles.empty}>Nenhum pedido encontrado.</div> : null}
-                </div>}
-                <footer className={styles.tableFooter}><span>{filtered.length ? `Mostrando ${(page-1)*perPage+1}–${Math.min(page*perPage,filtered.length)} de ${filtered.length} pedidos` : "0 pedidos"}</span><div className={styles.pagination}><button className={styles.pageBtn} type="button" onClick={() => setPage(value => Math.max(1,value-1))}>‹</button>{Array.from({length: pages},(_,i)=>i+1).slice(0,5).map(value => <button key={value} className={`${styles.pageBtn} ${page===value?styles.pageActive:""}`} type="button" onClick={() => setPage(value)}>{value}</button>)}<button className={styles.pageBtn} type="button" onClick={() => setPage(value => Math.min(pages,value+1))}>›</button></div></footer>
+                {error ? (
+                  <div className={styles.error}>
+                    <strong>Não foi possível carregar os pedidos</strong>
+                    <span>{error}</span>
+                    <button type="button" onClick={() => void reload()}>Tentar novamente</button>
+                  </div>
+                ) : (
+                  <div className={styles.table}>
+                    <div className={styles.thead}>
+                      <div>Pedido</div>
+                      <div>Cliente</div>
+                      <div>Produtos</div>
+                      <div>Comanda</div>
+                      <div>Retirada / Entrega</div>
+                      <div>Status</div>
+                      <div>Pagamento</div>
+                      <div>Total</div>
+                      <div/>
+                    </div>
+
+                    {visible.map(order => (
+                      <OrderRow
+                        key={order.id}
+                        order={order}
+                        selected={selected?.id === order.id}
+                        onSelect={() => openOrder(order)}
+                      />
+                    ))}
+
+                    {!loading && visible.length === 0 ? <div className={styles.empty}>Nenhum pedido encontrado.</div> : null}
+                  </div>
+                )}
+
+                <footer className={styles["table-footer"]}>
+                  <span>
+                    {filtered.length
+                      ? `Mostrando ${(page - 1) * perPage + 1}–${Math.min(page * perPage, filtered.length)} de ${filtered.length} pedidos`
+                      : "Mostrando 0 pedidos"}
+                  </span>
+                  <div className={styles.pagination}>
+                    <button className={styles["page-btn"]} type="button" onClick={() => setPage(value => Math.max(1, value - 1))}>‹</button>
+                    {Array.from({ length: pages }, (_, index) => index + 1).slice(0, 5).map(value => (
+                      <button
+                        key={value}
+                        className={cls("page-btn", page === value && "active")}
+                        type="button"
+                        onClick={() => setPage(value)}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                    <button className={styles["page-btn"]} type="button" onClick={() => setPage(value => Math.min(pages, value + 1))}>›</button>
+                  </div>
+                </footer>
               </div>
             </section>
+
+            <aside className={cls("drawer", drawerOpen && "open")} id="drawer">
+              {selected ? (
+                <>
+                  <div className={styles["drawer-head"]}>
+                    <div>
+                      <h2>Pedido #{selected.id}</h2>
+                      <div className={styles["drawer-client"]}>{selected.cliente_nome || "Cliente não informado"}</div>
+                      <div className={styles["drawer-tags"]}>
+                        {selectedComanda ? <span className={cls("tag", "purple")}>Comanda {comandaNumber(selected)}</span> : null}
+                        {selectedStatus ? <span className={cls("tag", selectedStatus.tone)}>{selectedStatus.label}</span> : null}
+                      </div>
+                    </div>
+                    <button className={styles.close} type="button" aria-label="Fechar" onClick={() => setDrawerOpen(false)}>×</button>
+                  </div>
+
+                  <div className={styles["drawer-meta"]}>
+                    <span><Icon name={selectedDelivery === "Entrega" ? "truck" : "bag"} className={styles["row-ico"]}/>{scheduleLabel(selected)}</span>
+                    <span className={styles.bullet}/>
+                    <span>{selectedDelivery}</span>
+                  </div>
+
+                  <div className={styles.tabs}>
+                    <button className={cls("tab", activeTab === "pedido" && "active")} type="button" onClick={() => setActiveTab("pedido")}>Pedido</button>
+                    <button className={cls("tab", activeTab === "comanda" && "active")} type="button" onClick={() => setActiveTab("comanda")}>Comanda</button>
+                  </div>
+
+                  <div className={cls("pedido-panel", activeTab !== "pedido" && "hidden")}>
+                    <section className={styles["drawer-section"]}>
+                      <h3 className={styles["section-title"]}>Itens do pedido</h3>
+                      {selectedItems.map((item, index) => (
+                        <div className={styles["line-item"]} key={`${item.produto_id || "item"}-${index}`}>
+                          <span>{item.produto_nome || "Produto"}</span>
+                          <span className={styles.qty}>{item.quantidade}x</span>
+                          <span className={styles.price}>{money(item.valor_total_centavos)}</span>
+                        </div>
+                      ))}
+                      <div className={styles["total-row"]}><span>Total do pedido</span><span>{money(selected.valor_total_centavos)}</span></div>
+                    </section>
+
+                    <section className={styles["drawer-section"]}>
+                      <h3 className={styles["section-title"]}>Pagamento</h3>
+                      <div className={styles["payment-row"]}>
+                        <div className={styles["payment-left"]}>
+                          {selectedPayment?.paid ? <span className={cls("tag", "green")}>✓ &nbsp; Pago</span> : <span className={cls("tag", "orange")}>Pendente</span>}
+                          <span className={styles.method}>Método</span>
+                        </div>
+                        <div className={cls("payment-left", "payment-left-end")}>
+                          <span>&nbsp;</span>
+                          <span className={styles.method}>{selectedPayment?.paid ? paymentMethod(selected) : "—"}</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className={cls("drawer-section", "last-drawer-section")}>
+                      <h3 className={styles["section-title"]}>Observações</h3>
+                      <div className={styles.note}>{selected.observacao || "—"}</div>
+                    </section>
+                  </div>
+
+                  <div className={cls("comanda-panel", activeTab === "comanda" && "active")}>
+                    <section className={styles["drawer-section"]}>
+                      <h3 className={styles["section-title"]}>Comanda {comandaNumber(selected)} · {selectedComanda || "Aberta"}</h3>
+                      {financialLoading ? <div className={styles.note}>Carregando comanda...</div> : comandaItems.map((item, index) => {
+                        const itemWithFinance = item as { status_financeiro?: string; adicionado_por_usuario_id?: number | null };
+                        const status = String(itemWithFinance.status_financeiro || (selectedPayment?.paid ? "PAGO" : "PENDENTE")).toLowerCase();
+                        const source = itemWithFinance.adicionado_por_usuario_id ? "Adicionado depois" : `Pedido #${selected.id}`;
+                        return (
+                          <div className={styles["comanda-item"]} key={`${item.produto_id || "item"}-${index}`}>
+                            <div><strong>{item.produto_nome || "Produto"}</strong><div className={styles["comanda-status"]}>{source} · {status}</div></div>
+                            <div>{money(item.valor_total_centavos)}</div>
+                          </div>
+                        );
+                      })}
+                      <div className={styles["comanda-summary"]}>
+                        <div className={cls("summary-row", "total")}><span>Total da comanda</span><span>{money(financial?.valor_total_centavos ?? selected.valor_total_centavos)}</span></div>
+                        <div className={cls("summary-row", "paid")}><span>Pago</span><span>{money(paidCents)}</span></div>
+                        <div className={cls("summary-row", "pending")}><span>Pendente</span><span>{money(pendingCents)}</span></div>
+                      </div>
+                    </section>
+                  </div>
+
+                  <div className={styles["drawer-actions"]}>
+                    <button className={styles["primary-btn"]} type="button" onClick={() => setActiveTab("comanda")}>
+                      <Icon name="receipt" className={styles["btn-ico"]}/>Ver comanda
+                    </button>
+                    <div className={styles["secondary-actions"]}>
+                      <button className={styles["secondary-btn"]} type="button"><Icon name="edit" className={styles["btn-ico"]}/>Editar pedido</button>
+                      <button className={styles["more-btn"]} type="button">⋮</button>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </aside>
           </div>
         </main>
       </div>
-
-      <button className={`${styles.drawerBackdrop} ${selected ? styles.openBackdrop : ""}`} type="button" aria-label="Fechar detalhes" onClick={() => setSelected(null)}/>
-      <aside className={`${styles.drawer} ${selected ? styles.drawerOpen : ""} ${editing ? styles.editing : ""}`} aria-hidden={!selected}>
-        {selected ? <>
-          <div className={styles.drawerHead}><div><h2>Pedido #{selected.id}</h2><div className={styles.drawerClient}>{selected.cliente_nome || "Cliente não informado"}</div><div className={styles.drawerTags}>{comandaState(selected) ? <span className={`${styles.tag} ${styles.tagPurple}`}>Comanda #{selected.id}</span> : null}<span className={`${styles.tag} ${styles[`tag${orderStatus(selected).tone[0].toUpperCase()}${orderStatus(selected).tone.slice(1)}`]}`}>{orderStatus(selected).label}</span></div></div><button className={styles.close} type="button" aria-label="Fechar" onClick={() => setSelected(null)}>×</button></div>
-          <div className={styles.drawerMeta}><span><Icon name={selected.tipo_entrega === "ENTREGA" ? "truck" : "bag"} className={styles.rowIco}/>{scheduleLabel(selected)}</span><span className={styles.bullet}/><span>{selected.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada"}</span></div>
-          {!editing ? <div className={styles.tabs}><button className={`${styles.tab} ${activeTab === "pedido" ? styles.tabActive : ""}`} type="button" onClick={() => setActiveTab("pedido")}>Pedido</button><button className={`${styles.tab} ${activeTab === "comanda" ? styles.tabActive : ""}`} type="button" onClick={() => setActiveTab("comanda")}>Comanda</button></div> : null}
-
-          {!editing && activeTab === "pedido" ? <div className={styles.pedidoPanel}><section className={styles.drawerSection}><h3 className={styles.sectionTitle}>Itens do pedido</h3>{itemsOf(selected).map((item,index)=><div className={styles.lineItem} key={`${item.produto_id||'item'}-${index}`}><span>{item.produto_nome || "Produto"}</span><span className={styles.qty}>{item.quantidade}x</span><span className={styles.price}>{money(item.valor_total_centavos)}</span></div>)}<div className={styles.totalRow}><span>Total do pedido</span><span>{money(selected.valor_total_centavos)}</span></div></section><section className={styles.drawerSection}><h3 className={styles.sectionTitle}>Pagamento</h3><div className={styles.paymentRow}><div className={styles.paymentLeft}>{paymentStatus(selected).label === "Pago" ? <span className={`${styles.tag} ${styles.tagGreen}`}>✓ &nbsp; Pago</span> : <span className={`${styles.tag} ${styles.tagOrange}`}>{paymentStatus(selected).label}</span>}<span className={styles.method}>Método</span></div><div className={styles.paymentLeftEnd}><span>&nbsp;</span><span className={styles.method}>{paymentMethod(selected)}</span></div></div></section><section className={`${styles.drawerSection} ${styles.lastSection}`}><h3 className={styles.sectionTitle}>Observações</h3><div className={styles.note}>{selected.observacao || "—"}</div></section></div> : null}
-
-          {!editing && activeTab === "comanda" ? <div className={`${styles.comandaPanel} ${styles.comandaActive}`}><section className={styles.drawerSection}><h3 className={styles.sectionTitle}>Comanda #{selected.id} · {comandaState(selected) || "Aberta"}</h3>{financialLoading ? <div className={styles.note}>Carregando comanda...</div> : (financial?.itens || itemsOf(selected)).map((item,index)=><div className={styles.comandaItem} key={`${item.id||item.produto_id||'item'}-${index}`}><div><strong>{item.produto_nome || "Produto"}</strong><div className={styles.comandaStatus}>Pedido #{selected.id}{"status_financeiro" in item ? ` · ${String(item.status_financeiro).toLowerCase()}` : ""}</div></div><div>{money(item.valor_total_centavos)}</div></div>)}<div className={styles.comandaSummary}><div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Total da comanda</span><span>{money(financial?.valor_total_centavos ?? selected.valor_total_centavos)}</span></div><div className={`${styles.summaryRow} ${styles.summaryPaid}`}><span>Pago</span><span>{money(financial?.valor_pago_centavos ?? (String(selected.status_pagamento).toUpperCase()==="PAGO"?selected.valor_total_centavos:0))}</span></div><div className={`${styles.summaryRow} ${styles.summaryPending}`}><span>Pendente</span><span>{money(financial?.saldo_centavos ?? (String(selected.status_pagamento).toUpperCase()==="PAGO"?0:selected.valor_total_centavos))}</span></div></div></section></div> : null}
-
-          {editing ? <div className={styles.pedidoEdit}><section className={styles.drawerSection}><div className={styles.field}><label className={styles.fieldLabel}>Status do pedido</label><select className={styles.formControl} value={editStatus} onChange={event => setEditStatus(event.target.value as OrderStatus)}><option value="NOVO">Confirmado</option><option value="PREPARANDO">Em produção</option><option value="PRONTO">Pronto</option><option value="ENTREGUE">Entregue</option><option value="CANCELADO">Cancelado</option></select></div></section><section className={styles.drawerSection}><h3 className={styles.sectionTitle}>Itens do pedido</h3>{itemsOf(selected).map((item,index)=><div className={styles.editItemRow} key={`${item.produto_id||'item'}-${index}`}><span className={styles.editItemName}>{item.produto_nome || "Produto"}</span><span className={styles.editItemQty}><button type="button" disabled>−</button><input value={item.quantidade} readOnly/><button type="button" disabled>+</button></span><span className={styles.editItemPrice}>{money(item.valor_total_centavos)}</span><button type="button" className={styles.editItemRemove} disabled>×</button></div>)}<div className={styles.totalRow}><span>Total do pedido</span><span>{money(selected.valor_total_centavos)}</span></div></section><section className={styles.drawerSection}><h3 className={styles.sectionTitle}>Pagamento</h3><div className={styles.fieldRow}><div className={styles.field}><label className={styles.fieldLabel}>Status</label><select className={styles.formControl} value={paymentStatus(selected).label} disabled><option>{paymentStatus(selected).label}</option></select></div><div className={styles.field}><label className={styles.fieldLabel}>Método</label><select className={styles.formControl} value={paymentMethod(selected) || "—"} disabled><option>{paymentMethod(selected) || "—"}</option></select></div></div></section><section className={`${styles.drawerSection} ${styles.lastSection}`}><div className={styles.field}><label className={styles.fieldLabel}>Observações</label><textarea className={styles.formControl} value={selected.observacao || ""} readOnly/></div></section></div> : null}
-
-          {!editing ? <div className={`${styles.drawerActions} ${styles.viewActions}`}><button className={styles.primaryBtn} type="button" onClick={() => setActiveTab("comanda")}><Icon name="receipt" className={styles.btnIco}/>Ver comanda</button><button className={styles.secondaryBtn} type="button" onClick={() => setEditing(true)}><Icon name="edit" className={styles.btnIco}/>Editar pedido</button></div> : <div className={`${styles.drawerActions} ${styles.editActions}`}><button className={styles.primaryBtn} type="button" disabled={saving} onClick={() => void saveEdit()}>{saving ? "Salvando..." : "Salvar alterações"}</button><button className={styles.secondaryBtn} type="button" onClick={() => setEditing(false)}>Cancelar</button></div>}
-        </> : null}
-      </aside>
-
-      {manualOrderOpen ? <ManualOrderDialog onClose={() => setManualOrderOpen(false)} onCreated={async () => { setQuery(""); setFilter("todos"); await reload(); setManualOrderOpen(false); }}/>: null}
     </div>
   );
 }
