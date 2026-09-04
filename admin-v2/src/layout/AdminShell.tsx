@@ -208,7 +208,7 @@ export function AdminShell({
 
   return (
     <div className={styles.app}>
-      <aside className={styles.sidebar}>
+      <aside className={styles.sidebar} data-admin-navigation-chrome>
         <div className={styles.brand} aria-label="R&P Doces">
           <div className={styles.brandRp}>R&amp;P</div>
           <div className={styles.brandDoces}>DOCES</div>
