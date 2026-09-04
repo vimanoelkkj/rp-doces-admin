@@ -24,18 +24,28 @@ export function ProductPreviewDialog({ product, onClose }: Props) {
   const hasActivePromo = promoState === "active" && currentPrice !== product.preco_centavos;
 
   useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
   }, [onClose]);
 
   return (
     <div
       className={styles.overlay}
       role="presentation"
-      onMouseDown={event => {
+      onPointerDown={event => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
@@ -84,7 +94,9 @@ export function ProductPreviewDialog({ product, onClose }: Props) {
             <div>
               <small>Estoque</small>
               <strong className={available <= 3 ? styles.lowStock : styles.stock}>
-                {available > 0 ? `${available} disponível${available === 1 ? "" : "is"}` : "Esgotado"}
+                {available > 0
+                  ? `${available} ${available === 1 ? "disponível" : "disponíveis"}`
+                  : "Esgotado"}
               </strong>
             </div>
           </div>
