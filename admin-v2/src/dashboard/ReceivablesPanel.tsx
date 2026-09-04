@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FinancialOrder } from "../orders/order.finance";
 import styles from "./ReceivablesPanel.module.css";
 
@@ -22,20 +22,23 @@ function itemStateLabel(status: FinancialOrder["itens"][number]["status_financei
 
 function itemStateClass(status: FinancialOrder["itens"][number]["status_financeiro"]): string {
   if (status === "PAGO") return styles.paid;
-  if (status === "PARCIAL") return styles.partial;
   return styles.pending;
 }
 
 export function ReceivablesPanel({ orders, onOpenOrder }: Props) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const receivables = useMemo(
     () => orders.filter(order => order.saldo_centavos > 0 && order.status_pedido !== "CANCELADO"),
     [orders]
   );
+  const [expandedId, setExpandedId] = useState<number | null | undefined>(undefined);
   const pendingTotal = useMemo(
     () => receivables.reduce((sum, order) => sum + order.saldo_centavos, 0),
     [receivables]
   );
+
+  useEffect(() => {
+    if (expandedId === undefined) setExpandedId(receivables[0]?.id ?? null);
+  }, [expandedId, receivables]);
 
   return (
     <section className={styles.panel} aria-label="Pagamentos pendentes">
@@ -52,7 +55,7 @@ export function ReceivablesPanel({ orders, onOpenOrder }: Props) {
           {receivables.slice(0, 6).map(order => {
             const expanded = expandedId === order.id;
             return (
-              <article className={styles.row} key={order.id}>
+              <article className={`${styles.row} ${expanded ? styles.openRow : ""}`} key={order.id}>
                 <button
                   className={styles.trigger}
                   type="button"
@@ -72,26 +75,23 @@ export function ReceivablesPanel({ orders, onOpenOrder }: Props) {
 
                 {expanded ? (
                   <div className={styles.details} id={`receivable-${order.id}`}>
-                    <div className={styles.items}>
-                      {order.itens.map(item => (
-                        <div className={styles.item} key={item.id}>
-                          <span className={styles.itemCopy}>
-                            <strong>{item.quantidade}× {item.produto_nome || "Produto"}</strong>
-                            <small>
-                              {item.status_financeiro === "PAGO"
-                                ? `${money(item.valor_pago_centavos)} pagos`
-                                : item.status_financeiro === "PARCIAL"
-                                  ? `${money(item.valor_pago_centavos)} pagos · ${money(item.saldo_centavos)} pendentes`
-                                  : `${money(item.saldo_centavos)} pendentes`}
-                            </small>
-                          </span>
-                          <span className={styles.itemValue}>{money(item.valor_total_centavos)}</span>
-                          <span className={`${styles.state} ${itemStateClass(item.status_financeiro)}`}>
-                            {itemStateLabel(item.status_financeiro)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    {order.itens.map(item => (
+                      <div className={styles.item} key={item.id}>
+                        <span>
+                          <strong>{item.quantidade}× {item.produto_nome || "Produto"}</strong>
+                          <small>
+                            {item.status_financeiro === "PAGO"
+                              ? `${money(item.valor_pago_centavos)} pagos`
+                              : item.status_financeiro === "PARCIAL"
+                                ? `${money(item.valor_pago_centavos)} pagos · ${money(item.saldo_centavos)} pendentes`
+                                : `${money(item.saldo_centavos)} pendentes`}
+                          </small>
+                        </span>
+                        <span className={`${styles.state} ${itemStateClass(item.status_financeiro)}`}>
+                          {itemStateLabel(item.status_financeiro)}
+                        </span>
+                      </div>
+                    ))}
 
                     <div className={styles.summary}>
                       <span>Total<strong>{money(order.valor_total_centavos)}</strong></span>
