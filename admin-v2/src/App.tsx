@@ -117,7 +117,7 @@ export function App() {
               } else if (view === "pedidos") {
                 content = <OrdersPage session={session} onNavigate={navigate} active={active} />;
               } else if (view === "admins") {
-                content = <AdminsPage session={session} onNavigate={navigate} />;
+                content = <AdminsPage session={session} onNavigate={navigate} active={active} />;
               } else if (view === "loja") {
                 content = <StorePage session={session} onNavigate={navigate} />;
               } else {
