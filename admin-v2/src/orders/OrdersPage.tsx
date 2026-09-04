@@ -417,19 +417,29 @@ export function OrdersPage({ session, onNavigate }: Props) {
 
   async function saveEditing() {
     if (!selected || savingEdit) return;
+
+    const currentStatus = normalizeOrderStatus(selected);
+    const currentPayment = selected.origem_pedido === "MANUAL"
+      ? normalizeManualPayment(selected)
+      : null;
+    const statusChanged = draftStatus !== currentStatus;
+    const paymentChanged = currentPayment !== null && draftPayment !== currentPayment;
+
+    if (!statusChanged && !paymentChanged) {
+      setEditError(null);
+      setEditing(false);
+      return;
+    }
+
     setSavingEdit(true);
     setEditError(null);
     try {
-      const currentStatus = normalizeOrderStatus(selected);
-      if (draftStatus !== currentStatus) {
+      if (statusChanged) {
         await updateOrderStatus(selected.id, draftStatus);
       }
 
-      if (selected.origem_pedido === "MANUAL") {
-        const currentPayment = normalizeManualPayment(selected);
-        if (draftPayment !== currentPayment) {
-          await updateManualPayment(selected.id, draftPayment);
-        }
+      if (paymentChanged) {
+        await updateManualPayment(selected.id, draftPayment);
       }
 
       await reload(selected.id);
