@@ -22,6 +22,8 @@ type Props = {
   onNavigate: (page: AdminV2Page) => void;
 };
 
+let productsCache: Product[] | null = null;
+
 function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -32,8 +34,8 @@ function SearchIcon() {
 }
 
 export function ProductsPage({ session, onNavigate }: Props) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>(() => productsCache ?? []);
+  const [loading, setLoading] = useState(() => productsCache === null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null | undefined>(null);
   const [managingCategories, setManagingCategories] = useState(false);
@@ -42,17 +44,20 @@ export function ProductsPage({ session, onNavigate }: Props) {
   const [filter, setFilter] = useState<Filter>("todos");
 
   const reload = useCallback(async () => {
-    setLoading(true);
+    const foreground = productsCache === null;
+    if (foreground) setLoading(true);
     setError(null);
 
     try {
-      setProducts(await listProducts());
+      const next = await listProducts();
+      productsCache = next;
+      setProducts(next);
     } catch (err) {
       setError(
         err instanceof ProductApiError ? err.message : "Não foi possível carregar os produtos."
       );
     } finally {
-      setLoading(false);
+      if (foreground) setLoading(false);
     }
   }, []);
 
