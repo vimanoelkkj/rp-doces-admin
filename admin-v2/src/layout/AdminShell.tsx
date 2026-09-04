@@ -20,21 +20,21 @@ type IconName =
   | "users"
   | "store"
   | "logout"
-  | "collapse"
-  | "external"
-  | "bell";
+  | "bell"
+  | "sun"
+  | "moon";
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
     dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
     products: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v9"/></>,
-    orders: <><path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h4"/></>,
+    orders: <><rect x="5" y="6" width="14" height="14" rx="2"/><path d="M9 6V4h6v2"/><path d="M9 11h6"/><path d="M9 15h4"/></>,
     users: <><circle cx="9" cy="8" r="3"/><path d="M4 20c0-3 2.2-5 5-5s5 2 5 5M17 7v6M14 10h6"/></>,
     store: <><path d="M4 9h16l-2-5H6L4 9Z"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
     logout: <><path d="M10 5H5v14h5M13 8l4 4-4 4M17 12H9"/></>,
-    collapse: <><path d="m14 7-5 5 5 5"/></>,
-    external: <><path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v6H5V5h6"/></>,
-    bell: <><path d="M6 17h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v5L6 17Z"/><path d="M10 20h4"/></>
+    bell: <><path d="M6 17h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v5L6 17Z"/><path d="M10 20h4"/></>,
+    sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></>,
+    moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>
   };
 
   return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
@@ -51,20 +51,43 @@ function initials(name: string): string {
   );
 }
 
+function readTheme(): "light" | "dark" {
+  const stored = window.localStorage.getItem("rp-admin-theme");
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function readNotificationsEnabled(): boolean {
+  if (!("Notification" in window)) return false;
+  const stored = window.localStorage.getItem("rp-admin-notifications-enabled");
+  if (stored === "0") return false;
+  return Notification.permission === "granted";
+}
+
 export function AdminShell({ session, activePage, title, subtitle, onNavigate, children }: Props) {
   const { user, logout, loggingOut, logoutError } = session;
-  const [collapsed, setCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(readNotificationsEnabled);
+  const [theme, setTheme] = useState<"light" | "dark">(readTheme);
   const profileRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!profileOpen) return;
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("rp-admin-theme", theme);
+  }, [theme]);
 
+  useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
-      if (!profileRef.current?.contains(event.target as Node)) setProfileOpen(false);
+      const target = event.target as Node;
+      if (profileOpen && !profileRef.current?.contains(target)) setProfileOpen(false);
+      if (notificationOpen && !notificationRef.current?.contains(target)) setNotificationOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setProfileOpen(false);
+      if (event.key !== "Escape") return;
+      setProfileOpen(false);
+      setNotificationOpen(false);
     };
 
     window.addEventListener("pointerdown", handlePointerDown);
@@ -73,7 +96,7 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [profileOpen]);
+  }, [notificationOpen, profileOpen]);
 
   const navItems = [
     { key: "dashboard", label: "Dashboard", icon: "dashboard" },
@@ -87,15 +110,32 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
     if (key !== activePage) onNavigate(key);
   }
 
+  async function toggleNotifications() {
+    if (!("Notification" in window)) return;
+
+    if (notificationsEnabled) {
+      window.localStorage.setItem("rp-admin-notifications-enabled", "0");
+      setNotificationsEnabled(false);
+      return;
+    }
+
+    const permission = Notification.permission === "granted"
+      ? "granted"
+      : await Notification.requestPermission();
+
+    const enabled = permission === "granted";
+    window.localStorage.setItem("rp-admin-notifications-enabled", enabled ? "1" : "0");
+    setNotificationsEnabled(enabled);
+  }
+
+  const wide = activePage === "dashboard" || activePage === "produtos";
+
   return (
-    <div className={`${styles.app} ${collapsed ? styles.collapsed : ""}`}>
+    <div className={styles.app}>
       <aside className={styles.sidebar}>
-        <div className={styles.brand}>
-          <span className={styles.brandMark}>R&amp;P</span>
-          <span className={styles.brandCopy}>
-            <strong>R&amp;P <em>Doces</em></strong>
-            <small>Painel administrativo</small>
-          </span>
+        <div className={styles.brand} aria-label="R&P Doces">
+          <div className={styles.brandRp}>R&amp;P</div>
+          <div className={styles.brandDoces}>DOCES</div>
         </div>
 
         <nav className={styles.nav} aria-label="Navegação principal">
@@ -107,7 +147,6 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
                 type="button"
                 className={`${styles.navItem} ${active ? styles.navActive : ""}`}
                 aria-current={active ? "page" : undefined}
-                title={active ? undefined : `Abrir ${item.label} no Admin V2`}
                 onClick={() => navigate(item.key)}
               >
                 <span className={styles.navIcon}><Icon name={item.icon} /></span>
@@ -117,69 +156,97 @@ export function AdminShell({ session, activePage, title, subtitle, onNavigate, c
           })}
         </nav>
 
-        <div className={styles.sidebarFooter}>
-          <button className={styles.collapseButton} type="button" onClick={() => setCollapsed(value => !value)}>
-            <span className={styles.navIcon}><Icon name="collapse" /></span>
-            <span>Recolher</span>
+        <div className={styles.navSpacer} />
+
+        <div className={styles.notificationWrap} ref={notificationRef}>
+          <button
+            className={styles.utilityButton}
+            type="button"
+            aria-label="Notificações"
+            aria-expanded={notificationOpen}
+            onClick={() => setNotificationOpen(open => !open)}
+          >
+            <span className={styles.navIcon}><Icon name="bell" /></span>
+            <span className={styles.navLabel}>Notificações</span>
+            {notificationsEnabled ? <span className={styles.notificationDot} /> : null}
           </button>
+
+          {notificationOpen ? (
+            <div className={styles.notificationPopover} role="dialog" aria-label="Notificações">
+              <h3>Notificações</h3>
+              <p>Receba um aviso quando um novo pedido for pago.</p>
+              <div className={`${styles.notificationStatus} ${notificationsEnabled ? "" : styles.notificationStatusOff}`}>
+                <strong>{notificationsEnabled ? "Ativas neste navegador" : "Desativadas neste navegador"}</strong>
+                <span>
+                  {notificationsEnabled
+                    ? "Você receberá avisos de novos pedidos pagos."
+                    : "Ative para permitir avisos neste navegador."}
+                </span>
+              </div>
+              <button className={styles.notificationAction} type="button" onClick={() => void toggleNotifications()}>
+                {notificationsEnabled ? "Desativar notificações" : "Ativar notificações"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        <button
+          className={styles.utilityButton}
+          type="button"
+          aria-label="Alternar tema claro/escuro"
+          onClick={() => setTheme(current => current === "dark" ? "light" : "dark")}
+        >
+          <span className={styles.navIcon}><Icon name={theme === "dark" ? "moon" : "sun"} /></span>
+          <span className={styles.navLabel}>Tema</span>
+        </button>
+
+        <div className={styles.profileWrap} ref={profileRef}>
+          <button
+            className={styles.profile}
+            type="button"
+            aria-label="Abrir menu da conta"
+            aria-expanded={profileOpen}
+            onClick={() => setProfileOpen(open => !open)}
+          >
+            {user.avatar_url
+              ? <img className={styles.avatarImage} src={user.avatar_url} alt="" />
+              : <span className={styles.avatar}>{initials(user.nome)}</span>}
+            <span className={styles.profileText}>
+              <span className={styles.profileName}>{user.nome}</span>
+              <span className={styles.profileRole}>{user.papel}</span>
+            </span>
+            <span className={styles.profileCaret}>⌄</span>
+          </button>
+
+          {profileOpen ? (
+            <div className={styles.profileMenu} role="menu">
+              <div className={styles.profileMenuIdentity}>
+                <strong>{user.nome}</strong>
+                <span>@{user.username} · {user.papel}</span>
+                {user.email ? <small>{user.email}</small> : null}
+              </div>
+              <button className={styles.profileMenuLogout} type="button" role="menuitem" onClick={() => void logout()} disabled={loggingOut}>
+                <Icon name="logout" />
+                {loggingOut ? "Saindo…" : "Sair da conta"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </aside>
 
-      <div className={styles.main}>
-        <header className={styles.topbar}>
-          <div className={styles.pageTitle}>
-            <h1>{title}<span className={styles.v2Badge}>V2</span></h1>
-            <p>{subtitle}</p>
-          </div>
-
-          <div className={styles.topbarActions}>
-            <a className={styles.iconButton} href="/" target="_blank" rel="noopener noreferrer" title="Abrir site público" aria-label="Abrir site público">
-              <Icon name="external" />
-            </a>
-            <button className={styles.iconButton} type="button" title="Notificações permanecem no Admin atual durante a migração" aria-label="Notificações" disabled>
-              <Icon name="bell" />
-            </button>
-
-            <div className={styles.profileWrap} ref={profileRef}>
-              <button
-                className={`${styles.profile} ${profileOpen ? styles.profileOpen : ""}`}
-                type="button"
-                aria-label="Abrir menu da conta"
-                aria-expanded={profileOpen}
-                onClick={() => setProfileOpen(open => !open)}
-              >
-                {user.avatar_url ? <img className={styles.avatar} src={user.avatar_url} alt="" /> : <span className={styles.avatarFallback} aria-hidden="true">{initials(user.nome)}</span>}
-                <span className={styles.profileCopy}>
-                  <strong>{user.nome}</strong>
-                  <small>{user.papel}</small>
-                </span>
-                <span className={styles.profileChevron} aria-hidden="true" />
-              </button>
-
-              {profileOpen ? (
-                <div className={styles.profileMenu} role="menu">
-                  <div className={styles.profileMenuIdentity}>
-                    <strong>{user.nome}</strong>
-                    <span>@{user.username} · {user.papel}</span>
-                    {user.email ? <small>{user.email}</small> : null}
-                  </div>
-                  <div className={styles.profileMenuActions}>
-                    <button className={styles.profileMenuLogout} type="button" role="menuitem" onClick={() => void logout()} disabled={loggingOut}>
-                      <Icon name="logout" />
-                      {loggingOut ? "Saindo…" : "Sair da conta"}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+      <main className={styles.content}>
+        <div className={`${styles.workspace} ${wide ? styles.workspaceWide : ""}`}>
+          <header className={styles.pageHeader}>
+            <div className={styles.pageTitleBlock}>
+              <h1>{title}</h1>
+              <p>{subtitle}</p>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <main className={styles.content}>
           {logoutError ? <div className={styles.logoutError} role="alert">{logoutError}</div> : null}
           {children}
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
