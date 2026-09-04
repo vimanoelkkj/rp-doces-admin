@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
+import { usePageScrollLock } from "../shared/usePageScrollLock";
 import {
   availableStock,
   currentPriceCents,
@@ -24,22 +25,14 @@ export function ProductPreviewDialog({ product, onClose }: Props) {
   const currentPrice = currentPriceCents(product);
   const hasActivePromo = promoState === "active" && currentPrice !== product.preco_centavos;
 
-  useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
+  usePageScrollLock(true);
 
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   const dialog = (
