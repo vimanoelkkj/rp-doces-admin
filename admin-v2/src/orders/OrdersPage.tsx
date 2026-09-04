@@ -363,14 +363,9 @@ export function OrdersPage({ session, onNavigate }: Props) {
     todos: orders.length,
     hoje: orders.filter(order => isToday(order.criado_em)).length,
     producao: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "PREPARANDO").length,
-    prontos: orders.filter(order => String(order.status_pedido || "").toUpperCase()) === "PRONTO" ? 0 : 0,
+    prontos: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "PRONTO").length,
     entregues: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "ENTREGUE").length
   }), [orders]);
-
-  const fixedCounts = useMemo(() => ({
-    ...counts,
-    prontos: orders.filter(order => String(order.status_pedido || "").toUpperCase() === "PRONTO").length
-  }), [counts, orders]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
@@ -515,7 +510,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
                     style={mobileFilterSelectStyle}
                     options={FILTER_OPTIONS.map(([key, label]) => ({
                       value: key,
-                      label: `${label} · ${fixedCounts[key]}`
+                      label: `${label} · ${counts[key]}`
                     }))}
                     onChange={value => setFilter(value)}
                   />
@@ -529,7 +524,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
                       className={cls("filter", filter === key && "active")}
                       onClick={() => setFilter(key)}
                     >
-                      {label} <span className={styles.count}>{fixedCounts[key]}</span>
+                      {label} <span className={styles.count}>{counts[key]}</span>
                     </button>
                   ))}
                 </div>
@@ -837,7 +832,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
             setFilter("todos");
             setPage(1);
             await reload();
-            closeDrawer();
+            setDrawerOpen(false);
             setActiveTab("pedido");
             setEditing(false);
             closeManualOrder();
