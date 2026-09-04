@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DateTimeField } from "../shared/DateTimeField";
 import { MoneyInput } from "../shared/MoneyInput";
+import { usePageScrollLock } from "../shared/usePageScrollLock";
 import { CategorySelect, type CategorySelectOption } from "./CategorySelect";
 import {
   createProduct,
@@ -105,6 +106,8 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
     ...categories.map(category => ({ value: category.id, label: `${category.emoji} ${category.nome}`.trim() }))
   ];
 
+  usePageScrollLock(true);
+
   useEffect(() => {
     setCategoriesLoaded(false);
     listCategories()
@@ -170,6 +173,20 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
     }
     onClose();
   }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (confirmingDiscard) {
+        continueEditing();
+        return;
+      }
+      requestClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [confirmingDiscard, operationBusy, hasUnsavedChanges, onClose]);
 
   function changeStock(delta: number) {
     setFormDirty(true);
@@ -245,8 +262,23 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
   const imageProductId = product?.id ?? createdProductId;
 
   return (
-    <div className={styles.overlay} role="presentation" onMouseDown={event => event.target === event.currentTarget && requestClose()}>
-      <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="product-title">
+    <div
+      className={styles.overlay}
+      role="presentation"
+      onClick={event => {
+        if (event.target !== event.currentTarget) return;
+        event.preventDefault();
+        event.stopPropagation();
+        requestClose();
+      }}
+    >
+      <section
+        className={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-title"
+        onClick={event => event.stopPropagation()}
+      >
         <header>
           <div>
             <small>Catálogo</small>
@@ -285,7 +317,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
                 setForm(current => ({ ...current, categoria: value }));
               }}
             />
-            {productUsesUnavailableCategory && <small>A categoria atual foi desativada. Escolha outra categoria para salvar alterações.</small>}
+            {productUsesUnavailableCategory && <small>A categoria atual está inativa. Escolha outra categoria para salvar alterações.</small>}
           </label>
 
           <label>
