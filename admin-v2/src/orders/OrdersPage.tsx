@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type Rea
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
 import { ApiClientError } from "../shared/apiClient";
+import { AdminSelect } from "../shared/AdminSelect";
 import {
   listOrders,
   updateManualPayment,
@@ -49,6 +50,9 @@ const FILTER_OPTIONS: Array<[FilterKey, string]> = [
 const editSelectStyle: CSSProperties = {
   width: "100%",
   height: 40,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
   border: "1px solid var(--line-strong)",
   borderRadius: 9,
   padding: "0 12px",
@@ -56,7 +60,16 @@ const editSelectStyle: CSSProperties = {
   color: "var(--text)",
   font: "inherit",
   fontSize: 12,
-  outline: "none"
+  outline: "none",
+  textAlign: "left"
+};
+
+const mobileFilterSelectStyle: CSSProperties = {
+  ...editSelectStyle,
+  minWidth: 0,
+  borderRadius: 10,
+  padding: "0 12px",
+  fontWeight: 700
 };
 
 function Icon({ name, className }: { name: IconName; className?: string }) {
@@ -461,18 +474,19 @@ export function OrdersPage({ session, onNavigate }: Props) {
               </header>
 
               <div className={styles["orders-card"]} aria-busy={loading}>
-                <label className={styles["mobile-filter"]}>
+                <div className={styles["mobile-filter"]}>
                   <span>Filtrar pedidos</span>
-                  <select
+                  <AdminSelect
                     value={filter}
-                    aria-label="Filtrar pedidos"
-                    onChange={event => setFilter(event.target.value as FilterKey)}
-                  >
-                    {FILTER_OPTIONS.map(([key, label]) => (
-                      <option key={key} value={key}>{label} · {counts[key]}</option>
-                    ))}
-                  </select>
-                </label>
+                    ariaLabel="Filtrar pedidos"
+                    style={mobileFilterSelectStyle}
+                    options={FILTER_OPTIONS.map(([key, label]) => ({
+                      value: key,
+                      label: `${label} · ${counts[key]}`
+                    }))}
+                    onChange={value => setFilter(value)}
+                  />
+                </div>
 
                 <div className={styles.filters}>
                   {FILTER_OPTIONS.map(([key, label]) => (
@@ -632,31 +646,27 @@ export function OrdersPage({ session, onNavigate }: Props) {
                       <>
                         <section className={styles["drawer-section"]}>
                           <h3 className={styles["section-title"]}>Status do pedido</h3>
-                          <select
+                          <AdminSelect
                             value={draftStatus}
-                            onChange={event => setDraftStatus(event.target.value as OrderStatus)}
+                            ariaLabel="Status do pedido"
                             style={editSelectStyle}
                             disabled={savingEdit}
-                          >
-                            {ORDER_STATUS_OPTIONS.map(([value, label]) => (
-                              <option key={value} value={value}>{label}</option>
-                            ))}
-                          </select>
+                            options={ORDER_STATUS_OPTIONS.map(([value, label]) => ({ value, label }))}
+                            onChange={value => setDraftStatus(value)}
+                          />
                         </section>
 
                         <section className={styles["drawer-section"]}>
                           <h3 className={styles["section-title"]}>Pagamento</h3>
                           {selectedIsManual ? (
-                            <select
+                            <AdminSelect
                               value={draftPayment}
-                              onChange={event => setDraftPayment(event.target.value as ManualPaymentStatus)}
+                              ariaLabel="Status do pagamento"
                               style={editSelectStyle}
                               disabled={savingEdit}
-                            >
-                              {PAYMENT_STATUS_OPTIONS.map(([value, label]) => (
-                                <option key={value} value={value}>{label}</option>
-                              ))}
-                            </select>
+                              options={PAYMENT_STATUS_OPTIONS.map(([value, label]) => ({ value, label }))}
+                              onChange={value => setDraftPayment(value)}
+                            />
                           ) : (
                             <div className={styles.note}>O pagamento deste pedido é controlado pela comanda financeira.</div>
                           )}
