@@ -1,32 +1,55 @@
-const MOBILE_QUERY = "(max-width: 760px)";
-const FILTER_SELECTOR = 'select[aria-label="Filtrar pedidos"]';
-const OVERLAY_ID = "rp-mobile-order-filter";
+const SELECT_SELECTOR = "select:not([multiple])";
+const OVERLAY_ID = "rp-native-select-menu";
 
 let activeSelect: HTMLSelectElement | null = null;
-let resizeHandler: (() => void) | null = null;
+let repositionHandler: (() => void) | null = null;
 
-function closeMenu(): void {
+function selectLabel(select: HTMLSelectElement): string {
+  const ariaLabel = select.getAttribute("aria-label")?.trim();
+  if (ariaLabel) return ariaLabel;
+
+  if (select.id) {
+    const label = document.querySelector<HTMLLabelElement>(`label[for="${CSS.escape(select.id)}"]`);
+    const text = label?.textContent?.trim();
+    if (text) return text;
+  }
+
+  const wrappingLabel = select.closest("label")?.textContent?.trim();
+  return wrappingLabel || select.name || "Selecionar opção";
+}
+
+function closeMenu({ restoreFocus = false }: { restoreFocus?: boolean } = {}): void {
+  const previousSelect = activeSelect;
   document.getElementById(OVERLAY_ID)?.remove();
   activeSelect = null;
-  if (resizeHandler) {
-    window.removeEventListener("resize", resizeHandler);
-    window.removeEventListener("scroll", resizeHandler, true);
-    resizeHandler = null;
+
+  if (repositionHandler) {
+    window.removeEventListener("resize", repositionHandler);
+    window.removeEventListener("scroll", repositionHandler, true);
+    repositionHandler = null;
+  }
+
+  if (restoreFocus && previousSelect && document.body.contains(previousSelect)) {
+    requestAnimationFrame(() => previousSelect.focus({ preventScroll: true }));
   }
 }
 
 function positionMenu(select: HTMLSelectElement, menu: HTMLElement): void {
   const rect = select.getBoundingClientRect();
+  const mobile = window.matchMedia("(max-width: 760px)").matches;
   const gap = 8;
-  const viewportPadding = 12;
-  const menuHeight = Math.min(menu.scrollHeight, window.innerHeight * 0.62);
+  const viewportPadding = mobile ? 12 : 10;
+  const availableWidth = window.innerWidth - viewportPadding * 2;
+  const requestedWidth = Math.max(rect.width, mobile ? 220 : 200);
+  const width = Math.min(requestedWidth, availableWidth);
+  const maxMenuHeight = Math.min(menu.scrollHeight, window.innerHeight * (mobile ? 0.58 : 0.5));
   const roomBelow = window.innerHeight - rect.bottom - viewportPadding;
   const roomAbove = rect.top - viewportPadding;
-  const placeAbove = roomBelow < menuHeight && roomAbove > roomBelow;
+  const placeAbove = roomBelow < Math.min(maxMenuHeight, 240) && roomAbove > roomBelow;
 
-  menu.style.left = `${Math.max(viewportPadding, rect.left)}px`;
-  menu.style.width = `${Math.min(rect.width, window.innerWidth - viewportPadding * 2)}px`;
-  menu.style.maxHeight = `${Math.max(180, placeAbove ? roomAbove - gap : roomBelow - gap)}px`;
+  menu.style.width = `${width}px`;
+  menu.style.left = `${Math.min(Math.max(viewportPadding, rect.left), window.innerWidth - width - viewportPadding)}px`;
+  menu.style.maxHeight = `${Math.max(160, Math.min(maxMenuHeight, placeAbove ? roomAbove - gap : roomBelow - gap))}px`;
 
   if (placeAbove) {
     menu.style.top = "auto";
@@ -37,15 +60,18 @@ function positionMenu(select: HTMLSelectElement, menu: HTMLElement): void {
   }
 }
 
-function setNativeSelectValue(select: HTMLSelectElement, value: string): void {
+function setSelectValue(select: HTMLSelectElement, value: string): void {
   const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
   if (setter) setter.call(select, value);
   else select.value = value;
+
+  select.dispatchEvent(new Event("input", { bubbles: true }));
   select.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function openMenu(select: HTMLSelectElement): void {
-  if (!window.matchMedia(MOBILE_QUERY).matches) return;
+  if (select.disabled) return;
+
   closeMenu();
   activeSelect = select;
 
@@ -56,18 +82,19 @@ function openMenu(select: HTMLSelectElement): void {
   const dismiss = document.createElement("button");
   dismiss.type = "button";
   dismiss.className = "rp-mobile-filter-backdrop";
-  dismiss.setAttribute("aria-label", "Fechar filtros");
-  dismiss.addEventListener("click", closeMenu);
+  dismiss.setAttribute("aria-label", "Fechar seletor");
+  dismiss.addEventListener("click", () => closeMenu({ restoreFocus: true }));
 
   const menu = document.createElement("div");
   menu.className = "rp-mobile-filter-menu";
   menu.setAttribute("role", "listbox");
-  menu.setAttribute("aria-label", "Filtrar pedidos");
+  menu.setAttribute("aria-label", selectLabel(select));
 
   Array.from(select.options).forEach(option => {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "rp-mobile-filter-option";
+    item.disabled = option.disabled;
     item.setAttribute("role", "option");
     item.setAttribute("aria-selected", option.value === select.value ? "true" : "false");
 
@@ -79,10 +106,12 @@ function openMenu(select: HTMLSelectElement): void {
     marker.setAttribute("aria-hidden", "true");
 
     item.append(label, marker);
-    item.addEventListener("click", () => {
-      setNativeSelectValue(select, option.value);
-      closeMenu();
-      select.focus({ preventScroll: true });
+    item.addEventListener("click", event => {
+      event.stopPropagation();
+      if (option.disabled) return;
+      const changed = option.value !== select.value;
+      if (changed) setSelectValue(select, option.value);
+      closeMenu({ restoreFocus: true });
     });
     menu.appendChild(item);
   });
@@ -91,40 +120,45 @@ function openMenu(select: HTMLSelectElement): void {
   document.body.appendChild(overlay);
   positionMenu(select, menu);
 
-  resizeHandler = () => {
+  repositionHandler = () => {
     if (!activeSelect || !document.body.contains(activeSelect)) {
       closeMenu();
       return;
     }
     positionMenu(activeSelect, menu);
   };
-  window.addEventListener("resize", resizeHandler, { passive: true });
-  window.addEventListener("scroll", resizeHandler, true);
+
+  window.addEventListener("resize", repositionHandler, { passive: true });
+  window.addEventListener("scroll", repositionHandler, true);
 }
 
-function onPointerDown(event: PointerEvent): void {
-  if (!window.matchMedia(MOBILE_QUERY).matches) return;
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement) || !target.matches(FILTER_SELECTOR)) return;
+function isEnhancedSelect(target: EventTarget | null): target is HTMLSelectElement {
+  return target instanceof HTMLSelectElement && target.matches(SELECT_SELECTOR);
+}
+
+// Usamos click, e não pointerdown. Abrir o overlay durante pointerdown fazia o
+// pointerup/click do mesmo toque cair no backdrop recém-criado e fechar o menu
+// imediatamente em alguns Chromiums/Androids.
+function onClick(event: MouseEvent): void {
+  if (!isEnhancedSelect(event.target)) return;
   event.preventDefault();
   event.stopPropagation();
-  openMenu(target);
+  openMenu(event.target);
 }
 
 function onKeyDown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
-    closeMenu();
+    closeMenu({ restoreFocus: true });
     return;
   }
 
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement) || !target.matches(FILTER_SELECTOR)) return;
-  if (!window.matchMedia(MOBILE_QUERY).matches) return;
-  if (event.key !== "Enter" && event.key !== " " && event.key !== "ArrowDown") return;
+  if (!isEnhancedSelect(event.target)) return;
+  if (event.key !== "Enter" && event.key !== " " && event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   event.preventDefault();
-  openMenu(target);
+  event.stopPropagation();
+  openMenu(event.target);
 }
 
-document.addEventListener("pointerdown", onPointerDown, true);
+document.addEventListener("click", onClick, true);
 document.addEventListener("keydown", onKeyDown, true);
-window.addEventListener("pagehide", closeMenu);
+window.addEventListener("pagehide", () => closeMenu());
