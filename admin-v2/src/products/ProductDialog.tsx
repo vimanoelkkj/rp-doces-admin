@@ -216,6 +216,11 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
       return;
     }
 
+    if ((product || createdProductId) && !hasUnsavedChanges) {
+      closeLayer();
+      return;
+    }
+
     const parsed = ProductInputSchema.safeParse(form);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message || "Revise os dados do produto.");
