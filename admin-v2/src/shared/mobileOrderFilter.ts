@@ -3,6 +3,8 @@ const OVERLAY_ID = "rp-native-select-menu";
 
 let activeSelect: HTMLSelectElement | null = null;
 let repositionHandler: (() => void) | null = null;
+let suppressOpeningClick = false;
+let suppressResetTimer: number | null = null;
 
 function selectLabel(select: HTMLSelectElement): string {
   const ariaLabel = select.getAttribute("aria-label")?.trim();
@@ -16,6 +18,20 @@ function selectLabel(select: HTMLSelectElement): string {
 
   const wrappingLabel = select.closest("label")?.textContent?.trim();
   return wrappingLabel || select.name || "Selecionar opção";
+}
+
+function clearSuppressResetTimer(): void {
+  if (suppressResetTimer === null) return;
+  window.clearTimeout(suppressResetTimer);
+  suppressResetTimer = null;
+}
+
+function releaseOpeningClickAfterCurrentGesture(): void {
+  clearSuppressResetTimer();
+  suppressResetTimer = window.setTimeout(() => {
+    suppressResetTimer = null;
+    suppressOpeningClick = false;
+  }, 0);
 }
 
 function closeMenu({ restoreFocus = false }: { restoreFocus?: boolean } = {}): void {
@@ -70,7 +86,7 @@ function setSelectValue(select: HTMLSelectElement, value: string): void {
 }
 
 function openMenu(select: HTMLSelectElement): void {
-  if (select.disabled) return;
+  if (select.disabled || !document.body.contains(select)) return;
 
   closeMenu();
   activeSelect = select;
@@ -83,7 +99,14 @@ function openMenu(select: HTMLSelectElement): void {
   dismiss.type = "button";
   dismiss.className = "rp-mobile-filter-backdrop";
   dismiss.setAttribute("aria-label", "Fechar seletor");
-  dismiss.addEventListener("click", () => closeMenu({ restoreFocus: true }));
+  dismiss.addEventListener("click", event => {
+    if (suppressOpeningClick) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    closeMenu({ restoreFocus: true });
+  });
 
   const menu = document.createElement("div");
   menu.className = "rp-mobile-filter-menu";
@@ -136,14 +159,39 @@ function isEnhancedSelect(target: EventTarget | null): target is HTMLSelectEleme
   return target instanceof HTMLSelectElement && target.matches(SELECT_SELECTOR);
 }
 
-// Usamos click, e não pointerdown. Abrir o overlay durante pointerdown fazia o
-// pointerup/click do mesmo toque cair no backdrop recém-criado e fechar o menu
-// imediatamente em alguns Chromiums/Androids.
-function onClick(event: MouseEvent): void {
-  if (!isEnhancedSelect(event.target)) return;
+// O picker nativo pode ser disparado antes do click em navegadores mobile.
+// Cancelamos o gesto já no pointerdown e abrimos o menu custom imediatamente.
+// O click gerado pelo mesmo gesto é ignorado pelo backdrop até o próximo task,
+// evitando que o overlay recém-criado se feche sozinho.
+function onPointerDown(event: PointerEvent): void {
+  if (!isEnhancedSelect(event.target) || event.target.disabled) return;
+
   event.preventDefault();
   event.stopPropagation();
+  clearSuppressResetTimer();
+  suppressOpeningClick = true;
   openMenu(event.target);
+}
+
+function onPointerUp(): void {
+  if (!suppressOpeningClick) return;
+  releaseOpeningClickAfterCurrentGesture();
+}
+
+function onPointerCancel(): void {
+  clearSuppressResetTimer();
+  suppressOpeningClick = false;
+}
+
+function onClick(event: MouseEvent): void {
+  if (!isEnhancedSelect(event.target)) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  // Cliques de teclado/sintéticos não passam necessariamente por pointerdown.
+  // O click residual do gesto que já abriu o menu não deve abri-lo de novo.
+  if (!suppressOpeningClick) openMenu(event.target);
 }
 
 function onKeyDown(event: KeyboardEvent): void {
@@ -159,6 +207,9 @@ function onKeyDown(event: KeyboardEvent): void {
   openMenu(event.target);
 }
 
+document.addEventListener("pointerdown", onPointerDown, true);
+document.addEventListener("pointerup", onPointerUp, true);
+document.addEventListener("pointercancel", onPointerCancel, true);
 document.addEventListener("click", onClick, true);
 document.addEventListener("keydown", onKeyDown, true);
 window.addEventListener("pagehide", () => closeMenu());
