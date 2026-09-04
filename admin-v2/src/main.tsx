@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./tokens.css";
 import "./shared/mobileOverlayScrollLock";
+import "./shared/themeChrome";
 
 const storedTheme = window.localStorage.getItem("rp-admin-theme");
 if (storedTheme === "light" || storedTheme === "dark") {
