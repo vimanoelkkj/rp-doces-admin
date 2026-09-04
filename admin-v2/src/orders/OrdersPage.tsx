@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { AuthSession } from "../auth/AuthGate";
-import type { AdminV2Page } from "../layout/AdminShell";
+import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
 import { ApiClientError } from "../shared/apiClient";
 import {
   listOrders,
@@ -22,18 +22,7 @@ type Props = {
 
 type FilterKey = "todos" | "hoje" | "producao" | "prontos" | "entregues";
 type DrawerTab = "pedido" | "comanda";
-type IconName =
-  | "home"
-  | "orders"
-  | "products"
-  | "clients"
-  | "payments"
-  | "settings"
-  | "search"
-  | "bag"
-  | "truck"
-  | "receipt"
-  | "edit";
+type IconName = "search" | "bag" | "truck" | "receipt" | "edit";
 
 const ORDER_STATUS_OPTIONS: Array<[OrderStatus, string]> = [
   ["NOVO", "Pendente"],
@@ -64,12 +53,6 @@ const editSelectStyle: CSSProperties = {
 
 function Icon({ name, className }: { name: IconName; className?: string }) {
   const paths: Record<IconName, ReactNode> = {
-    home: <><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9.5 20v-6h5v6"/></>,
-    orders: <><rect x="5" y="6" width="14" height="14" rx="2"/><path d="M9 6V4h6v2"/><path d="M9 11h6"/><path d="M9 15h4"/></>,
-    products: <><path d="M4 8h16"/><path d="M6 8V5h12v3"/><rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 8v11"/></>,
-    clients: <><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.4-3.5 2.3-5.3 5.5-5.3S14 15.5 14.5 19"/><path d="M16 6.5a3 3 0 0 1 0 5.8"/><path d="M17.5 14.2c2 .8 3 2.3 3 4.8"/></>,
-    payments: <><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M4 10h16"/><path d="M15 14h3"/></>,
-    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7l2.8-2.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1z"/></>,
     search: <><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></>,
     bag: <><path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></>,
     truck: <><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/></>,
@@ -82,10 +65,6 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
 
 function cls(...names: Array<string | false | null | undefined>) {
   return names.filter(Boolean).map(name => styles[name as string]).join(" ");
-}
-
-function initials(name: string) {
-  return name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() ?? "").join("") || "RP";
 }
 
 function money(cents?: number | null) {
@@ -204,7 +183,9 @@ function OrderRow({
       }}
     >
       <div className={styles["order-id"]}>#{order.id}</div>
-      <div className={styles.stack}><span className={styles.primary}>{order.cliente_nome || "Cliente não informado"}</span></div>
+      <div className={styles.stack}>
+        <span className={styles.primary}>{order.cliente_nome || "Cliente não informado"}</span>
+      </div>
       <div className={styles.stack}>
         <span>{product.first}</span>
         {product.extra > 0 ? <span className={styles.secondary}>+ {product.extra} itens</span> : null}
@@ -213,14 +194,22 @@ function OrderRow({
         {comanda ? (
           <>
             <span>Comanda {comandaNumber(order)}</span>
-            <span className={cls("dotline", comanda === "Aberta" ? "open" : "closed")}><span className={styles.dot}/>{comanda}</span>
+            <span className={cls("dotline", comanda === "Aberta" ? "open" : "closed")}>
+              <span className={styles.dot}/>{comanda}
+            </span>
           </>
         ) : (
-          <><span className={styles.secondary} style={{ margin: 0 }}>Sem comanda</span><span className={styles.secondary}>—</span></>
+          <>
+            <span className={styles.secondary} style={{ margin: 0 }}>Sem comanda</span>
+            <span className={styles.secondary}>—</span>
+          </>
         )}
       </div>
       <div className={styles.stack}>
-        <span><Icon name={delivery === "Entrega" ? "truck" : "bag"} className={styles["row-ico"]}/>{scheduleLabel(order)}</span>
+        <span>
+          <Icon name={delivery === "Entrega" ? "truck" : "bag"} className={styles["row-ico"]}/>
+          {scheduleLabel(order)}
+        </span>
         <span className={styles.secondary}>{delivery}</span>
       </div>
       <div><span className={cls("tag", status.tone)}>{status.label}</span></div>
@@ -236,14 +225,21 @@ function OrderRow({
       <div className={styles.chev}>›</div>
 
       <div className={styles["mobile-main"]}>
-        <div className={styles["mobile-title-line"]}><span className={styles["order-id"]}>#{order.id}</span><span className={styles.primary}>{order.cliente_nome || "Cliente não informado"}</span></div>
+        <div className={styles["mobile-title-line"]}>
+          <span className={styles["order-id"]}>#{order.id}</span>
+          <span className={styles.primary}>{order.cliente_nome || "Cliente não informado"}</span>
+        </div>
         <div className={styles["mobile-meta"]}>{product.first}{product.extra > 0 ? ` · +${product.extra} itens` : ""}</div>
-        <div className={styles["mobile-meta"]}>{scheduleLabel(order)} · {delivery} · {comanda ? `Comanda ${comandaNumber(order)} ${comanda.toLowerCase()}` : "Sem comanda"}</div>
+        <div className={styles["mobile-meta"]}>
+          {scheduleLabel(order)} · {delivery} · {comanda ? `Comanda ${comandaNumber(order)} ${comanda.toLowerCase()}` : "Sem comanda"}
+        </div>
         <div><span className={cls("tag", status.tone)}>{status.label}</span></div>
       </div>
       <div className={styles["mobile-right"]}>
         <span className={styles.money}>{money(order.valor_total_centavos)}</span>
-        {payment.paid ? <span className={styles["payment-ok"]}><span className={styles.check}>✓</span> Pago</span> : <span className={styles["payment-pending"]}>Pendente</span>}
+        {payment.paid
+          ? <span className={styles["payment-ok"]}><span className={styles.check}>✓</span> Pago</span>
+          : <span className={styles["payment-pending"]}>Pendente</span>}
         <span className={styles.chev}>›</span>
       </div>
     </div>
@@ -251,7 +247,6 @@ function OrderRow({
 }
 
 export function OrdersPage({ session, onNavigate }: Props) {
-  const { user } = session;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -287,18 +282,31 @@ export function OrdersPage({ session, onNavigate }: Props) {
     }
   }, []);
 
-  useEffect(() => { void reload(); }, [reload]);
-  useEffect(() => { setPage(1); }, [filter, query]);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, query]);
 
   useEffect(() => {
     if (!selected || activeTab !== "comanda") return;
     let alive = true;
     setFinancialLoading(true);
     void getFinancialOrder(selected.id)
-      .then(value => { if (alive) setFinancial(value); })
-      .catch(() => { if (alive) setFinancial(null); })
-      .finally(() => { if (alive) setFinancialLoading(false); });
-    return () => { alive = false; };
+      .then(value => {
+        if (alive) setFinancial(value);
+      })
+      .catch(() => {
+        if (alive) setFinancial(null);
+      })
+      .finally(() => {
+        if (alive) setFinancialLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, [selected, activeTab]);
 
   const counts = useMemo(() => ({
@@ -397,57 +405,18 @@ export function OrdersPage({ session, onNavigate }: Props) {
     }
   }
 
-  function navigate(event: MouseEvent<HTMLAnchorElement>, pageName?: AdminV2Page) {
-    event.preventDefault();
-    if (pageName) onNavigate(pageName);
-  }
-
   return (
-    <div className={styles.pageRoot}>
-      <div className={styles.app}>
-        <aside className={styles.sidebar}>
-          <div className={styles.brand}>
-            <div className={styles["brand-rp"]}>R&amp;P</div>
-            <div className={styles["brand-doces"]}>DOCES</div>
-          </div>
-
-          <nav className={styles.nav}>
-            <a className={styles["nav-item"]} href="#dashboard" onClick={event => navigate(event, "dashboard")}>
-              <span className={styles.ico}><Icon name="home"/></span><span>Início</span>
-            </a>
-            <a className={cls("nav-item", "active")} href="#pedidos" onClick={event => event.preventDefault()}>
-              <span className={styles.ico}><Icon name="orders"/></span><span>Pedidos</span>
-            </a>
-            <a className={styles["nav-item"]} href="#produtos" onClick={event => navigate(event, "produtos")}>
-              <span className={styles.ico}><Icon name="products"/></span><span>Produtos</span>
-            </a>
-            <a className={styles["nav-item"]} href="#" onClick={event => event.preventDefault()}>
-              <span className={styles.ico}><Icon name="clients"/></span><span>Clientes</span>
-            </a>
-            <a className={styles["nav-item"]} href="#" onClick={event => event.preventDefault()}>
-              <span className={styles.ico}><Icon name="payments"/></span><span>Pagamentos</span>
-            </a>
-
-            <div className={styles["nav-divider"]}/>
-
-            <a className={styles["nav-item"]} href="#" onClick={event => event.preventDefault()}>
-              <span className={styles.ico}><Icon name="settings"/></span><span>Configurações</span>
-            </a>
-          </nav>
-
-          <div className={styles["nav-spacer"]}/>
-
-          <div className={styles.profile}>
-            <div className={styles.avatar}>{initials(user.nome)}</div>
-            <div className={styles["profile-text"]}>
-              <div className={styles["profile-name"]}>{user.nome}</div>
-              <div className={styles["profile-role"]}>Administrador</div>
-            </div>
-            <div className={styles["profile-caret"]}>⌄</div>
-          </div>
-        </aside>
-
-        <main className={styles.content}>
+    <>
+      <AdminShell
+        session={session}
+        activePage="pedidos"
+        title="Pedidos"
+        subtitle="Acompanhe vendas, pagamentos e andamento"
+        onNavigate={onNavigate}
+        hideHeader
+        fullWidth
+      >
+        <div className={styles.pageRoot}>
           <div className={styles.workspace}>
             <section className={styles.main}>
               <header className={styles["page-header"]}>
@@ -521,7 +490,9 @@ export function OrdersPage({ session, onNavigate }: Props) {
                       />
                     ))}
 
-                    {!loading && visible.length === 0 ? <div className={styles.empty}>Nenhum pedido encontrado.</div> : null}
+                    {!loading && visible.length === 0
+                      ? <div className={styles.empty}>Nenhum pedido encontrado.</div>
+                      : null}
                   </div>
                 )}
 
@@ -532,7 +503,13 @@ export function OrdersPage({ session, onNavigate }: Props) {
                       : "Mostrando 0 pedidos"}
                   </span>
                   <div className={styles.pagination}>
-                    <button className={styles["page-btn"]} type="button" onClick={() => setPage(value => Math.max(1, value - 1))}>‹</button>
+                    <button
+                      className={styles["page-btn"]}
+                      type="button"
+                      onClick={() => setPage(value => Math.max(1, value - 1))}
+                    >
+                      ‹
+                    </button>
                     {Array.from({ length: pages }, (_, index) => index + 1).slice(0, 5).map(value => (
                       <button
                         key={value}
@@ -543,7 +520,13 @@ export function OrdersPage({ session, onNavigate }: Props) {
                         {value}
                       </button>
                     ))}
-                    <button className={styles["page-btn"]} type="button" onClick={() => setPage(value => Math.min(pages, value + 1))}>›</button>
+                    <button
+                      className={styles["page-btn"]}
+                      type="button"
+                      onClick={() => setPage(value => Math.min(pages, value + 1))}
+                    >
+                      ›
+                    </button>
                   </div>
                 </footer>
               </div>
@@ -561,18 +544,46 @@ export function OrdersPage({ session, onNavigate }: Props) {
                         {selectedStatus ? <span className={cls("tag", selectedStatus.tone)}>{selectedStatus.label}</span> : null}
                       </div>
                     </div>
-                    <button className={styles.close} type="button" aria-label="Fechar" onClick={() => { setDrawerOpen(false); setEditing(false); }}>×</button>
+                    <button
+                      className={styles.close}
+                      type="button"
+                      aria-label="Fechar"
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        setEditing(false);
+                      }}
+                    >
+                      ×
+                    </button>
                   </div>
 
                   <div className={styles["drawer-meta"]}>
-                    <span><Icon name={selectedDelivery === "Entrega" ? "truck" : "bag"} className={styles["row-ico"]}/>{scheduleLabel(selected)}</span>
+                    <span>
+                      <Icon name={selectedDelivery === "Entrega" ? "truck" : "bag"} className={styles["row-ico"]}/>
+                      {scheduleLabel(selected)}
+                    </span>
                     <span className={styles.bullet}/>
                     <span>{selectedDelivery}</span>
                   </div>
 
                   <div className={styles.tabs}>
-                    <button className={cls("tab", activeTab === "pedido" && "active")} type="button" onClick={() => setActiveTab("pedido")}>Pedido</button>
-                    <button className={cls("tab", activeTab === "comanda" && "active")} type="button" onClick={() => { setEditing(false); setActiveTab("comanda"); }}>Comanda</button>
+                    <button
+                      className={cls("tab", activeTab === "pedido" && "active")}
+                      type="button"
+                      onClick={() => setActiveTab("pedido")}
+                    >
+                      Pedido
+                    </button>
+                    <button
+                      className={cls("tab", activeTab === "comanda" && "active")}
+                      type="button"
+                      onClick={() => {
+                        setEditing(false);
+                        setActiveTab("comanda");
+                      }}
+                    >
+                      Comanda
+                    </button>
                   </div>
 
                   <div className={cls("pedido-panel", activeTab !== "pedido" && "hidden")}>
@@ -585,23 +596,40 @@ export function OrdersPage({ session, onNavigate }: Props) {
                           <span className={styles.price}>{money(item.valor_total_centavos)}</span>
                         </div>
                       ))}
-                      <div className={styles["total-row"]}><span>Total do pedido</span><span>{money(selected.valor_total_centavos)}</span></div>
+                      <div className={styles["total-row"]}>
+                        <span>Total do pedido</span>
+                        <span>{money(selected.valor_total_centavos)}</span>
+                      </div>
                     </section>
 
                     {editing ? (
                       <>
                         <section className={styles["drawer-section"]}>
                           <h3 className={styles["section-title"]}>Status do pedido</h3>
-                          <select value={draftStatus} onChange={event => setDraftStatus(event.target.value as OrderStatus)} style={editSelectStyle} disabled={savingEdit}>
-                            {ORDER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          <select
+                            value={draftStatus}
+                            onChange={event => setDraftStatus(event.target.value as OrderStatus)}
+                            style={editSelectStyle}
+                            disabled={savingEdit}
+                          >
+                            {ORDER_STATUS_OPTIONS.map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
                           </select>
                         </section>
 
                         <section className={styles["drawer-section"]}>
                           <h3 className={styles["section-title"]}>Pagamento</h3>
                           {selectedIsManual ? (
-                            <select value={draftPayment} onChange={event => setDraftPayment(event.target.value as ManualPaymentStatus)} style={editSelectStyle} disabled={savingEdit}>
-                              {PAYMENT_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            <select
+                              value={draftPayment}
+                              onChange={event => setDraftPayment(event.target.value as ManualPaymentStatus)}
+                              style={editSelectStyle}
+                              disabled={savingEdit}
+                            >
+                              {PAYMENT_STATUS_OPTIONS.map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
                             </select>
                           ) : (
                             <div className={styles.note}>O pagamento deste pedido é controlado pela comanda financeira.</div>
@@ -619,7 +647,9 @@ export function OrdersPage({ session, onNavigate }: Props) {
                           <h3 className={styles["section-title"]}>Pagamento</h3>
                           <div className={styles["payment-row"]}>
                             <div className={styles["payment-left"]}>
-                              {selectedPayment?.paid ? <span className={cls("tag", "green")}>✓ &nbsp; Pago</span> : <span className={cls("tag", "orange")}>Pendente</span>}
+                              {selectedPayment?.paid
+                                ? <span className={cls("tag", "green")}>✓ &nbsp; Pago</span>
+                                : <span className={cls("tag", "orange")}>Pendente</span>}
                               <span className={styles.method}>Método</span>
                             </div>
                             <div className={cls("payment-left", "payment-left-end")}>
@@ -639,41 +669,96 @@ export function OrdersPage({ session, onNavigate }: Props) {
 
                   <div className={cls("comanda-panel", activeTab === "comanda" && "active")}>
                     <section className={styles["drawer-section"]}>
-                      <h3 className={styles["section-title"]}>Comanda {comandaNumber(selected)} · {selectedComanda || "Aberta"}</h3>
-                      {financialLoading ? <div className={styles.note}>Carregando comanda...</div> : comandaItems.map((item, index) => {
-                        const itemWithFinance = item as { status_financeiro?: string; adicionado_por_usuario_id?: number | null };
-                        const status = String(itemWithFinance.status_financeiro || (selectedPayment?.paid ? "PAGO" : "PENDENTE")).toLowerCase();
-                        const source = itemWithFinance.adicionado_por_usuario_id ? "Adicionado depois" : `Pedido #${selected.id}`;
-                        return (
-                          <div className={styles["comanda-item"]} key={`${item.produto_id || "item"}-${index}`}>
-                            <div><strong>{item.produto_nome || "Produto"}</strong><div className={styles["comanda-status"]}>{source} · {status}</div></div>
-                            <div>{money(item.valor_total_centavos)}</div>
-                          </div>
-                        );
-                      })}
+                      <h3 className={styles["section-title"]}>
+                        Comanda {comandaNumber(selected)} · {selectedComanda || "Aberta"}
+                      </h3>
+                      {financialLoading ? (
+                        <div className={styles.note}>Carregando comanda...</div>
+                      ) : (
+                        comandaItems.map((item, index) => {
+                          const itemWithFinance = item as {
+                            status_financeiro?: string;
+                            adicionado_por_usuario_id?: number | null;
+                          };
+                          const status = String(
+                            itemWithFinance.status_financeiro || (selectedPayment?.paid ? "PAGO" : "PENDENTE")
+                          ).toLowerCase();
+                          const source = itemWithFinance.adicionado_por_usuario_id
+                            ? "Adicionado depois"
+                            : `Pedido #${selected.id}`;
+
+                          return (
+                            <div
+                              className={styles["comanda-item"]}
+                              key={`${item.produto_id || "item"}-${index}`}
+                            >
+                              <div>
+                                <strong>{item.produto_nome || "Produto"}</strong>
+                                <div className={styles["comanda-status"]}>{source} · {status}</div>
+                              </div>
+                              <div>{money(item.valor_total_centavos)}</div>
+                            </div>
+                          );
+                        })
+                      )}
                       <div className={styles["comanda-summary"]}>
-                        <div className={cls("summary-row", "total")}><span>Total da comanda</span><span>{money(financial?.valor_total_centavos ?? selected.valor_total_centavos)}</span></div>
-                        <div className={cls("summary-row", "paid")}><span>Pago</span><span>{money(paidCents)}</span></div>
-                        <div className={cls("summary-row", "pending")}><span>Pendente</span><span>{money(pendingCents)}</span></div>
+                        <div className={cls("summary-row", "total")}>
+                          <span>Total da comanda</span>
+                          <span>{money(financial?.valor_total_centavos ?? selected.valor_total_centavos)}</span>
+                        </div>
+                        <div className={cls("summary-row", "paid")}>
+                          <span>Pago</span>
+                          <span>{money(paidCents)}</span>
+                        </div>
+                        <div className={cls("summary-row", "pending")}>
+                          <span>Pendente</span>
+                          <span>{money(pendingCents)}</span>
+                        </div>
                       </div>
                     </section>
                   </div>
 
                   {activeTab === "pedido" && editing ? (
                     <div className={styles["drawer-actions"]}>
-                      {editError ? <div className={styles.note} role="alert" style={{ color: "var(--pink-strong)" }}>{editError}</div> : null}
-                      <button className={styles["primary-btn"]} type="button" disabled={savingEdit} onClick={() => void saveEditing()}>
+                      {editError ? (
+                        <div className={styles.note} role="alert" style={{ color: "var(--pink-strong)" }}>
+                          {editError}
+                        </div>
+                      ) : null}
+                      <button
+                        className={styles["primary-btn"]}
+                        type="button"
+                        disabled={savingEdit}
+                        onClick={() => void saveEditing()}
+                      >
                         {savingEdit ? "Salvando..." : "Salvar alterações"}
                       </button>
-                      <button className={styles["secondary-btn"]} type="button" disabled={savingEdit} onClick={cancelEditing}>Cancelar</button>
+                      <button
+                        className={styles["secondary-btn"]}
+                        type="button"
+                        disabled={savingEdit}
+                        onClick={cancelEditing}
+                      >
+                        Cancelar
+                      </button>
                     </div>
                   ) : (
                     <div className={styles["drawer-actions"]}>
-                      <button className={styles["primary-btn"]} type="button" onClick={() => setActiveTab("comanda")}>
+                      <button
+                        className={styles["primary-btn"]}
+                        type="button"
+                        onClick={() => setActiveTab("comanda")}
+                      >
                         <Icon name="receipt" className={styles["btn-ico"]}/>Ver comanda
                       </button>
                       <div className={styles["secondary-actions"]}>
-                        <button className={styles["secondary-btn"]} type="button" onClick={startEditing}><Icon name="edit" className={styles["btn-ico"]}/>Editar pedido</button>
+                        <button
+                          className={styles["secondary-btn"]}
+                          type="button"
+                          onClick={startEditing}
+                        >
+                          <Icon name="edit" className={styles["btn-ico"]}/>Editar pedido
+                        </button>
                         <button className={styles["more-btn"]} type="button" aria-label="Mais ações">⋮</button>
                       </div>
                     </div>
@@ -682,8 +767,8 @@ export function OrdersPage({ session, onNavigate }: Props) {
               ) : null}
             </aside>
           </div>
-        </main>
-      </div>
+        </div>
+      </AdminShell>
 
       {manualOrderOpen ? (
         <ManualOrderDialog
@@ -700,6 +785,6 @@ export function OrdersPage({ session, onNavigate }: Props) {
           }}
         />
       ) : null}
-    </div>
+    </>
   );
 }
