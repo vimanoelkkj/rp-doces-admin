@@ -274,6 +274,9 @@ export function DashboardPage({ session, onNavigate }: Props) {
   const cells = useMemo(() => calendarCells(viewYear, viewMonth), [viewMonth, viewYear]);
   const topFlavorTotal = topFlavors.reduce((sum, flavor) => sum + flavor.count, 0);
   const maxFlavor = Math.max(...topFlavors.map(flavor => flavor.count), 1);
+  const currentMonthIndex = anchorDate.getFullYear() * 12 + anchorDate.getMonth();
+  const viewMonthIndex = viewYear * 12 + viewMonth;
+  const viewingCurrentMonth = viewMonthIndex >= currentMonthIndex;
 
   function openCalendar() {
     setViewYear(selectedDate.getFullYear());
@@ -284,11 +287,22 @@ export function DashboardPage({ session, onNavigate }: Props) {
   function selectCalendarDate(date: Date) {
     const dayMs = 24 * 60 * 60 * 1000;
     const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    if (normalized.getTime() > anchorDate.getTime()) return;
     const offset = Math.round((normalized.getTime() - anchorDate.getTime()) / dayMs);
-    setDayOffset(offset);
+    setDayOffset(Math.min(0, offset));
     setViewYear(normalized.getFullYear());
     setViewMonth(normalized.getMonth());
     setCalendarOpen(false);
+  }
+
+  function goToNextMonth() {
+    if (viewingCurrentMonth) return;
+    if (viewMonth === 11) {
+      setViewYear(year => year + 1);
+      setViewMonth(0);
+      return;
+    }
+    setViewMonth(month => month + 1);
   }
 
   return (
@@ -331,28 +345,39 @@ export function DashboardPage({ session, onNavigate }: Props) {
                     <div className={styles.calendarHead}>
                       <button type="button" aria-label="Mês anterior" onClick={() => setViewMonth(month => month === 0 ? (setViewYear(year => year - 1), 11) : month - 1)}>‹</button>
                       <span>{monthLabel(viewYear, viewMonth)}</span>
-                      <button type="button" aria-label="Próximo mês" onClick={() => setViewMonth(month => month === 11 ? (setViewYear(year => year + 1), 0) : month + 1)}>›</button>
+                      <button type="button" aria-label="Próximo mês" disabled={viewingCurrentMonth} onClick={goToNextMonth}>›</button>
                     </div>
                     <div className={styles.weekdays}>
                       {['dom','seg','ter','qua','qui','sex','sáb'].map(day => <span key={day}>{day}</span>)}
                     </div>
                     <div className={styles.calendarGrid}>
-                      {cells.map(cell => (
-                        <button
-                          key={cell.date.toISOString()}
-                          type="button"
-                          className={`${styles.calendarDay} ${cell.outside ? styles.outside : ""} ${sameDate(cell.date, selectedDate) ? styles.selected : ""} ${sameDate(cell.date, anchorDate) ? styles.today : ""}`}
-                          onClick={() => selectCalendarDate(cell.date)}
-                        >
-                          {cell.date.getDate()}
-                        </button>
-                      ))}
+                      {cells.map(cell => {
+                        const future = cell.date.getTime() > anchorDate.getTime();
+                        return (
+                          <button
+                            key={cell.date.toISOString()}
+                            type="button"
+                            disabled={future}
+                            aria-disabled={future}
+                            className={`${styles.calendarDay} ${cell.outside ? styles.outside : ""} ${sameDate(cell.date, selectedDate) ? styles.selected : ""} ${sameDate(cell.date, anchorDate) ? styles.today : ""}`}
+                            onClick={() => selectCalendarDate(cell.date)}
+                          >
+                            {cell.date.getDate()}
+                          </button>
+                        );
+                      })}
                     </div>
                     <button className={styles.calendarClear} type="button" onClick={() => { setDayOffset(0); setCalendarOpen(false); }}>Limpar</button>
                   </div>
                 ) : null}
               </div>
-              <button className={styles.dayArrow} type="button" aria-label="Próximo dia" onClick={() => setDayOffset(offset => offset + 1)}>›</button>
+              <button
+                className={styles.dayArrow}
+                type="button"
+                aria-label="Próximo dia"
+                disabled={dayOffset >= 0}
+                onClick={() => setDayOffset(offset => Math.min(0, offset + 1))}
+              >›</button>
               <button className={`${styles.secondaryButton} ${dayOffset === 0 ? styles.currentDay : ""}`} type="button" onClick={() => setDayOffset(0)}>Hoje</button>
             </div>
           </div>
