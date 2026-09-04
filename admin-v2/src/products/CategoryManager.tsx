@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageScrollLock } from "../shared/usePageScrollLock";
 import {
   createCategory,
   listAllCategories,
@@ -30,6 +31,8 @@ export function CategoryManager({ onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  usePageScrollLock(true);
 
   async function reload() {
     setLoading(true);
