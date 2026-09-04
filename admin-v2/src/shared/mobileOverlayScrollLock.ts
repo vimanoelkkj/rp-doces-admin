@@ -21,8 +21,12 @@ function drawerIsVisible(): boolean {
   );
 }
 
+function modalIsOpen(): boolean {
+  return Boolean(document.querySelector('[aria-modal="true"]'));
+}
+
 function syncScrollLock(): void {
-  const shouldLock = drawerIsVisible();
+  const shouldLock = modalIsOpen() || drawerIsVisible();
   if (shouldLock && !releaseScrollLock) {
     releaseScrollLock = acquirePageScrollLock();
     return;
@@ -46,7 +50,7 @@ function start(): void {
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ["class"]
+    attributeFilter: ["class", "aria-modal"]
   });
   media.addEventListener("change", scheduleSync);
   window.addEventListener("resize", scheduleSync, { passive: true });
