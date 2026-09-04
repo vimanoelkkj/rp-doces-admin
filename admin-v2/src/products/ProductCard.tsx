@@ -55,8 +55,12 @@ export function ProductCard({
     onDelete?.();
   }
 
+  function openFromCard() {
+    if (window.matchMedia("(max-width: 760px)").matches) onEdit();
+  }
+
   return (
-    <article className={styles.card}>
+    <article className={styles.card} onClick={openFromCard}>
       <div className={styles.media}>
         {product.image_key ? (
           <img src={`/api/images/${encodeURIComponent(product.image_key)}`} alt="" />
@@ -79,7 +83,7 @@ export function ProductCard({
             </small>
             <h2>{product.nome}</h2>
           </div>
-          <div className={styles.menuWrap}>
+          <div className={styles.menuWrap} onClick={event => event.stopPropagation()}>
             <button
               type="button"
               className={styles.menuButton}
