@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { AdminsPage } from "./admins/AdminsPage";
 import { AuthGate } from "./auth/AuthGate";
 import { DashboardPage } from "./dashboard/DashboardPage";
@@ -8,6 +9,10 @@ import { ProductsPage } from "./products/ProductsPage";
 import { StorePage } from "./store/StorePage";
 
 const PAGES: AdminV2Page[] = ["dashboard", "produtos", "pedidos", "admins", "loja"];
+type NavigationDirection = "forward" | "backward";
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (update: () => void) => unknown;
+};
 
 function pageFromHash(): AdminV2Page {
   const hash = window.location.hash.toLowerCase();
@@ -18,10 +23,16 @@ function pageFromHash(): AdminV2Page {
   return "produtos";
 }
 
+function navigationDirection(from: AdminV2Page, to: AdminV2Page): NavigationDirection {
+  return PAGES.indexOf(to) >= PAGES.indexOf(from) ? "forward" : "backward";
+}
+
 export function App() {
   const initialPage = useRef<AdminV2Page>(pageFromHash()).current;
   const [page, setPage] = useState<AdminV2Page>(initialPage);
   const [visited, setVisited] = useState<Set<AdminV2Page>>(() => new Set([initialPage]));
+  const [direction, setDirection] = useState<NavigationDirection>("forward");
+  const [hasNavigated, setHasNavigated] = useState(false);
   const pageRef = useRef<AdminV2Page>(initialPage);
   const scrollPositions = useRef<Record<AdminV2Page, number>>({
     dashboard: 0,
@@ -31,12 +42,14 @@ export function App() {
     loja: 0
   });
 
-  function activate(nextPage: AdminV2Page) {
+  function activate(nextPage: AdminV2Page, nextDirection: NavigationDirection) {
     const currentPage = pageRef.current;
     if (nextPage === currentPage) return;
 
     scrollPositions.current[currentPage] = window.scrollY;
     pageRef.current = nextPage;
+    setDirection(nextDirection);
+    setHasNavigated(true);
     setVisited(current => {
       if (current.has(nextPage)) return current;
       const next = new Set(current);
@@ -46,8 +59,33 @@ export function App() {
     setPage(nextPage);
   }
 
+  function transitionTo(nextPage: AdminV2Page) {
+    const currentPage = pageRef.current;
+    if (nextPage === currentPage) return;
+
+    const nextDirection = navigationDirection(currentPage, nextPage);
+    document.documentElement.dataset.adminNavDirection = nextDirection;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const transitionDocument = document as ViewTransitionDocument;
+    const startViewTransition = transitionDocument.startViewTransition;
+
+    if (!reducedMotion && startViewTransition) {
+      try {
+        startViewTransition.call(document, () => {
+          flushSync(() => activate(nextPage, nextDirection));
+        });
+        return;
+      } catch {
+        // Navegação continua imediatamente caso o navegador rejeite uma transição concorrente.
+      }
+    }
+
+    activate(nextPage, nextDirection);
+  }
+
   useEffect(() => {
-    const handleLocationChange = () => activate(pageFromHash());
+    const handleLocationChange = () => transitionTo(pageFromHash());
     window.addEventListener("popstate", handleLocationChange);
     window.addEventListener("hashchange", handleLocationChange);
     return () => {
@@ -62,8 +100,8 @@ export function App() {
 
   function navigate(nextPage: AdminV2Page) {
     if (nextPage === pageRef.current) return;
-    activate(nextPage);
     window.history.pushState(null, "", `#${nextPage}`);
+    transitionTo(nextPage);
   }
 
   return (
@@ -94,6 +132,7 @@ export function App() {
                 hidden={!active}
                 aria-hidden={!active}
                 data-admin-view={view}
+                data-transition-direction={active && hasNavigated ? direction : undefined}
               >
                 {content}
               </div>
