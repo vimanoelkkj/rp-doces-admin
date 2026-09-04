@@ -357,11 +357,12 @@ function AdminShellRoot({
           </div>
         </header>
 
-        {fullWidth ? body : (
-          <div className={`${styles.workspace} ${wide ? styles.workspaceWide : ""}`}>
-            {body}
-          </div>
-        )}
+        <div
+          className={`${styles.workspace} ${wide ? styles.workspaceWide : ""}`}
+          style={fullWidth ? { maxWidth: "none", padding: 0 } : undefined}
+        >
+          {body}
+        </div>
       </main>
     </div>
   );
