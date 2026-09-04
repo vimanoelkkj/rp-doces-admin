@@ -281,7 +281,92 @@
 }
 
 @media (max-width: 760px) {
+  .card {
+    cursor: pointer;
+    border-radius: 12px;
+  }
+
+  .media,
+  .media img {
+    height: 118px;
+    min-height: 118px;
+  }
+
+  .body {
+    padding: 10px 10px 12px;
+  }
+
+  .heading {
+    gap: 4px;
+  }
+
+  .heading small {
+    max-width: 100%;
+    overflow: hidden;
+    margin-bottom: 3px;
+    font-size: 9.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .heading h2 {
+    min-height: 34px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    font-size: 12.5px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .body > p {
+    display: none;
+  }
+
+  .body footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .price {
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .price s {
+    font-size: 9px;
+  }
+
+  .price strong {
+    font-size: 13.5px;
+  }
+
+  .body footer > span {
+    font-size: 9.5px;
+  }
+
   .menuButton {
+    width: 24px;
+    height: 24px;
     opacity: 1;
+  }
+
+  .flags {
+    top: 7px;
+    left: 7px;
+  }
+
+  .flags b {
+    padding: 3px 5px;
+    font-size: 8px;
+  }
+
+  .promo {
+    right: 7px;
+    bottom: 7px;
+    padding: 3px 6px;
+    font-size: 8.5px;
   }
 }
