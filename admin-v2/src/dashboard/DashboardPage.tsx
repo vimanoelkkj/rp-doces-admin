@@ -17,6 +17,7 @@ import styles from "./DashboardPage.module.css";
 type Props = {
   session: AuthSession;
   onNavigate: (page: AdminV2Page) => void;
+  active: boolean;
 };
 
 type CalendarCell = {
@@ -24,6 +25,7 @@ type CalendarCell = {
   outside: boolean;
 };
 
+const DASHBOARD_AUTO_REFRESH_MS = 15_000;
 let dashboardCache: DashboardData | null = null;
 
 function money(cents: number): string {
@@ -116,6 +118,11 @@ function sameDate(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+function sameDashboard(left: DashboardData | null, right: DashboardData) {
+  if (!left) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 function RecentOrder({ order }: { order: FinancialOrder }) {
   const itemCount = dashboardOrderItemsCount(order);
 
@@ -141,7 +148,7 @@ function RecentOrder({ order }: { order: FinancialOrder }) {
   );
 }
 
-export function DashboardPage({ session, onNavigate }: Props) {
+export function DashboardPage({ session, onNavigate, active }: Props) {
   const [data, setData] = useState<DashboardData | null>(() => dashboardCache);
   const [loading, setLoading] = useState(() => dashboardCache === null);
   const [error, setError] = useState<string | null>(null);
@@ -160,32 +167,59 @@ export function DashboardPage({ session, onNavigate }: Props) {
   const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
   const calendarRef = useRef<HTMLDivElement>(null);
+  const autoRefreshInFlightRef = useRef(false);
 
-  const reload = useCallback(async () => {
-    const foreground = dashboardCache === null;
+  const reload = useCallback(async (silent = false) => {
+    const foreground = !silent && dashboardCache === null;
     if (foreground) setLoading(true);
-    setError(null);
+    if (!silent) setError(null);
+
     try {
       const next = await loadDashboardData();
+      const previous = dashboardCache;
       dashboardCache = next;
-      setData(next);
+      if (!sameDashboard(previous, next)) {
+        setData(next);
+      }
+      setError(null);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar o dashboard.");
+      if (!silent) {
+        setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar o dashboard.");
+      }
     } finally {
       if (foreground) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    if (!active) return;
+    let alive = true;
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void reload();
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [reload]);
+    const refresh = (silent: boolean) => {
+      if (!alive || document.visibilityState !== "visible" || autoRefreshInFlightRef.current) return;
+      autoRefreshInFlightRef.current = true;
+      void reload(silent).finally(() => {
+        autoRefreshInFlightRef.current = false;
+      });
+    };
+
+    refresh(dashboardCache !== null);
+
+    const intervalId = window.setInterval(() => refresh(true), DASHBOARD_AUTO_REFRESH_MS);
+    const handleResume = () => refresh(true);
+
+    window.addEventListener("focus", handleResume);
+    window.addEventListener("online", handleResume);
+    document.addEventListener("visibilitychange", handleResume);
+
+    return () => {
+      alive = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleResume);
+      window.removeEventListener("online", handleResume);
+      document.removeEventListener("visibilitychange", handleResume);
+    };
+  }, [active, reload]);
 
   useEffect(() => {
     if (!calendarOpen) return;
