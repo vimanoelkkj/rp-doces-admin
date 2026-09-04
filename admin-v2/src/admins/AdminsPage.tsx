@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthSession } from "../auth/AuthGate";
 import { AdminShell, type AdminV2Page } from "../layout/AdminShell";
 import { useBackLayer } from "../shared/useBackLayer";
@@ -111,15 +111,35 @@ export function AdminsPage({ session, onNavigate, active }: Props) {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const createBusyRef = useRef(false);
+  const confirmBusyRef = useRef(false);
+
+  function updateCreateBusy(value: boolean) {
+    createBusyRef.current = value;
+    setCreateBusy(value);
+  }
+
+  function updateConfirmBusy(value: boolean) {
+    confirmBusyRef.current = value;
+    setConfirmBusy(value);
+  }
 
   const closeCreate = useBackLayer(
     createOpen,
-    () => setCreateOpen(false),
+    () => {
+      if (createBusyRef.current) return false;
+      setCreateOpen(false);
+      return true;
+    },
     "admin-create"
   );
   const closeConfirm = useBackLayer(
     confirm !== null,
-    () => setConfirm(null),
+    () => {
+      if (confirmBusyRef.current) return false;
+      setConfirm(null);
+      return true;
+    },
     "admin-confirm"
   );
 
@@ -163,7 +183,7 @@ export function AdminsPage({ session, onNavigate, active }: Props) {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (createBusy) return;
+    if (createBusyRef.current) return;
 
     const form = event.currentTarget;
     const data = new FormData(form);
@@ -174,7 +194,7 @@ export function AdminsPage({ session, onNavigate, active }: Props) {
       return;
     }
 
-    setCreateBusy(true);
+    updateCreateBusy(true);
     setCreateError(null);
     try {
       await createAdmin({
@@ -184,6 +204,7 @@ export function AdminsPage({ session, onNavigate, active }: Props) {
         senha,
         papel: data.get("papel") === "OWNER" ? "OWNER" : "ADMIN"
       });
+      updateCreateBusy(false);
       closeCreate();
       setFeedback("Administrador criado com sucesso.");
       form.reset();
@@ -191,7 +212,7 @@ export function AdminsPage({ session, onNavigate, active }: Props) {
     } catch (err) {
       setCreateError(errorMessage(err, "Não foi possível criar o administrador."));
     } finally {
-      setCreateBusy(false);
+      updateCreateBusy(false);
     }
   }
 
@@ -228,15 +249,15 @@ export function AdminsPage({ session, onNavigate, active }: Props) {
   }
 
   async function handleConfirmedAction() {
-    if (!confirm || confirmBusy) return;
-    setConfirmBusy(true);
+    if (!confirm || confirmBusyRef.current) return;
+    updateConfirmBusy(true);
     setError(null);
 
     try {
       if (confirm.kind === "role") {
         await setAdminRole(confirm.user.id, confirm.nextRole);
         setFeedback(
-          `${confirm.user.nome} agora é ${confirm.nextRole === "OWNER" ? "Mestre" : "Administrador"}. As sessões anteriores foram encerradas.`
+          `${confirm.user.nome} agora é ${confirm.nextRole === "OWNER" ? "Mestre" : "Administrador"}. As sessões anteriores dessa conta foram encerradas.`
         );
       } else {
         await setAdminActive(confirm.user.id, confirm.nextActive);
@@ -246,13 +267,15 @@ export function AdminsPage({ session, onNavigate, active }: Props) {
             : `${confirm.user.nome} foi desativado e teve as sessões encerradas.`
         );
       }
+      updateConfirmBusy(false);
       closeConfirm();
       await reload();
     } catch (err) {
       setError(errorMessage(err, "Não foi possível concluir a alteração."));
+      updateConfirmBusy(false);
       closeConfirm();
     } finally {
-      setConfirmBusy(false);
+      updateConfirmBusy(false);
     }
   }
 
