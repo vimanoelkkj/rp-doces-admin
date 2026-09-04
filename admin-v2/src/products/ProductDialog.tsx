@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DateTimeField } from "../shared/DateTimeField";
 import { MoneyInput } from "../shared/MoneyInput";
+import { useBackLayer } from "../shared/useBackLayer";
 import { usePageScrollLock } from "../shared/usePageScrollLock";
 import { CategorySelect, type CategorySelectOption } from "./CategorySelect";
 import {
@@ -88,6 +89,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
   const [createdProductId, setCreatedProductId] = useState<ProductId | null>(null);
   const imageEditorRef = useRef<ProductImageEditorHandle>(null);
   const skipNextUnloadRef = useRef(false);
+  const forceCloseRef = useRef(false);
   const reservedStock = product?.estoque_reservado ?? 0;
   const availableStock = Math.max(0, form.estoque - reservedStock);
   const operationBusy = saving || imageBusy;
@@ -105,6 +107,22 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
       : []),
     ...categories.map(category => ({ value: category.id, label: `${category.emoji} ${category.nome}`.trim() }))
   ];
+
+  function attemptClose(): boolean {
+    const forced = forceCloseRef.current;
+    if (!forced && operationBusy) return false;
+    if (!forced && hasUnsavedChanges) {
+      setReloadAfterDiscard(false);
+      setConfirmingDiscard(true);
+      return false;
+    }
+
+    forceCloseRef.current = false;
+    onClose();
+    return true;
+  }
+
+  const closeLayer = useBackLayer(true, attemptClose, "product-editor");
 
   usePageScrollLock(true);
 
@@ -150,16 +168,6 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
     return () => window.removeEventListener("keydown", handleReloadShortcut, true);
   }, [hasUnsavedChanges]);
 
-  function requestClose() {
-    if (operationBusy) return;
-    if (hasUnsavedChanges) {
-      setReloadAfterDiscard(false);
-      setConfirmingDiscard(true);
-      return;
-    }
-    onClose();
-  }
-
   function continueEditing() {
     setReloadAfterDiscard(false);
     setConfirmingDiscard(false);
@@ -171,7 +179,8 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
       window.location.reload();
       return;
     }
-    onClose();
+    forceCloseRef.current = true;
+    closeLayer();
   }
 
   useEffect(() => {
@@ -182,11 +191,11 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
         continueEditing();
         return;
       }
-      requestClose();
+      closeLayer();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [confirmingDiscard, operationBusy, hasUnsavedChanges, onClose]);
+  }, [confirmingDiscard, closeLayer]);
 
   function changeStock(delta: number) {
     setFormDirty(true);
@@ -245,6 +254,9 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
         if (imageChange.kind === "upload") await uploadProductImage(targetId, imageChange.file);
         else await deleteProductImage(targetId);
       }
+
+      forceCloseRef.current = true;
+      closeLayer();
       onSaved();
     } catch (err) {
       const message = err instanceof ProductApiError ? err.message : err instanceof Error ? err.message : "Não foi possível salvar o produto.";
@@ -269,7 +281,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
         if (event.target !== event.currentTarget) return;
         event.preventDefault();
         event.stopPropagation();
-        requestClose();
+        closeLayer();
       }}
     >
       <section
@@ -285,7 +297,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
             <h2 id="product-title">{product ? "Editar produto" : "Novo produto"}</h2>
             <p>{product ? "Atualize os dados do produto no catálogo administrativo." : "Cadastre um doce e ele já entra no catálogo administrativo."}</p>
           </div>
-          <button type="button" onClick={requestClose} aria-label="Fechar" disabled={operationBusy}>×</button>
+          <button type="button" onClick={closeLayer} aria-label="Fechar" disabled={operationBusy}>×</button>
         </header>
 
         {confirmingDiscard ? (
@@ -449,7 +461,7 @@ export function ProductDialog({ product, onClose, onSaved, onImageChanged, onPro
           {error && <p className={styles.error} role="alert">{error}</p>}
 
           <footer>
-            <button type="button" onClick={requestClose} disabled={operationBusy}>Cancelar</button>
+            <button type="button" onClick={closeLayer} disabled={operationBusy}>Cancelar</button>
             <button type="submit" disabled={operationBusy}>{saving ? "Salvando…" : imageBusy ? "Aguarde a imagem…" : "Salvar produto"}</button>
           </footer>
         </form>
