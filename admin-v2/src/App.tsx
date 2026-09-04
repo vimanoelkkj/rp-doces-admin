@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AdminsPage } from "./admins/AdminsPage";
 import { AuthGate } from "./auth/AuthGate";
 import { DashboardPage } from "./dashboard/DashboardPage";
@@ -69,7 +69,7 @@ export function App() {
             if (!visited.has(view)) return null;
 
             const active = page === view;
-            let content;
+            let content: ReactNode;
 
             if (view === "dashboard") {
               content = <DashboardPage session={session} onNavigate={navigate} />;
