@@ -6,6 +6,7 @@ import { listOrders } from "./order.api";
 import { getFinancialOrder, type FinancialOrder } from "./order.finance";
 import { itemsOf } from "./order.model";
 import type { Order } from "./order.schema";
+import { ManualOrderDialog } from "./ManualOrderDialog";
 import styles from "./OrdersPage.module.css";
 
 type Props = {
@@ -219,14 +220,18 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("pedido");
   const [financial, setFinancial] = useState<FinancialOrder | null>(null);
   const [financialLoading, setFinancialLoading] = useState(false);
+  const [manualOrderOpen, setManualOrderOpen] = useState(false);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (preferredOrderId?: number) => {
     setLoading(true);
     setError(null);
     try {
       const next = await listOrders();
       setOrders(next);
-      setSelected(current => current ? next.find(order => order.id === current.id) || next[0] || null : next[0] || null);
+      setSelected(current => {
+        if (preferredOrderId) return next.find(order => order.id === preferredOrderId) || next[0] || null;
+        return current ? next.find(order => order.id === current.id) || next[0] || null : next[0] || null;
+      });
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar os pedidos.");
     } finally {
@@ -366,6 +371,14 @@ export function OrdersPage({ session, onNavigate }: Props) {
                   />
                   <span className={styles.shortcut}>⌘ K</span>
                 </label>
+                <button
+                  className={styles["primary-btn"]}
+                  type="button"
+                  style={{ height: 44, padding: "0 16px", whiteSpace: "nowrap" }}
+                  onClick={() => setManualOrderOpen(true)}
+                >
+                  + Novo pedido
+                </button>
               </header>
 
               <div className={styles["orders-card"]} aria-busy={loading}>
@@ -541,6 +554,21 @@ export function OrdersPage({ session, onNavigate }: Props) {
           </div>
         </main>
       </div>
+
+      {manualOrderOpen ? (
+        <ManualOrderDialog
+          onClose={() => setManualOrderOpen(false)}
+          onCreated={async id => {
+            setQuery("");
+            setFilter("todos");
+            setPage(1);
+            await reload(id);
+            setDrawerOpen(true);
+            setActiveTab("pedido");
+            setManualOrderOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
