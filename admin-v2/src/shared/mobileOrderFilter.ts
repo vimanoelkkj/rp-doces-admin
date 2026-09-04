@@ -50,6 +50,17 @@ function closeMenu({ restoreFocus = false }: { restoreFocus?: boolean } = {}): v
   }
 }
 
+function targetIsInsideOpenMenu(target: EventTarget | null): boolean {
+  if (!(target instanceof Node)) return false;
+  const menu = document.querySelector<HTMLElement>(`#${OVERLAY_ID} .rp-mobile-filter-menu`);
+  return Boolean(menu?.contains(target));
+}
+
+function closeMenuIfOutside(target: EventTarget | null): void {
+  if (!activeSelect || targetIsInsideOpenMenu(target)) return;
+  closeMenu();
+}
+
 function positionMenu(select: HTMLSelectElement, menu: HTMLElement): void {
   const rect = select.getBoundingClientRect();
   const mobile = window.matchMedia("(max-width: 760px)").matches;
@@ -152,10 +163,11 @@ function isEnhancedSelect(target: EventTarget | null): target is HTMLSelectEleme
   return target instanceof HTMLSelectElement && target.matches(SELECT_SELECTOR);
 }
 
-// Mouse/trackpad: o select nativo costuma reagir ao pointerdown/mousedown.
-// Cancelamos esse default, mas deixamos o click de alto nível chegar ao handler
-// abaixo, que abre apenas o menu customizado.
+// Click-away: qualquer pointerdown fora do menu fecha o seletor já aberto.
+// Isso roda em captura e independe do backdrop receber um click completo.
 function onPointerDown(event: PointerEvent): void {
+  closeMenuIfOutside(event.target);
+
   if (event.pointerType === "touch") return;
   if (!isEnhancedSelect(event.target) || event.target.disabled) return;
   event.preventDefault();
@@ -165,6 +177,9 @@ function onPointerDown(event: PointerEvent): void {
 // Touch: preventDefault no touchstart impede o picker nativo e, nos browsers
 // que seguem Touch Events, também suprime os eventos de mouse sintetizados.
 function onTouchStart(event: TouchEvent): void {
+  // Fallback para browsers/fluxos touch em que pointerdown não chega como esperado.
+  closeMenuIfOutside(event.target);
+
   if (!isEnhancedSelect(event.target) || event.target.disabled) return;
 
   resetTouchGesture();
