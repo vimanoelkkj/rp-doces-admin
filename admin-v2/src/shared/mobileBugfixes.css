@@ -7,6 +7,29 @@
 }
 
 @media (max-width: 760px) {
+  /* A bottom bar precisa viver numa camada de composição própria. Em alguns
+     navegadores mobile, repintar uma view grande durante a troca de aba pode
+     fazer um fixed sibling piscar por um frame mesmo com z-index correto.
+     A V1 mantém a navegação como chrome simples e opaco; aqui fazemos o mesmo
+     e ainda fixamos a barra numa layer estável do compositor. */
+  aside:has(nav[aria-label="Navegação principal"]) {
+    isolation: isolate !important;
+    contain: paint !important;
+    background: var(--surface) !important;
+    box-shadow: none !important;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  aside:has(nav[aria-label="Navegação principal"]) > nav {
+    position: relative;
+    z-index: 1;
+    background: var(--surface);
+  }
+
   /* A busca de Pedidos estava herdando uma escala grande demais no layout mobile. */
   input[placeholder="Buscar pedido, cliente ou comanda..."] {
     font-size: 13px !important;
