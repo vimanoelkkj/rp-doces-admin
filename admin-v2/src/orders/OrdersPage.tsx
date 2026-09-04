@@ -38,6 +38,14 @@ const PAYMENT_STATUS_OPTIONS: Array<[ManualPaymentStatus, string]> = [
   ["CANCELADO", "Cancelado"]
 ];
 
+const FILTER_OPTIONS: Array<[FilterKey, string]> = [
+  ["todos", "Todos"],
+  ["hoje", "Hoje"],
+  ["producao", "Em produção"],
+  ["prontos", "Prontos"],
+  ["entregues", "Entregues"]
+];
+
 const editSelectStyle: CSSProperties = {
   width: "100%",
   height: 40,
@@ -254,7 +262,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Order | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DrawerTab>("pedido");
   const [financial, setFinancial] = useState<FinancialOrder | null>(null);
   const [financialLoading, setFinancialLoading] = useState(false);
@@ -272,8 +280,8 @@ export function OrdersPage({ session, onNavigate }: Props) {
       const next = await listOrders();
       setOrders(next);
       setSelected(current => {
-        if (preferredOrderId) return next.find(order => order.id === preferredOrderId) || next[0] || null;
-        return current ? next.find(order => order.id === current.id) || next[0] || null : next[0] || null;
+        if (preferredOrderId) return next.find(order => order.id === preferredOrderId) || current;
+        return current ? next.find(order => order.id === current.id) || null : null;
       });
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Não foi possível carregar os pedidos.");
@@ -308,6 +316,17 @@ export function OrdersPage({ session, onNavigate }: Props) {
       alive = false;
     };
   }, [selected, activeTab]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || savingEdit) return;
+      setDrawerOpen(false);
+      setEditing(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [drawerOpen, savingEdit]);
 
   const counts = useMemo(() => ({
     todos: orders.length,
@@ -417,7 +436,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
         fullWidth
       >
         <div className={styles.pageRoot}>
-          <div className={styles.workspace}>
+          <div className={cls("workspace", drawerOpen && "drawer-open")}>
             <section className={styles.main}>
               <header className={styles["page-header"]}>
                 <h1 className={styles["page-title"]}>Pedidos</h1>
@@ -442,14 +461,21 @@ export function OrdersPage({ session, onNavigate }: Props) {
               </header>
 
               <div className={styles["orders-card"]} aria-busy={loading}>
+                <label className={styles["mobile-filter"]}>
+                  <span>Filtrar pedidos</span>
+                  <select
+                    value={filter}
+                    aria-label="Filtrar pedidos"
+                    onChange={event => setFilter(event.target.value as FilterKey)}
+                  >
+                    {FILTER_OPTIONS.map(([key, label]) => (
+                      <option key={key} value={key}>{label} · {counts[key]}</option>
+                    ))}
+                  </select>
+                </label>
+
                 <div className={styles.filters}>
-                  {([
-                    ["todos", "Todos"],
-                    ["hoje", "Hoje"],
-                    ["producao", "Em produção"],
-                    ["prontos", "Prontos"],
-                    ["entregues", "Entregues"]
-                  ] as Array<[FilterKey, string]>).map(([key, label]) => (
+                  {FILTER_OPTIONS.map(([key, label]) => (
                     <button
                       key={key}
                       type="button"
@@ -485,7 +511,7 @@ export function OrdersPage({ session, onNavigate }: Props) {
                       <OrderRow
                         key={order.id}
                         order={order}
-                        selected={selected?.id === order.id}
+                        selected={drawerOpen && selected?.id === order.id}
                         onSelect={() => openOrder(order)}
                       />
                     ))}
@@ -744,13 +770,6 @@ export function OrdersPage({ session, onNavigate }: Props) {
                     </div>
                   ) : (
                     <div className={styles["drawer-actions"]}>
-                      <button
-                        className={styles["primary-btn"]}
-                        type="button"
-                        onClick={() => setActiveTab("comanda")}
-                      >
-                        <Icon name="receipt" className={styles["btn-ico"]}/>Ver comanda
-                      </button>
                       <div className={styles["secondary-actions"]}>
                         <button
                           className={styles["secondary-btn"]}
@@ -773,12 +792,12 @@ export function OrdersPage({ session, onNavigate }: Props) {
       {manualOrderOpen ? (
         <ManualOrderDialog
           onClose={() => setManualOrderOpen(false)}
-          onCreated={async id => {
+          onCreated={async () => {
             setQuery("");
             setFilter("todos");
             setPage(1);
-            await reload(id);
-            setDrawerOpen(true);
+            await reload();
+            setDrawerOpen(false);
             setActiveTab("pedido");
             setEditing(false);
             setManualOrderOpen(false);
