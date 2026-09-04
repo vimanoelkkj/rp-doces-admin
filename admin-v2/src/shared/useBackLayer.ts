@@ -6,6 +6,8 @@ type HistoryState = Record<string, unknown> & {
   [HISTORY_KEY]?: string[];
 };
 
+type CloseHandler = () => void | boolean;
+
 function stateObject(): HistoryState {
   const current = window.history.state;
   return current && typeof current === "object" ? current as HistoryState : {};
@@ -24,14 +26,29 @@ function tokenFor(name: string) {
   return `${name}:${suffix}`;
 }
 
+function restoreLayer(token: string) {
+  const currentState = stateObject();
+  const layers = stateLayers(currentState);
+  if (layers.includes(token)) return;
+
+  window.history.pushState(
+    { ...currentState, [HISTORY_KEY]: [...layers, token] },
+    "",
+    window.location.href
+  );
+}
+
 /**
  * Faz dialogs/drawers participarem do histórico do navegador como uma camada
  * temporária. No Android/browser, Voltar fecha a camada antes de navegar para
  * outra tela. Fechar pelo X/backdrop também consome a entrada temporária.
+ *
+ * O callback pode retornar false para recusar o fechamento, por exemplo quando
+ * há alterações não salvas. Nesse caso a entrada de histórico é restaurada.
  */
-export function useBackLayer(open: boolean, onClose: () => void, name: string) {
+export function useBackLayer(open: boolean, onClose: CloseHandler, name: string) {
   const tokenRef = useRef<string | null>(null);
-  const closeRef = useRef(onClose);
+  const closeRef = useRef<CloseHandler>(onClose);
   closeRef.current = onClose;
 
   useEffect(() => {
@@ -52,8 +69,14 @@ export function useBackLayer(open: boolean, onClose: () => void, name: string) {
       if (tokenRef.current !== token) return;
       if (stateLayers(event.state).includes(token)) return;
 
+      const accepted = closeRef.current() !== false;
+      if (!accepted) {
+        tokenRef.current = token;
+        restoreLayer(token);
+        return;
+      }
+
       tokenRef.current = null;
-      closeRef.current();
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -67,10 +90,12 @@ export function useBackLayer(open: boolean, onClose: () => void, name: string) {
       return;
     }
 
+    const accepted = closeRef.current() !== false;
+    if (!accepted) return;
+
     const layers = stateLayers();
     const isTopLayer = layers[layers.length - 1] === token;
     tokenRef.current = null;
-    closeRef.current();
 
     if (isTopLayer) {
       window.history.back();
