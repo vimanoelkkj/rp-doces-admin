@@ -16,14 +16,14 @@
     overflow: visible !important;
   }
 
-  /* No mobile, notificações e perfil ficam no topo. O header precisa permanecer
-     junto deles; caso contrário, ao rolar a página os botões ficam flutuando
-     sozinhos sobre o conteúdo. */
-  main {
+  /* Só o header padrão do AdminShell (título + subtítulo) deve ficar preso no
+     topo. Headers especiais, como o de Pedidos com busca e Novo pedido, não
+     podem virar um bloco sticky gigante por cima da lista. */
+  main:has(header:has(> div > h1):has(> div > p)) {
     padding-top: 0 !important;
   }
 
-  main header:has(h1) {
+  main header:has(> div > h1):has(> div > p) {
     position: sticky !important;
     top: 0 !important;
     z-index: 80 !important;
@@ -40,7 +40,7 @@
   }
 
   @supports (backdrop-filter: blur(1px)) {
-    main header:has(h1) {
+    main header:has(> div > h1):has(> div > p) {
       background: color-mix(in srgb, var(--surface) 92%, transparent);
       backdrop-filter: blur(16px);
     }
