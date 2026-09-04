@@ -23,8 +23,14 @@
     overflow: visible !important;
   }
 
-  /* Header mobile real do AdminShell. Todas as páginas compartilham exatamente
-     a mesma barra; não dependemos mais da estrutura interna de cada tela. */
+  /* No mobile, notificações e conta pertencem ao header real. As cópias do
+     sidebar continuam existindo apenas para desktop/tablet. */
+  [data-desktop-only-utility] {
+    display: none !important;
+  }
+
+  /* Header mobile real do AdminShell. Título e ações vivem na mesma estrutura,
+     então foto/sino não ficam mais soltos ou desaparecem entre telas. */
   [data-mobile-admin-header] {
     position: fixed;
     top: 0;
@@ -34,11 +40,12 @@
     height: calc(72px + env(safe-area-inset-top));
     display: flex;
     align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
     padding:
       max(10px, env(safe-area-inset-top))
-      112px
-      10px
-      14px;
+      14px
+      10px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     box-shadow: 0 8px 24px rgba(63, 43, 34, .045);
@@ -51,8 +58,9 @@
     }
   }
 
-  [data-mobile-admin-header] > div {
+  [data-mobile-header-title] {
     min-width: 0;
+    flex: 1;
   }
 
   [data-mobile-admin-header] h1 {
@@ -76,6 +84,96 @@
     line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  [data-mobile-header-actions] {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  [data-mobile-header-notification],
+  [data-mobile-header-profile] {
+    position: relative;
+  }
+
+  [data-mobile-header-button],
+  [data-mobile-profile-button] {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0;
+    background: var(--surface);
+    color: var(--muted);
+    box-shadow: 0 6px 20px rgba(63, 43, 34, .06);
+  }
+
+  [data-mobile-header-icon],
+  [data-mobile-header-icon] svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  [data-mobile-header-icon] {
+    display: grid;
+    place-items: center;
+  }
+
+  [data-mobile-header-icon] svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  [data-mobile-avatar],
+  [data-mobile-avatar-image] {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+  }
+
+  [data-mobile-avatar] {
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #c33e5e, #e45a76);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  [data-mobile-avatar-image] {
+    display: block;
+    object-fit: cover;
+  }
+
+  [data-mobile-notification-dot] {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  [data-mobile-header-notification] > [role="dialog"],
+  [data-mobile-header-profile] > [role="menu"] {
+    top: 48px !important;
+    right: 0 !important;
+    bottom: auto !important;
+    left: auto !important;
+    width: min(300px, calc(100vw - 24px)) !important;
+    max-width: none !important;
+    z-index: 95 !important;
   }
 
   /* O conteúdo começa depois da barra fixa. O header desktop continua no DOM,
