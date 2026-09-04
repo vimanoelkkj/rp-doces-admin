@@ -16,6 +16,7 @@ import styles from "./AdminsPage.module.css";
 type Props = {
   session: AuthSession;
   onNavigate: (page: AdminV2Page) => void;
+  active: boolean;
 };
 
 type ConfirmState =
@@ -23,6 +24,11 @@ type ConfirmState =
   | { kind: "active"; user: AdminUser; nextActive: boolean };
 
 let adminsCache: AdminUser[] | null = null;
+
+function sameAdmins(left: AdminUser[] | null, right: AdminUser[]) {
+  if (!left || left.length !== right.length) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
 
 function initials(name: string): string {
   return (
@@ -90,7 +96,7 @@ function Modal({
   );
 }
 
-export function AdminsPage({ session, onNavigate }: Props) {
+export function AdminsPage({ session, onNavigate, active }: Props) {
   const { user: viewer } = session;
   const isOwner = viewer.papel === "OWNER";
   const [users, setUsers] = useState<AdminUser[]>(() => adminsCache ?? []);
@@ -117,24 +123,32 @@ export function AdminsPage({ session, onNavigate }: Props) {
     "admin-confirm"
   );
 
-  const reload = useCallback(async () => {
-    const foreground = adminsCache === null;
+  const reload = useCallback(async (silent = false) => {
+    const foreground = !silent && adminsCache === null;
     if (foreground) setLoading(true);
-    setError(null);
+    if (!silent) setError(null);
+
     try {
       const next = await listAdmins();
+      const previous = adminsCache;
       adminsCache = next;
-      setUsers(next);
+      if (!sameAdmins(previous, next)) {
+        setUsers(next);
+      }
+      setError(null);
     } catch (err) {
-      setError(errorMessage(err, "Não foi possível carregar os administradores."));
+      if (!silent) {
+        setError(errorMessage(err, "Não foi possível carregar os administradores."));
+      }
     } finally {
       if (foreground) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    if (!active) return;
+    void reload(adminsCache !== null);
+  }, [active, reload]);
 
   const activeCount = useMemo(() => users.filter(user => user.ativo).length, [users]);
   const ownerCount = useMemo(
