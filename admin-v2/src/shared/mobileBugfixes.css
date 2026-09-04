@@ -1,3 +1,7 @@
+[data-mobile-admin-header] {
+  display: none;
+}
+
 @media (max-width: 760px) {
   /* A busca de Pedidos estava herdando uma escala grande demais no layout mobile. */
   input[placeholder="Buscar pedido, cliente ou comanda..."] {
@@ -10,104 +14,97 @@
   }
 
   /* O popover do calendário vive dentro da faixa de navegação por dia.
-     overflow-x:auto também recorta o eixo Y no Chromium mobile, então o
-     calendário abria, mas ficava invisível fora da faixa. */
+     overflow-x:auto também recorta o eixo Y no Chromium mobile. */
   div:has(> button[aria-label="Dia anterior"]):has(> button[aria-label="Próximo dia"]) {
     overflow: visible !important;
   }
 
-  /* Uma única faixa superior fixa para todo o Admin mobile. Título fica à
-     esquerda; notificações e perfil permanecem à direita. */
-  aside:has(nav[aria-label="Navegação principal"])::before {
-    content: "";
+  /* Header mobile real do AdminShell. Todas as páginas compartilham exatamente
+     a mesma barra; não dependemos mais da estrutura interna de cada tela. */
+  [data-mobile-admin-header] {
     position: fixed;
     top: 0;
     right: 0;
     left: 0;
-    z-index: 78;
+    z-index: 80;
     height: calc(72px + env(safe-area-inset-top));
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    box-shadow: 0 8px 24px rgba(63, 43, 34, .045);
-    pointer-events: none;
-  }
-
-  @supports (backdrop-filter: blur(1px)) {
-    aside:has(nav[aria-label="Navegação principal"])::before {
-      background: color-mix(in srgb, var(--surface) 92%, transparent);
-      backdrop-filter: blur(16px);
-    }
-  }
-
-  /* Páginas que usam o header padrão do AdminShell passam a ter o header
-     realmente fixo. Não é mais sticky dependente do scroll/ancestrais. */
-  main:has(header:has(> div > h1):has(> div > p)) {
-    padding-top: calc(92px + env(safe-area-inset-top)) !important;
-  }
-
-  main header:has(> div > h1):has(> div > p) {
-    position: fixed !important;
-    top: 0 !important;
-    right: 0 !important;
-    left: 0 !important;
-    z-index: 80 !important;
-    min-height: calc(72px + env(safe-area-inset-top));
-    margin: 0 !important;
+    display: flex;
+    align-items: flex-end;
     padding:
-      max(11px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-top))
       112px
       10px
-      14px !important;
+      14px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     box-shadow: 0 8px 24px rgba(63, 43, 34, .045);
   }
 
   @supports (backdrop-filter: blur(1px)) {
-    main header:has(> div > h1):has(> div > p) {
+    [data-mobile-admin-header] {
       background: color-mix(in srgb, var(--surface) 92%, transparent);
       backdrop-filter: blur(16px);
     }
   }
 
-  /* Pedidos usa hideHeader e possui um header próprio com busca e CTA.
-     Só o título entra na faixa fixa; busca e Novo pedido continuam rolando no
-     conteúdo para não recriar o antigo header gigante. */
-  main header:has(> h1) > h1:first-child {
-    position: fixed !important;
-    top: max(17px, env(safe-area-inset-top)) !important;
-    left: 14px !important;
-    z-index: 80 !important;
-    max-width: calc(100vw - 132px);
-    margin: 0 !important;
+  [data-mobile-admin-header] > div {
+    min-width: 0;
+  }
+
+  [data-mobile-admin-header] h1 {
+    display: block !important;
+    margin: 0;
     overflow: hidden;
     color: var(--text);
-    font-size: 25px !important;
-    line-height: 40px;
+    font-size: 25px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -.7px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  div:has(> button[aria-label="Notificações"]),
-  div:has(> button[aria-label="Abrir menu da conta"]) {
-    position: fixed !important;
-    top: max(12px, env(safe-area-inset-top)) !important;
-    z-index: 90 !important;
+  [data-mobile-admin-header] p {
+    margin: 4px 0 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 10.5px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* O detalhe do pedido é um drawer full-screen no mobile. Antes seu primeiro
-     bloco começava atrás da faixa fixa, escondendo Pedido # e o botão Fechar.
-     Reservamos a altura do header global e mantemos o cabeçalho do drawer
-     preso logo abaixo dele durante o scroll. */
+  /* O conteúdo começa depois da barra fixa. Os headers antigos continuam no
+     DOM para desktop, mas no mobile o único título visível é o do shell. */
+  main {
+    padding-top: calc(92px + env(safe-area-inset-top)) !important;
+  }
+
+  main h1 {
+    display: none !important;
+  }
+
+  [data-mobile-admin-header] h1 {
+    display: block !important;
+  }
+
+  /* O drawer de pedido vira uma sub-tela entre o header superior e a navegação
+     inferior. O cabeçalho do pedido fica preso no topo dela, com o X visível. */
   #drawer {
-    padding-top: calc(72px + env(safe-area-inset-top)) !important;
+    top: calc(72px + env(safe-area-inset-top)) !important;
+    right: 0 !important;
+    bottom: calc(60px + env(safe-area-inset-bottom)) !important;
+    left: 0 !important;
+    max-height: none !important;
+    padding-top: 0 !important;
+    border-radius: 0 !important;
   }
 
   #drawer > div:first-child {
     position: sticky;
-    top: calc(72px + env(safe-area-inset-top));
+    top: 0;
     z-index: 12;
-    margin: 0 -28px 8px;
+    margin: -27px -28px 8px;
     padding: 14px 28px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
