@@ -7,10 +7,32 @@
   }
 }
 
+@keyframes rp-mobile-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes rp-popover-enter {
   from {
     opacity: 0;
     transform: translateY(-5px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rp-mobile-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.992);
   }
   to {
     opacity: 1;
@@ -125,6 +147,10 @@ nav[aria-label="Navegação principal"] button[aria-current="page"] svg {
 }
 
 @media (max-width: 760px) {
+  main {
+    animation: rp-mobile-page-enter 180ms cubic-bezier(.2, .75, .2, 1) both;
+  }
+
   main header:has(h1) {
     transition:
       background-color 180ms ease,
@@ -136,6 +162,48 @@ nav[aria-label="Navegação principal"] button[aria-current="page"] svg {
     transition:
       opacity 180ms ease,
       transform 220ms cubic-bezier(.2, .75, .2, 1);
+  }
+
+  #root :where(button:not(:disabled), [role="button"], a[href]) {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform 110ms cubic-bezier(.2, .8, .2, 1),
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      box-shadow 160ms ease,
+      opacity 140ms ease;
+  }
+
+  #root :where(button:not(:disabled), [role="button"], a[href]):active {
+    transform: scale(.975);
+  }
+
+  #root :where(input, select, textarea) {
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      color 160ms ease;
+  }
+
+  #root :where(input, select, textarea):focus {
+    transition-duration: 110ms;
+  }
+
+  [role="dialog"] {
+    transform-origin: bottom center;
+    animation: rp-mobile-dialog-enter 190ms cubic-bezier(.2, .75, .2, 1) both;
+  }
+
+  [role="menu"] {
+    transform-origin: top right;
+    animation: rp-popover-enter 160ms cubic-bezier(.2, .75, .2, 1) both;
+  }
+
+  .rp-mobile-filter-option:active {
+    transform: scale(.972);
   }
 }
 
@@ -153,7 +221,8 @@ nav[aria-label="Navegação principal"] button[aria-current="page"] svg {
   .rp-mobile-filter-menu,
   .rp-mobile-filter-option,
   .rp-mobile-filter-radio,
-  main header:has(h1) {
+  main header:has(h1),
+  #root :where(button, [role="button"], a[href], input, select, textarea) {
     animation: none !important;
     transition: none !important;
   }
