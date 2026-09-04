@@ -20,7 +20,7 @@
      conteúdo da página. O sidebar vira a navegação inferior, então usamos seu
      pseudo-elemento para manter uma faixa fixa no topo atrás de notificações e
      perfil, inclusive em telas com hideHeader como Pedidos. */
-  aside::before {
+  aside:has(nav[aria-label="Navegação principal"])::before {
     content: "";
     position: fixed;
     top: 0;
@@ -35,7 +35,7 @@
   }
 
   @supports (backdrop-filter: blur(1px)) {
-    aside::before {
+    aside:has(nav[aria-label="Navegação principal"])::before {
       background: color-mix(in srgb, var(--surface) 92%, transparent);
       backdrop-filter: blur(16px);
     }
