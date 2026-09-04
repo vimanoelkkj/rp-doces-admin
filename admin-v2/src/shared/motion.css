@@ -104,6 +104,7 @@ body {
   }
 
   ::view-transition-group(rp-admin-screen) {
+    z-index: 1;
     animation-duration: 155ms;
     animation-timing-function: cubic-bezier(.2, .75, .2, 1);
   }
@@ -195,6 +196,41 @@ nav[aria-label="Navegação principal"] button[aria-current="page"] svg {
 }
 
 @media (max-width: 760px) {
+  /* Header e bottom bar são chrome persistente. Cada um recebe seu próprio
+     snapshot e fica acima do conteúdo animado, então a tela nunca passa por
+     cima da navegação durante a troca de aba. */
+  @supports (view-transition-name: rp-admin-screen) {
+    [data-admin-view]:not([hidden]) [data-admin-navigation-chrome] {
+      view-transition-name: rp-admin-bottom-nav;
+    }
+
+    [data-admin-view]:not([hidden]) [data-mobile-admin-header] {
+      view-transition-name: rp-admin-topbar;
+    }
+
+    ::view-transition-group(root) {
+      z-index: 0;
+    }
+
+    ::view-transition-group(rp-admin-topbar),
+    ::view-transition-group(rp-admin-bottom-nav) {
+      z-index: 20;
+      animation: none !important;
+    }
+
+    ::view-transition-old(rp-admin-topbar),
+    ::view-transition-old(rp-admin-bottom-nav) {
+      opacity: 0;
+      animation: none !important;
+    }
+
+    ::view-transition-new(rp-admin-topbar),
+    ::view-transition-new(rp-admin-bottom-nav) {
+      opacity: 1;
+      animation: none !important;
+    }
+  }
+
   nav[aria-label="Navegação principal"] button[aria-current="page"]::before {
     transition:
       opacity 120ms ease,
@@ -264,7 +300,13 @@ nav[aria-label="Navegação principal"] button[aria-current="page"] svg {
 
   ::view-transition-group(rp-admin-screen),
   ::view-transition-old(rp-admin-screen),
-  ::view-transition-new(rp-admin-screen) {
+  ::view-transition-new(rp-admin-screen),
+  ::view-transition-group(rp-admin-topbar),
+  ::view-transition-old(rp-admin-topbar),
+  ::view-transition-new(rp-admin-topbar),
+  ::view-transition-group(rp-admin-bottom-nav),
+  ::view-transition-old(rp-admin-bottom-nav),
+  ::view-transition-new(rp-admin-bottom-nav) {
     animation-duration: 0.001ms !important;
   }
 }
