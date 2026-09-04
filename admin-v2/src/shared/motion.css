@@ -1,3 +1,44 @@
+@keyframes rp-screen-old-forward {
+  to {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+
+@keyframes rp-screen-new-forward {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes rp-screen-old-backward {
+  to {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+@keyframes rp-screen-new-backward {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes rp-screen-fallback {
+  from { opacity: .58; }
+  to { opacity: 1; }
+}
+
 @keyframes rp-popover-enter {
   from {
     opacity: 0;
@@ -47,6 +88,50 @@ body {
   transition:
     background-color 160ms ease,
     color 160ms ease;
+}
+
+/* A troca de aba usa snapshots do View Transitions API. Assim o conteúdo pode
+   deslizar sem aplicar transform em ancestrais reais e sem quebrar elementos
+   position: fixed como header, bottom nav ou drawer. */
+@supports (view-transition-name: rp-admin-screen) {
+  [data-admin-view]:not([hidden]) main > :last-child {
+    view-transition-name: rp-admin-screen;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+
+  ::view-transition-group(rp-admin-screen) {
+    animation-duration: 155ms;
+    animation-timing-function: cubic-bezier(.2, .75, .2, 1);
+  }
+
+  html[data-admin-nav-direction="forward"]::view-transition-old(rp-admin-screen) {
+    animation: rp-screen-old-forward 155ms cubic-bezier(.2, .75, .2, 1) both;
+  }
+
+  html[data-admin-nav-direction="forward"]::view-transition-new(rp-admin-screen) {
+    animation: rp-screen-new-forward 155ms cubic-bezier(.2, .75, .2, 1) both;
+  }
+
+  html[data-admin-nav-direction="backward"]::view-transition-old(rp-admin-screen) {
+    animation: rp-screen-old-backward 155ms cubic-bezier(.2, .75, .2, 1) both;
+  }
+
+  html[data-admin-nav-direction="backward"]::view-transition-new(rp-admin-screen) {
+    animation: rp-screen-new-backward 155ms cubic-bezier(.2, .75, .2, 1) both;
+  }
+}
+
+/* Navegadores sem View Transitions continuam instantâneos, mas recebem um
+   fade curtíssimo. Sem transform real no DOM para não recriar as regressões de
+   header/drawer que já tivemos. */
+@supports not (view-transition-name: rp-admin-screen) {
+  [data-admin-view][data-transition-direction]:not([hidden]) {
+    animation: rp-screen-fallback 110ms ease-out both;
+  }
 }
 
 nav[aria-label="Navegação principal"] button,
@@ -167,6 +252,7 @@ nav[aria-label="Navegação principal"] button[aria-current="page"] svg {
   button[aria-label="Abrir menu da conta"],
   [role="dialog"],
   [role="menu"],
+  [data-admin-view][data-transition-direction],
   .rp-mobile-filter-backdrop,
   .rp-mobile-filter-menu,
   .rp-mobile-filter-option,
@@ -174,5 +260,11 @@ nav[aria-label="Navegação principal"] button[aria-current="page"] svg {
   #root :where(button, [role="button"], a[href], input, select, textarea) {
     animation: none !important;
     transition: none !important;
+  }
+
+  ::view-transition-group(rp-admin-screen),
+  ::view-transition-old(rp-admin-screen),
+  ::view-transition-new(rp-admin-screen) {
+    animation-duration: 0.001ms !important;
   }
 }
