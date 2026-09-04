@@ -56,11 +56,6 @@ export function ProductsPage({ session, onNavigate }: Props) {
     () => setPreviewing(null),
     "product-preview"
   );
-  const closeEditing = useBackLayer(
-    editing !== null,
-    () => setEditing(null),
-    "product-editor"
-  );
 
   const reload = useCallback(async () => {
     const foreground = productsCache === null;
@@ -260,13 +255,10 @@ export function ProductsPage({ session, onNavigate }: Props) {
       {editing !== null ? (
         <ProductDialog
           product={editing ?? null}
-          onClose={closeEditing}
+          onClose={() => setEditing(null)}
           onImageChanged={() => void reload()}
           onProductPersisted={() => void reload()}
-          onSaved={async () => {
-            closeEditing();
-            await reload();
-          }}
+          onSaved={() => void reload()}
         />
       ) : null}
     </>
