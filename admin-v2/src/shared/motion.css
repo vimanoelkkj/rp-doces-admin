@@ -1,6 +1,12 @@
 @keyframes rp-screen-enter {
-  from { opacity: .58; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+    left: 18px;
+  }
+  to {
+    opacity: 1;
+    left: 0;
+  }
 }
 
 @keyframes rp-popover-enter {
@@ -54,11 +60,12 @@ body {
     color 160ms ease;
 }
 
-/* Mesmo princípio da V1: só a view central recebe uma entrada curta.
-   Sem View Transitions API e sem transform em ancestrais, portanto header,
-   bottom nav e drawers fixed nunca entram na animação. */
+/* Mesmo princípio da V1: só a view central anima. O deslocamento usa `left`
+   em vez de transform para não criar um containing block novo e não afetar
+   header, bottom nav, drawers ou dialogs position: fixed. */
 [data-admin-view][data-page-enter]:not([hidden]) {
-  animation: rp-screen-enter 110ms ease-out both;
+  position: relative;
+  animation: rp-screen-enter 190ms cubic-bezier(.2, .75, .2, 1) both;
 }
 
 nav[aria-label="Navegação principal"] button,
