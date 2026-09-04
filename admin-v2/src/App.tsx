@@ -5,6 +5,7 @@ import { DashboardPage } from "./dashboard/DashboardPage";
 import { AdminShell, type AdminV2Page } from "./layout/AdminShell";
 import { OrdersPage } from "./orders/OrdersPage";
 import { ProductsPage } from "./products/ProductsPage";
+import { closeTopBackLayer } from "./shared/useBackLayer";
 import { StorePage } from "./store/StorePage";
 
 const PAGES: AdminV2Page[] = ["dashboard", "produtos", "pedidos", "admins", "loja"];
@@ -86,6 +87,7 @@ export function App() {
   }, [page]);
 
   function navigate(nextPage: AdminV2Page) {
+    if (closeTopBackLayer()) return;
     if (nextPage === pageRef.current) return;
     window.history.pushState(null, "", `#${nextPage}`);
     activate(nextPage);
