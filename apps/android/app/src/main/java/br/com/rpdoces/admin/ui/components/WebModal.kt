@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
@@ -154,7 +155,8 @@ fun WebField(
     singleLine: Boolean = true,
     minHeight: Int = 40,
     visualTransformation: VisualTransformation = VisualTransformation.None,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
 ) {
     val web = LocalRPWebColors.current
     Column(modifier = modifier) {
@@ -172,6 +174,7 @@ fun WebField(
                 enabled = enabled,
                 singleLine = singleLine,
                 visualTransformation = visualTransformation,
+                keyboardOptions = keyboardOptions,
                 textStyle = TextStyle(color = if (enabled) web.text else web.muted, fontSize = 12.5.sp, fontWeight = FontWeight.Medium, lineHeight = 18.sp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = if (singleLine) 11.dp else 10.dp),
                 decorationBox = { inner ->
