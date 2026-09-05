@@ -25,7 +25,6 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +52,7 @@ import br.com.rpdoces.admin.data.orders.OrdersRepository
 import br.com.rpdoces.admin.data.products.ProductsRepository
 import br.com.rpdoces.admin.ui.components.MotionChevron
 import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
+import br.com.rpdoces.admin.ui.components.WebSelectorOption
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.time.ZoneId
@@ -194,9 +194,13 @@ fun OrdersScreen(
                         }
                         MotionDropdownMenu(expanded = filterOpen, onDismissRequest = { filterOpen = false }) {
                             OrderFilter.entries.forEach { item ->
-                                DropdownMenuItem(
-                                    text = { Text("${item.label} · ${counts[item] ?: 0}") },
-                                    onClick = { filter = item; filterOpen = false }
+                                WebSelectorOption(
+                                    text = "${item.label} · ${counts[item] ?: 0}",
+                                    selected = item == filter,
+                                    onClick = {
+                                        filter = item
+                                        filterOpen = false
+                                    }
                                 )
                             }
                         }
@@ -432,6 +436,7 @@ private fun OrderDetailDialog(
                             DetailSection("Editar pedido") {
                                 SelectorField(
                                     label = "Status",
+                                    selectedKey = status,
                                     value = orderStatusOptions.firstOrNull { it.first == status }?.second ?: status,
                                     expanded = statusOpen,
                                     onExpand = { statusOpen = true },
@@ -442,6 +447,7 @@ private fun OrderDetailDialog(
                                 Spacer(Modifier.height(10.dp))
                                 SelectorField(
                                     label = "Pagamento",
+                                    selectedKey = payment,
                                     value = paymentOptions.firstOrNull { it.first == payment }?.second ?: payment,
                                     expanded = paymentOpen,
                                     onExpand = { paymentOpen = true },
@@ -552,6 +558,7 @@ private fun DetailLine(label: String, value: String, strong: Boolean = false) {
 @Composable
 private fun SelectorField(
     label: String,
+    selectedKey: String,
     value: String,
     expanded: Boolean,
     onExpand: () -> Unit,
@@ -571,7 +578,13 @@ private fun SelectorField(
                 }
             }
             MotionDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-                options.forEach { (key, text) -> DropdownMenuItem(text = { Text(text) }, onClick = { onSelect(key) }) }
+                options.forEach { (key, text) ->
+                    WebSelectorOption(
+                        text = text,
+                        selected = key == selectedKey,
+                        onClick = { onSelect(key) }
+                    )
+                }
             }
         }
     }
