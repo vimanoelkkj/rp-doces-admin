@@ -1,12 +1,28 @@
 {
   "schema_version": 1,
-  "revision": 4,
+  "revision": 5,
   "min_app_version_code": 1,
   "poll_seconds": 5,
   "theme": "system",
   "dashboard_banner": {
     "enabled": true,
-    "title": "Remote config ativo",
-    "message": "Este aviso veio do site e pode mudar sem recompilar o app."
-  }
+    "eyebrow": "REMOTE CONFIG",
+    "title": "Dashboard conectado ao servidor",
+    "message": "Este banner, a ordem dos blocos e os recursos abaixo podem mudar sem recompilar o app.",
+    "tone": "accent"
+  },
+  "features": {
+    "dashboard_metrics": true,
+    "dashboard_flavors": true,
+    "dashboard_receivables": true,
+    "dashboard_recent_orders": true,
+    "dashboard_attention": true
+  },
+  "dashboard_section_order": [
+    "metrics",
+    "flavors",
+    "receivables",
+    "recent_orders",
+    "attention"
+  ]
 }
