@@ -12,13 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +37,9 @@ import br.com.rpdoces.admin.data.orders.ManualOrderItemInput
 import br.com.rpdoces.admin.data.orders.OrdersRepository
 import br.com.rpdoces.admin.data.products.Product
 import br.com.rpdoces.admin.data.products.ProductsRepository
+import br.com.rpdoces.admin.ui.components.MotionChevron
+import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
+import br.com.rpdoces.admin.ui.components.MotionValue
 import br.com.rpdoces.admin.ui.components.WebField
 import br.com.rpdoces.admin.ui.components.WebModal
 import br.com.rpdoces.admin.ui.components.WebModalActions
@@ -131,7 +130,9 @@ internal fun ManualOrderDialog(
                         QtyButton("−", enabled = (quantities[product.id] ?: 0) > 0) {
                             quantities[product.id] = ((quantities[product.id] ?: 0) - 1).coerceAtLeast(0)
                         }
-                        Text((quantities[product.id] ?: 0).toString(), color = web.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(22.dp))
+                        MotionValue(targetState = quantities[product.id] ?: 0, modifier = Modifier.width(22.dp)) { quantity ->
+                            Text(quantity.toString(), color = web.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                         QtyButton("+", enabled = (quantities[product.id] ?: 0) < product.availableStock) {
                             quantities[product.id] = ((quantities[product.id] ?: 0) + 1).coerceAtMost(product.availableStock)
                         }
@@ -143,7 +144,9 @@ internal fun ManualOrderDialog(
         Surface(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(10.dp), color = web.surfaceSoft) {
             Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Total do pedido", color = web.muted, fontSize = 11.sp)
-                Text(money(total), color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                MotionValue(targetState = money(total)) { totalLabel ->
+                    Text(totalLabel, color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
@@ -249,12 +252,14 @@ private fun ManualSelect(
         Spacer(Modifier.height(8.dp))
         Box {
             Surface(onClick = onExpand, modifier = Modifier.fillMaxWidth().height(40.dp), shape = RoundedCornerShape(9.dp), color = web.surface, border = BorderStroke(1.dp, web.borderStrong)) {
-                Row(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(value, color = web.text, fontSize = 12.sp, maxLines = 1)
-                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = web.muted, modifier = Modifier.size(18.dp))
+                Row(modifier = Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    MotionValue(targetState = value, modifier = Modifier.weight(1f)) { selected ->
+                        Text(selected, color = web.text, fontSize = 12.sp, maxLines = 1)
+                    }
+                    MotionChevron(expanded = expanded, tint = web.muted, modifier = Modifier.size(18.dp))
                 }
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+            MotionDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
                 options.forEach { (key, text) -> DropdownMenuItem(text = { Text(text) }, onClick = { onSelect(key) }) }
             }
         }

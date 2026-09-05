@@ -2,6 +2,19 @@ package br.com.rpdoces.admin.ui
 
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -71,6 +85,8 @@ import br.com.rpdoces.admin.data.store.StoreRepository
 import br.com.rpdoces.admin.security.NativeBiometricAuth
 import br.com.rpdoces.admin.ui.auth.AuthUiState
 import br.com.rpdoces.admin.ui.auth.AuthViewModel
+import br.com.rpdoces.admin.ui.components.MotionValue
+import br.com.rpdoces.admin.ui.components.RPMotion
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import coil3.compose.AsyncImage
 import kotlin.math.max
@@ -199,65 +215,89 @@ private fun ExactLoginScreen(
                 Spacer(Modifier.height(22.dp))
                 LoginHeading()
 
-                if (identified == null) {
-                    LoginField(
-                        label = "Usuário",
-                        value = username,
-                        onValueChange = { username = it },
-                        enabled = !state.submitting,
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Done,
-                        onDone = {
-                            focusManager.clearFocus()
-                            if (!state.submitting && username.isNotBlank()) onIdentify(username)
+                AnimatedContent(
+                    targetState = identified,
+                    modifier = Modifier.fillMaxWidth(),
+                    transitionSpec = {
+                        val enteringFromRight = targetState != null
+                        val direction = if (enteringFromRight) 1 else -1
+                        (fadeIn(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) +
+                            slideInHorizontally(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { direction * it / 7 }) togetherWith
+                            (fadeOut(tween(RPMotion.Fast)) +
+                                slideOutHorizontally(tween(RPMotion.Fast)) { -direction * it / 9 })
+                    },
+                    label = "login-step"
+                ) { identifiedUser ->
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (identifiedUser == null) {
+                            LoginField(
+                                label = "Usuário",
+                                value = username,
+                                onValueChange = { username = it },
+                                enabled = !state.submitting,
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Done,
+                                onDone = {
+                                    focusManager.clearFocus()
+                                    if (!state.submitting && username.isNotBlank()) onIdentify(username)
+                                }
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            LoginSubmit(
+                                text = if (state.submitting) "Procurando…" else "Continuar",
+                                enabled = !state.submitting && username.isNotBlank(),
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    onIdentify(username)
+                                }
+                            )
+                        } else {
+                            LoginIdentity(identifiedUser)
+                            LoginField(
+                                label = "Senha",
+                                value = password,
+                                onValueChange = { password = it },
+                                enabled = !state.submitting,
+                                password = true,
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done,
+                                onDone = {
+                                    focusManager.clearFocus()
+                                    if (!state.submitting && password.isNotBlank()) onLogin(password)
+                                }
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            LoginSubmit(
+                                text = if (state.submitting) "Entrando…" else "Entrar",
+                                enabled = !state.submitting && password.isNotBlank(),
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    onLogin(password)
+                                }
+                            )
+                            Surface(onClick = onSwitchUser, color = Color.Transparent, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                                Text("Trocar usuário", color = web.accentDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp))
+                            }
                         }
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    LoginSubmit(
-                        text = if (state.submitting) "Procurando…" else "Continuar",
-                        enabled = !state.submitting && username.isNotBlank(),
-                        onClick = {
-                            focusManager.clearFocus()
-                            onIdentify(username)
-                        }
-                    )
-                } else {
-                    LoginIdentity(identified)
-                    LoginField(
-                        label = "Senha",
-                        value = password,
-                        onValueChange = { password = it },
-                        enabled = !state.submitting,
-                        password = true,
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done,
-                        onDone = {
-                            focusManager.clearFocus()
-                            if (!state.submitting && password.isNotBlank()) onLogin(password)
-                        }
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    LoginSubmit(
-                        text = if (state.submitting) "Entrando…" else "Entrar",
-                        enabled = !state.submitting && password.isNotBlank(),
-                        onClick = {
-                            focusManager.clearFocus()
-                            onLogin(password)
-                        }
-                    )
-                    Surface(onClick = onSwitchUser, color = Color.Transparent, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                        Text("Trocar usuário", color = web.accentDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp))
                     }
                 }
 
-                Text(
-                    state.error.orEmpty(),
-                    color = if (state.error == null) web.muted else web.danger,
-                    fontSize = 11.sp,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    minLines = 1
-                )
+                AnimatedContent(
+                    targetState = state.error.orEmpty(),
+                    transitionSpec = {
+                        fadeIn(tween(RPMotion.Fast)) togetherWith fadeOut(tween(RPMotion.Quick))
+                    },
+                    label = "login-error"
+                ) { message ->
+                    Text(
+                        message,
+                        color = if (message.isBlank()) web.muted else web.danger,
+                        fontSize = 11.sp,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        minLines = 1
+                    )
+                }
                 Text(
                     "A biometria é validada pelo Android e não sai do seu aparelho.",
                     color = web.muted,
@@ -281,6 +321,16 @@ private fun BiometricUnlockScreen(
     val web = LocalRPWebColors.current
     var status by remember { mutableStateOf("") }
     var promptOpen by remember { mutableStateOf(false) }
+    val pulse = rememberInfiniteTransition(label = "biometric-pulse")
+    val pulseScale by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = RPMotion.EaseInOut),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "biometric-pulse-scale"
+    )
 
     fun authenticate() {
         if (promptOpen) return
@@ -341,7 +391,16 @@ private fun BiometricUnlockScreen(
                             border = BorderStroke(1.dp, web.border)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.Fingerprint, contentDescription = null, tint = web.accentDark, modifier = Modifier.size(23.dp))
+                                Icon(
+                                    Icons.Outlined.Fingerprint,
+                                    contentDescription = null,
+                                    tint = web.accentDark,
+                                    modifier = Modifier.size(23.dp).graphicsLayer {
+                                        val scale = if (promptOpen) pulseScale else 1f
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                )
                             }
                         }
                         Column {
@@ -356,14 +415,16 @@ private fun BiometricUnlockScreen(
                     Text("Usar senha", color = web.accentDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp))
                 }
 
-                Text(
-                    status,
-                    color = if (status.contains("não", ignoreCase = true) || status.contains("cancel", ignoreCase = true)) web.danger else web.muted,
-                    fontSize = 11.sp,
-                    minLines = 1,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
+                MotionValue(targetState = status, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { currentStatus ->
+                    Text(
+                        currentStatus,
+                        color = if (currentStatus.contains("não", ignoreCase = true) || currentStatus.contains("cancel", ignoreCase = true)) web.danger else web.muted,
+                        fontSize = 11.sp,
+                        minLines = 1,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
                 Text(
                     "Sua digital ou seu rosto são verificados pelo sistema biométrico nativo do Android.",
                     color = web.muted,
@@ -485,7 +546,11 @@ private fun LoginSubmit(text: String, enabled: Boolean, onClick: () -> Unit) {
         border = BorderStroke(1.dp, web.accent),
         shadowElevation = 7.dp
     ) {
-        Box(contentAlignment = Alignment.Center) { Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+        Box(contentAlignment = Alignment.Center) {
+            MotionValue(targetState = text) { label ->
+                Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
@@ -502,6 +567,24 @@ private fun Separator(text: String) {
 @Composable
 private fun LoginBackdrop(content: @Composable () -> Unit) {
     val web = LocalRPWebColors.current
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val alpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(RPMotion.Fast, easing = RPMotion.EaseOut),
+        label = "login-alpha"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (entered) 1f else .985f,
+        animationSpec = tween(RPMotion.Slow, easing = RPMotion.EaseOut),
+        label = "login-scale"
+    )
+    val lift by animateDpAsState(
+        targetValue = if (entered) 0.dp else 14.dp,
+        animationSpec = tween(RPMotion.Slow, easing = RPMotion.EaseOut),
+        label = "login-lift"
+    )
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize().background(web.appBackground)) {
         val density = LocalDensity.current
         val widthPx = with(density) { maxWidth.toPx() }
@@ -525,7 +608,18 @@ private fun LoginBackdrop(content: @Composable () -> Unit) {
                 )
             )
         )
-        Box(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 28.dp), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 28.dp)
+                .graphicsLayer {
+                    this.alpha = alpha
+                    scaleX = scale
+                    scaleY = scale
+                    translationY = with(density) { lift.toPx() }
+                },
+            contentAlignment = Alignment.Center
+        ) {
             content()
         }
     }

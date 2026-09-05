@@ -1,5 +1,15 @@
 package br.com.rpdoces.admin.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,7 +37,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -47,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -70,6 +80,8 @@ import br.com.rpdoces.admin.data.store.StoreRepository
 import br.com.rpdoces.admin.ui.admins.AdminsScreen
 import br.com.rpdoces.admin.ui.auth.AuthUiState
 import br.com.rpdoces.admin.ui.auth.AuthViewModel
+import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
+import br.com.rpdoces.admin.ui.components.RPMotion
 import br.com.rpdoces.admin.ui.dashboard.DashboardScreen
 import br.com.rpdoces.admin.ui.orders.OrdersScreen
 import br.com.rpdoces.admin.ui.products.ProductsScreen
@@ -242,36 +254,47 @@ private fun MainShell(
             }
         ) { scaffoldPadding ->
             Box(modifier = Modifier.fillMaxSize()) {
-                Column(
+                AnimatedContent(
+                    targetState = selected,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(bottom = scaffoldPadding.calculateBottomPadding())
-                        .padding(top = RPWebMetrics.mobileContentTop)
-                ) {
-                    PageHeader(selected)
-                    when (selected) {
-                        MainTab.Dashboard -> DashboardScreen(
-                            repository = dashboardRepository,
-                            onOpenOrders = { selected = MainTab.Pedidos },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        MainTab.Produtos -> ProductsScreen(
-                            repository = productsRepository,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        MainTab.Pedidos -> OrdersScreen(
-                            repository = ordersRepository,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        MainTab.Admins -> AdminsScreen(
-                            repository = adminsRepository,
-                            viewer = user,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        MainTab.Loja -> StoreScreen(
-                            repository = storeRepository,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                        .padding(top = RPWebMetrics.mobileContentTop),
+                    transitionSpec = {
+                        val direction = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                        (fadeIn(tween(RPMotion.Fast, easing = RPMotion.EaseOut)) +
+                            slideInHorizontally(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { direction * it / 7 }) togetherWith
+                            (fadeOut(tween(RPMotion.Fast)) +
+                                slideOutHorizontally(tween(RPMotion.Fast)) { -direction * it / 9 })
+                    },
+                    label = "main-tab"
+                ) { tab ->
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        PageHeader(tab)
+                        when (tab) {
+                            MainTab.Dashboard -> DashboardScreen(
+                                repository = dashboardRepository,
+                                onOpenOrders = { selected = MainTab.Pedidos },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            MainTab.Produtos -> ProductsScreen(
+                                repository = productsRepository,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            MainTab.Pedidos -> OrdersScreen(
+                                repository = ordersRepository,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            MainTab.Admins -> AdminsScreen(
+                                repository = adminsRepository,
+                                viewer = user,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            MainTab.Loja -> StoreScreen(
+                                repository = storeRepository,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
 
@@ -376,6 +399,11 @@ private fun MobileUtilities(
     modifier: Modifier = Modifier
 ) {
     val web = LocalRPWebColors.current
+    val profileScale by animateFloatAsState(
+        targetValue = if (profileOpen) .94f else 1f,
+        animationSpec = tween(RPMotion.Fast, easing = RPMotion.EaseOut),
+        label = "profile-scale"
+    )
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(RPWebMetrics.utilityGap),
@@ -409,7 +437,12 @@ private fun MobileUtilities(
         Box {
             Surface(
                 onClick = { onProfileOpenChange(true) },
-                modifier = Modifier.size(RPWebMetrics.utilitySize),
+                modifier = Modifier
+                    .size(RPWebMetrics.utilitySize)
+                    .graphicsLayer {
+                        scaleX = profileScale
+                        scaleY = profileScale
+                    },
                 shape = RoundedCornerShape(RPWebMetrics.utilityRadius),
                 color = web.surface,
                 border = BorderStroke(1.dp, web.border)
@@ -442,7 +475,7 @@ private fun MobileUtilities(
                 }
             }
 
-            DropdownMenu(expanded = profileOpen, onDismissRequest = { onProfileOpenChange(false) }) {
+            MotionDropdownMenu(expanded = profileOpen, onDismissRequest = { onProfileOpenChange(false) }) {
                 DropdownMenuItem(
                     text = {
                         Column {
@@ -492,6 +525,26 @@ private fun MobileBottomBar(
             ) {
                 MainTab.entries.forEach { tab ->
                     val active = selected == tab
+                    val indicatorWidth by animateDpAsState(
+                        targetValue = if (active) RPWebMetrics.bottomNavIndicatorWidth else 0.dp,
+                        animationSpec = tween(RPMotion.Normal, easing = RPMotion.EaseOut),
+                        label = "nav-indicator-${tab.name}"
+                    )
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (active) 1f else .92f,
+                        animationSpec = tween(RPMotion.Normal, easing = RPMotion.EaseOut),
+                        label = "nav-icon-${tab.name}"
+                    )
+                    val iconTint by animateColorAsState(
+                        targetValue = if (active) web.accentDark else web.muted,
+                        animationSpec = tween(RPMotion.Fast),
+                        label = "nav-tint-${tab.name}"
+                    )
+                    val labelColor by animateColorAsState(
+                        targetValue = if (active) web.accentDark else web.muted,
+                        animationSpec = tween(RPMotion.Fast),
+                        label = "nav-label-${tab.name}"
+                    )
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -503,9 +556,9 @@ private fun MobileBottomBar(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
-                                .width(RPWebMetrics.bottomNavIndicatorWidth)
+                                .width(indicatorWidth)
                                 .height(RPWebMetrics.bottomNavIndicatorHeight)
-                                .background(if (active) web.accent else Color.Transparent, RoundedCornerShape(99.dp))
+                                .background(web.accent, RoundedCornerShape(99.dp))
                         )
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -515,13 +568,18 @@ private fun MobileBottomBar(
                                 Icon(
                                     imageVector = tab.icon,
                                     contentDescription = tab.label,
-                                    modifier = Modifier.size(RPWebMetrics.bottomNavIcon),
-                                    tint = if (active) web.accentDark else web.muted
+                                    modifier = Modifier
+                                        .size(RPWebMetrics.bottomNavIcon)
+                                        .graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                        },
+                                    tint = iconTint
                                 )
                             }
                             Text(
                                 text = tab.mobileLabel,
-                                color = if (active) web.accentDark else web.muted,
+                                color = labelColor,
                                 fontSize = 8.75.sp,
                                 lineHeight = 11.sp,
                                 fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,

@@ -3,6 +3,14 @@ package br.com.rpdoces.admin.ui.products
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -18,13 +26,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +54,10 @@ import br.com.rpdoces.admin.data.products.CategoryInput
 import br.com.rpdoces.admin.data.products.Product
 import br.com.rpdoces.admin.data.products.ProductInput
 import br.com.rpdoces.admin.data.products.ProductsRepository
+import br.com.rpdoces.admin.ui.components.MotionChevron
+import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
+import br.com.rpdoces.admin.ui.components.MotionValue
+import br.com.rpdoces.admin.ui.components.RPMotion
 import br.com.rpdoces.admin.ui.components.WebField
 import br.com.rpdoces.admin.ui.components.WebModal
 import br.com.rpdoces.admin.ui.components.WebModalActions
@@ -135,11 +144,14 @@ internal fun ProductEditorDialog(
                     ) {
                         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                             val selected = categories.firstOrNull { it.id == category }
-                            Text("${selected?.emoji.orEmpty()} ${selected?.nome ?: category}".trim(), color = web.text, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = web.muted, modifier = Modifier.size(18.dp))
+                            val selectedLabel = "${selected?.emoji.orEmpty()} ${selected?.nome ?: category}".trim()
+                            MotionValue(targetState = selectedLabel, modifier = Modifier.weight(1f)) { label ->
+                                Text(label, color = web.text, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            MotionChevron(expanded = categoryOpen, tint = web.muted, modifier = Modifier.size(18.dp))
                         }
                     }
-                    DropdownMenu(expanded = categoryOpen, onDismissRequest = { categoryOpen = false }) {
+                    MotionDropdownMenu(expanded = categoryOpen, onDismissRequest = { categoryOpen = false }) {
                         categories.forEach { item ->
                             DropdownMenuItem(
                                 text = { Text("${item.emoji} ${item.nome}".trim()) },
@@ -157,7 +169,9 @@ internal fun ProductEditorDialog(
                     StepButton("−") { stock = ((stock.toIntOrNull() ?: 0) - 1).coerceAtLeast(product?.reservedStock ?: 0).toString() }
                     Surface(modifier = Modifier.weight(1f).height(40.dp), color = web.surface, border = BorderStroke(1.dp, web.borderStrong)) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(stock, color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            MotionValue(targetState = stock) { value ->
+                                Text(value, color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                     StepButton("+") { stock = ((stock.toIntOrNull() ?: 0) + 1).coerceAtMost(100000).toString() }
@@ -174,12 +188,27 @@ internal fun ProductEditorDialog(
         Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             emojiOptions.forEach { option ->
                 val selected = emoji == option
+                val scale by animateFloatAsState(
+                    targetValue = if (selected) 1.08f else 1f,
+                    animationSpec = tween(RPMotion.Normal, easing = RPMotion.EaseOut),
+                    label = "emoji-$option"
+                )
+                val borderColor by animateColorAsState(
+                    targetValue = if (selected) web.accent else web.borderStrong,
+                    animationSpec = tween(RPMotion.Fast),
+                    label = "emoji-border-$option"
+                )
+                val fillColor by animateColorAsState(
+                    targetValue = if (selected) web.accentSoft else web.surface,
+                    animationSpec = tween(RPMotion.Fast),
+                    label = "emoji-fill-$option"
+                )
                 Surface(
                     onClick = { emoji = option },
-                    modifier = Modifier.size(54.dp),
+                    modifier = Modifier.size(54.dp).graphicsLayer { scaleX = scale; scaleY = scale },
                     shape = RoundedCornerShape(10.dp),
-                    color = if (selected) web.accentSoft else web.surface,
-                    border = BorderStroke(1.dp, if (selected) web.accent else web.borderStrong)
+                    color = fillColor,
+                    border = BorderStroke(1.dp, borderColor)
                 ) {
                     Box(contentAlignment = Alignment.Center) { Text(option, fontSize = 20.sp) }
                 }
@@ -232,18 +261,24 @@ internal fun ProductEditorDialog(
         Spacer(Modifier.height(8.dp))
         ToggleCard("Promoção", "Ativa preço promocional e agendamento.", promotion) { promotion = !promotion }
 
-        if (promotion) {
-            Spacer(Modifier.height(12.dp))
-            Surface(shape = RoundedCornerShape(12.dp), color = web.accentSoft, border = BorderStroke(1.dp, web.pinkBorder)) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Configuração da promoção", color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text("Início e fim são opcionais. Sem datas, a promoção vale imediatamente.", color = web.muted, fontSize = 10.5.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 3.dp))
-                    Spacer(Modifier.height(12.dp))
-                    WebField("Preço promocional", promoPrice, { promoPrice = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } }, placeholder = "0,00")
-                    Spacer(Modifier.height(12.dp))
-                    WebField("Início", promoStart, { promoStart = it }, placeholder = "2026-09-05T18:00:00")
-                    Spacer(Modifier.height(12.dp))
-                    WebField("Fim", promoEnd, { promoEnd = it }, placeholder = "2026-09-10T23:59:00")
+        AnimatedVisibility(
+            visible = promotion,
+            enter = fadeIn(tween(RPMotion.Fast)) + expandVertically(tween(RPMotion.Normal, easing = RPMotion.EaseOut)),
+            exit = fadeOut(tween(RPMotion.Quick)) + shrinkVertically(tween(RPMotion.Fast))
+        ) {
+            Column {
+                Spacer(Modifier.height(12.dp))
+                Surface(shape = RoundedCornerShape(12.dp), color = web.accentSoft, border = BorderStroke(1.dp, web.pinkBorder)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text("Configuração da promoção", color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Início e fim são opcionais. Sem datas, a promoção vale imediatamente.", color = web.muted, fontSize = 10.5.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 3.dp))
+                        Spacer(Modifier.height(12.dp))
+                        WebField("Preço promocional", promoPrice, { promoPrice = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } }, placeholder = "0,00")
+                        Spacer(Modifier.height(12.dp))
+                        WebField("Início", promoStart, { promoStart = it }, placeholder = "2026-09-05T18:00:00")
+                        Spacer(Modifier.height(12.dp))
+                        WebField("Fim", promoEnd, { promoEnd = it }, placeholder = "2026-09-10T23:59:00")
+                    }
                 }
             }
         }
@@ -376,7 +411,9 @@ internal fun CategoryManagerDialog(
                         },
                         color = Color.Transparent
                     ) {
-                        Text(if (saving) "Criando…" else "+ Criar categoria", color = web.accentDark, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 9.dp))
+                        MotionValue(targetState = if (saving) "Criando…" else "+ Criar categoria") { label ->
+                            Text(label, color = web.accentDark, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 9.dp))
+                        }
                     }
                 }
             }
@@ -476,17 +513,34 @@ private fun StepButton(text: String, onClick: () -> Unit) {
 @Composable
 private fun ToggleCard(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     val web = LocalRPWebColors.current
+    val borderColor by animateColorAsState(
+        targetValue = if (checked) web.accent else web.borderStrong,
+        animationSpec = tween(RPMotion.Fast),
+        label = "toggle-border-$title"
+    )
+    val checkColor by animateColorAsState(
+        targetValue = if (checked) web.accent else web.surface,
+        animationSpec = tween(RPMotion.Fast),
+        label = "toggle-fill-$title"
+    )
+    val checkScale by animateFloatAsState(
+        targetValue = if (checked) 1f else .82f,
+        animationSpec = tween(RPMotion.Normal, easing = RPMotion.EaseOut),
+        label = "toggle-check-$title"
+    )
     Surface(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
         color = web.surface,
-        border = BorderStroke(1.dp, if (checked) web.accent else web.borderStrong)
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Row(modifier = Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-            Surface(modifier = Modifier.size(18.dp), shape = RoundedCornerShape(4.dp), color = if (checked) web.accent else web.surface, border = BorderStroke(1.dp, if (checked) web.accent else web.borderStrong)) {
-                Box(contentAlignment = Alignment.Center) { if (checked) Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            Surface(modifier = Modifier.size(18.dp), shape = RoundedCornerShape(4.dp), color = checkColor, border = BorderStroke(1.dp, borderColor)) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (checked) Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.graphicsLayer { scaleX = checkScale; scaleY = checkScale })
+                }
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = if (enabled) web.text else web.muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)

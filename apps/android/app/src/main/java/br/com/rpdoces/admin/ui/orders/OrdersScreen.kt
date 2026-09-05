@@ -1,5 +1,12 @@
 package br.com.rpdoces.admin.ui.orders
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,11 +29,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,6 +58,9 @@ import br.com.rpdoces.admin.data.dashboard.dashboardParseInstant
 import br.com.rpdoces.admin.data.orders.Order
 import br.com.rpdoces.admin.data.orders.OrdersRepository
 import br.com.rpdoces.admin.data.products.ProductsRepository
+import br.com.rpdoces.admin.ui.components.MotionChevron
+import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
+import br.com.rpdoces.admin.ui.components.RPMotion
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.time.ZoneId
@@ -189,10 +197,10 @@ fun OrdersScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text("${filter.label} · ${counts[filter] ?: 0}", color = web.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = web.muted, modifier = Modifier.size(18.dp))
+                                MotionChevron(expanded = filterOpen, tint = web.muted, modifier = Modifier.size(18.dp))
                             }
                         }
-                        DropdownMenu(expanded = filterOpen, onDismissRequest = { filterOpen = false }) {
+                        MotionDropdownMenu(expanded = filterOpen, onDismissRequest = { filterOpen = false }) {
                             OrderFilter.entries.forEach { item ->
                                 DropdownMenuItem(
                                     text = { Text("${item.label} · ${counts[item] ?: 0}") },
@@ -401,82 +409,92 @@ private fun OrderDetailDialog(
                 }
                 HorizontalDivider(color = web.border)
 
-                LazyColumn(
+                AnimatedContent(
+                    targetState = tab,
                     modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(top = 18.dp, bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    if (tab == "pedido") {
-                        item {
-                            DetailSection("Resumo") {
-                                DetailLine("Data", scheduleLabel(order.createdAt))
-                                DetailLine("Entrega", deliveryLabel(order.deliveryType))
-                                DetailLine("Pagamento", order.paymentMethod ?: "—")
-                                DetailLine("Total", money(order.totalCents), strong = true)
-                            }
-                        }
-                        item {
-                            DetailSection("Itens") {
-                                order.itens.forEach { item ->
-                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("${item.quantidade}× ${item.productName ?: "Produto"}", color = web.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                                        Text(money(item.totalCents), color = web.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                    }
+                    transitionSpec = {
+                        (fadeIn(tween(RPMotion.Fast, easing = RPMotion.EaseOut)) + slideInVertically(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { it / 12 }) togetherWith
+                            (fadeOut(tween(RPMotion.Fast)) + slideOutVertically(tween(RPMotion.Fast)) { -it / 14 })
+                    },
+                    label = "order-detail-tab"
+                ) { currentTab ->
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = 18.dp, bottom = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (currentTab == "pedido") {
+                            item {
+                                DetailSection("Resumo") {
+                                    DetailLine("Data", scheduleLabel(order.createdAt))
+                                    DetailLine("Entrega", deliveryLabel(order.deliveryType))
+                                    DetailLine("Pagamento", order.paymentMethod ?: "—")
+                                    DetailLine("Total", money(order.totalCents), strong = true)
                                 }
                             }
-                        }
-                        if (!order.note.isNullOrBlank()) {
-                            item { DetailSection("Observação") { Text(order.note, color = web.muted, fontSize = 12.sp, lineHeight = 17.sp) } }
-                        }
-                        item {
-                            DetailSection("Editar pedido") {
-                                SelectorField(
-                                    label = "Status",
-                                    value = orderStatusOptions.firstOrNull { it.first == status }?.second ?: status,
-                                    expanded = statusOpen,
-                                    onExpand = { statusOpen = true },
-                                    onDismiss = { statusOpen = false },
-                                    options = orderStatusOptions,
-                                    onSelect = { status = it; statusOpen = false }
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                SelectorField(
-                                    label = "Pagamento",
-                                    value = paymentOptions.firstOrNull { it.first == payment }?.second ?: payment,
-                                    expanded = paymentOpen,
-                                    onExpand = { paymentOpen = true },
-                                    onDismiss = { paymentOpen = false },
-                                    options = paymentOptions,
-                                    onSelect = { payment = it; paymentOpen = false }
-                                )
-                            }
-                        }
-                    } else {
-                        item {
-                            DetailSection("Comanda #${order.id}") {
-                                order.itens.forEach { item ->
-                                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("${item.quantidade}× ${item.productName ?: "Produto"}", color = web.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                            Text(financialLabel(item.financialStatus), color = if (item.financialStatus == "PAGO") web.tagGreenText else web.tagOrangeText, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                            item {
+                                DetailSection("Itens") {
+                                    order.itens.forEach { item ->
+                                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("${item.quantidade}× ${item.productName ?: "Produto"}", color = web.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                                            Text(money(item.totalCents), color = web.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                         }
-                                        Text(
-                                            when (item.financialStatus?.uppercase()) {
-                                                "PAGO" -> "${money(item.paidCents)} pagos"
-                                                "PARCIAL" -> "${money(item.paidCents)} pagos · ${money(item.balanceCents)} pendentes"
-                                                else -> "${money(item.balanceCents.takeIf { it > 0 } ?: item.totalCents)} pendentes"
-                                            },
-                                            color = web.muted,
-                                            fontSize = 10.5.sp,
-                                            modifier = Modifier.padding(top = 3.dp)
-                                        )
                                     }
-                                    HorizontalDivider(color = web.border)
                                 }
-                                Spacer(Modifier.height(8.dp))
-                                DetailLine("Total", money(order.totalCents))
-                                DetailLine("Pago", money(order.paidCents))
-                                DetailLine("Restante", money(order.balanceCents), strong = true)
+                            }
+                            if (!order.note.isNullOrBlank()) {
+                                item { DetailSection("Observação") { Text(order.note, color = web.muted, fontSize = 12.sp, lineHeight = 17.sp) } }
+                            }
+                            item {
+                                DetailSection("Editar pedido") {
+                                    SelectorField(
+                                        label = "Status",
+                                        value = orderStatusOptions.firstOrNull { it.first == status }?.second ?: status,
+                                        expanded = statusOpen,
+                                        onExpand = { statusOpen = true },
+                                        onDismiss = { statusOpen = false },
+                                        options = orderStatusOptions,
+                                        onSelect = { status = it; statusOpen = false }
+                                    )
+                                    Spacer(Modifier.height(10.dp))
+                                    SelectorField(
+                                        label = "Pagamento",
+                                        value = paymentOptions.firstOrNull { it.first == payment }?.second ?: payment,
+                                        expanded = paymentOpen,
+                                        onExpand = { paymentOpen = true },
+                                        onDismiss = { paymentOpen = false },
+                                        options = paymentOptions,
+                                        onSelect = { payment = it; paymentOpen = false }
+                                    )
+                                }
+                            }
+                        } else {
+                            item {
+                                DetailSection("Comanda #${order.id}") {
+                                    order.itens.forEach { item ->
+                                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Text("${item.quantidade}× ${item.productName ?: "Produto"}", color = web.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                                Text(financialLabel(item.financialStatus), color = if (item.financialStatus == "PAGO") web.tagGreenText else web.tagOrangeText, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                            Text(
+                                                when (item.financialStatus?.uppercase()) {
+                                                    "PAGO" -> "${money(item.paidCents)} pagos"
+                                                    "PARCIAL" -> "${money(item.paidCents)} pagos · ${money(item.balanceCents)} pendentes"
+                                                    else -> "${money(item.balanceCents.takeIf { it > 0 } ?: item.totalCents)} pendentes"
+                                                },
+                                                color = web.muted,
+                                                fontSize = 10.5.sp,
+                                                modifier = Modifier.padding(top = 3.dp)
+                                            )
+                                        }
+                                        HorizontalDivider(color = web.border)
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    DetailLine("Total", money(order.totalCents))
+                                    DetailLine("Pago", money(order.paidCents))
+                                    DetailLine("Restante", money(order.balanceCents), strong = true)
+                                }
                             }
                         }
                     }
@@ -567,10 +585,10 @@ private fun SelectorField(
             Surface(onClick = onExpand, modifier = Modifier.fillMaxWidth().height(40.dp), shape = RoundedCornerShape(9.dp), color = web.surface, border = BorderStroke(1.dp, web.borderStrong)) {
                 Row(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(value, color = web.text, fontSize = 12.sp)
-                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = web.muted, modifier = Modifier.size(18.dp))
+                    MotionChevron(expanded = expanded, tint = web.muted, modifier = Modifier.size(18.dp))
                 }
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+            MotionDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
                 options.forEach { (key, text) -> DropdownMenuItem(text = { Text(text) }, onClick = { onSelect(key) }) }
             }
         }

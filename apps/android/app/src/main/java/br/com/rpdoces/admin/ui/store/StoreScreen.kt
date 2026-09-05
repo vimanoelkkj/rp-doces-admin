@@ -1,6 +1,14 @@
 package br.com.rpdoces.admin.ui.store
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,6 +51,7 @@ import br.com.rpdoces.admin.BuildConfig
 import br.com.rpdoces.admin.data.store.StoreConfig
 import br.com.rpdoces.admin.data.store.StoreRepository
 import br.com.rpdoces.admin.data.store.StoreUpdateInput
+import br.com.rpdoces.admin.ui.components.RPMotion
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -123,16 +133,24 @@ fun StoreScreen(
             }
         }
 
-        if (error != null) {
-            item {
+        item {
+            AnimatedVisibility(
+                visible = error != null,
+                enter = fadeIn(tween(RPMotion.Fast)) + expandVertically(tween(RPMotion.Normal, easing = RPMotion.EaseOut)),
+                exit = fadeOut(tween(RPMotion.Quick)) + shrinkVertically(tween(RPMotion.Fast))
+            ) {
                 Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = web.accentSoft) {
                     Text(error.orEmpty(), color = web.danger, fontSize = 11.5.sp, modifier = Modifier.padding(12.dp))
                 }
             }
         }
 
-        if (status != null) {
-            item {
+        item {
+            AnimatedVisibility(
+                visible = status != null,
+                enter = fadeIn(tween(RPMotion.Fast)) + expandVertically(tween(RPMotion.Normal, easing = RPMotion.EaseOut)),
+                exit = fadeOut(tween(RPMotion.Quick)) + shrinkVertically(tween(RPMotion.Fast))
+            ) {
                 Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = web.greenSoft) {
                     Text(status.orEmpty(), color = web.tagGreenText, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp))
                 }
@@ -144,14 +162,30 @@ fun StoreScreen(
                 Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     storeDays.forEach { (key, label) ->
                         val active = key in activeDays
+                        val fill by animateColorAsState(
+                            targetValue = if (active) web.accentSoft else web.surface,
+                            animationSpec = tween(RPMotion.Fast),
+                            label = "day-fill-$key"
+                        )
+                        val stroke by animateColorAsState(
+                            targetValue = if (active) web.accent else web.borderStrong,
+                            animationSpec = tween(RPMotion.Fast),
+                            label = "day-stroke-$key"
+                        )
+                        val scale by animateFloatAsState(
+                            targetValue = if (active) 1.04f else 1f,
+                            animationSpec = tween(RPMotion.Normal, easing = RPMotion.EaseOut),
+                            label = "day-scale-$key"
+                        )
                         Surface(
                             onClick = {
                                 activeDays = if (active) activeDays - key else activeDays + key
                                 status = null
                             },
+                            modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (active) web.accentSoft else web.surface,
-                            border = BorderStroke(1.dp, if (active) web.accent else web.borderStrong)
+                            color = fill,
+                            border = BorderStroke(1.dp, stroke)
                         ) {
                             Text(label, color = if (active) web.accentDark else web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp))
                         }
@@ -189,12 +223,27 @@ fun StoreScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     deliveryOptions.forEach { (key, label) ->
                         val active = deliveryStatus == key
+                        val fill by animateColorAsState(
+                            targetValue = if (active) web.accentSoft else web.surface,
+                            animationSpec = tween(RPMotion.Fast),
+                            label = "delivery-fill-$key"
+                        )
+                        val stroke by animateColorAsState(
+                            targetValue = if (active) web.accent else web.borderStrong,
+                            animationSpec = tween(RPMotion.Fast),
+                            label = "delivery-stroke-$key"
+                        )
+                        val scale by animateFloatAsState(
+                            targetValue = if (active) 1.025f else 1f,
+                            animationSpec = tween(RPMotion.Normal, easing = RPMotion.EaseOut),
+                            label = "delivery-scale-$key"
+                        )
                         Surface(
                             onClick = { deliveryStatus = key; status = null },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).graphicsLayer { scaleX = scale; scaleY = scale },
                             shape = RoundedCornerShape(9.dp),
-                            color = if (active) web.accentSoft else web.surface,
-                            border = BorderStroke(1.dp, if (active) web.accent else web.borderStrong)
+                            color = fill,
+                            border = BorderStroke(1.dp, stroke)
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.height(42.dp)) {
                                 Text(label, color = if (active) web.accentDark else web.muted, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
