@@ -22,6 +22,22 @@ data class AuthUser(
 )
 
 @Serializable
+data class IdentifiedUser(
+    val nome: String,
+    val username: String,
+    @SerialName("avatar_url") val avatarUrl: String? = null
+)
+
+@Serializable
+private data class IdentifyRequest(val username: String)
+
+@Serializable
+private data class IdentifyResponse(
+    val encontrado: Boolean,
+    val usuario: IdentifiedUser? = null
+)
+
+@Serializable
 private data class LoginRequest(
     val username: String,
     val senha: String
@@ -53,6 +69,9 @@ private data class ApiError(
 )
 
 private interface AuthApi {
+    @POST("api/auth/identify")
+    suspend fun identify(@Body body: IdentifyRequest): Response<IdentifyResponse>
+
     @POST("api/auth/login")
     suspend fun login(@Body body: LoginRequest): Response<LoginResponse>
 
@@ -80,6 +99,15 @@ class AuthRepository(
         }
         if (!response.isSuccessful) throw error(response, "Não foi possível verificar a sessão.")
         return response.body()?.takeIf { it.autenticado }?.usuario
+    }
+
+    suspend fun identify(username: String): IdentifiedUser? {
+        val normalized = username.trim().lowercase()
+        if (normalized.isBlank()) throw AuthException("Informe seu usuário.")
+        val response = api.identify(IdentifyRequest(normalized))
+        if (!response.isSuccessful) throw error(response, "Não foi possível localizar a conta.")
+        val body = response.body() ?: throw AuthException("Resposta inválida do servidor.", response.code())
+        return body.usuario?.takeIf { body.encontrado }
     }
 
     suspend fun login(username: String, password: String): AuthUser {
