@@ -9,7 +9,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.DropdownMenu
@@ -20,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
+import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 
 object RPMotion {
     const val Quick = 120
@@ -38,6 +43,8 @@ fun MotionDropdownMenu(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val web = LocalRPWebColors.current
+    val menuShape = RoundedCornerShape(14.dp)
     val scale by animateFloatAsState(
         targetValue = if (expanded) 1f else .965f,
         animationSpec = tween(RPMotion.Fast, easing = RPMotion.EaseOut),
@@ -52,12 +59,15 @@ fun MotionDropdownMenu(
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = modifier.graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-            this.alpha = alpha
-            transformOrigin = TransformOrigin(.88f, 0f)
-        },
+        modifier = modifier
+            .background(web.surface, menuShape)
+            .border(1.dp, web.borderStrong, menuShape)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+                transformOrigin = TransformOrigin(.88f, 0f)
+            },
         content = content
     )
 }
