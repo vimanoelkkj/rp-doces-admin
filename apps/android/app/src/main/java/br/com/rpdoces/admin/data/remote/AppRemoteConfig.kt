@@ -17,6 +17,14 @@ private const val KEY_SAVED_AT = "saved_at"
 private const val MIN_POLL_SECONDS = 3L
 private const val MAX_POLL_SECONDS = 300L
 
+private val allowedDashboardSections = setOf(
+    "metrics",
+    "flavors",
+    "receivables",
+    "recent_orders",
+    "attention"
+)
+
 @Serializable
 data class AppRemoteConfig(
     @SerialName("schema_version") val schemaVersion: Int = 1,
@@ -24,14 +32,33 @@ data class AppRemoteConfig(
     @SerialName("min_app_version_code") val minAppVersionCode: Int = 1,
     @SerialName("poll_seconds") val pollSeconds: Long = 5L,
     val theme: String = "system",
-    @SerialName("dashboard_banner") val dashboardBanner: DashboardRemoteBanner = DashboardRemoteBanner()
+    @SerialName("dashboard_banner") val dashboardBanner: DashboardRemoteBanner = DashboardRemoteBanner(),
+    val features: RemoteFeatureFlags = RemoteFeatureFlags(),
+    @SerialName("dashboard_section_order") val dashboardSectionOrder: List<String> = listOf(
+        "metrics",
+        "flavors",
+        "receivables",
+        "recent_orders",
+        "attention"
+    )
 )
 
 @Serializable
 data class DashboardRemoteBanner(
     val enabled: Boolean = false,
+    val eyebrow: String = "AVISO",
     val title: String = "",
-    val message: String = ""
+    val message: String = "",
+    val tone: String = "accent"
+)
+
+@Serializable
+data class RemoteFeatureFlags(
+    @SerialName("dashboard_metrics") val dashboardMetrics: Boolean = true,
+    @SerialName("dashboard_flavors") val dashboardFlavors: Boolean = true,
+    @SerialName("dashboard_receivables") val dashboardReceivables: Boolean = true,
+    @SerialName("dashboard_recent_orders") val dashboardRecentOrders: Boolean = true,
+    @SerialName("dashboard_attention") val dashboardAttention: Boolean = true
 )
 
 class AppRemoteConfigRepository(context: Context) {
@@ -114,6 +141,14 @@ class AppRemoteConfigRepository(context: Context) {
         require(normalizedTheme in setOf("system", "light", "dark")) {
             "Tema remoto inválido."
         }
+
+        val normalizedTone = config.dashboardBanner.tone.trim().lowercase()
+        require(normalizedTone in setOf("accent", "success", "warning", "neutral")) {
+            "Tom do banner remoto inválido."
+        }
+        require(config.dashboardBanner.eyebrow.length <= 30) {
+            "Eyebrow do banner remoto excede 30 caracteres."
+        }
         require(config.dashboardBanner.title.length <= 80) {
             "Título do banner remoto excede 80 caracteres."
         }
@@ -121,6 +156,15 @@ class AppRemoteConfigRepository(context: Context) {
             "Mensagem do banner remoto excede 280 caracteres."
         }
 
-        return config.copy(theme = normalizedTheme)
+        val sectionOrder = config.dashboardSectionOrder.map { it.trim().lowercase() }
+        require(sectionOrder.size == allowedDashboardSections.size && sectionOrder.toSet() == allowedDashboardSections) {
+            "Ordem remota das seções do dashboard inválida."
+        }
+
+        return config.copy(
+            theme = normalizedTheme,
+            dashboardBanner = config.dashboardBanner.copy(tone = normalizedTone),
+            dashboardSectionOrder = sectionOrder
+        )
     }
 }
