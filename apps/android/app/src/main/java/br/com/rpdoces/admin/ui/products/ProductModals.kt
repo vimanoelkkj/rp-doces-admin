@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,12 +70,12 @@ import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import coil3.compose.AsyncImage
 import java.text.NumberFormat
 import java.util.Locale
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val emojiOptions = listOf("🍰", "🧁", "🍮", "🎂", "🍓", "🍫", "🥥", "🍋", "🍯", "🍪")
+private val numericKeyboard = KeyboardOptions(keyboardType = KeyboardType.Number)
 
 @Composable
 internal fun ProductEditorDialog(
@@ -91,13 +93,13 @@ internal fun ProductEditorDialog(
     var category by remember(product?.id) { mutableStateOf(product?.categoria.orEmpty()) }
     var stock by remember(product?.id) { mutableStateOf((product?.estoque ?: 0).toString()) }
     var emoji by remember(product?.id) { mutableStateOf(product?.emoji ?: "🍰") }
-    var price by remember(product?.id) { mutableStateOf(centsToInput(product?.priceCents ?: 0)) }
+    var price by remember(product?.id) { mutableStateOf(centsToCurrencyInput(product?.priceCents ?: 0)) }
     var description by remember(product?.id) { mutableStateOf(product?.descricao.orEmpty()) }
     var active by remember(product?.id) { mutableStateOf(product?.ativo ?: true) }
     var available by remember(product?.id) { mutableStateOf(product?.disponivel ?: true) }
     var featured by remember(product?.id) { mutableStateOf(product?.destaque ?: false) }
     var promotion by remember(product?.id) { mutableStateOf(product?.promotionActive ?: false) }
-    var promoPrice by remember(product?.id) { mutableStateOf(product?.promotionalPriceCents?.let(::centsToInput).orEmpty()) }
+    var promoPrice by remember(product?.id) { mutableStateOf(product?.promotionalPriceCents?.let(::centsToCurrencyInput).orEmpty()) }
     var promoStart by remember(product?.id) { mutableStateOf(product?.promotionStart.orEmpty()) }
     var promoEnd by remember(product?.id) { mutableStateOf(product?.promotionEnd.orEmpty()) }
     var pickedUri by remember(product?.id) { mutableStateOf<Uri?>(null) }
@@ -231,7 +233,13 @@ internal fun ProductEditorDialog(
         }
 
         Spacer(Modifier.height(18.dp))
-        WebField("Preço", price, { price = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } }, placeholder = "0,00")
+        WebField(
+            label = "Preço",
+            value = price,
+            onValueChange = { price = currencyInput(it) },
+            placeholder = "R$ 0,00",
+            keyboardOptions = numericKeyboard
+        )
         Spacer(Modifier.height(18.dp))
 
         Text("FOTO", color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
@@ -288,7 +296,13 @@ internal fun ProductEditorDialog(
                         Text("Configuração da promoção", color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Text("Início e fim são opcionais. Sem datas, a promoção vale imediatamente.", color = web.muted, fontSize = 10.5.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 3.dp))
                         Spacer(Modifier.height(12.dp))
-                        WebField("Preço promocional", promoPrice, { promoPrice = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } }, placeholder = "0,00")
+                        WebField(
+                            label = "Preço promocional",
+                            value = promoPrice,
+                            onValueChange = { promoPrice = currencyInput(it) },
+                            placeholder = "R$ 0,00",
+                            keyboardOptions = numericKeyboard
+                        )
                         Spacer(Modifier.height(12.dp))
                         WebField("Início", promoStart, { promoStart = it }, placeholder = "2026-09-05T18:00:00")
                         Spacer(Modifier.height(12.dp))
@@ -565,10 +579,17 @@ private fun ToggleCard(title: String, subtitle: String, checked: Boolean, enable
     }
 }
 
-private fun inputToCents(value: String): Int {
-    val normalized = value.trim().replace(" ", "").replace(",", ".")
-    return ((normalized.toDoubleOrNull() ?: 0.0) * 100.0).roundToInt()
+private fun currencyInput(value: String): String {
+    val digits = value.filter(Char::isDigit).trimStart('0').take(9)
+    if (digits.isEmpty()) return ""
+    val cents = digits.toLongOrNull()?.coerceAtMost(999_999_999L) ?: 0L
+    return NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(cents / 100.0)
 }
 
-private fun centsToInput(cents: Int): String = String.format(Locale("pt", "BR"), "%.2f", cents / 100.0)
+private fun inputToCents(value: String): Int =
+    value.filter(Char::isDigit).toLongOrNull()?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: 0
+
+private fun centsToCurrencyInput(cents: Int): String =
+    NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(cents.coerceAtLeast(0) / 100.0)
+
 private fun money(cents: Int): String = NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(cents / 100.0)
