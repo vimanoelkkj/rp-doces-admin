@@ -2,6 +2,7 @@ package br.com.rpdoces.admin.ui
 
 import android.Manifest
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -37,6 +38,8 @@ import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -84,6 +87,7 @@ import br.com.rpdoces.admin.data.products.ProductsRepository
 import br.com.rpdoces.admin.data.store.StoreRepository
 import br.com.rpdoces.admin.notifications.NativeNotifications
 import br.com.rpdoces.admin.ui.admins.AdminsScreen
+import br.com.rpdoces.admin.ui.appcontrol.AppControlScreen
 import br.com.rpdoces.admin.ui.auth.AuthUiState
 import br.com.rpdoces.admin.ui.auth.AuthViewModel
 import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
@@ -260,13 +264,22 @@ private fun MainShell(
     val visibleTabs = remember(remoteConfig.navigation) {
         MainTab.entries.filter { remoteConfig.navigation.isVisible(it.remoteKey) }
     }
+    val canManageApp = remember(user.papel) {
+        user.papel.trim().uppercase() in setOf("OWNER", "ADMIN")
+    }
     var selected by rememberSaveable { mutableStateOf(MainTab.Dashboard) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var notificationOpen by rememberSaveable { mutableStateOf(false) }
+    var appControlOpen by rememberSaveable { mutableStateOf(false) }
     var notificationsEnabled by remember { mutableStateOf(NativeNotifications.isEnabled(context)) }
+
+    BackHandler(enabled = appControlOpen) {
+        appControlOpen = false
+    }
 
     fun openTab(tab: MainTab) {
         if (tab !in visibleTabs || tab == selected) return
+        appControlOpen = false
         profileOpen = false
         notificationOpen = false
         selected = tab
@@ -332,80 +345,99 @@ private fun MainShell(
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                MobileBottomBar(
-                    selected = selected,
-                    tabs = visibleTabs,
-                    onSelected = ::openTab
-                )
+                if (!appControlOpen) {
+                    MobileBottomBar(
+                        selected = selected,
+                        tabs = visibleTabs,
+                        onSelected = ::openTab
+                    )
+                }
             }
         ) { scaffoldPadding ->
             Box(modifier = Modifier.fillMaxSize()) {
-                AnimatedContent(
-                    targetState = selected,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = scaffoldPadding.calculateBottomPadding())
-                        .padding(top = RPWebMetrics.mobileContentTop),
-                    transitionSpec = {
-                        val direction = if (targetState.ordinal >= initialState.ordinal) 1 else -1
-                        (fadeIn(tween(RPMotion.Fast, easing = RPMotion.EaseOut)) +
-                            slideInHorizontally(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { direction * it / 7 }) togetherWith
-                            (fadeOut(tween(RPMotion.Fast)) +
-                                slideOutHorizontally(tween(RPMotion.Fast)) { -direction * it / 9 })
-                    },
-                    label = "main-tab"
-                ) { tab ->
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        PageHeader(tab)
-                        when (tab) {
-                            MainTab.Dashboard -> DashboardScreen(
-                                repository = dashboardRepository,
-                                onOpenOrders = { openTab(MainTab.Pedidos) },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            MainTab.Produtos -> ProductsScreen(
-                                repository = productsRepository,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            MainTab.Pedidos -> OrdersScreen(
-                                repository = ordersRepository,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            MainTab.Admins -> AdminsScreen(
-                                repository = adminsRepository,
-                                viewer = user,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            MainTab.Loja -> StoreScreen(
-                                repository = storeRepository,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                if (appControlOpen) {
+                    AppControlScreen(
+                        viewer = user,
+                        onBack = { appControlOpen = false },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                    )
+                } else {
+                    AnimatedContent(
+                        targetState = selected,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = scaffoldPadding.calculateBottomPadding())
+                            .padding(top = RPWebMetrics.mobileContentTop),
+                        transitionSpec = {
+                            val direction = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                            (fadeIn(tween(RPMotion.Fast, easing = RPMotion.EaseOut)) +
+                                slideInHorizontally(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { direction * it / 7 }) togetherWith
+                                (fadeOut(tween(RPMotion.Fast)) +
+                                    slideOutHorizontally(tween(RPMotion.Fast)) { -direction * it / 9 })
+                        },
+                        label = "main-tab"
+                    ) { tab ->
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            PageHeader(tab)
+                            when (tab) {
+                                MainTab.Dashboard -> DashboardScreen(
+                                    repository = dashboardRepository,
+                                    onOpenOrders = { openTab(MainTab.Pedidos) },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                MainTab.Produtos -> ProductsScreen(
+                                    repository = productsRepository,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                MainTab.Pedidos -> OrdersScreen(
+                                    repository = ordersRepository,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                MainTab.Admins -> AdminsScreen(
+                                    repository = adminsRepository,
+                                    viewer = user,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                MainTab.Loja -> StoreScreen(
+                                    repository = storeRepository,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
-                }
 
-                MobileUtilities(
-                    user = user,
-                    profileOpen = profileOpen,
-                    notificationOpen = notificationOpen,
-                    notificationsEnabled = notificationsEnabled && remoteConfig.features.paidOrderNotifications,
-                    notificationFeatureEnabled = remoteConfig.features.paidOrderNotifications,
-                    onProfileOpenChange = {
-                        notificationOpen = false
-                        profileOpen = it
-                    },
-                    onNotificationOpenChange = {
-                        profileOpen = false
-                        notificationOpen = it
-                        if (it) notificationsEnabled = NativeNotifications.isEnabled(context)
-                    },
-                    onToggleNotifications = ::toggleNotifications,
-                    onLogout = onLogout,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(end = RPWebMetrics.utilityRight)
-                )
+                    MobileUtilities(
+                        user = user,
+                        profileOpen = profileOpen,
+                        notificationOpen = notificationOpen,
+                        notificationsEnabled = notificationsEnabled && remoteConfig.features.paidOrderNotifications,
+                        notificationFeatureEnabled = remoteConfig.features.paidOrderNotifications,
+                        canManageApp = canManageApp,
+                        onProfileOpenChange = {
+                            notificationOpen = false
+                            profileOpen = it
+                        },
+                        onNotificationOpenChange = {
+                            profileOpen = false
+                            notificationOpen = it
+                            if (it) notificationsEnabled = NativeNotifications.isEnabled(context)
+                        },
+                        onToggleNotifications = ::toggleNotifications,
+                        onOpenAppControl = {
+                            profileOpen = false
+                            notificationOpen = false
+                            appControlOpen = true
+                        },
+                        onLogout = onLogout,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                            .padding(end = RPWebMetrics.utilityRight)
+                    )
+                }
             }
         }
     }
@@ -495,9 +527,11 @@ private fun MobileUtilities(
     notificationOpen: Boolean,
     notificationsEnabled: Boolean,
     notificationFeatureEnabled: Boolean,
+    canManageApp: Boolean,
     onProfileOpenChange: (Boolean) -> Unit,
     onNotificationOpenChange: (Boolean) -> Unit,
     onToggleNotifications: () -> Unit,
+    onOpenAppControl: () -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -691,6 +725,22 @@ private fun MobileUtilities(
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
+                        }
+                    }
+                    if (canManageApp) {
+                        Surface(
+                            onClick = onOpenAppControl,
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
+                            ) {
+                                Icon(Icons.Outlined.Tune, contentDescription = null, tint = web.accentDark, modifier = Modifier.size(17.dp))
+                                Text("Controle do App", color = web.text, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                     Surface(
