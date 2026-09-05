@@ -3,7 +3,7 @@
   "name": "R&P Doces Admin",
   "short_name": "R&P Admin",
   "description": "Painel administrativo da R&P Doces.",
-  "start_url": "/admin-v2/#/dashboard",
+  "start_url": "/admin/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
