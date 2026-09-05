@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
 /**
- * Ícones da navegação copiados 1:1 dos SVGs usados em admin-v2/src/layout/AdminShell.tsx.
+ * Ícones copiados 1:1 dos SVGs usados em admin-v2/src/layout/AdminShell.tsx.
  * ViewBox 24x24, fill none, stroke currentColor, stroke-width 1.7,
  * stroke-linecap round e stroke-linejoin round, exatamente como no CSS web.
  */
@@ -27,31 +27,35 @@ internal object SiteNavIcons {
     }
 
     val Products: ImageVector by lazy {
-        vector(
-            "products",
-            "M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M4.5 7.8 12 12.1l7.5-4.3 M12 12v9"
-        )
+        vector("products", "M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M4.5 7.8 12 12.1l7.5-4.3 M12 12v9")
     }
 
     val Orders: ImageVector by lazy {
-        vector(
-            "orders",
-            "M7 6h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z M9 6V4h6v2 M9 11h6 M9 15h4"
-        )
+        vector("orders", "M7 6h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z M9 6V4h6v2 M9 11h6 M9 15h4")
     }
 
     val Users: ImageVector by lazy {
-        vector(
-            "users",
-            "M12 8a3 3 0 1 1-6 0 3 3 0 1 1 6 0 M4 20c0-3 2.2-5 5-5s5 2 5 5 M17 7v6 M14 10h6"
-        )
+        vector("users", "M12 8a3 3 0 1 1-6 0 3 3 0 1 1 6 0 M4 20c0-3 2.2-5 5-5s5 2 5 5 M17 7v6 M14 10h6")
     }
 
     val Store: ImageVector by lazy {
-        vector(
-            "store",
-            "M4 9h16l-2-5H6L4 9Z M5 9v11h14V9 M9 20v-6h6v6"
-        )
+        vector("store", "M4 9h16l-2-5H6L4 9Z M5 9v11h14V9 M9 20v-6h6v6")
+    }
+
+    val Bell: ImageVector by lazy {
+        vector("bell", "M6 17h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v5L6 17Z M10 20h4")
+    }
+
+    val Sun: ImageVector by lazy {
+        vector("sun", "M12 8a4 4 0 1 1 0 8 4 4 0 1 1 0-8 M12 2.5V5 M12 19v2.5 M4.6 4.6l1.8 1.8 M17.6 17.6l1.8 1.8 M2.5 12H5 M19 12h2.5 M4.6 19.4l1.8-1.8 M17.6 6.4l1.8-1.8")
+    }
+
+    val Moon: ImageVector by lazy {
+        vector("moon", "M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5Z")
+    }
+
+    val Logout: ImageVector by lazy {
+        vector("logout", "M10 5H5v14h5 M13 8l4 4-4 4 M17 12H9")
     }
 
     private fun vector(name: String, svgPath: String): ImageVector =
