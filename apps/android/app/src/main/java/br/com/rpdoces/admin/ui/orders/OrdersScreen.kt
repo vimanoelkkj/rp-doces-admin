@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -319,7 +320,7 @@ private fun OrderMobileRow(order: Order, onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 8.dp)
             )
-            Icon(Icons.Outlined.KeyboardArrowRight, contentDescription = null, tint = web.muted, modifier = Modifier.size(18.dp).padding(top = 4.dp))
+            Icon(Icons.Outlined.KeyboardArrowRight, contentDescription = null, tint = web.muted, modifier = Modifier.size(18.dp))
         }
     }
     HorizontalDivider(color = web.border)
@@ -472,18 +473,19 @@ private fun OrderDetailDialog(
                 if (tab == "pedido") {
                     Surface(
                         onClick = {
-                            if (saving) return@Surface
-                            saving = true
-                            error = null
-                            scope.launch {
-                                runCatching {
-                                    if (status != order.orderStatus?.uppercase()) repository.updateStatus(order.id, status)
-                                    if (payment != effectiveFinancialStatus(order)) repository.updatePayment(order.id, payment)
-                                }.onSuccess {
-                                    onUpdated()
-                                    onDismiss()
-                                }.onFailure { error = it.message ?: "Não foi possível salvar as alterações." }
-                                saving = false
+                            if (!saving) {
+                                saving = true
+                                error = null
+                                scope.launch {
+                                    runCatching {
+                                        if (status != order.orderStatus?.uppercase()) repository.updateStatus(order.id, status)
+                                        if (payment != effectiveFinancialStatus(order)) repository.updatePayment(order.id, payment)
+                                    }.onSuccess {
+                                        onUpdated()
+                                        onDismiss()
+                                    }.onFailure { error = it.message ?: "Não foi possível salvar as alterações." }
+                                    saving = false
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(44.dp),
@@ -513,11 +515,11 @@ private fun DetailTab(text: String, active: Boolean, modifier: Modifier, onClick
 }
 
 @Composable
-private fun DetailSection(title: String, content: @Composable Column.() -> Unit) {
+private fun DetailSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     val web = LocalRPWebColors.current
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = web.surfaceSoft, border = BorderStroke(1.dp, web.border)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, color = web.text, fontSize = 13pxToSp(), fontWeight = FontWeight.Bold)
+            Text(title, color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
             content()
         }
@@ -597,5 +599,3 @@ private fun isToday(value: String?): Boolean {
 }
 
 private fun money(cents: Int): String = NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(cents / 100.0)
-private fun Int?.orZero(): Int = this ?: 0
-private fun Int.pxToSp() = this.sp
