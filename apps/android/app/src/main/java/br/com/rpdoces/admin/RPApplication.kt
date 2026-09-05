@@ -2,6 +2,7 @@ package br.com.rpdoces.admin
 
 import android.app.Application
 import br.com.rpdoces.admin.data.auth.AuthRepository
+import br.com.rpdoces.admin.data.dashboard.DashboardRepository
 import br.com.rpdoces.admin.data.network.ApiClient
 import br.com.rpdoces.admin.data.network.SessionCookieJar
 
@@ -24,4 +25,6 @@ class AppContainer(application: Application) {
         json = apiClient.json,
         cookieJar = sessionCookieJar
     )
+
+    val dashboardRepository = DashboardRepository(apiClient.retrofit)
 }
