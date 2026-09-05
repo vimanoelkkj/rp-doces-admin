@@ -48,12 +48,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import br.com.rpdoces.admin.data.dashboard.DashboardOrder
 import br.com.rpdoces.admin.data.dashboard.DashboardProduct
 import br.com.rpdoces.admin.data.dashboard.DashboardRepository
 import br.com.rpdoces.admin.data.dashboard.DashboardSnapshot
 import br.com.rpdoces.admin.data.dashboard.dashboardParseInstant
 import br.com.rpdoces.admin.data.dashboard.effectivePaymentStatus
+import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.ZoneId
@@ -66,6 +66,7 @@ private val WarningOrange = Color(0xFFF0A04F)
 @Composable
 fun DashboardScreen(
     repository: DashboardRepository,
+    onOpenOrders: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val dashboardViewModel: DashboardViewModel = viewModel(
@@ -85,6 +86,7 @@ fun DashboardScreen(
             refreshing = current.refreshing,
             refreshError = current.refreshError,
             onRefresh = dashboardViewModel::refresh,
+            onOpenOrders = onOpenOrders,
             modifier = modifier
         )
     }
@@ -145,6 +147,7 @@ private fun DashboardContent(
     refreshing: Boolean,
     refreshError: String?,
     onRefresh: () -> Unit,
+    onOpenOrders: () -> Unit,
     modifier: Modifier
 ) {
     var dayOffset by rememberSaveable { mutableIntStateOf(0) }
@@ -219,7 +222,7 @@ private fun DashboardContent(
 
         item {
             Box(modifier = Modifier.padding(top = 20.dp)) {
-                MetricsGrid(metrics, snapshot)
+                MetricsGrid(metrics, snapshot, todaySelected = dayOffset == 0)
             }
         }
 
@@ -230,13 +233,27 @@ private fun DashboardContent(
             )
         }
 
-        if (snapshot.recentOrders.isNotEmpty()) {
-            item {
-                RecentOrdersPanel(
-                    orders = snapshot.recentOrders.take(4),
-                    modifier = Modifier.padding(top = 20.dp)
-                )
-            }
+        item {
+            ReceivablesPanelNative(
+                snapshot = snapshot,
+                onOpenOrders = onOpenOrders,
+                modifier = Modifier.padding(top = 20.dp)
+            )
+        }
+
+        item {
+            RecentOrdersPanelNative(
+                orders = snapshot.orders,
+                onOpenOrders = onOpenOrders,
+                modifier = Modifier.padding(top = 20.dp)
+            )
+        }
+
+        item {
+            AttentionPanelNative(
+                snapshot = snapshot,
+                modifier = Modifier.padding(top = 20.dp)
+            )
         }
     }
 }
@@ -371,18 +388,18 @@ private data class DayMetrics(
 
 private fun selectedDayMetrics(snapshot: DashboardSnapshot, selectedDate: LocalDate): DayMetrics {
     val zone = ZoneId.systemDefault()
-    val received = snapshot.orders.filter { order ->
-        effectivePaymentStatus(order) == "PAGO" &&
-            dashboardParseInstant(order.paidAt ?: order.updatedAt)
-                ?.atZone(zone)?.toLocalDate() == selectedDate
+    val received = snapshot.orders.flatMap { order ->
+        order.pagamentos.filter { payment ->
+            (payment.status ?: "").equals("PAGO", ignoreCase = true) &&
+                dashboardParseInstant(payment.paidAt ?: payment.updatedAt)
+                    ?.atZone(zone)?.toLocalDate() == selectedDate
+        }
     }
     val receivables = snapshot.orders.filter { order ->
-        val balance = if (order.balanceCents > 0) order.balanceCents
-        else if (effectivePaymentStatus(order) != "PAGO") order.totalCents else 0
-        balance > 0 && !order.orderStatus.equals("CANCELADO", true)
+        order.balanceCents > 0 && !order.orderStatus.equals("CANCELADO", true)
     }
     val openCommands = snapshot.orders.count { order ->
-        (order.commandStatus?.equals("ABERTA", true) ?: false) &&
+        (order.commandStatus ?: "ABERTA").equals("ABERTA", true) &&
             !order.orderStatus.equals("CANCELADO", true)
     }
     val waiting = snapshot.orders.count { order ->
@@ -390,11 +407,9 @@ private fun selectedDayMetrics(snapshot: DashboardSnapshot, selectedDate: LocalD
     }
 
     return DayMetrics(
-        receivedCents = received.sumOf { it.totalCents },
+        receivedCents = received.sumOf { it.valueCents },
         receivedCount = received.size,
-        receivableCents = receivables.sumOf {
-            if (it.balanceCents > 0) it.balanceCents else it.totalCents
-        },
+        receivableCents = receivables.sumOf { it.balanceCents },
         receivableCount = receivables.size,
         openCommands = openCommands,
         waitingPreparation = waiting
@@ -402,11 +417,11 @@ private fun selectedDayMetrics(snapshot: DashboardSnapshot, selectedDate: LocalD
 }
 
 @Composable
-private fun MetricsGrid(metrics: DayMetrics, snapshot: DashboardSnapshot) {
+private fun MetricsGrid(metrics: DayMetrics, snapshot: DashboardSnapshot, todaySelected: Boolean) {
     Column {
         MetricPair(
             left = MetricSpec(
-                label = "RECEBIDO NO DIA",
+                label = if (todaySelected) "RECEBIDO HOJE" else "RECEBIDO NO DIA",
                 value = money(metrics.receivedCents),
                 supporting = "${metrics.receivedCount} pagamento${if (metrics.receivedCount == 1) " confirmado" else "s confirmados"}",
                 accent = MaterialTheme.colorScheme.primary,
@@ -416,7 +431,7 @@ private fun MetricsGrid(metrics: DayMetrics, snapshot: DashboardSnapshot) {
                 label = "A RECEBER",
                 value = money(metrics.receivableCents),
                 supporting = "${metrics.receivableCount} cliente${if (metrics.receivableCount == 1) "" else "s"} com saldo pendente",
-                accent = WarningOrange,
+                accent = if (metrics.receivableCount > 0) WarningOrange else MaterialTheme.colorScheme.outline,
                 supportingColor = if (metrics.receivableCount > 0) WarningOrange else null
             )
         )
@@ -432,7 +447,9 @@ private fun MetricsGrid(metrics: DayMetrics, snapshot: DashboardSnapshot) {
             right = MetricSpec(
                 label = "AGUARDANDO PREPARO",
                 value = metrics.waitingPreparation.toString(),
-                supporting = "Pedidos pagos que ainda estão novos"
+                supporting = "Pedidos pagos que ainda estão novos",
+                accent = if (metrics.waitingPreparation > 0) WarningOrange else null,
+                supportingColor = if (metrics.waitingPreparation > 0) WarningOrange else null
             ),
             topBorder = true
         )
@@ -610,25 +627,27 @@ private fun topFlavors(snapshot: DashboardSnapshot): List<FlavorStat> {
 
 @Composable
 private fun FlavorPanel(flavors: List<FlavorStat>, modifier: Modifier = Modifier) {
+    val web = LocalRPWebColors.current
     val total = flavors.sumOf { it.count }
     val max = flavors.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = .76f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        color = web.surfaceVeilTwo,
+        border = BorderStroke(1.dp, web.border)
     ) {
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
             Text(
                 text = "Sabores de bolo mais vendidos",
+                color = web.text,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = "Últimos 30 dias · pedidos pagos · $total unidades no Top 4",
                 modifier = Modifier.padding(top = 4.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = web.muted,
                 fontSize = 11.5.sp,
                 lineHeight = 15.5.sp
             )
@@ -637,14 +656,12 @@ private fun FlavorPanel(flavors: List<FlavorStat>, modifier: Modifier = Modifier
                 Text(
                     text = "Ainda não há vendas pagas suficientes para formar o ranking.",
                     modifier = Modifier.padding(top = 18.dp, bottom = 4.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = web.muted,
                     fontSize = 11.5.sp
                 )
             } else {
                 flavors.forEachIndexed { index, flavor ->
-                    if (index > 0) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                    }
+                    if (index > 0) HorizontalDivider(color = web.border)
                     FlavorRow(
                         rank = index + 1,
                         flavor = flavor,
@@ -658,6 +675,7 @@ private fun FlavorPanel(flavors: List<FlavorStat>, modifier: Modifier = Modifier
 
 @Composable
 private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
+    val web = LocalRPWebColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -668,12 +686,12 @@ private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
         Surface(
             modifier = Modifier.size(26.dp),
             shape = RoundedCornerShape(13.dp),
-            color = MaterialTheme.colorScheme.primaryContainer
+            color = web.accentSoft
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     rank.toString(),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = web.accentDark,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -683,6 +701,7 @@ private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = flavor.name,
+                color = web.text,
                 fontSize = 13.sp,
                 lineHeight = 17.sp,
                 fontWeight = FontWeight.Bold,
@@ -691,7 +710,7 @@ private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
             )
             Text(
                 text = flavor.category,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = web.muted,
                 fontSize = 11.sp
             )
             Box(
@@ -699,13 +718,13 @@ private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
                     .fillMaxWidth()
                     .padding(top = 7.dp)
                     .height(5.dp)
-                    .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(99.dp))
+                    .background(web.border, RoundedCornerShape(99.dp))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(fraction.coerceIn(0f, 1f))
                         .height(5.dp)
-                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(99.dp))
+                        .background(web.accent, RoundedCornerShape(99.dp))
                 )
             }
         }
@@ -713,53 +732,16 @@ private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = "${flavor.count} un.",
+                color = web.text,
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = "≈ ${(flavor.count / 4.3).toLocale1()}/sem",
                 modifier = Modifier.padding(top = 3.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = web.muted,
                 fontSize = 10.5.sp
             )
-        }
-    }
-}
-
-@Composable
-private fun RecentOrdersPanel(orders: List<DashboardOrder>, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = .76f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
-            Text("Pedidos recentes", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "Últimas movimentações da loja",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.5.sp
-            )
-            orders.forEach { order ->
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 12.dp),
-                    color = MaterialTheme.colorScheme.outline
-                )
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("RP-${order.id}", color = MaterialTheme.colorScheme.primary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
-                        Text(
-                            order.customerName ?: "Cliente",
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Text(money(order.totalCents), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                }
-            }
         }
     }
 }
