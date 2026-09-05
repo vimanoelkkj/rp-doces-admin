@@ -53,6 +53,7 @@ import br.com.rpdoces.admin.data.dashboard.DashboardRepository
 import br.com.rpdoces.admin.data.dashboard.DashboardSnapshot
 import br.com.rpdoces.admin.data.dashboard.dashboardParseInstant
 import br.com.rpdoces.admin.data.dashboard.effectivePaymentStatus
+import br.com.rpdoces.admin.ui.remote.LocalAppRemoteConfig
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -156,6 +157,9 @@ private fun DashboardContent(
     val context = LocalContext.current
     val metrics = remember(snapshot, selectedDate) { selectedDayMetrics(snapshot, selectedDate) }
     val topFlavors = remember(snapshot) { topFlavors(snapshot) }
+    val remoteConfig = LocalAppRemoteConfig.current
+    val features = remoteConfig.features
+    val remoteBanner = remoteConfig.dashboardBanner
 
     fun openDatePicker() {
         DatePickerDialog(
@@ -220,40 +224,63 @@ private fun DashboardContent(
             }
         }
 
-        item {
-            Box(modifier = Modifier.padding(top = 20.dp)) {
-                MetricsGrid(metrics, snapshot, todaySelected = dayOffset == 0)
+        if (remoteBanner.enabled && (remoteBanner.title.isNotBlank() || remoteBanner.message.isNotBlank())) {
+            item(key = "remote-banner-${remoteConfig.revision}") {
+                RemoteDashboardBanner(
+                    banner = remoteBanner,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
             }
         }
 
-        item {
-            FlavorPanel(
-                flavors = topFlavors,
-                modifier = Modifier.padding(top = 20.dp)
-            )
-        }
+        remoteConfig.dashboardSectionOrder.forEach { section ->
+            when (section) {
+                "metrics" -> if (features.dashboardMetrics) {
+                    item(key = "remote-section-metrics") {
+                        Box(modifier = Modifier.padding(top = 20.dp)) {
+                            MetricsGrid(metrics, snapshot, todaySelected = dayOffset == 0)
+                        }
+                    }
+                }
 
-        item {
-            ReceivablesPanelNative(
-                snapshot = snapshot,
-                onOpenOrders = onOpenOrders,
-                modifier = Modifier.padding(top = 20.dp)
-            )
-        }
+                "flavors" -> if (features.dashboardFlavors) {
+                    item(key = "remote-section-flavors") {
+                        FlavorPanel(
+                            flavors = topFlavors,
+                            modifier = Modifier.padding(top = 20.dp)
+                        )
+                    }
+                }
 
-        item {
-            RecentOrdersPanelNative(
-                orders = snapshot.orders,
-                onOpenOrders = onOpenOrders,
-                modifier = Modifier.padding(top = 20.dp)
-            )
-        }
+                "receivables" -> if (features.dashboardReceivables) {
+                    item(key = "remote-section-receivables") {
+                        ReceivablesPanelNative(
+                            snapshot = snapshot,
+                            onOpenOrders = onOpenOrders,
+                            modifier = Modifier.padding(top = 20.dp)
+                        )
+                    }
+                }
 
-        item {
-            AttentionPanelNative(
-                snapshot = snapshot,
-                modifier = Modifier.padding(top = 20.dp)
-            )
+                "recent_orders" -> if (features.dashboardRecentOrders) {
+                    item(key = "remote-section-recent-orders") {
+                        RecentOrdersPanelNative(
+                            orders = snapshot.orders,
+                            onOpenOrders = onOpenOrders,
+                            modifier = Modifier.padding(top = 20.dp)
+                        )
+                    }
+                }
+
+                "attention" -> if (features.dashboardAttention) {
+                    item(key = "remote-section-attention") {
+                        AttentionPanelNative(
+                            snapshot = snapshot,
+                            modifier = Modifier.padding(top = 20.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
