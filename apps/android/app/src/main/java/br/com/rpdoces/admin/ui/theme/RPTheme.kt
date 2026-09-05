@@ -2,10 +2,12 @@ package br.com.rpdoces.admin.ui.theme
 
 import android.content.Context
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
+import androidx.compose.ui.unit.dp
 import br.com.rpdoces.admin.R
 
 private const val THEME_PREFS = "rp_admin_preferences"
@@ -73,6 +76,11 @@ private fun lightScheme(colors: RPWebColors) = lightColorScheme(
     onSurface = colors.text,
     surfaceVariant = colors.surfaceSoft,
     onSurfaceVariant = colors.muted,
+    surfaceContainerLowest = colors.surface,
+    surfaceContainerLow = colors.surface,
+    surfaceContainer = colors.surface,
+    surfaceContainerHigh = colors.surfaceSoft,
+    surfaceContainerHighest = colors.surfaceSoft,
     outline = colors.border,
     error = colors.danger
 )
@@ -90,6 +98,11 @@ private fun darkScheme(colors: RPWebColors) = darkColorScheme(
     onSurface = colors.text,
     surfaceVariant = colors.surfaceSoft,
     onSurfaceVariant = colors.muted,
+    surfaceContainerLowest = colors.surface,
+    surfaceContainerLow = colors.surface,
+    surfaceContainer = colors.surface,
+    surfaceContainerHigh = colors.surfaceSoft,
+    surfaceContainerHighest = colors.surfaceSoft,
     outline = colors.border,
     error = colors.danger
 )
@@ -111,6 +124,14 @@ private val RPTypography = Typography(
     labelLarge = Defaults.labelLarge.copy(fontFamily = RPWebFonts.Manrope),
     labelMedium = Defaults.labelMedium.copy(fontFamily = RPWebFonts.Manrope),
     labelSmall = Defaults.labelSmall.copy(fontFamily = RPWebFonts.Manrope)
+)
+
+private val RPShapes = Shapes(
+    extraSmall = RoundedCornerShape(14.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(18.dp),
+    extraLarge = RoundedCornerShape(24.dp)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,7 +171,8 @@ fun RPTheme(
     ) {
         MaterialTheme(
             colorScheme = if (effectiveDark) darkScheme(webColors) else lightScheme(webColors),
-            typography = RPTypography
+            typography = RPTypography,
+            shapes = RPShapes
         ) {
             ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
                 content()
