@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -413,8 +412,9 @@ private fun OrderDetailDialog(
                     targetState = tab,
                     modifier = Modifier.weight(1f),
                     transitionSpec = {
-                        (fadeIn(tween(RPMotion.Fast, easing = RPMotion.EaseOut)) + slideInVertically(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { it / 12 }) togetherWith
-                            (fadeOut(tween(RPMotion.Fast)) + slideOutVertically(tween(RPMotion.Fast)) { -it / 14 })
+                        (fadeIn(tween(RPMotion.Fast, easing = RPMotion.EaseOut)) +
+                            slideInVertically(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { it / 12 }) togetherWith
+                            fadeOut(tween(0))
                     },
                     label = "order-detail-tab"
                 ) { currentTab ->
