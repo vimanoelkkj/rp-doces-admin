@@ -31,17 +31,39 @@ data class DashboardOrderItem(
     val id: Int? = null,
     @SerialName("produto_id") val productId: Int? = null,
     @SerialName("produto_nome") val productName: String? = null,
-    val quantidade: Int = 0
+    val quantidade: Int = 0,
+    @SerialName("valor_unitario_centavos") val unitCents: Int = 0,
+    @SerialName("valor_total_centavos") val totalCents: Int = 0,
+    @SerialName("valor_pago_centavos") val paidCents: Int = 0,
+    @SerialName("saldo_centavos") val balanceCents: Int = 0,
+    @SerialName("status_financeiro") val financialStatus: String? = "PENDENTE"
+)
+
+@Serializable
+data class DashboardPayment(
+    val id: Int? = null,
+    @SerialName("pedido_id") val orderId: Int? = null,
+    val metodo: String? = null,
+    val origem: String? = null,
+    @SerialName("valor_centavos") val valueCents: Int = 0,
+    val status: String? = null,
+    @SerialName("criado_em") val createdAt: String? = null,
+    @SerialName("atualizado_em") val updatedAt: String? = null,
+    @SerialName("pago_em") val paidAt: String? = null
 )
 
 @Serializable
 data class DashboardOrder(
     val id: Int,
     @SerialName("cliente_nome") val customerName: String? = null,
+    @SerialName("cliente_email") val customerEmail: String? = null,
+    @SerialName("cliente_whatsapp") val customerWhatsapp: String? = null,
+    @SerialName("tipo_entrega") val deliveryType: String? = null,
     @SerialName("produto_id") val productId: Int? = null,
     @SerialName("produto_nome") val productName: String? = null,
     val quantidade: Int = 0,
     @SerialName("valor_total_centavos") val totalCents: Int = 0,
+    @SerialName("valor_pago_centavos") val paidCents: Int = 0,
     @SerialName("saldo_centavos") val balanceCents: Int = 0,
     @SerialName("status_pagamento") val paymentStatus: String? = "PENDENTE",
     @SerialName("status_financeiro") val financialStatus: String? = null,
@@ -50,7 +72,8 @@ data class DashboardOrder(
     @SerialName("criado_em") val createdAt: String? = null,
     @SerialName("atualizado_em") val updatedAt: String? = null,
     @SerialName("pago_em") val paidAt: String? = null,
-    val itens: List<DashboardOrderItem> = emptyList()
+    val itens: List<DashboardOrderItem> = emptyList(),
+    val pagamentos: List<DashboardPayment> = emptyList()
 )
 
 @Serializable
@@ -140,12 +163,14 @@ fun buildSnapshot(
     val today = now.atZone(zoneId).toLocalDate()
 
     val ordersToday = orders.filter { sameDay(it.createdAt, today, zoneId) }
-    val paidToday = orders.filter {
-        effectivePaymentStatus(it) == "PAGO" &&
-            sameDay(it.paidAt ?: it.updatedAt, today, zoneId)
+    val paidPaymentsToday = orders.flatMap { order ->
+        order.pagamentos.filter { payment ->
+            payment.status.equals("PAGO", ignoreCase = true) &&
+                sameDay(payment.paidAt ?: payment.updatedAt, today, zoneId)
+        }
     }
     val pendingPayment = orders.filter {
-        effectivePaymentStatus(it) in setOf("PENDENTE", "PARCIAL")
+        it.balanceCents > 0 && !it.orderStatus.equals("CANCELADO", ignoreCase = true)
     }
     val waitingPreparation = orders.filter {
         it.orderStatus.equals("NOVO", ignoreCase = true) && effectivePaymentStatus(it) == "PAGO"
@@ -158,13 +183,13 @@ fun buildSnapshot(
 
     val attention = buildList {
         if (pendingPayment.isNotEmpty()) {
-            add("${pendingPayment.size} ${plural(pendingPayment.size, "pedido aguardando pagamento", "pedidos aguardando pagamento")}")
+            add("${pendingPayment.size} ${plural(pendingPayment.size, "cliente com saldo pendente", "clientes com saldo pendente")}")
         }
         if (waitingPreparation.isNotEmpty()) {
-            add("${waitingPreparation.size} ${plural(waitingPreparation.size, "pedido aguardando preparação", "pedidos aguardando preparação")}")
+            add("${waitingPreparation.size} ${plural(waitingPreparation.size, "pedido pago aguardando início do preparo", "pedidos pagos aguardando início do preparo")}")
         }
         if (soldOut.isNotEmpty()) {
-            add("${soldOut.size} ${plural(soldOut.size, "produto sem estoque disponível", "produtos sem estoque disponível")}")
+            add("${soldOut.size} ${plural(soldOut.size, "produto esgotado", "produtos esgotados")}")
         }
         if (lowStock.isNotEmpty()) {
             add("${lowStock.size} ${plural(lowStock.size, "produto com estoque baixo", "produtos com estoque baixo")}")
@@ -172,8 +197,8 @@ fun buildSnapshot(
     }
 
     return DashboardSnapshot(
-        paidRevenueTodayCents = paidToday.sumOf { it.totalCents },
-        paidTodayCount = paidToday.size,
+        paidRevenueTodayCents = paidPaymentsToday.sumOf { it.valueCents },
+        paidTodayCount = paidPaymentsToday.size,
         ordersTodayCount = ordersToday.size,
         pendingPaymentCount = pendingPayment.size,
         waitingPreparationCount = waitingPreparation.size,
