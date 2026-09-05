@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +44,7 @@ import br.com.rpdoces.admin.ui.components.WebField
 import br.com.rpdoces.admin.ui.components.WebModal
 import br.com.rpdoces.admin.ui.components.WebModalActions
 import br.com.rpdoces.admin.ui.components.WebModalHeader
+import br.com.rpdoces.admin.ui.components.WebSelectorOption
 import br.com.rpdoces.admin.ui.remote.LocalAppRemoteConfig
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
@@ -188,6 +188,7 @@ internal fun ManualOrderDialog(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ManualSelect(
                 label = "Pagamento",
+                selectedKey = paymentMethod,
                 value = manualPaymentMethods.firstOrNull { it.first == paymentMethod }?.second ?: paymentMethod,
                 expanded = methodOpen,
                 onExpand = { methodOpen = true },
@@ -198,6 +199,7 @@ internal fun ManualOrderDialog(
             )
             ManualSelect(
                 label = "Estado",
+                selectedKey = paymentStatus,
                 value = manualPaymentStatuses.firstOrNull { it.first == paymentStatus }?.second ?: paymentStatus,
                 expanded = statusOpen,
                 onExpand = { statusOpen = true },
@@ -269,6 +271,7 @@ private fun QtyButton(text: String, enabled: Boolean, onClick: () -> Unit) {
 @Composable
 private fun ManualSelect(
     label: String,
+    selectedKey: String,
     value: String,
     expanded: Boolean,
     onExpand: () -> Unit,
@@ -291,7 +294,13 @@ private fun ManualSelect(
                 }
             }
             MotionDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-                options.forEach { (key, text) -> DropdownMenuItem(text = { Text(text) }, onClick = { onSelect(key) }) }
+                options.forEach { (key, text) ->
+                    WebSelectorOption(
+                        text = text,
+                        selected = key == selectedKey,
+                        onClick = { onSelect(key) }
+                    )
+                }
             }
         }
     }
