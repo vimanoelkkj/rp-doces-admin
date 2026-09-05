@@ -1,5 +1,6 @@
 {
   "revision": 1,
+  "theme": "system",
   "dashboard_banner": {
     "enabled": true,
     "title": "Remote config ativo",
