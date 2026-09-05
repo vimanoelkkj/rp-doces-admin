@@ -20,7 +20,11 @@ class MainActivity : ComponentActivity() {
             RPTheme {
                 RPApp(
                     authRepository = container.authRepository,
-                    dashboardRepository = container.dashboardRepository
+                    dashboardRepository = container.dashboardRepository,
+                    productsRepository = container.productsRepository,
+                    ordersRepository = container.ordersRepository,
+                    adminsRepository = container.adminsRepository,
+                    storeRepository = container.storeRepository
                 )
             }
         }
