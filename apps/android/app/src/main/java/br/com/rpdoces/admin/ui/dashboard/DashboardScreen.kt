@@ -1,6 +1,5 @@
 package br.com.rpdoces.admin.ui.dashboard
 
-import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -40,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -58,8 +55,6 @@ import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 private val WarningOrange = Color(0xFFF0A04F)
@@ -154,29 +149,11 @@ private fun DashboardContent(
     var dayOffset by rememberSaveable { mutableIntStateOf(0) }
     val today = remember { LocalDate.now() }
     val selectedDate = today.plusDays(dayOffset.toLong())
-    val context = LocalContext.current
     val metrics = remember(snapshot, selectedDate) { selectedDayMetrics(snapshot, selectedDate) }
     val topFlavors = remember(snapshot) { topFlavors(snapshot) }
     val remoteConfig = LocalAppRemoteConfig.current
     val features = remoteConfig.features
     val remoteBanner = remoteConfig.dashboardBanner
-
-    fun openDatePicker() {
-        DatePickerDialog(
-            context,
-            { _, year, month, day ->
-                val picked = LocalDate.of(year, month + 1, day)
-                if (!picked.isAfter(today)) {
-                    dayOffset = ChronoUnit.DAYS.between(today, picked).toInt()
-                }
-            },
-            selectedDate.year,
-            selectedDate.monthValue - 1,
-            selectedDate.dayOfMonth
-        ).apply {
-            datePicker.maxDate = System.currentTimeMillis()
-        }.show()
-    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -186,11 +163,12 @@ private fun DashboardContent(
         item {
             DayNavigator(
                 selectedDate = selectedDate,
+                today = today,
                 dayOffset = dayOffset,
                 onPrevious = { dayOffset -= 1 },
                 onNext = { if (dayOffset < 0) dayOffset += 1 },
                 onToday = { dayOffset = 0 },
-                onOpenCalendar = ::openDatePicker,
+                onSelectDate = { picked -> dayOffset = dashboardDayOffset(today, picked) },
                 refreshing = refreshing
             )
         }
@@ -288,11 +266,12 @@ private fun DashboardContent(
 @Composable
 private fun DayNavigator(
     selectedDate: LocalDate,
+    today: LocalDate,
     dayOffset: Int,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onToday: () -> Unit,
-    onOpenCalendar: () -> Unit,
+    onSelectDate: (LocalDate) -> Unit,
     refreshing: Boolean
 ) {
     Column {
@@ -333,24 +312,11 @@ private fun DayNavigator(
                 Icon(Icons.Outlined.ChevronLeft, null, modifier = Modifier.size(15.dp))
             }
 
-            CompactButton(
-                onClick = onOpenCalendar,
-                modifier = Modifier.width(116.dp)
-            ) {
-                Icon(
-                    Icons.Outlined.CalendarMonth,
-                    null,
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(7.dp))
-                Text(
-                    selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
-                )
-            }
+            SiteDashboardDateSelector(
+                selectedDate = selectedDate,
+                today = today,
+                onSelected = onSelectDate
+            )
 
             CompactButton(
                 onClick = onNext,
