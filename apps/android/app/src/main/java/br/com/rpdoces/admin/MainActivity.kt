@@ -14,6 +14,8 @@ import androidx.fragment.app.FragmentActivity
 import br.com.rpdoces.admin.data.remote.AppRemoteConfigRepository
 import br.com.rpdoces.admin.ui.BiometricRPApp
 import br.com.rpdoces.admin.ui.remote.LocalAppRemoteConfig
+import br.com.rpdoces.admin.ui.remote.RemoteMaintenanceScreen
+import br.com.rpdoces.admin.ui.remote.RemoteUpdateRequiredScreen
 import br.com.rpdoces.admin.ui.theme.RPTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -51,14 +53,21 @@ class MainActivity : FragmentActivity() {
 
             CompositionLocalProvider(LocalAppRemoteConfig provides remoteConfig) {
                 RPTheme(darkTheme = forcedDarkTheme) {
-                    BiometricRPApp(
-                        authRepository = container.authRepository,
-                        dashboardRepository = container.dashboardRepository,
-                        productsRepository = container.productsRepository,
-                        ordersRepository = container.ordersRepository,
-                        adminsRepository = container.adminsRepository,
-                        storeRepository = container.storeRepository
-                    )
+                    when {
+                        remoteConfig.maintenance.enabled -> RemoteMaintenanceScreen(remoteConfig.maintenance)
+                        remoteConfig.minAppVersionCode > BuildConfig.VERSION_CODE -> RemoteUpdateRequiredScreen(
+                            config = remoteConfig.update,
+                            currentVersion = BuildConfig.VERSION_NAME
+                        )
+                        else -> BiometricRPApp(
+                            authRepository = container.authRepository,
+                            dashboardRepository = container.dashboardRepository,
+                            productsRepository = container.productsRepository,
+                            ordersRepository = container.ordersRepository,
+                            adminsRepository = container.adminsRepository,
+                            storeRepository = container.storeRepository
+                        )
+                    }
                 }
             }
         }
