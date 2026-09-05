@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AdminsPage } from "./admins/AdminsPage";
+import { AppControlPage } from "./app-control/AppControlPage";
 import { AuthGate } from "./auth/AuthGate";
 import { DashboardPage } from "./dashboard/DashboardPage";
 import { AdminShell, type AdminV2Page } from "./layout/AdminShell";
@@ -8,7 +9,7 @@ import { ProductsPage } from "./products/ProductsPage";
 import { closeTopBackLayer } from "./shared/useBackLayer";
 import { StorePage } from "./store/StorePage";
 
-const PAGES: AdminV2Page[] = ["dashboard", "produtos", "pedidos", "admins", "loja"];
+const PAGES: AdminV2Page[] = ["dashboard", "produtos", "pedidos", "admins", "loja", "app"];
 
 const PAGE_META: Record<AdminV2Page, { title: string; subtitle: string }> = {
   dashboard: {
@@ -30,6 +31,10 @@ const PAGE_META: Record<AdminV2Page, { title: string; subtitle: string }> = {
   loja: {
     title: "Loja",
     subtitle: "Atendimento, contato e aparência do site público"
+  },
+  app: {
+    title: "Controle do App",
+    subtitle: "Remote config, manutenção, navegação e recursos"
   }
 };
 
@@ -39,6 +44,7 @@ function pageFromHash(): AdminV2Page {
   if (hash === "#pedidos") return "pedidos";
   if (hash === "#admins") return "admins";
   if (hash === "#loja") return "loja";
+  if (hash === "#app") return "app";
   return "produtos";
 }
 
@@ -53,7 +59,8 @@ export function App() {
     produtos: 0,
     pedidos: 0,
     admins: 0,
-    loja: 0
+    loja: 0,
+    app: 0
   });
 
   function activate(nextPage: AdminV2Page) {
@@ -122,6 +129,8 @@ export function App() {
                 content = <AdminsPage session={session} onNavigate={navigate} active={active} />;
               } else if (view === "loja") {
                 content = <StorePage session={session} onNavigate={navigate} />;
+              } else if (view === "app") {
+                content = <AppControlPage active={active} />;
               } else {
                 content = <ProductsPage session={session} onNavigate={navigate} active={active} />;
               }
