@@ -102,7 +102,8 @@ function AdminShellRoot({
   const notificationRef = useRef<HTMLDivElement>(null);
   const mobileProfileRef = useRef<HTMLDivElement>(null);
   const mobileNotificationRef = useRef<HTMLDivElement>(null);
-  const isAdmin = String(user.papel || "").toUpperCase() === "ADMIN";
+  const role = String(user.papel || "").toUpperCase();
+  const canControlApp = role === "OWNER" || role === "ADMIN";
 
   useEffect(() => {
     const themeColor = theme === "dark" ? "#1b1614" : "#fbf8f4";
@@ -204,7 +205,7 @@ function AdminShellRoot({
         <Icon name={theme === "dark" ? "sun" : "moon"} />
         {theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
       </button>
-      {isAdmin ? (
+      {canControlApp ? (
         <button
           className={styles.profileMenuLogout}
           type="button"
