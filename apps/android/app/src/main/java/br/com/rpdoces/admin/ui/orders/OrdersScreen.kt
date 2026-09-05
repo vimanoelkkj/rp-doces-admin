@@ -52,6 +52,7 @@ import androidx.compose.ui.window.DialogProperties
 import br.com.rpdoces.admin.data.dashboard.dashboardParseInstant
 import br.com.rpdoces.admin.data.orders.Order
 import br.com.rpdoces.admin.data.orders.OrdersRepository
+import br.com.rpdoces.admin.data.products.ProductsRepository
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.time.ZoneId
@@ -82,6 +83,7 @@ private val paymentOptions = listOf(
 @Composable
 fun OrdersScreen(
     repository: OrdersRepository,
+    productsRepository: ProductsRepository,
     modifier: Modifier = Modifier
 ) {
     val web = LocalRPWebColors.current
@@ -93,6 +95,7 @@ fun OrdersScreen(
     var filter by remember { mutableStateOf(OrderFilter.ALL) }
     var filterOpen by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Order?>(null) }
+    var manualOrderOpen by remember { mutableStateOf(false) }
 
     suspend fun reload(silent: Boolean = false) {
         if (!silent) loading = orders.isEmpty()
@@ -146,7 +149,7 @@ fun OrdersScreen(
         Spacer(Modifier.height(12.dp))
 
         Surface(
-            onClick = { },
+            onClick = { manualOrderOpen = true },
             modifier = Modifier.fillMaxWidth().height(44.dp),
             shape = RoundedCornerShape(10.dp),
             color = web.accent,
@@ -225,6 +228,17 @@ fun OrdersScreen(
                 }
             }
         }
+    }
+
+    if (manualOrderOpen) {
+        ManualOrderDialog(
+            ordersRepository = repository,
+            productsRepository = productsRepository,
+            onDismiss = { manualOrderOpen = false },
+            onCreated = {
+                scope.launch { reload(silent = true) }
+            }
+        )
     }
 
     selected?.let { order ->
