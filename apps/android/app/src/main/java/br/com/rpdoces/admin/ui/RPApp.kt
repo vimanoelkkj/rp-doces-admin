@@ -24,12 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.outlined.AdminPanelSettings
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.NotificationsNone
-import androidx.compose.material.icons.outlined.SpaceDashboard
-import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -82,11 +77,11 @@ private enum class MainTab(
     val subtitle: String,
     val icon: ImageVector
 ) {
-    Dashboard("Dashboard", "Dashboard", "Visão geral da operação", Icons.Outlined.SpaceDashboard),
-    Produtos("Produtos", "Produtos", "Gerencie o catálogo", Icons.Outlined.Inventory2),
-    Pedidos("Pedidos", "Pedidos", "Acompanhe a operação", Icons.AutoMirrored.Outlined.ReceiptLong),
-    Admins("Administradores", "Admins", "Gerencie os acessos", Icons.Outlined.AdminPanelSettings),
-    Loja("Loja", "Loja", "Configurações da loja", Icons.Outlined.Storefront)
+    Dashboard("Dashboard", "Dashboard", "Visão geral da operação", SiteNavIcons.Dashboard),
+    Produtos("Produtos", "Produtos", "Gerencie o catálogo", SiteNavIcons.Products),
+    Pedidos("Pedidos", "Pedidos", "Acompanhe a operação", SiteNavIcons.Orders),
+    Admins("Administradores", "Admins", "Gerencie os acessos", SiteNavIcons.Users),
+    Loja("Loja", "Loja", "Configurações da loja", SiteNavIcons.Store)
 }
 
 @Composable
