@@ -60,6 +60,11 @@ private enum class ProductFilter(val label: String) {
     ALL("Todos"), ACTIVE("Ativos"), SOLD_OUT("Esgotados"), ARCHIVED("Arquivados")
 }
 
+private sealed interface ProductPendingAction {
+    data class Archive(val product: Product) : ProductPendingAction
+    data class Delete(val product: Product) : ProductPendingAction
+}
+
 @Composable
 fun ProductsScreen(
     repository: ProductsRepository,
@@ -73,6 +78,11 @@ fun ProductsScreen(
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ProductFilter.ALL) }
     var busyId by remember { mutableStateOf<Int?>(null) }
+    var editorOpen by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Product?>(null) }
+    var previewing by remember { mutableStateOf<Product?>(null) }
+    var categoriesOpen by remember { mutableStateOf(false) }
+    var pendingAction by remember { mutableStateOf<ProductPendingAction?>(null) }
 
     suspend fun reload() {
         try {
@@ -148,13 +158,16 @@ fun ProductsScreen(
                     text = "Gerenciar categorias",
                     primary = false,
                     modifier = Modifier.weight(1f),
-                    onClick = { }
+                    onClick = { categoriesOpen = true }
                 )
                 ProductActionButton(
                     text = "+ Novo produto",
                     primary = true,
                     modifier = Modifier.weight(1f),
-                    onClick = { }
+                    onClick = {
+                        editing = null
+                        editorOpen = true
+                    }
                 )
             }
 
@@ -209,15 +222,12 @@ fun ProductsScreen(
                     ProductCard(
                         product = product,
                         busy = busyId == product.id,
-                        onArchive = {
-                            busyId = product.id
-                            scope.launch {
-                                runCatching { repository.archive(product.id) }
-                                    .onFailure { error = it.message ?: "Não foi possível arquivar o produto." }
-                                reload()
-                                busyId = null
-                            }
+                        onPreview = { previewing = product },
+                        onEdit = {
+                            editing = product
+                            editorOpen = true
                         },
+                        onArchive = { pendingAction = ProductPendingAction.Archive(product) },
                         onRestore = {
                             busyId = product.id
                             scope.launch {
@@ -227,19 +237,58 @@ fun ProductsScreen(
                                 busyId = null
                             }
                         },
-                        onDelete = {
-                            busyId = product.id
-                            scope.launch {
-                                runCatching { repository.deletePermanently(product.id) }
-                                    .onFailure { error = it.message ?: "Não foi possível excluir o produto." }
-                                reload()
-                                busyId = null
-                            }
-                        }
+                        onDelete = { pendingAction = ProductPendingAction.Delete(product) }
                     )
                 }
             }
         }
+    }
+
+    if (editorOpen) {
+        ProductEditorDialog(
+            repository = repository,
+            product = editing,
+            onDismiss = { editorOpen = false },
+            onSaved = { scope.launch { reload() } }
+        )
+    }
+
+    if (categoriesOpen) {
+        CategoryManagerDialog(repository = repository, onDismiss = { categoriesOpen = false })
+    }
+
+    previewing?.let { product ->
+        ProductPreviewDialog(product = product, onDismiss = { previewing = null })
+    }
+
+    pendingAction?.let { action ->
+        val product = when (action) {
+            is ProductPendingAction.Archive -> action.product
+            is ProductPendingAction.Delete -> action.product
+        }
+        val deleting = action is ProductPendingAction.Delete
+        ProductConfirmDialog(
+            title = if (deleting) "Excluir ${product.nome} permanentemente?" else "Arquivar ${product.nome}?",
+            message = if (deleting) "O produto será removido do catálogo de forma permanente." else "Ele deixará de aparecer no catálogo ativo.",
+            actionLabel = if (deleting) "Excluir" else "Arquivar",
+            danger = deleting,
+            busy = busyId == product.id,
+            onDismiss = { if (busyId == null) pendingAction = null },
+            onConfirm = {
+                if (busyId != null) return@ProductConfirmDialog
+                busyId = product.id
+                scope.launch {
+                    runCatching {
+                        if (deleting) repository.deletePermanently(product.id) else repository.archive(product.id)
+                    }.onFailure {
+                        error = it.message ?: if (deleting) "Não foi possível excluir o produto." else "Não foi possível arquivar o produto."
+                    }
+                    reload()
+                    busyId = null
+                    pendingAction = null
+                }
+            }
+        )
     }
 }
 
@@ -291,6 +340,8 @@ private fun ProductActionButton(text: String, primary: Boolean, modifier: Modifi
 private fun ProductCard(
     product: Product,
     busy: Boolean,
+    onPreview: () -> Unit,
+    onEdit: () -> Unit,
     onArchive: () -> Unit,
     onRestore: () -> Unit,
     onDelete: () -> Unit
@@ -299,7 +350,7 @@ private fun ProductCard(
     var menuOpen by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onEdit),
         shape = RoundedCornerShape(12.dp),
         color = web.surface,
         border = BorderStroke(1.dp, web.border)
@@ -309,7 +360,8 @@ private fun ProductCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(118.dp)
-                    .background(web.graySoft),
+                    .background(web.graySoft)
+                    .clickable(onClick = onPreview),
                 contentAlignment = Alignment.Center
             ) {
                 if (!product.imageKey.isNullOrBlank()) {
@@ -374,6 +426,7 @@ private fun ProductCard(
                             modifier = Modifier.clickable(enabled = !busy) { menuOpen = true }.padding(6.dp)
                         )
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(text = { Text("Editar") }, onClick = { menuOpen = false; onEdit() })
                             if (product.ativo) {
                                 DropdownMenuItem(text = { Text("Arquivar") }, onClick = { menuOpen = false; onArchive() })
                             } else {
