@@ -1,6 +1,8 @@
 package br.com.rpdoces.admin.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Typography
@@ -92,13 +94,17 @@ private val RPTypography = Typography(
     labelSmall = Defaults.labelSmall.copy(fontFamily = RPWebFonts.Manrope)
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RPTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     val webColors = if (darkTheme) RPWebDarkColors else RPWebLightColors
-    CompositionLocalProvider(LocalRPWebColors provides webColors) {
+    CompositionLocalProvider(
+        LocalRPWebColors provides webColors,
+        LocalRippleConfiguration provides null
+    ) {
         MaterialTheme(
             colorScheme = if (darkTheme) darkScheme(webColors) else lightScheme(webColors),
             typography = RPTypography
