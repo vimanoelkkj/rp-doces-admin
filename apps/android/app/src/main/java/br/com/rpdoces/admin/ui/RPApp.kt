@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -47,8 +49,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -58,12 +64,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import br.com.rpdoces.admin.BuildConfig
 import br.com.rpdoces.admin.data.auth.AuthRepository
 import br.com.rpdoces.admin.data.auth.AuthUser
 import br.com.rpdoces.admin.data.dashboard.DashboardRepository
 import br.com.rpdoces.admin.ui.auth.AuthUiState
 import br.com.rpdoces.admin.ui.auth.AuthViewModel
 import br.com.rpdoces.admin.ui.dashboard.DashboardScreen
+import coil3.compose.AsyncImage
 
 private enum class MainTab(
     val label: String,
@@ -233,38 +241,87 @@ private fun MainShell(
     var selected by rememberSaveable { mutableStateOf(MainTab.Dashboard) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            MobileHeader(
-                tab = selected,
-                user = user,
-                profileOpen = profileOpen,
-                onProfileOpenChange = { profileOpen = it },
-                onLogout = onLogout
-            )
-        },
-        bottomBar = {
-            MobileBottomBar(
-                selected = selected,
-                onSelected = { selected = it }
-            )
+    AppBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                MobileHeader(
+                    tab = selected,
+                    user = user,
+                    profileOpen = profileOpen,
+                    onProfileOpenChange = { profileOpen = it },
+                    onLogout = onLogout
+                )
+            },
+            bottomBar = {
+                MobileBottomBar(
+                    selected = selected,
+                    onSelected = { selected = it }
+                )
+            }
+        ) { padding ->
+            when (selected) {
+                MainTab.Dashboard -> DashboardScreen(
+                    repository = dashboardRepository,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                )
+                else -> PlaceholderScreen(
+                    tab = selected,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                )
+            }
         }
-    ) { padding ->
-        when (selected) {
-            MainTab.Dashboard -> DashboardScreen(
-                repository = dashboardRepository,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            )
-            else -> PlaceholderScreen(
-                tab = selected,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            )
-        }
+    }
+}
+
+@Composable
+private fun AppBackground(content: @Composable () -> Unit) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        val density = LocalDensity.current
+        val widthPx = with(density) { maxWidth.toPx() }
+        val heightPx = with(density) { maxHeight.toPx() }
+        val dark = MaterialTheme.colorScheme.background == Color(0xFF1B1614)
+        val first = if (dark) Color(0x24783C32) else Color(0x3DF4DFD7)
+        val second = if (dark) Color(0x1A643732) else Color(0x29F2DCD8)
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(first, Color.Transparent),
+                        center = Offset(widthPx * .16f, heightPx * .08f),
+                        radius = widthPx * .72f
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(second, Color.Transparent),
+                        center = Offset(widthPx * .94f, heightPx * .14f),
+                        radius = widthPx * .62f
+                    )
+                )
+        )
+        content()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars)
+                .background(MaterialTheme.colorScheme.primary)
+                .align(Alignment.TopCenter)
+        )
     }
 }
 
@@ -277,7 +334,7 @@ private fun MobileHeader(
     onLogout: () -> Unit
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.background,
+        color = Color.Transparent,
         shadowElevation = 0.dp
     ) {
         Column(
@@ -294,7 +351,7 @@ private fun MobileHeader(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = tab.label,
@@ -302,57 +359,76 @@ private fun MobileHeader(
                         fontSize = 25.sp,
                         lineHeight = 30.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.5).sp
+                        letterSpacing = (-0.8).sp
                     )
                     Text(
                         text = tab.subtitle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
+                        fontSize = 11.5.sp,
+                        lineHeight = 16.sp
                     )
                 }
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        modifier = Modifier.size(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                    ) {
-                        IconButton(onClick = { }) {
-                            Icon(
-                                imageVector = Icons.Outlined.NotificationsNone,
-                                contentDescription = "Notificações",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
+                    Box(modifier = Modifier.size(40.dp)) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ) {
+                            IconButton(onClick = { }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.NotificationsNone,
+                                    contentDescription = "Notificações",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 6.dp, end = 6.dp)
+                                .size(7.dp)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(99.dp))
+                                .align(Alignment.TopEnd)
+                        )
                     }
 
                     Box {
                         Surface(
                             onClick = { onProfileOpenChange(true) },
-                            modifier = Modifier.size(44.dp),
+                            modifier = Modifier.size(40.dp),
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surface,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Surface(
-                                    modifier = Modifier.size(34.dp),
-                                    shape = RoundedCornerShape(17.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = userInitials(user.nome),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                val avatar = avatarModel(user.avatarUrl)
+                                if (avatar != null) {
+                                    AsyncImage(
+                                        model = avatar,
+                                        contentDescription = user.nome,
+                                        modifier = Modifier.size(32.dp),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Surface(
+                                        modifier = Modifier.size(32.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = userInitials(user.nome),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -369,7 +445,7 @@ private fun MobileHeader(
                                         Text(
                                             user.email.orEmpty(),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 11.sp
+                                            fontSize = 10.5.sp
                                         )
                                     }
                                 },
@@ -377,7 +453,7 @@ private fun MobileHeader(
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Sair") },
+                                text = { Text("Sair", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold) },
                                 onClick = {
                                     onProfileOpenChange(false)
                                     onLogout()
@@ -399,7 +475,7 @@ private fun MobileBottomBar(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 12.dp
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -410,22 +486,22 @@ private fun MobileBottomBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(horizontal = 4.dp)
+                    .height(56.dp)
+                    .padding(start = 5.dp, end = 5.dp, top = 4.dp)
             ) {
                 MainTab.entries.forEach { tab ->
                     val active = selected == tab
-                    Column(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxSize()
+                            .height(52.dp)
                             .clickable { onSelected(tab) }
                             .padding(horizontal = 2.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Top
+                        contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
+                                .align(Alignment.TopCenter)
                                 .width(22.dp)
                                 .height(2.dp)
                                 .background(
@@ -433,26 +509,44 @@ private fun MobileBottomBar(
                                     RoundedCornerShape(99.dp)
                                 )
                         )
-                        Spacer(Modifier.height(8.dp))
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.label,
-                            modifier = Modifier.size(20.dp),
-                            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(3.dp))
-                        Text(
-                            text = tab.mobileLabel,
-                            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 9.sp,
-                            lineHeight = 11.sp,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.size(21.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = tab.mobileLabel,
+                                color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 8.75.sp,
+                                lineHeight = 11.sp,
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+private fun avatarModel(value: String?): String? {
+    val raw = value?.trim().orEmpty()
+    if (raw.isBlank()) return null
+    return when {
+        raw.startsWith("http://") || raw.startsWith("https://") -> raw
+        raw.startsWith("/") -> BuildConfig.API_ORIGIN + raw
+        else -> BuildConfig.API_ORIGIN + "/" + raw
     }
 }
 
