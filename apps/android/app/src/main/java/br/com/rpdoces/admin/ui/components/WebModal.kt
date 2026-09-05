@@ -268,10 +268,10 @@ private fun WebCurrencyField(
 ) {
     val web = LocalRPWebColors.current
     var focused by remember { mutableStateOf(false) }
-    var rawValue by remember { mutableStateOf(currencyRawFromFormatted(value)) }
+    var rawDigits by remember { mutableStateOf(currencyDigitsFromFormatted(value)) }
 
     LaunchedEffect(value, focused) {
-        if (!focused) rawValue = currencyRawFromFormatted(value)
+        if (!focused) rawDigits = currencyDigitsFromFormatted(value)
     }
 
     Column(modifier = modifier) {
@@ -284,16 +284,19 @@ private fun WebCurrencyField(
             border = BorderStroke(1.dp, web.borderStrong)
         ) {
             BasicTextField(
-                value = rawValue,
+                value = rawDigits,
                 onValueChange = { typed ->
-                    val sanitized = sanitizeCurrencyRaw(typed)
-                    rawValue = sanitized
-                    onValueChange(currencyRawToCentsDigits(sanitized))
+                    val digits = typed.filter(Char::isDigit).take(9)
+                    val sanitized = digits.trimStart('0').ifBlank {
+                        if (digits.isNotEmpty()) "0" else ""
+                    }
+                    rawDigits = sanitized
+                    onValueChange(sanitized)
                 },
                 enabled = enabled,
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                visualTransformation = CurrencyGroupingVisualTransformation,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                visualTransformation = CurrencyCentsVisualTransformation,
                 textStyle = TextStyle(
                     color = if (enabled) web.text else web.muted,
                     fontSize = 12.5.sp,
@@ -303,12 +306,9 @@ private fun WebCurrencyField(
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { state ->
-                        val wasFocused = focused
                         focused = state.isFocused
-                        if (state.isFocused && !wasFocused) {
-                            rawValue = currencyRawFromFormatted(value)
-                        } else if (!state.isFocused && wasFocused) {
-                            rawValue = currencyRawFromFormatted(value)
+                        if (!state.isFocused) {
+                            rawDigits = currencyDigitsFromFormatted(value)
                         }
                     }
                     .padding(horizontal = 12.dp, vertical = 11.dp),
@@ -321,7 +321,7 @@ private fun WebCurrencyField(
                             fontWeight = FontWeight.Medium
                         )
                         Box(modifier = Modifier.weight(1f)) {
-                            if (rawValue.isBlank()) {
+                            if (rawDigits.isBlank()) {
                                 Text("0,00", color = web.muted, fontSize = 12.5.sp)
                             }
                             inner()
@@ -333,43 +333,32 @@ private fun WebCurrencyField(
     }
 }
 
-private object CurrencyGroupingVisualTransformation : VisualTransformation {
+private object CurrencyCentsVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
-        val raw = text.text
+        val raw = text.text.filter(Char::isDigit)
         if (raw.isBlank()) {
             return TransformedText(AnnotatedString(""), OffsetMapping.Identity)
         }
 
-        val commaIndex = raw.indexOf(',')
-        val integerPart = if (commaIndex >= 0) raw.substring(0, commaIndex) else raw
-        val fractionPart = if (commaIndex >= 0) raw.substring(commaIndex + 1) else null
-        val groupedInteger = groupThousands(integerPart.ifBlank { "0" })
-        val transformed = buildString {
-            append(groupedInteger)
-            if (commaIndex >= 0) {
-                append(',')
-                append(fractionPart.orEmpty())
-            }
-        }
+        val transformed = formatCentsDigits(raw)
+        val transformedDigitPositions = transformed.indices.filter { transformed[it].isDigit() }
+        val originalDigitPositions = transformedDigitPositions.takeLast(raw.length)
 
-        val originalToTransformed = IntArray(raw.length + 1)
-        for (offset in 0..raw.length) {
-            originalToTransformed[offset] = originalOffsetToCurrencyOffset(
-                raw = raw,
-                groupedIntegerLength = groupedInteger.length,
-                originalOffset = offset
-            )
+        val boundaries = IntArray(raw.length + 1)
+        boundaries[0] = originalDigitPositions.firstOrNull() ?: 0
+        for (index in raw.indices) {
+            boundaries[index + 1] = (originalDigitPositions.getOrNull(index)?.plus(1) ?: transformed.length)
         }
 
         val mapping = object : OffsetMapping {
             override fun originalToTransformed(offset: Int): Int =
-                originalToTransformed[offset.coerceIn(0, raw.length)].coerceIn(0, transformed.length)
+                boundaries[offset.coerceIn(0, raw.length)].coerceIn(0, transformed.length)
 
             override fun transformedToOriginal(offset: Int): Int {
                 val target = offset.coerceIn(0, transformed.length)
                 var best = 0
-                for (original in originalToTransformed.indices) {
-                    if (originalToTransformed[original] <= target) best = original else break
+                boundaries.forEachIndexed { index, boundary ->
+                    if (boundary <= target) best = index
                 }
                 return best.coerceIn(0, raw.length)
             }
@@ -379,25 +368,12 @@ private object CurrencyGroupingVisualTransformation : VisualTransformation {
     }
 }
 
-private fun originalOffsetToCurrencyOffset(
-    raw: String,
-    groupedIntegerLength: Int,
-    originalOffset: Int
-): Int {
-    val commaIndex = raw.indexOf(',')
-    val integerLength = if (commaIndex >= 0) commaIndex else raw.length
-    val offset = originalOffset.coerceIn(0, raw.length)
-
-    if (offset <= integerLength) {
-        if (integerLength == 0) return 0
-        val separatorsBefore = (1 until offset).count { index ->
-            (integerLength - index) % 3 == 0
-        }
-        return offset + separatorsBefore
-    }
-
-    val fractionOffset = offset - integerLength - 1
-    return groupedIntegerLength + 1 + fractionOffset
+private fun formatCentsDigits(raw: String): String {
+    val digits = raw.filter(Char::isDigit).trimStart('0').ifBlank { "0" }
+    val padded = digits.padStart(3, '0')
+    val cents = padded.takeLast(2)
+    val reais = padded.dropLast(2).trimStart('0').ifBlank { "0" }
+    return "${groupThousands(reais)},$cents"
 }
 
 private fun groupThousands(value: String): String {
@@ -418,38 +394,9 @@ private fun groupThousands(value: String): String {
     }
 }
 
-private fun sanitizeCurrencyRaw(input: String): String {
-    val normalized = input.replace('.', ',').filter { it.isDigit() || it == ',' }
-    if (normalized.isBlank()) return ""
-
-    val commaIndex = normalized.indexOf(',')
-    val integerSource = if (commaIndex >= 0) normalized.substring(0, commaIndex) else normalized
-    val fractionSource = if (commaIndex >= 0) normalized.substring(commaIndex + 1) else ""
-
-    val integerDigits = integerSource.filter(Char::isDigit).take(7)
-    val integerPart = integerDigits.trimStart('0').ifBlank {
-        if (integerDigits.isNotEmpty() || commaIndex >= 0) "0" else ""
-    }
-    val fractionPart = fractionSource.filter(Char::isDigit).take(2)
-
-    return if (commaIndex >= 0) "$integerPart,$fractionPart" else integerPart
-}
-
-private fun currencyRawToCentsDigits(raw: String): String {
-    if (raw.isBlank()) return ""
-    val parts = raw.split(',', limit = 2)
-    val reais = parts.getOrNull(0)?.toLongOrNull() ?: 0L
-    val centavos = parts.getOrNull(1).orEmpty().padEnd(2, '0').take(2).toIntOrNull() ?: 0
-    val total = (reais * 100L + centavos).coerceAtMost(Int.MAX_VALUE.toLong())
-    return total.toString()
-}
-
-private fun currencyRawFromFormatted(formatted: String): String {
-    val cents = formatted.filter(Char::isDigit).toLongOrNull() ?: 0L
-    if (cents <= 0L) return ""
-    val reais = cents / 100L
-    val centavos = (cents % 100L).toString().padStart(2, '0')
-    return "$reais,$centavos"
+private fun currencyDigitsFromFormatted(formatted: String): String {
+    val digits = formatted.filter(Char::isDigit).trimStart('0')
+    return digits.take(9)
 }
 
 @Composable
