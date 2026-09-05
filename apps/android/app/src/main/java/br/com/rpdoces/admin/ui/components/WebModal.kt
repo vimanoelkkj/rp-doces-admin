@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +46,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
+
+private val webEmojiOptions = listOf(
+    "🍰", "🧁", "🍮", "🎂", "🍓",
+    "🍫", "🥥", "🍋", "🍯", "🍪",
+    "🍒", "🍎", "🍊", "🍌", "🍍",
+    "🥝", "🫐", "🍇", "🍑", "🥭",
+    "☕", "🥛", "🍦", "🍨", "🍧"
+)
 
 @Composable
 fun WebModal(
@@ -158,6 +167,17 @@ fun WebField(
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default
 ) {
+    if (label.equals("Emoji", ignoreCase = true)) {
+        WebEmojiPickerField(
+            label = label,
+            value = value,
+            onValueChange = onValueChange,
+            modifier = modifier,
+            enabled = enabled
+        )
+        return
+    }
+
     val web = LocalRPWebColors.current
     Column(modifier = modifier) {
         Text(label.uppercase(), color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
@@ -184,6 +204,74 @@ fun WebField(
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun WebEmojiPickerField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier,
+    enabled: Boolean
+) {
+    val web = LocalRPWebColors.current
+    var open by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier) {
+        Text(label.uppercase(), color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
+        Spacer(Modifier.height(8.dp))
+        Box {
+            Surface(
+                onClick = { if (enabled) open = true },
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                shape = RoundedCornerShape(9.dp),
+                color = web.surface,
+                border = BorderStroke(1.dp, web.borderStrong)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(value.ifBlank { "🍰" }, color = if (enabled) web.text else web.muted, fontSize = 20.sp)
+                    MotionChevron(expanded = open, tint = web.muted, modifier = Modifier.size(16.dp))
+                }
+            }
+
+            MotionDropdownMenu(
+                expanded = open,
+                onDismissRequest = { open = false }
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    webEmojiOptions.chunked(5).forEach { options ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            options.forEach { option ->
+                                val selected = option == value
+                                Surface(
+                                    onClick = {
+                                        onValueChange(option)
+                                        open = false
+                                    },
+                                    modifier = Modifier.size(38.dp),
+                                    shape = RoundedCornerShape(9.dp),
+                                    color = if (selected) web.accentSoft else web.surface,
+                                    border = BorderStroke(1.dp, if (selected) web.accent else web.border)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(option, fontSize = 18.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
