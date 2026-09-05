@@ -1,5 +1,6 @@
 package br.com.rpdoces.admin.ui.theme
 
+import android.content.Context
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
@@ -10,12 +11,21 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import br.com.rpdoces.admin.R
+
+private const val THEME_PREFS = "rp_admin_preferences"
+private const val THEME_KEY = "theme"
 
 private val GoogleFontsProvider = GoogleFont.Provider(
     providerAuthority = "com.google.android.gms.fonts",
@@ -39,6 +49,15 @@ object RPWebFonts {
     val Manrope = googleFamily("Manrope")
     val NunitoSans = googleFamily("Nunito Sans")
     val BricolageGrotesque = googleFamily("Bricolage Grotesque")
+}
+
+data class RPThemeController(
+    val isDark: Boolean,
+    val toggle: () -> Unit
+)
+
+val LocalRPThemeController = staticCompositionLocalOf {
+    RPThemeController(isDark = false, toggle = {})
 }
 
 private fun lightScheme(colors: RPWebColors) = lightColorScheme(
@@ -97,16 +116,40 @@ private val RPTypography = Typography(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RPTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean? = null,
     content: @Composable () -> Unit
 ) {
-    val webColors = if (darkTheme) RPWebDarkColors else RPWebLightColors
+    val context = LocalContext.current
+    val systemDark = isSystemInDarkTheme()
+    val preferences = remember(context) {
+        context.getSharedPreferences(THEME_PREFS, Context.MODE_PRIVATE)
+    }
+    var storedTheme by remember {
+        mutableStateOf(preferences.getString(THEME_KEY, null))
+    }
+
+    val effectiveDark = darkTheme ?: when (storedTheme) {
+        "dark" -> true
+        "light" -> false
+        else -> systemDark
+    }
+    val webColors = if (effectiveDark) RPWebDarkColors else RPWebLightColors
+    val controller = RPThemeController(
+        isDark = effectiveDark,
+        toggle = {
+            val next = if (effectiveDark) "light" else "dark"
+            preferences.edit().putString(THEME_KEY, next).apply()
+            storedTheme = next
+        }
+    )
+
     CompositionLocalProvider(
         LocalRPWebColors provides webColors,
+        LocalRPThemeController provides controller,
         LocalRippleConfiguration provides null
     ) {
         MaterialTheme(
-            colorScheme = if (darkTheme) darkScheme(webColors) else lightScheme(webColors),
+            colorScheme = if (effectiveDark) darkScheme(webColors) else lightScheme(webColors),
             typography = RPTypography
         ) {
             ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
