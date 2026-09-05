@@ -1,6 +1,8 @@
 package br.com.rpdoces.admin.ui.store
 
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -44,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,7 +57,11 @@ import br.com.rpdoces.admin.data.store.StoreUpdateInput
 import br.com.rpdoces.admin.ui.components.RPMotion
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private const val MAX_SITE_IMAGE_BYTES = 5 * 1024 * 1024
 
 private val storeDays = listOf(
     "seg" to "Seg", "ter" to "Ter", "qua" to "Qua", "qui" to "Qui",
@@ -74,11 +81,14 @@ fun StoreScreen(
 ) {
     val web = LocalRPWebColors.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var config by remember { mutableStateOf<StoreConfig?>(null) }
     var loading by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
+    var pendingImageSlot by remember { mutableStateOf<String?>(null) }
+    var imageBusySlot by remember { mutableStateOf<String?>(null) }
 
     var whatsapp by remember { mutableStateOf("") }
     var pickupLocation by remember { mutableStateOf("") }
@@ -108,6 +118,59 @@ fun StoreScreen(
             error = t.message ?: "Não foi possível carregar as configurações da loja."
         } finally {
             loading = false
+        }
+    }
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        val slot = pendingImageSlot
+        pendingImageSlot = null
+        if (uri == null || slot == null || imageBusySlot != null) return@rememberLauncherForActivityResult
+
+        imageBusySlot = slot
+        error = null
+        status = "Enviando imagem…"
+        scope.launch {
+            runCatching {
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                if (!mime.startsWith("image/")) error("Selecione uma imagem JPG, PNG ou WebP.")
+                val bytes = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: error("Não foi possível ler a imagem selecionada.")
+                }
+                if (bytes.size > MAX_SITE_IMAGE_BYTES) error("A imagem deve ter no máximo 5 MB.")
+                val extension = when (mime.lowercase()) {
+                    "image/png" -> "png"
+                    "image/webp" -> "webp"
+                    else -> "jpg"
+                }
+                repository.uploadSiteImage(slot, bytes, "rp-$slot.$extension", mime)
+            }.onSuccess {
+                status = if (slot == "hero") "Imagem principal atualizada ✓" else "Imagem da nossa história atualizada ✓"
+                load()
+            }.onFailure {
+                error = it.message ?: "Não foi possível enviar a imagem."
+                status = null
+            }
+            imageBusySlot = null
+        }
+    }
+
+    fun removeImage(slot: String) {
+        if (imageBusySlot != null) return
+        imageBusySlot = slot
+        error = null
+        status = "Removendo imagem…"
+        scope.launch {
+            runCatching { repository.removeSiteImage(slot) }
+                .onSuccess {
+                    status = "Imagem removida ✓"
+                    load()
+                }
+                .onFailure {
+                    error = it.message ?: "Não foi possível remover a imagem."
+                    status = null
+                }
+            imageBusySlot = null
         }
     }
 
@@ -256,16 +319,38 @@ fun StoreScreen(
 
         item {
             StoreCard(title = "Aparência do site", subtitle = "Imagens usadas na página inicial.", icon = "▣") {
-                SiteImagePreview("Imagem principal", config?.heroImageKey.orEmpty())
+                SiteImagePreview(
+                    title = "Imagem principal",
+                    key = config?.heroImageKey.orEmpty(),
+                    busy = imageBusySlot == "hero",
+                    onPick = {
+                        if (imageBusySlot == null) {
+                            pendingImageSlot = "hero"
+                            imagePicker.launch("image/*")
+                        }
+                    },
+                    onRemove = if (config?.heroImageKey.isNullOrBlank()) null else ({ removeImage("hero") })
+                )
                 HorizontalDivider(color = web.border, modifier = Modifier.padding(vertical = 14.dp))
-                SiteImagePreview("Nossa história", config?.aboutImageKey.orEmpty())
+                SiteImagePreview(
+                    title = "Nossa história",
+                    key = config?.aboutImageKey.orEmpty(),
+                    busy = imageBusySlot == "about",
+                    onPick = {
+                        if (imageBusySlot == null) {
+                            pendingImageSlot = "about"
+                            imagePicker.launch("image/*")
+                        }
+                    },
+                    onRemove = if (config?.aboutImageKey.isNullOrBlank()) null else ({ removeImage("about") })
+                )
             }
         }
 
         item {
             Surface(
                 onClick = {
-                    if (!saving) {
+                    if (!saving && imageBusySlot == null) {
                         saving = true
                         error = null
                         status = "Salvando…"
@@ -361,25 +446,50 @@ private fun StoreInput(
 }
 
 @Composable
-private fun SiteImagePreview(title: String, key: String) {
+private fun SiteImagePreview(
+    title: String,
+    key: String,
+    busy: Boolean,
+    onPick: () -> Unit,
+    onRemove: (() -> Unit)?
+) {
     val web = LocalRPWebColors.current
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(modifier = Modifier.width(92.dp).height(68.dp), shape = RoundedCornerShape(10.dp), color = web.graySoft, border = BorderStroke(1.dp, web.border)) {
-            if (key.isNotBlank()) {
-                AsyncImage(
-                    model = BuildConfig.API_ORIGIN + "/api/images/" + Uri.encode(key),
-                    contentDescription = title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(contentAlignment = Alignment.Center) { Text("Sem foto", color = web.muted, fontSize = 10.sp) }
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (key.isNotBlank()) {
+                    AsyncImage(
+                        model = BuildConfig.API_ORIGIN + "/api/images/" + Uri.encode(key),
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text("Sem foto", color = web.muted, fontSize = 10.sp)
+                }
+                if (busy) {
+                    Surface(modifier = Modifier.fillMaxSize(), color = web.surface.copy(alpha = .72f)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = web.accent)
+                        }
+                    }
+                }
             }
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = web.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Text(if (key.isBlank()) "Nenhuma imagem cadastrada." else "Imagem cadastrada no site.", color = web.muted, fontSize = 10.5.sp, modifier = Modifier.padding(top = 3.dp))
             Text("JPG, PNG ou WebP · até 5 MB", color = web.muted, fontSize = 9.5.sp, modifier = Modifier.padding(top = 3.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 5.dp)) {
+                Surface(onClick = onPick, enabled = !busy, color = Color.Transparent) {
+                    Text(if (key.isBlank()) "Adicionar" else "Trocar", color = web.accentDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 4.dp))
+                }
+                if (onRemove != null) {
+                    Surface(onClick = onRemove, enabled = !busy, color = Color.Transparent) {
+                        Text("Remover", color = web.danger, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                }
+            }
         }
     }
 }
