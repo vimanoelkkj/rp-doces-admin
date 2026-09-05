@@ -1,5 +1,6 @@
 package br.com.rpdoces.admin.ui.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -201,9 +204,7 @@ private fun DashboardContent(
             )
         }
 
-        item {
-            SectionTitle("Atenção")
-        }
+        item { SectionTitle("Atenção") }
 
         if (snapshot.attention.isEmpty()) {
             item {
@@ -225,14 +226,10 @@ private fun DashboardContent(
                 }
             }
         } else {
-            items(snapshot.attention) { attention ->
-                AttentionRow(attention)
-            }
+            items(snapshot.attention) { attention -> AttentionRow(attention) }
         }
 
-        item {
-            SectionTitle("Pedidos recentes")
-        }
+        item { SectionTitle("Pedidos recentes") }
 
         if (snapshot.recentOrders.isEmpty()) {
             item {
@@ -243,9 +240,7 @@ private fun DashboardContent(
                 )
             }
         } else {
-            items(snapshot.recentOrders, key = { it.id }) { order ->
-                RecentOrderCard(order)
-            }
+            items(snapshot.recentOrders, key = { it.id }) { order -> RecentOrderCard(order) }
         }
     }
 }
@@ -323,9 +318,7 @@ private fun AttentionRow(text: String) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .then(
-                        Modifier
-                    )
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
             )
             Text(
                 text = text,
