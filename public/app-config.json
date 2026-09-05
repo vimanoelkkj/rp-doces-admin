@@ -1,5 +1,8 @@
 {
-  "revision": 2,
+  "schema_version": 1,
+  "revision": 3,
+  "min_app_version_code": 1,
+  "poll_seconds": 5,
   "theme": "dark",
   "dashboard_banner": {
     "enabled": true,
