@@ -5,9 +5,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import br.com.rpdoces.admin.data.dashboard.DashboardRepository
 import br.com.rpdoces.admin.data.dashboard.DashboardSnapshot
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 sealed interface DashboardUiState {
@@ -28,14 +30,21 @@ class DashboardViewModel(
 
     init {
         refresh()
+        viewModelScope.launch {
+            while (isActive) {
+                delay(15_000)
+                refresh(silent = true)
+            }
+        }
     }
 
-    fun refresh() {
+    fun refresh(silent: Boolean = false) {
         val current = _state.value
         if (current is DashboardUiState.Ready && current.refreshing) return
 
         if (current is DashboardUiState.Ready) {
-            _state.value = current.copy(refreshing = true, refreshError = null)
+            _state.value = if (silent) current.copy(refreshError = null)
+            else current.copy(refreshing = true, refreshError = null)
         } else {
             _state.value = DashboardUiState.Loading
         }
@@ -47,7 +56,7 @@ class DashboardViewModel(
                 val message = error.message ?: "Não foi possível carregar o dashboard."
                 val latest = _state.value
                 if (latest is DashboardUiState.Ready) {
-                    latest.copy(refreshing = false, refreshError = message)
+                    latest.copy(refreshing = false, refreshError = if (silent) null else message)
                 } else {
                     DashboardUiState.Error(message)
                 }
