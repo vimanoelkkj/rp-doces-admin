@@ -7,17 +7,19 @@ import {
 } from "../../lib/app-config.js";
 import { bodyJson, json, sameOrigin } from "../../lib/http.js";
 
-async function requireAdmin(env, request) {
+async function requireAppControlAccess(env, request) {
   const auth = await requireUser(env, request);
   if (auth.error) return auth;
-  if (String(auth.user.papel || "").toUpperCase() !== "ADMIN") {
-    return { error: json({ erro: "Apenas administradores podem alterar a configuração do app." }, 403) };
+
+  const role = String(auth.user.papel || "").toUpperCase();
+  if (role !== "OWNER" && role !== "ADMIN") {
+    return { error: json({ erro: "Apenas owner e administradores podem alterar a configuração do app." }, 403) };
   }
   return auth;
 }
 
 export async function onRequestGet({ env, request }) {
-  const auth = await requireAdmin(env, request);
+  const auth = await requireAppControlAccess(env, request);
   if (auth.error) return auth.error;
 
   const [config, history] = await Promise.all([
@@ -29,7 +31,7 @@ export async function onRequestGet({ env, request }) {
 }
 
 export async function onRequestPut({ env, request }) {
-  const auth = await requireAdmin(env, request);
+  const auth = await requireAppControlAccess(env, request);
   if (auth.error) return auth.error;
   if (!sameOrigin(request)) return json({ erro: "Origem da requisição inválida." }, 403);
 
@@ -46,7 +48,7 @@ export async function onRequestPut({ env, request }) {
 }
 
 export async function onRequestPost({ env, request }) {
-  const auth = await requireAdmin(env, request);
+  const auth = await requireAppControlAccess(env, request);
   if (auth.error) return auth.error;
   if (!sameOrigin(request)) return json({ erro: "Origem da requisição inválida." }, 403);
 
