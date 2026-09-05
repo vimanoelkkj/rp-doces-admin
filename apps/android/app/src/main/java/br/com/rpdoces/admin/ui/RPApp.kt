@@ -1,15 +1,23 @@
 package br.com.rpdoces.admin.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,23 +25,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.SpaceDashboard
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +55,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.rpdoces.admin.data.auth.AuthRepository
@@ -59,13 +67,15 @@ import br.com.rpdoces.admin.ui.dashboard.DashboardScreen
 
 private enum class MainTab(
     val label: String,
+    val mobileLabel: String,
+    val subtitle: String,
     val icon: ImageVector
 ) {
-    Dashboard("Dashboard", Icons.Outlined.SpaceDashboard),
-    Produtos("Produtos", Icons.Outlined.Inventory2),
-    Pedidos("Pedidos", Icons.AutoMirrored.Outlined.ReceiptLong),
-    Admins("Admins", Icons.Outlined.AdminPanelSettings),
-    Loja("Loja", Icons.Outlined.Storefront)
+    Dashboard("Dashboard", "Dashboard", "Visão geral da operação", Icons.Outlined.SpaceDashboard),
+    Produtos("Produtos", "Produtos", "Gerencie o catálogo", Icons.Outlined.Inventory2),
+    Pedidos("Pedidos", "Pedidos", "Acompanhe a operação", Icons.AutoMirrored.Outlined.ReceiptLong),
+    Admins("Administradores", "Admins", "Gerencie os acessos", Icons.Outlined.AdminPanelSettings),
+    Loja("Loja", "Loja", "Configurações da loja", Icons.Outlined.Storefront)
 }
 
 @Composable
@@ -214,7 +224,6 @@ private fun LoginScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainShell(
     user: AuthUser,
@@ -222,50 +231,24 @@ private fun MainShell(
     onLogout: () -> Unit
 ) {
     var selected by rememberSaveable { mutableStateOf(MainTab.Dashboard) }
+    var profileOpen by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(selected.label, fontWeight = FontWeight.Bold)
-                        Text(
-                            text = user.nome,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                actions = {
-                    Button(
-                        onClick = onLogout,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text("Sair")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+            MobileHeader(
+                tab = selected,
+                user = user,
+                profileOpen = profileOpen,
+                onProfileOpenChange = { profileOpen = it },
+                onLogout = onLogout
             )
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                MainTab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = selected == tab,
-                        onClick = { selected = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                }
-            }
+            MobileBottomBar(
+                selected = selected,
+                onSelected = { selected = it }
+            )
         }
     ) { padding ->
         when (selected) {
@@ -283,6 +266,200 @@ private fun MainShell(
             )
         }
     }
+}
+
+@Composable
+private fun MobileHeader(
+    tab: MainTab,
+    user: AuthUser,
+    profileOpen: Boolean,
+    onProfileOpenChange: (Boolean) -> Unit,
+    onLogout: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        shadowElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = tab.label,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 25.sp,
+                        lineHeight = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.5).sp
+                    )
+                    Text(
+                        text = tab.subtitle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    ) {
+                        IconButton(onClick = { }) {
+                            Icon(
+                                imageVector = Icons.Outlined.NotificationsNone,
+                                contentDescription = "Notificações",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    Box {
+                        Surface(
+                            onClick = { onProfileOpenChange(true) },
+                            modifier = Modifier.size(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Surface(
+                                    modifier = Modifier.size(34.dp),
+                                    shape = RoundedCornerShape(17.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = userInitials(user.nome),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = profileOpen,
+                            onDismissRequest = { onProfileOpenChange(false) }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(user.nome, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            user.email.orEmpty(),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                },
+                                onClick = { }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Sair") },
+                                onClick = {
+                                    onProfileOpenChange(false)
+                                    onLogout()
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+@Composable
+private fun MobileBottomBar(
+    selected: MainTab,
+    onSelected: (MainTab) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 12.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+        ) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 4.dp)
+            ) {
+                MainTab.entries.forEach { tab ->
+                    val active = selected == tab
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .clickable { onSelected(tab) }
+                            .padding(horizontal = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(22.dp)
+                                .height(2.dp)
+                                .background(
+                                    if (active) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    RoundedCornerShape(99.dp)
+                                )
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Icon(
+                            imageVector = tab.icon,
+                            contentDescription = tab.label,
+                            modifier = Modifier.size(20.dp),
+                            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = tab.mobileLabel,
+                            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 9.sp,
+                            lineHeight = 11.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun userInitials(name: String): String {
+    val parts = name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (parts.isEmpty()) return "RP"
+    return parts.take(2).joinToString("") { it.first().uppercase() }
 }
 
 @Composable
