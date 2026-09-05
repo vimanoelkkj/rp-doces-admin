@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,12 +57,11 @@ import br.com.rpdoces.admin.data.dashboard.effectivePaymentStatus
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 private val WarningOrange = Color(0xFFF0A04F)
-private val SuccessGreen = Color(0xFF58CF93)
 
 @Composable
 fun DashboardScreen(
@@ -173,7 +173,7 @@ private fun DashboardContent(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 20.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 18.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         item {
@@ -218,13 +218,15 @@ private fun DashboardContent(
         }
 
         item {
-            MetricsGrid(metrics, snapshot)
+            Box(modifier = Modifier.padding(top = 20.dp)) {
+                MetricsGrid(metrics, snapshot)
+            }
         }
 
         item {
             FlavorPanel(
                 flavors = topFlavors,
-                modifier = Modifier.padding(top = 22.dp)
+                modifier = Modifier.padding(top = 20.dp)
             )
         }
 
@@ -232,7 +234,7 @@ private fun DashboardContent(
             item {
                 RecentOrdersPanel(
                     orders = snapshot.recentOrders.take(4),
-                    modifier = Modifier.padding(top = 18.dp)
+                    modifier = Modifier.padding(top = 20.dp)
                 )
             }
         }
@@ -276,22 +278,27 @@ private fun DayNavigator(
             }
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(16.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             CompactButton(onClick = onPrevious, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Outlined.ChevronLeft, null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.ChevronLeft, null, modifier = Modifier.size(15.dp))
             }
 
             CompactButton(
                 onClick = onOpenCalendar,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.width(116.dp)
             ) {
-                Icon(Icons.Outlined.CalendarMonth, null, modifier = Modifier.size(15.dp))
+                Icon(
+                    Icons.Outlined.CalendarMonth,
+                    null,
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.width(7.dp))
                 Text(
                     selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
@@ -306,7 +313,7 @@ private fun DayNavigator(
                 modifier = Modifier.size(30.dp),
                 enabled = dayOffset < 0
             ) {
-                Icon(Icons.Outlined.ChevronRight, null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.ChevronRight, null, modifier = Modifier.size(15.dp))
             }
 
             CompactButton(
@@ -318,8 +325,9 @@ private fun DayNavigator(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        Spacer(Modifier.height(2.dp))
     }
 }
 
@@ -398,7 +406,7 @@ private fun MetricsGrid(metrics: DayMetrics, snapshot: DashboardSnapshot) {
     Column {
         MetricPair(
             left = MetricSpec(
-                label = "RECEBIDO ${if (metrics.receivedCount >= 0) "NO DIA" else "HOJE"}",
+                label = "RECEBIDO NO DIA",
                 value = money(metrics.receivedCents),
                 supporting = "${metrics.receivedCount} pagamento${if (metrics.receivedCount == 1) " confirmado" else "s confirmados"}",
                 accent = MaterialTheme.colorScheme.primary,
@@ -413,6 +421,8 @@ private fun MetricsGrid(metrics: DayMetrics, snapshot: DashboardSnapshot) {
             )
         )
 
+        Spacer(Modifier.height(14.dp))
+
         MetricPair(
             left = MetricSpec(
                 label = "COMANDAS ABERTAS",
@@ -423,8 +433,11 @@ private fun MetricsGrid(metrics: DayMetrics, snapshot: DashboardSnapshot) {
                 label = "AGUARDANDO PREPARO",
                 value = metrics.waitingPreparation.toString(),
                 supporting = "Pedidos pagos que ainda estão novos"
-            )
+            ),
+            topBorder = true
         )
+
+        Spacer(Modifier.height(14.dp))
 
         Row(modifier = Modifier.fillMaxWidth()) {
             MetricCell(
@@ -435,7 +448,8 @@ private fun MetricsGrid(metrics: DayMetrics, snapshot: DashboardSnapshot) {
                     accent = if (snapshot.soldOutCount > 0 || snapshot.lowStockCount > 0) WarningOrange else MaterialTheme.colorScheme.outline,
                     supportingColor = if (snapshot.soldOutCount > 0 || snapshot.lowStockCount > 0) WarningOrange else null
                 ),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                topBorder = true
             )
             Spacer(Modifier.weight(1f))
         }
@@ -452,64 +466,102 @@ private data class MetricSpec(
 )
 
 @Composable
-private fun MetricPair(left: MetricSpec, right: MetricSpec) {
+private fun MetricPair(
+    left: MetricSpec,
+    right: MetricSpec,
+    topBorder: Boolean = false
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(110.dp)
+            .height(105.dp)
     ) {
-        MetricCell(left, Modifier.weight(1f))
+        MetricCell(
+            metric = left,
+            modifier = Modifier.weight(1f),
+            startPadding = 0.dp,
+            topBorder = topBorder
+        )
         Box(
             modifier = Modifier
                 .width(1.dp)
                 .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.outline)
         )
-        MetricCell(right, Modifier.weight(1f))
+        MetricCell(
+            metric = right,
+            modifier = Modifier.weight(1f),
+            startPadding = 18.dp,
+            topBorder = topBorder
+        )
     }
 }
 
 @Composable
-private fun MetricCell(metric: MetricSpec, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .height(110.dp)
-            .padding(top = 15.dp, end = 14.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+private fun MetricCell(
+    metric: MetricSpec,
+    modifier: Modifier = Modifier,
+    startPadding: Dp = 0.dp,
+    topBorder: Boolean = false
+) {
+    Box(
+        modifier = modifier.height(105.dp)
     ) {
-        Column {
+        if (topBorder) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outline)
+                    .align(Alignment.TopStart)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    start = startPadding,
+                    top = if (topBorder) 12.dp else 4.dp,
+                    end = 18.dp,
+                    bottom = 15.dp
+                )
+        ) {
             Text(
                 text = metric.label,
                 color = metric.labelColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 10.5.sp,
                 lineHeight = 14.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = .35.sp
+                letterSpacing = .4.sp
             )
             Text(
                 text = metric.value,
-                modifier = Modifier.padding(top = 7.dp),
+                modifier = Modifier.padding(top = 6.dp),
                 color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 21.sp,
-                lineHeight = 26.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 20.sp,
+                lineHeight = 25.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.3).sp
             )
             Text(
                 text = metric.supporting,
                 modifier = Modifier.padding(top = 3.dp),
                 color = metric.supportingColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 10.5.sp,
-                lineHeight = 14.sp,
+                lineHeight = 14.7.sp,
                 fontWeight = if (metric.supportingColor != null) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
         }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (metric.accent != null) 2.dp else 1.dp)
+                .height(2.dp)
                 .background(metric.accent ?: MaterialTheme.colorScheme.outline)
+                .align(Alignment.BottomStart)
         )
     }
 }
@@ -567,7 +619,7 @@ private fun FlavorPanel(flavors: List<FlavorStat>, modifier: Modifier = Modifier
         color = MaterialTheme.colorScheme.surface.copy(alpha = .76f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 17.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
             Text(
                 text = "Sabores de bolo mais vendidos",
                 fontSize = 14.sp,
@@ -577,8 +629,8 @@ private fun FlavorPanel(flavors: List<FlavorStat>, modifier: Modifier = Modifier
                 text = "Últimos 30 dias · pedidos pagos · $total unidades no Top 4",
                 modifier = Modifier.padding(top = 4.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp,
-                lineHeight = 15.sp
+                fontSize = 11.5.sp,
+                lineHeight = 15.5.sp
             )
 
             if (flavors.isEmpty()) {
@@ -586,10 +638,13 @@ private fun FlavorPanel(flavors: List<FlavorStat>, modifier: Modifier = Modifier
                     text = "Ainda não há vendas pagas suficientes para formar o ranking.",
                     modifier = Modifier.padding(top = 18.dp, bottom = 4.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    fontSize = 11.5.sp
                 )
             } else {
                 flavors.forEachIndexed { index, flavor ->
+                    if (index > 0) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    }
                     FlavorRow(
                         rank = index + 1,
                         flavor = flavor,
@@ -606,20 +661,20 @@ private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Surface(
-            modifier = Modifier.size(28.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.size(26.dp),
+            shape = RoundedCornerShape(13.dp),
             color = MaterialTheme.colorScheme.primaryContainer
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     rank.toString(),
                     color = MaterialTheme.colorScheme.primary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -636,9 +691,8 @@ private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
             )
             Text(
                 text = flavor.category,
-                modifier = Modifier.padding(top = 2.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 10.5.sp
+                fontSize = 11.sp
             )
             Box(
                 modifier = Modifier
@@ -666,7 +720,7 @@ private fun FlavorRow(rank: Int, flavor: FlavorStat, fraction: Float) {
                 text = "≈ ${(flavor.count / 4.3).toLocale1()}/sem",
                 modifier = Modifier.padding(top = 3.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 10.sp
+                fontSize = 10.5.sp
             )
         }
     }
@@ -680,12 +734,12 @@ private fun RecentOrdersPanel(orders: List<DashboardOrder>, modifier: Modifier =
         color = MaterialTheme.colorScheme.surface.copy(alpha = .76f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
             Text("Pedidos recentes", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Text(
                 "Últimas movimentações da loja",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp
+                fontSize = 11.5.sp
             )
             orders.forEach { order ->
                 HorizontalDivider(
@@ -694,7 +748,7 @@ private fun RecentOrdersPanel(orders: List<DashboardOrder>, modifier: Modifier =
                 )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("#${order.id}", color = MaterialTheme.colorScheme.primary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                        Text("RP-${order.id}", color = MaterialTheme.colorScheme.primary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                         Text(
                             order.customerName ?: "Cliente",
                             fontSize = 12.5.sp,
