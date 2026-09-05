@@ -3,7 +3,6 @@ package br.com.rpdoces.admin.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,9 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.SpaceDashboard
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Button
@@ -38,7 +37,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,8 +52,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.rpdoces.admin.data.auth.AuthRepository
 import br.com.rpdoces.admin.data.auth.AuthUser
+import br.com.rpdoces.admin.data.dashboard.DashboardRepository
 import br.com.rpdoces.admin.ui.auth.AuthUiState
 import br.com.rpdoces.admin.ui.auth.AuthViewModel
+import br.com.rpdoces.admin.ui.dashboard.DashboardScreen
 
 private enum class MainTab(
     val label: String,
@@ -63,14 +63,17 @@ private enum class MainTab(
 ) {
     Dashboard("Dashboard", Icons.Outlined.SpaceDashboard),
     Produtos("Produtos", Icons.Outlined.Inventory2),
-    Pedidos("Pedidos", Icons.Outlined.ReceiptLong),
+    Pedidos("Pedidos", Icons.AutoMirrored.Outlined.ReceiptLong),
     Admins("Admins", Icons.Outlined.AdminPanelSettings),
     Loja("Loja", Icons.Outlined.Storefront)
 }
 
 @Composable
-fun RPApp(repository: AuthRepository) {
-    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(repository))
+fun RPApp(
+    authRepository: AuthRepository,
+    dashboardRepository: DashboardRepository
+) {
+    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(authRepository))
     val state by authViewModel.state.collectAsStateWithLifecycle()
 
     when (val current = state) {
@@ -82,6 +85,7 @@ fun RPApp(repository: AuthRepository) {
         )
         is AuthUiState.SignedIn -> MainShell(
             user = current.user,
+            dashboardRepository = dashboardRepository,
             onLogout = authViewModel::logout
         )
     }
@@ -214,6 +218,7 @@ private fun LoginScreen(
 @Composable
 private fun MainShell(
     user: AuthUser,
+    dashboardRepository: DashboardRepository,
     onLogout: () -> Unit
 ) {
     var selected by rememberSaveable { mutableStateOf(MainTab.Dashboard) }
@@ -263,34 +268,49 @@ private fun MainShell(
             }
         }
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(20.dp),
-            contentAlignment = Alignment.Center
+        when (selected) {
+            MainTab.Dashboard -> DashboardScreen(
+                repository = dashboardRepository,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            )
+            else -> PlaceholderScreen(
+                tab = selected,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderScreen(tab: MainTab, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.padding(20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = selected.icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(42.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = selected.label,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Estrutura nativa pronta. Esta tela será conectada à API na próxima etapa.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+            Icon(
+                imageVector = tab.icon,
+                contentDescription = null,
+                modifier = Modifier.size(42.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = tab.label,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Esta área será portada para Compose nas próximas etapas.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }
