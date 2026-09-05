@@ -10,12 +10,6 @@ import styles from "./AppControlPage.module.css";
 
 type Props = { active?: boolean };
 
-type BooleanPath =
-  | ["maintenance", "enabled"]
-  | ["navigation", keyof AppRemoteConfig["navigation"]]
-  | ["dashboard_banner", "enabled"]
-  | ["features", keyof AppRemoteConfig["features"]];
-
 const navLabels: Record<keyof AppRemoteConfig["navigation"], string> = {
   dashboard: "Dashboard",
   products: "Produtos",
@@ -102,14 +96,32 @@ export function AppControlPage({ active = true }: Props) {
     void reload();
   }, [active]);
 
-  function setBoolean(path: BooleanPath, value: boolean) {
-    setDraft(current => {
-      if (!current) return current;
-      const next = cloneConfig(current);
-      const [group, key] = path;
-      (next[group] as Record<string, unknown>)[key] = value;
-      return next;
-    });
+  function setMaintenance(value: boolean) {
+    setDraft(current => current ? {
+      ...current,
+      maintenance: { ...current.maintenance, enabled: value }
+    } : current);
+  }
+
+  function setBannerEnabled(value: boolean) {
+    setDraft(current => current ? {
+      ...current,
+      dashboard_banner: { ...current.dashboard_banner, enabled: value }
+    } : current);
+  }
+
+  function setNavigation(key: keyof AppRemoteConfig["navigation"], value: boolean) {
+    setDraft(current => current ? {
+      ...current,
+      navigation: { ...current.navigation, [key]: value }
+    } : current);
+  }
+
+  function setFeature(key: keyof AppRemoteConfig["features"], value: boolean) {
+    setDraft(current => current ? {
+      ...current,
+      features: { ...current.features, [key]: value }
+    } : current);
   }
 
   function moveSection(index: number, direction: -1 | 1) {
@@ -192,7 +204,7 @@ export function AppControlPage({ active = true }: Props) {
             </div>
             <Toggle
               checked={draft.maintenance.enabled}
-              onChange={value => setBoolean(["maintenance", "enabled"], value)}
+              onChange={setMaintenance}
               label="Modo manutenção"
             />
           </div>
@@ -223,7 +235,7 @@ export function AppControlPage({ active = true }: Props) {
             {(Object.keys(navLabels) as Array<keyof AppRemoteConfig["navigation"]>).map(key => (
               <div className={styles.switchRow} key={key}>
                 <div><strong>{navLabels[key]}</strong><small>{key === "admins" ? "Contas e segurança da equipe" : "Visível na navegação principal"}</small></div>
-                <Toggle checked={draft.navigation[key]} onChange={value => setBoolean(["navigation", key], value)} label={navLabels[key]} />
+                <Toggle checked={draft.navigation[key]} onChange={value => setNavigation(key, value)} label={navLabels[key]} />
               </div>
             ))}
           </div>
@@ -235,7 +247,7 @@ export function AppControlPage({ active = true }: Props) {
             {(Object.keys(featureLabels) as Array<keyof AppRemoteConfig["features"]>).map(key => (
               <div className={styles.switchRow} key={key}>
                 <div><strong>{featureLabels[key].title}</strong><small>{featureLabels[key].description}</small></div>
-                <Toggle checked={draft.features[key]} onChange={value => setBoolean(["features", key], value)} label={featureLabels[key].title} />
+                <Toggle checked={draft.features[key]} onChange={value => setFeature(key, value)} label={featureLabels[key].title} />
               </div>
             ))}
           </div>
@@ -244,7 +256,7 @@ export function AppControlPage({ active = true }: Props) {
         <section className={styles.panel}>
           <div className={styles.panelHeading}>
             <div><span>DASHBOARD</span><h3>Banner remoto</h3><p>Mensagem que aparece no topo do dashboard nativo.</p></div>
-            <Toggle checked={draft.dashboard_banner.enabled} onChange={value => setBoolean(["dashboard_banner", "enabled"], value)} label="Banner do dashboard" />
+            <Toggle checked={draft.dashboard_banner.enabled} onChange={setBannerEnabled} label="Banner do dashboard" />
           </div>
           <div className={styles.fields}>
             <label><span>Rótulo</span><input value={draft.dashboard_banner.eyebrow} maxLength={30} onChange={e => setDraft(c => c ? { ...c, dashboard_banner: { ...c.dashboard_banner, eyebrow: e.target.value } } : c)} /></label>
