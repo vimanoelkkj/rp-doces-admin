@@ -165,16 +165,21 @@ internal fun ProductEditorDialog(
             Column(modifier = Modifier.weight(1f)) {
                 Text("ESTOQUE", color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
                 Spacer(Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-                    StepButton("−") { stock = ((stock.toIntOrNull() ?: 0) - 1).coerceAtLeast(product?.reservedStock ?: 0).toString() }
-                    Surface(modifier = Modifier.weight(1f).height(40.dp), color = web.surface, border = BorderStroke(1.dp, web.borderStrong)) {
-                        Box(contentAlignment = Alignment.Center) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(9.dp),
+                    color = web.surface,
+                    border = BorderStroke(1.dp, web.borderStrong)
+                ) {
+                    Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                        StepButton("−") { stock = ((stock.toIntOrNull() ?: 0) - 1).coerceAtLeast(product?.reservedStock ?: 0).toString() }
+                        Box(modifier = Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.Center) {
                             MotionValue(targetState = stock) { value ->
-                                Text(value, color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(value, color = web.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+                        StepButton("+") { stock = ((stock.toIntOrNull() ?: 0) + 1).coerceAtMost(100000).toString() }
                     }
-                    StepButton("+") { stock = ((stock.toIntOrNull() ?: 0) + 1).coerceAtMost(100000).toString() }
                 }
                 if ((product?.reservedStock ?: 0) > 0) {
                     Text("${product?.reservedStock} reservada(s)", color = web.muted, fontSize = 9.5.sp, modifier = Modifier.padding(top = 5.dp))
@@ -505,7 +510,7 @@ internal fun ProductConfirmDialog(
 @Composable
 private fun StepButton(text: String, onClick: () -> Unit) {
     val web = LocalRPWebColors.current
-    Surface(onClick = onClick, modifier = Modifier.width(38.dp).height(40.dp), color = web.surface, border = BorderStroke(1.dp, web.borderStrong)) {
+    Surface(onClick = onClick, modifier = Modifier.width(38.dp).height(40.dp), color = Color.Transparent) {
         Box(contentAlignment = Alignment.Center) { Text(text, color = web.accentDark, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
