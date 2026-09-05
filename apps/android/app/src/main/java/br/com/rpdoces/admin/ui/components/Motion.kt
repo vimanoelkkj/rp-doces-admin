@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -44,9 +45,9 @@ fun MotionDropdownMenu(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val web = LocalRPWebColors.current
-    val menuShape = RoundedCornerShape(14.dp)
+    val menuShape = RoundedCornerShape(12.dp)
     val scale by animateFloatAsState(
-        targetValue = if (expanded) 1f else .965f,
+        targetValue = if (expanded) 1f else .975f,
         animationSpec = tween(RPMotion.Fast, easing = RPMotion.EaseOut),
         label = "menu-scale"
     )
@@ -60,6 +61,7 @@ fun MotionDropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
         modifier = modifier
+            .clip(menuShape)
             .background(web.surface, menuShape)
             .border(1.dp, web.borderStrong, menuShape)
             .graphicsLayer {
