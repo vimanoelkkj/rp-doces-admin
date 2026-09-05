@@ -60,12 +60,20 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.rpdoces.admin.BuildConfig
+import br.com.rpdoces.admin.data.admins.AdminsRepository
 import br.com.rpdoces.admin.data.auth.AuthRepository
 import br.com.rpdoces.admin.data.auth.AuthUser
 import br.com.rpdoces.admin.data.dashboard.DashboardRepository
+import br.com.rpdoces.admin.data.orders.OrdersRepository
+import br.com.rpdoces.admin.data.products.ProductsRepository
+import br.com.rpdoces.admin.data.store.StoreRepository
+import br.com.rpdoces.admin.ui.admins.AdminsScreen
 import br.com.rpdoces.admin.ui.auth.AuthUiState
 import br.com.rpdoces.admin.ui.auth.AuthViewModel
 import br.com.rpdoces.admin.ui.dashboard.DashboardScreen
+import br.com.rpdoces.admin.ui.orders.OrdersScreen
+import br.com.rpdoces.admin.ui.products.ProductsScreen
+import br.com.rpdoces.admin.ui.store.StoreScreen
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import br.com.rpdoces.admin.ui.theme.RPWebMetrics
 import coil3.compose.AsyncImage
@@ -78,16 +86,20 @@ private enum class MainTab(
     val icon: ImageVector
 ) {
     Dashboard("Dashboard", "Dashboard", "Visão geral da operação", SiteNavIcons.Dashboard),
-    Produtos("Produtos", "Produtos", "Gerencie o catálogo", SiteNavIcons.Products),
-    Pedidos("Pedidos", "Pedidos", "Acompanhe a operação", SiteNavIcons.Orders),
-    Admins("Administradores", "Admins", "Gerencie os acessos", SiteNavIcons.Users),
-    Loja("Loja", "Loja", "Configurações da loja", SiteNavIcons.Store)
+    Produtos("Produtos", "Produtos", "Catálogo, categorias, estoque e promoções", SiteNavIcons.Products),
+    Pedidos("Pedidos", "Pedidos", "", SiteNavIcons.Orders),
+    Admins("Administradores", "Admins", "Contas, níveis de acesso e segurança da equipe", SiteNavIcons.Users),
+    Loja("Loja", "Loja", "Atendimento, contato e aparência do site público", SiteNavIcons.Store)
 }
 
 @Composable
 fun RPApp(
     authRepository: AuthRepository,
-    dashboardRepository: DashboardRepository
+    dashboardRepository: DashboardRepository,
+    productsRepository: ProductsRepository,
+    ordersRepository: OrdersRepository,
+    adminsRepository: AdminsRepository,
+    storeRepository: StoreRepository
 ) {
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(authRepository))
     val state by authViewModel.state.collectAsStateWithLifecycle()
@@ -102,6 +114,10 @@ fun RPApp(
         is AuthUiState.SignedIn -> MainShell(
             user = current.user,
             dashboardRepository = dashboardRepository,
+            productsRepository = productsRepository,
+            ordersRepository = ordersRepository,
+            adminsRepository = adminsRepository,
+            storeRepository = storeRepository,
             onLogout = authViewModel::logout
         )
     }
@@ -209,6 +225,10 @@ private fun LoginScreen(
 private fun MainShell(
     user: AuthUser,
     dashboardRepository: DashboardRepository,
+    productsRepository: ProductsRepository,
+    ordersRepository: OrdersRepository,
+    adminsRepository: AdminsRepository,
+    storeRepository: StoreRepository,
     onLogout: () -> Unit
 ) {
     var selected by rememberSaveable { mutableStateOf(MainTab.Dashboard) }
@@ -235,7 +255,23 @@ private fun MainShell(
                             onOpenOrders = { selected = MainTab.Pedidos },
                             modifier = Modifier.fillMaxSize()
                         )
-                        else -> PlaceholderScreen(tab = selected, modifier = Modifier.fillMaxSize())
+                        MainTab.Produtos -> ProductsScreen(
+                            repository = productsRepository,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        MainTab.Pedidos -> OrdersScreen(
+                            repository = ordersRepository,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        MainTab.Admins -> AdminsScreen(
+                            repository = adminsRepository,
+                            viewer = user,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        MainTab.Loja -> StoreScreen(
+                            repository = storeRepository,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
 
@@ -274,12 +310,14 @@ private fun PageHeader(tab: MainTab) {
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.8).sp
         )
-        Text(
-            text = tab.subtitle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 11.5.sp,
-            lineHeight = 16.sp
-        )
+        if (tab.subtitle.isNotBlank()) {
+            Text(
+                text = tab.subtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.5.sp,
+                lineHeight = 16.sp
+            )
+        }
     }
 }
 
@@ -511,22 +549,4 @@ private fun userInitials(name: String): String {
     val parts = name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
     if (parts.isEmpty()) return "RP"
     return parts.take(2).joinToString("") { it.first().uppercase() }
-}
-
-@Composable
-private fun PlaceholderScreen(tab: MainTab, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.padding(20.dp), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(imageVector = tab.icon, contentDescription = null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(text = tab.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(
-                text = "Esta área será portada para Compose nas próximas etapas.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
 }
