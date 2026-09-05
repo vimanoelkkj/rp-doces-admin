@@ -27,21 +27,38 @@ import retrofit2.Retrofit
 import retrofit2.http.GET
 
 @Serializable
+data class DashboardOrderItem(
+    val id: Int? = null,
+    @SerialName("produto_id") val productId: Int? = null,
+    @SerialName("produto_nome") val productName: String? = null,
+    val quantidade: Int = 0
+)
+
+@Serializable
 data class DashboardOrder(
     val id: Int,
     @SerialName("cliente_nome") val customerName: String? = null,
+    @SerialName("produto_id") val productId: Int? = null,
+    @SerialName("produto_nome") val productName: String? = null,
+    val quantidade: Int = 0,
     @SerialName("valor_total_centavos") val totalCents: Int = 0,
+    @SerialName("saldo_centavos") val balanceCents: Int = 0,
     @SerialName("status_pagamento") val paymentStatus: String? = "PENDENTE",
+    @SerialName("status_financeiro") val financialStatus: String? = null,
     @SerialName("status_pedido") val orderStatus: String? = "NOVO",
+    @SerialName("status_comanda") val commandStatus: String? = null,
     @SerialName("criado_em") val createdAt: String? = null,
     @SerialName("atualizado_em") val updatedAt: String? = null,
-    @SerialName("pago_em") val paidAt: String? = null
+    @SerialName("pago_em") val paidAt: String? = null,
+    val itens: List<DashboardOrderItem> = emptyList()
 )
 
 @Serializable
 data class DashboardProduct(
     val id: Int,
     val nome: String,
+    val categoria: String? = null,
+    @SerialName("categoria_nome") val categoryName: String? = null,
     @Serializable(with = FlexibleBooleanSerializer::class)
     val ativo: Boolean = true,
     val estoque: Int = 0,
@@ -79,15 +96,15 @@ data class DashboardSnapshot(
     val soldOutCount: Int,
     val lowStockCount: Int,
     val recentOrders: List<DashboardOrder>,
-    val attention: List<String>
+    val attention: List<String>,
+    val orders: List<DashboardOrder>,
+    val products: List<DashboardProduct>
 )
 
 class DashboardRepository(retrofit: Retrofit) {
     private val api = retrofit.create(DashboardApi::class.java)
 
     suspend fun load(): DashboardSnapshot = coroutineScope {
-        // Mantém a mesma ordem da V2: a rota principal reconcilia Pix pendentes
-        // antes da leitura do financeiro para não mostrar caixa defasado.
         val reconciliation = api.reconcileOrders()
         if (!reconciliation.isSuccessful) {
             throw DashboardException("Não foi possível atualizar os pedidos.", reconciliation.code())
@@ -124,17 +141,16 @@ fun buildSnapshot(
 
     val ordersToday = orders.filter { sameDay(it.createdAt, today, zoneId) }
     val paidToday = orders.filter {
-        it.paymentStatus.equals("PAGO", ignoreCase = true) &&
+        effectivePaymentStatus(it) == "PAGO" &&
             sameDay(it.paidAt ?: it.updatedAt, today, zoneId)
     }
     val pendingPayment = orders.filter {
-        it.paymentStatus.equals("PENDENTE", ignoreCase = true)
+        effectivePaymentStatus(it) in setOf("PENDENTE", "PARCIAL")
     }
     val waitingPreparation = orders.filter {
-        it.orderStatus.equals("NOVO", ignoreCase = true) &&
-            it.paymentStatus.equals("PAGO", ignoreCase = true)
+        it.orderStatus.equals("NOVO", ignoreCase = true) && effectivePaymentStatus(it) == "PAGO"
     }
-    val soldOut = products.filter { availableStock(it) <= 0 }
+    val soldOut = products.filter { it.ativo && availableStock(it) <= 0 }
     val lowStock = products.filter {
         val available = availableStock(it)
         it.ativo && available in 1..2
@@ -165,20 +181,18 @@ fun buildSnapshot(
         soldOutCount = soldOut.size,
         lowStockCount = lowStock.size,
         recentOrders = orders.take(6),
-        attention = attention
+        attention = attention,
+        orders = orders,
+        products = products
     )
 }
 
-private fun availableStock(product: DashboardProduct): Int = product.estoque - product.reservedStock
+fun effectivePaymentStatus(order: DashboardOrder): String =
+    (order.financialStatus ?: order.paymentStatus ?: "PENDENTE").uppercase()
 
-private fun plural(value: Int, singular: String, plural: String): String = if (value == 1) singular else plural
+fun availableStock(product: DashboardProduct): Int = product.estoque - product.reservedStock
 
-private fun sameDay(value: String?, expected: LocalDate, zoneId: ZoneId): Boolean {
-    val instant = parseInstant(value) ?: return false
-    return instant.atZone(zoneId).toLocalDate() == expected
-}
-
-private fun parseInstant(value: String?): Instant? {
+fun dashboardParseInstant(value: String?): Instant? {
     val text = value?.trim().orEmpty()
     if (text.isBlank()) return null
 
@@ -189,6 +203,13 @@ private fun parseInstant(value: String?): Instant? {
                 .toInstant(ZoneOffset.UTC)
         }.getOrNull()
         ?: runCatching { LocalDateTime.parse(text).toInstant(ZoneOffset.UTC) }.getOrNull()
+}
+
+private fun plural(value: Int, singular: String, plural: String): String = if (value == 1) singular else plural
+
+private fun sameDay(value: String?, expected: LocalDate, zoneId: ZoneId): Boolean {
+    val instant = dashboardParseInstant(value) ?: return false
+    return instant.atZone(zoneId).toLocalDate() == expected
 }
 
 object FlexibleBooleanSerializer : KSerializer<Boolean> {
