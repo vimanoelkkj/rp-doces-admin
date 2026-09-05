@@ -162,13 +162,15 @@ fun WebModalActions(
         horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.End),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            secondaryText,
-            color = web.muted,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(vertical = 10.dp)
-        )
+        Surface(onClick = onSecondary, enabled = !busy, color = Color.Transparent) {
+            Text(
+                secondaryText,
+                color = web.muted,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 10.dp)
+            )
+        }
         Surface(
             onClick = onPrimary,
             enabled = !busy,
