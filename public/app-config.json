@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "revision": 3,
+  "revision": 4,
   "min_app_version_code": 1,
   "poll_seconds": 5,
-  "theme": "dark",
+  "theme": "system",
   "dashboard_banner": {
     "enabled": true,
     "title": "Remote config ativo",
