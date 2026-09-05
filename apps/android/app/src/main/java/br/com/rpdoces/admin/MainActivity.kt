@@ -12,10 +12,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val repository = (application as RPApplication).container.authRepository
+        val container = (application as RPApplication).container
         setContent {
             RPTheme {
-                RPApp(repository = repository)
+                RPApp(
+                    authRepository = container.authRepository,
+                    dashboardRepository = container.dashboardRepository
+                )
             }
         }
     }
