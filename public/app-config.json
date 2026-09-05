@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "revision": 8,
+  "revision": 9,
   "min_app_version_code": 1,
   "poll_seconds": 5,
   "theme": "system",
   "maintenance": {
-    "enabled": false,
-    "eyebrow": "MANUTENÇÃO",
-    "title": "Voltamos em instantes",
-    "message": "O painel está temporariamente indisponível enquanto fazemos um ajuste."
+    "enabled": true,
+    "eyebrow": "MANUTENÇÃO REMOTA",
+    "title": "Painel temporariamente indisponível",
+    "message": "O modo manutenção foi ativado pelo servidor sem atualizar nem reinstalar o aplicativo."
   },
   "update": {
     "eyebrow": "ATUALIZAÇÃO NECESSÁRIA",
