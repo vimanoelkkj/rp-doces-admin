@@ -12,12 +12,14 @@ import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -173,11 +175,13 @@ internal fun ProductEditorDialog(
                 ) {
                     Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                         StepButton("−") { stock = ((stock.toIntOrNull() ?: 0) - 1).coerceAtLeast(product?.reservedStock ?: 0).toString() }
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(web.borderStrong))
                         Box(modifier = Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.Center) {
                             MotionValue(targetState = stock) { value ->
                                 Text(value, color = web.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(web.borderStrong))
                         StepButton("+") { stock = ((stock.toIntOrNull() ?: 0) + 1).coerceAtMost(100000).toString() }
                     }
                 }
