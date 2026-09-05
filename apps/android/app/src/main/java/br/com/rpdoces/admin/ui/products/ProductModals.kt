@@ -194,7 +194,13 @@ internal fun ProductEditorDialog(
         Spacer(Modifier.height(18.dp))
         Text("EMOJI", color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
         Spacer(Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             emojiOptions.forEach { option ->
                 val selected = emoji == option
                 val scale by animateFloatAsState(
