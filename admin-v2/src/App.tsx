@@ -104,6 +104,7 @@ export function App() {
     <AuthGate>
       {session => {
         const meta = PAGE_META[page];
+        const isAdmin = String(session.user.papel || "").toUpperCase() === "ADMIN";
 
         return (
           <AdminShell
@@ -130,7 +131,9 @@ export function App() {
               } else if (view === "loja") {
                 content = <StorePage session={session} onNavigate={navigate} />;
               } else if (view === "app") {
-                content = <AppControlPage active={active} />;
+                content = isAdmin
+                  ? <AppControlPage active={active} />
+                  : <p>Somente administradores podem acessar o controle do aplicativo.</p>;
               } else {
                 content = <ProductsPage session={session} onNavigate={navigate} active={active} />;
               }
