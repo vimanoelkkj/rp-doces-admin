@@ -34,14 +34,6 @@ type IconName =
   | "sun"
   | "moon";
 
-type NavItem = {
-  key: AdminV2Page;
-  label: string;
-  mobileLabel: string;
-  icon: IconName;
-  adminOnly?: boolean;
-};
-
 const AdminShellNestingContext = createContext(false);
 
 function Icon({ name }: { name: IconName }) {
@@ -110,6 +102,7 @@ function AdminShellRoot({
   const notificationRef = useRef<HTMLDivElement>(null);
   const mobileProfileRef = useRef<HTMLDivElement>(null);
   const mobileNotificationRef = useRef<HTMLDivElement>(null);
+  const isAdmin = String(user.papel || "").toUpperCase() === "ADMIN";
 
   useEffect(() => {
     const themeColor = theme === "dark" ? "#1b1614" : "#fbf8f4";
@@ -147,17 +140,13 @@ function AdminShellRoot({
     setNotificationOpen(false);
   }, [activePage]);
 
-  const navItems: NavItem[] = [
+  const navItems = [
     { key: "dashboard", label: "Dashboard", mobileLabel: "Dashboard", icon: "dashboard" },
     { key: "produtos", label: "Produtos", mobileLabel: "Produtos", icon: "products" },
     { key: "pedidos", label: "Pedidos", mobileLabel: "Pedidos", icon: "orders" },
     { key: "admins", label: "Administradores", mobileLabel: "Admins", icon: "users" },
-    { key: "loja", label: "Loja", mobileLabel: "Loja", icon: "store" },
-    { key: "app", label: "Controle do App", mobileLabel: "App", icon: "settings", adminOnly: true }
-  ];
-  const visibleNavItems = navItems.filter(
-    item => !item.adminOnly || String(user.papel || "").toUpperCase() === "ADMIN"
-  );
+    { key: "loja", label: "Loja", mobileLabel: "Loja", icon: "store" }
+  ] as const;
 
   function navigate(key: AdminV2Page) {
     if (key !== activePage) onNavigate(key);
@@ -215,6 +204,20 @@ function AdminShellRoot({
         <Icon name={theme === "dark" ? "sun" : "moon"} />
         {theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
       </button>
+      {isAdmin ? (
+        <button
+          className={styles.profileMenuLogout}
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            setProfileOpen(false);
+            navigate("app");
+          }}
+        >
+          <Icon name="settings" />
+          Controle do App
+        </button>
+      ) : null}
       <button className={styles.profileMenuLogout} type="button" role="menuitem" onClick={() => void logout()} disabled={loggingOut}>
         <Icon name="logout" />
         {loggingOut ? "Saindo…" : "Sair da conta"}
@@ -254,7 +257,7 @@ function AdminShellRoot({
         </div>
 
         <nav className={styles.nav} aria-label="Navegação principal">
-          {visibleNavItems.map(item => {
+          {navItems.map(item => {
             const active = item.key === activePage;
             return (
               <button
