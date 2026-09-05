@@ -12,6 +12,7 @@ import okhttp3.Request
 @Serializable
 data class AppRemoteConfig(
     val revision: Int = 1,
+    val theme: String = "system",
     @SerialName("dashboard_banner") val dashboardBanner: DashboardRemoteBanner = DashboardRemoteBanner()
 )
 
