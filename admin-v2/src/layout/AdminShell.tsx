@@ -9,7 +9,7 @@ import {
 import type { AuthSession } from "../auth/AuthGate";
 import styles from "./AdminShell.module.css";
 
-export type AdminV2Page = "dashboard" | "produtos" | "pedidos" | "admins" | "loja";
+export type AdminV2Page = "dashboard" | "produtos" | "pedidos" | "admins" | "loja" | "app";
 
 type Props = {
   session: AuthSession;
@@ -28,10 +28,19 @@ type IconName =
   | "orders"
   | "users"
   | "store"
+  | "settings"
   | "logout"
   | "bell"
   | "sun"
   | "moon";
+
+type NavItem = {
+  key: AdminV2Page;
+  label: string;
+  mobileLabel: string;
+  icon: IconName;
+  adminOnly?: boolean;
+};
 
 const AdminShellNestingContext = createContext(false);
 
@@ -42,6 +51,7 @@ function Icon({ name }: { name: IconName }) {
     orders: <><rect x="5" y="6" width="14" height="14" rx="2"/><path d="M9 6V4h6v2"/><path d="M9 11h6"/><path d="M9 15h4"/></>,
     users: <><circle cx="9" cy="8" r="3"/><path d="M4 20c0-3 2.2-5 5-5s5 2 5 5M17 7v6M14 10h6"/></>,
     store: <><path d="M4 9h16l-2-5H6L4 9Z"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
+    settings: <><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></>,
     logout: <><path d="M10 5H5v14h5M13 8l4 4-4 4M17 12H9"/></>,
     bell: <><path d="M6 17h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v5L6 17Z"/><path d="M10 20h4"/></>,
     sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></>,
@@ -137,15 +147,19 @@ function AdminShellRoot({
     setNotificationOpen(false);
   }, [activePage]);
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { key: "dashboard", label: "Dashboard", mobileLabel: "Dashboard", icon: "dashboard" },
     { key: "produtos", label: "Produtos", mobileLabel: "Produtos", icon: "products" },
     { key: "pedidos", label: "Pedidos", mobileLabel: "Pedidos", icon: "orders" },
     { key: "admins", label: "Administradores", mobileLabel: "Admins", icon: "users" },
-    { key: "loja", label: "Loja", mobileLabel: "Loja", icon: "store" }
-  ] as const;
+    { key: "loja", label: "Loja", mobileLabel: "Loja", icon: "store" },
+    { key: "app", label: "Controle do App", mobileLabel: "App", icon: "settings", adminOnly: true }
+  ];
+  const visibleNavItems = navItems.filter(
+    item => !item.adminOnly || String(user.papel || "").toUpperCase() === "ADMIN"
+  );
 
-  function navigate(key: (typeof navItems)[number]["key"]) {
+  function navigate(key: AdminV2Page) {
     if (key !== activePage) onNavigate(key);
   }
 
@@ -208,7 +222,7 @@ function AdminShellRoot({
     </div>
   ) : null;
 
-  const wide = activePage === "dashboard" || activePage === "produtos";
+  const wide = activePage === "dashboard" || activePage === "produtos" || activePage === "app";
   const pageChildren = (
     <AdminShellNestingContext.Provider value={true}>
       {children}
@@ -240,7 +254,7 @@ function AdminShellRoot({
         </div>
 
         <nav className={styles.nav} aria-label="Navegação principal">
-          {navItems.map(item => {
+          {visibleNavItems.map(item => {
             const active = item.key === activePage;
             return (
               <button
