@@ -2,12 +2,11 @@ package br.com.rpdoces.admin.ui.store
 
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -217,35 +216,36 @@ fun StoreScreen(
         item {
             Surface(
                 onClick = {
-                    if (saving) return@Surface
-                    saving = true
-                    error = null
-                    status = "Salvando…"
-                    scope.launch {
-                        val schedule = scheduleText(activeDays.toList(), opensAt, closesAt)
-                        runCatching {
-                            repository.update(
-                                StoreUpdateInput(
-                                    pickupLocation = pickupLocation.trim(),
-                                    endereco = address.trim(),
-                                    mapsUrl = mapsUrl.trim(),
-                                    whatsapp = whatsapp.trim(),
-                                    whatsappMessage = whatsappMessage.trim(),
-                                    scheduleDays = storeDays.map { it.first }.filter { it in activeDays }.joinToString(","),
-                                    opensAt = opensAt.ifBlank { "10:00" },
-                                    closesAt = closesAt.ifBlank { "19:00" },
-                                    scheduleText = schedule,
-                                    deliveryStatus = deliveryStatus
+                    if (!saving) {
+                        saving = true
+                        error = null
+                        status = "Salvando…"
+                        scope.launch {
+                            val schedule = scheduleText(activeDays.toList(), opensAt, closesAt)
+                            runCatching {
+                                repository.update(
+                                    StoreUpdateInput(
+                                        pickupLocation = pickupLocation.trim(),
+                                        endereco = address.trim(),
+                                        mapsUrl = mapsUrl.trim(),
+                                        whatsapp = whatsapp.trim(),
+                                        whatsappMessage = whatsappMessage.trim(),
+                                        scheduleDays = storeDays.map { it.first }.filter { it in activeDays }.joinToString(","),
+                                        opensAt = opensAt.ifBlank { "10:00" },
+                                        closesAt = closesAt.ifBlank { "19:00" },
+                                        scheduleText = schedule,
+                                        deliveryStatus = deliveryStatus
+                                    )
                                 )
-                            )
-                        }.onSuccess {
-                            status = "Alterações salvas ✓"
-                            load()
-                        }.onFailure {
-                            error = it.message ?: "Não foi possível salvar as alterações."
-                            status = null
+                            }.onSuccess {
+                                status = "Alterações salvas ✓"
+                                load()
+                            }.onFailure {
+                                error = it.message ?: "Não foi possível salvar as alterações."
+                                status = null
+                            }
+                            saving = false
                         }
-                        saving = false
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(44.dp),
@@ -263,7 +263,7 @@ fun StoreScreen(
 }
 
 @Composable
-private fun StoreCard(title: String, subtitle: String, icon: String, content: @Composable Column.() -> Unit) {
+private fun StoreCard(title: String, subtitle: String, icon: String, content: @Composable ColumnScope.() -> Unit) {
     val web = LocalRPWebColors.current
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = web.surfaceVeilTwo, border = BorderStroke(1.dp, web.border)) {
         Column(modifier = Modifier.padding(16.dp)) {
