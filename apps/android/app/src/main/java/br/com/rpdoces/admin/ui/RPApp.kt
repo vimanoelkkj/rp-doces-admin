@@ -232,6 +232,7 @@ private fun MainShell(
                     when (selected) {
                         MainTab.Dashboard -> DashboardScreen(
                             repository = dashboardRepository,
+                            onOpenOrders = { selected = MainTab.Pedidos },
                             modifier = Modifier.fillMaxSize()
                         )
                         else -> PlaceholderScreen(tab = selected, modifier = Modifier.fillMaxSize())
