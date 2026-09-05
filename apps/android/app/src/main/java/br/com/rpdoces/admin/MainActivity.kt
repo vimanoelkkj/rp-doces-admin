@@ -11,6 +11,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import br.com.rpdoces.admin.data.remote.AppRemoteConfigRepository
 import br.com.rpdoces.admin.ui.BiometricRPApp
 import br.com.rpdoces.admin.ui.remote.LocalAppRemoteConfig
@@ -29,6 +32,7 @@ class MainActivity : FragmentActivity() {
 
         val container = (application as RPApplication).container
         setContent {
+            val lifecycleOwner = LocalLifecycleOwner.current
             val remoteConfigRepository = remember {
                 AppRemoteConfigRepository(applicationContext)
             }
@@ -36,12 +40,14 @@ class MainActivity : FragmentActivity() {
                 mutableStateOf(remoteConfigRepository.cachedOrDefault())
             }
 
-            LaunchedEffect(remoteConfigRepository) {
-                while (isActive) {
-                    runCatching { remoteConfigRepository.fetch() }
-                        .onSuccess { remoteConfig = it }
+            LaunchedEffect(remoteConfigRepository, lifecycleOwner) {
+                lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    while (isActive) {
+                        runCatching { remoteConfigRepository.fetch() }
+                            .onSuccess { remoteConfig = it }
 
-                    delay(remoteConfig.pollSeconds.coerceIn(3L, 300L) * 1_000L)
+                        delay(remoteConfig.pollSeconds.coerceIn(10L, 300L) * 1_000L)
+                    }
                 }
             }
 
