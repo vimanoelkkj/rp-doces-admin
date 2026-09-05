@@ -32,6 +32,9 @@ data class AppRemoteConfig(
     @SerialName("min_app_version_code") val minAppVersionCode: Int = 1,
     @SerialName("poll_seconds") val pollSeconds: Long = 5L,
     val theme: String = "system",
+    val maintenance: RemoteMaintenance = RemoteMaintenance(),
+    val update: RemoteUpdate = RemoteUpdate(),
+    val navigation: RemoteNavigation = RemoteNavigation(),
     @SerialName("dashboard_banner") val dashboardBanner: DashboardRemoteBanner = DashboardRemoteBanner(),
     val features: RemoteFeatureFlags = RemoteFeatureFlags(),
     @SerialName("dashboard_section_order") val dashboardSectionOrder: List<String> = listOf(
@@ -42,6 +45,42 @@ data class AppRemoteConfig(
         "attention"
     )
 )
+
+@Serializable
+data class RemoteMaintenance(
+    val enabled: Boolean = false,
+    val eyebrow: String = "MANUTENÇÃO",
+    val title: String = "Voltamos em instantes",
+    val message: String = "O painel está temporariamente indisponível enquanto fazemos um ajuste."
+)
+
+@Serializable
+data class RemoteUpdate(
+    val eyebrow: String = "ATUALIZAÇÃO NECESSÁRIA",
+    val title: String = "Atualize o R&P Doces",
+    val message: String = "Há uma versão mais recente do aplicativo disponível.",
+    val url: String = ""
+)
+
+@Serializable
+data class RemoteNavigation(
+    val dashboard: Boolean = true,
+    val products: Boolean = true,
+    val orders: Boolean = true,
+    val admins: Boolean = true,
+    val store: Boolean = true
+) {
+    fun isVisible(key: String): Boolean = when (key) {
+        "dashboard" -> dashboard
+        "products" -> products
+        "orders" -> orders
+        "admins" -> admins
+        "store" -> store
+        else -> false
+    }
+
+    fun hasAnyVisible(): Boolean = dashboard || products || orders || admins || store
+}
 
 @Serializable
 data class DashboardRemoteBanner(
@@ -58,7 +97,9 @@ data class RemoteFeatureFlags(
     @SerialName("dashboard_flavors") val dashboardFlavors: Boolean = true,
     @SerialName("dashboard_receivables") val dashboardReceivables: Boolean = true,
     @SerialName("dashboard_recent_orders") val dashboardRecentOrders: Boolean = true,
-    @SerialName("dashboard_attention") val dashboardAttention: Boolean = true
+    @SerialName("dashboard_attention") val dashboardAttention: Boolean = true,
+    @SerialName("orders_manual_create") val ordersManualCreate: Boolean = true,
+    @SerialName("paid_order_notifications") val paidOrderNotifications: Boolean = true
 )
 
 class AppRemoteConfigRepository(context: Context) {
@@ -130,9 +171,7 @@ class AppRemoteConfigRepository(context: Context) {
             "Schema remoto não suportado: ${config.schemaVersion}"
         }
         require(config.revision >= 1) { "Revisão remota inválida." }
-        require(config.minAppVersionCode <= BuildConfig.VERSION_CODE) {
-            "Configuração exige app ${config.minAppVersionCode}; instalado ${BuildConfig.VERSION_CODE}."
-        }
+        require(config.minAppVersionCode >= 1) { "Versão mínima do app inválida." }
         require(config.pollSeconds in MIN_POLL_SECONDS..MAX_POLL_SECONDS) {
             "Intervalo de atualização remoto inválido."
         }
@@ -141,6 +180,29 @@ class AppRemoteConfigRepository(context: Context) {
         require(normalizedTheme in setOf("system", "light", "dark")) {
             "Tema remoto inválido."
         }
+
+        require(config.navigation.hasAnyVisible()) {
+            "A navegação remota precisa manter pelo menos uma seção visível."
+        }
+
+        validateRemoteMessage(
+            eyebrow = config.maintenance.eyebrow,
+            title = config.maintenance.title,
+            message = config.maintenance.message,
+            prefix = "Manutenção"
+        )
+        validateRemoteMessage(
+            eyebrow = config.update.eyebrow,
+            title = config.update.title,
+            message = config.update.message,
+            prefix = "Atualização"
+        )
+        require(config.update.url.length <= 500) { "URL de atualização excede 500 caracteres." }
+        require(
+            config.update.url.isBlank() ||
+                config.update.url.startsWith("https://") ||
+                config.update.url.startsWith("http://")
+        ) { "URL de atualização inválida." }
 
         val normalizedTone = config.dashboardBanner.tone.trim().lowercase()
         require(normalizedTone in setOf("accent", "success", "warning", "neutral")) {
@@ -166,5 +228,16 @@ class AppRemoteConfigRepository(context: Context) {
             dashboardBanner = config.dashboardBanner.copy(tone = normalizedTone),
             dashboardSectionOrder = sectionOrder
         )
+    }
+
+    private fun validateRemoteMessage(
+        eyebrow: String,
+        title: String,
+        message: String,
+        prefix: String
+    ) {
+        require(eyebrow.length <= 32) { "$prefix: eyebrow excede 32 caracteres." }
+        require(title.length <= 90) { "$prefix: título excede 90 caracteres." }
+        require(message.length <= 320) { "$prefix: mensagem excede 320 caracteres." }
     }
 }
