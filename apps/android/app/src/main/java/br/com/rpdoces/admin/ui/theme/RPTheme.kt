@@ -2,10 +2,18 @@ package br.com.rpdoces.admin.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
+import br.com.rpdoces.admin.R
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFFD84C6C),
@@ -41,6 +49,41 @@ private val DarkColors = darkColorScheme(
     error = Color(0xFFEF7489)
 )
 
+private val GoogleFontsProvider = GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage = "com.google.android.gms",
+    certificates = R.array.com_google_android_gms_fonts_certs
+)
+
+private val Manrope = GoogleFont("Manrope")
+
+private val ManropeFamily = FontFamily(
+    Font(googleFont = Manrope, fontProvider = GoogleFontsProvider, weight = FontWeight.Normal, style = FontStyle.Normal),
+    Font(googleFont = Manrope, fontProvider = GoogleFontsProvider, weight = FontWeight.Medium, style = FontStyle.Normal),
+    Font(googleFont = Manrope, fontProvider = GoogleFontsProvider, weight = FontWeight.SemiBold, style = FontStyle.Normal),
+    Font(googleFont = Manrope, fontProvider = GoogleFontsProvider, weight = FontWeight.Bold, style = FontStyle.Normal),
+    Font(googleFont = Manrope, fontProvider = GoogleFontsProvider, weight = FontWeight.ExtraBold, style = FontStyle.Normal)
+)
+
+private val Defaults = Typography()
+private val RPTypography = Typography(
+    displayLarge = Defaults.displayLarge.copy(fontFamily = ManropeFamily),
+    displayMedium = Defaults.displayMedium.copy(fontFamily = ManropeFamily),
+    displaySmall = Defaults.displaySmall.copy(fontFamily = ManropeFamily),
+    headlineLarge = Defaults.headlineLarge.copy(fontFamily = ManropeFamily),
+    headlineMedium = Defaults.headlineMedium.copy(fontFamily = ManropeFamily),
+    headlineSmall = Defaults.headlineSmall.copy(fontFamily = ManropeFamily),
+    titleLarge = Defaults.titleLarge.copy(fontFamily = ManropeFamily),
+    titleMedium = Defaults.titleMedium.copy(fontFamily = ManropeFamily),
+    titleSmall = Defaults.titleSmall.copy(fontFamily = ManropeFamily),
+    bodyLarge = Defaults.bodyLarge.copy(fontFamily = ManropeFamily),
+    bodyMedium = Defaults.bodyMedium.copy(fontFamily = ManropeFamily),
+    bodySmall = Defaults.bodySmall.copy(fontFamily = ManropeFamily),
+    labelLarge = Defaults.labelLarge.copy(fontFamily = ManropeFamily),
+    labelMedium = Defaults.labelMedium.copy(fontFamily = ManropeFamily),
+    labelSmall = Defaults.labelSmall.copy(fontFamily = ManropeFamily)
+)
+
 @Composable
 fun RPTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -48,6 +91,10 @@ fun RPTheme(
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
-        content = content
-    )
+        typography = RPTypography
+    ) {
+        ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
+            content()
+        }
+    }
 }
