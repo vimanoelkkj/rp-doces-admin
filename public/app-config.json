@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "revision": 7,
+  "revision": 8,
   "min_app_version_code": 1,
   "poll_seconds": 5,
   "theme": "system",
@@ -20,15 +20,15 @@
     "dashboard": true,
     "products": true,
     "orders": true,
-    "admins": true,
+    "admins": false,
     "store": true
   },
   "dashboard_banner": {
     "enabled": true,
-    "eyebrow": "REMOTE CONFIG",
-    "title": "Controle remoto global ativo",
-    "message": "Tema, dashboard, navegação, manutenção e recursos do app agora podem responder ao servidor.",
-    "tone": "success"
+    "eyebrow": "CONTROLE REMOTO",
+    "title": "Permissões operacionais alteradas",
+    "message": "A aba Administradores foi ocultada e a criação manual de pedidos foi desativada pelo servidor, sem novo APK.",
+    "tone": "warning"
   },
   "features": {
     "dashboard_metrics": true,
@@ -36,7 +36,7 @@
     "dashboard_receivables": true,
     "dashboard_recent_orders": true,
     "dashboard_attention": true,
-    "orders_manual_create": true,
+    "orders_manual_create": false,
     "paid_order_notifications": true
   },
   "dashboard_section_order": [
