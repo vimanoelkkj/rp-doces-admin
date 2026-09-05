@@ -35,11 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -178,6 +180,17 @@ fun WebField(
         return
     }
 
+    if (label.equals("Preço", ignoreCase = true) || label.equals("Preço promocional", ignoreCase = true)) {
+        WebCurrencyField(
+            label = label,
+            value = value,
+            onValueChange = onValueChange,
+            modifier = modifier,
+            enabled = enabled
+        )
+        return
+    }
+
     val web = LocalRPWebColors.current
     Column(modifier = modifier) {
         Text(label.uppercase(), color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
@@ -206,6 +219,109 @@ fun WebField(
             )
         }
     }
+}
+
+@Composable
+private fun WebCurrencyField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier,
+    enabled: Boolean
+) {
+    val web = LocalRPWebColors.current
+    var focused by remember { mutableStateOf(false) }
+    var rawValue by remember { mutableStateOf(currencyRawFromFormatted(value)) }
+
+    LaunchedEffect(value, focused) {
+        if (!focused) rawValue = currencyRawFromFormatted(value)
+    }
+
+    Column(modifier = modifier) {
+        Text(label.uppercase(), color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
+        Spacer(Modifier.height(8.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+            shape = RoundedCornerShape(9.dp),
+            color = web.surface,
+            border = BorderStroke(1.dp, web.borderStrong)
+        ) {
+            BasicTextField(
+                value = rawValue,
+                onValueChange = { typed ->
+                    val sanitized = sanitizeCurrencyRaw(typed)
+                    rawValue = sanitized
+                    onValueChange(currencyRawToCentsDigits(sanitized))
+                },
+                enabled = enabled,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                textStyle = TextStyle(
+                    color = if (enabled) web.text else web.muted,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 18.sp
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { state ->
+                        val wasFocused = focused
+                        focused = state.isFocused
+                        if (state.isFocused && !wasFocused) {
+                            rawValue = currencyRawFromFormatted(value)
+                        } else if (!state.isFocused && wasFocused) {
+                            rawValue = currencyRawFromFormatted(value)
+                        }
+                    }
+                    .padding(horizontal = 12.dp, vertical = 11.dp),
+                decorationBox = { inner ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("R$ ", color = if (enabled) web.text else web.muted, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (rawValue.isBlank()) {
+                                Text("0,00", color = web.muted, fontSize = 12.5.sp)
+                            }
+                            inner()
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+private fun sanitizeCurrencyRaw(input: String): String {
+    val normalized = input.replace('.', ',').filter { it.isDigit() || it == ',' }
+    if (normalized.isBlank()) return ""
+
+    val commaIndex = normalized.indexOf(',')
+    val integerSource = if (commaIndex >= 0) normalized.substring(0, commaIndex) else normalized
+    val fractionSource = if (commaIndex >= 0) normalized.substring(commaIndex + 1) else ""
+
+    val integerDigits = integerSource.filter(Char::isDigit).take(7)
+    val integerPart = integerDigits.trimStart('0').ifBlank {
+        if (integerDigits.isNotEmpty() || commaIndex >= 0) "0" else ""
+    }
+    val fractionPart = fractionSource.filter(Char::isDigit).take(2)
+
+    return if (commaIndex >= 0) "$integerPart,$fractionPart" else integerPart
+}
+
+private fun currencyRawToCentsDigits(raw: String): String {
+    if (raw.isBlank()) return ""
+    val parts = raw.split(',', limit = 2)
+    val reais = parts.getOrNull(0)?.toLongOrNull() ?: 0L
+    val centavos = parts.getOrNull(1).orEmpty().padEnd(2, '0').take(2).toIntOrNull() ?: 0
+    val total = (reais * 100L + centavos).coerceAtMost(Int.MAX_VALUE.toLong())
+    return total.toString()
+}
+
+private fun currencyRawFromFormatted(formatted: String): String {
+    val cents = formatted.filter(Char::isDigit).toLongOrNull() ?: 0L
+    if (cents <= 0L) return ""
+    val reais = cents / 100L
+    val centavos = (cents % 100L).toString().padStart(2, '0')
+    return "$reais,$centavos"
 }
 
 @Composable
