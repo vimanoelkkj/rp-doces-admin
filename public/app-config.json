@@ -1,28 +1,49 @@
 {
   "schema_version": 1,
-  "revision": 6,
+  "revision": 7,
   "min_app_version_code": 1,
   "poll_seconds": 5,
   "theme": "system",
+  "maintenance": {
+    "enabled": false,
+    "eyebrow": "MANUTENÇÃO",
+    "title": "Voltamos em instantes",
+    "message": "O painel está temporariamente indisponível enquanto fazemos um ajuste."
+  },
+  "update": {
+    "eyebrow": "ATUALIZAÇÃO NECESSÁRIA",
+    "title": "Atualize o R&P Doces",
+    "message": "Há uma versão mais recente do aplicativo disponível.",
+    "url": ""
+  },
+  "navigation": {
+    "dashboard": true,
+    "products": true,
+    "orders": true,
+    "admins": true,
+    "store": true
+  },
   "dashboard_banner": {
     "enabled": true,
-    "eyebrow": "TESTE REMOTO 2",
-    "title": "Layout alterado sem novo APK",
-    "message": "A seção de sabores foi ocultada e os blocos abaixo foram reordenados pelo servidor.",
-    "tone": "warning"
+    "eyebrow": "REMOTE CONFIG",
+    "title": "Controle remoto global ativo",
+    "message": "Tema, dashboard, navegação, manutenção e recursos do app agora podem responder ao servidor.",
+    "tone": "success"
   },
   "features": {
     "dashboard_metrics": true,
-    "dashboard_flavors": false,
+    "dashboard_flavors": true,
     "dashboard_receivables": true,
     "dashboard_recent_orders": true,
-    "dashboard_attention": true
+    "dashboard_attention": true,
+    "orders_manual_create": true,
+    "paid_order_notifications": true
   },
   "dashboard_section_order": [
-    "recent_orders",
     "metrics",
+    "flavors",
     "receivables",
-    "attention",
-    "flavors"
+    "recent_orders",
+    "attention"
   ]
 }
