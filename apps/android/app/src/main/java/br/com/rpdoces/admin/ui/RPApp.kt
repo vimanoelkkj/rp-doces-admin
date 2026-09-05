@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateBottomPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -71,7 +72,10 @@ import br.com.rpdoces.admin.data.dashboard.DashboardRepository
 import br.com.rpdoces.admin.ui.auth.AuthUiState
 import br.com.rpdoces.admin.ui.auth.AuthViewModel
 import br.com.rpdoces.admin.ui.dashboard.DashboardScreen
+import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
+import br.com.rpdoces.admin.ui.theme.RPWebMetrics
 import coil3.compose.AsyncImage
+import kotlin.math.max
 
 private enum class MainTab(
     val label: String,
@@ -111,10 +115,7 @@ fun RPApp(
 
 @Composable
 private fun LoadingScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
     }
 }
@@ -129,14 +130,9 @@ private fun LoginScreen(
     var password by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
             contentAlignment = Alignment.Center
         ) {
             Surface(
@@ -160,9 +156,7 @@ private fun LoginScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
                     OutlinedTextField(
                         value = username,
                         onValueChange = { username = it },
@@ -170,12 +164,8 @@ private fun LoginScreen(
                         enabled = !submitting,
                         singleLine = true,
                         label = { Text("Usuário") },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Text,
-                            imeAction = ImeAction.Next
-                        )
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next)
                     )
-
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
@@ -184,10 +174,7 @@ private fun LoginScreen(
                         singleLine = true,
                         label = { Text("Senha") },
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(
                             onDone = {
                                 focusManager.clearFocus()
@@ -195,23 +182,15 @@ private fun LoginScreen(
                             }
                         )
                     )
-
                     if (error != null) {
-                        Text(
-                            text = error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Text(text = error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                     }
-
                     Button(
                         onClick = {
                             focusManager.clearFocus()
                             onLogin(username, password)
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
                         enabled = !submitting
                     ) {
                         if (submitting) {
@@ -244,34 +223,36 @@ private fun MainShell(
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                MobileHeader(
-                    tab = selected,
+            bottomBar = {
+                MobileBottomBar(selected = selected, onSelected = { selected = it })
+            }
+        ) { scaffoldPadding ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = scaffoldPadding.calculateBottomPadding())
+                        .padding(top = RPWebMetrics.mobileContentTop)
+                ) {
+                    PageHeader(selected)
+                    when (selected) {
+                        MainTab.Dashboard -> DashboardScreen(
+                            repository = dashboardRepository,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        else -> PlaceholderScreen(tab = selected, modifier = Modifier.fillMaxSize())
+                    }
+                }
+
+                MobileUtilities(
                     user = user,
                     profileOpen = profileOpen,
                     onProfileOpenChange = { profileOpen = it },
-                    onLogout = onLogout
-                )
-            },
-            bottomBar = {
-                MobileBottomBar(
-                    selected = selected,
-                    onSelected = { selected = it }
-                )
-            }
-        ) { padding ->
-            when (selected) {
-                MainTab.Dashboard -> DashboardScreen(
-                    repository = dashboardRepository,
+                    onLogout = onLogout,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                )
-                else -> PlaceholderScreen(
-                    tab = selected,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
+                        .align(Alignment.TopEnd)
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .padding(end = RPWebMetrics.utilityRight)
                 )
             }
         }
@@ -279,27 +260,53 @@ private fun MainShell(
 }
 
 @Composable
-private fun AppBackground(content: @Composable () -> Unit) {
-    BoxWithConstraints(
+private fun PageHeader(tab: MainTab) {
+    Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .fillMaxWidth()
+            .padding(
+                start = RPWebMetrics.mobileWorkspacePadding + RPWebMetrics.mobileHeaderHorizontalMargin,
+                end = RPWebMetrics.mobileWorkspacePadding + RPWebMetrics.mobileHeaderHorizontalMargin,
+                bottom = RPWebMetrics.mobileHeaderBottomMargin
+            ),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = tab.label,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontSize = 25.sp,
+            lineHeight = 30.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.8).sp
+        )
+        Text(
+            text = tab.subtitle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.5.sp,
+            lineHeight = 16.sp
+        )
+    }
+}
+
+@Composable
+private fun AppBackground(content: @Composable () -> Unit) {
+    val web = LocalRPWebColors.current
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().background(web.appBackground)
     ) {
         val density = LocalDensity.current
         val widthPx = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { maxHeight.toPx() }
-        val dark = MaterialTheme.colorScheme.background == Color(0xFF1B1614)
-        val first = if (dark) Color(0x24783C32) else Color(0x3DF4DFD7)
-        val second = if (dark) Color(0x1A643732) else Color(0x29F2DCD8)
+        val maxPx = max(widthPx, heightPx)
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(first, Color.Transparent),
+                        colors = listOf(web.radialOne, Color.Transparent),
                         center = Offset(widthPx * .16f, heightPx * .08f),
-                        radius = widthPx * .72f
+                        radius = maxPx * .28f
                     )
                 )
         )
@@ -308,162 +315,119 @@ private fun AppBackground(content: @Composable () -> Unit) {
                 .fillMaxSize()
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(second, Color.Transparent),
+                        colors = listOf(web.radialTwo, Color.Transparent),
                         center = Offset(widthPx * .94f, heightPx * .14f),
-                        radius = widthPx * .62f
+                        radius = maxPx * .25f
                     )
                 )
         )
         content()
+
+        val dark = web.appBackground == br.com.rpdoces.admin.ui.theme.RPWebDarkColors.appBackground
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsTopHeight(WindowInsets.statusBars)
-                .background(MaterialTheme.colorScheme.primary)
+                .background(if (dark) web.appBackground else web.accent)
                 .align(Alignment.TopCenter)
         )
     }
 }
 
 @Composable
-private fun MobileHeader(
-    tab: MainTab,
+private fun MobileUtilities(
     user: AuthUser,
     profileOpen: Boolean,
     onProfileOpenChange: (Boolean) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Surface(
-        color = Color.Transparent,
-        shadowElevation = 0.dp
+    val web = LocalRPWebColors.current
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(RPWebMetrics.utilityGap),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Box(modifier = Modifier.size(RPWebMetrics.utilitySize)) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(RPWebMetrics.utilityRadius),
+                color = web.surface,
+                border = BorderStroke(1.dp, web.border)
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = tab.label,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 25.sp,
-                        lineHeight = 30.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.8).sp
-                    )
-                    Text(
-                        text = tab.subtitle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.5.sp,
-                        lineHeight = 16.sp
+                IconButton(onClick = { }) {
+                    Icon(
+                        imageVector = Icons.Outlined.NotificationsNone,
+                        contentDescription = "Notificações",
+                        tint = web.muted,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
+            }
+            Box(
+                modifier = Modifier
+                    .padding(top = 6.dp, end = 6.dp)
+                    .size(7.dp)
+                    .background(web.accent, RoundedCornerShape(99.dp))
+                    .align(Alignment.TopEnd)
+            )
+        }
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.size(40.dp)) {
-                        Surface(
-                            modifier = Modifier.fillMaxSize(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                        ) {
-                            IconButton(onClick = { }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.NotificationsNone,
-                                    contentDescription = "Notificações",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .padding(top = 6.dp, end = 6.dp)
-                                .size(7.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(99.dp))
-                                .align(Alignment.TopEnd)
+        Box {
+            Surface(
+                onClick = { onProfileOpenChange(true) },
+                modifier = Modifier.size(RPWebMetrics.utilitySize),
+                shape = RoundedCornerShape(RPWebMetrics.utilityRadius),
+                color = web.surface,
+                border = BorderStroke(1.dp, web.border)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    val avatar = avatarModel(user.avatarUrl)
+                    if (avatar != null) {
+                        AsyncImage(
+                            model = avatar,
+                            contentDescription = user.nome,
+                            modifier = Modifier.size(RPWebMetrics.avatarSize),
+                            contentScale = ContentScale.Crop
                         )
-                    }
-
-                    Box {
+                    } else {
                         Surface(
-                            onClick = { onProfileOpenChange(true) },
-                            modifier = Modifier.size(40.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                            modifier = Modifier.size(RPWebMetrics.avatarSize),
+                            shape = RoundedCornerShape(16.dp),
+                            color = web.accentSoft
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                val avatar = avatarModel(user.avatarUrl)
-                                if (avatar != null) {
-                                    AsyncImage(
-                                        model = avatar,
-                                        contentDescription = user.nome,
-                                        modifier = Modifier.size(32.dp),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Surface(
-                                        modifier = Modifier.size(32.dp),
-                                        shape = RoundedCornerShape(16.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = userInitials(user.nome),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontSize = 10.5.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                }
+                                Text(
+                                    text = userInitials(user.nome),
+                                    color = web.accentDark,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                        }
-
-                        DropdownMenu(
-                            expanded = profileOpen,
-                            onDismissRequest = { onProfileOpenChange(false) }
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(user.nome, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            user.email.orEmpty(),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 10.5.sp
-                                        )
-                                    }
-                                },
-                                onClick = { }
-                            )
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("Sair", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold) },
-                                onClick = {
-                                    onProfileOpenChange(false)
-                                    onLogout()
-                                }
-                            )
                         }
                     }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+            DropdownMenu(expanded = profileOpen, onDismissRequest = { onProfileOpenChange(false) }) {
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(user.nome, fontWeight = FontWeight.Bold)
+                            Text(user.email.orEmpty(), color = web.muted, fontSize = 10.5.sp)
+                        }
+                    },
+                    onClick = { }
+                )
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("Sair", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold) },
+                    onClick = {
+                        onProfileOpenChange(false)
+                        onLogout()
+                    }
+                )
+            }
         }
     }
 }
@@ -473,28 +437,32 @@ private fun MobileBottomBar(
     selected: MainTab,
     onSelected: (MainTab) -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 0.dp
-    ) {
+    val web = LocalRPWebColors.current
+    Surface(color = web.surface, shadowElevation = 0.dp) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(top = RPWebMetrics.bottomBarOuterPadding, bottom = RPWebMetrics.bottomBarOuterPadding)
         ) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(web.border)
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(start = 5.dp, end = 5.dp, top = 4.dp)
+                    .height(RPWebMetrics.bottomNavItemHeight)
+                    .padding(horizontal = 5.dp)
             ) {
                 MainTab.entries.forEach { tab ->
                     val active = selected == tab
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp)
+                            .fillMaxSize()
                             .clickable { onSelected(tab) }
                             .padding(horizontal = 2.dp),
                         contentAlignment = Alignment.Center
@@ -502,31 +470,25 @@ private fun MobileBottomBar(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
-                                .width(22.dp)
-                                .height(2.dp)
-                                .background(
-                                    if (active) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                    RoundedCornerShape(99.dp)
-                                )
+                                .width(RPWebMetrics.bottomNavIndicatorWidth)
+                                .height(RPWebMetrics.bottomNavIndicatorHeight)
+                                .background(if (active) web.accent else Color.Transparent, RoundedCornerShape(99.dp))
                         )
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Box(
-                                modifier = Modifier.size(21.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
+                            Box(modifier = Modifier.size(RPWebMetrics.bottomNavIconBox), contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = tab.icon,
                                     contentDescription = tab.label,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    modifier = Modifier.size(RPWebMetrics.bottomNavIcon),
+                                    tint = if (active) web.accentDark else web.muted
                                 )
                             }
                             Text(
                                 text = tab.mobileLabel,
-                                color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (active) web.accentDark else web.muted,
                                 fontSize = 8.75.sp,
                                 lineHeight = 11.sp,
                                 fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
@@ -558,25 +520,13 @@ private fun userInitials(name: String): String {
 
 @Composable
 private fun PlaceholderScreen(tab: MainTab, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.padding(20.dp),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = modifier.padding(20.dp), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                imageVector = tab.icon,
-                contentDescription = null,
-                modifier = Modifier.size(42.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = tab.label,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
+            Icon(imageVector = tab.icon, contentDescription = null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(text = tab.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
                 text = "Esta área será portada para Compose nas próximas etapas.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
