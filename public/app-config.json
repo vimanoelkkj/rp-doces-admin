@@ -1,28 +1,28 @@
 {
   "schema_version": 1,
-  "revision": 5,
+  "revision": 6,
   "min_app_version_code": 1,
   "poll_seconds": 5,
   "theme": "system",
   "dashboard_banner": {
     "enabled": true,
-    "eyebrow": "REMOTE CONFIG",
-    "title": "Dashboard conectado ao servidor",
-    "message": "Este banner, a ordem dos blocos e os recursos abaixo podem mudar sem recompilar o app.",
-    "tone": "accent"
+    "eyebrow": "TESTE REMOTO 2",
+    "title": "Layout alterado sem novo APK",
+    "message": "A seção de sabores foi ocultada e os blocos abaixo foram reordenados pelo servidor.",
+    "tone": "warning"
   },
   "features": {
     "dashboard_metrics": true,
-    "dashboard_flavors": true,
+    "dashboard_flavors": false,
     "dashboard_receivables": true,
     "dashboard_recent_orders": true,
     "dashboard_attention": true
   },
   "dashboard_section_order": [
-    "metrics",
-    "flavors",
-    "receivables",
     "recent_orders",
-    "attention"
+    "metrics",
+    "receivables",
+    "attention",
+    "flavors"
   ]
 }
