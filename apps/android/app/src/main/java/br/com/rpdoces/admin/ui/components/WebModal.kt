@@ -39,9 +39,12 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -96,6 +99,7 @@ fun WebModal(
                 .padding(8.dp)
                 .widthIn(max = maxWidth.dp)
                 .heightIn(max = maxHeight * .92f)
+
             Surface(
                 modifier = modifier
                     .then(bodyModifier)
@@ -113,7 +117,11 @@ fun WebModal(
             ) {
                 val scroll = rememberScrollState()
                 Column(
-                    modifier = if (scrollable) Modifier.verticalScroll(scroll).padding(22.dp) else Modifier.padding(22.dp),
+                    modifier = if (scrollable) {
+                        Modifier.verticalScroll(scroll).padding(22.dp)
+                    } else {
+                        Modifier.padding(22.dp)
+                    },
                     content = content
                 )
             }
@@ -135,10 +143,29 @@ fun WebModalHeader(
         verticalAlignment = Alignment.Top
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(kicker.uppercase(), color = web.accentDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
-            Text(title, color = web.text, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
+            Text(
+                kicker.uppercase(),
+                color = web.accentDark,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = .4.sp
+            )
+            Text(
+                title,
+                color = web.text,
+                fontSize = 18.sp,
+                lineHeight = 23.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 3.dp)
+            )
             if (!subtitle.isNullOrBlank()) {
-                Text(subtitle, color = web.muted, fontSize = 11.5.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(
+                    subtitle,
+                    color = web.muted,
+                    fontSize = 11.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
         }
         Surface(
@@ -208,11 +235,21 @@ fun WebField(
                 singleLine = singleLine,
                 visualTransformation = visualTransformation,
                 keyboardOptions = keyboardOptions,
-                textStyle = TextStyle(color = if (enabled) web.text else web.muted, fontSize = 12.5.sp, fontWeight = FontWeight.Medium, lineHeight = 18.sp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = if (singleLine) 11.dp else 10.dp),
+                textStyle = TextStyle(
+                    color = if (enabled) web.text else web.muted,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 18.sp
+                ),
+                modifier = Modifier.fillMaxWidth().padding(
+                    horizontal = 12.dp,
+                    vertical = if (singleLine) 11.dp else 10.dp
+                ),
                 decorationBox = { inner ->
                     Box {
-                        if (value.isBlank() && placeholder.isNotBlank()) Text(placeholder, color = web.muted, fontSize = 12.5.sp)
+                        if (value.isBlank() && placeholder.isNotBlank()) {
+                            Text(placeholder, color = web.muted, fontSize = 12.5.sp)
+                        }
                         inner()
                     }
                 }
@@ -256,6 +293,7 @@ private fun WebCurrencyField(
                 enabled = enabled,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                visualTransformation = CurrencyGroupingVisualTransformation,
                 textStyle = TextStyle(
                     color = if (enabled) web.text else web.muted,
                     fontSize = 12.5.sp,
@@ -276,7 +314,12 @@ private fun WebCurrencyField(
                     .padding(horizontal = 12.dp, vertical = 11.dp),
                 decorationBox = { inner ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("R$ ", color = if (enabled) web.text else web.muted, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            "R$ ",
+                            color = if (enabled) web.text else web.muted,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                         Box(modifier = Modifier.weight(1f)) {
                             if (rawValue.isBlank()) {
                                 Text("0,00", color = web.muted, fontSize = 12.5.sp)
@@ -286,6 +329,91 @@ private fun WebCurrencyField(
                     }
                 }
             )
+        }
+    }
+}
+
+private object CurrencyGroupingVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val raw = text.text
+        if (raw.isBlank()) {
+            return TransformedText(AnnotatedString(""), OffsetMapping.Identity)
+        }
+
+        val commaIndex = raw.indexOf(',')
+        val integerPart = if (commaIndex >= 0) raw.substring(0, commaIndex) else raw
+        val fractionPart = if (commaIndex >= 0) raw.substring(commaIndex + 1) else null
+        val groupedInteger = groupThousands(integerPart.ifBlank { "0" })
+        val transformed = buildString {
+            append(groupedInteger)
+            if (commaIndex >= 0) {
+                append(',')
+                append(fractionPart.orEmpty())
+            }
+        }
+
+        val originalToTransformed = IntArray(raw.length + 1)
+        for (offset in 0..raw.length) {
+            originalToTransformed[offset] = originalOffsetToCurrencyOffset(
+                raw = raw,
+                groupedIntegerLength = groupedInteger.length,
+                originalOffset = offset
+            )
+        }
+
+        val mapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int =
+                originalToTransformed[offset.coerceIn(0, raw.length)].coerceIn(0, transformed.length)
+
+            override fun transformedToOriginal(offset: Int): Int {
+                val target = offset.coerceIn(0, transformed.length)
+                var best = 0
+                for (original in originalToTransformed.indices) {
+                    if (originalToTransformed[original] <= target) best = original else break
+                }
+                return best.coerceIn(0, raw.length)
+            }
+        }
+
+        return TransformedText(AnnotatedString(transformed), mapping)
+    }
+}
+
+private fun originalOffsetToCurrencyOffset(
+    raw: String,
+    groupedIntegerLength: Int,
+    originalOffset: Int
+): Int {
+    val commaIndex = raw.indexOf(',')
+    val integerLength = if (commaIndex >= 0) commaIndex else raw.length
+    val offset = originalOffset.coerceIn(0, raw.length)
+
+    if (offset <= integerLength) {
+        if (integerLength == 0) return 0
+        val separatorsBefore = (1 until offset).count { index ->
+            (integerLength - index) % 3 == 0
+        }
+        return offset + separatorsBefore
+    }
+
+    val fractionOffset = offset - integerLength - 1
+    return groupedIntegerLength + 1 + fractionOffset
+}
+
+private fun groupThousands(value: String): String {
+    if (value.length <= 3) return value
+    val firstGroup = value.length % 3
+    return buildString {
+        var index = 0
+        if (firstGroup > 0) {
+            append(value.substring(0, firstGroup))
+            index = firstGroup
+            if (index < value.length) append('.')
+        }
+        while (index < value.length) {
+            append(value.substring(index, (index + 3).coerceAtMost(value.length)))
+            index += 3
+            if (index < value.length) append('.')
         }
     }
 }
