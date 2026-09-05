@@ -1,3 +1,37 @@
+(() => {
+  if (!document.querySelector('link[data-rp-app-shell]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/assets/css/app-shell.css';
+    link.dataset.rpAppShell = 'true';
+    document.head.appendChild(link);
+  }
+
+  if (!document.querySelector('link[data-rp-app-shell-desktop]')) {
+    const desktop = document.createElement('link');
+    desktop.rel = 'stylesheet';
+    desktop.href = '/assets/css/app-shell-desktop.css';
+    desktop.dataset.rpAppShellDesktop = 'true';
+    document.head.appendChild(desktop);
+  }
+
+  if (!document.querySelector('link[data-rp-app-shell-cart]')) {
+    const cart = document.createElement('link');
+    cart.rel = 'stylesheet';
+    cart.href = '/assets/css/app-shell-cart.css';
+    cart.dataset.rpAppShellCart = 'true';
+    document.head.appendChild(cart);
+  }
+
+  if (!document.querySelector('script[data-rp-app-shell]')) {
+    const script = document.createElement('script');
+    script.src = '/assets/js/app-shell.js';
+    script.defer = true;
+    script.dataset.rpAppShell = 'true';
+    document.head.appendChild(script);
+  }
+})();
+
 window.RP_CONFIG = {
   whatsapp: window.RP_WHATSAPP_NUMBER || "5533991285907",
   local_retirada: "Temponi Concept",

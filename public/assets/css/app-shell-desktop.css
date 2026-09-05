@@ -1,0 +1,245 @@
+/* R&P Doces — ajustes desktop baseados nos mockups d1/d2/d3 */
+@media (min-width:1024px){
+  body.rp-app-shell{
+    background:oklch(97% 0.014 55)!important;
+  }
+
+  /* Hero: card central de 1280px com cabeçalho integrado. */
+  body.rp-app-shell>header{
+    position:relative!important;
+    top:auto!important;
+    width:min(1280px,calc(100% - 80px))!important;
+    margin:40px auto 0!important;
+    border-radius:28px 28px 0 0!important;
+    border-bottom:0!important;
+    background:oklch(99% 0.006 55)!important;
+    box-shadow:none!important;
+    overflow:hidden!important;
+  }
+  body.rp-app-shell>header .nav.container{
+    width:100%!important;
+    max-width:none!important;
+    min-height:80px!important;
+    padding:20px 56px!important;
+  }
+  body.rp-app-shell>header .brand img{
+    width:44px!important;
+    height:44px!important;
+  }
+  body.rp-app-shell>header .brand-name{
+    font-size:20px!important;
+    letter-spacing:-.01em!important;
+  }
+  body.rp-app-shell>header .brand-name span{
+    display:none!important;
+  }
+  body.rp-app-shell>header .nav-links{
+    margin-left:auto!important;
+  }
+  body.rp-app-shell>header .nav-links a{
+    font-size:13px!important;
+  }
+  body.rp-app-shell>header .nav-cta{
+    border-radius:999px!important;
+  }
+
+  body.rp-app-shell .hero{
+    width:min(1280px,calc(100% - 80px))!important;
+    margin:0 auto 40px!important;
+    border-radius:0 0 28px 28px!important;
+    background:oklch(99% 0.006 55)!important;
+    box-shadow:0 1px 2px oklch(33% 0.045 40 / .04),0 12px 32px -16px oklch(33% 0.045 40 / .14)!important;
+    overflow:hidden!important;
+  }
+  body.rp-app-shell .hero>.container{
+    width:100%!important;
+    max-width:none!important;
+    min-height:536px!important;
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:64px!important;
+    align-items:center!important;
+    padding:24px 56px 72px!important;
+  }
+  body.rp-app-shell .hero-badge{
+    background:none!important;
+    padding:0!important;
+    color:oklch(54% 0.035 42)!important;
+    font-size:13px!important;
+    font-style:italic!important;
+  }
+  body.rp-app-shell .hero h1{
+    max-width:11ch!important;
+    margin-top:16px!important;
+    font-size:56px!important;
+    line-height:1.03!important;
+    letter-spacing:-.02em!important;
+  }
+  body.rp-app-shell .hero .lead{
+    max-width:36ch!important;
+    margin-top:22px!important;
+    font-size:17px!important;
+    line-height:1.6!important;
+  }
+  body.rp-app-shell .hero-actions{
+    margin-top:30px!important;
+  }
+  body.rp-app-shell .hero-actions .btn-primary{
+    padding:16px 30px!important;
+    font-size:16px!important;
+    border-radius:999px!important;
+  }
+  body.rp-app-shell .hero-actions .btn-outline,
+  body.rp-app-shell .hero-stats{
+    display:none!important;
+  }
+  body.rp-app-shell .hero-media{
+    height:440px!important;
+    border-radius:28px!important;
+    overflow:hidden!important;
+    background:repeating-linear-gradient(135deg,oklch(93% 0.035 18) 0 14px,oklch(96% 0.02 18) 14px 28px)!important;
+    display:grid!important;
+    place-items:center!important;
+  }
+  body.rp-app-shell .hero-media img{
+    width:100%!important;
+    height:100%!important;
+    object-fit:contain!important;
+    max-height:none!important;
+    filter:drop-shadow(0 22px 26px rgba(112,61,82,.12))!important;
+  }
+
+  /* Cardápio desktop: bloco largo e produtos compactos em quatro colunas. */
+  body.rp-app-shell .menu.section{
+    width:min(1280px,calc(100% - 80px))!important;
+    margin:40px auto!important;
+    padding:0!important;
+    border-radius:28px!important;
+    background:oklch(99% 0.006 55)!important;
+    box-shadow:0 1px 2px oklch(33% 0.045 40 / .04),0 12px 32px -16px oklch(33% 0.045 40 / .14)!important;
+    overflow:hidden!important;
+  }
+  body.rp-app-shell .menu.section>.container{
+    width:100%!important;
+    max-width:none!important;
+    padding:32px 56px 56px!important;
+  }
+  body.rp-app-shell .menu .section-head{
+    text-align:left!important;
+    margin-bottom:24px!important;
+  }
+  body.rp-app-shell .menu .section-head .eyebrow,
+  body.rp-app-shell .menu .section-head p{
+    display:none!important;
+  }
+  body.rp-app-shell .menu .section-head h2{
+    font-size:26px!important;
+    letter-spacing:-.01em!important;
+    margin:0!important;
+  }
+  body.rp-app-shell .rp-menu-filters,
+  body.rp-app-shell .category-photos{
+    display:none!important;
+  }
+  body.rp-app-shell .menu-category-title{
+    font-size:15px!important;
+    margin-bottom:14px!important;
+  }
+  body.rp-app-shell .menu-grid{
+    gap:28px!important;
+  }
+  body.rp-app-shell .menu-grid .flavor-card{
+    border:0!important;
+    box-shadow:none!important;
+    border-radius:0!important;
+    background:transparent!important;
+  }
+  body.rp-app-shell .menu-grid .flavor-card:hover{
+    transform:translateY(-2px)!important;
+    box-shadow:none!important;
+  }
+  body.rp-app-shell .rp-card-visual{
+    min-height:220px!important;
+    border-radius:20px!important;
+  }
+  body.rp-app-shell .rp-card-body{
+    padding:12px 2px 0!important;
+  }
+  body.rp-app-shell .rp-card-body h3{
+    font-size:17px!important;
+    line-height:1.2!important;
+  }
+  body.rp-app-shell .rp-card-body p{
+    font-size:12.5px!important;
+    line-height:1.45!important;
+  }
+  body.rp-app-shell .rp-card-price span{
+    font-size:20px!important;
+  }
+  body.rp-app-shell .rp-card-add{
+    width:36px!important;
+    height:36px!important;
+    min-width:36px!important;
+    padding:0!important;
+    border-radius:999px!important;
+  }
+  body.rp-app-shell .rp-card-add span{
+    display:none!important;
+  }
+  body.rp-app-shell .rp-card-add strong{
+    font-size:17px!important;
+  }
+  body.rp-app-shell .rp-card-qty{
+    padding:3px!important;
+  }
+  body.rp-app-shell .rp-card-qty button{
+    width:28px!important;
+    height:28px!important;
+  }
+
+  /* Se o carrinho desktop já existir no header, assume o visual de pílula do mockup. */
+  body.rp-app-shell #rpCartTrigger{
+    border-radius:999px!important;
+    background:oklch(97% 0.014 55)!important;
+    border:0!important;
+    padding:8px 8px 8px 20px!important;
+  }
+
+  /* Checkout desktop: modal central de aproximadamente 720px. */
+  body.rp-app-shell .pedido-overlay.open{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    padding:60px 0!important;
+    background:oklch(33% 0.045 40 / .16)!important;
+    backdrop-filter:blur(3px)!important;
+  }
+  body.rp-app-shell .pedido-modal{
+    width:720px!important;
+    max-width:90vw!important;
+    max-height:calc(100vh - 80px)!important;
+    border-radius:24px!important;
+    box-shadow:0 24px 64px -20px oklch(33% 0.045 40 / .35)!important;
+  }
+  body.rp-app-shell .pedido-modal-scroll{
+    padding:28px 32px 32px!important;
+  }
+  body.rp-app-shell .rp-cart-sheet-handle{
+    display:none!important;
+  }
+  body.rp-app-shell .rp-cart-checkout-active{
+    width:720px!important;
+  }
+  body.rp-app-shell .rp-cart-checkout-active .pedido-modal-scroll{
+    padding:36px 40px!important;
+  }
+  body.rp-app-shell .pedido-modal input,
+  body.rp-app-shell .pedido-modal textarea{
+    border-radius:14px!important;
+  }
+  body.rp-app-shell .rp-checkout-actions .btn-primary,
+  body.rp-app-shell .pedido-confirmar{
+    border-radius:16px!important;
+    min-height:46px!important;
+  }
+}

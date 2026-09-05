@@ -1,0 +1,130 @@
+/* Correção do carrinho/checkout para seguir os mockups enviados */
+@media (min-width:761px){
+  /* No desktop, carrinho e checkout são passos separados, não uma tela única. */
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active){
+    width:460px!important;
+    max-width:calc(100vw - 40px)!important;
+    max-height:calc(100vh - 48px)!important;
+    border-radius:24px!important;
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .pedido-modal-scroll{
+    padding:14px 22px 24px!important;
+  }
+  body.rp-app-shell .rp-cart-step{display:block!important}
+  body.rp-app-shell .rp-cart-step--items{display:flex!important;min-height:0!important;flex-direction:column!important}
+  body.rp-app-shell .rp-cart-step--checkout{display:none!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-cart-step--items{display:none!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-cart-step--checkout{display:block!important}
+
+  /* Cabeçalho compacto igual ao mockup de carrinho. */
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-desktop-title{display:none!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-mobile-head{display:block!important;padding:2px 38px 12px 34px!important;position:relative!important;border-bottom:1px solid oklch(85% 0.018 40)!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-mobile-head::before{
+    content:"";position:absolute;left:0;top:2px;width:20px;height:22px;border:1.4px solid oklch(33% 0.045 40);border-radius:6px 6px 8px 8px;
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-mobile-head::after{
+    content:"";position:absolute;left:4px;top:-4px;width:12px;height:8px;border:1.4px solid oklch(33% 0.045 40);border-bottom:0;border-radius:8px 8px 0 0;
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-mobile-head h3{
+    margin:0!important;font-family:'Bricolage Grotesque','Poppins',sans-serif!important;font-size:20px!important;line-height:1.2!important;color:oklch(33% 0.045 40)!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-mobile-head h3::first-letter{font-size:0!important;color:transparent!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-mobile-head p{margin:3px 0 0!important;font-size:11px!important;color:oklch(54% 0.035 42)!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-head{padding:0!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .pedido-close{
+    top:18px!important;right:20px!important;width:34px!important;height:34px!important;border:0!important;background:oklch(92% 0.018 35)!important;color:oklch(54% 0.035 42)!important;font-size:20px!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-sheet-handle{
+    display:block!important;width:36px!important;height:4px!important;margin:0 auto 18px!important;background:oklch(79% 0.018 40)!important
+  }
+
+  /* Item do carrinho: foto, nome/preço, stepper e lixeira. */
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-list{padding:8px 0 0!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-item{
+    display:grid!important;
+    grid-template-columns:56px minmax(0,1fr) 34px!important;
+    grid-template-areas:'thumb copy remove' 'thumb controls remove'!important;
+    gap:5px 12px!important;
+    padding:14px 0 18px!important;
+    border-bottom:1px dashed oklch(85% 0.018 40)!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-thumb{
+    grid-area:thumb!important;width:56px!important;height:56px!important;border-radius:14px!important;color:transparent!important;font-size:0!important;
+    background:repeating-linear-gradient(135deg,oklch(93% 0.035 18) 0 7px,oklch(96% 0.02 18) 7px 14px)!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-item-copy{grid-area:copy!important;min-width:0!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-item-copy>strong{
+    display:block!important;font-family:'Nunito Sans','Poppins',sans-serif!important;font-size:13.5px!important;color:oklch(33% 0.045 40)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-item-copy>small{display:block!important;margin-top:1px!important;font-size:11.5px!important;color:oklch(54% 0.035 42)!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-controls{
+    grid-area:controls!important;justify-self:start!important;display:inline-flex!important;align-items:center!important;background:oklch(90% 0.045 18)!important;border-radius:999px!important;padding:2px!important;gap:0!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-controls button{
+    width:28px!important;height:28px!important;border:0!important;background:transparent!important;color:oklch(56% 0.145 10)!important;font-size:15px!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-controls strong{min-width:22px!important;text-align:center!important;font-size:13px!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-remove{
+    grid-area:remove!important;align-self:center!important;width:30px!important;height:30px!important;border:0!important;background:transparent!important;color:oklch(54% 0.035 42)!important;padding:5px!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-remove svg{width:17px!important;height:17px!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-subtotal{display:none!important}
+
+  /* Resumo e ações do mockup. */
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-summary{margin-top:0!important;padding:16px 0 0!important;border-top:0!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-total-row{display:flex!important;align-items:baseline!important;justify-content:space-between!important;padding:0!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-total-row span{
+    font-size:10px!important;font-weight:800!important;letter-spacing:.11em!important;text-transform:uppercase!important;color:oklch(54% 0.035 42)!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-total-row strong{
+    font-family:'Bricolage Grotesque','Poppins',sans-serif!important;font-size:22px!important;letter-spacing:-.01em!important;color:oklch(33% 0.045 40)!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-note{margin:6px 0 0!important;font-size:11.5px!important;color:oklch(54% 0.035 42)!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-mobile-actions{display:grid!important;gap:8px!important;margin-top:18px!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) #rpCartContinue{
+    width:100%!important;min-height:50px!important;border-radius:16px!important;border:0!important;background:oklch(68% 0.14 12)!important;color:#fff!important;box-shadow:none!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;padding:12px 16px!important;font-size:14px!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) #rpCartContinue svg{display:none!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) #rpCartContinue i::before{content:'·';font-style:normal!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) #rpCartContinue strong{font-size:14px!important;color:#fff!important}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) #rpCartShop{
+    width:auto!important;justify-self:center!important;border:0!important;background:transparent!important;color:oklch(56% 0.145 10)!important;text-decoration:underline!important;font-weight:700!important;padding:6px 10px!important;box-shadow:none!important
+  }
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) #rpCartShop::after{content:' →'}
+  body.rp-app-shell .pedido-modal:not(.rp-cart-checkout-active) .rp-cart-trust{
+    display:flex!important;align-items:flex-start!important;gap:10px!important;margin-top:14px!important;padding:12px 2px 0!important;color:oklch(54% 0.035 42)!important
+  }
+
+  /* Checkout ativo: reproduz o d3 em duas colunas compactas. */
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active{
+    width:720px!important;max-width:90vw!important;border-radius:24px!important
+  }
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-modal-scroll{padding:36px 40px!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-cart-step--checkout{
+    display:grid!important;grid-template-columns:1fr 1fr!important;gap:40px!important
+  }
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-cart-checkout-head{
+    grid-column:1!important;grid-row:1 / span 10!important;display:block!important;border:0!important;margin:0!important;padding:0!important
+  }
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-cart-checkout-head .eyebrow{display:none!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-cart-checkout-title h3{
+    font-family:'Bricolage Grotesque','Poppins',sans-serif!important;font-size:22px!important;margin:0 0 18px!important
+  }
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-cart-checkout-head>p{display:none!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active #rpCartBack{display:none!important}
+  /* Campos que não aparecem no mockup desktop ficam fora da apresentação visual. */
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-field:has(input[type='email']),
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-field:has(input[type='tel']),
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-atendimento,
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active #pedidoConfirmar,
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-checkout-security{display:none!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active>.pedido-close{display:none!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-cart-step--checkout>.pedido-field,
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .rp-checkout-actions{grid-column:2!important;margin-top:0!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-field{margin-top:0!important;margin-bottom:12px!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-field input,
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-field textarea{border:1.5px solid oklch(85% 0.018 40)!important;border-radius:14px!important;background:#fff!important;font-size:13px!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-field input{min-height:44px!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active .pedido-field textarea{min-height:48px!important;max-height:72px!important;resize:none!important}
+  body.rp-app-shell .pedido-modal.rp-cart-checkout-active #pedidoPagarPix{width:100%!important;min-height:46px!important;border-radius:16px!important;margin-top:4px!important}
+}
