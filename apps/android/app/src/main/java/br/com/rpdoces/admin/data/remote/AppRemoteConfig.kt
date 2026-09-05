@@ -14,7 +14,8 @@ private const val SUPPORTED_SCHEMA_VERSION = 1
 private const val PREFS_NAME = "rp_remote_config"
 private const val KEY_CONFIG_JSON = "config_json"
 private const val KEY_SAVED_AT = "saved_at"
-private const val MIN_POLL_SECONDS = 3L
+private const val KEY_ETAG = "etag"
+private const val MIN_POLL_SECONDS = 10L
 private const val MAX_POLL_SECONDS = 300L
 
 private val allowedDashboardSections = setOf(
@@ -30,7 +31,7 @@ data class AppRemoteConfig(
     @SerialName("schema_version") val schemaVersion: Int = 1,
     val revision: Int = 1,
     @SerialName("min_app_version_code") val minAppVersionCode: Int = 1,
-    @SerialName("poll_seconds") val pollSeconds: Long = 5L,
+    @SerialName("poll_seconds") val pollSeconds: Long = 30L,
     val theme: String = "system",
     val maintenance: RemoteMaintenance = RemoteMaintenance(),
     val update: RemoteUpdate = RemoteUpdate(),
@@ -110,6 +111,7 @@ class AppRemoteConfigRepository(context: Context) {
         ignoreUnknownKeys = true
         isLenient = false
     }
+    private val apiOrigin = BuildConfig.API_ORIGIN.trimEnd('/')
 
     /**
      * Retorna imediatamente a última configuração válida salva no aparelho.
@@ -119,47 +121,97 @@ class AppRemoteConfigRepository(context: Context) {
         val raw = preferences.getString(KEY_CONFIG_JSON, null) ?: return AppRemoteConfig()
         return runCatching { decodeAndValidate(raw) }
             .getOrElse {
-                preferences.edit()
-                    .remove(KEY_CONFIG_JSON)
-                    .remove(KEY_SAVED_AT)
-                    .apply()
+                clearInvalidCache()
                 AppRemoteConfig()
             }
     }
 
     /**
-     * Busca a configuração publicada, valida antes de aplicar e mantém o cache anterior
-     * em caso de revisão regressiva. Falhas de rede/JSON nunca apagam uma configuração boa.
+     * A fonte principal é /api/app-config, servida pelo D1 e validada no servidor.
+     * ETag evita transferir o JSON novamente quando nada mudou. Enquanto versões antigas
+     * ainda existem em produção, o arquivo estático continua sendo um fallback seguro.
      */
     suspend fun fetch(): AppRemoteConfig = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url("${BuildConfig.API_ORIGIN}/app-config.json?t=${System.currentTimeMillis()}")
-            .header("Cache-Control", "no-cache, no-store")
-            .build()
+        val cached = cachedOrDefault()
+        runCatching { fetchDynamic(cached) }
+            .getOrElse { fetchLegacyStatic(cached) }
+    }
 
-        client.newCall(request).execute().use { response ->
+    fun cachedAtMillis(): Long = preferences.getLong(KEY_SAVED_AT, 0L)
+
+    private fun fetchDynamic(cached: AppRemoteConfig): AppRemoteConfig {
+        val builder = Request.Builder()
+            .url("$apiOrigin/api/app-config")
+            .header("Cache-Control", "no-cache")
+
+        preferences.getString(KEY_ETAG, null)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { builder.header("If-None-Match", it) }
+
+        client.newCall(builder.build()).execute().use { response ->
+            if (response.code == 304) {
+                touchCache()
+                return cached
+            }
             if (!response.isSuccessful) {
                 throw IllegalStateException("Remote config HTTP ${response.code}")
             }
 
             val body = response.body.string()
             val incoming = decodeAndValidate(body)
-            val cached = cachedOrDefault()
+            if (incoming.revision < cached.revision) return cached
 
-            if (incoming.revision < cached.revision) {
-                return@withContext cached
-            }
-
-            preferences.edit()
-                .putString(KEY_CONFIG_JSON, body)
-                .putLong(KEY_SAVED_AT, System.currentTimeMillis())
-                .apply()
-
-            incoming
+            persist(
+                body = body,
+                etag = response.header("ETag")
+            )
+            return incoming
         }
     }
 
-    fun cachedAtMillis(): Long = preferences.getLong(KEY_SAVED_AT, 0L)
+    private fun fetchLegacyStatic(cached: AppRemoteConfig): AppRemoteConfig {
+        val request = Request.Builder()
+            .url("$apiOrigin/app-config.json?t=${System.currentTimeMillis()}")
+            .header("Cache-Control", "no-cache, no-store")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IllegalStateException("Remote config fallback HTTP ${response.code}")
+            }
+
+            val body = response.body.string()
+            val incoming = decodeAndValidate(body)
+            if (incoming.revision < cached.revision) return cached
+
+            persist(body = body, etag = null)
+            return incoming
+        }
+    }
+
+    private fun persist(body: String, etag: String?) {
+        preferences.edit()
+            .putString(KEY_CONFIG_JSON, body)
+            .putLong(KEY_SAVED_AT, System.currentTimeMillis())
+            .apply {
+                if (etag.isNullOrBlank()) remove(KEY_ETAG) else putString(KEY_ETAG, etag)
+            }
+            .apply()
+    }
+
+    private fun touchCache() {
+        preferences.edit()
+            .putLong(KEY_SAVED_AT, System.currentTimeMillis())
+            .apply()
+    }
+
+    private fun clearInvalidCache() {
+        preferences.edit()
+            .remove(KEY_CONFIG_JSON)
+            .remove(KEY_SAVED_AT)
+            .remove(KEY_ETAG)
+            .apply()
+    }
 
     private fun decodeAndValidate(raw: String): AppRemoteConfig {
         val decoded = json.decodeFromString<AppRemoteConfig>(raw)
