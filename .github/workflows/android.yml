@@ -36,3 +36,11 @@ jobs:
 
       - name: Compilar APK debug
         run: gradle -p apps/android :app:assembleDebug --stacktrace
+
+      - name: Guardar APK debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: rp-doces-android-debug
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
