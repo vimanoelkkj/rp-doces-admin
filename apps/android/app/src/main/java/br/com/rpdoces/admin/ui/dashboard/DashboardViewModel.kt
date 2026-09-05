@@ -33,12 +33,16 @@ class DashboardViewModel(
         viewModelScope.launch {
             while (isActive) {
                 delay(15_000)
-                refresh(silent = true)
+                refreshInternal(silent = true)
             }
         }
     }
 
-    fun refresh(silent: Boolean = false) {
+    fun refresh() {
+        refreshInternal(silent = false)
+    }
+
+    private fun refreshInternal(silent: Boolean) {
         val current = _state.value
         if (current is DashboardUiState.Ready && current.refreshing) return
 
