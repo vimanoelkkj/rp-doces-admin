@@ -24,7 +24,9 @@ function run(command, args, options = {}) {
 
 function gitOutput(args) {
   const result = run("git", args, { capture: true });
-  return { status: result.status, output: String(result.stdout || "").trim() };
+  // Não remover espaços do início: no porcelain do Git eles fazem parte dos
+  // códigos XY (ex.: " M arquivo" para modificação no working tree).
+  return { status: result.status, output: String(result.stdout || "").trimEnd() };
 }
 
 function isAndroidOnlyChange(line) {
