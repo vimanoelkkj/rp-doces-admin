@@ -8,9 +8,8 @@ import androidx.compose.ui.unit.dp
 /**
  * Espelho dos tokens de admin-v2/src/tokens.css e AdminShell.module.css.
  *
- * O app nativo não consegue aplicar CSS diretamente ao Jetpack Compose, então
- * estes valores são a fonte de verdade do lado Android. Sempre que o CSS base
- * mudar, este arquivo deve acompanhar a mesma alteração.
+ * CSS não estiliza Jetpack Compose diretamente. Por isso o Android usa estes
+ * mesmos valores como fonte de verdade, em vez de manter uma paleta paralela.
  */
 @Immutable
 data class RPWebColors(
@@ -26,9 +25,25 @@ data class RPWebColors(
     val accentDark: Color,
     val accentSoft: Color,
     val accentWash: Color,
+    val pinkRow: Color,
+    val orange: Color,
+    val orangeSoft: Color,
+    val green: Color,
+    val greenSoft: Color,
+    val purple: Color,
+    val purpleSoft: Color,
+    val graySoft: Color,
+    val hoverNav: Color,
+    val surfaceVeilOne: Color,
+    val surfaceVeilTwo: Color,
+    val surfaceVeilThree: Color,
+    val pinkBorder: Color,
+    val tagOrangeText: Color,
+    val tagGreenText: Color,
     val success: Color,
     val warning: Color,
     val danger: Color,
+    val shadow: Color,
     val radialOne: Color,
     val radialTwo: Color
 )
@@ -46,9 +61,25 @@ val RPWebLightColors = RPWebColors(
     accentDark = Color(0xFFCF3F61),
     accentSoft = Color(0xFFFBE9EE),
     accentWash = Color(0xFFFFF6F7),
+    pinkRow = Color(0xFFFFF5F7),
+    orange = Color(0xFFED8A22),
+    orangeSoft = Color(0xFFFFF1DF),
+    green = Color(0xFF2F9B63),
+    greenSoft = Color(0xFFE7F6ED),
+    purple = Color(0xFF705BC4),
+    purpleSoft = Color(0xFFF0ECFF),
+    graySoft = Color(0xFFF2F2F0),
+    hoverNav = Color(0xFFFFF6F7),
+    surfaceVeilOne = Color(0x8AFFF CF8).let { Color(0x8AFFF CF8) },
+    surfaceVeilTwo = Color(0xBDFFF DFA).let { Color(0xBDFFF DFA) },
+    surfaceVeilThree = Color(0xEBFFF DFA).let { Color(0xEBFFF DFA) },
+    pinkBorder = Color(0xFFF0A8B9),
+    tagOrangeText = Color(0xFFDB7618),
+    tagGreenText = Color(0xFF278050),
     success = Color(0xFF2F9B63),
     warning = Color(0xFFED8A22),
     danger = Color(0xFFC7434D),
+    shadow = Color(0x0D3F2B22),
     radialOne = Color(0x3DF4DFD7),
     radialTwo = Color(0x29F2DCD8)
 )
@@ -66,9 +97,25 @@ val RPWebDarkColors = RPWebColors(
     accentDark = Color(0xFFF0839C),
     accentSoft = Color(0xFF3A232B),
     accentWash = Color(0xFF2C2020),
+    pinkRow = Color(0xFF2C1E22),
+    orange = Color(0xFFF0A04F),
+    orangeSoft = Color(0xFF3A2A17),
+    green = Color(0xFF4BBF85),
+    greenSoft = Color(0xFF17301F),
+    purple = Color(0xFF9483D9),
+    purpleSoft = Color(0xFF2A2440),
+    graySoft = Color(0xFF2A2422),
+    hoverNav = Color(0xFF2C2020),
+    surfaceVeilOne = Color(0x99241D1A),
+    surfaceVeilTwo = Color(0xC2241D1A),
+    surfaceVeilThree = Color(0xF0241D1A),
+    pinkBorder = Color(0xFF6B3644),
+    tagOrangeText = Color(0xFFF0A04F),
+    tagGreenText = Color(0xFF58CF93),
     success = Color(0xFF4BBF85),
     warning = Color(0xFFF0A04F),
     danger = Color(0xFFEF7489),
+    shadow = Color(0x73000000),
     radialOne = Color(0x24783C32),
     radialTwo = Color(0x1A643732)
 )
