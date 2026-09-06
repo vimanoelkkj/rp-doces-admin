@@ -378,9 +378,12 @@ private fun OrderDetailDialog(
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var editingItem by remember(order.id) { mutableStateOf<OrderItem?>(null) }
+    var deletingItem by remember(order.id) { mutableStateOf<OrderItem?>(null) }
+    var deleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
     Dialog(
-        onDismissRequest = { if (!saving && editingItem == null) onDismiss() },
+        onDismissRequest = { if (!saving && editingItem == null && deletingItem == null) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = web.surface) {
@@ -398,7 +401,7 @@ private fun OrderDetailDialog(
                         Icons.Outlined.Close,
                         contentDescription = "Fechar",
                         tint = web.muted,
-                        modifier = Modifier.size(28.dp).clickable(enabled = !saving && editingItem == null) { onDismiss() }.padding(4.dp)
+                        modifier = Modifier.size(28.dp).clickable(enabled = !saving && editingItem == null && deletingItem == null) { onDismiss() }.padding(4.dp)
                     )
                 }
 
@@ -503,6 +506,12 @@ private fun OrderDetailDialog(
                         item {
                             DetailSection("Comanda #${order.id}") {
                                 order.itens.forEach { item ->
+                                    val canDeleteItem = item.id != null &&
+                                        order.itens.size > 1 &&
+                                        item.paidCents <= 0 &&
+                                        item.stockDeductedAt == null &&
+                                        !order.commandStatus.equals("ENCERRADA", true) &&
+                                        !order.orderStatus.equals("CANCELADO", true)
                                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                             Text("${item.quantidade}× ${item.productName ?: "Produto"}", color = web.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -518,6 +527,22 @@ private fun OrderDetailDialog(
                                             fontSize = 10.5.sp,
                                             modifier = Modifier.padding(top = 3.dp)
                                         )
+                                        if (canDeleteItem) {
+                                            Surface(
+                                                onClick = {
+                                                    deleteError = null
+                                                    deletingItem = item
+                                                },
+                                                modifier = Modifier.padding(top = 8.dp).height(30.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = web.surface,
+                                                border = BorderStroke(1.dp, web.danger.copy(alpha = .35f))
+                                            ) {
+                                                Box(modifier = Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+                                                    Text("Excluir", color = web.danger, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
                                     }
                                     HorizontalDivider(color = web.border)
                                 }
@@ -577,6 +602,116 @@ private fun OrderDetailDialog(
                 onUpdated()
             }
         )
+    }
+
+    deletingItem?.let { item ->
+        DeleteOrderItemConfirmDialog(
+            item = item,
+            busy = deleting,
+            error = deleteError,
+            onDismiss = {
+                if (!deleting) {
+                    deletingItem = null
+                    deleteError = null
+                }
+            },
+            onConfirm = {
+                if (!deleting && item.id != null) {
+                    deleting = true
+                    deleteError = null
+                    scope.launch {
+                        runCatching { repository.deleteItem(order.id, item.id) }
+                            .onSuccess {
+                                deletingItem = null
+                                onUpdated()
+                            }
+                            .onFailure { deleteError = it.message ?: "Não foi possível excluir o item da comanda." }
+                        deleting = false
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun DeleteOrderItemConfirmDialog(
+    item: OrderItem,
+    busy: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val web = LocalRPWebColors.current
+    Dialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = web.surface,
+                border = BorderStroke(1.dp, web.border)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("REMOVER DA COMANDA", color = web.danger, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Excluir ${item.productName ?: "este produto"}?",
+                        color = web.text,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 7.dp)
+                    )
+                    Text(
+                        "${item.quantidade}x deste item será removido. A reserva correspondente será liberada e os totais da comanda serão recalculados.",
+                        color = web.muted,
+                        fontSize = 11.5.sp,
+                        lineHeight = 17.sp,
+                        modifier = Modifier.padding(top = 9.dp)
+                    )
+                    if (!error.isNullOrBlank()) {
+                        Text(error, color = web.danger, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            onClick = onDismiss,
+                            enabled = !busy,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(9.dp),
+                            color = web.surface,
+                            border = BorderStroke(1.dp, web.borderStrong)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("Voltar", color = web.muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Surface(
+                            onClick = onConfirm,
+                            enabled = !busy,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(9.dp),
+                            color = web.danger,
+                            border = BorderStroke(1.dp, web.danger)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (busy) {
+                                    CircularProgressIndicator(modifier = Modifier.size(17.dp), strokeWidth = 2.dp, color = Color.White)
+                                } else {
+                                    Text("Excluir item", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
