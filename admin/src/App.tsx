@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { AdminsPage } from "./admins/AdminsPage";
 import { AppControlPage } from "./app-control/AppControlPage";
 import { AuthGate } from "./auth/AuthGate";
+import { AttentionNavigationBridge } from "./dashboard/AttentionNavigationBridge";
 import { DashboardPage } from "./dashboard/DashboardPage";
 import { AdminShell, type AdminV2Page } from "./layout/AdminShell";
 import { OrdersPage } from "./orders/OrdersPage";
@@ -123,6 +124,7 @@ export function App() {
             hideHeader={page === "pedidos"}
             fullWidth={page === "pedidos"}
           >
+            <AttentionNavigationBridge onNavigate={navigate} />
             {PAGES.map(view => {
               if (!visited.has(view)) return null;
 
