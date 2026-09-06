@@ -113,9 +113,13 @@ fun ProductsScreen(
         query = ""
         filter = ProductFilter.ALL
         highlightedIds = ids
-        onFocusConsumed()
         val firstIndex = products.indexOfFirst { it.id in ids }
-        if (firstIndex >= 0) gridState.animateScrollToItem(firstIndex)
+        if (firstIndex >= 0) gridState.scrollToItem(firstIndex)
+        onFocusConsumed()
+    }
+
+    LaunchedEffect(highlightedIds) {
+        if (highlightedIds.isEmpty()) return@LaunchedEffect
         delay(4_500)
         highlightedIds = emptySet()
     }

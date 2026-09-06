@@ -123,19 +123,21 @@ export function ProductsPage({
     setQuery("");
     setFilter("todos");
     setHighlightedIds(ids);
-    onFocusConsumed?.();
 
     const scrollTimer = window.setTimeout(() => {
       const first = document.querySelector<HTMLElement>(`[data-product-id="${ids[0]}"]`);
       first?.scrollIntoView({ behavior: "smooth", block: "center" });
+      onFocusConsumed?.();
     }, 120);
 
-    const clearTimer = window.setTimeout(() => setHighlightedIds([]), 4_500);
-    return () => {
-      window.clearTimeout(scrollTimer);
-      window.clearTimeout(clearTimer);
-    };
+    return () => window.clearTimeout(scrollTimer);
   }, [active, focusProductIds, onFocusConsumed]);
+
+  useEffect(() => {
+    if (!highlightedIds.length) return;
+    const clearTimer = window.setTimeout(() => setHighlightedIds([]), 4_500);
+    return () => window.clearTimeout(clearTimer);
+  }, [highlightedIds]);
 
   const visible = useMemo(
     () =>
