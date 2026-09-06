@@ -39,7 +39,7 @@ export async function updateOrderStatus(id: number, status: OrderStatus): Promis
       `/api/admin/orders/${id}/payments`,
       {
         method: "POST",
-        body: JSON.stringify({ acao: "CANCELAR_COMANDA" })
+        body: JSON.stringify({ acao: "CANCELAR_COMANDA", confirmacao: "CANCELAR" })
       },
       "Não foi possível cancelar a comanda."
     );
@@ -64,6 +64,14 @@ export async function updateManualPayment(id: number, status: ManualPaymentStatu
       body: JSON.stringify({ status_pagamento: status })
     },
     "Não foi possível atualizar o pagamento."
+  );
+}
+
+export async function reopenPaidCommand(id: number): Promise<void> {
+  await requestJson(
+    `/api/admin/orders/${id}/reopen`,
+    { method: "POST" },
+    "Não foi possível reabrir a comanda paga."
   );
 }
 
