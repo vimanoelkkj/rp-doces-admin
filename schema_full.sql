@@ -44,6 +44,26 @@ CREATE TABLE admin_sessoes (
   FOREIGN KEY (usuario_id) REFERENCES usuarios_admin(id) ON DELETE CASCADE
 );
 
+-- table: app_remote_config
+CREATE TABLE app_remote_config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  revision INTEGER NOT NULL,
+  config_json TEXT NOT NULL,
+  atualizado_por INTEGER,
+  atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (atualizado_por) REFERENCES usuarios_admin(id) ON DELETE SET NULL
+);
+
+-- table: app_remote_config_history
+CREATE TABLE app_remote_config_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  revision INTEGER NOT NULL,
+  config_json TEXT NOT NULL,
+  atualizado_por INTEGER,
+  atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (atualizado_por) REFERENCES usuarios_admin(id) ON DELETE SET NULL
+);
+
 -- table: auth_rate_limits
 CREATE TABLE auth_rate_limits (
   chave TEXT PRIMARY KEY,
@@ -296,6 +316,10 @@ CREATE INDEX idx_admin_sessoes_token ON admin_sessoes(token_hash);
 
 -- index: idx_admin_sessoes_usuario
 CREATE INDEX idx_admin_sessoes_usuario ON admin_sessoes(usuario_id);
+
+-- index: idx_app_remote_config_history_revision
+CREATE UNIQUE INDEX idx_app_remote_config_history_revision
+  ON app_remote_config_history(revision);
 
 -- index: idx_auth_rate_limits_bloqueado
 CREATE INDEX idx_auth_rate_limits_bloqueado
