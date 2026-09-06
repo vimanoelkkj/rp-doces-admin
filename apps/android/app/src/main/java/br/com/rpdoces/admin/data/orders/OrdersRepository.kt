@@ -92,7 +92,9 @@ private data class PaidOrderItemExchangeInput(
 
 @Serializable
 private data class OrderItemReallocationInput(
-    @SerialName("destino_item_id") val targetItemId: Int
+    @SerialName("destino_item_id") val targetItemId: Int,
+    @SerialName("devolucao_metodo") val refundMethod: String? = null,
+    @SerialName("confirmacao_devolucao") val refundConfirmation: String? = null
 )
 
 @Serializable
@@ -267,11 +269,21 @@ class OrdersRepository(retrofit: Retrofit) {
         api.deleteItem(id, itemId).requireSuccess("Não foi possível excluir o item da comanda.")
     }
 
-    suspend fun reallocateItemPayment(id: Int, itemId: Int, targetItemId: Int) {
+    suspend fun reallocateItemPayment(
+        id: Int,
+        itemId: Int,
+        targetItemId: Int,
+        refundMethod: String? = null,
+        confirmRefund: Boolean = false
+    ) {
         api.reallocateItemPayment(
             id,
             itemId,
-            OrderItemReallocationInput(targetItemId = targetItemId)
+            OrderItemReallocationInput(
+                targetItemId = targetItemId,
+                refundMethod = refundMethod,
+                refundConfirmation = if (confirmRefund) "DEVOLVIDO" else null
+            )
         ).requireSuccess("Não foi possível corrigir o produto pago da comanda.")
     }
 
