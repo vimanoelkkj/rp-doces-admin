@@ -15,6 +15,18 @@
     background-color 180ms ease;
 }
 
+.card.highlighted {
+  border-color: var(--pink);
+  background: color-mix(in srgb, var(--surface) 92%, var(--pink) 8%);
+  box-shadow: 0 0 0 3px rgba(220,78,109,.18), 0 14px 34px rgba(206,61,95,.12);
+  animation: attentionPulse 900ms ease-in-out 2;
+}
+
+@keyframes attentionPulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
 .media {
   position: relative;
   height: 128px;
@@ -396,5 +408,9 @@
   .card,
   .menuButton {
     transition: none !important;
+  }
+
+  .card.highlighted {
+    animation: none;
   }
 }
