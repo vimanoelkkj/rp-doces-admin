@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +44,7 @@ import br.com.rpdoces.admin.ui.components.WebField
 import br.com.rpdoces.admin.ui.components.WebModal
 import br.com.rpdoces.admin.ui.components.WebModalActions
 import br.com.rpdoces.admin.ui.components.WebModalHeader
+import br.com.rpdoces.admin.ui.components.WebSelectorOption
 import br.com.rpdoces.admin.ui.remote.LocalAppRemoteConfig
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
@@ -148,21 +148,22 @@ internal fun ManualOrderDialog(
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(product.nome, color = web.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text("${money(product.currentPriceCents)} · ${product.availableStock} em estoque", color = web.muted, fontSize = 10.sp, modifier = Modifier.padding(top = 2.dp))
                         }
-                        QtyButton("−", enabled = (quantities[product.id] ?: 0) > 0) {
-                            quantities[product.id] = ((quantities[product.id] ?: 0) - 1).coerceAtLeast(0)
-                        }
-                        MotionValue(targetState = quantities[product.id] ?: 0, modifier = Modifier.width(22.dp)) { quantity ->
-                            Text(quantity.toString(), color = web.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                        QtyButton("+", enabled = (quantities[product.id] ?: 0) < product.availableStock) {
-                            quantities[product.id] = ((quantities[product.id] ?: 0) + 1).coerceAtMost(product.availableStock)
-                        }
+                        QuantityStepper(
+                            quantity = quantities[product.id] ?: 0,
+                            max = product.availableStock,
+                            onDecrease = {
+                                quantities[product.id] = ((quantities[product.id] ?: 0) - 1).coerceAtLeast(0)
+                            },
+                            onIncrease = {
+                                quantities[product.id] = ((quantities[product.id] ?: 0) + 1).coerceAtMost(product.availableStock)
+                            }
+                        )
                     }
                 }
             }
@@ -188,6 +189,7 @@ internal fun ManualOrderDialog(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ManualSelect(
                 label = "Pagamento",
+                selectedKey = paymentMethod,
                 value = manualPaymentMethods.firstOrNull { it.first == paymentMethod }?.second ?: paymentMethod,
                 expanded = methodOpen,
                 onExpand = { methodOpen = true },
@@ -198,6 +200,7 @@ internal fun ManualOrderDialog(
             )
             ManualSelect(
                 label = "Estado",
+                selectedKey = paymentStatus,
                 value = manualPaymentStatuses.firstOrNull { it.first == paymentStatus }?.second ?: paymentStatus,
                 expanded = statusOpen,
                 onExpand = { statusOpen = true },
@@ -252,23 +255,71 @@ internal fun ManualOrderDialog(
 }
 
 @Composable
-private fun QtyButton(text: String, enabled: Boolean, onClick: () -> Unit) {
+private fun QuantityStepper(
+    quantity: Int,
+    max: Int,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit
+) {
+    val web = LocalRPWebColors.current
+    Surface(
+        modifier = Modifier.width(104.dp).height(36.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = web.surface,
+        border = BorderStroke(1.dp, web.borderStrong)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            QuantityStepButton(
+                text = "−",
+                enabled = quantity > 0,
+                onClick = onDecrease
+            )
+            Surface(modifier = Modifier.width(1.dp).height(20.dp), color = web.border) {}
+            Box(
+                modifier = Modifier.weight(1f).height(36.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                MotionValue(targetState = quantity) { value ->
+                    Text(value.toString(), color = web.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Surface(modifier = Modifier.width(1.dp).height(20.dp), color = web.border) {}
+            QuantityStepButton(
+                text = "+",
+                enabled = quantity < max,
+                onClick = onIncrease
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuantityStepButton(text: String, enabled: Boolean, onClick: () -> Unit) {
     val web = LocalRPWebColors.current
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(30.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = web.surface,
-        border = BorderStroke(1.dp, web.borderStrong)
+        modifier = Modifier.width(34.dp).height(36.dp),
+        color = Color.Transparent
     ) {
-        Box(contentAlignment = Alignment.Center) { Text(text, color = if (enabled) web.accentDark else web.muted, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text,
+                color = if (enabled) web.accentDark else web.muted.copy(alpha = .55f),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
 @Composable
 private fun ManualSelect(
     label: String,
+    selectedKey: String,
     value: String,
     expanded: Boolean,
     onExpand: () -> Unit,
@@ -291,7 +342,13 @@ private fun ManualSelect(
                 }
             }
             MotionDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-                options.forEach { (key, text) -> DropdownMenuItem(text = { Text(text) }, onClick = { onSelect(key) }) }
+                options.forEach { (key, text) ->
+                    WebSelectorOption(
+                        text = text,
+                        selected = key == selectedKey,
+                        onClick = { onSelect(key) }
+                    )
+                }
             }
         }
     }

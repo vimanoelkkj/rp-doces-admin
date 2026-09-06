@@ -12,12 +12,14 @@ import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -45,6 +48,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,12 +70,12 @@ import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import coil3.compose.AsyncImage
 import java.text.NumberFormat
 import java.util.Locale
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val emojiOptions = listOf("🍰", "🧁", "🍮", "🎂", "🍓", "🍫", "🥥", "🍋", "🍯", "🍪")
+private val numericKeyboard = KeyboardOptions(keyboardType = KeyboardType.Number)
 
 @Composable
 internal fun ProductEditorDialog(
@@ -89,13 +93,13 @@ internal fun ProductEditorDialog(
     var category by remember(product?.id) { mutableStateOf(product?.categoria.orEmpty()) }
     var stock by remember(product?.id) { mutableStateOf((product?.estoque ?: 0).toString()) }
     var emoji by remember(product?.id) { mutableStateOf(product?.emoji ?: "🍰") }
-    var price by remember(product?.id) { mutableStateOf(centsToInput(product?.priceCents ?: 0)) }
+    var price by remember(product?.id) { mutableStateOf(centsToCurrencyInput(product?.priceCents ?: 0)) }
     var description by remember(product?.id) { mutableStateOf(product?.descricao.orEmpty()) }
     var active by remember(product?.id) { mutableStateOf(product?.ativo ?: true) }
     var available by remember(product?.id) { mutableStateOf(product?.disponivel ?: true) }
     var featured by remember(product?.id) { mutableStateOf(product?.destaque ?: false) }
     var promotion by remember(product?.id) { mutableStateOf(product?.promotionActive ?: false) }
-    var promoPrice by remember(product?.id) { mutableStateOf(product?.promotionalPriceCents?.let(::centsToInput).orEmpty()) }
+    var promoPrice by remember(product?.id) { mutableStateOf(product?.promotionalPriceCents?.let(::centsToCurrencyInput).orEmpty()) }
     var promoStart by remember(product?.id) { mutableStateOf(product?.promotionStart.orEmpty()) }
     var promoEnd by remember(product?.id) { mutableStateOf(product?.promotionEnd.orEmpty()) }
     var pickedUri by remember(product?.id) { mutableStateOf<Uri?>(null) }
@@ -165,16 +169,23 @@ internal fun ProductEditorDialog(
             Column(modifier = Modifier.weight(1f)) {
                 Text("ESTOQUE", color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
                 Spacer(Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-                    StepButton("−") { stock = ((stock.toIntOrNull() ?: 0) - 1).coerceAtLeast(product?.reservedStock ?: 0).toString() }
-                    Surface(modifier = Modifier.weight(1f).height(40.dp), color = web.surface, border = BorderStroke(1.dp, web.borderStrong)) {
-                        Box(contentAlignment = Alignment.Center) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(9.dp),
+                    color = web.surface,
+                    border = BorderStroke(1.dp, web.borderStrong)
+                ) {
+                    Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                        StepButton("−") { stock = ((stock.toIntOrNull() ?: 0) - 1).coerceAtLeast(product?.reservedStock ?: 0).toString() }
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(web.borderStrong))
+                        Box(modifier = Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.Center) {
                             MotionValue(targetState = stock) { value ->
-                                Text(value, color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(value, color = web.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(web.borderStrong))
+                        StepButton("+") { stock = ((stock.toIntOrNull() ?: 0) + 1).coerceAtMost(100000).toString() }
                     }
-                    StepButton("+") { stock = ((stock.toIntOrNull() ?: 0) + 1).coerceAtMost(100000).toString() }
                 }
                 if ((product?.reservedStock ?: 0) > 0) {
                     Text("${product?.reservedStock} reservada(s)", color = web.muted, fontSize = 9.5.sp, modifier = Modifier.padding(top = 5.dp))
@@ -185,7 +196,13 @@ internal fun ProductEditorDialog(
         Spacer(Modifier.height(18.dp))
         Text("EMOJI", color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
         Spacer(Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             emojiOptions.forEach { option ->
                 val selected = emoji == option
                 val scale by animateFloatAsState(
@@ -216,7 +233,13 @@ internal fun ProductEditorDialog(
         }
 
         Spacer(Modifier.height(18.dp))
-        WebField("Preço", price, { price = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } }, placeholder = "0,00")
+        WebField(
+            label = "Preço",
+            value = price,
+            onValueChange = { price = currencyInput(it) },
+            placeholder = "R$ 0,00",
+            keyboardOptions = numericKeyboard
+        )
         Spacer(Modifier.height(18.dp))
 
         Text("FOTO", color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
@@ -273,7 +296,13 @@ internal fun ProductEditorDialog(
                         Text("Configuração da promoção", color = web.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Text("Início e fim são opcionais. Sem datas, a promoção vale imediatamente.", color = web.muted, fontSize = 10.5.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 3.dp))
                         Spacer(Modifier.height(12.dp))
-                        WebField("Preço promocional", promoPrice, { promoPrice = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } }, placeholder = "0,00")
+                        WebField(
+                            label = "Preço promocional",
+                            value = promoPrice,
+                            onValueChange = { promoPrice = currencyInput(it) },
+                            placeholder = "R$ 0,00",
+                            keyboardOptions = numericKeyboard
+                        )
                         Spacer(Modifier.height(12.dp))
                         WebField("Início", promoStart, { promoStart = it }, placeholder = "2026-09-05T18:00:00")
                         Spacer(Modifier.height(12.dp))
@@ -505,7 +534,7 @@ internal fun ProductConfirmDialog(
 @Composable
 private fun StepButton(text: String, onClick: () -> Unit) {
     val web = LocalRPWebColors.current
-    Surface(onClick = onClick, modifier = Modifier.width(38.dp).height(40.dp), color = web.surface, border = BorderStroke(1.dp, web.borderStrong)) {
+    Surface(onClick = onClick, modifier = Modifier.width(38.dp).height(40.dp), color = Color.Transparent) {
         Box(contentAlignment = Alignment.Center) { Text(text, color = web.accentDark, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
@@ -550,10 +579,17 @@ private fun ToggleCard(title: String, subtitle: String, checked: Boolean, enable
     }
 }
 
-private fun inputToCents(value: String): Int {
-    val normalized = value.trim().replace(" ", "").replace(",", ".")
-    return ((normalized.toDoubleOrNull() ?: 0.0) * 100.0).roundToInt()
+private fun currencyInput(value: String): String {
+    val digits = value.filter(Char::isDigit).trimStart('0').take(9)
+    if (digits.isEmpty()) return ""
+    val cents = digits.toLongOrNull()?.coerceAtMost(999_999_999L) ?: 0L
+    return NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(cents / 100.0)
 }
 
-private fun centsToInput(cents: Int): String = String.format(Locale("pt", "BR"), "%.2f", cents / 100.0)
+private fun inputToCents(value: String): Int =
+    value.filter(Char::isDigit).toLongOrNull()?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: 0
+
+private fun centsToCurrencyInput(cents: Int): String =
+    NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(cents.coerceAtLeast(0) / 100.0)
+
 private fun money(cents: Int): String = NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(cents / 100.0)

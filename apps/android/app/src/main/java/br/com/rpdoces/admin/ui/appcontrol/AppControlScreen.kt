@@ -27,7 +27,6 @@ import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -56,6 +55,7 @@ import br.com.rpdoces.admin.data.remote.AppRemoteConfig
 import br.com.rpdoces.admin.data.remote.AppRemoteConfigRepository
 import br.com.rpdoces.admin.ui.components.MotionChevron
 import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
+import br.com.rpdoces.admin.ui.components.WebSelectorOption
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.time.Instant
 import java.time.ZoneId
@@ -575,9 +575,13 @@ private fun ControlSelector(
             }
             MotionDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option.second, fontSize = 12.sp) },
-                        onClick = { onSelected(option.first); open = false }
+                    WebSelectorOption(
+                        text = option.second,
+                        selected = option.first == value,
+                        onClick = {
+                            onSelected(option.first)
+                            open = false
+                        }
                     )
                 }
             }

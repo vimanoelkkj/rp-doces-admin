@@ -25,7 +25,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import br.com.rpdoces.admin.BuildConfig
 import br.com.rpdoces.admin.data.products.Product
 import br.com.rpdoces.admin.data.products.ProductsRepository
+import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import coil3.compose.AsyncImage
 import java.text.NumberFormat
@@ -425,14 +425,14 @@ private fun ProductCard(
                             fontWeight = FontWeight.ExtraBold,
                             modifier = Modifier.clickable(enabled = !busy) { menuOpen = true }.padding(6.dp)
                         )
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        MotionDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(text = { Text("Editar") }, onClick = { menuOpen = false; onEdit() })
                             if (product.ativo) {
                                 DropdownMenuItem(text = { Text("Arquivar") }, onClick = { menuOpen = false; onArchive() })
                             } else {
                                 DropdownMenuItem(text = { Text("Restaurar") }, onClick = { menuOpen = false; onRestore() })
                             }
-                            HorizontalDivider()
+                            HorizontalDivider(color = web.border)
                             DropdownMenuItem(text = { Text("Excluir permanentemente", color = web.danger) }, onClick = { menuOpen = false; onDelete() })
                         }
                     }

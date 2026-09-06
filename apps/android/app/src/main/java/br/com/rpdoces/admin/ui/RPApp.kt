@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -58,6 +59,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -435,7 +437,7 @@ private fun MainShell(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .windowInsetsPadding(WindowInsets.statusBars)
-                            .padding(end = RPWebMetrics.utilityRight)
+                            .padding(top = 10.dp, end = RPWebMetrics.utilityRight)
                     )
                 }
             }
@@ -653,7 +655,7 @@ private fun MobileUtilities(
                         scaleX = profileScale
                         scaleY = profileScale
                     },
-                shape = RoundedCornerShape(RPWebMetrics.utilityRadius),
+                shape = CircleShape,
                 color = web.surface,
                 border = BorderStroke(1.dp, web.border)
             ) {
@@ -663,13 +665,15 @@ private fun MobileUtilities(
                         AsyncImage(
                             model = avatar,
                             contentDescription = user.nome,
-                            modifier = Modifier.size(RPWebMetrics.avatarSize),
+                            modifier = Modifier
+                                .size(RPWebMetrics.avatarSize)
+                                .clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
                     } else {
                         Surface(
                             modifier = Modifier.size(RPWebMetrics.avatarSize),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = CircleShape,
                             color = web.accentSoft
                         ) {
                             Box(contentAlignment = Alignment.Center) {
