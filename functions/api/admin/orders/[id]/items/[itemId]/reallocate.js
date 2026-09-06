@@ -7,13 +7,25 @@ import {
 import { baixarEstoquePedido } from "../../../../../../lib/stock.js";
 import { logEvent } from "../../../../../../lib/logger.js";
 
+const REFUND_METHODS = new Set(["PIX_EXTERNO", "DINHEIRO", "CARTAO", "OUTRO"]);
+
 function upper(value) {
   return String(value || "").toUpperCase();
 }
 
+function defaultRefundMethod(value) {
+  const method = upper(value);
+  if (method === "DINHEIRO") return "DINHEIRO";
+  if (method === "CARTAO") return "CARTAO";
+  if (method === "PIX_MP" || method === "PIX_EXTERNO") return "PIX_EXTERNO";
+  return "OUTRO";
+}
+
 async function paidAllocationsForItem(env, itemId) {
   const { results } = await env.DB.prepare(
-    `SELECT a.id, a.pagamento_id, a.valor_centavos
+    `SELECT a.id, a.pagamento_id, a.valor_centavos,
+            p.metodo, p.valor_centavos AS pagamento_valor_centavos,
+            p.valor_original_centavos
      FROM pedido_pagamento_alocacoes a
      JOIN pedido_pagamentos p ON p.id = a.pagamento_id
      WHERE a.pedido_item_id = ? AND p.status = 'PAGO'
@@ -125,7 +137,20 @@ export async function onRequestPost({ request, env, params }) {
   }
 
   const transferTotal = Math.min(sourcePaid, targetOpen);
-  const generatedCredit = Math.max(0, sourcePaid - transferTotal);
+  const refundCents = Math.max(0, sourcePaid - transferTotal);
+  const refundMethod = upper(body?.devolucao_metodo) || defaultRefundMethod(sourceAllocations[0]?.metodo);
+
+  if (refundCents > 0) {
+    if (upper(body?.confirmacao_devolucao) !== "DEVOLVIDO") {
+      return json({
+        erro: `Confirme a devolução de R$ ${(refundCents / 100).toFixed(2).replace(".", ",")} antes de corrigir o item.`
+      }, 409);
+    }
+    if (!REFUND_METHODS.has(refundMethod)) {
+      return json({ erro: "Forma de devolução inválida." }, 400);
+    }
+  }
+
   let remainingTransfer = transferTotal;
   const statements = [];
 
@@ -142,6 +167,51 @@ export async function onRequestPost({ request, env, params }) {
       ).bind(Number(allocation.pagamento_id), targetItemId, amount)
     );
     remainingTransfer -= amount;
+  }
+
+  if (refundCents > 0) {
+    let accountingTransfer = transferTotal;
+    const operationId = crypto.randomUUID();
+    for (const allocation of sourceAllocations) {
+      const allocated = Number(allocation.valor_centavos || 0);
+      const transferred = Math.min(allocated, accountingTransfer);
+      accountingTransfer -= transferred;
+      const refundSlice = allocated - transferred;
+      if (refundSlice <= 0) continue;
+
+      const paymentCurrent = Number(allocation.pagamento_valor_centavos || 0);
+      if (refundSlice >= paymentCurrent) {
+        statements.push(env.DB.prepare(
+          `UPDATE pedido_pagamentos
+           SET valor_original_centavos = COALESCE(valor_original_centavos, valor_centavos),
+               status = 'REEMBOLSADO', atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'PAGO'`
+        ).bind(allocation.pagamento_id));
+      } else {
+        statements.push(env.DB.prepare(
+          `UPDATE pedido_pagamentos
+           SET valor_original_centavos = COALESCE(valor_original_centavos, valor_centavos),
+               valor_centavos = valor_centavos - ?, atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'PAGO' AND valor_centavos > ?`
+        ).bind(refundSlice, allocation.pagamento_id, refundSlice));
+      }
+
+      statements.push(env.DB.prepare(
+        `INSERT INTO pedido_reembolsos (
+           pedido_id, pagamento_id, origem, metodo, valor_centavos, status,
+           idempotency_key, registrado_por_usuario_id, motivo, devolveu_estoque,
+           concluido_em
+         ) VALUES (?, ?, 'MANUAL', ?, ?, 'REEMBOLSADO', ?, ?, ?, 0, CURRENT_TIMESTAMP)`
+      ).bind(
+        pedidoId,
+        allocation.pagamento_id,
+        refundMethod,
+        refundSlice,
+        `reallocate:${pedidoId}:${itemId}:${operationId}:${allocation.pagamento_id}`,
+        auth.user.id,
+        `Devolução de diferença na correção de ${source.produto_nome || "produto"} para ${target.produto_nome || "produto"}`
+      ));
+    }
   }
 
   const reservationActive = upper(pedido.reserva_status) === "ATIVA";
@@ -252,7 +322,7 @@ export async function onRequestPost({ request, env, params }) {
          reserva_origem_liberada,
          estoque_destino_baixado,
          realizado_por_usuario_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`
     ).bind(
       pedidoId,
       itemId,
@@ -266,7 +336,6 @@ export async function onRequestPost({ request, env, params }) {
       Number(target.quantidade),
       Number(target.valor_total_centavos || 0),
       transferTotal,
-      generatedCredit,
       sourceWasDeducted ? 1 : 0,
       sourceReservationReleased ? 1 : 0,
       targetStockDeducted ? 1 : 0,
@@ -326,6 +395,7 @@ export async function onRequestPost({ request, env, params }) {
         item_removido_id: itemId,
         destino_item_id: targetItemId,
         valor_realocado_centavos: transferTotal,
+        devolucao_centavos: refundCents,
         credito_centavos: state?.credito_centavos || 0
       });
     }
@@ -334,7 +404,9 @@ export async function onRequestPost({ request, env, params }) {
 
   logEvent("info", "comanda.item_payment_reallocated", {
     pedido_id: pedidoId,
-    action: "ITEM_PAYMENT_REALLOCATED"
+    action: "ITEM_PAYMENT_REALLOCATED",
+    devolucao_centavos: refundCents,
+    devolucao_metodo: refundCents > 0 ? refundMethod : undefined
   });
 
   return json({
@@ -343,7 +415,9 @@ export async function onRequestPost({ request, env, params }) {
     item_removido_id: itemId,
     destino_item_id: targetItemId,
     valor_realocado_centavos: transferTotal,
-    credito_gerado_centavos: generatedCredit,
+    credito_gerado_centavos: 0,
+    devolucao_centavos: refundCents,
+    devolucao_metodo: refundCents > 0 ? refundMethod : null,
     saldo_destino_centavos: Math.max(0, targetOpen - transferTotal),
     estoque_antigo_reposto: sourceWasDeducted,
     reserva_antiga_liberada: sourceReservationReleased,
