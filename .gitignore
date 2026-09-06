@@ -11,3 +11,9 @@ Thumbs.db
 /rp-doces-backup-*.sql
 /public/admin/
 /admin/tsconfig.tsbuildinfo
+
+# Android
+/apps/android/.gradle/
+/apps/android/.idea/
+/apps/android/app/build/
+/apps/android/local.properties
