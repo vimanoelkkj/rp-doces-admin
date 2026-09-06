@@ -71,14 +71,12 @@ private val orderStatusOptions = listOf(
     "NOVO" to "Pendente",
     "PREPARANDO" to "Em produção",
     "PRONTO" to "Pronto",
-    "ENTREGUE" to "Entregue",
-    "CANCELADO" to "Cancelado"
+    "ENTREGUE" to "Entregue"
 )
 
 private val paymentOptions = listOf(
     "PENDENTE" to "Pendente",
-    "PAGO" to "Pago",
-    "CANCELADO" to "Cancelado"
+    "PAGO" to "Pago"
 )
 
 @Composable
@@ -373,6 +371,8 @@ private fun OrderDetailDialog(
     var tab by remember { mutableStateOf("pedido") }
     var status by remember(order.id) { mutableStateOf(order.orderStatus?.uppercase() ?: "NOVO") }
     var payment by remember(order.id) { mutableStateOf(effectiveFinancialStatus(order)) }
+    var statusDirty by remember(order.id) { mutableStateOf(false) }
+    var paymentDirty by remember(order.id) { mutableStateOf(false) }
     var statusOpen by remember { mutableStateOf(false) }
     var paymentOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
@@ -384,10 +384,25 @@ private fun OrderDetailDialog(
     var reallocatingItem by remember(order.id) { mutableStateOf<OrderItem?>(null) }
     var reallocating by remember { mutableStateOf(false) }
     var reallocationError by remember { mutableStateOf<String?>(null) }
+    var cancelConfirmOpen by remember(order.id) { mutableStateOf(false) }
+    var canceling by remember(order.id) { mutableStateOf(false) }
+    var cancelError by remember(order.id) { mutableStateOf<String?>(null) }
+
+    val commandClosed = order.commandStatus.equals("ENCERRADA", true)
+    val canceledOrder = order.orderStatus.equals("CANCELADO", true) || order.paymentStatus.equals("CANCELADO", true)
+    val canReopen = commandClosed && canceledOrder
+    val hasChanges = statusDirty || paymentDirty
+
+    LaunchedEffect(order.orderStatus, statusDirty) {
+        if (!statusDirty) status = order.orderStatus?.uppercase() ?: "NOVO"
+    }
+    LaunchedEffect(order.financialStatus, order.paymentStatus, paymentDirty) {
+        if (!paymentDirty) payment = effectiveFinancialStatus(order)
+    }
 
     Dialog(
         onDismissRequest = {
-            if (!saving && editingItem == null && deletingItem == null && reallocatingItem == null) onDismiss()
+            if (!saving && !cancelConfirmOpen && editingItem == null && deletingItem == null && reallocatingItem == null) onDismiss()
         },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
@@ -409,7 +424,7 @@ private fun OrderDetailDialog(
                         modifier = Modifier
                             .size(28.dp)
                             .clickable(
-                                enabled = !saving && editingItem == null && deletingItem == null && reallocatingItem == null
+                                enabled = !saving && !cancelConfirmOpen && editingItem == null && deletingItem == null && reallocatingItem == null
                             ) { onDismiss() }
                             .padding(4.dp)
                     )
@@ -439,9 +454,7 @@ private fun OrderDetailDialog(
                         item {
                             DetailSection("Itens") {
                                 order.itens.forEach { item ->
-                                    val canEditItem = item.id != null &&
-                                        !order.commandStatus.equals("ENCERRADA", true) &&
-                                        !order.orderStatus.equals("CANCELADO", true)
+                                    val canEditItem = item.id != null && !commandClosed && !canceledOrder
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
                                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -489,36 +502,61 @@ private fun OrderDetailDialog(
                         }
                         item {
                             DetailSection("Editar pedido") {
-                                SelectorField(
-                                    label = "Status",
-                                    selectedKey = status,
-                                    value = orderStatusOptions.firstOrNull { it.first == status }?.second ?: status,
-                                    expanded = statusOpen,
-                                    onExpand = { statusOpen = true },
-                                    onDismiss = { statusOpen = false },
-                                    options = orderStatusOptions,
-                                    onSelect = { status = it; statusOpen = false }
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                SelectorField(
-                                    label = "Pagamento",
-                                    selectedKey = payment,
-                                    value = paymentOptions.firstOrNull { it.first == payment }?.second ?: payment,
-                                    expanded = paymentOpen,
-                                    onExpand = { paymentOpen = true },
-                                    onDismiss = { paymentOpen = false },
-                                    options = paymentOptions,
-                                    onSelect = { payment = it; paymentOpen = false }
-                                )
+                                when {
+                                    canReopen -> {
+                                        Text(
+                                            "Esta comanda está cancelada e encerrada. Reabra a comanda para voltar a editar status e pagamento.",
+                                            color = web.muted,
+                                            fontSize = 11.5.sp,
+                                            lineHeight = 17.sp
+                                        )
+                                    }
+                                    commandClosed -> {
+                                        Text(
+                                            "Esta comanda já foi encerrada.",
+                                            color = web.muted,
+                                            fontSize = 11.5.sp
+                                        )
+                                    }
+                                    else -> {
+                                        SelectorField(
+                                            label = "Status",
+                                            selectedKey = status,
+                                            value = orderStatusOptions.firstOrNull { it.first == status }?.second ?: status,
+                                            expanded = statusOpen,
+                                            onExpand = { statusOpen = true },
+                                            onDismiss = { statusOpen = false },
+                                            options = orderStatusOptions,
+                                            onSelect = { selectedStatus ->
+                                                status = selectedStatus
+                                                statusDirty = selectedStatus != (order.orderStatus?.uppercase() ?: "NOVO")
+                                                statusOpen = false
+                                            }
+                                        )
+                                        Spacer(Modifier.height(10.dp))
+                                        SelectorField(
+                                            label = "Pagamento",
+                                            selectedKey = payment,
+                                            value = paymentOptions.firstOrNull { it.first == payment }?.second ?: payment,
+                                            expanded = paymentOpen,
+                                            onExpand = { paymentOpen = true },
+                                            onDismiss = { paymentOpen = false },
+                                            options = paymentOptions,
+                                            onSelect = { selectedPayment ->
+                                                payment = selectedPayment
+                                                paymentDirty = selectedPayment != effectiveFinancialStatus(order)
+                                                paymentOpen = false
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                     } else {
                         item {
                             DetailSection("Comanda #${order.id}") {
                                 order.itens.forEach { item ->
-                                    val comandaEditable =
-                                        !order.commandStatus.equals("ENCERRADA", true) &&
-                                        !order.orderStatus.equals("CANCELADO", true)
+                                    val comandaEditable = !commandClosed && !canceledOrder
                                     val reallocationCandidates = order.itens.filter { candidate ->
                                         candidate.id != item.id && candidate.id != null && candidate.balanceCents > 0
                                     }
@@ -593,36 +631,123 @@ private fun OrderDetailDialog(
                 if (error != null) Text(error.orEmpty(), color = web.danger, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 8.dp))
 
                 if (tab == "pedido") {
-                    Surface(
-                        onClick = {
-                            if (!saving) {
-                                saving = true
-                                error = null
-                                scope.launch {
-                                    runCatching {
-                                        if (status != order.orderStatus?.uppercase()) repository.updateStatus(order.id, status)
-                                        if (payment != effectiveFinancialStatus(order)) repository.updatePayment(order.id, payment)
-                                    }.onSuccess {
-                                        onUpdated()
-                                        onDismiss()
-                                    }.onFailure { error = it.message ?: "Não foi possível salvar as alterações." }
-                                    saving = false
+                    if (canReopen) {
+                        Surface(
+                            onClick = {
+                                if (!saving) {
+                                    saving = true
+                                    error = null
+                                    scope.launch {
+                                        runCatching { repository.updatePayment(order.id, "PENDENTE") }
+                                            .onSuccess {
+                                                statusDirty = false
+                                                paymentDirty = false
+                                                onUpdated()
+                                                onDismiss()
+                                            }
+                                            .onFailure { error = it.message ?: "Não foi possível reabrir a comanda." }
+                                        saving = false
+                                    }
                                 }
+                            },
+                            enabled = !saving,
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            color = web.accent,
+                            border = BorderStroke(1.dp, web.accentDark)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (saving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                                else Text("Reabrir comanda", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        color = web.accent,
-                        border = BorderStroke(1.dp, web.accentDark)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            if (saving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                            else Text("Salvar alterações", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else if (!commandClosed) {
+                        Surface(
+                            onClick = {
+                                if (!saving && hasChanges) {
+                                    saving = true
+                                    error = null
+                                    scope.launch {
+                                        runCatching {
+                                            if (paymentDirty) repository.updatePayment(order.id, payment)
+                                            if (statusDirty) repository.updateStatus(order.id, status)
+                                        }.onSuccess {
+                                            statusDirty = false
+                                            paymentDirty = false
+                                            onUpdated()
+                                            onDismiss()
+                                        }.onFailure { error = it.message ?: "Não foi possível salvar as alterações." }
+                                        saving = false
+                                    }
+                                }
+                            },
+                            enabled = !saving && hasChanges,
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (hasChanges) web.accent else web.surfaceSoft,
+                            border = BorderStroke(1.dp, if (hasChanges) web.accentDark else web.borderStrong)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (saving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                                else Text(
+                                    "Salvar alterações",
+                                    color = if (hasChanges) Color.White else web.muted,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+                        Surface(
+                            onClick = {
+                                cancelError = null
+                                cancelConfirmOpen = true
+                            },
+                            enabled = !saving,
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            color = web.surface,
+                            border = BorderStroke(1.dp, web.danger.copy(alpha = .45f))
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("Cancelar pedido", color = web.danger, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    if (cancelConfirmOpen) {
+        CancelOrderConfirmDialog(
+            order = order,
+            busy = canceling,
+            error = cancelError,
+            onDismiss = {
+                if (!canceling) {
+                    cancelConfirmOpen = false
+                    cancelError = null
+                }
+            },
+            onConfirm = {
+                if (!canceling) {
+                    canceling = true
+                    cancelError = null
+                    scope.launch {
+                        runCatching { repository.cancelOrder(order.id) }
+                            .onSuccess {
+                                cancelConfirmOpen = false
+                                onUpdated()
+                                onDismiss()
+                            }
+                            .onFailure { cancelError = it.message ?: "Não foi possível cancelar a comanda." }
+                        canceling = false
+                    }
+                }
+            }
+        )
     }
 
     editingItem?.let { item ->
@@ -702,6 +827,87 @@ private fun OrderDetailDialog(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun CancelOrderConfirmDialog(
+    order: Order,
+    busy: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val web = LocalRPWebColors.current
+    Dialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = web.surface,
+                border = BorderStroke(1.dp, web.border)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("CANCELAR PEDIDO", color = web.danger, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Cancelar o pedido #${order.id}?",
+                        color = web.text,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 7.dp)
+                    )
+                    Text(
+                        "Isso encerrará a comanda e liberará os itens ainda reservados. Se houver pagamento confirmado, o cancelamento será bloqueado e será necessário estornar ou reembolsar primeiro.",
+                        color = web.muted,
+                        fontSize = 11.5.sp,
+                        lineHeight = 17.sp,
+                        modifier = Modifier.padding(top = 9.dp)
+                    )
+                    if (!error.isNullOrBlank()) {
+                        Text(error, color = web.danger, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            onClick = onDismiss,
+                            enabled = !busy,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(9.dp),
+                            color = web.surface,
+                            border = BorderStroke(1.dp, web.borderStrong)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("Voltar", color = web.muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Surface(
+                            onClick = onConfirm,
+                            enabled = !busy,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(9.dp),
+                            color = web.danger,
+                            border = BorderStroke(1.dp, web.danger)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (busy) {
+                                    CircularProgressIndicator(modifier = Modifier.size(17.dp), strokeWidth = 2.dp, color = Color.White)
+                                } else {
+                                    Text("Cancelar pedido", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
