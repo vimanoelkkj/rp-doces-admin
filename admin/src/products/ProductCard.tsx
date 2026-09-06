@@ -10,6 +10,7 @@ import styles from "./ProductCard.module.css";
 
 interface Props {
   product: Product;
+  highlighted?: boolean;
   menuOpen: boolean;
   onToggleMenu: () => void;
   onPreview: () => void;
@@ -24,6 +25,7 @@ const money = (cents: number) =>
 
 export function ProductCard({
   product,
+  highlighted = false,
   menuOpen,
   onToggleMenu,
   onPreview,
@@ -74,7 +76,11 @@ export function ProductCard({
   }
 
   return (
-    <article className={styles.card} onClick={openFromCard}>
+    <article
+      className={`${styles.card} ${highlighted ? styles.highlighted : ""}`}
+      data-product-id={product.id}
+      onClick={openFromCard}
+    >
       <div
         className={styles.media}
         role="button"
