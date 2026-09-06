@@ -138,6 +138,9 @@ private interface OrdersApi {
     @POST("api/admin/orders/{id}/payments")
     suspend fun cancelCommand(@Path("id") id: Int, @Body body: CancelCommandRequest): Response<JsonElement>
 
+    @POST("api/admin/orders/{id}/reopen")
+    suspend fun reopenPaidCommand(@Path("id") id: Int): Response<JsonElement>
+
     @POST("api/admin/orders")
     suspend fun createManual(@Body input: ManualOrderInput): Response<CreateManualOrderResponse>
 }
@@ -162,6 +165,11 @@ class OrdersRepository(retrofit: Retrofit) {
     suspend fun cancelOrder(id: Int) {
         api.cancelCommand(id, CancelCommandRequest())
             .requireSuccess("Não foi possível cancelar a comanda.")
+    }
+
+    suspend fun reopenPaidCommand(id: Int) {
+        api.reopenPaidCommand(id)
+            .requireSuccess("Não foi possível reabrir a comanda paga.")
     }
 
     suspend fun updatePayment(id: Int, status: String) {
@@ -202,9 +210,6 @@ class OrdersRepository(retrofit: Retrofit) {
         )
         if (payment.isSuccessful) return
 
-        // O Mercado Pago pode confirmar o Pix durante a reconciliação do POST.
-        // Nesse caso o endpoint pode rejeitar um segundo lançamento porque o saldo
-        // acabou de zerar. Recarregamos o ledger antes de tratar como falha.
         val refreshed = runCatching { list().firstOrNull { it.id == id } }.getOrNull()
         if (refreshed != null && (refreshed.balanceCents <= 0 || refreshed.financialStatus.equals("PAGO", ignoreCase = true))) {
             return
