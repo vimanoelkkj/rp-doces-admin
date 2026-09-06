@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Aplicar patch
-        run: node scripts/oneoff-20260906-command-alerts.mjs
+        run: python3 scripts/oneoff-20260906-command-alerts.py
 
       - name: Commitar alterações
         run: |
