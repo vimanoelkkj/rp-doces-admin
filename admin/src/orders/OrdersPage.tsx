@@ -12,11 +12,12 @@ import {
   type ManualPaymentStatus,
   type OrderStatus
 } from "./order.api";
-import { getFinancialOrder, type FinancialOrder } from "./order.finance";
+import { getFinancialOrder, type FinancialOrder, type FinancialOrderItem } from "./order.finance";
 import { itemsOf } from "./order.model";
 import type { Order, OrderItem } from "./order.schema";
 import { EditOrderItemDialog } from "./EditOrderItemDialog";
 import { ManualOrderDialog } from "./ManualOrderDialog";
+import { ReallocateOrderItemDialog } from "./ReallocateOrderItemDialog";
 import styles from "./OrdersPage.module.css";
 
 type Props = {
@@ -302,6 +303,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const [deletingItem, setDeletingItem] = useState<OrderItem | null>(null);
   const [deletingItemBusy, setDeletingItemBusy] = useState(false);
   const [deleteItemError, setDeleteItemError] = useState<string | null>(null);
+  const [reallocatingItem, setReallocatingItem] = useState<FinancialOrderItem | null>(null);
   const [editing, setEditing] = useState(false);
   const [draftStatus, setDraftStatus] = useState<OrderStatus>("NOVO");
   const [draftPayment, setDraftPayment] = useState<ManualPaymentStatus>("PENDENTE");
@@ -319,7 +321,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const closeDrawer = useBackLayer(
     drawerOpen,
     () => {
-      if (savingEditRef.current || editingItem || deletingItem) return false;
+      if (savingEditRef.current || editingItem || deletingItem || reallocatingItem) return false;
       setDrawerOpen(false);
       setEditing(false);
       setEditingItem(null);
@@ -432,14 +434,14 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   }, [selected, activeTab]);
 
   useEffect(() => {
-    if (!drawerOpen || editingItem || deletingItem) return;
+    if (!drawerOpen || editingItem || deletingItem || reallocatingItem) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || savingEditRef.current) return;
       closeDrawer();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [drawerOpen, editingItem, deletingItem, closeDrawer]);
+  }, [drawerOpen, editingItem, deletingItem, reallocatingItem, closeDrawer]);
 
   useEffect(() => {
     if (!deletingItem) return;
@@ -512,6 +514,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
     setEditing(false);
     setEditingItem(null);
     setDeletingItem(null);
+    setReallocatingItem(null);
     setDeleteItemError(null);
     setEditError(null);
   }
@@ -735,7 +738,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                       type="button"
                       aria-label="Fechar"
                       onClick={closeDrawer}
-                      disabled={savingEdit || Boolean(editingItem) || Boolean(deletingItem)}
+                      disabled={savingEdit || Boolean(editingItem) || Boolean(deletingItem) || Boolean(reallocatingItem)}
                     >
                       ×
                     </button>
@@ -874,9 +877,11 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                         <div className={styles.note}>Carregando comanda...</div>
                       ) : (
                         comandaItems.map((item, index) => {
+                          const financialItem = financialItems.find(candidate => candidate.id === item.id);
                           const itemWithFinance = item as OrderItem & {
                             status_financeiro?: string;
                             valor_pago_centavos?: number;
+                            saldo_centavos?: number;
                             adicionado_por_usuario_id?: number | null;
                           };
                           const status = String(
@@ -885,13 +890,22 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                           const source = itemWithFinance.adicionado_por_usuario_id
                             ? "Adicionado depois"
                             : `Pedido #${selected.id}`;
+                          const comandaEditable =
+                            String(selected.status_comanda || "ABERTA").toUpperCase() === "ABERTA" &&
+                            String(selected.status_pedido || "").toUpperCase() !== "CANCELADO";
+                          const reallocationCandidates = financialItem
+                            ? financialItems.filter(candidate => candidate.id !== financialItem.id && Number(candidate.saldo_centavos || 0) > 0)
+                            : [];
+                          const canReallocateItem = Boolean(financialItem) &&
+                            Number(financialItem?.valor_pago_centavos || 0) > 0 &&
+                            reallocationCandidates.length > 0 &&
+                            comandaEditable;
                           const canDeleteItem = Boolean(financial) &&
                             Boolean(item.id) &&
                             comandaItems.length > 1 &&
                             Number(itemWithFinance.valor_pago_centavos || 0) <= 0 &&
                             !item.estoque_baixado_em &&
-                            String(selected.status_comanda || "ABERTA").toUpperCase() === "ABERTA" &&
-                            String(selected.status_pedido || "").toUpperCase() !== "CANCELADO";
+                            comandaEditable;
 
                           return (
                             <div
@@ -904,7 +918,16 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                               </div>
                               <div style={{ display: "grid", justifyItems: "end", gap: 7 }}>
                                 <div>{money(item.valor_total_centavos)}</div>
-                                {canDeleteItem ? (
+                                {canReallocateItem && financialItem ? (
+                                  <button
+                                    className={styles["secondary-btn"]}
+                                    type="button"
+                                    style={{ height: 27, padding: "0 9px", color: "var(--pink-strong)" }}
+                                    onClick={() => setReallocatingItem(financialItem)}
+                                  >
+                                    Corrigir item
+                                  </button>
+                                ) : canDeleteItem ? (
                                   <button
                                     className={styles["secondary-btn"]}
                                     type="button"
@@ -1007,6 +1030,23 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
           onSaved={async () => {
             await reload(selected.id);
             setFinancial(null);
+          }}
+        />
+      ) : null}
+
+      {selected && financial && reallocatingItem ? (
+        <ReallocateOrderItemDialog
+          orderId={selected.id}
+          item={reallocatingItem}
+          candidates={financial.itens.filter(candidate =>
+            candidate.id !== reallocatingItem.id && Number(candidate.saldo_centavos || 0) > 0
+          )}
+          onClose={() => setReallocatingItem(null)}
+          onSaved={async () => {
+            await reload(selected.id);
+            const refreshedFinancial = await getFinancialOrder(selected.id, true);
+            setFinancial(refreshedFinancial);
+            setReallocatingItem(null);
           }}
         />
       ) : null}
