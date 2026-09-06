@@ -5,6 +5,7 @@ import { ApiClientError } from "../shared/apiClient";
 import { AdminSelect } from "../shared/AdminSelect";
 import { useBackLayer } from "../shared/useBackLayer";
 import {
+  deleteOrderItem,
   listOrders,
   updateManualPayment,
   updateOrderStatus,
@@ -298,6 +299,9 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const [financialLoading, setFinancialLoading] = useState(false);
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<OrderItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<OrderItem | null>(null);
+  const [deletingItemBusy, setDeletingItemBusy] = useState(false);
+  const [deleteItemError, setDeleteItemError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draftStatus, setDraftStatus] = useState<OrderStatus>("NOVO");
   const [draftPayment, setDraftPayment] = useState<ManualPaymentStatus>("PENDENTE");
@@ -315,7 +319,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const closeDrawer = useBackLayer(
     drawerOpen,
     () => {
-      if (savingEditRef.current || editingItem) return false;
+      if (savingEditRef.current || editingItem || deletingItem) return false;
       setDrawerOpen(false);
       setEditing(false);
       setEditingItem(null);
@@ -428,14 +432,26 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   }, [selected, activeTab]);
 
   useEffect(() => {
-    if (!drawerOpen || editingItem) return;
+    if (!drawerOpen || editingItem || deletingItem) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || savingEditRef.current) return;
       closeDrawer();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [drawerOpen, editingItem, closeDrawer]);
+  }, [drawerOpen, editingItem, deletingItem, closeDrawer]);
+
+  useEffect(() => {
+    if (!deletingItem) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || deletingItemBusy) return;
+      event.preventDefault();
+      setDeletingItem(null);
+      setDeleteItemError(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deletingItem, deletingItemBusy]);
 
   const counts = useMemo(() => ({
     todos: orders.length,
@@ -495,6 +511,8 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
     setFinancial(null);
     setEditing(false);
     setEditingItem(null);
+    setDeletingItem(null);
+    setDeleteItemError(null);
     setEditError(null);
   }
 
@@ -545,6 +563,23 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
       setEditError(err instanceof ApiClientError ? err.message : "Não foi possível salvar as alterações do pedido.");
     } finally {
       updateSavingEdit(false);
+    }
+  }
+
+  async function confirmDeleteItem() {
+    if (!selected || !deletingItem?.id || deletingItemBusy) return;
+    setDeletingItemBusy(true);
+    setDeleteItemError(null);
+    try {
+      await deleteOrderItem(selected.id, deletingItem.id);
+      await reload(selected.id);
+      const refreshedFinancial = await getFinancialOrder(selected.id, true);
+      setFinancial(refreshedFinancial);
+      setDeletingItem(null);
+    } catch (err) {
+      setDeleteItemError(err instanceof ApiClientError ? err.message : "Não foi possível excluir o item da comanda.");
+    } finally {
+      setDeletingItemBusy(false);
     }
   }
 
@@ -672,7 +707,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                       </button>
                     ))}
                     <button
-                      className={styles["page-btn"]}
+                      className={cls("page-btn")}
                       type="button"
                       onClick={() => setPage(value => Math.min(pages, value + 1))}
                     >
@@ -700,7 +735,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                       type="button"
                       aria-label="Fechar"
                       onClick={closeDrawer}
-                      disabled={savingEdit || Boolean(editingItem)}
+                      disabled={savingEdit || Boolean(editingItem) || Boolean(deletingItem)}
                     >
                       ×
                     </button>
@@ -839,8 +874,9 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                         <div className={styles.note}>Carregando comanda...</div>
                       ) : (
                         comandaItems.map((item, index) => {
-                          const itemWithFinance = item as {
+                          const itemWithFinance = item as OrderItem & {
                             status_financeiro?: string;
+                            valor_pago_centavos?: number;
                             adicionado_por_usuario_id?: number | null;
                           };
                           const status = String(
@@ -849,17 +885,39 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                           const source = itemWithFinance.adicionado_por_usuario_id
                             ? "Adicionado depois"
                             : `Pedido #${selected.id}`;
+                          const canDeleteItem = Boolean(financial) &&
+                            Boolean(item.id) &&
+                            comandaItems.length > 1 &&
+                            Number(itemWithFinance.valor_pago_centavos || 0) <= 0 &&
+                            !item.estoque_baixado_em &&
+                            String(selected.status_comanda || "ABERTA").toUpperCase() === "ABERTA" &&
+                            String(selected.status_pedido || "").toUpperCase() !== "CANCELADO";
 
                           return (
                             <div
                               className={styles["comanda-item"]}
-                              key={`${item.produto_id || "item"}-${index}`}
+                              key={`${item.id || item.produto_id || "item"}-${index}`}
                             >
                               <div>
                                 <strong>{item.produto_nome || "Produto"}</strong>
                                 <div className={styles["comanda-status"]}>{source} · {status}</div>
                               </div>
-                              <div>{money(item.valor_total_centavos)}</div>
+                              <div style={{ display: "grid", justifyItems: "end", gap: 7 }}>
+                                <div>{money(item.valor_total_centavos)}</div>
+                                {canDeleteItem ? (
+                                  <button
+                                    className={styles["secondary-btn"]}
+                                    type="button"
+                                    style={{ height: 27, padding: "0 9px", color: "var(--danger)" }}
+                                    onClick={() => {
+                                      setDeleteItemError(null);
+                                      setDeletingItem(item);
+                                    }}
+                                  >
+                                    Excluir
+                                  </button>
+                                ) : null}
+                              </div>
                             </div>
                           );
                         })
@@ -907,7 +965,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                     </div>
                   ) : (
                     <div className={styles["drawer-actions"]}>
-                      <div className={styles["secondary-actions"]}>
+                      <div className={styles["secondary-actions"]} style={{ gridTemplateColumns: "1fr" }}>
                         <button
                           className={styles["secondary-btn"]}
                           type="button"
@@ -915,7 +973,6 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                         >
                           <Icon name="edit" className={styles["btn-ico"]}/>Editar pedido
                         </button>
-                        <button className={styles["more-btn"]} type="button" aria-label="Mais ações">⋮</button>
                       </div>
                     </div>
                   )}
@@ -952,6 +1009,104 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
             setFinancial(null);
           }}
         />
+      ) : null}
+
+      {selected && deletingItem ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1300,
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+            fontFamily: '"Manrope", system-ui, sans-serif'
+          }}
+        >
+          <button
+            type="button"
+            aria-label="Fechar confirmação"
+            disabled={deletingItemBusy}
+            onClick={() => {
+              setDeletingItem(null);
+              setDeleteItemError(null);
+            }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              border: 0,
+              padding: 0,
+              background: "rgba(30,20,16,.42)",
+              backdropFilter: "blur(5px)",
+              cursor: deletingItemBusy ? "wait" : "pointer"
+            }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-item-title"
+            style={{
+              position: "relative",
+              zIndex: 1,
+              width: "min(410px, 100%)",
+              border: "1px solid var(--line)",
+              borderRadius: 16,
+              padding: 22,
+              background: "var(--surface)",
+              color: "var(--text)",
+              boxShadow: "0 24px 70px rgba(63,43,34,.20)"
+            }}
+          >
+            <div style={{ color: "var(--danger)", fontSize: 10.5, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase" }}>
+              Remover da comanda
+            </div>
+            <h2 id="delete-item-title" style={{ margin: "7px 0 0", fontSize: 19, letterSpacing: "-.3px" }}>
+              Excluir {deletingItem.produto_nome || "este produto"}?
+            </h2>
+            <p style={{ margin: "9px 0 0", color: "var(--muted)", fontSize: 11.5, lineHeight: 1.55 }}>
+              {deletingItem.quantidade}x deste item será removido da comanda. A reserva de estoque correspondente será liberada e os totais serão recalculados.
+            </p>
+            {deleteItemError ? (
+              <div role="alert" style={{ marginTop: 14, color: "var(--danger)", fontSize: 11, fontWeight: 700 }}>
+                {deleteItemError}
+              </div>
+            ) : null}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 20 }}>
+              <button
+                className={styles["secondary-btn"]}
+                type="button"
+                disabled={deletingItemBusy}
+                onClick={() => {
+                  setDeletingItem(null);
+                  setDeleteItemError(null);
+                }}
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                disabled={deletingItemBusy}
+                onClick={() => void confirmDeleteItem()}
+                style={{
+                  height: 42,
+                  border: "1px solid var(--danger)",
+                  borderRadius: 9,
+                  background: "var(--danger)",
+                  color: "#fff",
+                  font: "inherit",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: deletingItemBusy ? "wait" : "pointer",
+                  opacity: deletingItemBusy ? .65 : 1
+                }}
+              >
+                {deletingItemBusy ? "Excluindo..." : "Excluir item"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </>
   );
