@@ -37,6 +37,13 @@ import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.util.Locale
 
+private val reallocationRefundMethods = listOf(
+    "PIX_EXTERNO" to "Pix",
+    "DINHEIRO" to "Dinheiro",
+    "CARTAO" to "Cartão",
+    "OUTRO" to "Outro meio"
+)
+
 @Composable
 fun ReallocateOrderItemDialog(
     item: OrderItem,
@@ -44,20 +51,22 @@ fun ReallocateOrderItemDialog(
     busy: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onConfirm: (targetItemId: Int) -> Unit
+    onConfirm: (targetItemId: Int, refundMethod: String?, confirmRefund: Boolean) -> Unit
 ) {
     val web = LocalRPWebColors.current
     var selectedId by remember(item.id, candidates) { mutableStateOf(candidates.firstOrNull()?.id) }
     var selectorOpen by remember { mutableStateOf(false) }
+    var refundMethod by remember(item.id) { mutableStateOf("PIX_EXTERNO") }
+    var refundSelectorOpen by remember { mutableStateOf(false) }
     val target = candidates.firstOrNull { it.id == selectedId } ?: candidates.firstOrNull()
     val paid = item.paidCents
     val targetBalance = target?.balanceCents ?: 0
     val transferred = minOf(paid, targetBalance)
     val remaining = (targetBalance - transferred).coerceAtLeast(0)
-    val credit = (paid - transferred).coerceAtLeast(0)
+    val refund = (paid - transferred).coerceAtLeast(0)
 
     Dialog(
-        onDismissRequest = { if (!busy && !selectorOpen) onDismiss() },
+        onDismissRequest = { if (!busy && !selectorOpen && !refundSelectorOpen) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
@@ -151,8 +160,11 @@ fun ReallocateOrderItemDialog(
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(top = 15.dp),
                             shape = RoundedCornerShape(12.dp),
-                            color = web.accentSoft,
-                            border = BorderStroke(1.dp, web.accent.copy(alpha = .28f))
+                            color = if (refund > 0) web.orangeSoft else web.accentSoft,
+                            border = BorderStroke(
+                                1.dp,
+                                if (refund > 0) web.tagOrangeText.copy(alpha = .30f) else web.accent.copy(alpha = .28f)
+                            )
                         ) {
                             Column(
                                 modifier = Modifier.padding(13.dp),
@@ -170,19 +182,73 @@ fun ReallocateOrderItemDialog(
                                         web.tagOrangeText
                                     )
                                 }
-                                if (credit > 0) {
+                                if (refund > 0) {
                                     ReallocationPreviewLine(
-                                        "Crédito que sobra na comanda",
-                                        reallocationMoney(credit),
-                                        web.tagGreenText
+                                        "Diferença a devolver",
+                                        reallocationMoney(refund),
+                                        web.tagOrangeText
                                     )
+
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(
+                                        "FORMA DA DEVOLUÇÃO",
+                                        color = web.muted,
+                                        fontSize = 9.8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Box {
+                                        Surface(
+                                            onClick = { if (!busy) refundSelectorOpen = true },
+                                            enabled = !busy,
+                                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                                            shape = RoundedCornerShape(9.dp),
+                                            color = web.surface,
+                                            border = BorderStroke(1.dp, web.borderStrong)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxSize().padding(horizontal = 11.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    reallocationRefundMethods.firstOrNull { it.first == refundMethod }?.second ?: refundMethod,
+                                                    color = web.text,
+                                                    fontSize = 11.sp
+                                                )
+                                                MotionChevron(
+                                                    expanded = refundSelectorOpen,
+                                                    tint = web.muted,
+                                                    modifier = Modifier.size(17.dp)
+                                                )
+                                            }
+                                        }
+                                        MotionDropdownMenu(
+                                            expanded = refundSelectorOpen,
+                                            onDismissRequest = { refundSelectorOpen = false }
+                                        ) {
+                                            reallocationRefundMethods.forEach { (key, label) ->
+                                                WebSelectorOption(
+                                                    text = label,
+                                                    selected = key == refundMethod,
+                                                    onClick = {
+                                                        refundMethod = key
+                                                        refundSelectorOpen = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
                     Text(
-                        "Ao confirmar, o produto antigo sai da comanda. Se já tinha sido baixado, sua quantidade volta ao estoque. O produto escolhido passa a ser o efetivamente levado e recebe a baixa física.",
+                        if (refund > 0) {
+                            "Ao confirmar, ${reallocationMoney(refund)} será registrado como devolvido. O produto antigo volta ao estoque quando já havia sido baixado, e o produto efetivamente levado assume a baixa física."
+                        } else {
+                            "Ao confirmar, o produto antigo sai da comanda. Se já tinha sido baixado, sua quantidade volta ao estoque. O produto escolhido passa a ser o efetivamente levado e recebe a baixa física."
+                        },
                         color = web.muted,
                         fontSize = 10.8.sp,
                         lineHeight = 16.sp,
@@ -218,7 +284,9 @@ fun ReallocateOrderItemDialog(
                         Surface(
                             onClick = {
                                 val id = target?.id
-                                if (!busy && id != null) onConfirm(id)
+                                if (!busy && id != null) {
+                                    onConfirm(id, refundMethod.takeIf { refund > 0 }, refund > 0)
+                                }
                             },
                             enabled = !busy && target?.id != null,
                             modifier = Modifier.weight(1.25f).height(42.dp),
@@ -235,7 +303,7 @@ fun ReallocateOrderItemDialog(
                                     )
                                 } else {
                                     Text(
-                                        "Confirmar correção",
+                                        if (refund > 0) "Corrigir e devolver" else "Confirmar correção",
                                         color = Color.White,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
