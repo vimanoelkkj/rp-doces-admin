@@ -173,7 +173,8 @@ CREATE TABLE pedido_pagamentos (
   criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   pago_em TEXT,
-  cancelado_em TEXT, pix_expira_em TEXT,
+  cancelado_em TEXT, pix_expira_em TEXT, valor_original_centavos INTEGER
+CHECK (valor_original_centavos IS NULL OR valor_original_centavos > 0),
   FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
   FOREIGN KEY (substitui_pagamento_id) REFERENCES pedido_pagamentos(id) ON DELETE SET NULL,
   FOREIGN KEY (registrado_por_usuario_id) REFERENCES usuarios_admin(id) ON DELETE SET NULL
