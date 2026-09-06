@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePageScrollLock } from "../shared/usePageScrollLock";
 import {
   createCategory,
@@ -18,6 +18,8 @@ type FormState = {
   descricao: string;
 };
 
+const EMOJI_OPTIONS = ["🍰", "🧁", "🍮", "🎂", "🍓", "🍫", "🥥", "🍋", "🍯", "🍪"];
+
 const emptyForm = (): FormState => ({
   nome: "",
   emoji: "🍰",
@@ -31,6 +33,8 @@ export function CategoryManager({ onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   usePageScrollLock(true);
 
@@ -60,12 +64,31 @@ export function CategoryManager({ onClose }: Props) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !saving) onClose();
+      if (event.key !== "Escape") return;
+      if (emojiOpen) {
+        event.preventDefault();
+        setEmojiOpen(false);
+        return;
+      }
+      if (!saving) onClose();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, saving]);
+  }, [emojiOpen, onClose, saving]);
+
+  useEffect(() => {
+    if (!emojiOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!emojiPickerRef.current?.contains(target)) setEmojiOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [emojiOpen]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,6 +113,7 @@ export function CategoryManager({ onClose }: Props) {
     try {
       await createCategory({ nome, emoji, descricao });
       setForm(emptyForm());
+      setEmojiOpen(false);
       setMessage("Categoria criada.");
       await reload(true);
     } catch (err) {
@@ -156,17 +180,45 @@ export function CategoryManager({ onClose }: Props) {
               />
             </label>
 
-            <label className={styles.emoji}>
-              Emoji
-              <input
-                value={form.emoji}
-                maxLength={16}
-                required
-                onChange={event =>
-                  setForm(current => ({ ...current, emoji: event.target.value }))
-                }
-              />
-            </label>
+            <div className={styles.emojiField} ref={emojiPickerRef}>
+              <span className={styles.emojiLabel}>Emoji</span>
+              <button
+                className={`${styles.emojiTrigger} ${emojiOpen ? styles.emojiTriggerOpen : ""}`}
+                type="button"
+                aria-label={`Selecionar emoji. Atual: ${form.emoji}`}
+                aria-haspopup="listbox"
+                aria-expanded={emojiOpen}
+                onClick={() => setEmojiOpen(open => !open)}
+                disabled={saving}
+              >
+                <span aria-hidden="true">{form.emoji}</span>
+                <span className={styles.emojiChevron} aria-hidden="true">⌄</span>
+              </button>
+
+              {emojiOpen ? (
+                <div className={styles.emojiPicker} role="listbox" aria-label="Escolher emoji da categoria">
+                  {EMOJI_OPTIONS.map(option => {
+                    const selected = form.emoji === option;
+                    return (
+                      <button
+                        key={option}
+                        className={`${styles.emojiOption} ${selected ? styles.emojiOptionSelected : ""}`}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        aria-label={`Usar ${option}`}
+                        onClick={() => {
+                          setForm(current => ({ ...current, emoji: option }));
+                          setEmojiOpen(false);
+                        }}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
 
             <label className={styles.wide}>
               Descrição
