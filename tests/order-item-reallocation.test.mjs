@@ -133,6 +133,7 @@ function reallocationDb({
       assert.ok(statements.some(statement => statement.sql.includes("SET estoque = estoque +")));
       assert.ok(statements.some(statement => statement.sql.includes("SET estoque = estoque -")));
       assert.ok(statements.some(statement => statement.sql.includes("SET estoque_baixado_em = CURRENT_TIMESTAMP")));
+      assert.ok(statements.some(statement => statement.sql.includes("INSERT INTO pedido_item_correcoes")));
       assert.ok(statements.some(statement => statement.sql.includes("DELETE FROM pedido_itens")));
       targetDeducted = true;
       deleted = true;
