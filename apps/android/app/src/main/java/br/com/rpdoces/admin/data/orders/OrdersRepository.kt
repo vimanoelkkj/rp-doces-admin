@@ -2,7 +2,11 @@ package br.com.rpdoces.admin.data.orders
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.http.Body
@@ -61,6 +65,14 @@ private data class PaymentStatusRequest(@SerialName("status_pagamento") val stat
 private data class CancelCommandRequest(val acao: String = "CANCELAR_COMANDA")
 
 @Serializable
+private data class RegisterPaymentRequest(
+    val acao: String = "REGISTRAR",
+    val metodo: String,
+    @SerialName("valor_centavos") val valueCents: Int,
+    @SerialName("pix_pendente") val pixDecision: String = "CANCELAR"
+)
+
+@Serializable
 data class OrderItemUpdateInput(
     @SerialName("item_id") val itemId: Int,
     @SerialName("produto_id") val productId: Int,
@@ -115,6 +127,12 @@ private interface OrdersApi {
     ): Response<JsonElement>
 
     @POST("api/admin/orders/{id}/payments")
+    suspend fun registerPayment(
+        @Path("id") id: Int,
+        @Body body: RegisterPaymentRequest
+    ): Response<JsonElement>
+
+    @POST("api/admin/orders/{id}/payments")
     suspend fun cancelCommand(@Path("id") id: Int, @Body body: CancelCommandRequest): Response<JsonElement>
 
     @POST("api/admin/orders")
@@ -136,7 +154,48 @@ class OrdersRepository(retrofit: Retrofit) {
     }
 
     suspend fun updatePayment(id: Int, status: String) {
-        api.updatePayment(id, PaymentStatusRequest(status)).requireSuccess("Não foi possível atualizar o pagamento.")
+        val normalized = status.uppercase()
+        val direct = api.updatePayment(id, PaymentStatusRequest(normalized))
+        if (direct.isSuccessful) return
+
+        val directMessage = direct.apiErrorMessage("Não foi possível atualizar o pagamento.")
+        val isFinancialOrder = direct.code() == 400 && directMessage.contains("Alteração de pagamento inválida", ignoreCase = true)
+        if (normalized != "PAGO" || !isFinancialOrder) {
+            throw OrdersException(directMessage, direct.code())
+        }
+
+        val order = list().firstOrNull { it.id == id }
+            ?: throw OrdersException("Pedido não encontrado ao atualizar o financeiro.", 404)
+        if (order.balanceCents <= 0 || order.financialStatus.equals("PAGO", ignoreCase = true)) return
+
+        val method = manualFinancialMethod(order.paymentMethod)
+            ?: throw OrdersException(
+                "Não foi possível identificar a forma de pagamento desta comanda. Registre o pagamento pela tela financeira.",
+                400
+            )
+
+        val payment = api.registerPayment(
+            id,
+            RegisterPaymentRequest(
+                metodo = method,
+                valueCents = order.balanceCents,
+                pixDecision = "CANCELAR"
+            )
+        )
+        if (payment.isSuccessful) return
+
+        // O Mercado Pago pode confirmar o Pix durante a reconciliação do POST.
+        // Nesse caso o endpoint pode rejeitar um segundo lançamento porque o saldo
+        // acabou de zerar. Recarregamos o ledger antes de tratar como falha.
+        val refreshed = runCatching { list().firstOrNull { it.id == id } }.getOrNull()
+        if (refreshed != null && (refreshed.balanceCents <= 0 || refreshed.financialStatus.equals("PAGO", ignoreCase = true))) {
+            return
+        }
+
+        throw OrdersException(
+            payment.apiErrorMessage("Não foi possível registrar a quitação da comanda."),
+            payment.code()
+        )
     }
 
     suspend fun updateItem(id: Int, itemId: Int, productId: Int, quantity: Int) {
@@ -163,13 +222,35 @@ class OrdersRepository(retrofit: Retrofit) {
         .id
 }
 
+private fun manualFinancialMethod(value: String?): String? {
+    val method = value.orEmpty().uppercase()
+    return when {
+        "PIX" in method -> "PIX_EXTERNO"
+        "CART" in method -> "CARTAO"
+        "DINHEIRO" in method -> "DINHEIRO"
+        else -> null
+    }
+}
+
+private fun Response<*>.apiErrorMessage(fallback: String): String {
+    val raw = runCatching { errorBody()?.string().orEmpty() }.getOrDefault("")
+    if (raw.isBlank()) return fallback
+    return runCatching {
+        Json.parseToJsonElement(raw)
+            .jsonObject["erro"]
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?.takeIf { it.isNotBlank() }
+    }.getOrNull() ?: fallback
+}
+
 private fun <T> Response<T>.requireBody(message: String): T {
-    if (!isSuccessful) throw OrdersException(message, code())
+    if (!isSuccessful) throw OrdersException(apiErrorMessage(message), code())
     return body() ?: throw OrdersException(message, code())
 }
 
 private fun Response<*>.requireSuccess(message: String) {
-    if (!isSuccessful) throw OrdersException(message, code())
+    if (!isSuccessful) throw OrdersException(apiErrorMessage(message), code())
 }
 
 class OrdersException(message: String, val status: Int? = null) : Exception(message)
