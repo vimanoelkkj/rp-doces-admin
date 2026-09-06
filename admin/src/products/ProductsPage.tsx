@@ -23,6 +23,8 @@ type Props = {
   session: AuthSession;
   onNavigate: (page: AdminV2Page) => void;
   active: boolean;
+  focusProductIds?: number[];
+  onFocusConsumed?: () => void;
 };
 
 let productsCache: Product[] | null = null;
@@ -47,7 +49,13 @@ function SearchIcon() {
   );
 }
 
-export function ProductsPage({ session, onNavigate, active }: Props) {
+export function ProductsPage({
+  session,
+  onNavigate,
+  active,
+  focusProductIds = [],
+  onFocusConsumed
+}: Props) {
   const [products, setProducts] = useState<Product[]>(() => productsCache ?? []);
   const [loading, setLoading] = useState(() => productsCache === null);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +65,7 @@ export function ProductsPage({ session, onNavigate, active }: Props) {
   const [menu, setMenu] = useState<ProductId | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
+  const [highlightedIds, setHighlightedIds] = useState<number[]>([]);
 
   const closeCategories = useBackLayer(
     managingCategories,
@@ -104,6 +113,29 @@ export function ProductsPage({ session, onNavigate, active }: Props) {
     if (!active) return;
     void reload(productsCache !== null);
   }, [active, reload]);
+
+  useEffect(() => {
+    if (!active || !focusProductIds.length) return;
+
+    const ids = [...new Set(focusProductIds.filter(id => Number.isInteger(id) && id > 0))];
+    if (!ids.length) return;
+
+    setQuery("");
+    setFilter("todos");
+    setHighlightedIds(ids);
+    onFocusConsumed?.();
+
+    const scrollTimer = window.setTimeout(() => {
+      const first = document.querySelector<HTMLElement>(`[data-product-id="${ids[0]}"]`);
+      first?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+
+    const clearTimer = window.setTimeout(() => setHighlightedIds([]), 4_500);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [active, focusProductIds, onFocusConsumed]);
 
   const visible = useMemo(
     () =>
@@ -247,6 +279,7 @@ export function ProductsPage({ session, onNavigate, active }: Props) {
             <ProductCard
               key={product.id}
               product={product}
+              highlighted={highlightedIds.includes(product.id)}
               menuOpen={menu === product.id}
               onToggleMenu={() => setMenu(current => (current === product.id ? null : product.id))}
               onPreview={() => {
