@@ -817,14 +817,20 @@ private fun OrderDetailDialog(
                     reallocationError = null
                 }
             },
-            onConfirm = { targetItemId ->
+            onConfirm = { targetItemId, refundMethod, confirmRefund ->
                 val sourceItemId = item.id
                 if (!reallocating && sourceItemId != null) {
                     reallocating = true
                     reallocationError = null
                     scope.launch {
                         runCatching {
-                            repository.reallocateItemPayment(order.id, sourceItemId, targetItemId)
+                            repository.reallocateItemPayment(
+                        order.id,
+                        sourceItemId,
+                        targetItemId,
+                        refundMethod,
+                        confirmRefund
+                    )
                         }.onSuccess {
                             reallocatingItem = null
                             onUpdated()
