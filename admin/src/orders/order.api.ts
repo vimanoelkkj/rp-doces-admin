@@ -78,6 +78,14 @@ export async function updateOrderItem(id: number, input: OrderItemUpdateInput): 
   );
 }
 
+export async function deleteOrderItem(id: number, itemId: number): Promise<void> {
+  await requestJson(
+    `/api/admin/orders/${id}/items/${itemId}`,
+    { method: "DELETE" },
+    "Não foi possível excluir o item da comanda."
+  );
+}
+
 export async function createManualOrder(input: ManualOrderInput): Promise<number> {
   return CreateManualOrderResponseSchema.parse(
     await requestJson(
