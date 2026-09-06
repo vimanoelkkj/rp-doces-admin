@@ -22,7 +22,8 @@ data class OrderItem(
     @SerialName("valor_total_centavos") val totalCents: Int = 0,
     @SerialName("valor_pago_centavos") val paidCents: Int = 0,
     @SerialName("saldo_centavos") val balanceCents: Int = 0,
-    @SerialName("status_financeiro") val financialStatus: String? = null
+    @SerialName("status_financeiro") val financialStatus: String? = null,
+    @SerialName("estoque_baixado_em") val stockDeductedAt: String? = null
 )
 
 @Serializable
