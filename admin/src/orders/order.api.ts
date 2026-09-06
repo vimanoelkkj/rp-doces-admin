@@ -6,6 +6,7 @@ export type OrderStatus = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCE
 export type ManualPaymentStatus = "PENDENTE" | "PAGO" | "CANCELADO";
 export type ManualOrderPaymentStatus = "PENDENTE" | "PAGO";
 export type ManualOrderPaymentMethod = "PIX_EXTERNO" | "CARTAO" | "DINHEIRO" | "A_COMBINAR";
+export type RefundMethod = "PIX_EXTERNO" | "DINHEIRO" | "CARTAO" | "OUTRO";
 
 export type ManualOrderInput = {
   itens: Array<{ produto_id: number; quantidade: number }>;
@@ -20,6 +21,13 @@ export type OrderItemUpdateInput = {
   item_id: number;
   produto_id: number;
   quantidade: number;
+};
+
+export type PaidOrderItemExchangeInput = {
+  produto_id: number;
+  quantidade: number;
+  devolucao_metodo?: RefundMethod;
+  confirmacao_devolucao?: "DEVOLVIDO";
 };
 
 const CreateManualOrderResponseSchema = z.object({
@@ -83,6 +91,21 @@ export async function updateOrderItem(id: number, input: OrderItemUpdateInput): 
       body: JSON.stringify(input)
     },
     "Não foi possível alterar o item do pedido."
+  );
+}
+
+export async function exchangePaidOrderItem(
+  id: number,
+  itemId: number,
+  input: PaidOrderItemExchangeInput
+): Promise<void> {
+  await requestJson(
+    `/api/admin/orders/${id}/items/${itemId}/exchange`,
+    {
+      method: "POST",
+      body: JSON.stringify(input)
+    },
+    "Não foi possível trocar o item pago."
   );
 }
 
