@@ -125,6 +125,7 @@ export async function onRequestPost({ request, env, params }) {
   }
 
   const transferTotal = Math.min(sourcePaid, targetOpen);
+  const generatedCredit = Math.max(0, sourcePaid - transferTotal);
   let remainingTransfer = transferTotal;
   const statements = [];
 
@@ -146,6 +147,8 @@ export async function onRequestPost({ request, env, params }) {
   const reservationActive = upper(pedido.reserva_status) === "ATIVA";
   const sourceWasDeducted = Boolean(source.estoque_baixado_em);
   const targetWasDeducted = Boolean(target.estoque_baixado_em);
+  const sourceReservationReleased = !sourceWasDeducted && reservationActive;
+  const targetStockDeducted = !targetWasDeducted;
 
   if (sourceWasDeducted) {
     statements.push(
@@ -230,6 +233,48 @@ export async function onRequestPost({ request, env, params }) {
   }
 
   statements.push(
+    env.DB.prepare(
+      `INSERT INTO pedido_item_correcoes (
+         pedido_id,
+         item_origem_id,
+         produto_origem_id,
+         produto_origem_nome,
+         quantidade_origem,
+         valor_origem_centavos,
+         item_destino_id,
+         produto_destino_id,
+         produto_destino_nome,
+         quantidade_destino,
+         valor_destino_centavos,
+         valor_realocado_centavos,
+         credito_gerado_centavos,
+         estoque_origem_reposto,
+         reserva_origem_liberada,
+         estoque_destino_baixado,
+         realizado_por_usuario_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      pedidoId,
+      itemId,
+      Number(source.produto_id),
+      String(source.produto_nome || "Produto"),
+      Number(source.quantidade),
+      Number(source.valor_total_centavos || 0),
+      targetItemId,
+      Number(target.produto_id),
+      String(target.produto_nome || "Produto"),
+      Number(target.quantidade),
+      Number(target.valor_total_centavos || 0),
+      transferTotal,
+      generatedCredit,
+      sourceWasDeducted ? 1 : 0,
+      sourceReservationReleased ? 1 : 0,
+      targetStockDeducted ? 1 : 0,
+      auth.user.id
+    )
+  );
+
+  statements.push(
     env.DB.prepare("DELETE FROM pedido_itens WHERE id = ? AND pedido_id = ?")
       .bind(itemId, pedidoId)
   );
@@ -272,8 +317,7 @@ export async function onRequestPost({ request, env, params }) {
     if (!stock.ok) {
       logEvent("error", "comanda.item_reallocation_stock_failed", {
         pedido_id: pedidoId,
-        item_id: itemId,
-        destino_item_id: targetItemId
+        reason: "ITEM_REALLOCATION_STOCK_RECONCILIATION"
       });
       return json({
         ok: true,
@@ -290,17 +334,7 @@ export async function onRequestPost({ request, env, params }) {
 
   logEvent("info", "comanda.item_payment_reallocated", {
     pedido_id: pedidoId,
-    item_id: itemId,
-    produto_anterior_id: Number(source.produto_id),
-    produto_anterior_nome: source.produto_nome || undefined,
-    destino_item_id: targetItemId,
-    produto_destino_id: Number(target.produto_id),
-    produto_destino_nome: target.produto_nome || undefined,
-    valor_realocado_centavos: transferTotal,
-    valor_credito_centavos: Math.max(0, sourcePaid - transferTotal),
-    estoque_antigo_reposto: sourceWasDeducted,
-    estoque_destino_baixado: !targetWasDeducted,
-    usuario_id: auth.user.id
+    action: "ITEM_PAYMENT_REALLOCATED"
   });
 
   return json({
@@ -309,11 +343,11 @@ export async function onRequestPost({ request, env, params }) {
     item_removido_id: itemId,
     destino_item_id: targetItemId,
     valor_realocado_centavos: transferTotal,
-    credito_gerado_centavos: Math.max(0, sourcePaid - transferTotal),
+    credito_gerado_centavos: generatedCredit,
     saldo_destino_centavos: Math.max(0, targetOpen - transferTotal),
     estoque_antigo_reposto: sourceWasDeducted,
-    reserva_antiga_liberada: !sourceWasDeducted && reservationActive,
-    estoque_destino_baixado: !targetWasDeducted,
+    reserva_antiga_liberada: sourceReservationReleased,
+    estoque_destino_baixado: targetStockDeducted,
     status_financeiro: state?.status_financeiro || "PENDENTE",
     total_centavos: state?.total_centavos || 0,
     pago_centavos: state?.pago_centavos || 0,
