@@ -1,0 +1,211 @@
+.section {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line, #ead8d2);
+  border-radius: 18px;
+  background: var(--surface, #fff);
+  padding: 20px;
+  display: grid;
+  gap: 18px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sectionHead h3 {
+  margin: 4px 0 6px;
+  font-size: 18px;
+}
+
+.sectionHead p,
+.cardHead p {
+  margin: 0;
+  color: var(--text-muted, #806d66);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kicker {
+  color: var(--pink-strong, #c94860);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.ownerBadge,
+.realBadge,
+.testBadge {
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.ownerBadge,
+.testBadge {
+  background: var(--pink-soft, #fff0f3);
+  color: var(--pink-strong, #c94860);
+}
+
+.realBadge {
+  border: 1px solid var(--pink-strong, #c94860);
+  color: var(--pink-strong, #c94860);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid var(--line, #ead8d2);
+  border-radius: 15px;
+  padding: 16px;
+  background: var(--surface-veil, #fffaf8);
+  display: grid;
+  gap: 14px;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.cardHead strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.status,
+.notice {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.status {
+  background: var(--surface, #fff);
+  border: 1px solid var(--line, #ead8d2);
+  color: var(--text, #3c302c);
+}
+
+.notice {
+  background: var(--pink-soft, #fff0f3);
+  color: var(--text-muted, #806d66);
+}
+
+.pixResult {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.qr {
+  width: 150px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--line, #ead8d2);
+  background: #fff;
+}
+
+.codeBox {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.codeBox small,
+.meta,
+.field > span {
+  color: var(--text-muted, #806d66);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.codeBox textarea {
+  min-height: 90px;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line-strong, #dbc2b9);
+  border-radius: 10px;
+  padding: 9px;
+  background: var(--surface, #fff);
+  color: var(--text, #3c302c);
+  font: 600 10px/1.35 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field input {
+  height: 40px;
+  border: 1px solid var(--line-strong, #dbc2b9);
+  border-radius: 10px;
+  padding: 0 11px;
+  background: var(--surface, #fff);
+  color: var(--text, #3c302c);
+  font: inherit;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 38px;
+  border-radius: 10px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid var(--pink-strong, #c94860);
+  background: var(--pink-strong, #c94860);
+  color: #fff;
+}
+
+.secondaryButton {
+  border: 1px solid var(--line-strong, #dbc2b9);
+  background: var(--surface, #fff);
+  color: var(--text, #3c302c);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pixResult {
+    grid-template-columns: 1fr;
+  }
+
+  .qr {
+    width: min(210px, 100%);
+  }
+}
