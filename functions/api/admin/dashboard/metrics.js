@@ -2,6 +2,7 @@ import { json } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DIAGNOSTIC_ORDER_PREFIX = "diagnostic-order:%";
 
 function utcBoundsForBrazilDay(value) {
   if (!DATE_RE.test(value)) return null;
@@ -31,32 +32,34 @@ export async function onRequestGet({ request, env }) {
          SELECT
            pp.pedido_id,
            pp.valor_centavos,
-           COALESCE(pp.pago_em, pp.atualizado_em) AS recebido_em
+           p.criado_em AS data_venda
          FROM pedido_pagamentos pp
          INNER JOIN pedidos p ON p.id = pp.pedido_id
          WHERE pp.status = 'PAGO'
            AND UPPER(COALESCE(p.status_pedido, '')) <> 'CANCELADO'
+           AND p.idempotency_key NOT LIKE ?
 
          UNION ALL
 
          SELECT
            p.id AS pedido_id,
            p.valor_total_centavos AS valor_centavos,
-           COALESCE(p.pago_em, p.atualizado_em) AS recebido_em
+           p.criado_em AS data_venda
          FROM pedidos p
          WHERE UPPER(COALESCE(p.origem_pedido, '')) = 'MANUAL'
            AND UPPER(COALESCE(p.status_pagamento, '')) = 'PAGO'
            AND UPPER(COALESCE(p.status_pedido, '')) <> 'CANCELADO'
+           AND p.idempotency_key NOT LIKE ?
            AND NOT EXISTS (
              SELECT 1
              FROM pedido_pagamentos pp2
              WHERE pp2.pedido_id = p.id
                AND pp2.status = 'PAGO'
            )
-       ) recebimentos
-       WHERE recebido_em >= ?
-         AND recebido_em < ?`
-    ).bind(bounds.start, bounds.end).first(),
+       ) vendas
+       WHERE data_venda >= ?
+         AND data_venda < ?`
+    ).bind(DIAGNOSTIC_ORDER_PREFIX, DIAGNOSTIC_ORDER_PREFIX, bounds.start, bounds.end).first(),
     env.DB.prepare(
       `SELECT
          COUNT(*) AS pedidos_quitados,
@@ -69,16 +72,18 @@ export async function onRequestGet({ request, env }) {
        FROM pedidos p
        WHERE UPPER(COALESCE(p.status_pagamento, '')) = 'PAGO'
          AND UPPER(COALESCE(p.status_pedido, '')) <> 'CANCELADO'
-         AND COALESCE(p.pago_em, p.atualizado_em) >= ?
-         AND COALESCE(p.pago_em, p.atualizado_em) < ?`
-    ).bind(bounds.start, bounds.end).first(),
+         AND p.idempotency_key NOT LIKE ?
+         AND p.criado_em >= ?
+         AND p.criado_em < ?`
+    ).bind(DIAGNOSTIC_ORDER_PREFIX, bounds.start, bounds.end).first(),
     env.DB.prepare(
       `SELECT COUNT(*) AS pedidos_criados
        FROM pedidos
        WHERE UPPER(COALESCE(status_pedido, '')) <> 'CANCELADO'
+         AND idempotency_key NOT LIKE ?
          AND criado_em >= ?
          AND criado_em < ?`
-    ).bind(bounds.start, bounds.end).first()
+    ).bind(DIAGNOSTIC_ORDER_PREFIX, bounds.start, bounds.end).first()
   ]);
 
   const paidOrders = Number(settled?.pedidos_quitados || 0);
