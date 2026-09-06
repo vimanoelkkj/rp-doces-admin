@@ -1,7 +1,8 @@
 import { json, bodyJson, sameOrigin } from "../../../lib/http.js";
 import { requireUser } from "../../../lib/auth.js";
 import { baixarEstoquePedido, liberarReservaPedido } from "../../../lib/stock.js";
-import { syncManualPaidOrder } from "../../../lib/comandaLedger.js";
+import { recalculateComanda, syncManualPaidOrder } from "../../../lib/comandaLedger.js";
+import { reconcileActiveReservationsForOrder } from "../../../lib/stockReservation.js";
 
 const VALIDOS = new Set(["NOVO", "PREPARANDO", "PRONTO", "ENTREGUE", "CANCELADO"]);
 const PAGAMENTOS_MANUAIS = new Set(["PENDENTE", "PAGO", "CANCELADO"]);
@@ -114,52 +115,60 @@ async function reservarPedidoManual(env, pedidoId) {
   }
 }
 
-async function confirmarPagamentoManual(env, pedido, usuarioId) {
-  if (pedido.status_pagamento === "PAGO") {
-    const ledger = await syncManualPaidOrder(env, pedido.id, usuarioId);
-    return ledger.ok
-      ? { ok: true, status_pagamento: "PAGO" }
-      : { ok: false, erro: ledger.erro || "ERRO_FINANCEIRO" };
-  }
+async function rollbackNovoPagamentoManual(env, pedidoId, ledger) {
+  if (!ledger?.pagamento_id || ledger.ja_quitado) return false;
 
+  await env.DB.prepare(
+    `DELETE FROM pedido_pagamentos
+     WHERE id = ? AND pedido_id = ? AND origem = 'ADMIN'`
+  )
+    .bind(ledger.pagamento_id, pedidoId)
+    .run();
+  await recalculateComanda(env, pedidoId);
+  return true;
+}
+
+async function confirmarPagamentoManual(env, pedido, usuarioId) {
   if (pedido.status_pagamento === "CANCELADO") {
     const reserva = await reservarPedidoManual(env, pedido.id);
     if (!reserva.ok) return reserva;
   }
 
-  await env.DB.prepare(
-    `UPDATE pedidos
-     SET status_pagamento = 'PAGO',
-         pago_em = CURRENT_TIMESTAMP,
-         status_pedido = CASE WHEN status_pedido = 'CANCELADO' THEN 'NOVO' ELSE status_pedido END,
-         atualizado_em = CURRENT_TIMESTAMP
-     WHERE id = ?`
-  )
-    .bind(pedido.id)
-    .run();
+  const reconciliacao = await reconcileActiveReservationsForOrder(env, pedido.id);
+  if (!reconciliacao.ok) return reconciliacao;
 
-  const ledger = await syncManualPaidOrder(env, pedido.id, usuarioId);
-  if (!ledger.ok) {
+  if (pedido.status_pagamento !== "PAGO") {
     await env.DB.prepare(
       `UPDATE pedidos
-       SET status_pagamento = 'PENDENTE', pago_em = NULL, atualizado_em = CURRENT_TIMESTAMP
+       SET status_pagamento = 'PAGO',
+           pago_em = CURRENT_TIMESTAMP,
+           status_pedido = CASE WHEN status_pedido = 'CANCELADO' THEN 'NOVO' ELSE status_pedido END,
+           atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`
     )
       .bind(pedido.id)
       .run();
+  }
+
+  const ledger = await syncManualPaidOrder(env, pedido.id, usuarioId);
+  if (!ledger.ok) {
+    await recalculateComanda(env, pedido.id);
     return { ok: false, erro: ledger.erro || "ERRO_FINANCEIRO" };
   }
 
   const stock = await baixarEstoquePedido(env, pedido.id);
   if (!stock.ok) {
-    await env.DB.prepare(
-      `UPDATE pedidos
-       SET status_pagamento = 'PENDENTE', pago_em = NULL, atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ? AND estoque_baixado_em IS NULL`
-    )
-      .bind(pedido.id)
-      .run();
-    return { ok: false, erro: "ESTOQUE_INCONSISTENTE" };
+    const rollback = await rollbackNovoPagamentoManual(env, pedido.id, ledger);
+    if (!rollback) {
+      await recalculateComanda(env, pedido.id);
+      return {
+        ok: false,
+        erro: ledger.ja_quitado
+          ? "PAGAMENTO_CONFIRMADO_ESTOQUE_PENDENTE"
+          : stock.erro || "ESTOQUE_INCONSISTENTE"
+      };
+    }
+    return { ok: false, erro: stock.erro || "ESTOQUE_INCONSISTENTE" };
   }
 
   return { ok: true, status_pagamento: "PAGO" };
@@ -252,12 +261,16 @@ export async function onRequestPut({ request, env, params }) {
     if (!result.ok) {
       const mensagem =
         result.erro === "ESTOQUE_INSUFICIENTE"
-          ? "Não há estoque disponível para reabrir este pedido."
-          : result.erro === "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO"
-            ? "Este pedido já possui pagamento confirmado. Faça o estorno/reembolso antes de alterar ou cancelar o pagamento."
-            : result.erro === "ERRO_FINANCEIRO" || result.erro === "PAGAMENTO_NAO_REGISTRADO"
-              ? "Não foi possível registrar a quitação no financeiro."
-              : "Não foi possível atualizar o pagamento por inconsistência no estoque.";
+          ? "Não há estoque físico suficiente para quitar esta comanda."
+          : result.erro === "PRODUTO_NAO_ENCONTRADO"
+            ? "Um produto desta comanda não existe mais no estoque."
+            : result.erro === "PAGAMENTO_CONFIRMADO_ESTOQUE_PENDENTE"
+              ? "O pagamento já está registrado, mas a baixa de estoque ainda não pôde ser concluída. Confira o estoque da comanda antes de tentar novamente."
+              : result.erro === "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO"
+                ? "Este pedido já possui pagamento confirmado. Faça o estorno/reembolso antes de alterar ou cancelar o pagamento."
+                : result.erro === "ERRO_FINANCEIRO" || result.erro === "PAGAMENTO_NAO_REGISTRADO"
+                  ? "Não foi possível registrar a quitação no financeiro."
+                  : "Não foi possível atualizar o pagamento por inconsistência no estoque.";
       return json({
         erro: mensagem,
         codigo: result.erro,
