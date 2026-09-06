@@ -4,7 +4,7 @@ import type { Product } from "../products/product.types";
 import { ApiClientError } from "../shared/apiClient";
 import { useBackLayer } from "../shared/useBackLayer";
 import { usePageScrollLock } from "../shared/usePageScrollLock";
-import { updateOrderItem } from "./order.api";
+import { exchangePaidOrderItem, updateOrderItem, type RefundMethod } from "./order.api";
 import type { Order, OrderItem } from "./order.schema";
 import { ManualOrderSelect } from "./ManualOrderSelect";
 import styles from "./ManualOrderDialog.module.css";
@@ -38,11 +38,27 @@ function money(cents: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
 
+function defaultRefundMethod(value: string | null | undefined): RefundMethod {
+  const method = String(value || "").toUpperCase();
+  if (method.includes("DINHEIRO")) return "DINHEIRO";
+  if (method.includes("CART")) return "CARTAO";
+  if (method.includes("PIX")) return "PIX_EXTERNO";
+  return "OUTRO";
+}
+
+const REFUND_METHOD_OPTIONS: Array<{ value: RefundMethod; label: string }> = [
+  { value: "PIX_EXTERNO", label: "Pix" },
+  { value: "DINHEIRO", label: "Dinheiro" },
+  { value: "CARTAO", label: "Cartão" },
+  { value: "OUTRO", label: "Outro meio" }
+];
+
 export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productId, setProductId] = useState(Number(item.produto_id || 0));
   const [quantity, setQuantity] = useState(Math.max(1, Number(item.quantidade || 1)));
+  const [refundMethod, setRefundMethod] = useState<RefundMethod>(() => defaultRefundMethod(order.metodo_pagamento));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const savingRef = useRef(false);
@@ -120,6 +136,10 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
     ? Number(item.valor_unitario_centavos || 0)
     : selectedProduct ? currentUnitPrice(selectedProduct) : 0;
   const previewTotal = unitCents * quantity;
+  const paidCents = Number(item.valor_pago_centavos || 0);
+  const paidExchange = paidCents > 0;
+  const refundCents = paidExchange ? Math.max(0, paidCents - previewTotal) : 0;
+  const pendingAfterExchange = paidExchange ? Math.max(0, previewTotal - paidCents) : 0;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -145,11 +165,22 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
 
     updateSaving(true);
     try {
-      await updateOrderItem(order.id, {
-        item_id: item.id,
-        produto_id: selectedProduct.id,
-        quantidade: quantity
-      });
+      if (paidExchange) {
+        await exchangePaidOrderItem(order.id, item.id, {
+          produto_id: selectedProduct.id,
+          quantidade: quantity,
+          ...(refundCents > 0 ? {
+            devolucao_metodo: refundMethod,
+            confirmacao_devolucao: "DEVOLVIDO" as const
+          } : {})
+        });
+      } else {
+        await updateOrderItem(order.id, {
+          item_id: item.id,
+          produto_id: selectedProduct.id,
+          quantidade: quantity
+        });
+      }
       await onSaved();
       updateSaving(false);
       closeLayer();
@@ -240,8 +271,53 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
             </div>
           </div>
 
+          {paidExchange ? (
+            <section className={styles.itemSection}>
+              <div className={styles.sectionHead}>
+                <div>
+                  <h3>Ajuste do pagamento</h3>
+                  <small>O valor já pago acompanha o novo produto.</small>
+                </div>
+              </div>
+
+              <div className={styles.grid}>
+                <div className={styles.field}>
+                  <label>Valor já pago</label>
+                  <input value={money(paidCents)} readOnly disabled />
+                </div>
+                <div className={styles.field}>
+                  <label>{refundCents > 0 ? "Diferença a devolver" : "Saldo após a troca"}</label>
+                  <input
+                    value={refundCents > 0 ? money(refundCents) : pendingAfterExchange > 0 ? `${money(pendingAfterExchange)} pendente` : "Quitado"}
+                    readOnly
+                    disabled
+                  />
+                </div>
+              </div>
+
+              {refundCents > 0 ? (
+                <div className={styles.field}>
+                  <label htmlFor="edit-order-refund-method">Forma da devolução</label>
+                  <ManualOrderSelect
+                    id="edit-order-refund-method"
+                    value={refundMethod}
+                    options={REFUND_METHOD_OPTIONS}
+                    disabled={saving}
+                    ariaLabel="Selecionar forma da devolução"
+                    onChange={value => setRefundMethod(value as RefundMethod)}
+                  />
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           <p className={styles.itemMeta}>
-            Se o valor mudar, a comanda recalcula automaticamente o saldo ou crédito. Pagamentos já registrados são preservados.
+            {refundCents > 0
+              ? `Ao confirmar, ${money(refundCents)} será registrado como devolvido. O produto original volta ao estoque e o novo produto assume a baixa ou reserva correspondente.`
+              : paidExchange
+                ? "O pagamento já registrado será preservado no novo produto. Se o novo total for maior, somente a diferença ficará pendente."
+                : "Se o valor mudar, a comanda recalcula automaticamente o saldo."
+            }
           </p>
 
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
@@ -249,7 +325,7 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
           <footer className={styles.footer}>
             <button className={styles.cancel} type="button" onClick={closeLayer} disabled={saving}>Cancelar</button>
             <button className={styles.submit} type="submit" disabled={saving || loadingProducts || !selectedProduct}>
-              {saving ? "Salvando..." : "Salvar troca"}
+              {saving ? "Salvando..." : refundCents > 0 ? `Trocar e devolver ${money(refundCents)}` : "Salvar troca"}
             </button>
           </footer>
         </form>
