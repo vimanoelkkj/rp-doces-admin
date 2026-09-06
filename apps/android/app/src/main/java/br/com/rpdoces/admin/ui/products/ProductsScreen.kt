@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -54,6 +55,7 @@ import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import coil3.compose.AsyncImage
 import java.text.NumberFormat
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class ProductFilter(val label: String) {
@@ -68,6 +70,8 @@ private sealed interface ProductPendingAction {
 @Composable
 fun ProductsScreen(
     repository: ProductsRepository,
+    focusProductIds: Set<Int> = emptySet(),
+    onFocusConsumed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val web = LocalRPWebColors.current
@@ -83,6 +87,8 @@ fun ProductsScreen(
     var previewing by remember { mutableStateOf<Product?>(null) }
     var categoriesOpen by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<ProductPendingAction?>(null) }
+    var highlightedIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    val gridState = rememberLazyGridState()
 
     suspend fun reload() {
         try {
@@ -96,6 +102,23 @@ fun ProductsScreen(
     }
 
     LaunchedEffect(Unit) { reload() }
+
+    LaunchedEffect(focusProductIds, products) {
+        if (focusProductIds.isEmpty() || products.isEmpty()) return@LaunchedEffect
+        val ids = focusProductIds.filter { id -> products.any { it.id == id } }.toSet()
+        if (ids.isEmpty()) {
+            onFocusConsumed()
+            return@LaunchedEffect
+        }
+        query = ""
+        filter = ProductFilter.ALL
+        highlightedIds = ids
+        onFocusConsumed()
+        val firstIndex = products.indexOfFirst { it.id in ids }
+        if (firstIndex >= 0) gridState.animateScrollToItem(firstIndex)
+        delay(4_500)
+        highlightedIds = emptySet()
+    }
 
     val normalizedQuery = query.trim().lowercase(Locale("pt", "BR"))
     val visible = products.filter { product ->
@@ -213,6 +236,7 @@ fun ProductsScreen(
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
+                state = gridState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -221,6 +245,7 @@ fun ProductsScreen(
                 items(visible, key = { it.id }) { product ->
                     ProductCard(
                         product = product,
+                        highlighted = product.id in highlightedIds,
                         busy = busyId == product.id,
                         onPreview = { previewing = product },
                         onEdit = {
@@ -339,6 +364,7 @@ private fun ProductActionButton(text: String, primary: Boolean, modifier: Modifi
 @Composable
 private fun ProductCard(
     product: Product,
+    highlighted: Boolean,
     busy: Boolean,
     onPreview: () -> Unit,
     onEdit: () -> Unit,
@@ -352,8 +378,8 @@ private fun ProductCard(
     Surface(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onEdit),
         shape = RoundedCornerShape(12.dp),
-        color = web.surface,
-        border = BorderStroke(1.dp, web.border)
+        color = if (highlighted) web.accentSoft else web.surface,
+        border = BorderStroke(if (highlighted) 2.dp else 1.dp, if (highlighted) web.accent else web.border)
     ) {
         Column {
             Box(

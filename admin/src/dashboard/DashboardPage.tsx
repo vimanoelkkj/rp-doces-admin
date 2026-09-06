@@ -304,7 +304,7 @@ export function DashboardPage({ session, onNavigate, active }: Props) {
     if (summary.waitingPreparationCount) {
       messages.push(`${summary.waitingPreparationCount} pedido${summary.waitingPreparationCount === 1 ? " pago aguardando" : "s pagos aguardando"} início do preparo`);
     }
-    if (!messages.length && summary.lowStockCount) {
+    if (summary.lowStockCount) {
       messages.push(`${summary.lowStockCount} produto${summary.lowStockCount === 1 ? "" : "s"} com estoque baixo`);
     }
     return messages;

@@ -96,6 +96,8 @@ import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
 import br.com.rpdoces.admin.ui.components.MotionValue
 import br.com.rpdoces.admin.ui.components.RPMotion
 import br.com.rpdoces.admin.ui.dashboard.DashboardScreen
+import br.com.rpdoces.admin.ui.navigation.AppNavigationBus
+import br.com.rpdoces.admin.ui.navigation.AppNavigationRequest
 import br.com.rpdoces.admin.ui.orders.OrdersScreen
 import br.com.rpdoces.admin.ui.products.ProductsScreen
 import br.com.rpdoces.admin.ui.remote.LocalAppRemoteConfig
@@ -106,6 +108,7 @@ import br.com.rpdoces.admin.ui.theme.RPWebMetrics
 import coil3.compose.AsyncImage
 import kotlin.math.max
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 
 private enum class MainTab(
@@ -270,6 +273,7 @@ private fun MainShell(
         user.papel.trim().uppercase() in setOf("OWNER", "ADMIN")
     }
     var selected by rememberSaveable { mutableStateOf(MainTab.Dashboard) }
+    var productFocusIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var notificationOpen by rememberSaveable { mutableStateOf(false) }
     var appControlOpen by rememberSaveable { mutableStateOf(false) }
@@ -292,6 +296,17 @@ private fun MainShell(
             selected = visibleTabs.firstOrNull() ?: MainTab.Dashboard
             profileOpen = false
             notificationOpen = false
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        AppNavigationBus.requests.collect { request ->
+            when (request) {
+                is AppNavigationRequest.OpenProducts -> {
+                    productFocusIds = request.productIds
+                    openTab(MainTab.Produtos)
+                }
+            }
         }
     }
 
@@ -392,6 +407,8 @@ private fun MainShell(
                                 )
                                 MainTab.Produtos -> ProductsScreen(
                                     repository = productsRepository,
+                                    focusProductIds = productFocusIds,
+                                    onFocusConsumed = { productFocusIds = emptySet() },
                                     modifier = Modifier.fillMaxSize()
                                 )
                                 MainTab.Pedidos -> OrdersScreen(

@@ -390,7 +390,10 @@ private fun OrderDetailDialog(
 
     val commandClosed = order.commandStatus.equals("ENCERRADA", true)
     val canceledOrder = order.orderStatus.equals("CANCELADO", true) || order.paymentStatus.equals("CANCELADO", true)
-    val canReopen = commandClosed && canceledOrder
+    val hasConfirmedPayment = order.paidCents > 0 || effectiveFinancialStatus(order) in setOf("PAGO", "PARCIAL")
+    val canReopenPaid = commandClosed && hasConfirmedPayment
+    val canReopenCanceled = commandClosed && canceledOrder && !hasConfirmedPayment
+    val canReopen = canReopenPaid || canReopenCanceled
     val hasChanges = statusDirty || paymentDirty
 
     LaunchedEffect(order.orderStatus, statusDirty) {
@@ -505,7 +508,11 @@ private fun OrderDetailDialog(
                                 when {
                                     canReopen -> {
                                         Text(
-                                            "Esta comanda está cancelada e encerrada. Reabra a comanda para voltar a editar status e pagamento.",
+                                            if (canReopenPaid) {
+                                                "Esta comanda está encerrada e possui ${money(order.paidCents)} pagos. Ao reabrir, pagamentos e baixas de estoque serão preservados."
+                                            } else {
+                                                "Esta comanda está cancelada e encerrada. Reabra a comanda para voltar a editar status e pagamento."
+                                            },
                                             color = web.muted,
                                             fontSize = 11.5.sp,
                                             lineHeight = 17.sp
@@ -638,8 +645,10 @@ private fun OrderDetailDialog(
                                     saving = true
                                     error = null
                                     scope.launch {
-                                        runCatching { repository.updatePayment(order.id, "PENDENTE") }
-                                            .onSuccess {
+                                        runCatching {
+                                            if (canReopenPaid) repository.reopenPaidCommand(order.id)
+                                            else repository.updatePayment(order.id, "PENDENTE")
+                                        }.onSuccess {
                                                 statusDirty = false
                                                 paymentDirty = false
                                                 onUpdated()

@@ -7,6 +7,7 @@ import { useBackLayer } from "../shared/useBackLayer";
 import {
   deleteOrderItem,
   listOrders,
+  reopenPaidCommand,
   updateManualPayment,
   updateOrderStatus,
   type ManualPaymentStatus,
@@ -308,6 +309,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const [draftStatus, setDraftStatus] = useState<OrderStatus>("NOVO");
   const [draftPayment, setDraftPayment] = useState<ManualPaymentStatus>("PENDENTE");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [reopeningCommand, setReopeningCommand] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const editingRef = useRef(false);
   const savingEditRef = useRef(false);
@@ -505,6 +507,10 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const comandaItems = financialItems.length ? financialItems : selectedItems;
   const paidCents = financial?.valor_pago_centavos ?? (selectedPayment?.paid ? Number(selected?.valor_total_centavos || 0) : 0);
   const pendingCents = financial?.saldo_centavos ?? (selectedPayment?.paid ? 0 : Number(selected?.valor_total_centavos || 0));
+  const selectedCommandClosed = String(selected?.status_comanda || "ABERTA").toUpperCase() === "ENCERRADA";
+  const selectedCanceled = String(selected?.status_pedido || "").toUpperCase() === "CANCELADO" ||
+    String(selected?.status_pagamento || "").toUpperCase() === "CANCELADO";
+  const canReopenCommand = Boolean(selected && selectedCommandClosed && (paidCents > 0 || (selectedIsManual && selectedCanceled)));
 
   function openOrder(order: Order) {
     setSelected(order);
@@ -566,6 +572,26 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
       setEditError(err instanceof ApiClientError ? err.message : "Não foi possível salvar as alterações do pedido.");
     } finally {
       updateSavingEdit(false);
+    }
+  }
+
+  async function reopenSelectedCommand() {
+    if (!selected || reopeningCommand) return;
+    setReopeningCommand(true);
+    setEditError(null);
+    try {
+      if (paidCents > 0) {
+        await reopenPaidCommand(selected.id);
+      } else {
+        await updateManualPayment(selected.id, "PENDENTE");
+      }
+      await reload(selected.id);
+      setFinancial(null);
+      setEditing(false);
+    } catch (err) {
+      setEditError(err instanceof ApiClientError ? err.message : "Não foi possível reabrir a comanda.");
+    } finally {
+      setReopeningCommand(false);
     }
   }
 
@@ -988,14 +1014,30 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                     </div>
                   ) : (
                     <div className={styles["drawer-actions"]}>
+                      {editError ? (
+                        <div className={styles.note} role="alert" style={{ color: "var(--pink-strong)" }}>
+                          {editError}
+                        </div>
+                      ) : null}
                       <div className={styles["secondary-actions"]} style={{ gridTemplateColumns: "1fr" }}>
-                        <button
-                          className={styles["secondary-btn"]}
-                          type="button"
-                          onClick={startEditing}
-                        >
-                          <Icon name="edit" className={styles["btn-ico"]}/>Editar pedido
-                        </button>
+                        {canReopenCommand ? (
+                          <button
+                            className={styles["primary-btn"]}
+                            type="button"
+                            disabled={reopeningCommand}
+                            onClick={() => void reopenSelectedCommand()}
+                          >
+                            {reopeningCommand ? "Reabrindo..." : "Reabrir comanda"}
+                          </button>
+                        ) : (
+                          <button
+                            className={styles["secondary-btn"]}
+                            type="button"
+                            onClick={startEditing}
+                          >
+                            <Icon name="edit" className={styles["btn-ico"]}/>Editar pedido
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}

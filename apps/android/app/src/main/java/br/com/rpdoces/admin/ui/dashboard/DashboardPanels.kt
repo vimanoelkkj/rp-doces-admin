@@ -36,6 +36,7 @@ import br.com.rpdoces.admin.data.dashboard.DashboardOrderItem
 import br.com.rpdoces.admin.data.dashboard.DashboardSnapshot
 import br.com.rpdoces.admin.data.dashboard.availableStock
 import br.com.rpdoces.admin.data.dashboard.dashboardParseInstant
+import br.com.rpdoces.admin.ui.navigation.AppNavigationBus
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.time.ZoneId
@@ -330,6 +331,11 @@ private fun RecentOrderRow(order: DashboardOrder) {
     }
 }
 
+private data class AttentionEntry(
+    val text: String,
+    val productIds: Set<Int>? = null
+)
+
 @Composable
 internal fun AttentionPanelNative(
     snapshot: DashboardSnapshot,
@@ -341,18 +347,28 @@ internal fun AttentionPanelNative(
     }
     val receivableTotal = receivables.sumOf { it.balanceCents }
     val soldOut = snapshot.products.filter { it.ativo && availableStock(it) <= 0 }
+    val lowStock = snapshot.products.filter {
+        val available = availableStock(it)
+        it.ativo && available in 1..2
+    }
     val attention = buildList {
         if (receivables.isNotEmpty()) {
-            add("${receivables.size} cliente${if (receivables.size == 1) "" else "s"} com saldo pendente (${moneyPanel(receivableTotal)} no total)")
+            add(AttentionEntry("${receivables.size} cliente${if (receivables.size == 1) "" else "s"} com saldo pendente (${moneyPanel(receivableTotal)} no total)"))
         }
         if (soldOut.isNotEmpty()) {
-            add("${soldOut.size} produto${if (soldOut.size == 1) " esgotado" else "s esgotados"}: ${soldOut.take(2).joinToString(", ") { it.nome }}")
+            add(AttentionEntry(
+                "${soldOut.size} produto${if (soldOut.size == 1) " esgotado" else "s esgotados"}: ${soldOut.take(2).joinToString(", ") { it.nome }}",
+                soldOut.map { it.id }.toSet()
+            ))
         }
         if (snapshot.waitingPreparationCount > 0) {
-            add("${snapshot.waitingPreparationCount} pedido${if (snapshot.waitingPreparationCount == 1) " pago aguardando" else "s pagos aguardando"} início do preparo")
+            add(AttentionEntry("${snapshot.waitingPreparationCount} pedido${if (snapshot.waitingPreparationCount == 1) " pago aguardando" else "s pagos aguardando"} início do preparo"))
         }
-        if (isEmpty() && snapshot.lowStockCount > 0) {
-            add("${snapshot.lowStockCount} produto${if (snapshot.lowStockCount == 1) "" else "s"} com estoque baixo")
+        if (lowStock.isNotEmpty()) {
+            add(AttentionEntry(
+                "${lowStock.size} produto${if (lowStock.size == 1) "" else "s"} com estoque baixo",
+                lowStock.map { it.id }.toSet()
+            ))
         }
     }
 
@@ -385,11 +401,16 @@ internal fun AttentionPanelNative(
             } else {
                 Column(modifier = Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     attention.forEach { item ->
+                        val rowModifier = Modifier
+                            .fillMaxWidth()
+                            .background(web.orangeSoft, RoundedCornerShape(10.dp))
+                            .let { base ->
+                                if (item.productIds != null) base.clickable { AppNavigationBus.openProducts(item.productIds) }
+                                else base
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(web.orangeSoft, RoundedCornerShape(10.dp))
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = rowModifier,
                             horizontalArrangement = Arrangement.spacedBy(9.dp),
                             verticalAlignment = Alignment.Top
                         ) {
@@ -399,7 +420,7 @@ internal fun AttentionPanelNative(
                                     .size(6.dp)
                                     .background(web.tagOrangeText, RoundedCornerShape(99.dp))
                             )
-                            Text(item, modifier = Modifier.weight(1f), color = web.text, fontSize = 12.5.sp, lineHeight = 17.sp)
+                            Text(item.text, modifier = Modifier.weight(1f), color = web.text, fontSize = 12.5.sp, lineHeight = 17.sp)
                         }
                     }
                 }
