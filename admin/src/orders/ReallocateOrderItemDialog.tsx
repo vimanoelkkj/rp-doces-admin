@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ApiClientError } from "../shared/apiClient";
 import { AdminSelect } from "../shared/AdminSelect";
 import { useBackLayer } from "../shared/useBackLayer";
-import { reallocateOrderItemPayment } from "./order.api";
+import { reallocateOrderItemPayment, type RefundMethod } from "./order.api";
 import type { FinancialOrderItem } from "./order.finance";
 import styles from "./ReallocateOrderItemDialog.module.css";
 
@@ -14,6 +14,13 @@ type Props = {
   onSaved: () => void | Promise<void>;
 };
 
+const REFUND_METHOD_OPTIONS: Array<{ value: RefundMethod; label: string }> = [
+  { value: "PIX_EXTERNO", label: "Pix" },
+  { value: "DINHEIRO", label: "Dinheiro" },
+  { value: "CARTAO", label: "Cartão" },
+  { value: "OUTRO", label: "Outro meio" }
+];
+
 function money(cents: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -23,6 +30,7 @@ function money(cents: number) {
 
 export function ReallocateOrderItemDialog({ orderId, item, candidates, onClose, onSaved }: Props) {
   const [targetId, setTargetId] = useState(() => String(candidates[0]?.id || ""));
+  const [refundMethod, setRefundMethod] = useState<RefundMethod>("PIX_EXTERNO");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,14 +53,20 @@ export function ReallocateOrderItemDialog({ orderId, item, candidates, onClose, 
   const targetBalance = Number(target?.saldo_centavos || 0);
   const transferred = Math.min(paid, targetBalance);
   const remaining = Math.max(0, targetBalance - transferred);
-  const credit = Math.max(0, paid - transferred);
+  const refund = Math.max(0, paid - transferred);
 
   async function submit() {
     if (!target || saving) return;
     setSaving(true);
     setError(null);
     try {
-      await reallocateOrderItemPayment(orderId, item.id, target.id);
+      await reallocateOrderItemPayment(
+        orderId,
+        item.id,
+        target.id,
+        refund > 0 ? refundMethod : undefined,
+        refund > 0
+      );
       await onSaved();
       close();
     } catch (err) {
@@ -108,17 +122,33 @@ export function ReallocateOrderItemDialog({ orderId, item, candidates, onClose, 
                 <strong className={styles.warn}>{money(remaining)}</strong>
               </div>
             ) : null}
-            {credit > 0 ? (
-              <div className={styles.row}>
-                <span>Crédito que sobra na comanda</span>
-                <strong className={styles.good}>{money(credit)}</strong>
-              </div>
+            {refund > 0 ? (
+              <>
+                <div className={styles.row}>
+                  <span>Diferença a devolver</span>
+                  <strong className={styles.warn}>{money(refund)}</strong>
+                </div>
+                <div className={styles.box}>
+                  <span className={styles.label}>Forma da devolução</span>
+                  <AdminSelect
+                    value={refundMethod}
+                    ariaLabel="Forma da devolução"
+                    className={styles.select}
+                    disabled={saving}
+                    options={REFUND_METHOD_OPTIONS}
+                    onChange={value => setRefundMethod(value as RefundMethod)}
+                  />
+                </div>
+              </>
             ) : null}
           </div>
         ) : null}
 
         <p className={styles.note}>
-          Ao confirmar, o produto antigo será removido da comanda. Se ele já tinha sido baixado, sua quantidade volta ao estoque. O produto escolhido será marcado como o produto efetivamente levado e terá a baixa física aplicada.
+          {refund > 0
+            ? `Ao confirmar, ${money(refund)} será registrado como devolvido. O produto antigo volta ao estoque quando já havia sido baixado, e o produto efetivamente levado assume a baixa física.`
+            : "Ao confirmar, o produto antigo será removido da comanda. Se ele já tinha sido baixado, sua quantidade volta ao estoque. O produto escolhido será marcado como o produto efetivamente levado e terá a baixa física aplicada."
+          }
         </p>
 
         {error ? <div className={styles.error} role="alert">{error}</div> : null}
@@ -128,7 +158,7 @@ export function ReallocateOrderItemDialog({ orderId, item, candidates, onClose, 
             Voltar
           </button>
           <button className={styles.confirm} type="button" disabled={saving || !target} onClick={() => void submit()}>
-            {saving ? "Corrigindo..." : "Confirmar correção"}
+            {saving ? "Corrigindo..." : refund > 0 ? `Corrigir e devolver ${money(refund)}` : "Confirmar correção"}
           </button>
         </div>
       </div>
