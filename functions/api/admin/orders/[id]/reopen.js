@@ -1,5 +1,6 @@
 import { json, sameOrigin } from "../../../../lib/http.js";
 import { requireUser } from "../../../../lib/auth.js";
+import { recalculateComanda } from "../../../../lib/comandaLedger.js";
 import { logEvent } from "../../../../lib/logger.js";
 
 async function confirmedPaidCents(env, pedido) {
@@ -66,9 +67,17 @@ export async function onRequestPost({ request, env, params }) {
     return json({ erro: "Não foi possível reabrir a comanda." }, 409);
   }
 
+  // O ledger é a fonte da verdade financeira. Recalcular aqui corrige apenas
+  // projeções antigas como status_pagamento=CANCELADO, sem tocar nos pagamentos
+  // registrados, nas alocações ou nas baixas físicas de estoque.
+  const financeiro = await recalculateComanda(env, pedidoId);
+  if (!financeiro) {
+    return json({ erro: "A comanda foi reaberta, mas o financeiro não pôde ser reconciliado." }, 409);
+  }
+
   logEvent("info", "comanda.reopened_paid", {
     pedido_id: pedidoId,
-    paid_cents: pagoCentavos,
+    paid_cents: financeiro.pago_centavos,
     user_id: auth.user.id,
     stock_preserved: true
   });
@@ -78,8 +87,10 @@ export async function onRequestPost({ request, env, params }) {
     pedido_id: pedidoId,
     status_comanda: "ABERTA",
     status_pedido: String(pedido.status_pedido || "").toUpperCase() === "CANCELADO" ? "NOVO" : pedido.status_pedido,
-    status_pagamento: pedido.status_pagamento,
-    valor_pago_centavos: pagoCentavos,
+    status_pagamento: financeiro.status_financeiro,
+    valor_pago_centavos: financeiro.pago_centavos,
+    saldo_centavos: financeiro.saldo_centavos,
+    credito_centavos: financeiro.credito_centavos,
     estoque_preservado: true
   });
 }
