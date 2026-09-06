@@ -62,7 +62,10 @@ private data class OrderStatusRequest(@SerialName("status_pedido") val status: S
 private data class PaymentStatusRequest(@SerialName("status_pagamento") val status: String)
 
 @Serializable
-private data class CancelCommandRequest(val acao: String = "CANCELAR_COMANDA")
+private data class CancelCommandRequest(
+    val acao: String = "CANCELAR_COMANDA",
+    val confirmacao: String = "CANCELAR"
+)
 
 @Serializable
 private data class RegisterPaymentRequest(
@@ -145,16 +148,31 @@ class OrdersRepository(retrofit: Retrofit) {
     suspend fun list(): List<Order> = api.listFinancial().requireBody("Não foi possível carregar os pedidos.").pedidos
 
     suspend fun updateStatus(id: Int, status: String) {
-        val response = if (status == "CANCELADO") {
-            api.cancelCommand(id, CancelCommandRequest())
-        } else {
-            api.updateStatus(id, OrderStatusRequest(status))
+        val normalized = status.uppercase()
+        if (normalized == "CANCELADO") {
+            throw OrdersException(
+                "Cancelamento exige confirmação explícita. Use a ação de cancelar pedido.",
+                409
+            )
         }
-        response.requireSuccess("Não foi possível atualizar o pedido.")
+        api.updateStatus(id, OrderStatusRequest(normalized))
+            .requireSuccess("Não foi possível atualizar o pedido.")
+    }
+
+    suspend fun cancelOrder(id: Int) {
+        api.cancelCommand(id, CancelCommandRequest())
+            .requireSuccess("Não foi possível cancelar a comanda.")
     }
 
     suspend fun updatePayment(id: Int, status: String) {
         val normalized = status.uppercase()
+        if (normalized == "CANCELADO") {
+            throw OrdersException(
+                "O pagamento não pode ser cancelado pelo seletor. Use o fluxo de cancelamento da comanda.",
+                409
+            )
+        }
+
         val direct = api.updatePayment(id, PaymentStatusRequest(normalized))
         if (direct.isSuccessful) return
 
