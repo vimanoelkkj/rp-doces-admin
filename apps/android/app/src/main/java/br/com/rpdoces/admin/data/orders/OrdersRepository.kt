@@ -83,6 +83,14 @@ data class OrderItemUpdateInput(
 )
 
 @Serializable
+private data class PaidOrderItemExchangeInput(
+    @SerialName("produto_id") val productId: Int,
+    val quantidade: Int,
+    @SerialName("devolucao_metodo") val refundMethod: String? = null,
+    @SerialName("confirmacao_devolucao") val refundConfirmation: String? = null
+)
+
+@Serializable
 private data class OrderItemReallocationInput(
     @SerialName("destino_item_id") val targetItemId: Int
 )
@@ -118,6 +126,13 @@ private interface OrdersApi {
 
     @PUT("api/admin/orders/{id}/items")
     suspend fun updateItem(@Path("id") id: Int, @Body body: OrderItemUpdateInput): Response<JsonElement>
+
+    @POST("api/admin/orders/{id}/items/{itemId}/exchange")
+    suspend fun exchangePaidItem(
+        @Path("id") id: Int,
+        @Path("itemId") itemId: Int,
+        @Body body: PaidOrderItemExchangeInput
+    ): Response<JsonElement>
 
     @DELETE("api/admin/orders/{id}/items/{itemId}")
     suspend fun deleteItem(@Path("id") id: Int, @Path("itemId") itemId: Int): Response<JsonElement>
@@ -226,6 +241,26 @@ class OrdersRepository(retrofit: Retrofit) {
             id,
             OrderItemUpdateInput(itemId = itemId, productId = productId, quantidade = quantity)
         ).requireSuccess("Não foi possível alterar o item do pedido.")
+    }
+
+    suspend fun exchangePaidItem(
+        id: Int,
+        itemId: Int,
+        productId: Int,
+        quantity: Int,
+        refundMethod: String? = null,
+        confirmRefund: Boolean = false
+    ) {
+        api.exchangePaidItem(
+            id,
+            itemId,
+            PaidOrderItemExchangeInput(
+                productId = productId,
+                quantidade = quantity,
+                refundMethod = refundMethod,
+                refundConfirmation = if (confirmRefund) "DEVOLVIDO" else null
+            )
+        ).requireSuccess("Não foi possível trocar o item pago.")
     }
 
     suspend fun deleteItem(id: Int, itemId: Int) {
