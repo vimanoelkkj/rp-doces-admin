@@ -8,6 +8,9 @@ export const OrderItemSchema = z.object({
   quantidade: z.coerce.number().default(0),
   valor_unitario_centavos: z.coerce.number().default(0),
   valor_total_centavos: z.coerce.number().default(0),
+  valor_pago_centavos: z.coerce.number().default(0),
+  saldo_centavos: z.coerce.number().default(0),
+  status_financeiro: z.string().nullable().optional(),
   estoque_baixado_em: z.string().nullable().optional(),
   adicionado_por_usuario_id: z.coerce.number().nullable().optional(),
   adicionado_em: z.string().nullable().optional()
