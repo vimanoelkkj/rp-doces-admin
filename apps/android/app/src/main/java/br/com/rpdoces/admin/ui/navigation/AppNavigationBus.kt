@@ -8,6 +8,7 @@ sealed interface AppNavigationRequest {
 }
 
 object AppNavigationBus {
+    // Eventos efêmeros: o foco é consumido ao abrir Produtos para não reaparecer ao recriar a tela.
     private val channel = Channel<AppNavigationRequest>(Channel.BUFFERED)
     val requests = channel.receiveAsFlow()
 
