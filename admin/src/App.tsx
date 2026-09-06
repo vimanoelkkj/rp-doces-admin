@@ -53,6 +53,7 @@ export function App() {
   const [page, setPage] = useState<AdminV2Page>(initialPage);
   const [visited, setVisited] = useState<Set<AdminV2Page>>(() => new Set([initialPage]));
   const [hasNavigated, setHasNavigated] = useState(false);
+  const [productFocusIds, setProductFocusIds] = useState<number[]>([]);
   const pageRef = useRef<AdminV2Page>(initialPage);
   const scrollPositions = useRef<Record<AdminV2Page, number>>({
     dashboard: 0,
@@ -93,8 +94,13 @@ export function App() {
     window.scrollTo(0, scrollPositions.current[page]);
   }, [page]);
 
-  function navigate(nextPage: AdminV2Page) {
+  function navigate(nextPage: AdminV2Page, focusProductIds?: number[]) {
     if (closeTopBackLayer()) return;
+
+    if (nextPage === "produtos" && focusProductIds?.length) {
+      setProductFocusIds([...new Set(focusProductIds.filter(id => Number.isInteger(id) && id > 0))]);
+    }
+
     if (nextPage === pageRef.current) return;
     window.history.pushState(null, "", `#${nextPage}`);
     activate(nextPage);
@@ -136,7 +142,15 @@ export function App() {
                   ? <AppControlPage active={active} />
                   : <p>Somente proprietários e administradores podem acessar o controle do aplicativo.</p>;
               } else {
-                content = <ProductsPage session={session} onNavigate={navigate} active={active} />;
+                content = (
+                  <ProductsPage
+                    session={session}
+                    onNavigate={navigate}
+                    active={active}
+                    focusProductIds={productFocusIds}
+                    onFocusConsumed={() => setProductFocusIds([])}
+                  />
+                );
               }
 
               return (
