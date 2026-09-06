@@ -25,7 +25,7 @@
 }
 
 .trigger:hover:not(:disabled) {
-  background: var(--surface-2);
+  background: var(--accent-wash);
   border-color: color-mix(in srgb, var(--accent) 34%, var(--line-strong));
 }
 
@@ -101,13 +101,14 @@
   line-height: 1.35;
   text-align: left;
   cursor: pointer;
+  transition: background .12s ease, color .12s ease;
 }
 
 .option:hover:not(:disabled),
 .option:focus-visible {
   outline: none;
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--accent-soft);
+  color: var(--accent-dark);
 }
 
 .selected {
