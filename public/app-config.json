@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "revision": 10,
+  "min_app_version_code": 1,
+  "poll_seconds": 30,
+  "theme": "system",
+  "maintenance": {
+    "enabled": false,
+    "eyebrow": "MANUTENÇÃO",
+    "title": "Voltamos em instantes",
+    "message": "O painel está temporariamente indisponível enquanto fazemos um ajuste."
+  },
+  "update": {
+    "eyebrow": "ATUALIZAÇÃO NECESSÁRIA",
+    "title": "Atualize o R&P Doces",
+    "message": "Há uma versão mais recente do aplicativo disponível.",
+    "url": ""
+  },
+  "navigation": {
+    "dashboard": true,
+    "products": true,
+    "orders": true,
+    "admins": true,
+    "store": true
+  },
+  "dashboard_banner": {
+    "enabled": false,
+    "eyebrow": "AVISO",
+    "title": "",
+    "message": "",
+    "tone": "accent"
+  },
+  "features": {
+    "dashboard_metrics": true,
+    "dashboard_flavors": true,
+    "dashboard_receivables": true,
+    "dashboard_recent_orders": true,
+    "dashboard_attention": true,
+    "orders_manual_create": true,
+    "paid_order_notifications": true
+  },
+  "dashboard_section_order": [
+    "metrics",
+    "flavors",
+    "receivables",
+    "recent_orders",
+    "attention"
+  ]
+}

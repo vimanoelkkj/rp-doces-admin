@@ -45,6 +45,7 @@ import br.com.rpdoces.admin.ui.components.WebField
 import br.com.rpdoces.admin.ui.components.WebModal
 import br.com.rpdoces.admin.ui.components.WebModalActions
 import br.com.rpdoces.admin.ui.components.WebModalHeader
+import br.com.rpdoces.admin.ui.remote.LocalAppRemoteConfig
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
 import java.text.NumberFormat
 import java.util.Locale
@@ -70,6 +71,31 @@ internal fun ManualOrderDialog(
     onCreated: (Int) -> Unit
 ) {
     val web = LocalRPWebColors.current
+    val remoteConfig = LocalAppRemoteConfig.current
+
+    if (!remoteConfig.features.ordersManualCreate) {
+        WebModal(onDismiss = onDismiss, maxWidth = 420) {
+            WebModalHeader(
+                kicker = "Pedidos",
+                title = "Novo pedido pausado",
+                subtitle = "A criação manual de pedidos foi desativada temporariamente pelo servidor.",
+                onClose = onDismiss
+            )
+            Surface(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(9.dp),
+                color = web.surface,
+                border = BorderStroke(1.dp, web.borderStrong)
+            ) {
+                Box(modifier = Modifier.height(40.dp), contentAlignment = Alignment.Center) {
+                    Text("Fechar", color = web.accentDark, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        return
+    }
+
     val scope = rememberCoroutineScope()
     var products by remember { mutableStateOf<List<Product>>(emptyList()) }
     val quantities = remember { mutableStateMapOf<Int, Int>() }
@@ -191,6 +217,10 @@ internal fun ManualOrderDialog(
             primaryText = "Registrar pedido",
             onPrimary = {
                 if (saving) return@WebModalActions
+                if (!remoteConfig.features.ordersManualCreate) {
+                    error = "A criação manual de pedidos foi pausada pelo servidor."
+                    return@WebModalActions
+                }
                 error = when {
                     selectedItems.isEmpty() -> "Adicione pelo menos um produto."
                     customer.trim().isBlank() -> "Informe o nome da cliente."

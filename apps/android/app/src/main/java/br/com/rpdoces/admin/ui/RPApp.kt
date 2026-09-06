@@ -2,6 +2,7 @@ package br.com.rpdoces.admin.ui
 
 import android.Manifest
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -37,6 +38,8 @@ import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -84,6 +87,7 @@ import br.com.rpdoces.admin.data.products.ProductsRepository
 import br.com.rpdoces.admin.data.store.StoreRepository
 import br.com.rpdoces.admin.notifications.NativeNotifications
 import br.com.rpdoces.admin.ui.admins.AdminsScreen
+import br.com.rpdoces.admin.ui.appcontrol.AppControlScreen
 import br.com.rpdoces.admin.ui.auth.AuthUiState
 import br.com.rpdoces.admin.ui.auth.AuthViewModel
 import br.com.rpdoces.admin.ui.components.MotionDropdownMenu
@@ -92,6 +96,7 @@ import br.com.rpdoces.admin.ui.components.RPMotion
 import br.com.rpdoces.admin.ui.dashboard.DashboardScreen
 import br.com.rpdoces.admin.ui.orders.OrdersScreen
 import br.com.rpdoces.admin.ui.products.ProductsScreen
+import br.com.rpdoces.admin.ui.remote.LocalAppRemoteConfig
 import br.com.rpdoces.admin.ui.store.StoreScreen
 import br.com.rpdoces.admin.ui.theme.LocalRPThemeController
 import br.com.rpdoces.admin.ui.theme.LocalRPWebColors
@@ -102,16 +107,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 private enum class MainTab(
+    val remoteKey: String,
     val label: String,
     val mobileLabel: String,
     val subtitle: String,
     val icon: ImageVector
 ) {
-    Dashboard("Dashboard", "Dashboard", "Visão geral da operação", SiteNavIcons.Dashboard),
-    Produtos("Produtos", "Produtos", "Catálogo, categorias, estoque e promoções", SiteNavIcons.Products),
-    Pedidos("Pedidos", "Pedidos", "", SiteNavIcons.Orders),
-    Admins("Administradores", "Admins", "Contas, níveis de acesso e segurança da equipe", SiteNavIcons.Users),
-    Loja("Loja", "Loja", "Atendimento, contato e aparência do site público", SiteNavIcons.Store)
+    Dashboard("dashboard", "Dashboard", "Dashboard", "Visão geral da operação", SiteNavIcons.Dashboard),
+    Produtos("products", "Produtos", "Produtos", "Catálogo, categorias, estoque e promoções", SiteNavIcons.Products),
+    Pedidos("orders", "Pedidos", "Pedidos", "", SiteNavIcons.Orders),
+    Admins("admins", "Administradores", "Admins", "Contas, níveis de acesso e segurança da equipe", SiteNavIcons.Users),
+    Loja("store", "Loja", "Loja", "Atendimento, contato e aparência do site público", SiteNavIcons.Store)
 }
 
 @Composable
@@ -254,10 +260,38 @@ private fun MainShell(
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
+    val remoteConfig = LocalAppRemoteConfig.current
+    val visibleTabs = remember(remoteConfig.navigation) {
+        MainTab.entries.filter { remoteConfig.navigation.isVisible(it.remoteKey) }
+    }
+    val canManageApp = remember(user.papel) {
+        user.papel.trim().uppercase() in setOf("OWNER", "ADMIN")
+    }
     var selected by rememberSaveable { mutableStateOf(MainTab.Dashboard) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var notificationOpen by rememberSaveable { mutableStateOf(false) }
+    var appControlOpen by rememberSaveable { mutableStateOf(false) }
     var notificationsEnabled by remember { mutableStateOf(NativeNotifications.isEnabled(context)) }
+
+    BackHandler(enabled = appControlOpen) {
+        appControlOpen = false
+    }
+
+    fun openTab(tab: MainTab) {
+        if (tab !in visibleTabs || tab == selected) return
+        appControlOpen = false
+        profileOpen = false
+        notificationOpen = false
+        selected = tab
+    }
+
+    LaunchedEffect(visibleTabs, selected) {
+        if (selected !in visibleTabs) {
+            selected = visibleTabs.firstOrNull() ?: MainTab.Dashboard
+            profileOpen = false
+            notificationOpen = false
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         NativeNotifications.setEnabled(context, granted)
@@ -265,6 +299,7 @@ private fun MainShell(
     }
 
     fun toggleNotifications() {
+        if (!remoteConfig.features.paidOrderNotifications) return
         if (notificationsEnabled) {
             NativeNotifications.setEnabled(context, false)
             notificationsEnabled = false
@@ -283,8 +318,8 @@ private fun MainShell(
         NativeNotifications.createChannel(context)
     }
 
-    LaunchedEffect(notificationsEnabled, user.id) {
-        if (!notificationsEnabled) return@LaunchedEffect
+    LaunchedEffect(notificationsEnabled, user.id, remoteConfig.features.paidOrderNotifications) {
+        if (!notificationsEnabled || !remoteConfig.features.paidOrderNotifications) return@LaunchedEffect
         var knownPaidIds = emptySet<Int>()
         var seeded = false
 
@@ -310,84 +345,99 @@ private fun MainShell(
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                MobileBottomBar(
-                    selected = selected,
-                    onSelected = {
-                        if (it != selected) {
-                            profileOpen = false
-                            notificationOpen = false
-                            selected = it
-                        }
-                    }
-                )
+                if (!appControlOpen) {
+                    MobileBottomBar(
+                        selected = selected,
+                        tabs = visibleTabs,
+                        onSelected = ::openTab
+                    )
+                }
             }
         ) { scaffoldPadding ->
             Box(modifier = Modifier.fillMaxSize()) {
-                AnimatedContent(
-                    targetState = selected,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = scaffoldPadding.calculateBottomPadding())
-                        .padding(top = RPWebMetrics.mobileContentTop),
-                    transitionSpec = {
-                        val direction = if (targetState.ordinal >= initialState.ordinal) 1 else -1
-                        (fadeIn(tween(RPMotion.Fast, easing = RPMotion.EaseOut)) +
-                            slideInHorizontally(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { direction * it / 7 }) togetherWith
-                            (fadeOut(tween(RPMotion.Fast)) +
-                                slideOutHorizontally(tween(RPMotion.Fast)) { -direction * it / 9 })
-                    },
-                    label = "main-tab"
-                ) { tab ->
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        PageHeader(tab)
-                        when (tab) {
-                            MainTab.Dashboard -> DashboardScreen(
-                                repository = dashboardRepository,
-                                onOpenOrders = { selected = MainTab.Pedidos },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            MainTab.Produtos -> ProductsScreen(
-                                repository = productsRepository,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            MainTab.Pedidos -> OrdersScreen(
-                                repository = ordersRepository,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            MainTab.Admins -> AdminsScreen(
-                                repository = adminsRepository,
-                                viewer = user,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            MainTab.Loja -> StoreScreen(
-                                repository = storeRepository,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                if (appControlOpen) {
+                    AppControlScreen(
+                        viewer = user,
+                        onBack = { appControlOpen = false },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                    )
+                } else {
+                    AnimatedContent(
+                        targetState = selected,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = scaffoldPadding.calculateBottomPadding())
+                            .padding(top = RPWebMetrics.mobileContentTop),
+                        transitionSpec = {
+                            val direction = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                            (fadeIn(tween(RPMotion.Fast, easing = RPMotion.EaseOut)) +
+                                slideInHorizontally(tween(RPMotion.Normal, easing = RPMotion.EaseOut)) { direction * it / 7 }) togetherWith
+                                (fadeOut(tween(RPMotion.Fast)) +
+                                    slideOutHorizontally(tween(RPMotion.Fast)) { -direction * it / 9 })
+                        },
+                        label = "main-tab"
+                    ) { tab ->
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            PageHeader(tab)
+                            when (tab) {
+                                MainTab.Dashboard -> DashboardScreen(
+                                    repository = dashboardRepository,
+                                    onOpenOrders = { openTab(MainTab.Pedidos) },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                MainTab.Produtos -> ProductsScreen(
+                                    repository = productsRepository,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                MainTab.Pedidos -> OrdersScreen(
+                                    repository = ordersRepository,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                MainTab.Admins -> AdminsScreen(
+                                    repository = adminsRepository,
+                                    viewer = user,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                MainTab.Loja -> StoreScreen(
+                                    repository = storeRepository,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
-                }
 
-                MobileUtilities(
-                    user = user,
-                    profileOpen = profileOpen,
-                    notificationOpen = notificationOpen,
-                    notificationsEnabled = notificationsEnabled,
-                    onProfileOpenChange = {
-                        notificationOpen = false
-                        profileOpen = it
-                    },
-                    onNotificationOpenChange = {
-                        profileOpen = false
-                        notificationOpen = it
-                        if (it) notificationsEnabled = NativeNotifications.isEnabled(context)
-                    },
-                    onToggleNotifications = ::toggleNotifications,
-                    onLogout = onLogout,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(end = RPWebMetrics.utilityRight)
-                )
+                    MobileUtilities(
+                        user = user,
+                        profileOpen = profileOpen,
+                        notificationOpen = notificationOpen,
+                        notificationsEnabled = notificationsEnabled && remoteConfig.features.paidOrderNotifications,
+                        notificationFeatureEnabled = remoteConfig.features.paidOrderNotifications,
+                        canManageApp = canManageApp,
+                        onProfileOpenChange = {
+                            notificationOpen = false
+                            profileOpen = it
+                        },
+                        onNotificationOpenChange = {
+                            profileOpen = false
+                            notificationOpen = it
+                            if (it) notificationsEnabled = NativeNotifications.isEnabled(context)
+                        },
+                        onToggleNotifications = ::toggleNotifications,
+                        onOpenAppControl = {
+                            profileOpen = false
+                            notificationOpen = false
+                            appControlOpen = true
+                        },
+                        onLogout = onLogout,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                            .padding(end = RPWebMetrics.utilityRight)
+                    )
+                }
             }
         }
     }
@@ -476,9 +526,12 @@ private fun MobileUtilities(
     profileOpen: Boolean,
     notificationOpen: Boolean,
     notificationsEnabled: Boolean,
+    notificationFeatureEnabled: Boolean,
+    canManageApp: Boolean,
     onProfileOpenChange: (Boolean) -> Unit,
     onNotificationOpenChange: (Boolean) -> Unit,
     onToggleNotifications: () -> Unit,
+    onOpenAppControl: () -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -540,7 +593,7 @@ private fun MobileUtilities(
                 Column(modifier = Modifier.width(286.dp).padding(horizontal = 16.dp, vertical = 14.dp)) {
                     Text("Notificações", color = web.text, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        "Receba um aviso quando um novo pedido for pago.",
+                        if (notificationFeatureEnabled) "Receba um aviso quando um novo pedido for pago." else "As notificações foram pausadas remotamente.",
                         color = web.muted,
                         fontSize = 10.5.sp,
                         lineHeight = 15.sp,
@@ -554,14 +607,14 @@ private fun MobileUtilities(
                         Column(modifier = Modifier.padding(12.dp)) {
                             MotionValue(targetState = notificationsEnabled) { enabled ->
                                 Text(
-                                    if (enabled) "Ativas neste aparelho" else "Desativadas neste aparelho",
+                                    if (enabled) "Ativas neste aparelho" else if (notificationFeatureEnabled) "Desativadas neste aparelho" else "Pausadas pelo servidor",
                                     color = if (enabled) web.tagGreenText else web.muted,
                                     fontSize = 10.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Text(
-                                if (notificationsEnabled) "Você receberá avisos de novos pedidos pagos." else "Ative para permitir avisos nativos do Android.",
+                                if (notificationsEnabled) "Você receberá avisos de novos pedidos pagos." else if (notificationFeatureEnabled) "Ative para permitir avisos nativos do Android." else "O recurso volta automaticamente quando for reativado.",
                                 color = web.muted,
                                 fontSize = 10.sp,
                                 lineHeight = 14.sp,
@@ -569,20 +622,22 @@ private fun MobileUtilities(
                             )
                         }
                     }
-                    Surface(
-                        onClick = onToggleNotifications,
-                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                        shape = RoundedCornerShape(9.dp),
-                        color = web.surface,
-                        border = BorderStroke(1.dp, web.borderStrong)
-                    ) {
-                        Box(modifier = Modifier.height(38.dp), contentAlignment = Alignment.Center) {
-                            Text(
-                                if (notificationsEnabled) "Desativar notificações" else "Ativar notificações",
-                                color = web.accentDark,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                    if (notificationFeatureEnabled) {
+                        Surface(
+                            onClick = onToggleNotifications,
+                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                            shape = RoundedCornerShape(9.dp),
+                            color = web.surface,
+                            border = BorderStroke(1.dp, web.borderStrong)
+                        ) {
+                            Box(modifier = Modifier.height(38.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    if (notificationsEnabled) "Desativar notificações" else "Ativar notificações",
+                                    color = web.accentDark,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -672,6 +727,22 @@ private fun MobileUtilities(
                             )
                         }
                     }
+                    if (canManageApp) {
+                        Surface(
+                            onClick = onOpenAppControl,
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
+                            ) {
+                                Icon(Icons.Outlined.Tune, contentDescription = null, tint = web.accentDark, modifier = Modifier.size(17.dp))
+                                Text("Controle do App", color = web.text, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
                     Surface(
                         onClick = {
                             onProfileOpenChange(false)
@@ -698,6 +769,7 @@ private fun MobileUtilities(
 @Composable
 private fun MobileBottomBar(
     selected: MainTab,
+    tabs: List<MainTab>,
     onSelected: (MainTab) -> Unit
 ) {
     val web = LocalRPWebColors.current
@@ -720,7 +792,7 @@ private fun MobileBottomBar(
                     .height(RPWebMetrics.bottomNavItemHeight)
                     .padding(horizontal = 5.dp)
             ) {
-                MainTab.entries.forEach { tab ->
+                tabs.forEach { tab ->
                     val active = selected == tab
                     val indicatorWidth by animateDpAsState(
                         targetValue = if (active) RPWebMetrics.bottomNavIndicatorWidth else 0.dp,

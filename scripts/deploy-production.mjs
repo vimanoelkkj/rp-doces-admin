@@ -24,14 +24,32 @@ function run(command, args, options = {}) {
 
 function gitOutput(args) {
   const result = run("git", args, { capture: true });
-  return { status: result.status, output: String(result.stdout || "").trim() };
+  // Não remover espaços do início: no porcelain do Git eles fazem parte dos
+  // códigos XY (ex.: " M arquivo" para modificação no working tree).
+  return { status: result.status, output: String(result.stdout || "").trimEnd() };
+}
+
+function isAndroidOnlyChange(line) {
+  const porcelainPath = line.slice(3).trim().replaceAll("\\", "/");
+  const effectivePath = porcelainPath.includes(" -> ")
+    ? porcelainPath.split(" -> ").at(-1)
+    : porcelainPath;
+  return effectivePath?.startsWith("apps/android/") ?? false;
 }
 
 function assertCleanTree() {
   const status = gitOutput(["status", "--porcelain", "--untracked-files=all"]);
   if (status.status !== 0) cancel("Deploy cancelado: não foi possível verificar o working tree.");
-  if (status.output)
-    cancel("Deploy cancelado: existem alterações locais não commitadas.", status.output);
+
+  // O deploy publica apenas public/. Alterações locais do app Android não entram
+  // no bundle do site e não devem bloquear uma publicação web.
+  const webChanges = status.output
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .filter(line => !isAndroidOnlyChange(line));
+
+  if (webChanges.length)
+    cancel("Deploy cancelado: existem alterações locais não commitadas no site.", webChanges.join("\n"));
 }
 
 const branch = gitOutput(["symbolic-ref", "--quiet", "--short", "HEAD"]);
