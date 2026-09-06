@@ -1,5 +1,6 @@
 name: One-off paid exchange finalize
 
+# Revalidação final após manter os campos financeiros por item opcionais no Admin.
 on:
   push:
     branches: [main]
