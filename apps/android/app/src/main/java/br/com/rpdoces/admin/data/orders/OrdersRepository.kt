@@ -68,6 +68,11 @@ data class OrderItemUpdateInput(
 )
 
 @Serializable
+private data class OrderItemReallocationInput(
+    @SerialName("destino_item_id") val targetItemId: Int
+)
+
+@Serializable
 data class ManualOrderItemInput(
     @SerialName("produto_id") val productId: Int,
     val quantidade: Int
@@ -101,6 +106,13 @@ private interface OrdersApi {
 
     @DELETE("api/admin/orders/{id}/items/{itemId}")
     suspend fun deleteItem(@Path("id") id: Int, @Path("itemId") itemId: Int): Response<JsonElement>
+
+    @POST("api/admin/orders/{id}/items/{itemId}/reallocate")
+    suspend fun reallocateItemPayment(
+        @Path("id") id: Int,
+        @Path("itemId") itemId: Int,
+        @Body body: OrderItemReallocationInput
+    ): Response<JsonElement>
 
     @POST("api/admin/orders/{id}/payments")
     suspend fun cancelCommand(@Path("id") id: Int, @Body body: CancelCommandRequest): Response<JsonElement>
@@ -136,6 +148,14 @@ class OrdersRepository(retrofit: Retrofit) {
 
     suspend fun deleteItem(id: Int, itemId: Int) {
         api.deleteItem(id, itemId).requireSuccess("Não foi possível excluir o item da comanda.")
+    }
+
+    suspend fun reallocateItemPayment(id: Int, itemId: Int, targetItemId: Int) {
+        api.reallocateItemPayment(
+            id,
+            itemId,
+            OrderItemReallocationInput(targetItemId = targetItemId)
+        ).requireSuccess("Não foi possível corrigir o produto pago da comanda.")
     }
 
     suspend fun createManual(input: ManualOrderInput): Int = api.createManual(input)
