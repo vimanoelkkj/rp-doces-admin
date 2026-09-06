@@ -5,7 +5,7 @@ import { recalculateComanda, syncManualPaidOrder } from "../../../lib/comandaLed
 import { reconcileActiveReservationsForOrder } from "../../../lib/stockReservation.js";
 
 const VALIDOS = new Set(["NOVO", "PREPARANDO", "PRONTO", "ENTREGUE", "CANCELADO"]);
-const PAGAMENTOS_MANUAIS = new Set(["PENDENTE", "PAGO", "CANCELADO"]);
+const PAGAMENTOS_MANUAIS = new Set(["PENDENTE", "PAGO"]);
 
 async function itensAgrupados(env, pedidoId) {
   const { results } = await env.DB.prepare(
@@ -101,6 +101,7 @@ async function reservarPedidoManual(env, pedidoId) {
            reserva_status = 'ATIVA',
            reserva_expira_em = NULL,
            reserva_liberada_em = NULL,
+           status_comanda = 'ABERTA',
            status_pedido = CASE WHEN status_pedido = 'CANCELADO' THEN 'NOVO' ELSE status_pedido END,
            atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`
@@ -142,6 +143,7 @@ async function confirmarPagamentoManual(env, pedido, usuarioId) {
       `UPDATE pedidos
        SET status_pagamento = 'PAGO',
            pago_em = CURRENT_TIMESTAMP,
+           status_comanda = 'ABERTA',
            status_pedido = CASE WHEN status_pedido = 'CANCELADO' THEN 'NOVO' ELSE status_pedido END,
            atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`
@@ -171,7 +173,7 @@ async function confirmarPagamentoManual(env, pedido, usuarioId) {
     return { ok: false, erro: stock.erro || "ESTOQUE_INCONSISTENTE" };
   }
 
-  return { ok: true, status_pagamento: "PAGO" };
+  return { ok: true, status_pagamento: "PAGO", status_pedido: "NOVO", status_comanda: "ABERTA" };
 }
 
 async function cancelarPagamentoManual(env, pedido) {
@@ -211,8 +213,12 @@ async function cancelarPagamentoManual(env, pedido) {
 }
 
 async function tornarPendenteManual(env, pedido) {
-  if (pedido.status_pagamento === "PENDENTE" && pedido.reserva_status === "ATIVA") {
-    return { ok: true, status_pagamento: "PENDENTE" };
+  if (
+    pedido.status_pagamento === "PENDENTE" &&
+    pedido.reserva_status === "ATIVA" &&
+    String(pedido.status_comanda || "ABERTA").toUpperCase() === "ABERTA"
+  ) {
+    return { ok: true, status_pagamento: "PENDENTE", status_comanda: "ABERTA" };
   }
 
   const pago = await valorConfirmado(env, pedido);
@@ -226,7 +232,7 @@ async function tornarPendenteManual(env, pedido) {
 
   const reserva = await reservarPedidoManual(env, pedido.id);
   if (!reserva.ok) return reserva;
-  return { ok: true, status_pagamento: "PENDENTE", status_pedido: "NOVO" };
+  return { ok: true, status_pagamento: "PENDENTE", status_pedido: "NOVO", status_comanda: "ABERTA" };
 }
 
 export async function onRequestPut({ request, env, params }) {
@@ -239,7 +245,7 @@ export async function onRequestPut({ request, env, params }) {
   if (!Number.isInteger(id) || id < 1) return json({ erro: "Dados inválidos." }, 400);
 
   const pedido = await env.DB.prepare(
-    `SELECT id, origem_pedido, status_pedido, status_pagamento, reserva_status,
+    `SELECT id, origem_pedido, status_pedido, status_pagamento, status_comanda, reserva_status,
             estoque_baixado_em, valor_total_centavos
      FROM pedidos WHERE id = ? LIMIT 1`
   )
@@ -250,24 +256,27 @@ export async function onRequestPut({ request, env, params }) {
   if (body?.status_pagamento != null) {
     const nextPayment = String(body.status_pagamento || "").toUpperCase();
     if (pedido.origem_pedido !== "MANUAL" || !PAGAMENTOS_MANUAIS.has(nextPayment)) {
-      return json({ erro: "Alteração de pagamento inválida." }, 400);
+      return json({
+        erro: nextPayment === "CANCELADO"
+          ? "O pagamento não pode ser cancelado pelo seletor. Use o fluxo explícito de cancelamento da comanda."
+          : "Alteração de pagamento inválida."
+      }, 400);
     }
 
     let result;
     if (nextPayment === "PAGO") result = await confirmarPagamentoManual(env, pedido, auth.user.id);
-    else if (nextPayment === "CANCELADO") result = await cancelarPagamentoManual(env, pedido);
     else result = await tornarPendenteManual(env, pedido);
 
     if (!result.ok) {
       const mensagem =
         result.erro === "ESTOQUE_INSUFICIENTE"
-          ? "Não há estoque físico suficiente para quitar esta comanda."
+          ? "Não há estoque físico suficiente para quitar ou reabrir esta comanda."
           : result.erro === "PRODUTO_NAO_ENCONTRADO"
             ? "Um produto desta comanda não existe mais no estoque."
             : result.erro === "PAGAMENTO_CONFIRMADO_ESTOQUE_PENDENTE"
               ? "O pagamento já está registrado, mas a baixa de estoque ainda não pôde ser concluída. Confira o estoque da comanda antes de tentar novamente."
               : result.erro === "PAGAMENTO_CONFIRMADO_REQUER_ESTORNO"
-                ? "Este pedido já possui pagamento confirmado. Faça o estorno/reembolso antes de alterar ou cancelar o pagamento."
+                ? "Este pedido já possui pagamento confirmado. Faça o estorno/reembolso antes de alterar o pagamento."
                 : result.erro === "ERRO_FINANCEIRO" || result.erro === "PAGAMENTO_NAO_REGISTRADO"
                   ? "Não foi possível registrar a quitação no financeiro."
                   : "Não foi possível atualizar o pagamento por inconsistência no estoque.";
