@@ -120,13 +120,19 @@ export async function deleteOrderItem(id: number, itemId: number): Promise<void>
 export async function reallocateOrderItemPayment(
   id: number,
   itemId: number,
-  targetItemId: number
+  targetItemId: number,
+  refundMethod?: RefundMethod,
+  confirmRefund = false
 ): Promise<void> {
   await requestJson(
     `/api/admin/orders/${id}/items/${itemId}/reallocate`,
     {
       method: "POST",
-      body: JSON.stringify({ destino_item_id: targetItemId })
+      body: JSON.stringify({
+        destino_item_id: targetItemId,
+        ...(refundMethod ? { devolucao_metodo: refundMethod } : {}),
+        ...(confirmRefund ? { confirmacao_devolucao: "DEVOLVIDO" } : {})
+      })
     },
     "Não foi possível corrigir o produto pago da comanda."
   );
