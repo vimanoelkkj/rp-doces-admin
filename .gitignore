@@ -9,5 +9,5 @@ Thumbs.db
 /.private-backups/
 /backup-*.sql
 /rp-doces-backup-*.sql
-/public/admin-v2/
-/admin-v2/tsconfig.tsbuildinfo
+/public/admin/
+/admin/tsconfig.tsbuildinfo

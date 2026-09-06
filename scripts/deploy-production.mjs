@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
@@ -60,31 +60,35 @@ if (branch.output !== "main") {
   cancel("Deploy cancelado: você não está na branch main.", `Branch atual: ${branch.output}`);
 }
 
+// Remove o bundle gerado pelo antigo caminho /admin-v2 para não deixar lixo local
+// após a consolidação do painel em /admin.
+rmSync(path.join(process.cwd(), "public", "admin-v2"), { recursive: true, force: true });
+
 assertCleanTree();
 
 console.log("Branch main confirmada. Executando testes...");
 const tests = run("npm", ["test"]);
 if (tests.status !== 0) cancel("Deploy cancelado: os testes falharam.");
 
-const adminV2Dir = path.join(process.cwd(), "admin-v2");
-const adminV2Modules = path.join(adminV2Dir, "node_modules");
-if (!existsSync(adminV2Modules)) {
+const adminDir = path.join(process.cwd(), "admin");
+const adminModules = path.join(adminDir, "node_modules");
+if (!existsSync(adminModules)) {
   cancel(
-    "Deploy cancelado: dependências do Admin V2 não encontradas.",
-    "Execute npm install dentro de admin-v2 antes de publicar."
+    "Deploy cancelado: dependências do Admin não encontradas.",
+    "Execute npm install dentro de admin antes de publicar."
   );
 }
 
-console.log("Executando testes do Admin V2...");
-const adminV2Tests = run("npm", ["test"], { cwd: adminV2Dir });
-if (adminV2Tests.status !== 0) cancel("Deploy cancelado: os testes do Admin V2 falharam.");
+console.log("Executando testes do Admin...");
+const adminTests = run("npm", ["test"], { cwd: adminDir });
+if (adminTests.status !== 0) cancel("Deploy cancelado: os testes do Admin falharam.");
 
-console.log("Gerando bundle de produção do Admin V2...");
-const adminV2Build = run("npm", ["run", "build"], { cwd: adminV2Dir });
-if (adminV2Build.status !== 0) cancel("Deploy cancelado: o build do Admin V2 falhou.");
+console.log("Gerando bundle de produção do Admin...");
+const adminBuild = run("npm", ["run", "build"], { cwd: adminDir });
+if (adminBuild.status !== 0) cancel("Deploy cancelado: o build do Admin falhou.");
 
 // Impede que testes ou hooks deixem artefatos versionados não commitados antes da publicação.
-// O bundle gerado em public/admin-v2 é ignorado pelo Git e é publicado pelo Wrangler logo abaixo.
+// O bundle gerado em public/admin é ignorado pelo Git e é publicado pelo Wrangler logo abaixo.
 assertCleanTree();
 
 if (CHECK_ONLY) {

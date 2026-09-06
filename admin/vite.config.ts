@@ -5,7 +5,7 @@ const apiTarget = "http://127.0.0.1:8788";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/admin-v2/",
+  base: "/admin/",
   server: {
     proxy: {
       "/api": {
@@ -14,18 +14,14 @@ export default defineConfig({
         configure(proxy) {
           proxy.on("proxyReq", proxyReq => {
             proxyReq.setHeader("Origin", apiTarget);
-            proxyReq.setHeader("Referer", `${apiTarget}/admin-v2/`);
+            proxyReq.setHeader("Referer", `${apiTarget}/admin/`);
           });
         }
-      },
-      "/admin/": {
-        target: apiTarget,
-        changeOrigin: true
       }
     }
   },
   build: {
-    outDir: "../public/admin-v2",
+    outDir: "../public/admin",
     emptyOutDir: true
   }
 });

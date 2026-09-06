@@ -1,41 +1,64 @@
 # R&P Doces
 
-Estrutura:
+Aplicação da R&P Doces com storefront, painel administrativo, backend e aplicativo Android nativo.
 
-- `public/` site público
-- `public/admin/` painel administrativo
-- `functions/` Pages Functions / API
-- `migrations/002_admin.sql` tabelas de autenticação e coluna `emoji`
+## Estrutura
 
-## Antes do primeiro deploy com Functions
+- `public/` storefront e assets públicos
+- `admin/` painel administrativo React + Vite + TypeScript
+- `apps/android/` aplicativo Android nativo em Kotlin/Compose
+- `functions/` Pages Functions e APIs
+- `migrations/` migrações do D1
+- `scripts/` rotinas de build, backup, validação e deploy
+- `tests/` testes do backend e da infraestrutura web
 
-1. Execute `migrations/002_admin.sql` no Console do D1 `rp-doces-db`.
-2. Em Pages > rp-doces > Settings > Variables and secrets, crie um **Secret** chamado `SETUP_KEY`.
-   Use uma chave forte e temporária.
-3. O binding D1 `DB -> rp-doces-db` já deve permanecer configurado no dashboard.
-4. No PC:
-   - `npm install`
-   - `npx wrangler login`
-   - `npm run deploy`
-5. Acesse `/admin/`. Como ainda não existe administrador, aparecerá a primeira configuração.
-6. Crie sua conta usando a mesma `SETUP_KEY`.
-7. Depois crie as outras duas contas pelo painel.
+O painel administrativo oficial é publicado em `/admin/`.
 
-## Recuperação de senha
+## Desenvolvimento
 
-- Um administrador logado pode redefinir a senha de outro administrador.
-- O fluxo de token por e-mail já está implementado.
-- Para o envio automático funcionar, configure futuramente o binding `EMAIL` e a variável `EMAIL_FROM`.
-  Isso pode ser feito quando o domínio próprio estiver no Cloudflare Email Service.
+### Raiz / storefront / backend
 
-## Mercado Pago Pix (Orders API)
+```bash
+npm ci
+npm test
+npm run dev
+```
 
-1. Aplique `migrations/007_pedidos_mercado_pago.sql` no D1.
-2. No Cloudflare Pages, configure os secrets:
-   - `MP_ACCESS_TOKEN` = Access Token do Mercado Pago (comece com credencial de teste).
-   - `MP_WEBHOOK_SECRET` = chave secreta gerada ao configurar o Webhook da aplicação.
-3. No Mercado Pago, configure o Webhook de **Order (Mercado Pago)** para:
-   - `https://rp-doces.pages.dev/api/webhooks/mercadopago`
-4. Faça deploy normalmente.
+### Admin
 
-O frontend envia apenas `produto_id`, quantidade e dados do cliente. O preço é sempre buscado e recalculado no Worker a partir do D1. O Access Token nunca é enviado ao navegador.
+```bash
+cd admin
+npm ci
+npm run dev
+```
+
+### Android
+
+```powershell
+cd apps\android
+.\gradlew.bat installDebug
+```
+
+## Produção
+
+Antes do deploy, instale as dependências da raiz e do Admin:
+
+```bash
+npm ci
+cd admin
+npm ci
+cd ..
+npm run deploy:production
+```
+
+O script de produção valida a branch `main`, o working tree, os testes da raiz, os testes e o build do Admin antes de publicar `public/` no Cloudflare Pages.
+
+## Infraestrutura
+
+- Cloudflare Pages para o site e o painel
+- Pages Functions para as APIs
+- D1 para persistência
+- R2 para imagens e arquivos
+- Mercado Pago para os fluxos de pagamento configurados no projeto
+
+Segredos e credenciais ficam no ambiente de produção e nunca devem ser enviados ao navegador nem versionados no repositório.
