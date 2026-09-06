@@ -13,7 +13,7 @@ function request() {
   });
 }
 
-function paidClosedOrder() {
+function paidClosedOrder(overrides = {}) {
   return {
     id: 18,
     status_pedido: "ENTREGUE",
@@ -21,21 +21,60 @@ function paidClosedOrder() {
     status_comanda: "ENCERRADA",
     reserva_status: "CONVERTIDA",
     estoque_baixado_em: "2026-09-05 15:00:00",
-    valor_total_centavos: 4000
+    valor_total_centavos: 4000,
+    ...overrides
   };
 }
 
-test("reabre comanda paga sem alterar pagamento nem estoque", async () => {
+function paidLedgerDb(order = paidClosedOrder()) {
   let reopened = false;
   const db = fakeDb(sql => {
     if (sql.includes("FROM admin_sessoes")) {
       return { first: () => ({ id: 1, nome: "Admin", ativo: 1, papel: "ADMIN" }) };
     }
-    if (sql.includes("FROM pedidos") && sql.includes("WHERE id = ? LIMIT 1")) {
-      return { first: () => paidClosedOrder() };
+    if (sql.includes("SELECT id, status_pedido") && sql.includes("FROM pedidos")) {
+      return { first: () => order };
+    }
+    if (sql.includes("SELECT * FROM pedidos")) {
+      return { first: () => ({ ...order, status_comanda: "ABERTA" }) };
     }
     if (sql.includes("SUM(valor_centavos)") && sql.includes("pedido_pagamentos")) {
       return { first: () => ({ total_centavos: 4000 }) };
+    }
+    if (sql.includes("FROM pedido_itens") && sql.includes("ORDER BY id")) {
+      return {
+        all: () => ({
+          results: [
+            {
+              id: 101,
+              pedido_id: 18,
+              produto_id: 1,
+              produto_nome: "Encanto",
+              quantidade: 1,
+              valor_unitario_centavos: 2000,
+              valor_total_centavos: 2000,
+              estoque_baixado_em: "2026-09-05 15:00:00"
+            },
+            {
+              id: 102,
+              pedido_id: 18,
+              produto_id: 2,
+              produto_nome: "Tentação",
+              quantidade: 1,
+              valor_unitario_centavos: 2000,
+              valor_total_centavos: 2000,
+              estoque_baixado_em: "2026-09-05 15:00:00"
+            }
+          ]
+        })
+      };
+    }
+    if (sql.includes("FROM pedido_pagamentos") && sql.includes("ORDER BY criado_em")) {
+      return {
+        all: () => ({
+          results: [{ id: 501, pedido_id: 18, metodo: "PIX_EXTERNO", valor_centavos: 4000, status: "PAGO" }]
+        })
+      };
     }
     if (sql.includes("UPDATE pedidos SET") && sql.includes("status_comanda = 'ABERTA'")) {
       return {
@@ -47,11 +86,16 @@ test("reabre comanda paga sem alterar pagamento nem estoque", async () => {
     }
     return {};
   });
+  return { db, wasReopened: () => reopened };
+}
+
+test("reabre comanda paga sem alterar pagamento nem estoque", async () => {
+  const fixture = paidLedgerDb();
 
   const response = await reopenPaidCommand({
     request: request(),
     params: { id: "18" },
-    env: { DB: db }
+    env: { DB: fixture.db }
   });
   const body = await responseJson(response);
 
@@ -59,8 +103,30 @@ test("reabre comanda paga sem alterar pagamento nem estoque", async () => {
   assert.equal(body.status_comanda, "ABERTA");
   assert.equal(body.status_pagamento, "PAGO");
   assert.equal(body.valor_pago_centavos, 4000);
+  assert.equal(body.saldo_centavos, 0);
   assert.equal(body.estoque_preservado, true);
-  assert.equal(reopened, true);
+  assert.equal(fixture.wasReopened(), true);
+});
+
+test("corrige status cancelado antigo a partir do ledger pago ao reabrir", async () => {
+  const fixture = paidLedgerDb(paidClosedOrder({
+    status_pedido: "CANCELADO",
+    status_pagamento: "CANCELADO"
+  }));
+
+  const response = await reopenPaidCommand({
+    request: request(),
+    params: { id: "18" },
+    env: { DB: fixture.db }
+  });
+  const body = await responseJson(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.status_comanda, "ABERTA");
+  assert.equal(body.status_pedido, "NOVO");
+  assert.equal(body.status_pagamento, "PAGO");
+  assert.equal(body.valor_pago_centavos, 4000);
+  assert.equal(body.estoque_preservado, true);
 });
 
 test("não usa o fluxo pago para reabrir comanda sem pagamento confirmado", async () => {
@@ -68,13 +134,11 @@ test("não usa o fluxo pago para reabrir comanda sem pagamento confirmado", asyn
     if (sql.includes("FROM admin_sessoes")) {
       return { first: () => ({ id: 1, nome: "Admin", ativo: 1, papel: "ADMIN" }) };
     }
-    if (sql.includes("FROM pedidos") && sql.includes("WHERE id = ? LIMIT 1")) {
+    if (sql.includes("SELECT id, status_pedido") && sql.includes("FROM pedidos")) {
       return {
-        first: () => ({
-          ...paidClosedOrder(),
+        first: () => paidClosedOrder({
           status_pedido: "CANCELADO",
-          status_pagamento: "CANCELADO",
-          valor_total_centavos: 4000
+          status_pagamento: "CANCELADO"
         })
       };
     }
