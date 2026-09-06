@@ -25,33 +25,23 @@ jobs:
           from pathlib import Path
           path = Path('apps/android/app/src/main/java/br/com/rpdoces/admin/ui/orders/OrdersScreen.kt')
           text = path.read_text(encoding='utf-8')
-          old = '''            onConfirm = { targetItemId ->
-                  val sourceItemId = item.id
-                  if (!reallocating && sourceItemId != null) {
-                      reallocating = true
-                      reallocationError = null
-                      scope.launch {
-                          runCatching {
-                              repository.reallocateItemPayment(order.id, sourceItemId, targetItemId)
-                          }.onSuccess {'''
-          new = '''            onConfirm = { targetItemId, refundMethod, confirmRefund ->
-                  val sourceItemId = item.id
-                  if (!reallocating && sourceItemId != null) {
-                      reallocating = true
-                      reallocationError = null
-                      scope.launch {
-                          runCatching {
-                              repository.reallocateItemPayment(
+          callback_old = 'onConfirm = { targetItemId ->'
+          callback_new = 'onConfirm = { targetItemId, refundMethod, confirmRefund ->'
+          call_old = 'repository.reallocateItemPayment(order.id, sourceItemId, targetItemId)'
+          call_new = '''repository.reallocateItemPayment(
                                   order.id,
                                   sourceItemId,
                                   targetItemId,
                                   refundMethod,
                                   confirmRefund
-                              )
-                          }.onSuccess {'''
-          if text.count(old) != 1:
-              raise SystemExit(f'Bloco Android esperado não encontrado exatamente uma vez: {text.count(old)}')
-          path.write_text(text.replace(old, new), encoding='utf-8')
+                              )'''
+          if text.count(callback_old) != 1:
+              raise SystemExit(f'Callback esperado não encontrado exatamente uma vez: {text.count(callback_old)}')
+          if text.count(call_old) != 1:
+              raise SystemExit(f'Chamada esperada não encontrada exatamente uma vez: {text.count(call_old)}')
+          text = text.replace(callback_old, callback_new)
+          text = text.replace(call_old, call_new)
+          path.write_text(text, encoding='utf-8')
           PY
 
       - name: Configurar Node.js
