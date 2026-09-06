@@ -144,7 +144,7 @@ export async function onRequestGet({ request, env }) {
     SELECT id, token_publico, produto_id, produto_nome, quantidade,
       valor_unitario_centavos, valor_total_centavos, cliente_nome, cliente_email,
       cliente_whatsapp, tipo_entrega, observacao, metodo_pagamento, status_pagamento, status_pedido,
-      origem_pedido, mp_order_id, mp_payment_id, mp_status, mp_status_detail,
+      status_comanda, origem_pedido, mp_order_id, mp_payment_id, mp_status, mp_status_detail,
       criado_em, atualizado_em, pago_em, estoque_baixado_em, reserva_status
     FROM pedidos ORDER BY id DESC LIMIT 250
   `
@@ -154,8 +154,9 @@ export async function onRequestGet({ request, env }) {
 
   const { results: itemRows } = await env.DB.prepare(
     `
-    SELECT pedido_id, produto_id, produto_nome, quantidade,
-           valor_unitario_centavos, valor_total_centavos, estoque_baixado_em
+    SELECT id, pedido_id, produto_id, produto_nome, quantidade,
+           valor_unitario_centavos, valor_total_centavos, estoque_baixado_em,
+           adicionado_por_usuario_id, adicionado_em
     FROM pedido_itens
     WHERE pedido_id IN (SELECT id FROM pedidos ORDER BY id DESC LIMIT 250)
     ORDER BY pedido_id DESC, id

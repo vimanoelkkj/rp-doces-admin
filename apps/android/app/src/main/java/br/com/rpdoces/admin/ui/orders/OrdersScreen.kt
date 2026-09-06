@@ -48,6 +48,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import br.com.rpdoces.admin.data.dashboard.dashboardParseInstant
 import br.com.rpdoces.admin.data.orders.Order
+import br.com.rpdoces.admin.data.orders.OrderItem
 import br.com.rpdoces.admin.data.orders.OrdersRepository
 import br.com.rpdoces.admin.data.products.ProductsRepository
 import br.com.rpdoces.admin.ui.components.MotionChevron
@@ -249,6 +250,7 @@ fun OrdersScreen(
         OrderDetailDialog(
             order = order,
             repository = repository,
+            productsRepository = productsRepository,
             onDismiss = { selected = null },
             onUpdated = {
                 scope.launch { reload(silent = true) }
@@ -362,6 +364,7 @@ private fun StatusTag(label: String, tone: String, modifier: Modifier = Modifier
 private fun OrderDetailDialog(
     order: Order,
     repository: OrdersRepository,
+    productsRepository: ProductsRepository,
     onDismiss: () -> Unit,
     onUpdated: () -> Unit
 ) {
@@ -374,9 +377,10 @@ private fun OrderDetailDialog(
     var paymentOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var editingItem by remember(order.id) { mutableStateOf<OrderItem?>(null) }
 
     Dialog(
-        onDismissRequest = { if (!saving) onDismiss() },
+        onDismissRequest = { if (!saving && editingItem == null) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = web.surface) {
@@ -394,7 +398,7 @@ private fun OrderDetailDialog(
                         Icons.Outlined.Close,
                         contentDescription = "Fechar",
                         tint = web.muted,
-                        modifier = Modifier.size(28.dp).clickable(enabled = !saving) { onDismiss() }.padding(4.dp)
+                        modifier = Modifier.size(28.dp).clickable(enabled = !saving && editingItem == null) { onDismiss() }.padding(4.dp)
                     )
                 }
 
@@ -422,9 +426,47 @@ private fun OrderDetailDialog(
                         item {
                             DetailSection("Itens") {
                                 order.itens.forEach { item ->
-                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("${item.quantidade}× ${item.productName ?: "Produto"}", color = web.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                                        Text(money(item.totalCents), color = web.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    val canEditItem = item.id != null &&
+                                        !order.commandStatus.equals("ENCERRADA", true) &&
+                                        !order.orderStatus.equals("CANCELADO", true)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                "${item.quantidade}× ${item.productName ?: "Produto"}",
+                                                color = web.text,
+                                                fontSize = 12.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                money(item.totalCents),
+                                                color = web.muted,
+                                                fontSize = 10.5.sp,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+                                        }
+                                        if (canEditItem) {
+                                            Surface(
+                                                onClick = { editingItem = item },
+                                                modifier = Modifier.height(32.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = web.accentSoft,
+                                                border = BorderStroke(1.dp, web.accent.copy(alpha = .35f))
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.padding(horizontal = 11.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text("Trocar", color = web.accentDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        } else {
+                                            Text(money(item.totalCents), color = web.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        }
                                     }
                                 }
                             }
@@ -521,6 +563,20 @@ private fun OrderDetailDialog(
                 }
             }
         }
+    }
+
+    editingItem?.let { item ->
+        EditOrderItemDialog(
+            order = order,
+            item = item,
+            ordersRepository = repository,
+            productsRepository = productsRepository,
+            onDismiss = { editingItem = null },
+            onSaved = {
+                editingItem = null
+                onUpdated()
+            }
+        )
     }
 }
 

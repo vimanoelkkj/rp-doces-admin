@@ -16,6 +16,12 @@ export type ManualOrderInput = {
   status_pagamento: ManualOrderPaymentStatus;
 };
 
+export type OrderItemUpdateInput = {
+  item_id: number;
+  produto_id: number;
+  quantidade: number;
+};
+
 const CreateManualOrderResponseSchema = z.object({
   ok: z.literal(true),
   id: z.coerce.number().int().positive()
@@ -58,6 +64,17 @@ export async function updateManualPayment(id: number, status: ManualPaymentStatu
       body: JSON.stringify({ status_pagamento: status })
     },
     "Não foi possível atualizar o pagamento."
+  );
+}
+
+export async function updateOrderItem(id: number, input: OrderItemUpdateInput): Promise<void> {
+  await requestJson(
+    `/api/admin/orders/${id}/items`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input)
+    },
+    "Não foi possível alterar o item do pedido."
   );
 }
 

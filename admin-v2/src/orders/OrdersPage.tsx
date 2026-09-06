@@ -13,7 +13,8 @@ import {
 } from "./order.api";
 import { getFinancialOrder, type FinancialOrder } from "./order.finance";
 import { itemsOf } from "./order.model";
-import type { Order } from "./order.schema";
+import type { Order, OrderItem } from "./order.schema";
+import { EditOrderItemDialog } from "./EditOrderItemDialog";
 import { ManualOrderDialog } from "./ManualOrderDialog";
 import styles from "./OrdersPage.module.css";
 
@@ -144,7 +145,7 @@ function paymentMethod(order: Order) {
   return order.metodo_pagamento || "—";
 }
 
-function orderItems(order: Order) {
+function orderItems(order: Order): OrderItem[] {
   const items = itemsOf(order);
   if (items.length) return items;
   return [{
@@ -296,6 +297,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const [financial, setFinancial] = useState<FinancialOrder | null>(null);
   const [financialLoading, setFinancialLoading] = useState(false);
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<OrderItem | null>(null);
   const [editing, setEditing] = useState(false);
   const [draftStatus, setDraftStatus] = useState<OrderStatus>("NOVO");
   const [draftPayment, setDraftPayment] = useState<ManualPaymentStatus>("PENDENTE");
@@ -313,9 +315,10 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const closeDrawer = useBackLayer(
     drawerOpen,
     () => {
-      if (savingEditRef.current) return false;
+      if (savingEditRef.current || editingItem) return false;
       setDrawerOpen(false);
       setEditing(false);
+      setEditingItem(null);
       return true;
     },
     "order-drawer"
@@ -425,14 +428,14 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   }, [selected, activeTab]);
 
   useEffect(() => {
-    if (!drawerOpen) return;
+    if (!drawerOpen || editingItem) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || savingEditRef.current) return;
       closeDrawer();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [drawerOpen, closeDrawer]);
+  }, [drawerOpen, editingItem, closeDrawer]);
 
   const counts = useMemo(() => ({
     todos: orders.length,
@@ -491,6 +494,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
     setActiveTab("pedido");
     setFinancial(null);
     setEditing(false);
+    setEditingItem(null);
     setEditError(null);
   }
 
@@ -696,7 +700,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                       type="button"
                       aria-label="Fechar"
                       onClick={closeDrawer}
-                      disabled={savingEdit}
+                      disabled={savingEdit || Boolean(editingItem)}
                     >
                       ×
                     </button>
@@ -724,6 +728,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                       type="button"
                       onClick={() => {
                         setEditing(false);
+                        setEditingItem(null);
                         setActiveTab("comanda");
                       }}
                     >
@@ -734,13 +739,30 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                   <div className={cls("pedido-panel", activeTab !== "pedido" && "hidden")}>
                     <section className={styles["drawer-section"]}>
                       <h3 className={styles["section-title"]}>Itens do pedido</h3>
-                      {selectedItems.map((item, index) => (
-                        <div className={styles["line-item"]} key={`${item.produto_id || "item"}-${index}`}>
-                          <span>{item.produto_nome || "Produto"}</span>
-                          <span className={styles.qty}>{item.quantidade}x</span>
-                          <span className={styles.price}>{money(item.valor_total_centavos)}</span>
-                        </div>
-                      ))}
+                      {selectedItems.map((item, index) => {
+                        const canEditItem = Boolean(item.id) &&
+                          String(selected.status_comanda || "ABERTA").toUpperCase() === "ABERTA" &&
+                          String(selected.status_pedido || "").toUpperCase() !== "CANCELADO";
+                        return (
+                          <div className={styles["line-item"]} key={`${item.id || item.produto_id || "item"}-${index}`}>
+                            <span style={{ display: "grid", gap: 7 }}>
+                              <span>{item.produto_nome || "Produto"}</span>
+                              {canEditItem ? (
+                                <button
+                                  className={styles["secondary-btn"]}
+                                  type="button"
+                                  style={{ width: "fit-content", height: 28, padding: "0 10px", color: "var(--pink-strong)" }}
+                                  onClick={() => setEditingItem(item)}
+                                >
+                                  Trocar
+                                </button>
+                              ) : null}
+                            </span>
+                            <span className={styles.qty}>{item.quantidade}x</span>
+                            <span className={styles.price}>{money(item.valor_total_centavos)}</span>
+                          </div>
+                        );
+                      })}
                       <div className={styles["total-row"]}>
                         <span>Total do pedido</span>
                         <span>{money(selected.valor_total_centavos)}</span>
@@ -915,6 +937,19 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
             setDrawerOpen(false);
             setActiveTab("pedido");
             setEditing(false);
+            setEditingItem(null);
+          }}
+        />
+      ) : null}
+
+      {selected && editingItem ? (
+        <EditOrderItemDialog
+          order={selected}
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onSaved={async () => {
+            await reload(selected.id);
+            setFinancial(null);
           }}
         />
       ) : null}

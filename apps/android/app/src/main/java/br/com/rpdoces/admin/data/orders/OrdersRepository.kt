@@ -59,6 +59,13 @@ private data class PaymentStatusRequest(@SerialName("status_pagamento") val stat
 private data class CancelCommandRequest(val acao: String = "CANCELAR_COMANDA")
 
 @Serializable
+data class OrderItemUpdateInput(
+    @SerialName("item_id") val itemId: Int,
+    @SerialName("produto_id") val productId: Int,
+    val quantidade: Int
+)
+
+@Serializable
 data class ManualOrderItemInput(
     @SerialName("produto_id") val productId: Int,
     val quantidade: Int
@@ -87,6 +94,9 @@ private interface OrdersApi {
     @PUT("api/admin/orders/{id}")
     suspend fun updatePayment(@Path("id") id: Int, @Body body: PaymentStatusRequest): Response<JsonElement>
 
+    @PUT("api/admin/orders/{id}/items")
+    suspend fun updateItem(@Path("id") id: Int, @Body body: OrderItemUpdateInput): Response<JsonElement>
+
     @POST("api/admin/orders/{id}/payments")
     suspend fun cancelCommand(@Path("id") id: Int, @Body body: CancelCommandRequest): Response<JsonElement>
 
@@ -110,6 +120,13 @@ class OrdersRepository(retrofit: Retrofit) {
 
     suspend fun updatePayment(id: Int, status: String) {
         api.updatePayment(id, PaymentStatusRequest(status)).requireSuccess("Não foi possível atualizar o pagamento.")
+    }
+
+    suspend fun updateItem(id: Int, itemId: Int, productId: Int, quantity: Int) {
+        api.updateItem(
+            id,
+            OrderItemUpdateInput(itemId = itemId, productId = productId, quantidade = quantity)
+        ).requireSuccess("Não foi possível alterar o item do pedido.")
     }
 
     suspend fun createManual(input: ManualOrderInput): Int = api.createManual(input)
