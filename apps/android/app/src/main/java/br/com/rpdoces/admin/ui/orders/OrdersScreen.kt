@@ -381,9 +381,14 @@ private fun OrderDetailDialog(
     var deletingItem by remember(order.id) { mutableStateOf<OrderItem?>(null) }
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
+    var reallocatingItem by remember(order.id) { mutableStateOf<OrderItem?>(null) }
+    var reallocating by remember { mutableStateOf(false) }
+    var reallocationError by remember { mutableStateOf<String?>(null) }
 
     Dialog(
-        onDismissRequest = { if (!saving && editingItem == null && deletingItem == null) onDismiss() },
+        onDismissRequest = {
+            if (!saving && editingItem == null && deletingItem == null && reallocatingItem == null) onDismiss()
+        },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = web.surface) {
@@ -401,7 +406,12 @@ private fun OrderDetailDialog(
                         Icons.Outlined.Close,
                         contentDescription = "Fechar",
                         tint = web.muted,
-                        modifier = Modifier.size(28.dp).clickable(enabled = !saving && editingItem == null && deletingItem == null) { onDismiss() }.padding(4.dp)
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clickable(
+                                enabled = !saving && editingItem == null && deletingItem == null && reallocatingItem == null
+                            ) { onDismiss() }
+                            .padding(4.dp)
                     )
                 }
 
@@ -506,12 +516,22 @@ private fun OrderDetailDialog(
                         item {
                             DetailSection("Comanda #${order.id}") {
                                 order.itens.forEach { item ->
+                                    val comandaEditable =
+                                        !order.commandStatus.equals("ENCERRADA", true) &&
+                                        !order.orderStatus.equals("CANCELADO", true)
+                                    val reallocationCandidates = order.itens.filter { candidate ->
+                                        candidate.id != item.id && candidate.id != null && candidate.balanceCents > 0
+                                    }
+                                    val canReallocateItem = item.id != null &&
+                                        item.paidCents > 0 &&
+                                        reallocationCandidates.isNotEmpty() &&
+                                        comandaEditable
                                     val canDeleteItem = item.id != null &&
                                         order.itens.size > 1 &&
                                         item.paidCents <= 0 &&
                                         item.stockDeductedAt == null &&
-                                        !order.commandStatus.equals("ENCERRADA", true) &&
-                                        !order.orderStatus.equals("CANCELADO", true)
+                                        comandaEditable
+
                                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                             Text("${item.quantidade}× ${item.productName ?: "Produto"}", color = web.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -527,7 +547,22 @@ private fun OrderDetailDialog(
                                             fontSize = 10.5.sp,
                                             modifier = Modifier.padding(top = 3.dp)
                                         )
-                                        if (canDeleteItem) {
+                                        if (canReallocateItem) {
+                                            Surface(
+                                                onClick = {
+                                                    reallocationError = null
+                                                    reallocatingItem = item
+                                                },
+                                                modifier = Modifier.padding(top = 8.dp).height(30.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = web.accentSoft,
+                                                border = BorderStroke(1.dp, web.accent.copy(alpha = .35f))
+                                            ) {
+                                                Box(modifier = Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+                                                    Text("Corrigir item", color = web.accentDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        } else if (canDeleteItem) {
                                             Surface(
                                                 onClick = {
                                                     deleteError = null
@@ -627,6 +662,42 @@ private fun OrderDetailDialog(
                             }
                             .onFailure { deleteError = it.message ?: "Não foi possível excluir o item da comanda." }
                         deleting = false
+                    }
+                }
+            }
+        )
+    }
+
+    reallocatingItem?.let { item ->
+        val candidates = order.itens.filter { candidate ->
+            candidate.id != item.id && candidate.id != null && candidate.balanceCents > 0
+        }
+        ReallocateOrderItemDialog(
+            item = item,
+            candidates = candidates,
+            busy = reallocating,
+            error = reallocationError,
+            onDismiss = {
+                if (!reallocating) {
+                    reallocatingItem = null
+                    reallocationError = null
+                }
+            },
+            onConfirm = { targetItemId ->
+                val sourceItemId = item.id
+                if (!reallocating && sourceItemId != null) {
+                    reallocating = true
+                    reallocationError = null
+                    scope.launch {
+                        runCatching {
+                            repository.reallocateItemPayment(order.id, sourceItemId, targetItemId)
+                        }.onSuccess {
+                            reallocatingItem = null
+                            onUpdated()
+                        }.onFailure {
+                            reallocationError = it.message ?: "Não foi possível corrigir o produto pago da comanda."
+                        }
+                        reallocating = false
                     }
                 }
             }
