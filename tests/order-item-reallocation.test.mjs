@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { onRequestPost as reallocateItem } from "../functions/api/admin/orders/[id]/items/[itemId]/reallocate.js";
 import { fakeDb, responseJson } from "./helpers/fake-db.mjs";
 
-function request(targetItemId = 12) {
+function request(targetItemId = 12, { refundMethod, confirmRefund = false } = {}) {
+  const body = { destino_item_id: targetItemId };
+  if (refundMethod) body.devolucao_metodo = refundMethod;
+  if (confirmRefund) body.confirmacao_devolucao = "DEVOLVIDO";
   return new Request("https://loja.test/api/admin/orders/7/items/11/reallocate", {
     method: "POST",
     headers: {
@@ -11,7 +14,7 @@ function request(targetItemId = 12) {
       Cookie: "rp_admin_session=sessao",
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ destino_item_id: targetItemId })
+    body: JSON.stringify(body)
   });
 }
 
@@ -65,6 +68,8 @@ function reallocationDb({
 } = {}) {
   let deleted = false;
   let targetDeducted = Boolean(target.estoque_baixado_em);
+  let currentPaymentTotal = paymentTotal;
+  let refundInserted = false;
 
   const db = fakeDb(
     sql => {
@@ -87,11 +92,18 @@ function reallocationDb({
       if (sql.includes("p.status = 'PENDENTE'") && sql.includes("COUNT(*) AS total")) {
         return { first: () => ({ total: pendingSourceAllocation ? 1 : 0 }) };
       }
-      if (sql.includes("SELECT a.id, a.pagamento_id, a.valor_centavos")) {
+      if (sql.includes("SELECT a.id, a.pagamento_id, a.valor_centavos") && sql.includes("pagamento_valor_centavos")) {
         return {
           all: () => ({
             results: sourcePaid > 0
-              ? [{ id: 300, pagamento_id: 90, valor_centavos: sourcePaid }]
+              ? [{
+                  id: 300,
+                  pagamento_id: 90,
+                  valor_centavos: sourcePaid,
+                  metodo: "PIX_EXTERNO",
+                  pagamento_valor_centavos: currentPaymentTotal,
+                  valor_original_centavos: paymentTotal
+                }]
               : []
           })
         };
@@ -116,7 +128,7 @@ function reallocationDb({
       if (sql.includes("FROM pedido_pagamentos") && sql.includes("ORDER BY criado_em ASC")) {
         return {
           all: () => ({
-            results: [{ id: 90, pedido_id: 7, valor_centavos: paymentTotal, status: "PAGO" }]
+            results: [{ id: 90, pedido_id: 7, valor_centavos: currentPaymentTotal, status: "PAGO" }]
           })
         };
       }
@@ -135,13 +147,26 @@ function reallocationDb({
       assert.ok(statements.some(statement => statement.sql.includes("SET estoque_baixado_em = CURRENT_TIMESTAMP")));
       assert.ok(statements.some(statement => statement.sql.includes("INSERT INTO pedido_item_correcoes")));
       assert.ok(statements.some(statement => statement.sql.includes("DELETE FROM pedido_itens")));
+
+      const refundStatement = statements.find(statement => statement.sql.includes("INSERT INTO pedido_reembolsos"));
+      if (refundStatement) {
+        const refundCents = Number(refundStatement.args[3] || 0);
+        currentPaymentTotal = Math.max(0, currentPaymentTotal - refundCents);
+        refundInserted = true;
+      }
+
       targetDeducted = true;
       deleted = true;
       return statements.map(() => ({ success: true, meta: { changes: 1 } }));
     }
   );
 
-  return { db, deleted: () => deleted, targetDeducted: () => targetDeducted };
+  return {
+    db,
+    deleted: () => deleted,
+    targetDeducted: () => targetDeducted,
+    refundInserted: () => refundInserted
+  };
 }
 
 test("realoca pagamento, repõe o produto antigo e baixa o produto levado", async () => {
@@ -182,12 +207,12 @@ test("mantém diferença pendente quando o produto levado é mais caro", async (
   assert.equal(body.saldo_centavos, 500);
 });
 
-test("gera crédito quando o produto levado é mais barato", async () => {
+test("devolve diferença quando o produto levado é mais barato", async () => {
   const memory = reallocationDb({
     target: targetItem({ valor_unitario_centavos: 1500, valor_total_centavos: 1500 })
   });
   const response = await reallocateItem({
-    request: request(),
+    request: request(12, { refundMethod: "PIX_EXTERNO", confirmRefund: true }),
     params: { id: "7", itemId: "11" },
     env: { DB: memory.db }
   });
@@ -195,9 +220,28 @@ test("gera crédito quando o produto levado é mais barato", async () => {
 
   assert.equal(response.status, 200);
   assert.equal(body.valor_realocado_centavos, 1500);
-  assert.equal(body.credito_gerado_centavos, 500);
-  assert.equal(body.credito_centavos, 500);
+  assert.equal(body.devolucao_centavos, 500);
+  assert.equal(body.credito_gerado_centavos, 0);
+  assert.equal(body.credito_centavos, 0);
   assert.equal(body.status_financeiro, "PAGO");
+  assert.equal(memory.refundInserted(), true);
+});
+
+test("exige confirmação para devolver diferença na correção paga", async () => {
+  const memory = reallocationDb({
+    target: targetItem({ valor_unitario_centavos: 1500, valor_total_centavos: 1500 })
+  });
+  const response = await reallocateItem({
+    request: request(12, { refundMethod: "PIX_EXTERNO" }),
+    params: { id: "7", itemId: "11" },
+    env: { DB: memory.db }
+  });
+  const body = await responseJson(response);
+
+  assert.equal(response.status, 409);
+  assert.match(body.erro, /confirme a devolução/i);
+  assert.equal(memory.deleted(), false);
+  assert.equal(memory.refundInserted(), false);
 });
 
 test("bloqueia realocação para item já totalmente pago", async () => {
