@@ -47,6 +47,13 @@ import java.text.NumberFormat
 import java.util.Locale
 import kotlinx.coroutines.launch
 
+private val refundMethodOptions = listOf(
+    "PIX_EXTERNO" to "Pix",
+    "DINHEIRO" to "Dinheiro",
+    "CARTAO" to "Cartão",
+    "OUTRO" to "Outro meio"
+)
+
 @Composable
 internal fun EditOrderItemDialog(
     order: Order,
@@ -62,6 +69,8 @@ internal fun EditOrderItemDialog(
     var selectedProductId by remember(item.id) { mutableStateOf(item.productId ?: 0) }
     var quantity by remember(item.id) { mutableStateOf(item.quantidade.coerceAtLeast(1)) }
     var productOpen by remember { mutableStateOf(false) }
+    var refundMethod by remember(item.id) { mutableStateOf(defaultRefundMethod(order.paymentMethod)) }
+    var refundMethodOpen by remember { mutableStateOf(false) }
     var loading by remember(item.id) { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -91,6 +100,9 @@ internal fun EditOrderItemDialog(
     } ?: 50
     val unitCents = if (sameProduct) item.unitCents else selectedProduct?.currentPriceCents ?: 0
     val previewTotal = unitCents * quantity
+    val paidExchange = item.paidCents > 0
+    val refundCents = if (paidExchange) (item.paidCents - previewTotal).coerceAtLeast(0) else 0
+    val pendingAfterExchange = if (paidExchange) (previewTotal - item.paidCents).coerceAtLeast(0) else 0
 
     WebModal(onDismiss = { if (!saving) onDismiss() }, maxWidth = 500) {
         WebModalHeader(
@@ -201,8 +213,58 @@ internal fun EditOrderItemDialog(
                 }
             }
 
+            if (paidExchange) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (refundCents > 0) web.orangeSoft else web.surfaceSoft,
+                    border = BorderStroke(1.dp, if (refundCents > 0) web.tagOrangeText.copy(alpha = .35f) else web.border)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("AJUSTE DO PAGAMENTO", color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Valor já pago", color = web.muted, fontSize = 11.sp)
+                            Text(money(item.paidCents), color = web.text, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(7.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(if (refundCents > 0) "Diferença a devolver" else "Saldo após a troca", color = web.muted, fontSize = 11.sp)
+                            Text(
+                                when {
+                                    refundCents > 0 -> money(refundCents)
+                                    pendingAfterExchange > 0 -> "${money(pendingAfterExchange)} pendente"
+                                    else -> "Quitado"
+                                },
+                                color = if (refundCents > 0) web.tagOrangeText else web.text,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (refundCents > 0) {
+                            Spacer(Modifier.height(12.dp))
+                            RefundMethodSelect(
+                                selectedKey = refundMethod,
+                                expanded = refundMethodOpen,
+                                onExpand = { refundMethodOpen = true },
+                                onDismiss = { refundMethodOpen = false },
+                                onSelect = {
+                                    refundMethod = it
+                                    refundMethodOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             Text(
-                "Se o valor mudar, a comanda recalcula automaticamente o saldo ou crédito. Pagamentos já registrados são preservados.",
+                when {
+                    refundCents > 0 -> "Ao confirmar, ${money(refundCents)} será registrado como devolvido. O produto original volta ao estoque e o novo assume a baixa ou reserva correspondente."
+                    paidExchange -> "O pagamento já registrado será preservado no novo produto. Se ele for mais caro, somente a diferença ficará pendente."
+                    else -> "Se o valor mudar, a comanda recalcula automaticamente o saldo."
+                },
                 color = web.muted,
                 fontSize = 10.5.sp,
                 lineHeight = 15.sp,
@@ -222,7 +284,7 @@ internal fun EditOrderItemDialog(
 
         Spacer(Modifier.height(14.dp))
         WebModalActions(
-            primaryText = "Salvar troca",
+            primaryText = if (refundCents > 0) "Trocar e devolver ${money(refundCents)}" else "Salvar troca",
             onPrimary = {
                 if (saving) return@WebModalActions
                 val itemId = item.id
@@ -238,12 +300,23 @@ internal fun EditOrderItemDialog(
                 saving = true
                 scope.launch {
                     runCatching {
-                        ordersRepository.updateItem(
-                            id = order.id,
-                            itemId = itemId,
-                            productId = product.id,
-                            quantity = quantity
-                        )
+                        if (paidExchange) {
+                            ordersRepository.exchangePaidItem(
+                                id = order.id,
+                                itemId = itemId,
+                                productId = product.id,
+                                quantity = quantity,
+                                refundMethod = refundMethod.takeIf { refundCents > 0 },
+                                confirmRefund = refundCents > 0
+                            )
+                        } else {
+                            ordersRepository.updateItem(
+                                id = order.id,
+                                itemId = itemId,
+                                productId = product.id,
+                                quantity = quantity
+                            )
+                        }
                     }.onSuccess {
                         onSaved()
                         onDismiss()
@@ -256,6 +329,44 @@ internal fun EditOrderItemDialog(
             onSecondary = onDismiss,
             busy = saving
         )
+    }
+}
+
+@Composable
+private fun RefundMethodSelect(
+    selectedKey: String,
+    expanded: Boolean,
+    onExpand: () -> Unit,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    val web = LocalRPWebColors.current
+    Column {
+        Text("FORMA DA DEVOLUÇÃO", color = web.muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .4.sp)
+        Spacer(Modifier.height(8.dp))
+        Box {
+            Surface(
+                onClick = onExpand,
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                shape = RoundedCornerShape(9.dp),
+                color = web.surface,
+                border = BorderStroke(1.dp, web.borderStrong)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(refundMethodOptions.firstOrNull { it.first == selectedKey }?.second ?: selectedKey, color = web.text, fontSize = 11.5.sp)
+                    MotionChevron(expanded = expanded, tint = web.muted, modifier = Modifier.size(18.dp))
+                }
+            }
+            MotionDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+                refundMethodOptions.forEach { (key, label) ->
+                    WebSelectorOption(text = label, selected = key == selectedKey, onClick = { onSelect(key) })
+                }
+            }
+        }
     }
 }
 
@@ -350,6 +461,16 @@ private fun EditItemStepButton(text: String, enabled: Boolean, onClick: () -> Un
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+}
+
+private fun defaultRefundMethod(value: String?): String {
+    val method = value.orEmpty().uppercase()
+    return when {
+        "DINHEIRO" in method -> "DINHEIRO"
+        "CART" in method -> "CARTAO"
+        "PIX" in method -> "PIX_EXTERNO"
+        else -> "OUTRO"
     }
 }
 
