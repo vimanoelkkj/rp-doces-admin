@@ -4,6 +4,7 @@ import { attachOrderFinancials } from "../../../lib/orderLedger.js";
 
 const SALES_WINDOW_DAYS = 30;
 const MAX_DASHBOARD_ORDERS = 80;
+const DIAGNOSTIC_ORDER_PREFIX = "diagnostic-order:%";
 
 async function loadProducts(env) {
   const { results } = await env.DB.prepare(
@@ -25,6 +26,7 @@ export async function onRequestGet({ request, env }) {
        SELECT id, 0 AS prioridade
        FROM pedidos
        WHERE arquivado = 0
+         AND idempotency_key NOT LIKE ?
        ORDER BY id DESC
        LIMIT 6
      ),
@@ -32,6 +34,7 @@ export async function onRequestGet({ request, env }) {
        SELECT id, 1 AS prioridade
        FROM pedidos
        WHERE arquivado = 0
+         AND idempotency_key NOT LIKE ?
          AND UPPER(COALESCE(status_pedido, '')) <> 'CANCELADO'
          AND (
            UPPER(COALESCE(status_pedido, 'NOVO')) <> 'ENTREGUE'
@@ -42,9 +45,10 @@ export async function onRequestGet({ request, env }) {
        SELECT id, 2 AS prioridade
        FROM pedidos
        WHERE arquivado = 0
+         AND idempotency_key NOT LIKE ?
          AND UPPER(COALESCE(status_pedido, '')) <> 'CANCELADO'
          AND UPPER(COALESCE(status_pagamento, '')) = 'PAGO'
-         AND COALESCE(pago_em, atualizado_em, criado_em) >= datetime('now', '-' || ? || ' days')
+         AND criado_em >= datetime('now', '-' || ? || ' days')
      ),
      ids AS (
        SELECT id, MIN(prioridade) AS prioridade
@@ -68,7 +72,13 @@ export async function onRequestGet({ request, env }) {
      JOIN pedidos p ON p.id = ids.id
      ORDER BY p.id DESC`
   )
-    .bind(SALES_WINDOW_DAYS, MAX_DASHBOARD_ORDERS)
+    .bind(
+      DIAGNOSTIC_ORDER_PREFIX,
+      DIAGNOSTIC_ORDER_PREFIX,
+      DIAGNOSTIC_ORDER_PREFIX,
+      SALES_WINDOW_DAYS,
+      MAX_DASHBOARD_ORDERS
+    )
     .all();
 
   const pedidos = results || [];
