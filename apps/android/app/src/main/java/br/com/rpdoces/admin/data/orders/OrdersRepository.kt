@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonElement
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -97,6 +98,9 @@ private interface OrdersApi {
     @PUT("api/admin/orders/{id}/items")
     suspend fun updateItem(@Path("id") id: Int, @Body body: OrderItemUpdateInput): Response<JsonElement>
 
+    @DELETE("api/admin/orders/{id}/items/{itemId}")
+    suspend fun deleteItem(@Path("id") id: Int, @Path("itemId") itemId: Int): Response<JsonElement>
+
     @POST("api/admin/orders/{id}/payments")
     suspend fun cancelCommand(@Path("id") id: Int, @Body body: CancelCommandRequest): Response<JsonElement>
 
@@ -127,6 +131,10 @@ class OrdersRepository(retrofit: Retrofit) {
             id,
             OrderItemUpdateInput(itemId = itemId, productId = productId, quantidade = quantity)
         ).requireSuccess("Não foi possível alterar o item do pedido.")
+    }
+
+    suspend fun deleteItem(id: Int, itemId: Int) {
+        api.deleteItem(id, itemId).requireSuccess("Não foi possível excluir o item da comanda.")
     }
 
     suspend fun createManual(input: ManualOrderInput): Int = api.createManual(input)
