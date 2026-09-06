@@ -18,6 +18,7 @@ import { logEvent } from "../../../../lib/logger.js";
 
 const MANUAL_METHODS = new Set(["PIX_EXTERNO", "CARTAO", "DINHEIRO"]);
 const PIX_DECISIONS = new Set(["CANCELAR", "MANTER"]);
+const CANCEL_CONFIRMATION = "CANCELAR";
 
 async function getActivePendingPixCents(env, pedidoId) {
   const row = await env.DB.prepare(
@@ -125,6 +126,14 @@ export async function onRequestPost({ request, env, params }) {
   }
 
   if (action === "CANCELAR_COMANDA") {
+    const confirmation = String(body?.confirmacao || "").toUpperCase();
+    if (confirmation !== CANCEL_CONFIRMATION) {
+      return json({
+        erro: "O cancelamento da comanda precisa de confirmação explícita.",
+        codigo: "CONFIRMACAO_CANCELAMENTO_NECESSARIA"
+      }, 400);
+    }
+
     const pendingDecision = await settlePendingPixDecision(env, pedidoId, "CANCELAR");
     if (!pendingDecision.ok) {
       return json({ erro: "Não foi possível cancelar a cobrança Pix antes de encerrar a comanda." }, pendingDecision.httpStatus || 502);
