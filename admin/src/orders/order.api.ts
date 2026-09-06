@@ -86,6 +86,21 @@ export async function deleteOrderItem(id: number, itemId: number): Promise<void>
   );
 }
 
+export async function reallocateOrderItemPayment(
+  id: number,
+  itemId: number,
+  targetItemId: number
+): Promise<void> {
+  await requestJson(
+    `/api/admin/orders/${id}/items/${itemId}/reallocate`,
+    {
+      method: "POST",
+      body: JSON.stringify({ destino_item_id: targetItemId })
+    },
+    "Não foi possível corrigir o produto pago da comanda."
+  );
+}
+
 export async function createManualOrder(input: ManualOrderInput): Promise<number> {
   return CreateManualOrderResponseSchema.parse(
     await requestJson(
