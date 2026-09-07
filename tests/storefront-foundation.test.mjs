@@ -6,6 +6,7 @@ import { normalizeOrderResponse } from "../public/assets/js/utils/order-response
 import { catalogProducts } from "../public/assets/js/utils/catalog-response.js";
 import { escapeHtml } from "../public/assets/js/utils/html.js";
 import { formatMoney } from "../public/assets/js/utils/money.js";
+import { stockCount, clampQuantity } from "../public/assets/js/utils/stock.js";
 
 test("checkout line items remove invalid entries", () => {
   assert.deepEqual(
@@ -37,4 +38,11 @@ test("html escaping protects rendered text", () => {
 });
 test("money formatter consumes cents", () => {
   assert.match(formatMoney(1600), /16,00/);
+});
+test("stock count exposes only units not reserved", () => {
+  assert.equal(stockCount({ estoque: 5, estoque_reservado: 3 }), 2);
+  assert.equal(stockCount({ estoque: 1, estoque_reservado: 1 }), 0);
+});
+test("cart quantity never exceeds net available stock", () => {
+  assert.equal(clampQuantity({ estoque: 5, estoque_reservado: 3, disponivel: true }, 5), 2);
 });
