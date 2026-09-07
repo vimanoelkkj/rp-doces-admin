@@ -61,7 +61,12 @@ patch(
 # Add Android payment-method presentation helper next to other small label helpers.
 patch(
     "apps/android/app/src/main/java/br/com/rpdoces/admin/ui/orders/OrdersScreen.kt",
-    "private fun financialLabel(status: String?): String {\n",
+    '''private fun financialLabel(status: String?): String = when (status?.uppercase()) {
+    "PAGO" -> "Pago"
+    "PARCIAL" -> "Parcial"
+    else -> "Pendente"
+}
+''',
     '''private fun paymentMethodLabel(method: String?): String = when (method.orEmpty().uppercase()) {
     "PIX", "PIX_MP" -> "Pix"
     "PIX_EXTERNO" -> "Pix direto"
@@ -72,6 +77,10 @@ patch(
     else -> method ?: "—"
 }
 
-private fun financialLabel(status: String?): String {
+private fun financialLabel(status: String?): String = when (status?.uppercase()) {
+    "PAGO" -> "Pago"
+    "PARCIAL" -> "Parcial"
+    else -> "Pendente"
+}
 '''
 )
