@@ -242,6 +242,7 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
           <label className={styles.field}>
             <span>Produto</span>
             <AdminSelect
+              className={styles.selectControl}
               value={productId}
               ariaLabel="Produto do pedido de teste"
               options={availableProducts.map(product => ({
