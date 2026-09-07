@@ -37,6 +37,7 @@ export function ProductCard({
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const available = availableStock(product);
+  const reserved = Math.max(0, Number(product.estoque_reservado || 0));
   const promoState = promotionState(product);
   const promo = promotionLabel(promoState);
   const currentPrice = currentPriceCents(product);
@@ -183,7 +184,11 @@ export function ProductCard({
             <strong>{money(currentPrice)}</strong>
           </div>
           <span className={available <= 3 ? styles.lowStock : ""}>
-            {available > 0 ? `${available} em estoque` : "Esgotado"}
+            {reserved > 0
+              ? `${available} disponível${available === 1 ? "" : "is"} · ${reserved} reservado${reserved === 1 ? "" : "s"}`
+              : available > 0
+                ? `${available} disponível${available === 1 ? "" : "is"}`
+                : "Esgotado"}
           </span>
         </footer>
       </div>
