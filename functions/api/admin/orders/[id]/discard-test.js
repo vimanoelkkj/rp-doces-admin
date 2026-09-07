@@ -139,9 +139,10 @@ export async function onRequestPost({ request, env, params }) {
     ).bind(pedidoId)
   );
 
-  // Recalcula o agregado de reservas a partir dos outros pedidos ativos. Assim
-  // o descarte também corrige um contador de reserva que tenha ficado torto no
-  // meio de algum cenário de teste.
+  // Recalcula o agregado de reservas a partir dos outros pedidos ativos. Como
+  // um pedido de diagnóstico só pode nascer com produto disponível, também
+  // restauramos a disponibilidade quando, depois do descarte, volta a existir
+  // estoque líquido para venda.
   for (const produtoId of porProduto.keys()) {
     statements.push(
       env.DB.prepare(
@@ -155,6 +156,18 @@ export async function onRequestPost({ request, env, params }) {
                  AND p.reserva_status = 'ATIVA'
                  AND UPPER(COALESCE(p.status_pedido, 'NOVO')) <> 'CANCELADO'
              ), 0),
+             disponivel = CASE
+               WHEN ativo = 1 AND estoque - COALESCE((
+                 SELECT SUM(pi.quantidade)
+                 FROM pedido_itens pi
+                 JOIN pedidos p ON p.id = pi.pedido_id
+                 WHERE pi.produto_id = produtos.id
+                   AND pi.estoque_baixado_em IS NULL
+                   AND p.reserva_status = 'ATIVA'
+                   AND UPPER(COALESCE(p.status_pedido, 'NOVO')) <> 'CANCELADO'
+               ), 0) > 0 THEN 1
+               ELSE 0
+             END,
              atualizado_em = CURRENT_TIMESTAMP
          WHERE id = ?`
       ).bind(produtoId)
