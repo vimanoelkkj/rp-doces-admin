@@ -1,5 +1,7 @@
 export function stockCount(product = {}) {
-  return Math.max(0, Number(product.estoque) || 0);
+  const physical = Math.max(0, Number(product.estoque) || 0);
+  const reserved = Math.max(0, Number(product.estoque_reservado) || 0);
+  return Math.max(0, physical - reserved);
 }
 export function isProductAvailable(product = {}) {
   return product.disponivel !== false && stockCount(product) > 0;
