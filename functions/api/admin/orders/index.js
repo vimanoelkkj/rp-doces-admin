@@ -10,6 +10,7 @@ const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
 const MANUAL_PAYMENT_METHODS = new Set(["PIX_EXTERNO", "CARTAO", "DINHEIRO", "A_COMBINAR"]);
 const MANUAL_PAYMENT_STATUSES = new Set(["PENDENTE", "PAGO"]);
+const DIAGNOSTIC_ORDER_PREFIX = "diagnostic-order:";
 
 function promotionPrice(product, now = Date.now()) {
   const inicioOk = !product.promocao_inicio || Date.parse(product.promocao_inicio) <= now;
@@ -145,7 +146,8 @@ export async function onRequestGet({ request, env }) {
       valor_unitario_centavos, valor_total_centavos, cliente_nome, cliente_email,
       cliente_whatsapp, tipo_entrega, observacao, metodo_pagamento, status_pagamento, status_pedido,
       status_comanda, origem_pedido, mp_order_id, mp_payment_id, mp_status, mp_status_detail,
-      criado_em, atualizado_em, pago_em, estoque_baixado_em, reserva_status
+      criado_em, atualizado_em, pago_em, estoque_baixado_em, reserva_status, arquivado,
+      CASE WHEN idempotency_key LIKE 'diagnostic-order:%' THEN 1 ELSE 0 END AS pedido_teste
     FROM pedidos ORDER BY id DESC LIMIT 250
   `
   ).all();
@@ -177,10 +179,18 @@ export async function onRequestPost({ request, env }) {
   if (auth.error) return auth.error;
 
   const body = await bodyJson(request);
+  const isDiagnostic = body?.pedido_teste === true;
+  if (isDiagnostic && String(auth.user?.papel || "").trim().toUpperCase() !== "OWNER") {
+    return json({ erro: "Apenas OWNER pode criar pedidos de teste." }, 403);
+  }
+
   const requested = normalizeManualItems(body?.itens);
-  const method = String(body?.metodo_pagamento || "").toUpperCase();
-  const paymentStatus = String(body?.status_pagamento || "PENDENTE").toUpperCase();
-  const clienteNome = String(body?.cliente_nome || "").trim().slice(0, 120);
+  const requestedMethod = String(body?.metodo_pagamento || "").toUpperCase();
+  const requestedPaymentStatus = String(body?.status_pagamento || "PENDENTE").toUpperCase();
+  const method = isDiagnostic ? "A_COMBINAR" : requestedMethod;
+  const paymentStatus = isDiagnostic ? "PENDENTE" : requestedPaymentStatus;
+  const rawClienteNome = String(body?.cliente_nome || "").trim().slice(0, 120);
+  const clienteNome = isDiagnostic && !rawClienteNome ? "Pedido de teste" : rawClienteNome;
   const clienteWhatsapp = String(body?.cliente_whatsapp || "").trim().slice(0, 40);
   const observacao = String(body?.observacao || "").trim().slice(0, 500);
 
@@ -233,7 +243,7 @@ export async function onRequestPost({ request, env }) {
   if (!Number.isSafeInteger(total) || total <= 0) return json({ erro: "Valor do pedido inválido." }, 400);
 
   const tokenPublico = crypto.randomUUID();
-  const idempotencyKey = `manual:${crypto.randomUUID()}`;
+  const idempotencyKey = `${isDiagnostic ? DIAGNOSTIC_ORDER_PREFIX : "manual:"}${crypto.randomUUID()}`;
   const productSummary = items.length === 1 ? items[0].produto : `Pedido com ${items.length} itens`;
   const statements = [
     env.DB.prepare(
@@ -315,11 +325,11 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  logEvent("info", "manual_order.created", {
+  logEvent("info", isDiagnostic ? "diagnostic_order.created" : "manual_order.created", {
     pedido_id: pedidoId,
-    payment_method: method,
-    payment_status: paymentStatus
+    status: paymentStatus,
+    action: isDiagnostic ? "CREATE_TEST_ORDER" : "CREATE_MANUAL_ORDER"
   });
 
-  return json({ ok: true, id: pedidoId }, 201);
+  return json({ ok: true, id: pedidoId, pedido_teste: isDiagnostic }, 201);
 }
