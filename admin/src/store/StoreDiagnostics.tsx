@@ -27,6 +27,14 @@ type PixDiagnostic = {
 };
 
 type OrderTestResult = { ok: true; id: number };
+type OrderListResponse = {
+  pedidos?: Array<{
+    id: number;
+    pedido_teste?: boolean | number;
+    arquivado?: boolean | number;
+    status_pedido?: string | null;
+  }>;
+};
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -73,15 +81,36 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
     : 1;
   const safeQuantity = Math.min(Math.max(1, quantity), maxQuantity);
 
+  async function reloadProducts() {
+    const items = await listProducts();
+    setProducts(items);
+    const selectedStillAvailable = items.find(product =>
+      String(product.id) === productId &&
+      product.ativo &&
+      product.disponivel &&
+      product.estoque - product.estoque_reservado > 0
+    );
+    if (selectedStillAvailable) return;
+    const first = items.find(product => product.ativo && product.disponivel && product.estoque - product.estoque_reservado > 0);
+    setProductId(first ? String(first.id) : "");
+    setQuantity(1);
+  }
+
+  async function loadActiveTestOrder() {
+    const value = await requestJson<OrderListResponse>("/api/admin/orders");
+    const active = (value.pedidos || []).find(order =>
+      Boolean(order.pedido_teste) &&
+      !Boolean(order.arquivado) &&
+      String(order.status_pedido || "").toUpperCase() !== "CANCELADO"
+    );
+    setTestOrderId(active ? Number(active.id) : null);
+    if (active) setOrderStatus(`Pedido de teste #${active.id} ativo. Descarte-o ao terminar o cenário.`);
+  }
+
   useEffect(() => {
     if (!owner) return;
-    void listProducts()
-      .then(items => {
-        setProducts(items);
-        const first = items.find(product => product.ativo && product.disponivel && product.estoque - product.estoque_reservado > 0);
-        if (first) setProductId(String(first.id));
-      })
-      .catch(() => setOrderStatus("Não foi possível carregar os produtos para teste."));
+    void reloadProducts().catch(() => setOrderStatus("Não foi possível carregar os produtos para teste."));
+    void loadActiveTestOrder().catch(() => {});
 
     void requestJson<PixDiagnostic>("/api/admin/health/pix-real?latest=1")
       .then(value => {
@@ -90,6 +119,7 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
         setPixStatus(value.status === "PAGO" ? "Último Pix confirmado" : `Último teste: ${String(value.status || "PENDENTE").toLowerCase()}`);
       })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [owner]);
 
   useEffect(() => {
@@ -156,10 +186,9 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
   }
 
   async function createTestOrder() {
-    if (!selectedProduct || orderBusy) return;
+    if (!selectedProduct || orderBusy || testOrderId) return;
     setOrderBusy(true);
     setOrderStatus("Criando pedido de teste…");
-    setTestOrderId(null);
     try {
       const value = await requestJson<OrderTestResult>("/api/admin/orders", {
         method: "POST",
@@ -172,8 +201,26 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
       });
       setTestOrderId(value.id);
       setOrderStatus(`Pedido de teste #${value.id} criado. O estoque foi reservado.`);
+      await reloadProducts();
     } catch (error) {
       setOrderStatus(error instanceof Error ? error.message : "Não foi possível criar o pedido de teste.");
+    } finally {
+      setOrderBusy(false);
+    }
+  }
+
+  async function discardTestOrder() {
+    if (!testOrderId || orderBusy) return;
+    const currentId = testOrderId;
+    setOrderBusy(true);
+    setOrderStatus(`Descartando pedido de teste #${currentId}…`);
+    try {
+      await requestJson(`/api/admin/orders/${currentId}/discard-test`, { method: "POST" });
+      setTestOrderId(null);
+      setOrderStatus(`Pedido de teste #${currentId} descartado. Estoque e financeiro simulados foram limpos.`);
+      await reloadProducts();
+    } catch (error) {
+      setOrderStatus(error instanceof Error ? error.message : "Não foi possível descartar o pedido de teste.");
     } finally {
       setOrderBusy(false);
     }
@@ -190,6 +237,10 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
     }
     if (confirmAction === "ORDER") {
       void createTestOrder();
+      return;
+    }
+    if (confirmAction === "DISCARD_ORDER") {
+      void discardTestOrder();
     }
   }
 
@@ -262,7 +313,7 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
 
           <article className={styles.card}>
             <div className={styles.cardHead}>
-              <div><strong>Pedido de produto de teste</strong><p>Cria uma comanda real de teste para exercitar estoque, pagamento, troca e reabertura.</p></div>
+              <div><strong>Pedido de produto de teste</strong><p>Cria uma comanda de diagnóstico para exercitar estoque, pagamento, troca e reabertura.</p></div>
               <span className={styles.testBadge}>TESTE</span>
             </div>
 
@@ -272,6 +323,7 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
                 className={styles.selectControl}
                 value={productId}
                 ariaLabel="Produto do pedido de teste"
+                disabled={Boolean(testOrderId) || orderBusy}
                 options={availableProducts.map(product => ({
                   value: String(product.id),
                   label: `${product.nome} · ${product.estoque - product.estoque_reservado} disp.`
@@ -289,30 +341,42 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
                 type="number"
                 min={1}
                 max={maxQuantity}
+                disabled={Boolean(testOrderId) || orderBusy}
                 value={quantity}
                 onChange={event => setQuantity(Math.min(maxQuantity, Math.max(1, Number(event.target.value) || 1)))}
               />
             </label>
 
             <div className={styles.notice}>
-              Usa estoque real para o teste ser fiel. O pedido recebe identificação de diagnóstico e fica excluído das métricas de venda.
+              Usa estoque real para o teste ser fiel. Só é permitido um pedido de diagnóstico ativo por vez e ele fica fora das métricas de venda.
             </div>
             {orderStatus ? <div className={styles.status}>{orderStatus}</div> : null}
 
             <div className={styles.actions}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                disabled={orderBusy || !selectedProduct}
-                onClick={() => setConfirmAction("ORDER")}
-              >
-                {orderBusy ? "Criando…" : "Criar pedido de teste"}
-              </button>
-              {testOrderId ? (
-                <button type="button" className={styles.secondaryButton} onClick={() => onNavigate("pedidos")}>
-                  Abrir em Pedidos
+              {!testOrderId ? (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  disabled={orderBusy || !selectedProduct}
+                  onClick={() => setConfirmAction("ORDER")}
+                >
+                  {orderBusy ? "Criando…" : "Criar pedido de teste"}
                 </button>
-              ) : null}
+              ) : (
+                <>
+                  <button type="button" className={styles.secondaryButton} disabled={orderBusy} onClick={() => onNavigate("pedidos")}>
+                    Abrir pedido #{testOrderId}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={orderBusy}
+                    onClick={() => setConfirmAction("DISCARD_ORDER")}
+                  >
+                    {orderBusy ? "Descartando…" : "Descartar pedido de teste"}
+                  </button>
+                </>
+              )}
             </div>
           </article>
         </div>
@@ -323,6 +387,7 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
           kind={confirmAction}
           productName={selectedProduct?.nome}
           quantity={safeQuantity}
+          orderId={testOrderId}
           onClose={() => setConfirmAction(null)}
           onConfirm={confirmCurrentAction}
         />
