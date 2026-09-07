@@ -66,7 +66,24 @@ export async function onRequestGet({ request, env }) {
     `SELECT id, token_publico, produto_id, produto_nome, quantidade,
             valor_unitario_centavos, valor_total_centavos,
             cliente_nome, cliente_email, cliente_whatsapp,
-            tipo_entrega, observacao, metodo_pagamento,
+            tipo_entrega, observacao,
+            CASE
+              WHEN (SELECT COUNT(DISTINCT pp.metodo)
+                    FROM pedido_pagamentos pp
+                    WHERE pp.pedido_id = pedidos.id AND pp.status = 'PAGO') = 1
+              THEN COALESCE((
+                SELECT CASE WHEN pp.metodo = 'PIX_MP' THEN 'PIX' ELSE pp.metodo END
+                FROM pedido_pagamentos pp
+                WHERE pp.pedido_id = pedidos.id AND pp.status = 'PAGO'
+                ORDER BY pp.id DESC
+                LIMIT 1
+              ), pedidos.metodo_pagamento)
+              WHEN (SELECT COUNT(DISTINCT pp.metodo)
+                    FROM pedido_pagamentos pp
+                    WHERE pp.pedido_id = pedidos.id AND pp.status = 'PAGO') > 1
+              THEN 'MULTIPLO'
+              ELSE pedidos.metodo_pagamento
+            END AS metodo_pagamento,
             status_pagamento, status_pedido, status_comanda, origem_pedido,
             mp_order_id, mp_payment_id, mp_status, mp_status_detail,
             criado_em, atualizado_em, pago_em,

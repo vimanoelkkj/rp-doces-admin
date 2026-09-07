@@ -157,6 +157,8 @@ function paymentMethod(order: Order) {
   if (method.includes("PIX")) return "Pix";
   if (method.includes("CART")) return "Cartão";
   if (method.includes("DINHEIRO")) return "Dinheiro";
+  if (method === "MULTIPLO") return "Múltiplos";
+  if (method === "A_COMBINAR") return "A combinar";
   return order.metodo_pagamento || "—";
 }
 

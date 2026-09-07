@@ -459,7 +459,7 @@ private fun OrderDetailDialog(
                             DetailSection("Resumo") {
                                 DetailLine("Data", scheduleLabel(order.createdAt))
                                 DetailLine("Entrega", deliveryLabel(order.deliveryType))
-                                DetailLine("Pagamento", order.paymentMethod ?: "—")
+                                DetailLine("Pagamento", paymentMethodLabel(order.paymentMethod))
                                 DetailLine("Total", money(order.totalCents), strong = true)
                             }
                         }
@@ -1162,6 +1162,16 @@ private fun statusInfo(status: String?): Pair<String, String> = when (status?.up
     "ENTREGUE" -> "Entregue" to "purple"
     "CANCELADO" -> "Cancelado" to "pink"
     else -> "Pendente" to "orange"
+}
+
+private fun paymentMethodLabel(method: String?): String = when (method.orEmpty().uppercase()) {
+    "PIX", "PIX_MP" -> "Pix"
+    "PIX_EXTERNO" -> "Pix direto"
+    "CARTAO" -> "Cartão"
+    "DINHEIRO" -> "Dinheiro"
+    "MULTIPLO" -> "Múltiplos"
+    "A_COMBINAR" -> "A combinar"
+    else -> method ?: "—"
 }
 
 private fun financialLabel(status: String?): String = when (status?.uppercase()) {
