@@ -128,6 +128,13 @@ export async function onRequestPost({ request, env, params }) {
   const reservaAtual = String(pedido.reserva_status || "SEM_RESERVA").toUpperCase();
   let reservaReconstruida = false;
 
+  if (!temPagamento && !itensPendentesEstoque.length) {
+    return json({
+      erro: "Esta comanda não possui pagamento confirmado nem itens pendentes para reconstruir a reserva.",
+      codigo: "COMANDA_SEM_PAGAMENTO_CONFIRMADO"
+    }, 409);
+  }
+
   if (!temPagamento && itensPendentesEstoque.length) {
     if (reservaAtual === "ATIVA") {
       await env.DB.prepare(
