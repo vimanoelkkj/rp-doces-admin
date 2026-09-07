@@ -388,6 +388,12 @@ fun AppControlScreen(
                             }
                         }
 
+                        if (viewer.papel.trim().uppercase() == "OWNER") {
+                            item {
+                                DiagnosticsPanel()
+                            }
+                        }
+
                         item {
                             ControlPanel(
                                 eyebrow = "AUDITORIA",

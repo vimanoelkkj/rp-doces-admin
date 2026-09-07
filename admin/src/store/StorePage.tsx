@@ -14,6 +14,7 @@ import {
 } from "./store.model";
 import type { SiteImageSlot, StoreConfig, StoreFormState } from "./store.types";
 import styles from "./StorePage.module.css";
+import { StoreDiagnostics } from "./StoreDiagnostics";
 
 type Props = {
   session: AuthSession;
@@ -449,6 +450,9 @@ export function StorePage({ session, onNavigate }: Props) {
             </section>
           </div>
         </form>
+      ) : null}
+      {!loading && !loadError ? (
+        <StoreDiagnostics session={session} onNavigate={onNavigate} />
       ) : null}
     </AdminShell>
   );
