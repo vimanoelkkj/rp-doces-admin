@@ -42,6 +42,11 @@ export function ProductCard({
   const promo = promotionLabel(promoState);
   const currentPrice = currentPriceCents(product);
   const hasActivePromo = promoState === "active" && currentPrice !== product.preco_centavos;
+  const availabilityLabel = reserved > 0
+    ? `${available} ${available === 1 ? "disponível" : "disponíveis"} · ${reserved} ${reserved === 1 ? "reservado" : "reservados"}`
+    : available > 0
+      ? `${available} ${available === 1 ? "disponível" : "disponíveis"}`
+      : "Esgotado";
 
   useEffect(() => {
     if (!menuOpen) {
@@ -183,13 +188,7 @@ export function ProductCard({
             {hasActivePromo && <s>{money(product.preco_centavos)}</s>}
             <strong>{money(currentPrice)}</strong>
           </div>
-          <span className={available <= 3 ? styles.lowStock : ""}>
-            {reserved > 0
-              ? `${available} disponível${available === 1 ? "" : "is"} · ${reserved} reservado${reserved === 1 ? "" : "s"}`
-              : available > 0
-                ? `${available} disponível${available === 1 ? "" : "is"}`
-                : "Esgotado"}
-          </span>
+          <span className={available <= 3 ? styles.lowStock : ""}>{availabilityLabel}</span>
         </footer>
       </div>
     </article>
