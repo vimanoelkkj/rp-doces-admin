@@ -678,22 +678,61 @@ private fun HistoryRow(
     onRestore: () -> Unit
 ) {
     val web = LocalRPWebColors.current
+    val isCurrent = item.revision == currentRevision
+    val canRestore = !saving && !isCurrent
+
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("#${item.revision}", color = web.accentDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp))
+        Text(
+            "#${item.revision}",
+            color = web.accentDark,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(38.dp)
+        )
         Column(modifier = Modifier.weight(1f)) {
-            Text(item.updatedByName ?: "Sistema", color = web.text, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                item.updatedByName ?: "Sistema",
+                color = web.text,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(formatHistoryDate(item.updatedAt), color = web.muted, fontSize = 9.sp)
         }
-        ActionButton(
-            text = if (item.revision == currentRevision) "Ativa" else "Restaurar",
-            enabled = !saving && item.revision != currentRevision,
-            primary = false,
-            onClick = onRestore
-        )
+
+        Surface(
+            onClick = onRestore,
+            enabled = canRestore,
+            modifier = Modifier.width(86.dp).height(34.dp),
+            shape = RoundedCornerShape(9.dp),
+            color = if (isCurrent) web.accentSoft else web.surface,
+            border = BorderStroke(
+                1.dp,
+                when {
+                    isCurrent -> web.accentDark.copy(alpha = .28f)
+                    canRestore -> web.accentDark.copy(alpha = .38f)
+                    else -> web.borderStrong
+                }
+            )
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    if (isCurrent) "Ativa" else "Restaurar",
+                    color = when {
+                        isCurrent -> web.accentDark
+                        canRestore -> web.accentDark
+                        else -> web.muted.copy(alpha = .45f)
+                    },
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 
