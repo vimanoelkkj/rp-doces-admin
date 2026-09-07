@@ -4,6 +4,10 @@ import type { AdminV2Page } from "../layout/AdminShell";
 import { listProducts } from "../products/product.api";
 import type { Product } from "../products/product.types";
 import { AdminSelect } from "../shared/AdminSelect";
+import {
+  StoreDiagnosticsConfirmDialog,
+  type DiagnosticConfirmKind
+} from "./StoreDiagnosticsConfirmDialog";
 import styles from "./StoreDiagnostics.module.css";
 
 type Props = {
@@ -56,6 +60,7 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
   const [orderBusy, setOrderBusy] = useState(false);
   const [orderStatus, setOrderStatus] = useState("");
   const [testOrderId, setTestOrderId] = useState<number | null>(null);
+  const [confirmAction, setConfirmAction] = useState<DiagnosticConfirmKind | null>(null);
 
   const availableProducts = useMemo(
     () => products.filter(product => product.ativo && product.disponivel && product.estoque - product.estoque_reservado > 0),
@@ -66,6 +71,7 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
   const maxQuantity = selectedProduct
     ? Math.max(1, selectedProduct.estoque - selectedProduct.estoque_reservado)
     : 1;
+  const safeQuantity = Math.min(Math.max(1, quantity), maxQuantity);
 
   useEffect(() => {
     if (!owner) return;
@@ -104,7 +110,6 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
 
   async function generatePix() {
     if (pixBusy) return;
-    if (!window.confirm("Este teste cria um Pix REAL de R$ 0,10 usando a credencial de diagnóstico. Continuar?")) return;
     setPixBusy(true);
     setPixStatus("Gerando cobrança real…");
     try {
@@ -134,7 +139,6 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
 
   async function refundPix() {
     if (!pix?.order_id || pixBusy) return;
-    if (!window.confirm("Solicitar o reembolso REAL deste Pix de diagnóstico?")) return;
     setPixBusy(true);
     setPixStatus("Solicitando reembolso…");
     try {
@@ -153,8 +157,6 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
 
   async function createTestOrder() {
     if (!selectedProduct || orderBusy) return;
-    const safeQuantity = Math.min(Math.max(1, quantity), maxQuantity);
-    if (!window.confirm(`Criar pedido de teste com ${safeQuantity}x ${selectedProduct.nome}? Ele vai reservar estoque real, mas não entra no faturamento.`)) return;
     setOrderBusy(true);
     setOrderStatus("Criando pedido de teste…");
     setTestOrderId(null);
@@ -177,118 +179,154 @@ export function StoreDiagnostics({ session, onNavigate }: Props) {
     }
   }
 
+  function confirmCurrentAction() {
+    if (confirmAction === "PIX") {
+      void generatePix();
+      return;
+    }
+    if (confirmAction === "REFUND") {
+      void refundPix();
+      return;
+    }
+    if (confirmAction === "ORDER") {
+      void createTestOrder();
+    }
+  }
+
   return (
-    <section className={styles.section}>
-      <div className={styles.sectionHead}>
-        <div>
-          <span className={styles.kicker}>Diagnósticos permanentes</span>
-          <h3>Testes operacionais</h3>
-          <p>Ferramentas isoladas para validar pagamento e fluxo de pedido sem contaminar o faturamento.</p>
-        </div>
-        <span className={styles.ownerBadge}>OWNER</span>
-      </div>
-
-      <div className={styles.grid}>
-        <article className={styles.card}>
-          <div className={styles.cardHead}>
-            <div><strong>Pix real de diagnóstico</strong><p>Gera R$ 0,10 fora dos pedidos e do faturamento.</p></div>
-            <span className={styles.realBadge}>REAL</span>
+    <>
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <div>
+            <span className={styles.kicker}>Diagnósticos permanentes</span>
+            <h3>Testes operacionais</h3>
+            <p>Ferramentas isoladas para validar pagamento e fluxo de pedido sem contaminar o faturamento.</p>
           </div>
+          <span className={styles.ownerBadge}>OWNER</span>
+        </div>
 
-          <div className={styles.status}>{pixStatus}</div>
+        <div className={styles.grid}>
+          <article className={styles.card}>
+            <div className={styles.cardHead}>
+              <div><strong>Pix real de diagnóstico</strong><p>Gera R$ 0,10 fora dos pedidos e do faturamento.</p></div>
+              <span className={styles.realBadge}>REAL</span>
+            </div>
 
-          {pix?.qr_code_base64 ? (
-            <div className={styles.pixResult}>
-              <img className={styles.qr} src={`data:image/png;base64,${pix.qr_code_base64}`} alt="QR Code do Pix de diagnóstico" />
-              <div className={styles.codeBox}>
-                <small>Pix copia e cola</small>
-                <textarea readOnly value={pix.qr_code || ""} />
+            <div className={styles.status}>{pixStatus}</div>
+
+            {pix?.qr_code_base64 ? (
+              <div className={styles.pixResult}>
+                <img className={styles.qr} src={`data:image/png;base64,${pix.qr_code_base64}`} alt="QR Code do Pix de diagnóstico" />
+                <div className={styles.codeBox}>
+                  <small>Pix copia e cola</small>
+                  <textarea readOnly value={pix.qr_code || ""} />
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => void navigator.clipboard.writeText(pix.qr_code || "")}
+                    disabled={!pix.qr_code}
+                  >
+                    Copiar código
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={pixBusy}
+                onClick={() => setConfirmAction("PIX")}
+              >
+                {pixBusy ? "Processando…" : "Gerar Pix de R$ 0,10"}
+              </button>
+              {pix?.order_id ? (
+                <button type="button" className={styles.secondaryButton} disabled={pixBusy} onClick={() => void refreshPix()}>
+                  Consultar agora
+                </button>
+              ) : null}
+              {String(pix?.status || "").toUpperCase() === "PAGO" ? (
                 <button
                   type="button"
                   className={styles.secondaryButton}
-                  onClick={() => void navigator.clipboard.writeText(pix.qr_code || "")}
-                  disabled={!pix.qr_code}
+                  disabled={pixBusy}
+                  onClick={() => setConfirmAction("REFUND")}
                 >
-                  Copiar código
+                  Reembolsar teste
                 </button>
-              </div>
+              ) : null}
             </div>
-          ) : null}
+            {pix?.order_id ? <small className={styles.meta}>Order {pix.order_id} · {money(Number(pix.valor_centavos || 10))}</small> : null}
+          </article>
 
-          <div className={styles.actions}>
-            <button type="button" className={styles.primaryButton} disabled={pixBusy} onClick={() => void generatePix()}>
-              {pixBusy ? "Processando…" : "Gerar Pix de R$ 0,10"}
-            </button>
-            {pix?.order_id ? (
-              <button type="button" className={styles.secondaryButton} disabled={pixBusy} onClick={() => void refreshPix()}>
-                Consultar agora
+          <article className={styles.card}>
+            <div className={styles.cardHead}>
+              <div><strong>Pedido de produto de teste</strong><p>Cria uma comanda real de teste para exercitar estoque, pagamento, troca e reabertura.</p></div>
+              <span className={styles.testBadge}>TESTE</span>
+            </div>
+
+            <label className={styles.field}>
+              <span>Produto</span>
+              <AdminSelect
+                className={styles.selectControl}
+                value={productId}
+                ariaLabel="Produto do pedido de teste"
+                options={availableProducts.map(product => ({
+                  value: String(product.id),
+                  label: `${product.nome} · ${product.estoque - product.estoque_reservado} disp.`
+                }))}
+                onChange={value => {
+                  setProductId(value);
+                  setQuantity(1);
+                }}
+              />
+            </label>
+
+            <label className={styles.field}>
+              <span>Quantidade</span>
+              <input
+                type="number"
+                min={1}
+                max={maxQuantity}
+                value={quantity}
+                onChange={event => setQuantity(Math.min(maxQuantity, Math.max(1, Number(event.target.value) || 1)))}
+              />
+            </label>
+
+            <div className={styles.notice}>
+              Usa estoque real para o teste ser fiel. O pedido recebe identificação de diagnóstico e fica excluído das métricas de venda.
+            </div>
+            {orderStatus ? <div className={styles.status}>{orderStatus}</div> : null}
+
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={orderBusy || !selectedProduct}
+                onClick={() => setConfirmAction("ORDER")}
+              >
+                {orderBusy ? "Criando…" : "Criar pedido de teste"}
               </button>
-            ) : null}
-            {String(pix?.status || "").toUpperCase() === "PAGO" ? (
-              <button type="button" className={styles.secondaryButton} disabled={pixBusy} onClick={() => void refundPix()}>
-                Reembolsar teste
-              </button>
-            ) : null}
-          </div>
-          {pix?.order_id ? <small className={styles.meta}>Order {pix.order_id} · {money(Number(pix.valor_centavos || 10))}</small> : null}
-        </article>
+              {testOrderId ? (
+                <button type="button" className={styles.secondaryButton} onClick={() => onNavigate("pedidos")}>
+                  Abrir em Pedidos
+                </button>
+              ) : null}
+            </div>
+          </article>
+        </div>
+      </section>
 
-        <article className={styles.card}>
-          <div className={styles.cardHead}>
-            <div><strong>Pedido de produto de teste</strong><p>Cria uma comanda real de teste para exercitar estoque, pagamento, troca e reabertura.</p></div>
-            <span className={styles.testBadge}>TESTE</span>
-          </div>
-
-          <label className={styles.field}>
-            <span>Produto</span>
-            <AdminSelect
-              className={styles.selectControl}
-              value={productId}
-              ariaLabel="Produto do pedido de teste"
-              options={availableProducts.map(product => ({
-                value: String(product.id),
-                label: `${product.nome} · ${product.estoque - product.estoque_reservado} disp.`
-              }))}
-              onChange={value => {
-                setProductId(value);
-                setQuantity(1);
-              }}
-            />
-          </label>
-
-          <label className={styles.field}>
-            <span>Quantidade</span>
-            <input
-              type="number"
-              min={1}
-              max={maxQuantity}
-              value={quantity}
-              onChange={event => setQuantity(Math.min(maxQuantity, Math.max(1, Number(event.target.value) || 1)))}
-            />
-          </label>
-
-          <div className={styles.notice}>
-            Usa estoque real para o teste ser fiel. O pedido recebe identificação de diagnóstico e fica excluído das métricas de venda.
-          </div>
-          {orderStatus ? <div className={styles.status}>{orderStatus}</div> : null}
-
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={styles.primaryButton}
-              disabled={orderBusy || !selectedProduct}
-              onClick={() => void createTestOrder()}
-            >
-              {orderBusy ? "Criando…" : "Criar pedido de teste"}
-            </button>
-            {testOrderId ? (
-              <button type="button" className={styles.secondaryButton} onClick={() => onNavigate("pedidos")}>
-                Abrir em Pedidos
-              </button>
-            ) : null}
-          </div>
-        </article>
-      </div>
-    </section>
+      {confirmAction ? (
+        <StoreDiagnosticsConfirmDialog
+          kind={confirmAction}
+          productName={selectedProduct?.nome}
+          quantity={safeQuantity}
+          onClose={() => setConfirmAction(null)}
+          onConfirm={confirmCurrentAction}
+        />
+      ) : null}
+    </>
   );
 }
