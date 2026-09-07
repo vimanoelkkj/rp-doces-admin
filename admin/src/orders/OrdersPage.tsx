@@ -13,7 +13,13 @@ import {
   type ManualPaymentStatus,
   type OrderStatus
 } from "./order.api";
-import { getFinancialOrder, type FinancialOrder, type FinancialOrderItem } from "./order.finance";
+import {
+  getFinancialOrder,
+  registerComandaPayment,
+  type FinancialOrder,
+  type FinancialOrderItem,
+  type ManualComandaPaymentMethod
+} from "./order.finance";
 import { itemsOf } from "./order.model";
 import type { Order, OrderItem } from "./order.schema";
 import { EditOrderItemDialog } from "./EditOrderItemDialog";
@@ -43,6 +49,12 @@ const PAYMENT_STATUS_OPTIONS: Array<[ManualPaymentStatus, string]> = [
   ["PENDENTE", "Pendente"],
   ["PAGO", "Pago"],
   ["CANCELADO", "Cancelado"]
+];
+
+const MANUAL_PAYMENT_METHOD_OPTIONS: Array<[ManualComandaPaymentMethod, string]> = [
+  ["PIX_EXTERNO", "Pix direto"],
+  ["CARTAO", "Cartão"],
+  ["DINHEIRO", "Dinheiro"]
 ];
 
 const FILTER_OPTIONS: Array<[FilterKey, string]> = [
@@ -311,6 +323,9 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const [savingEdit, setSavingEdit] = useState(false);
   const [reopeningCommand, setReopeningCommand] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [registeringPayment, setRegisteringPayment] = useState(false);
+  const [registerPaymentError, setRegisterPaymentError] = useState<string | null>(null);
+  const [registerPaymentMethod, setRegisterPaymentMethod] = useState<ManualComandaPaymentMethod>("DINHEIRO");
   const editingRef = useRef(false);
   const savingEditRef = useRef(false);
   const autoRefreshInFlightRef = useRef(false);
@@ -498,6 +513,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const selectedDelivery = selected?.tipo_entrega === "ENTREGA" ? "Entrega" : "Retirada";
   const selectedItems = selected ? orderItems(selected) : [];
   const selectedIsManual = selected?.origem_pedido === "MANUAL";
+  const selectedIsDiagnostic = Boolean(selected?.pedido_teste);
 
   useEffect(() => {
     setPage(current => Math.min(current, pages));
@@ -523,6 +539,8 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
     setReallocatingItem(null);
     setDeleteItemError(null);
     setEditError(null);
+    setRegisterPaymentError(null);
+    setRegisterPaymentMethod("DINHEIRO");
   }
 
   function startEditing() {
@@ -543,7 +561,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
     if (!selected || savingEditRef.current) return;
 
     const currentStatus = normalizeOrderStatus(selected);
-    const currentPayment = selected.origem_pedido === "MANUAL"
+    const currentPayment = selected.origem_pedido === "MANUAL" && !selected.pedido_teste
       ? normalizeManualPayment(selected)
       : null;
     const statusChanged = draftStatus !== currentStatus;
@@ -592,6 +610,29 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
       setEditError(err instanceof ApiClientError ? err.message : "Não foi possível reabrir a comanda.");
     } finally {
       setReopeningCommand(false);
+    }
+  }
+
+  async function registerSelectedDiagnosticPayment() {
+    if (!selected || !selectedIsDiagnostic || registeringPayment || pendingCents <= 0) return;
+    setRegisteringPayment(true);
+    setRegisterPaymentError(null);
+    try {
+      await registerComandaPayment(selected.id, {
+        metodo: registerPaymentMethod,
+        valor_centavos: pendingCents
+      });
+      await reload(selected.id);
+      const refreshedFinancial = await getFinancialOrder(selected.id, true);
+      setFinancial(refreshedFinancial);
+    } catch (err) {
+      setRegisterPaymentError(
+        err instanceof ApiClientError || err instanceof Error
+          ? err.message
+          : "Não foi possível registrar o pagamento do teste."
+      );
+    } finally {
+      setRegisteringPayment(false);
     }
   }
 
@@ -849,7 +890,11 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
 
                         <section className={styles["drawer-section"]}>
                           <h3 className={styles["section-title"]}>Pagamento</h3>
-                          {selectedIsManual ? (
+                          {selectedIsDiagnostic ? (
+                            <div className={styles.note}>
+                              Pedido de teste: registre o pagamento pela aba Comanda para escolher a forma de pagamento.
+                            </div>
+                          ) : selectedIsManual ? (
                             <AdminSelect
                               value={draftPayment}
                               ariaLabel="Status do pagamento"
@@ -985,6 +1030,36 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                           <span>{money(pendingCents)}</span>
                         </div>
                       </div>
+
+                      {selectedIsDiagnostic && !selectedCommandClosed && pendingCents > 0 ? (
+                        <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+                          <div className={styles.note}>
+                            <strong style={{ display: "block", marginBottom: 6, color: "var(--text)" }}>Registrar pagamento do teste</strong>
+                            Escolha a forma de pagamento. Nada é cobrado de verdade neste fluxo manual.
+                          </div>
+                          <AdminSelect
+                            value={registerPaymentMethod}
+                            ariaLabel="Forma de pagamento do pedido de teste"
+                            style={editSelectStyle}
+                            disabled={registeringPayment}
+                            options={MANUAL_PAYMENT_METHOD_OPTIONS.map(([value, label]) => ({ value, label }))}
+                            onChange={value => setRegisterPaymentMethod(value)}
+                          />
+                          {registerPaymentError ? (
+                            <div className={styles.note} role="alert" style={{ color: "var(--pink-strong)" }}>
+                              {registerPaymentError}
+                            </div>
+                          ) : null}
+                          <button
+                            className={styles["primary-btn"]}
+                            type="button"
+                            disabled={registeringPayment}
+                            onClick={() => void registerSelectedDiagnosticPayment()}
+                          >
+                            {registeringPayment ? "Registrando..." : `Registrar ${money(pendingCents)} como pago`}
+                          </button>
+                        </div>
+                      ) : null}
                     </section>
                   </div>
 

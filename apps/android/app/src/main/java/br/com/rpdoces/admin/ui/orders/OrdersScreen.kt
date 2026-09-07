@@ -79,6 +79,12 @@ private val paymentOptions = listOf(
     "PAGO" to "Pago"
 )
 
+private val manualPaymentMethodOptions = listOf(
+    "PIX_EXTERNO" to "Pix direto",
+    "CARTAO" to "Cartão",
+    "DINHEIRO" to "Dinheiro"
+)
+
 @Composable
 fun OrdersScreen(
     repository: OrdersRepository,
@@ -375,6 +381,8 @@ private fun OrderDetailDialog(
     var paymentDirty by remember(order.id) { mutableStateOf(false) }
     var statusOpen by remember { mutableStateOf(false) }
     var paymentOpen by remember { mutableStateOf(false) }
+    var manualPaymentMethod by remember(order.id) { mutableStateOf("DINHEIRO") }
+    var manualPaymentMethodOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var editingItem by remember(order.id) { mutableStateOf<OrderItem?>(null) }
@@ -394,7 +402,8 @@ private fun OrderDetailDialog(
     val canReopenPaid = commandClosed && hasConfirmedPayment
     val canReopenCanceled = commandClosed && canceledOrder && !hasConfirmedPayment
     val canReopen = canReopenPaid || canReopenCanceled
-    val hasChanges = statusDirty || paymentDirty
+    val isDiagnosticOrder = order.testOrder == 1
+    val hasChanges = statusDirty || (paymentDirty && !isDiagnosticOrder)
 
     LaunchedEffect(order.orderStatus, statusDirty) {
         if (!statusDirty) status = order.orderStatus?.uppercase() ?: "NOVO"
@@ -541,20 +550,29 @@ private fun OrderDetailDialog(
                                             }
                                         )
                                         Spacer(Modifier.height(10.dp))
-                                        SelectorField(
-                                            label = "Pagamento",
-                                            selectedKey = payment,
-                                            value = paymentOptions.firstOrNull { it.first == payment }?.second ?: payment,
-                                            expanded = paymentOpen,
-                                            onExpand = { paymentOpen = true },
-                                            onDismiss = { paymentOpen = false },
-                                            options = paymentOptions,
-                                            onSelect = { selectedPayment ->
-                                                payment = selectedPayment
-                                                paymentDirty = selectedPayment != effectiveFinancialStatus(order)
-                                                paymentOpen = false
-                                            }
-                                        )
+                                        if (isDiagnosticOrder) {
+                                            Text(
+                                                "Pedido de teste: escolha a forma de pagamento na aba Comanda.",
+                                                color = web.muted,
+                                                fontSize = 11.5.sp,
+                                                lineHeight = 17.sp
+                                            )
+                                        } else {
+                                            SelectorField(
+                                                label = "Pagamento",
+                                                selectedKey = payment,
+                                                value = paymentOptions.firstOrNull { it.first == payment }?.second ?: payment,
+                                                expanded = paymentOpen,
+                                                onExpand = { paymentOpen = true },
+                                                onDismiss = { paymentOpen = false },
+                                                options = paymentOptions,
+                                                onSelect = { selectedPayment ->
+                                                    payment = selectedPayment
+                                                    paymentDirty = selectedPayment != effectiveFinancialStatus(order)
+                                                    paymentOpen = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -630,6 +648,69 @@ private fun OrderDetailDialog(
                                 DetailLine("Total", money(order.totalCents))
                                 DetailLine("Pago", money(order.paidCents))
                                 DetailLine("Restante", money(order.balanceCents), strong = true)
+                                if (isDiagnosticOrder && !commandClosed && order.balanceCents > 0) {
+                                    Spacer(Modifier.height(14.dp))
+                                    Text(
+                                        "Registrar pagamento do teste",
+                                        color = web.text,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "Escolha a forma. Este registro é manual e não cobra dinheiro de verdade.",
+                                        color = web.muted,
+                                        fontSize = 10.5.sp,
+                                        lineHeight = 15.sp,
+                                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                                    )
+                                    SelectorField(
+                                        label = "Forma de pagamento",
+                                        selectedKey = manualPaymentMethod,
+                                        value = manualPaymentMethodOptions.firstOrNull { it.first == manualPaymentMethod }?.second ?: manualPaymentMethod,
+                                        expanded = manualPaymentMethodOpen,
+                                        onExpand = { manualPaymentMethodOpen = true },
+                                        onDismiss = { manualPaymentMethodOpen = false },
+                                        options = manualPaymentMethodOptions,
+                                        onSelect = { selectedMethod ->
+                                            manualPaymentMethod = selectedMethod
+                                            manualPaymentMethodOpen = false
+                                        }
+                                    )
+                                    Spacer(Modifier.height(10.dp))
+                                    Surface(
+                                        onClick = {
+                                            if (!saving) {
+                                                saving = true
+                                                error = null
+                                                scope.launch {
+                                                    runCatching {
+                                                        repository.registerManualPayment(order.id, manualPaymentMethod, order.balanceCents)
+                                                    }.onSuccess {
+                                                        onUpdated()
+                                                        onDismiss()
+                                                    }.onFailure {
+                                                        error = it.message ?: "Não foi possível registrar o pagamento do teste."
+                                                    }
+                                                    saving = false
+                                                }
+                                            }
+                                        },
+                                        enabled = !saving,
+                                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                                        shape = RoundedCornerShape(9.dp),
+                                        color = web.accent,
+                                        border = BorderStroke(1.dp, web.accentDark)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                if (saving) "Registrando..." else "Registrar ${money(order.balanceCents)} como pago",
+                                                color = Color.White,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -678,7 +759,7 @@ private fun OrderDetailDialog(
                                     error = null
                                     scope.launch {
                                         runCatching {
-                                            if (paymentDirty) repository.updatePayment(order.id, payment)
+                                            if (paymentDirty && !isDiagnosticOrder) repository.updatePayment(order.id, payment)
                                             if (statusDirty) repository.updateStatus(order.id, status)
                                         }.onSuccess {
                                             statusDirty = false

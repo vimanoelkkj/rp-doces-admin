@@ -246,7 +246,7 @@ export async function onRequestPut({ request, env, params }) {
 
   const pedido = await env.DB.prepare(
     `SELECT id, origem_pedido, status_pedido, status_pagamento, status_comanda, reserva_status,
-            estoque_baixado_em, valor_total_centavos
+            estoque_baixado_em, valor_total_centavos, idempotency_key
      FROM pedidos WHERE id = ? LIMIT 1`
   )
     .bind(id)
@@ -261,6 +261,14 @@ export async function onRequestPut({ request, env, params }) {
           ? "O pagamento não pode ser cancelado pelo seletor. Use o fluxo explícito de cancelamento da comanda."
           : "Alteração de pagamento inválida."
       }, 400);
+    }
+
+    const diagnostic = String(pedido.idempotency_key || "").startsWith("diagnostic-order:");
+    if (diagnostic && nextPayment === "PAGO") {
+      return json({
+        erro: "Pedido de teste deve registrar o pagamento pela comanda, escolhendo a forma de pagamento.",
+        codigo: "PAGAMENTO_TESTE_REQUER_COMANDA"
+      }, 409);
     }
 
     let result;

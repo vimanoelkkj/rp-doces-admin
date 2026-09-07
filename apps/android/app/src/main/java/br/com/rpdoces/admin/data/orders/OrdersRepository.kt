@@ -49,6 +49,7 @@ data class Order(
     @SerialName("criado_em") val createdAt: String? = null,
     @SerialName("atualizado_em") val updatedAt: String? = null,
     @SerialName("pago_em") val paidAt: String? = null,
+    @SerialName("pedido_teste") val testOrder: Int = 0,
     val itens: List<OrderItem> = emptyList()
 )
 
@@ -236,6 +237,22 @@ class OrdersRepository(retrofit: Retrofit) {
             payment.apiErrorMessage("Não foi possível registrar a quitação da comanda."),
             payment.code()
         )
+    }
+
+    suspend fun registerManualPayment(id: Int, method: String, valueCents: Int) {
+        require(valueCents > 0) { "O valor do pagamento deve ser maior que zero." }
+        val normalizedMethod = method.uppercase()
+        if (normalizedMethod !in setOf("PIX_EXTERNO", "CARTAO", "DINHEIRO")) {
+            throw OrdersException("Forma de pagamento inválida.", 400)
+        }
+        api.registerPayment(
+            id,
+            RegisterPaymentRequest(
+                metodo = normalizedMethod,
+                valueCents = valueCents,
+                pixDecision = "CANCELAR"
+            )
+        ).requireSuccess("Não foi possível registrar o pagamento da comanda.")
     }
 
     suspend fun updateItem(id: Int, itemId: Int, productId: Int, quantity: Int) {

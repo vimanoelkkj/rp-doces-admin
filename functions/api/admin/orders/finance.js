@@ -69,7 +69,8 @@ export async function onRequestGet({ request, env }) {
             tipo_entrega, observacao, metodo_pagamento,
             status_pagamento, status_pedido, status_comanda, origem_pedido,
             mp_order_id, mp_payment_id, mp_status, mp_status_detail,
-            criado_em, atualizado_em, pago_em
+            criado_em, atualizado_em, pago_em,
+            CASE WHEN idempotency_key LIKE 'diagnostic-order:%' THEN 1 ELSE 0 END AS pedido_teste
      FROM pedidos
      WHERE arquivado = 0
      ORDER BY id DESC

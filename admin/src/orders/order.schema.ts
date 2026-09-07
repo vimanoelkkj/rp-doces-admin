@@ -43,6 +43,8 @@ export const OrderSchema = z.object({
   pago_em: z.string().nullable().optional(),
   estoque_baixado_em: z.string().nullable().optional(),
   reserva_status: z.string().nullable().optional(),
+  pedido_teste: z.coerce.boolean().optional(),
+  arquivado: z.coerce.boolean().optional(),
   itens: z.array(OrderItemSchema).default([])
 });
 
