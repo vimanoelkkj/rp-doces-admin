@@ -40,9 +40,9 @@ export async function onRequestPost({ request, env, params }) {
     return json({ erro: "Este pedido não é um pedido de teste e não pode ser descartado por este fluxo." }, 409);
   }
 
-  if (Number(pedido.arquivado || 0) === 1 && String(pedido.status_pedido || "").toUpperCase() === "CANCELADO") {
-    return json({ ok: true, pedido_id: pedidoId, ja_descartado: true });
-  }
+  const jaDescartado =
+    Number(pedido.arquivado || 0) === 1 &&
+    String(pedido.status_pedido || "").toUpperCase() === "CANCELADO";
 
   const pagamentoExterno = await env.DB.prepare(
     `SELECT COUNT(*) AS total
@@ -83,7 +83,7 @@ export async function onRequestPost({ request, env, params }) {
     if (!Number.isInteger(produtoId) || produtoId < 1 || !Number.isInteger(quantidade) || quantidade < 1) continue;
 
     const atual = porProduto.get(produtoId) || { baixado: 0 };
-    if (item.estoque_baixado_em) {
+    if (!jaDescartado && item.estoque_baixado_em) {
       atual.baixado += quantidade;
       estoqueReposto += quantidade;
     }
@@ -142,7 +142,8 @@ export async function onRequestPost({ request, env, params }) {
   // Recalcula o agregado de reservas a partir dos outros pedidos ativos. Como
   // um pedido de diagnóstico só pode nascer com produto disponível, também
   // restauramos a disponibilidade quando, depois do descarte, volta a existir
-  // estoque líquido para venda.
+  // estoque líquido para venda. Este passo roda até em um descarte repetido,
+  // para reparar estados antigos sem repor estoque duas vezes.
   for (const produtoId of porProduto.keys()) {
     statements.push(
       env.DB.prepare(
@@ -187,7 +188,7 @@ export async function onRequestPost({ request, env, params }) {
   logEvent("info", "diagnostic_order.discarded", {
     pedido_id: pedidoId,
     quantity: estoqueReposto,
-    action: "DISCARD_TEST_ORDER"
+    action: jaDescartado ? "RECONCILE_DISCARDED_TEST_ORDER" : "DISCARD_TEST_ORDER"
   });
 
   return json({
@@ -195,6 +196,7 @@ export async function onRequestPost({ request, env, params }) {
     pedido_id: pedidoId,
     estoque_reposto_unidades: estoqueReposto,
     pagamentos_simulados_removidos: true,
-    arquivado: true
+    arquivado: true,
+    ja_descartado: jaDescartado
   });
 }
