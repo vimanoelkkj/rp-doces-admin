@@ -2,12 +2,13 @@ import { createPortal } from "react-dom";
 import { useBackLayer } from "../shared/useBackLayer";
 import styles from "./StoreDiagnosticsConfirmDialog.module.css";
 
-export type DiagnosticConfirmKind = "PIX" | "REFUND" | "ORDER";
+export type DiagnosticConfirmKind = "PIX" | "REFUND" | "ORDER" | "DISCARD_ORDER";
 
 type Props = {
   kind: DiagnosticConfirmKind;
   productName?: string;
   quantity?: number;
+  orderId?: number | null;
   onClose: () => void;
   onConfirm: () => void;
 };
@@ -41,10 +42,18 @@ const COPY: Record<DiagnosticConfirmKind, {
     description: "Será criada uma comanda real de diagnóstico para validar estoque e os fluxos de pedido.",
     note: "O pedido fica fora das métricas de venda, mas usa e reserva estoque real para o teste ser fiel.",
     confirm: "Criar pedido"
+  },
+  DISCARD_ORDER: {
+    eyebrow: "Limpeza do diagnóstico",
+    title: "Descartar pedido de teste?",
+    description: "O sistema desfará o estado criado pelo diagnóstico sem gerar reembolso fictício.",
+    note: "Estoque físico baixado volta ao produto, reservas do teste são removidas e pagamentos simulados são apagados. Pagamento externo real bloqueia esta ação.",
+    confirm: "Descartar teste",
+    danger: true
   }
 };
 
-export function StoreDiagnosticsConfirmDialog({ kind, productName, quantity = 1, onClose, onConfirm }: Props) {
+export function StoreDiagnosticsConfirmDialog({ kind, productName, quantity = 1, orderId, onClose, onConfirm }: Props) {
   const copy = COPY[kind];
   const close = useBackLayer(true, () => {
     onClose();
@@ -87,6 +96,13 @@ export function StoreDiagnosticsConfirmDialog({ kind, productName, quantity = 1,
           <div className={styles.summary}>
             <span>{quantity}x produto</span>
             <strong>{productName || "Produto selecionado"}</strong>
+          </div>
+        ) : null}
+
+        {kind === "DISCARD_ORDER" && orderId ? (
+          <div className={styles.summary}>
+            <span>Pedido de diagnóstico</span>
+            <strong>#{orderId}</strong>
           </div>
         ) : null}
 
