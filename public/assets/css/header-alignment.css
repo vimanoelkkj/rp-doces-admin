@@ -41,6 +41,17 @@
   }
 }
 
+/* On desktop the brand link must only occupy its own text width. */
+@media (min-width: 820px) {
+  .rp-site-header__brand {
+    flex: 0 0 auto;
+  }
+
+  .rp-site-header__actions {
+    margin-left: auto;
+  }
+}
+
 /* The catalog route used to scale the entire section on entry, including its
    header. Keep the header as a visual anchor and fade the route without
    changing its geometry. */
