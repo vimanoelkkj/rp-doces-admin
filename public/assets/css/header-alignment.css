@@ -28,6 +28,19 @@
   }
 }
 
+/* Keep the R&P Doces brand at the same size on home and catalog. */
+@media (max-width: 767px) {
+  .rp-site-header__brand {
+    font-size: 17px;
+  }
+}
+
+@media (min-width: 768px) {
+  .rp-site-header__brand {
+    font-size: 22px;
+  }
+}
+
 /* The catalog route used to scale the entire section on entry, including its
    header. Keep the header as a visual anchor and fade the route without
    changing its geometry. */
