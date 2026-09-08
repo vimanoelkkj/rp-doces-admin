@@ -22,7 +22,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Aplicar patch
-        run: python3 scripts/oneoff-auto-mp-exchange-refund.py
+        run: |
+          python3 scripts/oneoff-auto-mp-exchange-refund.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('admin/src/orders/order.schema.ts')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('reembolso_automatico_disponivel: z.coerce.boolean().optional().default(false),', 'reembolso_automatico_disponivel: z.coerce.boolean().optional(),')
+          p.write_text(text, encoding='utf-8')
+          PY
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
