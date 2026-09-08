@@ -25,6 +25,7 @@ import type { Order, OrderItem } from "./order.schema";
 import { EditOrderItemDialog } from "./EditOrderItemDialog";
 import { ManualOrderDialog } from "./ManualOrderDialog";
 import { ReallocateOrderItemDialog } from "./ReallocateOrderItemDialog";
+import { ComandaDialog } from "./ComandaDialog";
 import styles from "./OrdersPage.module.css";
 
 type Props = {
@@ -66,6 +67,7 @@ const FILTER_OPTIONS: Array<[FilterKey, string]> = [
 ];
 
 const ORDER_AUTO_REFRESH_MS = 10_000;
+const REFUNDABLE_ORDER_STATUSES = new Set(["NOVO", "PREPARANDO", "PRONTO"]);
 let ordersCache: Order[] | null = null;
 
 const editSelectStyle: CSSProperties = {
@@ -328,6 +330,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const [registeringPayment, setRegisteringPayment] = useState(false);
   const [registerPaymentError, setRegisterPaymentError] = useState<string | null>(null);
   const [registerPaymentMethod, setRegisterPaymentMethod] = useState<ManualComandaPaymentMethod>("DINHEIRO");
+  const [refundOrderId, setRefundOrderId] = useState<number | null>(null);
   const editingRef = useRef(false);
   const savingEditRef = useRef(false);
   const autoRefreshInFlightRef = useRef(false);
@@ -516,6 +519,7 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
   const selectedItems = selected ? orderItems(selected) : [];
   const selectedIsManual = selected?.origem_pedido === "MANUAL";
   const selectedIsDiagnostic = Boolean(selected?.pedido_teste);
+  const selectedRefundAllowed = REFUNDABLE_ORDER_STATUSES.has(String(selected?.status_pedido || "").toUpperCase());
 
   useEffect(() => {
     setPage(current => Math.min(current, pages));
@@ -1033,6 +1037,25 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
                         </div>
                       </div>
 
+                      {paidCents > 0 ? (
+                        <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+                          {selectedRefundAllowed ? (
+                            <button
+                              className={styles["secondary-btn"]}
+                              type="button"
+                              style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
+                              onClick={() => setRefundOrderId(selected.id)}
+                            >
+                              Reembolsar pagamento
+                            </button>
+                          ) : (
+                            <div className={styles.note}>
+                              Reembolso indisponível para pedidos entregues ou cancelados.
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+
                       {selectedIsDiagnostic && !selectedCommandClosed && pendingCents > 0 ? (
                         <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
                           <div className={styles.note}>
@@ -1137,6 +1160,20 @@ export function OrdersPage({ session, onNavigate, active }: Props) {
             setActiveTab("pedido");
             setEditing(false);
             setEditingItem(null);
+          }}
+        />
+      ) : null}
+
+      {refundOrderId ? (
+        <ComandaDialog
+          orderId={refundOrderId}
+          onClose={() => setRefundOrderId(null)}
+          onChanged={() => {
+            const orderId = refundOrderId;
+            void reload(orderId);
+            void getFinancialOrder(orderId, true).then(value => {
+              if (selected?.id === orderId) setFinancial(value);
+            });
           }}
         />
       ) : null}

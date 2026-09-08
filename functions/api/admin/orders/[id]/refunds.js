@@ -5,6 +5,7 @@ import { localTestMode, mpRequest } from "../../../../lib/mercadoPago.js";
 import { logEvent } from "../../../../lib/logger.js";
 
 const MANUAL_METHODS = new Set(["PIX_EXTERNO", "DINHEIRO", "CARTAO", "OUTRO"]);
+const REFUNDABLE_ORDER_STATUSES = new Set(["NOVO", "PREPARANDO", "PRONTO"]);
 const CONFIRMED_MP_STATUSES = new Set(["approved", "processed", "refunded"]);
 
 function normalizeStatus(value) {
@@ -252,6 +253,13 @@ export async function onRequestPost({ request, env, params }) {
   }
   if (String(payment.status || "").toUpperCase() !== "PAGO") {
     return json({ erro: "Somente pagamentos confirmados podem ser reembolsados." }, 409);
+  }
+
+  const orderStatus = String(payment.status_pedido || "").trim().toUpperCase();
+  if (!REFUNDABLE_ORDER_STATUSES.has(orderStatus)) {
+    return json({
+      erro: "Reembolso permitido apenas para pedidos pendentes, em produção ou prontos. Pedidos entregues ou cancelados não podem ser reembolsados."
+    }, 409);
   }
 
   const automatic = payment.metodo === "PIX_MP" && Boolean(payment.mp_order_id || payment.mp_payment_id);

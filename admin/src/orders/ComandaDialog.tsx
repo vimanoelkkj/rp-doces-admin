@@ -29,6 +29,7 @@ type Props = {
 type AddPaymentMode = "PENDENTE" | "PAGO" | "PIX";
 
 const REFUND_SYNC_MS = 3_000;
+const REFUNDABLE_ORDER_STATUSES = new Set(["NOVO", "PREPARANDO", "PRONTO"]);
 
 const PAYMENT_LABELS: Record<string, string> = {
   PIX_MP: "Pix pelo site",
@@ -294,6 +295,7 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
   };
 
   const open = order?.status_comanda !== "ENCERRADA";
+  const refundAllowedByStatus = REFUNDABLE_ORDER_STATUSES.has(String(order?.status_pedido || "").toUpperCase());
   const historyCount = (order?.pagamentos.length || 0) + refunds.length;
 
   return (
@@ -471,12 +473,18 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
                   <span>{historyCount} {historyCount === 1 ? "registro" : "registros"}</span>
                 </header>
 
+                {!refundAllowedByStatus && order.pagamentos.some(payment => payment.status === "PAGO") ? (
+                  <div className={styles.empty}>
+                    Reembolso indisponível para pedidos entregues ou cancelados.
+                  </div>
+                ) : null}
+
                 {order.pagamentos.map((payment, index) => {
                   const paymentId = Number(payment.id || 0);
                   const existingRefund = paymentId ? refundByPayment.get(paymentId) : undefined;
                   const refundPending = existingRefund?.status === "PENDENTE";
                   const refundCompleted = existingRefund?.status === "REEMBOLSADO";
-                  const canRefund = payment.status === "PAGO" && paymentId > 0 && !refundPending && !refundCompleted;
+                  const canRefund = refundAllowedByStatus && payment.status === "PAGO" && paymentId > 0 && !refundPending && !refundCompleted;
                   const retryRefund = existingRefund?.status === "FALHOU";
 
                   return (
