@@ -75,16 +75,16 @@ const adminModules = path.join(adminDir, "node_modules");
 if (!existsSync(adminModules)) {
   cancel(
     "Deploy cancelado: dependências do Admin não encontradas.",
-    "Execute npm install dentro de admin antes de publicar."
+    "Execute npm install na raiz do projeto antes de publicar."
   );
 }
 
 console.log("Executando testes do Admin...");
-const adminTests = run("npm", ["test"], { cwd: adminDir });
+const adminTests = run("npm", ["run", "admin:test"]);
 if (adminTests.status !== 0) cancel("Deploy cancelado: os testes do Admin falharam.");
 
 console.log("Gerando bundle de produção do Admin...");
-const adminBuild = run("npm", ["run", "build"], { cwd: adminDir });
+const adminBuild = run("npm", ["run", "admin:build"]);
 if (adminBuild.status !== 0) cancel("Deploy cancelado: o build do Admin falhou.");
 
 // Impede que testes ou hooks deixem artefatos versionados não commitados antes da publicação.
@@ -99,7 +99,7 @@ if (CHECK_ONLY) {
 const wranglerName = process.platform === "win32" ? "wrangler.cmd" : "wrangler";
 const wrangler = path.join(process.cwd(), "node_modules", ".bin", wranglerName);
 if (!existsSync(wrangler)) {
-  cancel("Deploy cancelado: Wrangler local não encontrado. Execute npm install.");
+  cancel("Deploy cancelado: Wrangler local não encontrado. Execute npm install na raiz do projeto.");
 }
 
 console.log("Testes e build aprovados. Publicando explicitamente a branch main...");
