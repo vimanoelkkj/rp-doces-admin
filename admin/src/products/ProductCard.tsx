@@ -4,7 +4,8 @@ import {
   availableStock,
   currentPriceCents,
   promotionLabel,
-  promotionState
+  promotionState,
+  stockLevel
 } from "./productDisplay";
 import styles from "./ProductCard.module.css";
 
@@ -37,16 +38,22 @@ export function ProductCard({
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const available = availableStock(product);
+  const stock = stockLevel(product);
   const reserved = Math.max(0, Number(product.estoque_reservado || 0));
   const promoState = promotionState(product);
   const promo = promotionLabel(promoState);
   const currentPrice = currentPriceCents(product);
   const hasActivePromo = promoState === "active" && currentPrice !== product.preco_centavos;
-  const availabilityLabel = reserved > 0
+  const quantityLabel = reserved > 0
     ? `${available} ${available === 1 ? "disponível" : "disponíveis"} · ${reserved} ${reserved === 1 ? "reservado" : "reservados"}`
-    : available > 0
-      ? `${available} ${available === 1 ? "disponível" : "disponíveis"}`
-      : "Esgotado";
+    : `${available} ${available === 1 ? "disponível" : "disponíveis"}`;
+  const availabilityLabel = stock === "out"
+    ? "Esgotado"
+    : stock === "critical"
+      ? `Estoque crítico · ${quantityLabel}`
+      : stock === "low"
+        ? `Estoque baixo · ${quantityLabel}`
+        : quantityLabel;
 
   useEffect(() => {
     if (!menuOpen) {
@@ -188,7 +195,12 @@ export function ProductCard({
             {hasActivePromo && <s>{money(product.preco_centavos)}</s>}
             <strong>{money(currentPrice)}</strong>
           </div>
-          <span className={available <= 3 ? styles.lowStock : ""}>{availabilityLabel}</span>
+          <span
+            className={stock === "low" || stock === "critical" ? styles.lowStock : ""}
+            style={stock === "critical" ? { color: "var(--danger)" } : undefined}
+          >
+            {availabilityLabel}
+          </span>
         </footer>
       </div>
     </article>

@@ -1,4 +1,5 @@
 import type { Order } from "../orders/order.schema";
+import { availableStock, stockLevel } from "../products/productDisplay";
 import type { Product } from "../products/product.types";
 
 export type DashboardSummary = {
@@ -9,6 +10,7 @@ export type DashboardSummary = {
   productCount: number;
   soldOutCount: number;
   lowStockCount: number;
+  criticalStockCount: number;
   ordersTodayCount: number;
   recentOrders: Order[];
   attention: string[];
@@ -41,7 +43,7 @@ export function dashboardOrderItemsCount(order: Order): number {
 }
 
 export function dashboardAvailableStock(product: Product): number {
-  return Number(product.estoque || 0) - Number(product.estoque_reservado || 0);
+  return availableStock(product);
 }
 
 export function buildDashboardSummary(
@@ -63,11 +65,14 @@ export function buildDashboardSummary(
       String(order.status_pedido || "NOVO").toUpperCase() === "NOVO" &&
       String(order.status_pagamento || "").toUpperCase() === "PAGO"
   );
-  const soldOut = products.filter(product => dashboardAvailableStock(product) <= 0);
-  const lowStock = products.filter(product => {
-    const available = dashboardAvailableStock(product);
-    return available > 0 && available <= 2 && Boolean(product.ativo);
-  });
+  const soldOut = products.filter(product => stockLevel(product) === "out");
+  const criticalStock = products.filter(
+    product => Boolean(product.ativo) && stockLevel(product) === "critical"
+  );
+  const lowStock = products.filter(
+    product => Boolean(product.ativo) && stockLevel(product) === "low"
+  );
+  const attentionStock = [...criticalStock, ...lowStock];
   const paidRevenueToday = paidToday.reduce(
     (total, order) => total + Number(order.valor_total_centavos || 0),
     0
@@ -89,6 +94,11 @@ export function buildDashboardSummary(
       `${soldOut.length} produto${soldOut.length === 1 ? "" : "s"} sem estoque disponível`
     );
   }
+  if (criticalStock.length) {
+    attention.push(
+      `${criticalStock.length} produto${criticalStock.length === 1 ? "" : "s"} com estoque crítico`
+    );
+  }
   if (lowStock.length) {
     attention.push(
       `${lowStock.length} produto${lowStock.length === 1 ? "" : "s"} com estoque baixo`
@@ -102,7 +112,8 @@ export function buildDashboardSummary(
     pendingPaymentCount: pendingPayment.length,
     productCount: products.length,
     soldOutCount: soldOut.length,
-    lowStockCount: lowStock.length,
+    lowStockCount: attentionStock.length,
+    criticalStockCount: criticalStock.length,
     ordersTodayCount: ordersToday.length,
     recentOrders: orders.slice(0, 6),
     attention

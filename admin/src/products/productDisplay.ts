@@ -1,9 +1,21 @@
 import type { Product } from "./product.types";
 
 export type PromotionState = "inactive" | "scheduled" | "active" | "ended";
+export type StockLevel = "out" | "critical" | "low" | "normal";
+
+export const CRITICAL_STOCK_MAX = 1;
+export const LOW_STOCK_MAX = 3;
 
 export function availableStock(product: Product): number {
   return Math.max(0, product.estoque - product.estoque_reservado);
+}
+
+export function stockLevel(product: Product): StockLevel {
+  const available = availableStock(product);
+  if (available <= 0) return "out";
+  if (available <= CRITICAL_STOCK_MAX) return "critical";
+  if (available <= LOW_STOCK_MAX) return "low";
+  return "normal";
 }
 
 export function promotionState(product: Product, now = Date.now()): PromotionState {

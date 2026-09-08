@@ -7,8 +7,11 @@ type Props = {
   onNavigate: (page: AdminV2Page, focusProductIds?: number[]) => void;
 };
 
-function attentionAction(text: string): "low-stock" | "sold-out" | "orders" | null {
+type AttentionAction = "critical-stock" | "low-stock" | "sold-out" | "orders";
+
+function attentionAction(text: string): AttentionAction | null {
   const normalized = text.toLocaleLowerCase("pt-BR");
+  if (normalized.includes("estoque crítico")) return "critical-stock";
   if (normalized.includes("estoque baixo")) return "low-stock";
   if (normalized.includes("esgotado")) return "sold-out";
   if (normalized.includes("saldo pendente") || normalized.includes("aguardando") || normalized.includes("preparo")) {
@@ -55,7 +58,9 @@ export function AttentionNavigationBridge({ onNavigate }: Props) {
           .filter(product => {
             const available = availableStock(product);
             if (!product.ativo) return false;
-            return action === "sold-out" ? available <= 0 : available > 0 && available <= 2;
+            if (action === "sold-out") return available <= 0;
+            if (action === "critical-stock") return available === 1;
+            return available > 0 && available <= 3;
           })
           .map(product => product.id);
         onNavigate("produtos", ids);
