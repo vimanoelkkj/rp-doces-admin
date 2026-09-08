@@ -29,6 +29,7 @@
   width: 56px;
   height: 42px;
   color: var(--rp-color-brand);
+  transition: color 160ms ease;
   will-change: transform;
 }
 
@@ -67,10 +68,6 @@
 @media (prefers-reduced-motion: no-preference) {
   .rp-home-discovery__chevron {
     animation: rp-home-discovery-bounce 1.55s ease-in-out infinite;
-  }
-
-  .rp-home-discovery:hover .rp-home-discovery__chevron {
-    animation-duration: 1.05s;
   }
 
   @keyframes rp-home-discovery-bounce {
