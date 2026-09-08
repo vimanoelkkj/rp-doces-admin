@@ -70,6 +70,7 @@ internal fun EditOrderItemDialog(
     var quantity by remember(item.id) { mutableStateOf(item.quantidade.coerceAtLeast(1)) }
     var productOpen by remember { mutableStateOf(false) }
     var refundMethod by remember(item.id) { mutableStateOf(defaultRefundMethod(order.paymentMethod)) }
+    var refundConfirmed by remember(item.id) { mutableStateOf(false) }
     var refundMethodOpen by remember { mutableStateOf(false) }
     var loading by remember(item.id) { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
@@ -158,6 +159,7 @@ internal fun EditOrderItemDialog(
                 onSelect = { productId ->
                     selectedProductId = productId
                     quantity = 1
+                    refundConfirmed = false
                     productOpen = false
                 }
             )
@@ -180,8 +182,14 @@ internal fun EditOrderItemDialog(
                 EditItemQuantityStepper(
                     quantity = quantity,
                     max = maxQuantity,
-                    onDecrease = { quantity = (quantity - 1).coerceAtLeast(1) },
-                    onIncrease = { quantity = (quantity + 1).coerceAtMost(maxQuantity) }
+                    onDecrease = {
+                        quantity = (quantity - 1).coerceAtLeast(1)
+                        refundConfirmed = false
+                    },
+                    onIncrease = {
+                        quantity = (quantity + 1).coerceAtMost(maxQuantity)
+                        refundConfirmed = false
+                    }
                 )
             }
 
@@ -251,9 +259,43 @@ internal fun EditOrderItemDialog(
                                 onDismiss = { refundMethodOpen = false },
                                 onSelect = {
                                     refundMethod = it
+                                    refundConfirmed = false
                                     refundMethodOpen = false
                                 }
                             )
+                            Spacer(Modifier.height(10.dp))
+                            Surface(
+                                onClick = { if (!saving) refundConfirmed = !refundConfirmed },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(9.dp),
+                                color = web.surface,
+                                border = BorderStroke(1.dp, if (refundConfirmed) web.accent else web.borderStrong)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(5.dp),
+                                        color = if (refundConfirmed) web.accent else web.surface,
+                                        border = BorderStroke(1.dp, if (refundConfirmed) web.accent else web.borderStrong)
+                                    ) {
+                                        Box(modifier = Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+                                            if (refundConfirmed) {
+                                                Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        "Confirmo que ${money(refundCents)} já foi devolvido à cliente",
+                                        color = web.text,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -261,7 +303,7 @@ internal fun EditOrderItemDialog(
 
             Text(
                 when {
-                    refundCents > 0 -> "Ao confirmar, ${money(refundCents)} será registrado como devolvido. O produto original volta ao estoque e o novo assume a baixa ou reserva correspondente."
+                    refundCents > 0 -> "Faça a devolução de ${money(refundCents)} à cliente antes de confirmar. Este fluxo não envia Pix nem faz estorno automático; ele apenas registra a devolução e conclui a troca."
                     paidExchange -> "O pagamento já registrado será preservado no novo produto. Se ele for mais caro, somente a diferença ficará pendente."
                     else -> "Se o valor mudar, a comanda recalcula automaticamente o saldo."
                 },
@@ -284,7 +326,7 @@ internal fun EditOrderItemDialog(
 
         Spacer(Modifier.height(14.dp))
         WebModalActions(
-            primaryText = if (refundCents > 0) "Trocar e devolver ${money(refundCents)}" else "Salvar troca",
+            primaryText = if (refundCents > 0) "Confirmar devolução de ${money(refundCents)}" else "Salvar troca",
             onPrimary = {
                 if (saving) return@WebModalActions
                 val itemId = item.id
@@ -293,6 +335,7 @@ internal fun EditOrderItemDialog(
                     itemId == null -> "Este item não possui identificador para edição."
                     product == null -> "Selecione um produto válido."
                     quantity !in 1..maxQuantity -> "Quantidade indisponível para este produto."
+                    refundCents > 0 && !refundConfirmed -> "Confirme que ${money(refundCents)} já foi devolvido à cliente."
                     else -> null
                 }
                 if (error != null || itemId == null || product == null) return@WebModalActions
@@ -307,7 +350,7 @@ internal fun EditOrderItemDialog(
                                 productId = product.id,
                                 quantity = quantity,
                                 refundMethod = refundMethod.takeIf { refundCents > 0 },
-                                confirmRefund = refundCents > 0
+                                confirmRefund = refundCents > 0 && refundConfirmed
                             )
                         } else {
                             ordersRepository.updateItem(
