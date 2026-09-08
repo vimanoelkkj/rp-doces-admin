@@ -1,0 +1,54 @@
+name: One-off refund remaining balance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/patches/oneoff-refund-remaining-balance.py"
+      - ".github/workflows/oneoff-refund-remaining-balance.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-validate-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Aplicar patch
+        run: python .github/patches/oneoff-refund-remaining-balance.py
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Testar backend
+        run: |
+          npm ci
+          npm test
+
+      - name: Testar e compilar Admin
+        working-directory: admin
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Regenerar schema
+        run: npm run schema:generate
+
+      - name: Limpar ferramentas temporárias e publicar patch
+        run: |
+          rm .github/patches/oneoff-refund-remaining-balance.py
+          rm .github/workflows/oneoff-refund-remaining-balance.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(orders): permite reembolsar saldo restante"
+          git push origin HEAD:main
