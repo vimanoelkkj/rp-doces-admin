@@ -96,13 +96,21 @@ export function App() {
   }, [page]);
 
   function navigate(nextPage: AdminV2Page, focusProductIds?: number[]) {
-    if (closeTopBackLayer()) return;
+    // Uma camada aberta não deve consumir o clique usado para trocar de tela.
+    // Mantemos o comportamento de fechar a camada apenas quando o usuário
+    // aciona novamente a própria página atual.
+    if (nextPage === pageRef.current) {
+      closeTopBackLayer();
+      if (nextPage === "produtos" && focusProductIds?.length) {
+        setProductFocusIds([...new Set(focusProductIds.filter(id => Number.isInteger(id) && id > 0))]);
+      }
+      return;
+    }
 
     if (nextPage === "produtos" && focusProductIds?.length) {
       setProductFocusIds([...new Set(focusProductIds.filter(id => Number.isInteger(id) && id > 0))]);
     }
 
-    if (nextPage === pageRef.current) return;
     window.history.pushState(null, "", `#${nextPage}`);
     activate(nextPage);
   }
