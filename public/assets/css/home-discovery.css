@@ -26,10 +26,10 @@
 
 .rp-home-discovery__chevron {
   display: block;
-  width: 58px;
-  height: 158px;
+  width: 86px;
+  height: 190px;
   background: url("/assets/img/home-discovery-arrow.svg") center / contain no-repeat;
-  filter: drop-shadow(0 10px 18px rgb(224 107 138 / 0.12));
+  filter: drop-shadow(0 10px 18px rgb(224 107 138 / 0.14));
   transform-origin: 50% 35%;
   will-change: transform;
 }
@@ -39,7 +39,7 @@
 }
 
 .rp-home-discovery:hover .rp-home-discovery__chevron {
-  filter: drop-shadow(0 12px 22px rgb(224 107 138 / 0.2));
+  filter: drop-shadow(0 12px 22px rgb(224 107 138 / 0.22));
 }
 
 .rp-home-discovery:active {
@@ -83,8 +83,8 @@
   }
 
   .rp-home-discovery__chevron {
-    width: 46px;
-    height: 126px;
+    width: 64px;
+    height: 144px;
   }
 }
 
@@ -99,14 +99,14 @@
   }
 
   .rp-home-discovery__chevron {
-    width: 64px;
-    height: 176px;
+    width: 92px;
+    height: 204px;
   }
 }
 
 @media (min-width: 1440px) {
   .rp-home-discovery__chevron {
-    width: 72px;
-    height: 196px;
+    width: 106px;
+    height: 234px;
   }
 }
