@@ -150,8 +150,9 @@ function orderStatus(order: Order): { label: string; tone: "orange" | "green" | 
 
 function paymentInfo(order: Order) {
   const status = String(order.status_pagamento || "PENDENTE").toUpperCase();
-  if (status === "PAGO") return { paid: true, label: "Pago" };
-  return { paid: false, label: "Pendente" };
+  if (status === "PAGO") return { paid: true, refunded: false, label: "Pago" };
+  if (status === "REEMBOLSADO") return { paid: false, refunded: true, label: "Reembolsado" };
+  return { paid: false, refunded: false, label: "Pendente" };
 }
 
 function paymentMethod(order: Order) {
@@ -271,12 +272,14 @@ function OrderRow({
       </div>
       <div><span className={cls("tag", status.tone)}>{status.label}</span></div>
       <div className={styles.stack}>
-        {payment.paid ? (
+        {payment.refunded ? (
+          <span className={styles["payment-refunded"]}>Reembolsado</span>
+        ) : payment.paid ? (
           <span className={styles["payment-ok"]}><span className={styles.check}>✓</span> Pago</span>
         ) : (
           <span className={styles["payment-pending"]}>Pendente</span>
         )}
-        <span className={styles.secondary}>{payment.paid ? paymentMethod(order) : "—"}</span>
+        <span className={styles.secondary}>{payment.paid || payment.refunded ? paymentMethod(order) : "—"}</span>
       </div>
       <div className={styles.money}>{money(order.valor_total_centavos)}</div>
       <div className={styles.chev}>›</div>
@@ -294,9 +297,11 @@ function OrderRow({
       </div>
       <div className={styles["mobile-right"]}>
         <span className={styles.money}>{money(order.valor_total_centavos)}</span>
-        {payment.paid
-          ? <span className={styles["payment-ok"]}><span className={styles.check}>✓</span> Pago</span>
-          : <span className={styles["payment-pending"]}>Pendente</span>}
+        {payment.refunded
+          ? <span className={styles["payment-refunded"]}>Reembolsado</span>
+          : payment.paid
+            ? <span className={styles["payment-ok"]}><span className={styles.check}>✓</span> Pago</span>
+            : <span className={styles["payment-pending"]}>Pendente</span>}
         <span className={styles.chev}>›</span>
       </div>
     </div>
