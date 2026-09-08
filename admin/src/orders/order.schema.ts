@@ -11,6 +11,8 @@ export const OrderItemSchema = z.object({
   valor_pago_centavos: z.coerce.number().optional(),
   saldo_centavos: z.coerce.number().optional(),
   status_financeiro: z.string().nullable().optional(),
+  reembolso_automatico_disponivel: z.coerce.boolean().optional(),
+  reembolso_automatico_meio: z.string().nullable().optional(),
   estoque_baixado_em: z.string().nullable().optional(),
   adicionado_por_usuario_id: z.coerce.number().nullable().optional(),
   adicionado_em: z.string().nullable().optional()

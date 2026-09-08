@@ -42,10 +42,22 @@ function fakePixOrder({ id, status = "action_required" }) {
   };
 }
 
-function fakeMpRequest(path, { method = "GET", idempotencyKey } = {}) {
+function fakeMpRequest(path, { method = "GET", idempotencyKey, body } = {}) {
   const cancelMatch = path.match(/^\/v1\/orders\/([^/]+)\/cancel$/);
   if (method === "POST" && cancelMatch) {
     return fakePixOrder({ id: decodeURIComponent(cancelMatch[1]), status: "canceled" });
+  }
+
+  const paymentRefundMatch = path.match(/^\/v1\/payments\/([^/]+)\/refunds$/);
+  if (method === "POST" && paymentRefundMatch) {
+    const paymentId = decodeURIComponent(paymentRefundMatch[1]);
+    const amount = Number(body?.amount || 0);
+    return {
+      id: `local_refund_${fakeOrderId(idempotencyKey)}`,
+      payment_id: paymentId,
+      amount,
+      status: "approved"
+    };
   }
 
   const orderMatch = path.match(/^\/v1\/orders\/([^/]+)$/);

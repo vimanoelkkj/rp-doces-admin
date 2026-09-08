@@ -1,12 +1,35 @@
 import { json, bodyJson, sameOrigin } from "../../../../../../lib/http.js";
 import { requireUser } from "../../../../../../lib/auth.js";
 import { ensureLegacyPaymentMaterialized, recalculateComanda } from "../../../../../../lib/comandaLedger.js";
+import { mpRequest } from "../../../../../../lib/mercadoPago.js";
 import { logEvent } from "../../../../../../lib/logger.js";
 
 const REFUND_METHODS = new Set(["PIX_EXTERNO", "DINHEIRO", "CARTAO", "OUTRO"]);
+const CONFIRMED_MP_REFUND_STATUSES = new Set(["approved", "processed", "refunded"]);
 
 function upper(value) {
   return String(value || "").trim().toUpperCase();
+}
+
+function lower(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function automaticRefundAllocation(allocations, refundCents) {
+  if (refundCents <= 0 || !Array.isArray(allocations) || allocations.length === 0) return null;
+  const paymentIds = new Set(allocations.map(item => Number(item.pagamento_id)).filter(Number.isInteger));
+  if (paymentIds.size !== 1) return null;
+  const paymentId = [...paymentIds][0];
+  const samePayment = allocations.filter(item => Number(item.pagamento_id) === paymentId);
+  const allocated = samePayment.reduce((sum, item) => sum + Number(item.valor_centavos || 0), 0);
+  const eligible =
+    allocated >= refundCents &&
+    samePayment.every(item => upper(item.metodo) === "PIX_MP" && Boolean(item.mp_payment_id));
+  return eligible ? samePayment[0] : null;
+}
+
+function automaticRefundKey({ pedidoId, item, produtoId, quantidade, refundCents, pagamentoId }) {
+  return `exchange-mp:${pedidoId}:${item.id}:${item.produto_id}:${produtoId}:${quantidade}:${refundCents}:${pagamentoId}`;
 }
 
 function promotionPrice(product, now = Date.now()) {
@@ -76,7 +99,7 @@ export async function onRequestPost({ request, env, params }) {
   const { results: allocations } = await env.DB.prepare(
     `SELECT a.id, a.pagamento_id, a.valor_centavos,
             p.metodo, p.valor_centavos AS pagamento_valor_centavos,
-            p.valor_original_centavos
+            p.valor_original_centavos, p.mp_order_id, p.mp_payment_id
      FROM pedido_pagamento_alocacoes a
      JOIN pedido_pagamentos p ON p.id = a.pagamento_id
      WHERE a.pedido_item_id = ? AND p.status = 'PAGO'
@@ -119,8 +142,13 @@ export async function onRequestPost({ request, env, params }) {
   }
 
   const refundCents = Math.max(0, paidCents - subtotal);
-  const refundMethod = upper(body?.devolucao_metodo) || defaultRefundMethod(paidAllocations[0]?.metodo);
-  if (refundCents > 0) {
+  const automaticAllocation = automaticRefundAllocation(paidAllocations, refundCents);
+  const automaticRefund = Boolean(automaticAllocation);
+  const refundMethod = automaticRefund
+    ? "PIX_MP"
+    : upper(body?.devolucao_metodo) || defaultRefundMethod(paidAllocations[0]?.metodo);
+
+  if (refundCents > 0 && !automaticRefund) {
     if (upper(body?.confirmacao_devolucao) !== "DEVOLVIDO") {
       return json({
         erro: `Confirme a devolução de R$ ${(refundCents / 100).toFixed(2).replace(".", ",")} antes de concluir a troca.`
@@ -128,6 +156,112 @@ export async function onRequestPost({ request, env, params }) {
     }
     if (!REFUND_METHODS.has(refundMethod)) {
       return json({ erro: "Forma de devolução inválida." }, 400);
+    }
+  }
+
+  let automaticRefundRecord = null;
+  if (automaticRefund) {
+    const idempotencyKey = automaticRefundKey({
+      pedidoId,
+      item,
+      produtoId,
+      quantidade,
+      refundCents,
+      pagamentoId: Number(automaticAllocation.pagamento_id)
+    });
+
+    automaticRefundRecord = await env.DB.prepare(
+      "SELECT * FROM pedido_reembolsos WHERE idempotency_key = ? LIMIT 1"
+    ).bind(idempotencyKey).first();
+
+    if (!automaticRefundRecord) {
+      const inserted = await env.DB.prepare(
+        `INSERT INTO pedido_reembolsos (
+           pedido_id, pagamento_id, origem, metodo, valor_centavos, status,
+           idempotency_key, registrado_por_usuario_id, motivo, devolveu_estoque
+         ) VALUES (?, ?, 'MERCADO_PAGO', 'PIX_MP', ?, 'PENDENTE', ?, ?, ?, 0)`
+      ).bind(
+        pedidoId,
+        Number(automaticAllocation.pagamento_id),
+        refundCents,
+        idempotencyKey,
+        auth.user.id,
+        `Estorno automático da diferença na troca de ${item.produto_nome || "produto"} por ${product.nome}`
+      ).run();
+      automaticRefundRecord = {
+        id: Number(inserted?.meta?.last_row_id || 0),
+        pedido_id: pedidoId,
+        pagamento_id: Number(automaticAllocation.pagamento_id),
+        origem: "MERCADO_PAGO",
+        metodo: "PIX_MP",
+        valor_centavos: refundCents,
+        status: "PENDENTE",
+        idempotency_key: idempotencyKey,
+        mp_refund_id: null,
+        mp_status: null
+      };
+    } else if (upper(automaticRefundRecord.status) === "FALHOU") {
+      await env.DB.prepare(
+        "UPDATE pedido_reembolsos SET status = 'PENDENTE', atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND status = 'FALHOU'"
+      ).bind(automaticRefundRecord.id).run();
+      automaticRefundRecord.status = "PENDENTE";
+    }
+
+    const alreadyConfirmed =
+      upper(automaticRefundRecord.status) === "REEMBOLSADO" ||
+      (Boolean(automaticRefundRecord.mp_refund_id) && CONFIRMED_MP_REFUND_STATUSES.has(lower(automaticRefundRecord.mp_status)));
+
+    if (!alreadyConfirmed) {
+      try {
+        const response = await mpRequest(
+          env,
+          `/v1/payments/${encodeURIComponent(automaticAllocation.mp_payment_id)}/refunds`,
+          {
+            method: "POST",
+            idempotencyKey,
+            body: { amount: Number((refundCents / 100).toFixed(2)) }
+          }
+        );
+        const providerStatus = lower(response?.status || "");
+        const providerConfirmed = Boolean(response?.id) && CONFIRMED_MP_REFUND_STATUSES.has(providerStatus);
+        const mpRefundId = response?.id ? String(response.id) : null;
+
+        await env.DB.prepare(
+          `UPDATE pedido_reembolsos
+           SET mp_refund_id = COALESCE(?, mp_refund_id),
+               mp_status = ?, atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        ).bind(mpRefundId, providerStatus || null, automaticRefundRecord.id).run();
+
+        automaticRefundRecord.mp_refund_id = mpRefundId;
+        automaticRefundRecord.mp_status = providerStatus;
+
+        if (!providerConfirmed) {
+          return json({
+            erro: "O Mercado Pago recebeu o pedido de estorno, mas ainda não confirmou a devolução. A troca não foi concluída.",
+            codigo: "EXCHANGE_REFUND_PENDING",
+            mp_refund_id: mpRefundId
+          }, 409);
+        }
+      } catch (error) {
+        await env.DB.prepare(
+          `UPDATE pedido_reembolsos
+           SET status = 'FALHOU', mp_status = ?, atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'PENDENTE'`
+        ).bind(`HTTP_${Number(error?.status || 0) || 0}`, automaticRefundRecord.id).run();
+
+        logEvent("warn", "comanda.exchange_refund_failed", {
+          pedido_id: pedidoId,
+          item_id: itemId,
+          mp_order_id: automaticAllocation.mp_order_id || undefined,
+          http_status: Number(error?.status || 0) || undefined,
+          reason: "EXCHANGE_REFUND_PROVIDER_FAILED"
+        });
+        return json({
+          erro: "O Mercado Pago não confirmou o estorno. O produto, o estoque e o financeiro não foram alterados.",
+          codigo: "EXCHANGE_REFUND_FAILED"
+        }, 502);
+      }
     }
   }
 
@@ -168,27 +302,39 @@ export async function onRequestPost({ request, env, params }) {
       ).bind(slice, allocation.pagamento_id, slice));
     }
 
-    statements.push(env.DB.prepare(
-      `INSERT INTO pedido_reembolsos (
-         pedido_id, pagamento_id, origem, metodo, valor_centavos, status,
-         idempotency_key, registrado_por_usuario_id, motivo, devolveu_estoque,
-         concluido_em
-       ) VALUES (?, ?, 'MANUAL', ?, ?, 'REEMBOLSADO', ?, ?, ?, 0, CURRENT_TIMESTAMP)`
-    ).bind(
-      pedidoId,
-      allocation.pagamento_id,
-      refundMethod,
-      slice,
-      `exchange:${pedidoId}:${itemId}:${operationId}:${allocation.pagamento_id}`,
-      auth.user.id,
-      `Devolução de diferença na troca de ${item.produto_nome || "produto"} por ${product.nome}`
-    ));
+    if (!automaticRefund) {
+      statements.push(env.DB.prepare(
+        `INSERT INTO pedido_reembolsos (
+           pedido_id, pagamento_id, origem, metodo, valor_centavos, status,
+           idempotency_key, registrado_por_usuario_id, motivo, devolveu_estoque,
+           concluido_em
+         ) VALUES (?, ?, 'MANUAL', ?, ?, 'REEMBOLSADO', ?, ?, ?, 0, CURRENT_TIMESTAMP)`
+      ).bind(
+        pedidoId,
+        allocation.pagamento_id,
+        refundMethod,
+        slice,
+        `exchange:${pedidoId}:${itemId}:${operationId}:${allocation.pagamento_id}`,
+        auth.user.id,
+        `Devolução de diferença na troca de ${item.produto_nome || "produto"} por ${product.nome}`
+      ));
+    }
 
     remainingRefund -= slice;
   }
 
   if (remainingRefund > 0) {
     return json({ erro: "Não foi possível vincular toda a devolução aos pagamentos do item." }, 409);
+  }
+
+  if (automaticRefund && automaticRefundRecord?.id) {
+    statements.push(env.DB.prepare(
+      `UPDATE pedido_reembolsos
+       SET status = 'REEMBOLSADO',
+           concluido_em = COALESCE(concluido_em, CURRENT_TIMESTAMP),
+           atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND status IN ('PENDENTE', 'REEMBOLSADO')`
+    ).bind(automaticRefundRecord.id));
   }
 
   if (sourceDeducted) {
@@ -305,6 +451,7 @@ export async function onRequestPost({ request, env, params }) {
     valor_novo_centavos: subtotal,
     devolucao_centavos: refundCents,
     devolucao_metodo: refundCents > 0 ? refundMethod : undefined,
+    devolucao_automatica: automaticRefund,
     estoque_origem_reposto: sourceDeducted && !sameProduct,
     estoque_destino_baixado: sourceDeducted,
     usuario_id: auth.user.id
@@ -322,6 +469,8 @@ export async function onRequestPost({ request, env, params }) {
     valor_pago_preservado_centavos: Math.min(paidCents, subtotal),
     devolucao_centavos: refundCents,
     devolucao_metodo: refundCents > 0 ? refundMethod : null,
+    devolucao_automatica: automaticRefund,
+    mp_refund_id: automaticRefund ? automaticRefundRecord?.mp_refund_id || null : null,
     estoque_original_reposto: sourceDeducted && !sameProduct,
     reserva_original_liberada: reservationActive && !sameProduct,
     estoque_novo_baixado: sourceDeducted,

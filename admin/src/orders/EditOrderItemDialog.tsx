@@ -141,6 +141,7 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
   const paidExchange = paidCents > 0;
   const refundCents = paidExchange ? Math.max(0, paidCents - previewTotal) : 0;
   const pendingAfterExchange = paidExchange ? Math.max(0, previewTotal - paidCents) : 0;
+  const automaticRefund = refundCents > 0 && Boolean(item.reembolso_automatico_disponivel);
 
   useEffect(() => {
     setRefundConfirmed(false);
@@ -167,7 +168,7 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
       setError(`${selectedProduct.nome}: estoque disponível insuficiente.`);
       return;
     }
-    if (refundCents > 0 && !refundConfirmed) {
+    if (refundCents > 0 && !automaticRefund && !refundConfirmed) {
       setError(`Confirme que ${money(refundCents)} já foi devolvido à cliente antes de registrar a troca.`);
       return;
     }
@@ -178,7 +179,7 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
         await exchangePaidOrderItem(order.id, item.id, {
           produto_id: selectedProduct.id,
           quantidade: quantity,
-          ...(refundCents > 0 ? {
+          ...(refundCents > 0 && !automaticRefund ? {
             devolucao_metodo: refundMethod,
             confirmacao_devolucao: "DEVOLVIDO" as const
           } : {})
@@ -305,19 +306,7 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
               </div>
 
               {refundCents > 0 ? (
-                <>
-                  <div className={styles.field}>
-                    <label htmlFor="edit-order-refund-method">Forma da devolução</label>
-                    <ManualOrderSelect
-                      id="edit-order-refund-method"
-                      value={refundMethod}
-                      options={REFUND_METHOD_OPTIONS}
-                      disabled={saving}
-                      ariaLabel="Selecionar forma da devolução"
-                      onChange={value => setRefundMethod(value as RefundMethod)}
-                    />
-                  </div>
-
+                automaticRefund ? (
                   <div
                     style={{
                       marginTop: 12,
@@ -326,42 +315,75 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
                       borderRadius: 10,
                       background: "var(--surface-soft)",
                       display: "grid",
-                      gap: 10
+                      gap: 8
                     }}
                   >
-                    <strong style={{ fontSize: 12, color: "var(--text)" }}>Atenção</strong>
+                    <strong style={{ fontSize: 12, color: "var(--text)" }}>Estorno automático · Mercado Pago</strong>
                     <span style={{ fontSize: 11, lineHeight: 1.5, color: "var(--muted)" }}>
-                      Faça a devolução de {money(refundCents)} para a cliente antes de confirmar. Este fluxo não envia Pix nem faz estorno automático.
+                      Ao confirmar, o sistema solicitará um estorno REAL de {money(refundCents)} ao Mercado Pago. A troca e o estoque só serão concluídos depois da confirmação do provedor.
                     </span>
-                    <label
+                  </div>
+                ) : (
+                  <>
+                    <div className={styles.field}>
+                      <label htmlFor="edit-order-refund-method">Forma da devolução</label>
+                      <ManualOrderSelect
+                        id="edit-order-refund-method"
+                        value={refundMethod}
+                        options={REFUND_METHOD_OPTIONS}
+                        disabled={saving}
+                        ariaLabel="Selecionar forma da devolução"
+                        onChange={value => setRefundMethod(value as RefundMethod)}
+                      />
+                    </div>
+
+                    <div
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 9,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "var(--text)",
-                        cursor: saving ? "default" : "pointer"
+                        marginTop: 12,
+                        padding: 12,
+                        border: "1px solid var(--line)",
+                        borderRadius: 10,
+                        background: "var(--surface-soft)",
+                        display: "grid",
+                        gap: 10
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={refundConfirmed}
-                        disabled={saving}
-                        onChange={event => setRefundConfirmed(event.target.checked)}
-                        style={{ accentColor: "var(--pink-strong)", width: 16, height: 16 }}
-                      />
-                      Confirmo que {money(refundCents)} já foi devolvido à cliente
-                    </label>
-                  </div>
-                </>
+                      <strong style={{ fontSize: 12, color: "var(--text)" }}>Atenção</strong>
+                      <span style={{ fontSize: 11, lineHeight: 1.5, color: "var(--muted)" }}>
+                        Faça a devolução de {money(refundCents)} para a cliente antes de confirmar. Este fluxo não envia Pix nem faz estorno automático.
+                      </span>
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 9,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "var(--text)",
+                          cursor: saving ? "default" : "pointer"
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={refundConfirmed}
+                          disabled={saving}
+                          onChange={event => setRefundConfirmed(event.target.checked)}
+                          style={{ accentColor: "var(--pink-strong)", width: 16, height: 16 }}
+                        />
+                        Confirmo que {money(refundCents)} já foi devolvido à cliente
+                      </label>
+                    </div>
+                  </>
+                )
               ) : null}
             </section>
           ) : null}
 
           <p className={styles.itemMeta}>
             {refundCents > 0
-              ? `Depois da confirmação manual, ${money(refundCents)} será apenas registrado como devolvido no sistema. O produto original volta ao estoque e o novo produto assume a baixa ou reserva correspondente.`
+              ? automaticRefund
+                ? `O estorno de ${money(refundCents)} será enviado ao Mercado Pago. Depois da confirmação, o produto original volta ao estoque e o novo produto assume a baixa ou reserva correspondente.`
+                : `Depois da confirmação manual, ${money(refundCents)} será apenas registrado como devolvido no sistema. O produto original volta ao estoque e o novo produto assume a baixa ou reserva correspondente.`
               : paidExchange
                 ? "O pagamento já registrado será preservado no novo produto. Se o novo total for maior, somente a diferença ficará pendente."
                 : "Se o valor mudar, a comanda recalcula automaticamente o saldo."
@@ -375,9 +397,13 @@ export function EditOrderItemDialog({ order, item, onClose, onSaved }: Props) {
             <button
               className={styles.submit}
               type="submit"
-              disabled={saving || loadingProducts || !selectedProduct || (refundCents > 0 && !refundConfirmed)}
+              disabled={saving || loadingProducts || !selectedProduct || (refundCents > 0 && !automaticRefund && !refundConfirmed)}
             >
-              {saving ? "Salvando..." : refundCents > 0 ? `Confirmar devolução de ${money(refundCents)}` : "Salvar troca"}
+              {saving
+                ? automaticRefund ? "Solicitando estorno..." : "Salvando..."
+                : refundCents > 0
+                  ? automaticRefund ? `Trocar e estornar ${money(refundCents)}` : `Confirmar devolução de ${money(refundCents)}`
+                  : "Salvar troca"}
             </button>
           </footer>
         </form>

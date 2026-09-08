@@ -104,6 +104,7 @@ internal fun EditOrderItemDialog(
     val paidExchange = item.paidCents > 0
     val refundCents = if (paidExchange) (item.paidCents - previewTotal).coerceAtLeast(0) else 0
     val pendingAfterExchange = if (paidExchange) (previewTotal - item.paidCents).coerceAtLeast(0) else 0
+    val automaticRefund = refundCents > 0 && item.automaticRefundAvailable == 1
 
     WebModal(onDismiss = { if (!saving) onDismiss() }, maxWidth = 500) {
         WebModalHeader(
@@ -252,48 +253,73 @@ internal fun EditOrderItemDialog(
 
                         if (refundCents > 0) {
                             Spacer(Modifier.height(12.dp))
-                            RefundMethodSelect(
-                                selectedKey = refundMethod,
-                                expanded = refundMethodOpen,
-                                onExpand = { refundMethodOpen = true },
-                                onDismiss = { refundMethodOpen = false },
-                                onSelect = {
-                                    refundMethod = it
-                                    refundConfirmed = false
-                                    refundMethodOpen = false
-                                }
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Surface(
-                                onClick = { if (!saving) refundConfirmed = !refundConfirmed },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(9.dp),
-                                color = web.surface,
-                                border = BorderStroke(1.dp, if (refundConfirmed) web.accent else web.borderStrong)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                            if (automaticRefund) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(9.dp),
+                                    color = web.surface,
+                                    border = BorderStroke(1.dp, web.accent.copy(alpha = .45f))
                                 ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(5.dp),
-                                        color = if (refundConfirmed) web.accent else web.surface,
-                                        border = BorderStroke(1.dp, if (refundConfirmed) web.accent else web.borderStrong)
+                                    Column(modifier = Modifier.padding(11.dp)) {
+                                        Text(
+                                            "Estorno automático · Mercado Pago",
+                                            color = web.text,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            "Ao confirmar, será solicitado um estorno REAL de ${money(refundCents)}. A troca e o estoque só serão concluídos depois da confirmação do provedor.",
+                                            color = web.muted,
+                                            fontSize = 10.5.sp,
+                                            lineHeight = 15.sp,
+                                            modifier = Modifier.padding(top = 5.dp)
+                                        )
+                                    }
+                                }
+                            } else {
+                                RefundMethodSelect(
+                                    selectedKey = refundMethod,
+                                    expanded = refundMethodOpen,
+                                    onExpand = { refundMethodOpen = true },
+                                    onDismiss = { refundMethodOpen = false },
+                                    onSelect = {
+                                        refundMethod = it
+                                        refundConfirmed = false
+                                        refundMethodOpen = false
+                                    }
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                Surface(
+                                    onClick = { if (!saving) refundConfirmed = !refundConfirmed },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(9.dp),
+                                    color = web.surface,
+                                    border = BorderStroke(1.dp, if (refundConfirmed) web.accent else web.borderStrong)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(9.dp)
                                     ) {
-                                        Box(modifier = Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                                            if (refundConfirmed) {
-                                                Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Surface(
+                                            shape = RoundedCornerShape(5.dp),
+                                            color = if (refundConfirmed) web.accent else web.surface,
+                                            border = BorderStroke(1.dp, if (refundConfirmed) web.accent else web.borderStrong)
+                                        ) {
+                                            Box(modifier = Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+                                                if (refundConfirmed) {
+                                                    Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
                                             }
                                         }
+                                        Text(
+                                            "Confirmo que ${money(refundCents)} já foi devolvido à cliente",
+                                            color = web.text,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.weight(1f)
+                                        )
                                     }
-                                    Text(
-                                        "Confirmo que ${money(refundCents)} já foi devolvido à cliente",
-                                        color = web.text,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.weight(1f)
-                                    )
                                 }
                             }
                         }
@@ -303,6 +329,7 @@ internal fun EditOrderItemDialog(
 
             Text(
                 when {
+                    refundCents > 0 && automaticRefund -> "O estorno de ${money(refundCents)} será enviado ao Mercado Pago. Se o provedor não confirmar, a troca não será concluída."
                     refundCents > 0 -> "Faça a devolução de ${money(refundCents)} à cliente antes de confirmar. Este fluxo não envia Pix nem faz estorno automático; ele apenas registra a devolução e conclui a troca."
                     paidExchange -> "O pagamento já registrado será preservado no novo produto. Se ele for mais caro, somente a diferença ficará pendente."
                     else -> "Se o valor mudar, a comanda recalcula automaticamente o saldo."
@@ -326,7 +353,11 @@ internal fun EditOrderItemDialog(
 
         Spacer(Modifier.height(14.dp))
         WebModalActions(
-            primaryText = if (refundCents > 0) "Confirmar devolução de ${money(refundCents)}" else "Salvar troca",
+            primaryText = when {
+                refundCents > 0 && automaticRefund -> "Trocar e estornar ${money(refundCents)}"
+                refundCents > 0 -> "Confirmar devolução de ${money(refundCents)}"
+                else -> "Salvar troca"
+            },
             onPrimary = {
                 if (saving) return@WebModalActions
                 val itemId = item.id
@@ -335,7 +366,7 @@ internal fun EditOrderItemDialog(
                     itemId == null -> "Este item não possui identificador para edição."
                     product == null -> "Selecione um produto válido."
                     quantity !in 1..maxQuantity -> "Quantidade indisponível para este produto."
-                    refundCents > 0 && !refundConfirmed -> "Confirme que ${money(refundCents)} já foi devolvido à cliente."
+                    refundCents > 0 && !automaticRefund && !refundConfirmed -> "Confirme que ${money(refundCents)} já foi devolvido à cliente."
                     else -> null
                 }
                 if (error != null || itemId == null || product == null) return@WebModalActions
@@ -349,8 +380,8 @@ internal fun EditOrderItemDialog(
                                 itemId = itemId,
                                 productId = product.id,
                                 quantity = quantity,
-                                refundMethod = refundMethod.takeIf { refundCents > 0 },
-                                confirmRefund = refundCents > 0 && refundConfirmed
+                                refundMethod = refundMethod.takeIf { refundCents > 0 && !automaticRefund },
+                                confirmRefund = refundCents > 0 && !automaticRefund && refundConfirmed
                             )
                         } else {
                             ordersRepository.updateItem(

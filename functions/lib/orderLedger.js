@@ -212,7 +212,8 @@ export async function attachOrderFinancials(env, orders) {
     .all();
 
   const { results: allocations } = await env.DB.prepare(
-    `SELECT a.pagamento_id, a.pedido_item_id, a.valor_centavos, p.pedido_id, p.status
+    `SELECT a.pagamento_id, a.pedido_item_id, a.valor_centavos, p.pedido_id, p.status,
+            p.metodo, p.mp_payment_id
      FROM pedido_pagamento_alocacoes a
      JOIN pedido_pagamentos p ON p.id = a.pagamento_id
      WHERE p.pedido_id IN (${placeholders})
@@ -229,10 +230,13 @@ export async function attachOrderFinancials(env, orders) {
   }
 
   const paidByItem = new Map();
+  const paidSourcesByItem = new Map();
   for (const allocation of allocations || []) {
     if (allocation.status !== PAID_STATUS) continue;
     const itemId = Number(allocation.pedido_item_id);
     paidByItem.set(itemId, (paidByItem.get(itemId) || 0) + Number(allocation.valor_centavos || 0));
+    if (!paidSourcesByItem.has(itemId)) paidSourcesByItem.set(itemId, []);
+    paidSourcesByItem.get(itemId).push(allocation);
   }
 
   for (const order of orders) {
@@ -263,6 +267,22 @@ export async function attachOrderFinancials(env, orders) {
       item.valor_pago_centavos = itemPaid;
       item.saldo_centavos = Math.max(0, itemTotal - itemPaid);
       item.status_financeiro = financialStatus(itemTotal, itemPaid);
+
+      const sources = paidSourcesByItem.get(Number(item.id)) || [];
+      const paymentIds = new Set(sources.map(source => Number(source.pagamento_id)).filter(Number.isInteger));
+      const ledgerAutomatic =
+        paymentIds.size === 1 &&
+        sources.length > 0 &&
+        sources.every(source => source.metodo === "PIX_MP" && Boolean(source.mp_payment_id));
+      const legacyAutomatic =
+        usingLegacyFallback &&
+        orderPayments.length === 1 &&
+        orderPayments[0]?.status === PAID_STATUS &&
+        orderPayments[0]?.metodo === "PIX_MP" &&
+        Boolean(orderPayments[0]?.mp_payment_id);
+      const automaticRefund = itemPaid > 0 && (ledgerAutomatic || legacyAutomatic);
+      item.reembolso_automatico_disponivel = automaticRefund ? 1 : 0;
+      item.reembolso_automatico_meio = automaticRefund ? "PIX_MP" : null;
     }
   }
 

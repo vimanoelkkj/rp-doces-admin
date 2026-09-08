@@ -18,7 +18,7 @@ function request({ productId = 2, quantity = 1, refundMethod, confirmRefund } = 
   });
 }
 
-function buildDb({ targetPrice = 3500 } = {}) {
+function buildDb({ targetPrice = 3500, paymentMethod = "PIX_EXTERNO", mpPaymentId = null } = {}) {
   const order = {
     id: 7,
     status_pedido: "NOVO",
@@ -57,6 +57,8 @@ function buildDb({ targetPrice = 3500 } = {}) {
   let refundInserted = false;
   let sourceRestocked = false;
   let targetDeducted = false;
+  let automaticRefundRow = null;
+  let nextRefundId = 501;
 
   const db = fakeDb(
     sql => {
@@ -79,15 +81,61 @@ function buildDb({ targetPrice = 3500 } = {}) {
               id: 300,
               pagamento_id: 90,
               valor_centavos: 5000,
-              metodo: "PIX_EXTERNO",
+              metodo: paymentMethod,
               pagamento_valor_centavos: 5000,
-              valor_original_centavos: 5000
+              valor_original_centavos: 5000,
+              mp_order_id: mpPaymentId ? "ord_123" : null,
+              mp_payment_id: mpPaymentId
             }]
           })
         };
       }
       if (sql.includes("FROM produtos WHERE id = ? LIMIT 1")) {
         return { first: () => target };
+      }
+      if (sql === "SELECT * FROM pedido_reembolsos WHERE idempotency_key = ? LIMIT 1") {
+        return { first: () => automaticRefundRow };
+      }
+      if (sql.includes("INSERT INTO pedido_reembolsos") && sql.includes("'MERCADO_PAGO'")) {
+        return {
+          run: stmt => {
+            automaticRefundRow = {
+              id: nextRefundId++,
+              pedido_id: 7,
+              pagamento_id: 90,
+              origem: "MERCADO_PAGO",
+              metodo: "PIX_MP",
+              valor_centavos: Number(stmt.args[2] || 0),
+              status: "PENDENTE",
+              idempotency_key: stmt.args[3],
+              mp_refund_id: null,
+              mp_status: null
+            };
+            return { success: true, meta: { changes: 1, last_row_id: automaticRefundRow.id } };
+          }
+        };
+      }
+      if (sql.includes("UPDATE pedido_reembolsos") && sql.includes("mp_refund_id")) {
+        return {
+          run: stmt => {
+            if (automaticRefundRow) {
+              automaticRefundRow.mp_refund_id = stmt.args[0];
+              automaticRefundRow.mp_status = stmt.args[1];
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
+        };
+      }
+      if (sql.includes("UPDATE pedido_reembolsos") && sql.includes("status = 'FALHOU'")) {
+        return {
+          run: stmt => {
+            if (automaticRefundRow) {
+              automaticRefundRow.status = "FALHOU";
+              automaticRefundRow.mp_status = stmt.args[0];
+            }
+            return { success: true, meta: { changes: 1 } };
+          }
+        };
       }
       if (sql.includes("SELECT * FROM pedidos WHERE id = ? LIMIT 1")) {
         return { first: () => ({ ...order, valor_total_centavos: exchanged ? itemTotal : 5000 }) };
@@ -125,7 +173,13 @@ function buildDb({ targetPrice = 3500 } = {}) {
       assert.ok(statements.some(statement => statement.sql.includes("SET estoque = estoque -")));
 
       if (refund > 0) {
-        assert.ok(statements.some(statement => statement.sql.includes("INSERT INTO pedido_reembolsos")));
+        if (paymentMethod === "PIX_MP" && mpPaymentId) {
+          assert.ok(statements.some(statement => statement.sql.includes("UPDATE pedido_reembolsos") && statement.sql.includes("REEMBOLSADO")));
+          assert.ok(automaticRefundRow?.mp_refund_id);
+          automaticRefundRow.status = "REEMBOLSADO";
+        } else {
+          assert.ok(statements.some(statement => statement.sql.includes("INSERT INTO pedido_reembolsos")));
+        }
         assert.ok(statements.some(statement => statement.sql.includes("valor_original_centavos")));
         paymentValue = 5000 - refund;
         refundInserted = true;
@@ -143,7 +197,9 @@ function buildDb({ targetPrice = 3500 } = {}) {
     db,
     refundInserted: () => refundInserted,
     sourceRestocked: () => sourceRestocked,
-    targetDeducted: () => targetDeducted
+    targetDeducted: () => targetDeducted,
+    automaticRefundRow: () => automaticRefundRow,
+    batches: () => db.batches.length
   };
 }
 
@@ -202,4 +258,42 @@ test("troca item pago por mais caro e mantém somente a diferença pendente", as
   assert.equal(memory.refundInserted(), false);
   assert.equal(memory.sourceRestocked(), true);
   assert.equal(memory.targetDeducted(), true);
+});
+
+
+test("troca mais barata paga por Pix Mercado Pago estorna automaticamente", async () => {
+  const memory = buildDb({ targetPrice: 3500, paymentMethod: "PIX_MP", mpPaymentId: "pay_123" });
+  const response = await exchangePaidItem({
+    request: request(),
+    params: { id: "7", itemId: "11" },
+    env: { DB: memory.db, LOCAL_TEST_MODE: "1" }
+  });
+  const body = await responseJson(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.devolucao_centavos, 1500);
+  assert.equal(body.devolucao_metodo, "PIX_MP");
+  assert.equal(body.devolucao_automatica, true);
+  assert.match(body.mp_refund_id, /local_refund_/);
+  assert.equal(memory.automaticRefundRow()?.status, "REEMBOLSADO");
+  assert.equal(memory.sourceRestocked(), true);
+  assert.equal(memory.targetDeducted(), true);
+});
+
+test("falha no estorno Mercado Pago não altera produto nem estoque", async () => {
+  const memory = buildDb({ targetPrice: 3500, paymentMethod: "PIX_MP", mpPaymentId: "pay_123" });
+  const response = await exchangePaidItem({
+    request: request(),
+    params: { id: "7", itemId: "11" },
+    env: { DB: memory.db }
+  });
+  const body = await responseJson(response);
+
+  assert.equal(response.status, 502);
+  assert.equal(body.codigo, "EXCHANGE_REFUND_FAILED");
+  assert.equal(memory.batches(), 0);
+  assert.equal(memory.sourceRestocked(), false);
+  assert.equal(memory.targetDeducted(), false);
+  assert.equal(memory.automaticRefundRow()?.status, "FALHOU");
 });
