@@ -2,6 +2,11 @@
   display: none;
 }
 
+.rp-coming-soon:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
 @media (min-width: 768px) {
   .rp-home-header__menu--mobile,
   .rp-site-header__menu--mobile {
@@ -157,6 +162,12 @@
     background: color-mix(in oklch, var(--rp-color-brand-soft) 76%, transparent);
     outline: none;
     transform: translateX(2px);
+  }
+
+  .rp-desktop-menu__popover .rp-coming-soon:disabled:hover,
+  .rp-desktop-menu__popover .rp-coming-soon:disabled:focus-visible {
+    background: transparent;
+    transform: none;
   }
 
   .rp-desktop-menu__popover strong {

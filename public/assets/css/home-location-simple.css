@@ -45,8 +45,32 @@
 }
 
 .rp-home-location-simple__place {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
   color: var(--rp-color-muted);
   font-size: 13px;
+  line-height: 1.45;
+}
+
+.rp-home-location-simple__place > span:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.rp-home-location-simple__place strong {
+  color: var(--rp-color-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.rp-home-location-simple__place small {
+  margin-top: 1px;
+  color: var(--rp-color-muted);
+  font-size: 12px;
 }
 
 .rp-home-location-simple__maps {
