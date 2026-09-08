@@ -38,6 +38,9 @@
 
 .list {
   display: grid;
+  max-height: 620px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .row {
@@ -175,16 +178,32 @@
   font-size: 13px;
 }
 
-.open {
-  min-height: 34px;
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
-  border: 1px solid var(--pink-strong);
+}
+
+.open,
+.secondaryOpen {
+  min-height: 34px;
   border-radius: 9px;
   padding: 0 12px;
-  background: linear-gradient(180deg, #dc4e6d, #ce3d5f);
-  color: #fff;
   font-size: 11px;
   font-weight: 700;
+}
+
+.open {
+  border: 1px solid var(--pink-strong);
+  background: linear-gradient(180deg, #dc4e6d, #ce3d5f);
+  color: #fff;
+}
+
+.secondaryOpen {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .empty {
@@ -209,6 +228,11 @@
 }
 
 @media (max-width: 700px) {
+  .list {
+    max-height: none;
+    overflow: visible;
+  }
+
   .trigger {
     align-items: flex-start;
     flex-wrap: wrap;
@@ -223,10 +247,15 @@
     grid-template-columns: repeat(3, 1fr);
   }
 
-  .open {
+  .actions {
     grid-column: 1 / -1;
     width: 100%;
     margin-left: 0;
+  }
+
+  .open,
+  .secondaryOpen {
+    flex: 1;
   }
 }
 

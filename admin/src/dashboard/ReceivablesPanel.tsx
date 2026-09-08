@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FinancialOrder } from "../orders/order.finance";
+import {
+  getFinancialOrder,
+  type FinancialOrder
+} from "../orders/order.finance";
+import { ComandaDialog } from "../orders/ComandaDialog";
 import styles from "./ReceivablesPanel.module.css";
 
 type Props = {
@@ -26,11 +30,24 @@ function itemStateClass(status: FinancialOrder["itens"][number]["status_financei
 }
 
 export function ReceivablesPanel({ orders, onOpenOrder }: Props) {
-  const receivables = useMemo(
-    () => orders.filter(order => order.saldo_centavos > 0 && order.status_pedido !== "CANCELADO"),
-    [orders]
-  );
   const [expandedId, setExpandedId] = useState<number | null | undefined>(undefined);
+  const [openOrderId, setOpenOrderId] = useState<number | null>(null);
+  const [overrides, setOverrides] = useState<Record<number, FinancialOrder>>({});
+
+  useEffect(() => {
+    setOverrides({});
+  }, [orders]);
+
+  const effectiveOrders = useMemo(
+    () => orders.map(order => overrides[order.id] || order),
+    [orders, overrides]
+  );
+
+  const receivables = useMemo(
+    () => effectiveOrders.filter(order => order.saldo_centavos > 0 && order.status_pedido !== "CANCELADO"),
+    [effectiveOrders]
+  );
+
   const pendingTotal = useMemo(
     () => receivables.reduce((sum, order) => sum + order.saldo_centavos, 0),
     [receivables]
@@ -40,79 +57,105 @@ export function ReceivablesPanel({ orders, onOpenOrder }: Props) {
     if (expandedId === undefined) setExpandedId(receivables[0]?.id ?? null);
   }, [expandedId, receivables]);
 
+  async function refreshOpenOrder() {
+    if (!openOrderId) return;
+    try {
+      const fresh = await getFinancialOrder(openOrderId, true);
+      setOverrides(current => ({ ...current, [fresh.id]: fresh }));
+    } catch {
+      // O dashboard faz atualização automática; se esta leitura pontual falhar,
+      // mantemos a comanda aberta e deixamos o próximo ciclo reconciliar a lista.
+    }
+  }
+
   return (
-    <section className={styles.panel} aria-label="Pagamentos pendentes">
-      <header className={styles.head}>
-        <div>
-          <strong>Pagamentos pendentes</strong>
-          <span>{receivables.length} cliente{receivables.length === 1 ? "" : "s"} com saldo a receber</span>
-        </div>
-        <span className={styles.totalPending}>{money(pendingTotal)}</span>
-      </header>
+    <>
+      <section className={styles.panel} aria-label="Pagamentos pendentes">
+        <header className={styles.head}>
+          <div>
+            <strong>Pagamentos pendentes</strong>
+            <span>{receivables.length} cliente{receivables.length === 1 ? "" : "s"} com saldo a receber</span>
+          </div>
+          <span className={styles.totalPending}>{money(pendingTotal)}</span>
+        </header>
 
-      {receivables.length ? (
-        <div className={styles.list}>
-          {receivables.slice(0, 6).map(order => {
-            const expanded = expandedId === order.id;
-            return (
-              <article className={`${styles.row} ${expanded ? styles.openRow : ""}`} key={order.id}>
-                <button
-                  className={styles.trigger}
-                  type="button"
-                  aria-expanded={expanded}
-                  aria-controls={`receivable-${order.id}`}
-                  onClick={() => setExpandedId(current => current === order.id ? null : order.id)}
-                >
-                  <span className={styles.customer}>
-                    <strong>{order.cliente_nome || "Cliente não informado"}</strong>
-                    <small>Pedido #{order.id} · {order.itens.length} item{order.itens.length === 1 ? "" : "s"}</small>
-                  </span>
-                  <span className={styles.balance}>{money(order.saldo_centavos)} pendentes</span>
-                  <svg className={styles.chevron} viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m7 9 5 5 5-5" />
-                  </svg>
-                </button>
+        {receivables.length ? (
+          <div className={styles.list}>
+            {receivables.map(order => {
+              const expanded = expandedId === order.id;
+              return (
+                <article className={`${styles.row} ${expanded ? styles.openRow : ""}`} key={order.id}>
+                  <button
+                    className={styles.trigger}
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-controls={`receivable-${order.id}`}
+                    onClick={() => setExpandedId(current => current === order.id ? null : order.id)}
+                  >
+                    <span className={styles.customer}>
+                      <strong>{order.cliente_nome || "Cliente não informado"}</strong>
+                      <small>Pedido #{order.id} · {order.itens.length} item{order.itens.length === 1 ? "" : "s"}</small>
+                    </span>
+                    <span className={styles.balance}>{money(order.saldo_centavos)} pendentes</span>
+                    <svg className={styles.chevron} viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m7 9 5 5 5-5" />
+                    </svg>
+                  </button>
 
-                {expanded ? (
-                  <div className={styles.details} id={`receivable-${order.id}`}>
-                    {order.itens.map(item => (
-                      <div className={styles.item} key={item.id}>
-                        <span>
-                          <strong>{item.quantidade}× {item.produto_nome || "Produto"}</strong>
-                          <small>
-                            {item.status_financeiro === "PAGO"
-                              ? `${money(item.valor_pago_centavos)} pagos`
-                              : item.status_financeiro === "PARCIAL"
-                                ? `${money(item.valor_pago_centavos)} pagos · ${money(item.saldo_centavos)} pendentes`
-                                : `${money(item.saldo_centavos)} pendentes`}
-                          </small>
-                        </span>
-                        <span className={`${styles.state} ${itemStateClass(item.status_financeiro)}`}>
-                          {itemStateLabel(item.status_financeiro)}
-                        </span>
+                  {expanded ? (
+                    <div className={styles.details} id={`receivable-${order.id}`}>
+                      {order.itens.map(item => (
+                        <div className={styles.item} key={item.id}>
+                          <span>
+                            <strong>{item.quantidade}× {item.produto_nome || "Produto"}</strong>
+                            <small>
+                              {item.status_financeiro === "PAGO"
+                                ? `${money(item.valor_pago_centavos)} pagos`
+                                : item.status_financeiro === "PARCIAL"
+                                  ? `${money(item.valor_pago_centavos)} pagos · ${money(item.saldo_centavos)} pendentes`
+                                  : `${money(item.saldo_centavos)} pendentes`}
+                            </small>
+                          </span>
+                          <span className={`${styles.state} ${itemStateClass(item.status_financeiro)}`}>
+                            {itemStateLabel(item.status_financeiro)}
+                          </span>
+                        </div>
+                      ))}
+
+                      <div className={styles.summary}>
+                        <span>Total<strong>{money(order.valor_total_centavos)}</strong></span>
+                        <span>Pago<strong>{money(order.valor_pago_centavos)}</strong></span>
+                        <span>Restante<strong>{money(order.saldo_centavos)}</strong></span>
+                        <div className={styles.actions}>
+                          <button className={styles.secondaryOpen} type="button" onClick={() => onOpenOrder(order)}>
+                            Ver pedido
+                          </button>
+                          <button className={styles.open} type="button" onClick={() => setOpenOrderId(order.id)}>
+                            Receber
+                          </button>
+                        </div>
                       </div>
-                    ))}
-
-                    <div className={styles.summary}>
-                      <span>Total<strong>{money(order.valor_total_centavos)}</strong></span>
-                      <span>Pago<strong>{money(order.valor_pago_centavos)}</strong></span>
-                      <span>Restante<strong>{money(order.saldo_centavos)}</strong></span>
-                      <button className={styles.open} type="button" onClick={() => onOpenOrder(order)}>
-                        Abrir comanda
-                      </button>
                     </div>
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      ) : (
-        <div className={styles.empty}>
-          <strong>Nenhum valor pendente</strong>
-          <span>As comandas com saldo a receber aparecerão aqui.</span>
-        </div>
-      )}
-    </section>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className={styles.empty}>
+            <strong>Nenhum valor pendente</strong>
+            <span>As comandas com saldo a receber aparecerão aqui.</span>
+          </div>
+        )}
+      </section>
+
+      {openOrderId ? (
+        <ComandaDialog
+          orderId={openOrderId}
+          onClose={() => setOpenOrderId(null)}
+          onChanged={() => void refreshOpenOrder()}
+        />
+      ) : null}
+    </>
   );
 }
