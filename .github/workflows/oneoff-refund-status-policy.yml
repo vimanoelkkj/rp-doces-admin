@@ -1,0 +1,56 @@
+name: One-off refund status policy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/patches/oneoff-refund-status-policy.py"
+      - ".github/workflows/oneoff-refund-status-policy.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-validate-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Aplicar patch
+        run: python .github/patches/oneoff-refund-status-policy.py
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Testar backend
+        run: |
+          npm ci
+          npm test
+
+      - name: Testar e compilar Admin
+        working-directory: admin
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Verificar schema
+        run: |
+          npm run schema:generate
+          git diff --exit-code -- schema_full.sql
+
+      - name: Limpar ferramentas temporárias e publicar patch
+        run: |
+          rm .github/patches/oneoff-refund-status-policy.py
+          rm .github/workflows/oneoff-refund-status-policy.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(orders): libera reembolso por status do pedido"
+          git push origin HEAD:main
