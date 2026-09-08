@@ -48,15 +48,22 @@ function fakeMpRequest(path, { method = "GET", idempotencyKey, body } = {}) {
     return fakePixOrder({ id: decodeURIComponent(cancelMatch[1]), status: "canceled" });
   }
 
-  const paymentRefundMatch = path.match(/^\/v1\/payments\/([^/]+)\/refunds$/);
-  if (method === "POST" && paymentRefundMatch) {
-    const paymentId = decodeURIComponent(paymentRefundMatch[1]);
-    const amount = Number(body?.amount || 0);
+  const orderRefundMatch = path.match(/^\/v1\/orders\/([^/]+)\/refund$/);
+  if (method === "POST" && orderRefundMatch) {
+    const orderId = decodeURIComponent(orderRefundMatch[1]);
+    const transaction = body?.transactions?.[0] || {};
     return {
-      id: `local_refund_${fakeOrderId(idempotencyKey)}`,
-      payment_id: paymentId,
-      amount,
-      status: "approved"
+      id: orderId,
+      status: "processed",
+      status_detail: "partially_refunded",
+      transactions: {
+        refunds: [{
+          id: `local_refund_${fakeOrderId(idempotencyKey)}`,
+          transaction_id: String(transaction.id || ""),
+          amount: String(transaction.amount || "0.00"),
+          status: "processed"
+        }]
+      }
     };
   }
 

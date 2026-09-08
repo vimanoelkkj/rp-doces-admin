@@ -213,7 +213,7 @@ export async function attachOrderFinancials(env, orders) {
 
   const { results: allocations } = await env.DB.prepare(
     `SELECT a.pagamento_id, a.pedido_item_id, a.valor_centavos, p.pedido_id, p.status,
-            p.metodo, p.mp_payment_id
+            p.metodo, p.mp_order_id, p.mp_payment_id
      FROM pedido_pagamento_alocacoes a
      JOIN pedido_pagamentos p ON p.id = a.pagamento_id
      WHERE p.pedido_id IN (${placeholders})
@@ -273,12 +273,15 @@ export async function attachOrderFinancials(env, orders) {
       const ledgerAutomatic =
         paymentIds.size === 1 &&
         sources.length > 0 &&
-        sources.every(source => source.metodo === "PIX_MP" && Boolean(source.mp_payment_id));
+        sources.every(source =>
+          source.metodo === "PIX_MP" && Boolean(source.mp_order_id) && Boolean(source.mp_payment_id)
+        );
       const legacyAutomatic =
         usingLegacyFallback &&
         orderPayments.length === 1 &&
         orderPayments[0]?.status === PAID_STATUS &&
         orderPayments[0]?.metodo === "PIX_MP" &&
+        Boolean(orderPayments[0]?.mp_order_id) &&
         Boolean(orderPayments[0]?.mp_payment_id);
       const automaticRefund = itemPaid > 0 && (ledgerAutomatic || legacyAutomatic);
       item.reembolso_automatico_disponivel = automaticRefund ? 1 : 0;

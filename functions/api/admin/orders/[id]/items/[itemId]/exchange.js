@@ -5,7 +5,7 @@ import { mpRequest } from "../../../../../../lib/mercadoPago.js";
 import { logEvent } from "../../../../../../lib/logger.js";
 
 const REFUND_METHODS = new Set(["PIX_EXTERNO", "DINHEIRO", "CARTAO", "OUTRO"]);
-const CONFIRMED_MP_REFUND_STATUSES = new Set(["approved", "processed", "refunded"]);
+const CONFIRMED_MP_REFUND_STATUSES = new Set(["processed", "refunded"]);
 
 function upper(value) {
   return String(value || "").trim().toUpperCase();
@@ -24,12 +24,35 @@ function automaticRefundAllocation(allocations, refundCents) {
   const allocated = samePayment.reduce((sum, item) => sum + Number(item.valor_centavos || 0), 0);
   const eligible =
     allocated >= refundCents &&
-    samePayment.every(item => upper(item.metodo) === "PIX_MP" && Boolean(item.mp_payment_id));
+    samePayment.every(item =>
+      upper(item.metodo) === "PIX_MP" && Boolean(item.mp_order_id) && Boolean(item.mp_payment_id)
+    );
   return eligible ? samePayment[0] : null;
 }
 
 function automaticRefundKey({ pedidoId, item, produtoId, quantidade, refundCents, pagamentoId }) {
   return `exchange-mp:${pedidoId}:${item.id}:${item.produto_id}:${produtoId}:${quantidade}:${refundCents}:${pagamentoId}`;
+}
+
+function providerRefundKey(localKey) {
+  return `${localKey}:orders-v2`.slice(0, 128);
+}
+
+function centsFromProviderAmount(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.round(amount * 100) : -1;
+}
+
+function matchingOrderRefund(order, transactionId, refundCents) {
+  const refunds = Array.isArray(order?.transactions?.refunds) ? order.transactions.refunds : [];
+  return refunds.find(refund =>
+    String(refund?.transaction_id || "") === String(transactionId || "") &&
+    centsFromProviderAmount(refund?.amount) === refundCents
+  ) || null;
+}
+
+function confirmedOrderRefund(refund) {
+  return Boolean(refund?.id) && CONFIRMED_MP_REFUND_STATUSES.has(lower(refund?.status));
 }
 
 function promotionPrice(product, now = Date.now()) {
@@ -213,18 +236,43 @@ export async function onRequestPost({ request, env, params }) {
 
     if (!alreadyConfirmed) {
       try {
-        const response = await mpRequest(
+        // Primeiro reconcilia a Order. Isto protege retries depois de uma resposta ambígua:
+        // se o provedor já devolveu o valor, não disparamos um segundo estorno.
+        const orderState = await mpRequest(
           env,
-          `/v1/payments/${encodeURIComponent(automaticAllocation.mp_payment_id)}/refunds`,
-          {
-            method: "POST",
-            idempotencyKey,
-            body: { amount: Number((refundCents / 100).toFixed(2)) }
-          }
+          `/v1/orders/${encodeURIComponent(automaticAllocation.mp_order_id)}`
         );
-        const providerStatus = lower(response?.status || "");
-        const providerConfirmed = Boolean(response?.id) && CONFIRMED_MP_REFUND_STATUSES.has(providerStatus);
-        const mpRefundId = response?.id ? String(response.id) : null;
+        let providerRefund = matchingOrderRefund(
+          orderState,
+          automaticAllocation.mp_payment_id,
+          refundCents
+        );
+
+        if (!confirmedOrderRefund(providerRefund)) {
+          const response = await mpRequest(
+            env,
+            `/v1/orders/${encodeURIComponent(automaticAllocation.mp_order_id)}/refund`,
+            {
+              method: "POST",
+              idempotencyKey: providerRefundKey(idempotencyKey),
+              body: {
+                transactions: [{
+                  id: String(automaticAllocation.mp_payment_id),
+                  amount: (refundCents / 100).toFixed(2)
+                }]
+              }
+            }
+          );
+          providerRefund = matchingOrderRefund(
+            response,
+            automaticAllocation.mp_payment_id,
+            refundCents
+          );
+        }
+
+        const providerConfirmed = confirmedOrderRefund(providerRefund);
+        const mpRefundId = providerRefund?.id ? String(providerRefund.id) : null;
+        const providerStatus = lower(providerRefund?.status || "");
 
         await env.DB.prepare(
           `UPDATE pedido_reembolsos

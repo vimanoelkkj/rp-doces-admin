@@ -18,7 +18,7 @@ function request({ productId = 2, quantity = 1, refundMethod, confirmRefund } = 
   });
 }
 
-function buildDb({ targetPrice = 3500, paymentMethod = "PIX_EXTERNO", mpPaymentId = null } = {}) {
+function buildDb({ targetPrice = 3500, paymentMethod = "PIX_EXTERNO", mpPaymentId = null, mpOrderId = null } = {}) {
   const order = {
     id: 7,
     status_pedido: "NOVO",
@@ -84,7 +84,7 @@ function buildDb({ targetPrice = 3500, paymentMethod = "PIX_EXTERNO", mpPaymentI
               metodo: paymentMethod,
               pagamento_valor_centavos: 5000,
               valor_original_centavos: 5000,
-              mp_order_id: mpPaymentId ? "ord_123" : null,
+              mp_order_id: mpOrderId || (mpPaymentId ? "ord_123" : null),
               mp_payment_id: mpPaymentId
             }]
           })
@@ -261,8 +261,13 @@ test("troca item pago por mais caro e mantém somente a diferença pendente", as
 });
 
 
-test("troca mais barata paga por Pix Mercado Pago estorna automaticamente", async () => {
-  const memory = buildDb({ targetPrice: 3500, paymentMethod: "PIX_MP", mpPaymentId: "pay_123" });
+test("troca mais barata paga por Pix Mercado Pago estorna automaticamente via Orders API", async () => {
+  const memory = buildDb({
+    targetPrice: 3500,
+    paymentMethod: "PIX_MP",
+    mpPaymentId: "pay_123",
+    mpOrderId: "ord_123"
+  });
   const response = await exchangePaidItem({
     request: request(),
     params: { id: "7", itemId: "11" },
@@ -282,7 +287,12 @@ test("troca mais barata paga por Pix Mercado Pago estorna automaticamente", asyn
 });
 
 test("falha no estorno Mercado Pago não altera produto nem estoque", async () => {
-  const memory = buildDb({ targetPrice: 3500, paymentMethod: "PIX_MP", mpPaymentId: "pay_123" });
+  const memory = buildDb({
+    targetPrice: 3500,
+    paymentMethod: "PIX_MP",
+    mpPaymentId: "pay_123",
+    mpOrderId: "ord_123"
+  });
   const response = await exchangePaidItem({
     request: request(),
     params: { id: "7", itemId: "11" },
