@@ -10,7 +10,7 @@ Thumbs.db
 /backup-*.sql
 /rp-doces-backup-*.sql
 /public/admin/
-/admin/tsconfig.tsbuildinfo
+*.tsbuildinfo
 
 # Android
 /apps/android/.gradle/
