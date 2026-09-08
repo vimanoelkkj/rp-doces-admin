@@ -5,7 +5,7 @@
   gap: 10px;
   margin-top: 26px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 0;
   background: transparent;
   color: var(--rp-color-muted);
@@ -26,14 +26,12 @@
 
 .rp-home-discovery__chevron {
   display: block;
-  width: 84px;
-  height: 96px;
-  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20120%20120%22%20fill%3D%22none%22%3E%0A%20%20%3Cpath%20d%3D%22M22%2018%20C%2030%2056%2C%2046%2074%2C%2060%2092%22%20stroke%3D%22%23E06B8A%22%20stroke-width%3D%2214%22%20stroke-linecap%3D%22round%22/%3E%0A%20%20%3Cpath%20d%3D%22M60%2092%20C%2052%2080%2C%2040%2072%2C%2028%2066%22%20stroke%3D%22%23E06B8A%22%20stroke-width%3D%2214%22%20stroke-linecap%3D%22round%22/%3E%0A%20%20%3Cpath%20d%3D%22M60%2092%20C%2070%2080%2C%2082%2071%2C%2095%2064%22%20stroke%3D%22%23E06B8A%22%20stroke-width%3D%2214%22%20stroke-linecap%3D%22round%22/%3E%0A%20%20%3Cpath%20d%3D%22M28%2020%20C%2036%2054%2C%2049%2070%2C%2061%2088%22%20stroke%3D%22%23F4A3B8%22%20stroke-width%3D%224.5%22%20stroke-linecap%3D%22round%22%20opacity%3D%220.7%22/%3E%0A%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  filter: drop-shadow(0 8px 18px rgb(224 107 138 / 0.16));
-  transform-origin: center;
+  width: 58px;
+  height: 158px;
+  background: url("/assets/img/home-discovery-arrow.svg") center / contain no-repeat;
+  filter: drop-shadow(0 10px 18px rgb(224 107 138 / 0.12));
+  transform-origin: 50% 35%;
+  will-change: transform;
 }
 
 .rp-home-discovery:hover {
@@ -41,7 +39,7 @@
 }
 
 .rp-home-discovery:hover .rp-home-discovery__chevron {
-  filter: drop-shadow(0 10px 22px rgb(224 107 138 / 0.22));
+  filter: drop-shadow(0 12px 22px rgb(224 107 138 / 0.2));
 }
 
 .rp-home-discovery:active {
@@ -56,20 +54,20 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .rp-home-discovery__chevron {
-    animation: rp-home-discovery-arrow 1.7s ease-in-out infinite;
+    animation: rp-home-discovery-arrow 1.75s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
   }
 
   .rp-home-discovery:hover .rp-home-discovery__chevron {
-    animation-duration: 1.1s;
+    animation-duration: 1.15s;
   }
 
   @keyframes rp-home-discovery-arrow {
     0%,
     100% {
-      transform: translateY(0) scale(1);
+      transform: translate3d(0, 0, 0) rotate(-1deg);
     }
     50% {
-      transform: translateY(12px) scale(1.02);
+      transform: translate3d(0, 14px, 0) rotate(2deg);
     }
   }
 }
@@ -85,15 +83,15 @@
   }
 
   .rp-home-discovery__chevron {
-    width: 62px;
-    height: 72px;
+    width: 46px;
+    height: 126px;
   }
 }
 
 @media (min-width: 768px) {
   .rp-home-discovery {
-    margin-top: 30px;
-    gap: 12px;
+    gap: 11px;
+    margin-top: 28px;
   }
 
   .rp-home-discovery__label {
@@ -101,14 +99,14 @@
   }
 
   .rp-home-discovery__chevron {
-    width: 96px;
-    height: 108px;
+    width: 64px;
+    height: 176px;
   }
 }
 
 @media (min-width: 1440px) {
   .rp-home-discovery__chevron {
-    width: 112px;
-    height: 124px;
+    width: 72px;
+    height: 196px;
   }
 }
