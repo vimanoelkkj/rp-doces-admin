@@ -4,6 +4,7 @@ import { mpRequest } from "../../../lib/mercadoPago.js";
 import { baixarEstoquePedido } from "../../../lib/stock.js";
 import { syncOrderPayment } from "../../../lib/paymentSync.js";
 import { syncManualPaidOrder } from "../../../lib/comandaLedger.js";
+import { attachOrderFinancials } from "../../../lib/orderLedger.js";
 import { logEvent } from "../../../lib/logger.js";
 
 const RECONCILE_AFTER_SECONDS = 15;
@@ -188,6 +189,7 @@ export async function onRequestGet({ request, env }) {
     porPedido.get(Number(item.pedido_id)).push(item);
   }
   for (const pedido of pedidos) pedido.itens = porPedido.get(Number(pedido.id)) || [];
+  await attachOrderFinancials(env, pedidos);
   return json({ pedidos });
 }
 

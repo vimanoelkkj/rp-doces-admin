@@ -332,6 +332,20 @@ export async function onRequestPut({ request, env, params }) {
 
   await ensureLegacyPaymentMaterialized(env, pedidoId);
 
+  const paidRow = await env.DB.prepare(
+    `SELECT COALESCE(SUM(a.valor_centavos), 0) AS pago_centavos
+     FROM pedido_pagamento_alocacoes a
+     JOIN pedido_pagamentos pp ON pp.id = a.pagamento_id
+     WHERE a.pedido_item_id = ? AND pp.status = 'PAGO'`
+  )
+    .bind(itemId)
+    .first();
+  if (Number(paidRow?.pago_centavos || 0) > 0) {
+    return json({
+      erro: "Este item possui pagamento confirmado. Use a troca de item pago para ajustar saldo ou devolução."
+    }, 409);
+  }
+
   const statements = stockMutationStatements(env, item, product, quantidade, pedido.reserva_status);
   statements.push(
     env.DB.prepare(
