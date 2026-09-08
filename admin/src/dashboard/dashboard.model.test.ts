@@ -80,7 +80,7 @@ describe("dashboard.model", () => {
     ).toBe(3);
   });
 
-  it("calcula as mesmas metricas operacionais do dashboard legado", () => {
+  it("calcula metricas operacionais e separa estoque critico de baixo", () => {
     const now = new Date(2026, 8, 1, 18, 0, 0);
     const orders = [
       order({
@@ -103,7 +103,8 @@ describe("dashboard.model", () => {
     const products = [
       product({ id: 1, estoque: 1 }),
       product({ id: 2, estoque: 3, estoque_reservado: 3 }),
-      product({ id: 3, estoque: 2, ativo: false })
+      product({ id: 3, estoque: 2, ativo: false }),
+      product({ id: 4, estoque: 3 })
     ];
 
     const summary = buildDashboardSummary(orders, products, now);
@@ -112,15 +113,17 @@ describe("dashboard.model", () => {
     expect(summary.paidTodayCount).toBe(1);
     expect(summary.waitingPreparationCount).toBe(1);
     expect(summary.pendingPaymentCount).toBe(1);
-    expect(summary.productCount).toBe(3);
+    expect(summary.productCount).toBe(4);
     expect(summary.soldOutCount).toBe(1);
-    expect(summary.lowStockCount).toBe(1);
+    expect(summary.lowStockCount).toBe(2);
+    expect(summary.criticalStockCount).toBe(1);
     expect(summary.ordersTodayCount).toBe(2);
     expect(summary.recentOrders).toHaveLength(3);
     expect(summary.attention).toEqual([
       "1 pedido aguardando pagamento",
       "1 pedido aguardando preparação",
       "1 produto sem estoque disponível",
+      "1 produto com estoque crítico",
       "1 produto com estoque baixo"
     ]);
   });
