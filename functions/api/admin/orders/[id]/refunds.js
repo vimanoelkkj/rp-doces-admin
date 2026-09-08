@@ -12,16 +12,61 @@ function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function refundIdFromOrder(order) {
-  const refunds = order?.transactions?.refunds || [];
-  return refunds[0]?.id ? String(refunds[0].id) : null;
+function centsFromProviderAmount(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.round(amount * 100) : -1;
 }
 
-function orderRefundConfirmed(order) {
-  if (normalizeStatus(order?.status) === "refunded") return true;
-  return (order?.transactions?.refunds || []).some(refund =>
-    CONFIRMED_MP_STATUSES.has(normalizeStatus(refund?.status))
-  );
+function providerRefunds(order) {
+  return Array.isArray(order?.transactions?.refunds) ? order.transactions.refunds : [];
+}
+
+function providerRefundConfirmed(refund) {
+  return Boolean(refund?.id) && CONFIRMED_MP_STATUSES.has(normalizeStatus(refund?.status));
+}
+
+function matchingOrderRefund(order, transactionId, refundCents, { preferredId = null, excludedIds = new Set() } = {}) {
+  const refunds = providerRefunds(order);
+  if (preferredId) {
+    const preferred = refunds.find(item => String(item?.id || "") === String(preferredId));
+    if (preferred && String(preferred?.transaction_id || "") === String(transactionId || "") &&
+        centsFromProviderAmount(preferred?.amount) === refundCents) {
+      return preferred;
+    }
+  }
+  return refunds.find(item =>
+    String(item?.transaction_id || "") === String(transactionId || "") &&
+    centsFromProviderAmount(item?.amount) === refundCents &&
+    !excludedIds.has(String(item?.id || ""))
+  ) || null;
+}
+
+function matchingPaymentRefund(refunds, refundCents, { preferredId = null, excludedIds = new Set() } = {}) {
+  const items = Array.isArray(refunds) ? refunds : [];
+  if (preferredId) {
+    const preferred = items.find(item => String(item?.id || "") === String(preferredId));
+    if (preferred && centsFromProviderAmount(preferred?.amount) === refundCents) return preferred;
+  }
+  return items.find(item =>
+    centsFromProviderAmount(item?.amount) === refundCents &&
+    !excludedIds.has(String(item?.id || ""))
+  ) || null;
+}
+
+async function claimedProviderRefundIds(env, pagamentoId, currentRefundId) {
+  const { results } = await env.DB.prepare(
+    `SELECT mp_refund_id
+     FROM pedido_reembolsos
+     WHERE pagamento_id = ?
+       AND id <> ?
+       AND status = 'REEMBOLSADO'
+       AND mp_refund_id IS NOT NULL`
+  ).bind(pagamentoId, currentRefundId).all();
+  return new Set((results || []).map(item => String(item.mp_refund_id)).filter(Boolean));
+}
+
+function providerIdempotencyKey(localKey, family) {
+  return `${localKey}:${family}`.slice(0, 128);
 }
 
 async function paymentForRefund(env, pedidoId, pagamentoId) {
@@ -97,6 +142,10 @@ async function restoreStock(env, pedidoId) {
 }
 
 async function finalizeRefund(env, refund, payment, { mpRefundId = null, mpStatus = null } = {}) {
+  if (Number(refund.valor_centavos || 0) !== Number(payment.valor_centavos || 0)) {
+    return { ok: false, erro: "VALOR_REEMBOLSO_DESATUALIZADO", httpStatus: 409 };
+  }
+
   const remaining = await remainingPaidCount(env, Number(payment.pedido_id), Number(payment.id));
   if (Number(refund.devolveu_estoque || 0) === 1 && remaining > 0) {
     return { ok: false, erro: "ESTOQUE_EXIGE_REEMBOLSO_TOTAL", httpStatus: 409 };
@@ -160,38 +209,44 @@ async function finalizeRefund(env, refund, payment, { mpRefundId = null, mpStatu
 async function syncPendingRefund(env, refund) {
   if (refund.status !== "PENDENTE" || refund.origem !== "MERCADO_PAGO") return refund;
   const payment = await paymentForRefund(env, Number(refund.pedido_id), Number(refund.pagamento_id));
-  if (!payment) return refund;
+  if (!payment || String(payment.status || "").toUpperCase() !== "PAGO") return refund;
+
+  const refundCents = Number(refund.valor_centavos || 0);
+  const excludedIds = await claimedProviderRefundIds(env, Number(refund.pagamento_id), Number(refund.id));
 
   try {
     if (localTestMode(env)) {
-      await finalizeRefund(env, refund, payment, {
-        mpRefundId: `local_refund_${payment.id}`,
-        mpStatus: "processed"
-      });
-      return { ...refund, status: "REEMBOLSADO", mp_refund_id: `local_refund_${payment.id}`, mp_status: "processed" };
+      const localId = `local_refund_${refund.id}`;
+      await finalizeRefund(env, refund, payment, { mpRefundId: localId, mpStatus: "processed" });
+      return { ...refund, status: "REEMBOLSADO", mp_refund_id: localId, mp_status: "processed" };
     }
 
-    if (payment.mp_order_id) {
+    if (payment.mp_order_id && payment.mp_payment_id) {
       const order = await mpRequest(env, `/v1/orders/${encodeURIComponent(payment.mp_order_id)}`);
-      if (!orderRefundConfirmed(order)) return refund;
-      const mpRefundId = refundIdFromOrder(order) || refund.mp_refund_id || null;
-      await finalizeRefund(env, refund, payment, { mpRefundId, mpStatus: "processed" });
-      return { ...refund, status: "REEMBOLSADO", mp_refund_id: mpRefundId, mp_status: "processed" };
+      const match = matchingOrderRefund(order, payment.mp_payment_id, refundCents, {
+        preferredId: refund.mp_refund_id,
+        excludedIds
+      });
+      if (!providerRefundConfirmed(match)) return refund;
+      const mpRefundId = String(match.id);
+      const mpStatus = normalizeStatus(match.status || "processed");
+      const finalized = await finalizeRefund(env, refund, payment, { mpRefundId, mpStatus });
+      if (!finalized.ok) return refund;
+      return { ...refund, status: "REEMBOLSADO", mp_refund_id: mpRefundId, mp_status: mpStatus };
     }
 
     if (payment.mp_payment_id) {
-      const refunds = await mpRequest(env, `/v1/payments/${encodeURIComponent(payment.mp_payment_id)}/refunds`);
-      const match = Array.isArray(refunds)
-        ? refunds.find(item => Number(item?.amount || 0) === Number(payment.valor_centavos || 0) / 100) || refunds[0]
-        : null;
-      if (!match) return refund;
-      const status = normalizeStatus(match.status || "processed");
-      if (!CONFIRMED_MP_STATUSES.has(status)) return refund;
-      await finalizeRefund(env, refund, payment, {
-        mpRefundId: match.id ? String(match.id) : null,
-        mpStatus: status
+      const providerState = await mpRequest(env, `/v1/payments/${encodeURIComponent(payment.mp_payment_id)}/refunds`);
+      const match = matchingPaymentRefund(providerState, refundCents, {
+        preferredId: refund.mp_refund_id,
+        excludedIds
       });
-      return { ...refund, status: "REEMBOLSADO", mp_refund_id: match.id ? String(match.id) : null, mp_status: status };
+      if (!providerRefundConfirmed(match)) return refund;
+      const mpRefundId = String(match.id);
+      const mpStatus = normalizeStatus(match.status || "processed");
+      const finalized = await finalizeRefund(env, refund, payment, { mpRefundId, mpStatus });
+      if (!finalized.ok) return refund;
+      return { ...refund, status: "REEMBOLSADO", mp_refund_id: mpRefundId, mp_status: mpStatus };
     }
   } catch (error) {
     logEvent("warn", "payment.refund_sync_failed", {
@@ -262,7 +317,7 @@ export async function onRequestPost({ request, env, params }) {
     }, 409);
   }
 
-  const automatic = payment.metodo === "PIX_MP" && Boolean(payment.mp_order_id || payment.mp_payment_id);
+  const automatic = payment.metodo === "PIX_MP" && Boolean(payment.mp_payment_id);
   const requestedOrigin = String(body?.origem || (automatic ? "MERCADO_PAGO" : "MANUAL")).toUpperCase();
   if (automatic && requestedOrigin !== "MERCADO_PAGO") {
     return json({ erro: "Este Pix deve ser reembolsado pelo Mercado Pago para haver confirmação do provedor." }, 400);
@@ -281,7 +336,7 @@ export async function onRequestPost({ request, env, params }) {
     return json({ erro: "Reembolse os outros pagamentos antes de devolver os itens ao estoque." }, 409);
   }
 
-  const idempotencyKey = `refund:${pedidoId}:${pagamentoId}`;
+  const idempotencyKey = `refund:v2:${pedidoId}:${pagamentoId}:${Number(payment.valor_centavos || 0)}`;
   let refund = await env.DB.prepare(
     `SELECT * FROM pedido_reembolsos WHERE idempotency_key = ? LIMIT 1`
   ).bind(idempotencyKey).first();
@@ -312,6 +367,12 @@ export async function onRequestPost({ request, env, params }) {
 
   if (!refund) return json({ erro: "Não foi possível iniciar o reembolso." }, 500);
   if (refund.status === "REEMBOLSADO") return json({ ok: true, reembolso: refund, ja_reembolsado: true });
+  if (refund.status === "FALHOU") {
+    await env.DB.prepare(
+      "UPDATE pedido_reembolsos SET status = 'PENDENTE', atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND status = 'FALHOU'"
+    ).bind(refund.id).run();
+    refund.status = "PENDENTE";
+  }
 
   if (!automatic) {
     const finalized = await finalizeRefund(env, refund, payment);
@@ -322,37 +383,69 @@ export async function onRequestPost({ request, env, params }) {
 
   let providerConfirmed = false;
   try {
-    let response;
+    const refundCents = Number(refund.valor_centavos || 0);
+    const excludedIds = await claimedProviderRefundIds(env, pagamentoId, Number(refund.id));
+    let providerRefund = null;
+
     if (localTestMode(env)) {
-      response = {
-        id: payment.mp_order_id || `local_order_${pedidoId}`,
-        status: "refunded",
-        transactions: { refunds: [{ id: `local_refund_${pagamentoId}`, status: "processed" }] }
+      providerRefund = {
+        id: `local_refund_${refund.id}`,
+        transaction_id: payment.mp_payment_id || `local_payment_${pagamentoId}`,
+        amount: (refundCents / 100).toFixed(2),
+        status: "processed"
       };
-    } else if (payment.mp_order_id) {
-      response = await mpRequest(
-        env,
-        `/v1/orders/${encodeURIComponent(payment.mp_order_id)}/refund`,
-        { method: "POST", idempotencyKey }
-      );
-    } else {
-      response = await mpRequest(
-        env,
-        `/v1/payments/${encodeURIComponent(payment.mp_payment_id)}/refunds`,
-        { method: "POST", idempotencyKey }
-      );
+    } else if (payment.mp_order_id && payment.mp_payment_id) {
+      const currentOrder = await mpRequest(env, `/v1/orders/${encodeURIComponent(payment.mp_order_id)}`);
+      providerRefund = matchingOrderRefund(currentOrder, payment.mp_payment_id, refundCents, {
+        preferredId: refund.mp_refund_id,
+        excludedIds
+      });
+
+      if (!providerRefundConfirmed(providerRefund)) {
+        const response = await mpRequest(
+          env,
+          `/v1/orders/${encodeURIComponent(payment.mp_order_id)}/refund`,
+          {
+            method: "POST",
+            idempotencyKey: providerIdempotencyKey(idempotencyKey, "orders-v2"),
+            body: {
+              transactions: [{
+                id: String(payment.mp_payment_id),
+                amount: (refundCents / 100).toFixed(2)
+              }]
+            }
+          }
+        );
+        providerRefund = matchingOrderRefund(response, payment.mp_payment_id, refundCents, {
+          preferredId: refund.mp_refund_id,
+          excludedIds
+        });
+      }
+    } else if (payment.mp_payment_id) {
+      const providerState = await mpRequest(env, `/v1/payments/${encodeURIComponent(payment.mp_payment_id)}/refunds`);
+      providerRefund = matchingPaymentRefund(providerState, refundCents, {
+        preferredId: refund.mp_refund_id,
+        excludedIds
+      });
+
+      if (!providerRefundConfirmed(providerRefund)) {
+        const response = await mpRequest(
+          env,
+          `/v1/payments/${encodeURIComponent(payment.mp_payment_id)}/refunds`,
+          {
+            method: "POST",
+            idempotencyKey: providerIdempotencyKey(idempotencyKey, "payments-v2"),
+            body: { amount: Number((refundCents / 100).toFixed(2)) }
+          }
+        );
+        providerRefund = response;
+      }
     }
 
-    const confirmed = payment.mp_order_id
-      ? orderRefundConfirmed(response)
-      : Boolean(response?.id) && CONFIRMED_MP_STATUSES.has(normalizeStatus(response?.status || "processed"));
+    const confirmed = providerRefundConfirmed(providerRefund);
     providerConfirmed = confirmed;
-    const mpRefundId = payment.mp_order_id
-      ? refundIdFromOrder(response)
-      : response?.id ? String(response.id) : null;
-    const mpStatus = payment.mp_order_id
-      ? normalizeStatus(response?.transactions?.refunds?.[0]?.status || response?.status)
-      : normalizeStatus(response?.status || "processed");
+    const mpRefundId = providerRefund?.id ? String(providerRefund.id) : refund.mp_refund_id || null;
+    const mpStatus = normalizeStatus(providerRefund?.status || "");
 
     await env.DB.prepare(
       `UPDATE pedido_reembolsos
@@ -370,7 +463,12 @@ export async function onRequestPost({ request, env, params }) {
     }
 
     const finalized = await finalizeRefund(env, refund, payment, { mpRefundId, mpStatus });
-    if (!finalized.ok) return json({ erro: "O provedor confirmou o reembolso, mas houve uma inconsistência local." }, finalized.httpStatus || 409);
+    if (!finalized.ok) {
+      return json({
+        erro: "O provedor confirmou o reembolso, mas houve uma inconsistência local. Não repita o reembolso.",
+        codigo: "REFUND_CONFIRMED_LOCAL_PENDING"
+      }, finalized.httpStatus || 409);
+    }
     const current = await env.DB.prepare("SELECT * FROM pedido_reembolsos WHERE id = ?").bind(refund.id).first();
     return json({ ok: true, reembolso: current, confirmado_por: "MERCADO_PAGO", ...finalized });
   } catch (error) {

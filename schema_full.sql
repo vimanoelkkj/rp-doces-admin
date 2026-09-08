@@ -470,11 +470,6 @@ CREATE UNIQUE INDEX uq_pedido_pagamentos_mp_order
 CREATE UNIQUE INDEX uq_pedido_reembolsos_idempotency
   ON pedido_reembolsos(idempotency_key);
 
--- index: uq_pedido_reembolsos_pagamento_concluido
-CREATE UNIQUE INDEX uq_pedido_reembolsos_pagamento_concluido
-  ON pedido_reembolsos(pagamento_id)
-  WHERE status = 'REEMBOLSADO';
-
 -- trigger: pedidos_encerrar_comanda_status_terminal
 CREATE TRIGGER pedidos_encerrar_comanda_status_terminal
 AFTER UPDATE OF status_pedido ON pedidos

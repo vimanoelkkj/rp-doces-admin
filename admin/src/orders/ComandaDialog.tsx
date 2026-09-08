@@ -182,10 +182,16 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
     [order]
   );
 
-  const refundByPayment = useMemo(
-    () => new Map(refunds.map(refund => [Number(refund.pagamento_id), refund])),
-    [refunds]
-  );
+  const refundsByPayment = useMemo(() => {
+    const map = new Map<number, OrderRefund[]>();
+    refunds.forEach(refund => {
+      const paymentId = Number(refund.pagamento_id);
+      const entries = map.get(paymentId) || [];
+      entries.push(refund);
+      map.set(paymentId, entries);
+    });
+    return map;
+  }, [refunds]);
 
   const selectedProduct = useMemo(
     () => products.find(product => String(product.id) === productId) || null,
@@ -481,11 +487,13 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
 
                 {order.pagamentos.map((payment, index) => {
                   const paymentId = Number(payment.id || 0);
-                  const existingRefund = paymentId ? refundByPayment.get(paymentId) : undefined;
-                  const refundPending = existingRefund?.status === "PENDENTE";
-                  const refundCompleted = existingRefund?.status === "REEMBOLSADO";
-                  const canRefund = refundAllowedByStatus && payment.status === "PAGO" && paymentId > 0 && !refundPending && !refundCompleted;
-                  const retryRefund = existingRefund?.status === "FALHOU";
+                  const paymentRefunds = paymentId ? refundsByPayment.get(paymentId) || [] : [];
+                  const refundPending = paymentRefunds.some(refund => refund.status === "PENDENTE");
+                  const completedRefunds = paymentRefunds.filter(refund => refund.status === "REEMBOLSADO");
+                  const latestRefund = paymentRefunds[paymentRefunds.length - 1];
+                  const canRefund = refundAllowedByStatus && payment.status === "PAGO" && Number(payment.valor_centavos || 0) > 0 && paymentId > 0 && !refundPending;
+                  const retryRefund = latestRefund?.status === "FALHOU";
+                  const hasPartialRefundHistory = completedRefunds.length > 0;
 
                   return (
                     <Fragment key={payment.id ?? `legacy-${index}`}>
@@ -502,7 +510,11 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
                               onClick={() => setRefundPaymentId(current => current === paymentId ? null : paymentId)}
                               disabled={saving}
                             >
-                              {retryRefund ? "Tentar reembolso novamente" : "Reembolsar"}
+                              {retryRefund
+                                ? "Tentar reembolso novamente"
+                                : hasPartialRefundHistory
+                                  ? `Reembolsar saldo restante · ${money(payment.valor_centavos)}`
+                                  : "Reembolsar"}
                             </button>
                           ) : null}
                         </div>

@@ -46,7 +46,7 @@ export function RefundPanel({ order, payment, saving, onCancel, onConfirm }: Pro
     <div className={styles.panel} role="group" aria-label={`Reembolso de ${money(payment.valor_centavos)}`}>
       <div className={styles.heading}>
         <div>
-          <span>Reembolso integral</span>
+          <span>Saldo a reembolsar</span>
           <strong>{money(payment.valor_centavos)}{automatic ? " pelo Mercado Pago" : ""}</strong>
         </div>
         <button type="button" className={styles.close} onClick={onCancel} disabled={saving} aria-label="Fechar reembolso">×</button>
@@ -54,8 +54,8 @@ export function RefundPanel({ order, payment, saving, onCancel, onConfirm }: Pro
 
       <p className={styles.explanation}>
         {automatic
-          ? "O sistema só marcará este pagamento como reembolsado depois que o Mercado Pago confirmar o estorno."
-          : "Confirme somente depois de devolver o dinheiro ao cliente. O sistema registrará este estorno como manual."}
+          ? "Este é o saldo ainda pago neste lançamento. O sistema só o marcará como reembolsado depois que o Mercado Pago confirmar o estorno."
+          : "Este é o saldo ainda pago neste lançamento. Confirme somente depois de devolver o dinheiro ao cliente."}
       </p>
 
       {!automatic ? (

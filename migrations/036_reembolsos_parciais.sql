@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS uq_pedido_reembolsos_pagamento_concluido;
