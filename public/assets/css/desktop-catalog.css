@@ -191,7 +191,7 @@
 
 @media (min-width: 1800px) {
   [data-catalog-route] {
-    width: calc(100% - 32px);
+    width: calc(100vw - 32px);
     max-width: none;
   }
 
@@ -202,7 +202,7 @@
 
 @media (min-width: 2600px) {
   [data-catalog-route] {
-    width: calc(100% - 40px);
+    width: calc(100vw - 40px);
   }
 
   [data-catalog-route] .rp-site-header__inner {
