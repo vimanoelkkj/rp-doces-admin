@@ -490,9 +490,11 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
                   const paymentRefunds = paymentId ? refundsByPayment.get(paymentId) || [] : [];
                   const refundPending = paymentRefunds.some(refund => refund.status === "PENDENTE");
                   const completedRefunds = paymentRefunds.filter(refund => refund.status === "REEMBOLSADO");
+                  const refundedCents = completedRefunds.reduce((sum, refund) => sum + Number(refund.valor_centavos || 0), 0);
+                  const refundableCents = Math.max(0, Number(payment.valor_centavos || 0) - refundedCents);
                   const latestRefund = paymentRefunds[paymentRefunds.length - 1];
-                  const canRefund = refundAllowedByStatus && payment.status === "PAGO" && Number(payment.valor_centavos || 0) > 0 && paymentId > 0 && !refundPending;
-                  const retryRefund = latestRefund?.status === "FALHOU";
+                  const canRefund = refundAllowedByStatus && payment.status === "PAGO" && refundableCents > 0 && paymentId > 0 && !refundPending;
+                  const retryRefund = latestRefund?.status === "FALHOU" && Number(latestRefund.valor_centavos || 0) === refundableCents;
                   const hasPartialRefundHistory = completedRefunds.length > 0;
 
                   return (
@@ -511,9 +513,9 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
                               disabled={saving}
                             >
                               {retryRefund
-                                ? "Tentar reembolso novamente"
+                                ? `Tentar reembolso novamente · ${money(refundableCents)}`
                                 : hasPartialRefundHistory
-                                  ? `Reembolsar saldo restante · ${money(payment.valor_centavos)}`
+                                  ? `Reembolsar saldo restante · ${money(refundableCents)}`
                                   : "Reembolsar"}
                             </button>
                           ) : null}
@@ -529,6 +531,7 @@ export function ComandaDialog({ orderId, onClose, onChanged }: Props) {
                           key={paymentId}
                           order={order}
                           payment={payment}
+                          refundableCents={refundableCents}
                           saving={saving}
                           onCancel={() => setRefundPaymentId(null)}
                           onConfirm={input => void handleRefund(input)}

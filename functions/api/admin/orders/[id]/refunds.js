@@ -83,6 +83,23 @@ async function paymentForRefund(env, pedidoId, pagamentoId) {
     .first();
 }
 
+async function refundedCentsForPayment(env, pagamentoId) {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(valor_centavos), 0) AS total
+     FROM pedido_reembolsos
+     WHERE pagamento_id = ? AND status = 'REEMBOLSADO'`
+  )
+    .bind(pagamentoId)
+    .first();
+  return Math.max(0, Number(row?.total || 0));
+}
+
+async function refundableBalanceForPayment(env, payment) {
+  const original = Math.max(0, Number(payment?.valor_centavos || 0));
+  const refunded = await refundedCentsForPayment(env, Number(payment?.id || 0));
+  return Math.max(0, original - refunded);
+}
+
 async function remainingPaidCount(env, pedidoId, exceptPaymentId) {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS total
@@ -142,12 +159,15 @@ async function restoreStock(env, pedidoId) {
 }
 
 async function finalizeRefund(env, refund, payment, { mpRefundId = null, mpStatus = null } = {}) {
-  if (Number(refund.valor_centavos || 0) !== Number(payment.valor_centavos || 0)) {
+  const refundValue = Number(refund.valor_centavos || 0);
+  const refundableBefore = await refundableBalanceForPayment(env, payment);
+  if (!Number.isSafeInteger(refundValue) || refundValue <= 0 || refundValue > refundableBefore) {
     return { ok: false, erro: "VALOR_REEMBOLSO_DESATUALIZADO", httpStatus: 409 };
   }
+  const refundableAfter = Math.max(0, refundableBefore - refundValue);
 
   const remaining = await remainingPaidCount(env, Number(payment.pedido_id), Number(payment.id));
-  if (Number(refund.devolveu_estoque || 0) === 1 && remaining > 0) {
+  if (Number(refund.devolveu_estoque || 0) === 1 && (remaining > 0 || refundableAfter > 0)) {
     return { ok: false, erro: "ESTOQUE_EXIGE_REEMBOLSO_TOTAL", httpStatus: 409 };
   }
 
@@ -163,11 +183,11 @@ async function finalizeRefund(env, refund, payment, { mpRefundId = null, mpStatu
     ).bind(mpRefundId, mpStatus, refund.id),
     env.DB.prepare(
       `UPDATE pedido_pagamentos
-       SET status = 'REEMBOLSADO',
+       SET status = CASE WHEN ? = 0 THEN 'REEMBOLSADO' ELSE status END,
            mp_status = COALESCE(?, mp_status),
            atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND status = 'PAGO'`
-    ).bind(mpStatus, payment.id)
+    ).bind(refundableAfter, mpStatus, payment.id)
   ]);
 
   await recalculateComanda(env, Number(payment.pedido_id));
@@ -310,6 +330,14 @@ export async function onRequestPost({ request, env, params }) {
     return json({ erro: "Somente pagamentos confirmados podem ser reembolsados." }, 409);
   }
 
+  const refundableCents = await refundableBalanceForPayment(env, payment);
+  if (refundableCents <= 0) {
+    const existing = (await listRefunds(env, pedidoId)).find(
+      item => Number(item.pagamento_id) === pagamentoId && item.status === "REEMBOLSADO"
+    );
+    return json({ ok: true, reembolso: existing || null, ja_reembolsado: true });
+  }
+
   const orderStatus = String(payment.status_pedido || "").trim().toUpperCase();
   if (!REFUNDABLE_ORDER_STATUSES.has(orderStatus)) {
     return json({
@@ -336,7 +364,7 @@ export async function onRequestPost({ request, env, params }) {
     return json({ erro: "Reembolse os outros pagamentos antes de devolver os itens ao estoque." }, 409);
   }
 
-  const idempotencyKey = `refund:v2:${pedidoId}:${pagamentoId}:${Number(payment.valor_centavos || 0)}`;
+  const idempotencyKey = `refund:v3:${pedidoId}:${pagamentoId}:${refundableCents}`;
   let refund = await env.DB.prepare(
     `SELECT * FROM pedido_reembolsos WHERE idempotency_key = ? LIMIT 1`
   ).bind(idempotencyKey).first();
@@ -353,7 +381,7 @@ export async function onRequestPost({ request, env, params }) {
         pagamentoId,
         automatic ? "MERCADO_PAGO" : "MANUAL",
         automatic ? "PIX_MP" : manualMethod,
-        Number(payment.valor_centavos),
+        refundableCents,
         idempotencyKey,
         auth.user.id,
         String(body?.motivo || "").trim().slice(0, 300),

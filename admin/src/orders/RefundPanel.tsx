@@ -10,6 +10,7 @@ import styles from "./RefundPanel.module.css";
 type Props = {
   order: FinancialOrder;
   payment: OrderPayment;
+  refundableCents: number;
   saving: boolean;
   onCancel: () => void;
   onConfirm: (input: RefundInput) => void;
@@ -21,7 +22,7 @@ function money(cents?: number | null): string {
   );
 }
 
-export function RefundPanel({ order, payment, saving, onCancel, onConfirm }: Props) {
+export function RefundPanel({ order, payment, refundableCents, saving, onCancel, onConfirm }: Props) {
   const automatic = payment.metodo === "PIX_MP" && Boolean(payment.mp_order_id || payment.mp_payment_id);
   const paidPayments = order.pagamentos.filter(item => item.status === "PAGO");
   const canReturnStock = paidPayments.length === 1;
@@ -43,11 +44,11 @@ export function RefundPanel({ order, payment, saving, onCancel, onConfirm }: Pro
   }
 
   return (
-    <div className={styles.panel} role="group" aria-label={`Reembolso de ${money(payment.valor_centavos)}`}>
+    <div className={styles.panel} role="group" aria-label={`Reembolso de ${money(refundableCents)}`}>
       <div className={styles.heading}>
         <div>
           <span>Saldo a reembolsar</span>
-          <strong>{money(payment.valor_centavos)}{automatic ? " pelo Mercado Pago" : ""}</strong>
+          <strong>{money(refundableCents)}{automatic ? " pelo Mercado Pago" : ""}</strong>
         </div>
         <button type="button" className={styles.close} onClick={onCancel} disabled={saving} aria-label="Fechar reembolso">×</button>
       </div>
