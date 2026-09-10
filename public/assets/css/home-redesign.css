@@ -127,7 +127,7 @@
 .rp-home--redesign .rp-product-card__media { aspect-ratio: 4 / 3; height: auto; background: var(--rp-home-panel-2); }
 .rp-home--redesign .rp-product-card__image { width: 100%; height: 100%; object-fit: cover; }
 .rp-home--redesign .rp-product-card__body { padding: 15px; }
-.rp-home--redesign .rp-product-card__title { color: var(--rp-home-text); font-size: 15px; line-height: 1.25; }
+.rp-home--redesign .rp-product-card__title { min-height: 38px; color: var(--rp-home-text); font-size: 15px; line-height: 1.25; }
 .rp-home--redesign .rp-product-card__description { display: none; }
 .rp-home--redesign .rp-product-card__footer { align-items: center; margin-top: 14px; }
 .rp-home--redesign .rp-product-card__price { color: var(--rp-home-text); font-size: 16px; }
@@ -223,14 +223,12 @@
   .rp-home--redesign .rp-product-card__media { aspect-ratio: 1 / .86; }
   .rp-home--redesign .rp-product-card__body { padding: 10px; }
   .rp-home--redesign .rp-product-card__title { min-height: 34px; font-size: 12px; }
-  .rp-home--redesign .rp-product-card__footer { gap: 4px; }
-  .rp-home--redesign .rp-product-card__pricing { min-width: 0; }
-  .rp-home--redesign .rp-product-card__price { font-size: 13px; white-space: nowrap; }
-  .rp-home--redesign .rp-product-card__stock { font-size: 8.5px; }
-  .rp-home--redesign .rp-product-card__add { width: 30px; height: 30px; flex-basis: 30px; }
-  .rp-home--redesign .rp-product-card__stepper { height: 30px; grid-template-columns: 20px 20px 20px; flex: 0 0 60px; }
-  .rp-home--redesign .rp-product-card__stepper button { width: 20px; height: 28px; font-size: 13px; }
-  .rp-home--redesign .rp-product-card__stepper strong { font-size: 10.5px; }
+  .rp-home--redesign .rp-product-card__price { font-size: 14px; }
+  .rp-home--redesign .rp-product-card__add { width: 30px; height: 30px; }
+  .rp-home--redesign .rp-product-card__footer { gap: 6px; }
+  .rp-home--redesign .rp-product-card__stepper { height: 30px; grid-template-columns: 24px 24px 24px; }
+  .rp-home--redesign .rp-product-card__stepper button { width: 24px; height: 28px; font-size: 14px; }
+  .rp-home--redesign .rp-product-card__stepper strong { font-size: 11px; }
   .rp-home--redesign .rp-product-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .rp-home--redesign .rp-product-card:last-child:nth-child(odd) .rp-product-card__media { aspect-ratio: 2 / .82; }
   .rp-home--redesign .rp-home-promo-grid { grid-template-columns: 1fr; padding: 0 14px 52px; }
