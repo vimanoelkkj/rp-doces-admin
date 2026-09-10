@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#e85b79" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="R&P Admin" />
+    <link rel="manifest" href="/admin/manifest.webmanifest" />
+    <link rel="icon" href="/admin-favicon.png" />
+    <link rel="apple-touch-icon" href="/admin-apple-touch-icon.png" />
+    <script>
+      (() => {
+        try {
+          const stored = window.localStorage.getItem("rp-admin-theme");
+          const theme = stored === "light" || stored === "dark"
+            ? stored
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          const pageColor = theme === "dark" ? "#1b1614" : "#fbf8f4";
+          const statusColor = theme === "dark" ? "#1b1614" : "#e85b79";
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+          document.documentElement.style.backgroundColor = pageColor;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute("content", statusColor);
+        } catch {
+          // O React aplica o tema novamente assim que o shell monta.
+        }
+      })();
+    </script>
+    <style>
+      html,
+      body {
+        background: #fbf8f4;
+      }
+
+      html[data-theme="dark"],
+      html[data-theme="dark"] body {
+        background: #1b1614;
+        color: #f1e9e3;
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Manrope:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400..800&display=swap"
+    />
+    <title>R&amp;P Doces Admin</title>
+    <script type="module" crossorigin src="/admin/assets/index-D8hMZ047.js"></script>
+    <link rel="stylesheet" crossorigin href="/admin/assets/index-BRB7U05v.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
