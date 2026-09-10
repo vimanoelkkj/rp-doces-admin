@@ -1,6 +1,42 @@
 import { json } from "../lib/http.js";
 import { limparReservasExpiradas } from "../lib/stock.js";
 
+const DEFAULT_PRODUCTION_ORIGIN = "https://rp-doces.pages.dev";
+
+function isLocalRequest(request) {
+  try {
+    const hostname = new URL(request.url).hostname;
+    return hostname === "127.0.0.1" || hostname === "localhost";
+  } catch {
+    return false;
+  }
+}
+
+function productionOrigin(env) {
+  return String(env.PRODUCTION_CATALOG_ORIGIN || DEFAULT_PRODUCTION_ORIGIN).replace(/\/$/, "");
+}
+
+async function loadProductionCatalog(env) {
+  const origin = productionOrigin(env);
+  const response = await fetch(`${origin}/api/products`, {
+    headers: { Accept: "application/json" },
+    cf: { cacheTtl: 0 }
+  });
+
+  if (!response.ok) throw new Error(`Production catalog HTTP ${response.status}`);
+
+  const payload = await response.json();
+  const produtos = Array.isArray(payload?.produtos) ? payload.produtos : [];
+
+  return produtos.map(product => ({
+    ...product,
+    image_url:
+      typeof product.image_url === "string" && product.image_url
+        ? new URL(product.image_url, origin).toString()
+        : null
+  }));
+}
+
 async function queryProducts(env, { withCategories = true, withImage = true } = {}) {
   const imageColumn = withImage ? ", p.image_key" : "";
   const categoryColumns = withCategories
@@ -70,8 +106,17 @@ async function loadProducts(env) {
   }
 }
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, request }) {
   try {
+    if (isLocalRequest(request)) {
+      const produtos = await loadProductionCatalog(env);
+      return json(
+        { produtos, source: "production-readonly" },
+        200,
+        { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+      );
+    }
+
     await limparReservasExpiradas(env);
     const results = await loadProducts(env);
     const agora = Date.now();
