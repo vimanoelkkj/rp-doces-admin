@@ -1,0 +1,1 @@
+hero asset refresh in progress
