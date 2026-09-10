@@ -31,8 +31,8 @@ async function loadProductionCatalog(env) {
   return produtos.map(product => ({
     ...product,
     image_url:
-      typeof product.image_url === "string" && product.image_url
-        ? new URL(product.image_url, origin).toString()
+      typeof product.image_key === "string" && product.image_key
+        ? `/api/production-images/${encodeURIComponent(product.image_key)}`
         : null
   }));
 }
