@@ -3,7 +3,7 @@ import { renderProductCard } from "./product-card.js";
 import { storefrontProducts } from "../utils/product-filter.js";
 import { sortProducts } from "../utils/product-sort.js";
 
-const REDESIGN_HERO_IMAGE = "/assets/images/rp-hero-ultrawide-v2.webp";
+const REDESIGN_HERO_IMAGE = "/assets/images/rp-hero-ultrawide-v3.webp";
 
 function cartQuantity(cart, product) {
   return Number(cart?.get?.(String(product.id))) || 0;
