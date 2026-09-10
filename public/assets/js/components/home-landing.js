@@ -3,6 +3,8 @@ import { renderProductCard } from "./product-card.js";
 import { storefrontProducts } from "../utils/product-filter.js";
 import { sortProducts } from "../utils/product-sort.js";
 
+const REDESIGN_HERO_IMAGE = "/assets/images/rp-hero-ultrawide.webp";
+
 function cartQuantity(cart, product) {
   return Number(cart?.get?.(String(product.id))) || 0;
 }
@@ -49,8 +51,8 @@ export function renderHomeLanding(products = [], cart = new Map()) {
           <p class="rp-home-hero__lede">Receitas artesanais, feitas com ingredientes de verdade e muito carinho.</p>
         </div>
 
-        <div class="rp-home-media rp-home-media--hero" role="img" aria-label="Doces R&amp;P em destaque">
-          <span>foto principal dos produtos R&amp;P</span>
+        <div class="rp-home-media rp-home-media--hero has-image" role="img" aria-label="Doces R&amp;P em destaque">
+          <img data-home-managed-image src="${REDESIGN_HERO_IMAGE}" alt="Bolos no pote e pudim da R&amp;P Doces" decoding="async" fetchpriority="high">
         </div>
       </div>
     </section>
