@@ -1,4 +1,5 @@
 const REFRESH_INTERVAL_MS = 8000;
+const REDESIGN_HERO_IMAGE = "/assets/images/rp-hero-ultrawide.webp";
 let config = null;
 let timer = null;
 let inFlight = false;
@@ -13,13 +14,12 @@ function imageUrl(key) {
   return isLocalHost() ? `/api/production-images/${encoded}` : `/api/images/${encoded}`;
 }
 
-function syncMedia(selector, key, alt) {
+function syncMedia(selector, src, alt) {
   const media = document.querySelector(selector);
   if (!media) return;
-  const url = imageUrl(key);
   let image = media.querySelector("img[data-home-managed-image]");
 
-  if (!url) {
+  if (!src) {
     image?.remove();
     media.classList.remove("has-image");
     return;
@@ -31,17 +31,19 @@ function syncMedia(selector, key, alt) {
     image.decoding = "async";
     media.appendChild(image);
   }
+
   image.alt = alt;
-  if (image.getAttribute("src") !== url) image.src = url;
+  if (image.getAttribute("src") !== src) image.src = src;
   media.classList.add("has-image");
 }
 
 function applyConfig() {
+  syncMedia(".rp-home-media--hero", REDESIGN_HERO_IMAGE, "Bolos no pote e pudim da R&P Doces");
+
   if (!config) return;
-  syncMedia(".rp-home-media--hero", config.home_hero_image_key, "Foto principal da R&P Doces");
   syncMedia(
     ".rp-home-media--about",
-    config.home_about_image_key,
+    imageUrl(config.home_about_image_key),
     "R&P Doces na seção Nossa história"
   );
 }
@@ -56,9 +58,7 @@ async function refreshConfig() {
     });
     if (!response.ok) return;
     const next = await response.json();
-    const changed =
-      next.home_hero_image_key !== config?.home_hero_image_key ||
-      next.home_about_image_key !== config?.home_about_image_key;
+    const changed = next.home_about_image_key !== config?.home_about_image_key;
     config = next;
     if (changed) applyConfig();
   } catch {
@@ -78,4 +78,5 @@ window.addEventListener("online", refreshConfig);
 
 timer = setInterval(refreshConfig, REFRESH_INTERVAL_MS);
 void timer;
+applyConfig();
 refreshConfig();
