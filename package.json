@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "postinstall": "npm --prefix admin ci",
+    "build": "npm run admin:build",
     "dev": "wrangler pages dev public",
     "dev:test": "node scripts/setup-local-test.mjs --serve",
     "test:local:setup": "node scripts/setup-local-test.mjs",
