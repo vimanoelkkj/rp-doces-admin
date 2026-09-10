@@ -135,7 +135,6 @@
 .rp-home--redesign .rp-product-card__stock { font-size: 10px; }
 .rp-home--redesign .rp-product-card__add { border: 0; background: var(--rp-home-pink); color: #211315; }
 
-/* One-piece quantity stepper: no detached pink blocks. */
 .rp-home--redesign .rp-product-card__stepper {
   height: 38px;
   display: inline-grid;
@@ -224,11 +223,14 @@
   .rp-home--redesign .rp-product-card__media { aspect-ratio: 1 / .86; }
   .rp-home--redesign .rp-product-card__body { padding: 10px; }
   .rp-home--redesign .rp-product-card__title { min-height: 34px; font-size: 12px; }
-  .rp-home--redesign .rp-product-card__price { font-size: 14px; }
-  .rp-home--redesign .rp-product-card__add { width: 30px; height: 30px; }
-  .rp-home--redesign .rp-product-card__stepper { height: 34px; grid-template-columns: 30px 28px 30px; }
-  .rp-home--redesign .rp-product-card__stepper button { width: 30px; height: 32px; font-size: 15px; }
-  .rp-home--redesign .rp-product-card__stepper strong { font-size: 12px; }
+  .rp-home--redesign .rp-product-card__footer { gap: 4px; }
+  .rp-home--redesign .rp-product-card__pricing { min-width: 0; }
+  .rp-home--redesign .rp-product-card__price { font-size: 13px; white-space: nowrap; }
+  .rp-home--redesign .rp-product-card__stock { font-size: 8.5px; }
+  .rp-home--redesign .rp-product-card__add { width: 30px; height: 30px; flex-basis: 30px; }
+  .rp-home--redesign .rp-product-card__stepper { height: 30px; grid-template-columns: 20px 20px 20px; flex: 0 0 60px; }
+  .rp-home--redesign .rp-product-card__stepper button { width: 20px; height: 28px; font-size: 13px; }
+  .rp-home--redesign .rp-product-card__stepper strong { font-size: 10.5px; }
   .rp-home--redesign .rp-product-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .rp-home--redesign .rp-product-card:last-child:nth-child(odd) .rp-product-card__media { aspect-ratio: 2 / .82; }
   .rp-home--redesign .rp-home-promo-grid { grid-template-columns: 1fr; padding: 0 14px 52px; }
