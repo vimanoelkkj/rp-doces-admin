@@ -3,8 +3,14 @@ let config = null;
 let timer = null;
 let inFlight = false;
 
+function isLocalHost() {
+  return location.hostname === "127.0.0.1" || location.hostname === "localhost";
+}
+
 function imageUrl(key) {
-  return key ? `/api/images/${encodeURIComponent(key)}` : "";
+  if (!key) return "";
+  const encoded = encodeURIComponent(key);
+  return isLocalHost() ? `/api/production-images/${encoded}` : `/api/images/${encoded}`;
 }
 
 function syncMedia(selector, key, alt) {
