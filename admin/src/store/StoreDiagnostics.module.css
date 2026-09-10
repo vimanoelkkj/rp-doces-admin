@@ -3,9 +3,10 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  border: 1px solid var(--line, #ead8d2);
+  border: 1px solid var(--line);
   border-radius: 18px;
-  background: var(--surface, #fff);
+  background: var(--surface);
+  color: var(--text);
   padding: 20px;
   display: grid;
   gap: 18px;
@@ -26,20 +27,21 @@
 
 .sectionHead h3 {
   margin: 4px 0 6px;
+  color: var(--text);
   font-size: 18px;
 }
 
 .sectionHead p,
 .cardHead p {
   margin: 0;
-  color: var(--text-muted, #806d66);
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
 .kicker {
-  color: var(--pink-strong, #c94860);
+  color: var(--pink-strong);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .12em;
@@ -59,13 +61,14 @@
 
 .ownerBadge,
 .testBadge {
-  background: var(--pink-soft, #fff0f3);
-  color: var(--pink-strong, #c94860);
+  background: var(--pink-soft);
+  color: var(--pink-strong);
 }
 
 .realBadge {
-  border: 1px solid var(--pink-strong, #c94860);
-  color: var(--pink-strong, #c94860);
+  border: 1px solid var(--pink-strong);
+  background: transparent;
+  color: var(--pink-strong);
 }
 
 .grid {
@@ -81,10 +84,11 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  border: 1px solid var(--line, #ead8d2);
+  border: 1px solid var(--line);
   border-radius: 15px;
   padding: 16px;
-  background: var(--surface-veil, #fffaf8);
+  background: var(--surface-2);
+  color: var(--text);
   display: grid;
   gap: 14px;
 }
@@ -100,6 +104,7 @@
 .cardHead strong {
   display: block;
   margin-bottom: 4px;
+  color: var(--text);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
@@ -116,14 +121,15 @@
 }
 
 .status {
-  background: var(--surface, #fff);
-  border: 1px solid var(--line, #ead8d2);
-  color: var(--text, #3c302c);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
 }
 
 .notice {
-  background: var(--pink-soft, #fff0f3);
-  color: var(--text-muted, #806d66);
+  border: 1px solid var(--pink-border);
+  background: var(--pink-soft);
+  color: var(--muted);
 }
 
 .pixResult {
@@ -142,7 +148,7 @@
   aspect-ratio: 1;
   object-fit: contain;
   border-radius: 12px;
-  border: 1px solid var(--line, #ead8d2);
+  border: 1px solid var(--line);
   background: #fff;
 }
 
@@ -157,7 +163,7 @@
 .codeBox small,
 .meta,
 .field > span {
-  color: var(--text-muted, #806d66);
+  color: var(--muted);
   font-size: 10px;
   font-weight: 700;
 }
@@ -175,11 +181,11 @@
   max-width: 100%;
   min-width: 0;
   resize: vertical;
-  border: 1px solid var(--line-strong, #dbc2b9);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   padding: 9px;
-  background: var(--surface, #fff);
-  color: var(--text, #3c302c);
+  background: var(--surface);
+  color: var(--text);
   font: 600 10px/1.35 ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
@@ -196,11 +202,11 @@
   max-width: 100%;
   min-width: 0;
   height: 40px;
-  border: 1px solid var(--line-strong, #dbc2b9);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   padding: 0 11px;
-  background: var(--surface, #fff);
-  color: var(--text, #3c302c);
+  background: var(--surface);
+  color: var(--text);
   font: inherit;
 }
 
@@ -213,11 +219,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border: 1px solid var(--line-strong, var(--border-strong, #dbc2b9));
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   padding: 0 11px;
-  background: var(--surface, #fff);
-  color: var(--text, #3c302c);
+  background: var(--surface);
+  color: var(--text);
   font: inherit;
   text-align: left;
   transition: border-color .15s ease, background-color .15s ease, color .15s ease, box-shadow .15s ease;
@@ -231,16 +237,16 @@
 }
 
 .selectControl:hover {
-  border-color: var(--pink-strong, var(--accent, #d84c6c));
-  background: var(--pink-soft, var(--accent-soft, #fbe9ee));
-  color: var(--pink-strong, var(--accent-dark, #cf3f61));
+  border-color: var(--pink-strong);
+  background: var(--pink-soft);
+  color: var(--pink-strong);
 }
 
 .selectControl:focus-visible,
 .selectControl[aria-expanded="true"] {
-  border-color: var(--pink-strong, var(--accent, #d84c6c));
-  background: var(--surface, #fff);
-  box-shadow: 0 0 0 3px var(--pink-soft, var(--accent-soft, #fbe9ee));
+  border-color: var(--pink-strong);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--pink-soft);
   outline: none;
 }
 
@@ -269,27 +275,27 @@
 }
 
 .primaryButton {
-  border: 1px solid var(--pink-strong, #c94860);
-  background: var(--pink-strong, #c94860);
+  border: 1px solid var(--pink-strong);
+  background: var(--pink-strong);
   color: #fff;
 }
 
 .primaryButton:hover:not(:disabled) {
-  background: var(--accent, #d84c6c);
-  border-color: var(--accent, #d84c6c);
+  background: var(--pink);
+  border-color: var(--pink);
   transform: translateY(-1px);
 }
 
 .secondaryButton {
-  border: 1px solid var(--line-strong, #dbc2b9);
-  background: var(--surface, #fff);
-  color: var(--text, #3c302c);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .secondaryButton:hover:not(:disabled) {
-  border-color: var(--pink-strong, var(--accent, #d84c6c));
-  background: var(--pink-soft, var(--accent-soft, #fbe9ee));
-  color: var(--pink-strong, var(--accent-dark, #cf3f61));
+  border-color: var(--pink-strong);
+  background: var(--pink-soft);
+  color: var(--pink-strong);
 }
 
 .primaryButton:disabled,
