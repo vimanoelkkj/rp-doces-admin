@@ -1,5 +1,8 @@
 .section {
   grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--line, #ead8d2);
   border-radius: 18px;
   background: var(--surface, #fff);
@@ -9,10 +12,16 @@
 }
 
 .sectionHead {
+  min-width: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.sectionHead > div,
+.cardHead > div {
+  min-width: 0;
 }
 
 .sectionHead h3 {
@@ -26,6 +35,7 @@
   color: var(--text-muted, #806d66);
   font-size: 12px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .kicker {
@@ -39,6 +49,7 @@
 .ownerBadge,
 .realBadge,
 .testBadge {
+  flex: 0 0 auto;
   border-radius: 999px;
   padding: 5px 9px;
   font-size: 9px;
@@ -58,12 +69,18 @@
 }
 
 .grid {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
 .card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--line, #ead8d2);
   border-radius: 15px;
   padding: 16px;
@@ -73,6 +90,7 @@
 }
 
 .cardHead {
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -83,14 +101,18 @@
   display: block;
   margin-bottom: 4px;
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .status,
 .notice {
+  min-width: 0;
+  max-width: 100%;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 11px;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .status {
@@ -105,6 +127,9 @@
 }
 
 .pixResult {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
   gap: 14px;
@@ -113,6 +138,7 @@
 
 .qr {
   width: 150px;
+  max-width: 100%;
   aspect-ratio: 1;
   object-fit: contain;
   border-radius: 12px;
@@ -121,6 +147,8 @@
 }
 
 .codeBox {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   display: grid;
   gap: 7px;
@@ -134,9 +162,18 @@
   font-weight: 700;
 }
 
+.meta {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .codeBox textarea {
   min-height: 90px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   resize: vertical;
   border: 1px solid var(--line-strong, #dbc2b9);
   border-radius: 10px;
@@ -147,11 +184,17 @@
 }
 
 .field {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: grid;
   gap: 7px;
 }
 
 .field input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: 40px;
   border: 1px solid var(--line-strong, #dbc2b9);
   border-radius: 10px;
@@ -163,6 +206,8 @@
 
 .selectControl {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 40px;
   display: flex;
   align-items: center;
@@ -200,6 +245,9 @@
 }
 
 .actions {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -207,6 +255,8 @@
 
 .primaryButton,
 .secondaryButton {
+  max-width: 100%;
+  min-width: 0;
   min-height: 38px;
   border-radius: 10px;
   padding: 0 12px;
@@ -215,6 +265,7 @@
   font-weight: 800;
   cursor: pointer;
   transition: border-color .15s ease, background-color .15s ease, color .15s ease, transform .15s ease;
+  white-space: normal;
 }
 
 .primaryButton {
@@ -249,14 +300,40 @@
 
 @media (max-width: 860px) {
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .pixResult {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .qr {
     width: min(210px, 100%);
+  }
+}
+
+@media (max-width: 560px) {
+  .section {
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .sectionHead {
+    gap: 10px;
+  }
+
+  .card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
   }
 }
