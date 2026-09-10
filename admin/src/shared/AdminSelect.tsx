@@ -124,14 +124,23 @@ export function AdminSelect<T extends string>({
         close(true);
       }
     };
+    const pointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (triggerRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      close(false);
+    };
 
     window.addEventListener("resize", reposition, { passive: true });
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("keydown", keydown);
+    document.addEventListener("pointerdown", pointerDown, true);
     return () => {
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
       window.removeEventListener("keydown", keydown);
+      document.removeEventListener("pointerdown", pointerDown, true);
     };
   }, [close, open, updatePosition]);
 
