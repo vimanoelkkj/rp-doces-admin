@@ -1,0 +1,108 @@
+.rp-home--redesign .rp-home-hero {
+  position: relative;
+  min-height: clamp(560px, 76vh, 760px);
+  overflow: hidden;
+  background: #120d0b;
+}
+
+.rp-home--redesign .rp-home-hero__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  max-width: 1440px;
+  min-height: clamp(560px, 76vh, 760px);
+  margin: 0 auto;
+  padding: clamp(48px, 6vw, 88px) clamp(20px, 5vw, 76px);
+}
+
+.rp-home--redesign .rp-home-hero__copy {
+  position: relative;
+  z-index: 3;
+  width: min(47%, 620px);
+}
+
+.rp-home--redesign .rp-home-media--hero {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  border-radius: 0;
+  background: #211511;
+  box-shadow: none;
+}
+
+.rp-home--redesign .rp-home-media--hero::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgb(12 8 7 / 94%) 0%, rgb(12 8 7 / 82%) 26%, rgb(12 8 7 / 42%) 48%, rgb(12 8 7 / 8%) 72%),
+    linear-gradient(180deg, rgb(8 6 5 / 18%) 0%, transparent 58%, rgb(8 6 5 / 28%) 100%);
+}
+
+.rp-home--redesign .rp-home-media--hero img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 46%;
+}
+
+.rp-home--redesign .rp-home-media--hero span {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .rp-home--redesign .rp-home-hero,
+  .rp-home--redesign .rp-home-hero__body {
+    min-height: 620px;
+  }
+
+  .rp-home--redesign .rp-home-hero__body {
+    display: flex;
+    align-items: flex-end;
+    padding: 44px 24px 52px;
+  }
+
+  .rp-home--redesign .rp-home-hero__copy {
+    width: min(78%, 560px);
+  }
+
+  .rp-home--redesign .rp-home-media--hero {
+    height: 100%;
+    min-height: 0;
+    border-radius: 0;
+  }
+
+  .rp-home--redesign .rp-home-media--hero::after {
+    background:
+      linear-gradient(180deg, rgb(10 7 6 / 12%) 0%, rgb(10 7 6 / 24%) 38%, rgb(10 7 6 / 88%) 100%),
+      linear-gradient(90deg, rgb(10 7 6 / 62%) 0%, transparent 78%);
+  }
+}
+
+@media (max-width: 680px) {
+  .rp-home--redesign .rp-home-hero,
+  .rp-home--redesign .rp-home-hero__body {
+    min-height: 540px;
+  }
+
+  .rp-home--redesign .rp-home-hero__body {
+    padding: 30px 16px 34px;
+  }
+
+  .rp-home--redesign .rp-home-hero__copy {
+    width: 92%;
+  }
+
+  .rp-home--redesign .rp-home-media--hero img {
+    object-position: 58% center;
+  }
+}
