@@ -32,13 +32,27 @@ function menuPosition(trigger: HTMLElement, menu: HTMLElement | null): MenuPosit
   const mobile = window.matchMedia("(max-width: 760px)").matches;
   const viewportPadding = mobile ? 12 : 10;
   const gap = 8;
+
+  // No mobile, o AdminShell mantém um header fixo no topo e a navegação
+  // principal fixa no rodapé. O select é renderizado via portal, então precisa
+  // considerar essas duas áreas como indisponíveis ao decidir se abre para
+  // cima ou para baixo.
+  const mobileHeaderReserve = mobile ? 84 : 0;
+  const mobileBottomReserve = mobile ? 72 : 0;
+  const viewportTop = viewportPadding + mobileHeaderReserve;
+  const viewportBottom = window.innerHeight - viewportPadding - mobileBottomReserve;
+
   const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
   const width = Math.min(Math.max(rect.width, mobile ? 220 : 200), availableWidth);
   const measuredHeight = menu?.scrollHeight || 260;
   const wantedHeight = Math.min(measuredHeight, window.innerHeight * (mobile ? 0.58 : 0.5));
-  const roomBelow = window.innerHeight - rect.bottom - viewportPadding;
-  const roomAbove = rect.top - viewportPadding;
-  const placeAbove = roomBelow < Math.min(wantedHeight, 240) && roomAbove > roomBelow;
+  const roomBelow = Math.max(0, viewportBottom - rect.bottom);
+  const roomAbove = Math.max(0, rect.top - viewportTop);
+
+  // Antes a troca para cima só acontecia quando sobravam menos de 240 px.
+  // Isso deixava menus altos invadirem a bottom navigation mesmo havendo muito
+  // mais espaço acima do campo. Agora comparamos com a altura real desejada.
+  const placeAbove = roomBelow < wantedHeight && roomAbove > roomBelow;
   const left = Math.min(
     Math.max(viewportPadding, rect.left),
     Math.max(viewportPadding, window.innerWidth - width - viewportPadding)
@@ -50,8 +64,17 @@ function menuPosition(trigger: HTMLElement, menu: HTMLElement | null): MenuPosit
     left,
     maxHeight: Math.min(wantedHeight, availableHeight),
     ...(placeAbove
-      ? { top: "auto", bottom: Math.max(viewportPadding, window.innerHeight - rect.top + gap) }
-      : { top: Math.min(window.innerHeight - viewportPadding, rect.bottom + gap), bottom: "auto" })
+      ? {
+          top: "auto",
+          bottom: Math.max(
+            viewportPadding + mobileBottomReserve,
+            window.innerHeight - rect.top + gap
+          )
+        }
+      : {
+          top: Math.min(viewportBottom, rect.bottom + gap),
+          bottom: "auto"
+        })
   };
 }
 
