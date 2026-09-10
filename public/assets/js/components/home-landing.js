@@ -77,20 +77,31 @@ export function renderHomeLanding(products = [], cart = new Map()) {
 
     <section class="rp-home-promo-grid" id="contato">
       <article class="rp-home-promo rp-home-promo--dark">
-        <div>
-          <span class="rp-home-eyebrow">Para dividir. Ou não.</span>
+        <div class="rp-home-promo__copy">
           <h2>Combos especiais</h2>
-          <p>Monte seu combo favorito com os sabores disponíveis no dia.</p>
-          <button type="button" data-show-catalog>Ver cardápio <span aria-hidden="true">→</span></button>
+          <p>Mais sabor, mais momentos. Monte seu combo favorito e aproveite para compartilhar (ou não).</p>
+          <button class="rp-home-promo__cta" type="button" data-show-catalog>Ver combos <span aria-hidden="true">→</span></button>
         </div>
+        <div class="rp-home-promo__combo-art" aria-hidden="true">
+          <div class="rp-home-promo__combo-photos">
+            <img src="/assets/images/rp-image-01.webp" alt="">
+            <img src="/assets/images/rp-image-03.webp" alt="">
+            <img src="/assets/images/rp-image-04.webp" alt="">
+          </div>
+        </div>
+        <span class="rp-home-promo__scribble" aria-hidden="true">Juntos tudo fica mais doce. ♡</span>
       </article>
+
       <article class="rp-home-promo rp-home-promo--pink">
-        <div>
-          <span class="rp-home-eyebrow">Um carinho em forma de doce</span>
+        <div class="rp-home-promo__copy">
           <h2>Presentes que adoçam</h2>
-          <p>Uma opção simples e gostosa para surpreender alguém.</p>
-          <a href="https://wa.me/5533991285907" target="_blank" rel="noopener noreferrer">Falar com a R&amp;P <span aria-hidden="true">→</span></a>
+          <p>Surpreenda alguém com um doce especial.</p>
+          <a class="rp-home-promo__cta" href="https://wa.me/5533991285907" target="_blank" rel="noopener noreferrer">Ver presentes <span aria-hidden="true">→</span></a>
         </div>
+        <svg class="rp-home-promo__gift-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <path d="M8 20h32v21H8V20Zm16 0v21M6 14h36v8H6v-8Zm18 0c-7 0-11-2.2-11-6 0-2.5 1.9-4 4.2-4C21 4 24 9.3 24 14Zm0 0c7 0 11-2.2 11-6 0-2.5-1.9-4-4.2-4C27 4 24 9.3 24 14Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <img class="rp-home-promo__gift-product" src="/assets/images/rp-image-02.webp" alt="Bolo no pote R&amp;P">
       </article>
     </section>
 
