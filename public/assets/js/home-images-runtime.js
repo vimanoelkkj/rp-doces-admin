@@ -1,5 +1,5 @@
 const REFRESH_INTERVAL_MS = 8000;
-const REDESIGN_HERO_IMAGE = "/assets/images/rp-hero-ultrawide-v2.webp";
+const REDESIGN_HERO_IMAGE = "/assets/images/rp-hero-ultrawide-v3.webp";
 let config = null;
 let timer = null;
 let inFlight = false;
