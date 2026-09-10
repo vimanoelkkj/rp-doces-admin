@@ -49,9 +49,6 @@ function menuPosition(trigger: HTMLElement, menu: HTMLElement | null): MenuPosit
   const roomBelow = Math.max(0, viewportBottom - rect.bottom);
   const roomAbove = Math.max(0, rect.top - viewportTop);
 
-  // Antes a troca para cima só acontecia quando sobravam menos de 240 px.
-  // Isso deixava menus altos invadirem a bottom navigation mesmo havendo muito
-  // mais espaço acima do campo. Agora comparamos com a altura real desejada.
   const placeAbove = roomBelow < wantedHeight && roomAbove > roomBelow;
   const left = Math.min(
     Math.max(viewportPadding, rect.left),
@@ -107,6 +104,19 @@ export function AdminSelect<T extends string>({
     }
   }, []);
 
+  const eventIsInsideSelect = useCallback((event: Event) => {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    if (triggerRef.current && path.includes(triggerRef.current)) return true;
+    if (menuRef.current && path.includes(menuRef.current)) return true;
+
+    const target = event.target as Node | null;
+    if (!target) return false;
+    return Boolean(
+      triggerRef.current?.contains(target) ||
+      menuRef.current?.contains(target)
+    );
+  }, []);
+
   useLayoutEffect(() => {
     if (!open) return;
     updatePosition();
@@ -124,25 +134,26 @@ export function AdminSelect<T extends string>({
         close(true);
       }
     };
-    const pointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (triggerRef.current?.contains(target)) return;
-      if (menuRef.current?.contains(target)) return;
-      close(false);
+    const outsidePointer = (event: PointerEvent) => {
+      if (!eventIsInsideSelect(event)) close(false);
+    };
+    const outsideClick = (event: MouseEvent) => {
+      if (!eventIsInsideSelect(event)) close(false);
     };
 
     window.addEventListener("resize", reposition, { passive: true });
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("keydown", keydown);
-    document.addEventListener("pointerdown", pointerDown, true);
+    document.addEventListener("pointerdown", outsidePointer, true);
+    document.addEventListener("click", outsideClick, true);
     return () => {
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
       window.removeEventListener("keydown", keydown);
-      document.removeEventListener("pointerdown", pointerDown, true);
+      document.removeEventListener("pointerdown", outsidePointer, true);
+      document.removeEventListener("click", outsideClick, true);
     };
-  }, [close, open, updatePosition]);
+  }, [close, eventIsInsideSelect, open, updatePosition]);
 
   function openFromKeyboard(event: React.KeyboardEvent<HTMLButtonElement>) {
     if (!["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) return;
@@ -154,6 +165,12 @@ export function AdminSelect<T extends string>({
     if (option.disabled) return;
     if (option.value !== value) onChange(option.value);
     close(true);
+  }
+
+  function closeFromOverlay(event: React.PointerEvent<HTMLDivElement>) {
+    const target = event.target as Node;
+    if (menuRef.current?.contains(target)) return;
+    close(false);
   }
 
   return (
@@ -195,12 +212,16 @@ export function AdminSelect<T extends string>({
 
       {open
         ? createPortal(
-            <div className="rp-mobile-filter-overlay">
+            <div className="rp-mobile-filter-overlay" onPointerDownCapture={closeFromOverlay}>
               <button
                 className="rp-mobile-filter-backdrop"
                 type="button"
                 aria-label="Fechar seletor"
-                onClick={() => close(true)}
+                onPointerDown={event => {
+                  event.preventDefault();
+                  close(false);
+                }}
+                onClick={() => close(false)}
               />
               <div
                 ref={menuRef}
