@@ -80,8 +80,12 @@ function updateRegion(name, markup) {
   regionMarkup.set(name, markup);
 }
 function ensureRouteMarkup() {
-  if (renderedRoute === storefrontRoute) return;
-  const markup = storefrontRoute === "home" ? renderHomeLanding() : catalogMarkup();
+  if (renderedRoute === storefrontRoute && storefrontRoute !== "home") return;
+  const summary = getCartSummary();
+  const markup =
+    storefrontRoute === "home"
+      ? renderHomeLanding({ products: state.products, cart: state.cart, summary })
+      : catalogMarkup();
   updateRegion("route", markup);
   renderedRoute = storefrontRoute;
   regionMarkup.delete("header");
