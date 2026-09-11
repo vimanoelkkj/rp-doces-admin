@@ -1,0 +1,34 @@
+/* Sacola no visual do Figma, preservando a lógica real do carrinho. */
+.rp-cart-overlay{position:fixed;inset:0;z-index:100;display:flex;justify-content:flex-end;background:rgba(9,5,7,.62);backdrop-filter:blur(4px)}
+.rp-cart-overlay__backdrop{position:absolute;inset:0;border:0;background:transparent}
+.rp-cart-sheet{position:relative;z-index:1;width:min(520px,100%);height:100%;padding:34px 32px 28px;display:flex;flex-direction:column;background:var(--rp-figma-bg);border-left:1px solid var(--rp-figma-line);box-shadow:-24px 0 70px rgba(0,0,0,.35);color:#fff;overflow:auto}
+.rp-cart-sheet__handle{display:none}
+.rp-cart-sheet__head{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:24px;border-bottom:1px solid var(--rp-figma-line)}
+.rp-cart-sheet__eyebrow{display:block;margin-bottom:6px;color:var(--rp-figma-pink);font-size:11px;font-weight:800;letter-spacing:.15em;text-transform:uppercase}
+.rp-cart-sheet__head h2{margin:0;font-family:"Fraunces",serif;font-size:38px;line-height:1}
+.rp-cart-sheet__close{width:38px;height:38px;border:1px solid var(--rp-figma-line);border-radius:50%;background:transparent;color:var(--rp-figma-pink);font-size:24px;cursor:pointer}
+.rp-cart-sheet__items{display:flex;flex-direction:column}
+.rp-cart-item{padding:22px 0;display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:16px;align-items:center;border-bottom:1px solid var(--rp-figma-line)}
+.rp-cart-item__thumb{width:86px;height:86px;overflow:hidden;border-radius:12px;background:var(--rp-figma-card)}
+.rp-cart-item__thumb img{width:100%;height:100%;object-fit:cover}
+.rp-cart-item__thumb--empty{background:linear-gradient(135deg,#291a20,#1b1215)}
+.rp-cart-item__main{min-width:0}
+.rp-cart-item__name{display:block;color:#fff;font-family:"Fraunces",serif;font-size:18px}
+.rp-cart-item__unit{display:block;margin-top:5px;color:var(--rp-figma-pink-soft);font-size:12px}
+.rp-cart-item__controls{margin-top:14px;display:flex;align-items:center;gap:14px}
+.rp-cart-item__stepper{height:34px;display:flex;align-items:center;border:1px solid var(--rp-figma-line);border-radius:99px;overflow:hidden}
+.rp-cart-item__stepper button{width:34px;height:34px;border:0;background:transparent;color:var(--rp-figma-pink);font-size:18px;cursor:pointer}
+.rp-cart-item__stepper strong{min-width:28px;text-align:center;font-size:13px}
+.rp-cart-item__trash{padding:5px;border:0;background:none;color:#b98a97;cursor:pointer;font-size:11px}
+.rp-cart-item__price{align-self:start;padding-top:4px;color:#fff;font-size:14px}
+.rp-cart-summary{margin-top:auto;padding-top:24px}
+.rp-cart-summary__line,.rp-cart-total{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.rp-cart-summary__line{padding:7px 0;color:#fff;font-size:13px}
+.rp-cart-summary__line--muted{color:var(--rp-figma-pink-soft)}
+.rp-cart-total{margin-top:12px;padding-top:18px;border-top:1px solid var(--rp-figma-line);font-family:"Fraunces",serif;font-size:22px}
+.rp-cart-total strong{color:var(--rp-figma-pink)}
+.rp-cart-sheet__note{margin:18px 0;color:#aa8a93;font-size:11px;line-height:1.5}
+.rp-cart-sheet__actions{display:grid;gap:10px}
+.rp-cart-sheet__primary{min-height:48px;border-radius:10px;background:var(--rp-figma-pink)!important;color:#150f11!important;font-weight:800}
+.rp-cart-sheet__continue{min-height:42px;border:0;background:transparent;color:var(--rp-figma-pink-soft);cursor:pointer}
+@media(max-width:768px){.rp-cart-overlay{align-items:flex-end}.rp-cart-sheet{width:100%;height:auto;max-height:92dvh;padding:10px 20px 24px;border-left:0;border-top:1px solid var(--rp-figma-line);border-radius:22px 22px 0 0;box-shadow:0 -24px 60px rgba(0,0,0,.4)}.rp-cart-sheet__handle{width:42px;height:4px;margin:0 auto 14px;display:block;border-radius:99px;background:#5d424a}.rp-cart-sheet__head{padding-bottom:18px}.rp-cart-sheet__head h2{font-size:30px}.rp-cart-item{grid-template-columns:70px minmax(0,1fr) auto;gap:12px;padding:16px 0}.rp-cart-item__thumb{width:70px;height:70px}.rp-cart-item__name{font-size:16px}.rp-cart-item__controls{margin-top:10px}.rp-cart-item__price{font-size:13px}.rp-cart-summary{padding-top:18px}.rp-cart-sheet__note{margin:14px 0}.rp-cart-sheet__primary{min-height:50px}}
