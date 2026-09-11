@@ -1,0 +1,84 @@
+.rp-home.rp-figma-home {
+  background: #150f11 !important;
+  color: #fff !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-benefits {
+  background: #1c1518 !important;
+  border-color: #322125 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-benefit strong,
+.rp-home.rp-figma-home .rp-figma-benefit small,
+.rp-home.rp-figma-home .rp-figma-section__head h2,
+.rp-home.rp-figma-home .rp-figma-about h2,
+.rp-home.rp-figma-home .rp-figma-about__copy p {
+  color: #fff !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-benefit small,
+.rp-home.rp-figma-home .rp-figma-about__copy p,
+.rp-home.rp-figma-home .rp-figma-home__empty {
+  color: #d1a7b2 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-section,
+.rp-home.rp-figma-home .rp-figma-highlights,
+.rp-home.rp-figma-home .rp-figma-promos,
+.rp-home.rp-figma-home .rp-figma-about {
+  background: #150f11 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-section__head button {
+  color: #e691a8 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card {
+  border-color: #322125 !important;
+  background: #22171a !important;
+  color: #fff !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card__media {
+  background: #2b1d21 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card__title,
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card__price {
+  color: #fff !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card__description,
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card__unit,
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card__stock {
+  color: #d1a7b2 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card__price,
+.rp-home.rp-figma-home .rp-figma-home__products .rp-product-card__old-price {
+  color: #e691a8 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-promos {
+  border-color: #322125 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-promo {
+  background-color: #22171a !important;
+  border-color: #322125 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-about {
+  border-color: #322125 !important;
+}
+
+.rp-home.rp-figma-home .rp-figma-footer {
+  background: #100b0d !important;
+  border-color: #322125 !important;
+  color: #fff !important;
+}
+
+/* Neutraliza fundos claros herdados dos estilos antigos da home. */
+.rp-home.rp-figma-home section:not(.rp-figma-hero):not(.rp-figma-benefits) {
+  color-scheme: dark;
+}
