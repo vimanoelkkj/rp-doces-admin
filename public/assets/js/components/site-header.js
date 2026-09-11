@@ -3,25 +3,72 @@ let previousCartCount = 0;
 function syncHeaderCart(summary = {}) {
   if (typeof document === "undefined") return;
   const count = Number(summary.items) || 0;
-  const cart = document.querySelector('[data-region="header"] .rp-site-header__cart');
-  if (!cart) return;
-  const badge = cart.querySelector(".rp-site-header__badge");
+  const carts = document.querySelectorAll("#rp-app .rp-site-header__cart");
   const increased = count > previousCartCount;
 
-  cart.hidden = count <= 0;
-  cart.setAttribute("aria-label", `Abrir carrinho com ${count} ${count === 1 ? "item" : "itens"}`);
-  if (badge) badge.textContent = String(count);
+  carts.forEach(cart => {
+    const badge = cart.querySelector(".rp-site-header__badge");
+    cart.setAttribute(
+      "aria-label",
+      `Abrir carrinho com ${count} ${count === 1 ? "item" : "itens"}`
+    );
+    if (badge) {
+      badge.textContent = String(count);
+      badge.hidden = count <= 0;
+    }
 
-  cart.classList.remove("rp-site-header__cart--feedback");
-  if (increased && count > 0) {
-    void cart.offsetWidth;
-    cart.classList.add("rp-site-header__cart--feedback");
-  }
+    cart.classList.remove("rp-site-header__cart--feedback");
+    if (increased && count > 0) {
+      void cart.offsetWidth;
+      cart.classList.add("rp-site-header__cart--feedback");
+    }
+  });
 
   previousCartCount = count;
 }
 
+function searchIcon() {
+  return `<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17.5 17.5L13.883 13.883M15.833 9.167a6.667 6.667 0 1 1-13.333 0 6.667 6.667 0 0 1 13.333 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+}
+
+function bagIcon() {
+  return `<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M13.333 8.333a3.333 3.333 0 0 1-6.666 0M2.585 5.028h14.829M2.833 4.555A1.667 1.667 0 0 0 2.5 5.555v11.112c0 .92.746 1.667 1.667 1.667h11.666c.92 0 1.667-.746 1.667-1.667V5.555c0-.36-.117-.711-.333-1l-1.667-2.222a1.667 1.667 0 0 0-1.333-.667H5.833c-.524 0-1.018.247-1.333.667L2.833 4.555Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function menuIcon() {
+  return `<span class="rp-site-header__hamburger" aria-hidden="true"><i></i><i></i><i></i></span>`;
+}
+
 export function renderSiteHeader(summary = {}) {
+  const count = Number(summary.items) || 0;
   queueMicrotask(() => syncHeaderCart(summary));
-  return `<header class="rp-site-header"><div class="rp-site-header__inner"><a class="rp-site-header__brand" href="#topo" data-home-top aria-label="R&P Doces, início">R&P Doces</a><div class="rp-site-header__actions"><button class="rp-site-header__cart" type="button" data-open-cart hidden aria-label="Abrir carrinho"><span class="rp-site-header__bag" aria-hidden="true"></span><span class="rp-site-header__badge">0</span></button><button class="rp-site-header__menu rp-site-header__menu--mobile" type="button" data-open-menu aria-label="Abrir menu"><span aria-hidden="true"></span></button><div class="rp-desktop-menu rp-desktop-menu--catalog"><button type="button" class="rp-desktop-menu__trigger" aria-label="Abrir menu" aria-haspopup="menu"><span>Menu</span><span class="rp-desktop-menu__trigger-chevron" aria-hidden="true"></span></button><div class="rp-desktop-menu__popover" role="menu" aria-label="Menu do cardápio"><button type="button" role="menuitem" data-home-section="topo"><strong>Início</strong><small>Voltar para a página inicial</small></button><button type="button" role="menuitem" data-open-party><strong>Pedidos para festa</strong><small>Encomendas especiais · 7 dias</small></button><button type="button" role="menuitem" data-home-section="sobre"><strong>Sobre nós</strong><small>Nossa história e nossos valores</small></button><button type="button" role="menuitem" data-home-section="onde-encontrar"><strong>Localização</strong><small>Veja onde estamos</small></button><button type="button" role="menuitem" data-home-section="contato"><strong>Contato</strong><small>Fale com a gente pelo WhatsApp</small></button></div></div></div></div></header>`;
+
+  return `<header class="rp-site-header">
+    <div class="rp-site-header__inner">
+      <button class="rp-site-header__brand" type="button" data-home-top aria-label="R&P Doces, início">
+        <strong>R&amp;P</strong> <span>Doces</span>
+      </button>
+
+      <nav class="rp-site-header__nav" aria-label="Navegação principal">
+        <button type="button" class="is-active" data-home-top>Início</button>
+        <button type="button" data-show-catalog>Cardápio</button>
+        <button type="button" data-show-catalog>Combos</button>
+        <button type="button" data-show-catalog>Presentes</button>
+        <button type="button" data-home-section="sobre">Sobre nós</button>
+      </nav>
+
+      <div class="rp-site-header__actions">
+        <button class="rp-site-header__search" type="button" data-show-catalog aria-label="Abrir cardápio">
+          ${searchIcon()}
+        </button>
+        <button class="rp-site-header__cart" type="button" data-open-cart aria-label="Abrir carrinho">
+          ${bagIcon()}
+          <span class="rp-site-header__badge"${count <= 0 ? " hidden" : ""}>${count}</span>
+        </button>
+        <button class="rp-site-header__menu rp-site-header__menu--mobile" type="button" data-open-menu aria-label="Abrir menu">
+          ${menuIcon()}
+        </button>
+      </div>
+    </div>
+  </header>`;
 }
