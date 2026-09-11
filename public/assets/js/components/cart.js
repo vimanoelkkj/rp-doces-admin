@@ -1,100 +1,88 @@
 import { formatMoney } from "../utils/money.js";
 import { escapeHtml } from "../utils/html.js";
-
-let cartMounted = false;
-let stableMarkup = "";
+import { renderSiteHeader } from "./site-header.js";
+import { renderSiteFooter } from "./site-footer.js";
 
 function thumbMarkup(product) {
   const url = String(product?.image_url || "");
-  if (!url) return `<div class="rp-cart-item__thumb rp-cart-item__thumb--empty" aria-hidden="true"></div>`;
-  return `<div class="rp-cart-item__thumb"><img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async" /></div>`;
+  if (!url) return `<div class="rp-cart-page__thumb rp-cart-page__thumb--empty" aria-hidden="true"></div>`;
+  return `<div class="rp-cart-page__thumb"><img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async" /></div>`;
 }
 
 function cartItemMarkup({ product, quantity }) {
-  const name = escapeHtml(product.nome || "Produto");
+  const name = escapeHtml(product.nome || product.name || "Produto");
+  const description = escapeHtml(product.descricao || product.description || "");
   const id = escapeHtml(product.id);
   const unit = Number(product.preco_centavos) || 0;
-  return `<article class="rp-cart-item" data-cart-item="${id}">${thumbMarkup(product)}<div class="rp-cart-item__main"><strong class="rp-cart-item__name">${name}</strong><span class="rp-cart-item__unit">${formatMoney(unit)} cada</span><div class="rp-cart-item__controls"><div class="rp-cart-item__stepper" aria-label="Quantidade de ${name}"><button type="button" data-cart-delta="-1" data-product-id="${id}" aria-label="Remover uma unidade">−</button><strong data-cart-item-quantity>${quantity}</strong><button type="button" data-cart-delta="1" data-product-id="${id}" ${quantity >= Number(product.estoque || 0) ? "disabled" : ""} aria-label="Adicionar uma unidade">+</button></div><button class="rp-cart-item__trash" type="button" data-cart-remove data-product-id="${id}" aria-label="Remover ${name} do pedido"><span aria-hidden="true">Remover</span></button></div></div><strong class="rp-cart-item__price" data-cart-item-price>${formatMoney(unit * quantity)}</strong></article>`;
+  const total = unit * quantity;
+
+  return `<article class="rp-cart-page__item" data-cart-item="${id}">
+    ${thumbMarkup(product)}
+    <div class="rp-cart-page__item-copy">
+      <strong>${name}</strong>
+      ${description ? `<p>${description}</p>` : ""}
+    </div>
+    <div class="rp-cart-page__stepper" aria-label="Quantidade de ${name}">
+      <button type="button" data-cart-delta="-1" data-product-id="${id}" aria-label="Remover uma unidade">−</button>
+      <strong>${quantity}</strong>
+      <button type="button" data-cart-delta="1" data-product-id="${id}" ${quantity >= Number(product.estoque || 0) ? "disabled" : ""} aria-label="Adicionar uma unidade">+</button>
+    </div>
+    <div class="rp-cart-page__price">
+      <strong>${formatMoney(total)}</strong>
+      <small>${formatMoney(unit)} cada</small>
+    </div>
+    <button class="rp-cart-page__remove" type="button" data-cart-remove data-product-id="${id}" aria-label="Remover ${name} da sacola">Remover</button>
+  </article>`;
 }
 
-function emptyCartMarkup() {
-  return `<div class="rp-cart-overlay" aria-hidden="false"><button class="rp-cart-overlay__backdrop" type="button" data-close-cart aria-label="Fechar sacola"></button><section class="rp-cart-sheet rp-cart-sheet--empty" role="dialog" aria-modal="true" aria-labelledby="rp-cart-title" data-cart-sheet><div class="rp-cart-sheet__handle" aria-hidden="true"></div><header class="rp-cart-sheet__head"><div><span class="rp-cart-sheet__eyebrow">Sua seleção</span><h2 id="rp-cart-title">Sacola</h2></div><button type="button" class="rp-cart-sheet__close" data-close-cart aria-label="Fechar sacola">×</button></header><div class="rp-cart-empty"><div class="rp-cart-empty__icon" aria-hidden="true">♡</div><h3>Sua sacola está vazia</h3><p>Escolha seus doces favoritos e eles aparecem por aqui.</p><button class="rp-btn rp-btn--primary rp-cart-empty__cta" type="button" data-close-cart>Continuar escolhendo</button></div></section></div>`;
+function emptyMarkup() {
+  return `<main class="rp-cart-page__empty">
+    <div>
+      <span class="rp-cart-page__eyebrow">Sua seleção</span>
+      <h1>Sua sacola está vazia</h1>
+      <p>Escolha seus doces no cardápio e eles aparecem aqui.</p>
+      <button type="button" data-close-cart>Voltar ao cardápio</button>
+    </div>
+  </main>`;
 }
 
-function syncThumb(row, product) {
-  const url = String(product?.image_url || "");
-  let thumb = row.querySelector(".rp-cart-item__thumb");
-  if (!thumb) {
-    thumb = document.createElement("div");
-    thumb.className = "rp-cart-item__thumb";
-    row.prepend(thumb);
-  }
-  if (!url) {
-    thumb.classList.add("rp-cart-item__thumb--empty");
-    thumb.replaceChildren();
-    return;
-  }
-  thumb.classList.remove("rp-cart-item__thumb--empty");
-  let image = thumb.querySelector("img");
-  if (!image) {
-    image = document.createElement("img");
-    image.alt = "";
-    image.loading = "lazy";
-    image.decoding = "async";
-    thumb.appendChild(image);
-  }
-  if (image.getAttribute("src") !== url) image.src = url;
+function filledMarkup(items, summary) {
+  return `<main class="rp-cart-page__main">
+    <section class="rp-cart-page__items-area">
+      <div class="rp-cart-page__title-row">
+        <h1>Sua sacola <span>(${items.length} ${items.length === 1 ? "item" : "itens"})</span></h1>
+      </div>
+      <div class="rp-cart-page__items">
+        ${items.map(cartItemMarkup).join("")}
+      </div>
+    </section>
+
+    <aside class="rp-cart-page__aside">
+      <section class="rp-cart-page__coupon" aria-label="Cupom de desconto">
+        <strong>Cupom de desconto</strong>
+        <div>
+          <input type="text" placeholder="Digite o código" aria-label="Cupom de desconto" disabled />
+          <button type="button" disabled>Aplicar</button>
+        </div>
+      </section>
+
+      <section class="rp-cart-page__summary">
+        <h2>Resumo do pedido</h2>
+        <div class="rp-cart-page__summary-line"><span>Subtotal</span><strong>${formatMoney(summary.totalCents)}</strong></div>
+        <div class="rp-cart-page__summary-line"><span>Entrega / frete</span><strong>A combinar</strong></div>
+        <div class="rp-cart-page__summary-total"><span>Total</span><strong>${formatMoney(summary.totalCents)}</strong></div>
+        <button class="rp-cart-page__checkout" type="button" data-start-checkout>Finalizar pedido <span aria-hidden="true">→</span></button>
+      </section>
+    </aside>
+  </main>`;
 }
 
-function cartMarkup(items, summary) {
-  return `<div class="rp-cart-overlay" aria-hidden="false"><button class="rp-cart-overlay__backdrop" type="button" data-close-cart aria-label="Fechar sacola"></button><section class="rp-cart-sheet" role="dialog" aria-modal="true" aria-labelledby="rp-cart-title" data-cart-sheet><div class="rp-cart-sheet__handle" aria-hidden="true"></div><header class="rp-cart-sheet__head"><div><span class="rp-cart-sheet__eyebrow">Sua seleção</span><h2 id="rp-cart-title">Sacola</h2></div><button type="button" class="rp-cart-sheet__close" data-close-cart aria-label="Fechar sacola">×</button></header><div class="rp-cart-sheet__items">${items.map(cartItemMarkup).join("")}</div><div class="rp-cart-summary"><div class="rp-cart-summary__line"><span>Subtotal</span><strong data-cart-subtotal>${formatMoney(summary.totalCents)}</strong></div><div class="rp-cart-summary__line rp-cart-summary__line--muted"><span>Entrega</span><strong>A combinar</strong></div><div class="rp-cart-total"><span>Total</span><strong data-cart-total>${formatMoney(summary.totalCents)}</strong></div></div><p class="rp-cart-sheet__note">Os itens ficam sujeitos à disponibilidade até a confirmação do pedido.</p><div class="rp-cart-sheet__actions"><button class="rp-btn rp-btn--primary rp-cart-sheet__primary" type="button" data-start-checkout>Continuar para pagamento <span aria-hidden="true">→</span></button><button class="rp-cart-sheet__continue" type="button" data-close-cart>Continuar comprando</button></div></section></div>`;
-}
+export function renderCart({ open = false, items = [], summary = {} } = {}) {
+  if (!open) return "";
 
-function patchOpenCart(items, summary) {
-  if (typeof document === "undefined") return false;
-  const sheet = document.querySelector("#rp-app [data-cart-sheet]");
-  if (!sheet || sheet.classList.contains("rp-cart-sheet--empty")) return false;
-  const itemsRoot = sheet.querySelector(".rp-cart-sheet__items");
-  if (!itemsRoot) return false;
-  const nextIds = new Set(items.map(({ product }) => String(product.id)));
-  itemsRoot.querySelectorAll("[data-cart-item]").forEach(item => {
-    if (!nextIds.has(item.dataset.cartItem)) item.remove();
-  });
-  items.forEach(item => {
-    const id = String(item.product.id);
-    let row = [...itemsRoot.querySelectorAll("[data-cart-item]")].find(element => element.dataset.cartItem === id);
-    if (!row) {
-      itemsRoot.insertAdjacentHTML("beforeend", cartItemMarkup(item));
-      return;
-    }
-    syncThumb(row, item.product);
-    const quantity = row.querySelector("[data-cart-item-quantity]");
-    const price = row.querySelector("[data-cart-item-price]");
-    const addButton = row.querySelector('[data-cart-delta="1"]');
-    if (quantity) quantity.textContent = String(item.quantity);
-    if (price) price.textContent = formatMoney((Number(item.product.preco_centavos) || 0) * item.quantity);
-    if (addButton) addButton.disabled = item.quantity >= Number(item.product.estoque || 0);
-  });
-  const subtotal = sheet.querySelector("[data-cart-subtotal]");
-  const total = sheet.querySelector("[data-cart-total]");
-  if (subtotal) subtotal.textContent = formatMoney(summary.totalCents);
-  if (total) total.textContent = formatMoney(summary.totalCents);
-  return true;
-}
-
-export function renderCart({ open, items, summary }) {
-  if (!open) {
-    cartMounted = false;
-    stableMarkup = "";
-    return "";
-  }
-  if (!items.length) {
-    cartMounted = false;
-    stableMarkup = emptyCartMarkup();
-    return stableMarkup;
-  }
-  if (cartMounted && stableMarkup && patchOpenCart(items, summary)) return stableMarkup;
-  stableMarkup = cartMarkup(items, summary);
-  cartMounted = true;
-  return stableMarkup;
+  return `<section class="rp-cart-page" role="dialog" aria-modal="true" aria-label="Sua sacola">
+    ${renderSiteHeader(summary)}
+    ${items.length ? filledMarkup(items, summary) : emptyMarkup()}
+    ${renderSiteFooter()}
+  </section>`;
 }
