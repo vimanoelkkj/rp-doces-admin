@@ -78,7 +78,48 @@
   color: #fff !important;
 }
 
-/* Neutraliza fundos claros herdados dos estilos antigos da home. */
 .rp-home.rp-figma-home section:not(.rp-figma-hero):not(.rp-figma-benefits) {
   color-scheme: dark;
+}
+
+.rp-home.rp-figma-home .rp-product-card__stepper {
+  min-width: 96px !important;
+  height: 40px !important;
+  display: grid !important;
+  grid-template-columns: 32px 32px 32px !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(230,145,168,.45) !important;
+  border-radius: 999px !important;
+  background: rgba(230,145,168,.12) !important;
+}
+
+.rp-home.rp-figma-home .rp-product-card__stepper button,
+.rp-home.rp-figma-home .rp-product-card__stepper button:last-child {
+  width: 32px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #e691a8 !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+
+.rp-home.rp-figma-home .rp-product-card__stepper button:hover:not(:disabled),
+.rp-home.rp-figma-home .rp-product-card__stepper button:focus-visible:not(:disabled) {
+  background: rgba(230,145,168,.12) !important;
+  outline: none !important;
+}
+
+.rp-home.rp-figma-home .rp-product-card__stepper strong {
+  min-width: 32px !important;
+  color: #fff !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
 }
