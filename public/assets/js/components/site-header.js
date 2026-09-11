@@ -27,10 +27,6 @@ function syncHeaderCart(summary = {}) {
   previousCartCount = count;
 }
 
-function searchIcon() {
-  return `<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17.5 17.5L13.883 13.883M15.833 9.167a6.667 6.667 0 1 1-13.333 0 6.667 6.667 0 0 1 13.333 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-}
-
 function bagIcon() {
   return `<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M13.333 8.333a3.333 3.333 0 0 1-6.666 0M2.585 5.028h14.829M2.833 4.555A1.667 1.667 0 0 0 2.5 5.555v11.112c0 .92.746 1.667 1.667 1.667h11.666c.92 0 1.667-.746 1.667-1.667V5.555c0-.36-.117-.711-.333-1l-1.667-2.222a1.667 1.667 0 0 0-1.333-.667H5.833c-.524 0-1.018.247-1.333.667L2.833 4.555Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
@@ -58,9 +54,6 @@ export function renderSiteHeader(summary = {}) {
       </nav>
 
       <div class="rp-site-header__actions">
-        <button class="rp-site-header__search" type="button" data-show-catalog aria-label="Abrir cardápio">
-          ${searchIcon()}
-        </button>
         <button class="rp-site-header__cart" type="button" data-open-cart aria-label="Abrir carrinho">
           ${bagIcon()}
           <span class="rp-site-header__badge"${count <= 0 ? " hidden" : ""}>${count}</span>
