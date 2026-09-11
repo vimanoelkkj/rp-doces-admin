@@ -1,0 +1,87 @@
+.rp-cart-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 120 !important;
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: flex-end !important;
+  padding: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+.rp-cart-overlay__backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  border: 0 !important;
+  background: rgba(9, 5, 7, 0.62) !important;
+  backdrop-filter: blur(5px) !important;
+}
+
+.rp-cart-sheet {
+  position: relative !important;
+  z-index: 2 !important;
+  width: min(520px, 100%) !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 34px 32px 28px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: auto !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+  animation: none !important;
+  border: 0 !important;
+  border-left: 1px solid #322125 !important;
+  border-radius: 0 !important;
+  background: #150f11 !important;
+  box-shadow: -24px 0 70px rgba(0,0,0,.42) !important;
+  color: #fff !important;
+}
+
+.rp-cart-sheet__head,
+.rp-cart-sheet__items,
+.rp-cart-summary,
+.rp-cart-sheet__note,
+.rp-cart-sheet__actions,
+.rp-cart-item,
+.rp-cart-total {
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+}
+
+.rp-cart-sheet__head {
+  flex: 0 0 auto !important;
+}
+
+.rp-cart-sheet__items {
+  flex: 0 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+.rp-cart-summary {
+  margin-top: auto !important;
+}
+
+@media (max-width: 768px) {
+  .rp-cart-overlay {
+    align-items: flex-end !important;
+    justify-content: center !important;
+  }
+
+  .rp-cart-sheet {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 92dvh !important;
+    padding: 10px 20px 24px !important;
+    border-left: 0 !important;
+    border-top: 1px solid #322125 !important;
+    border-radius: 22px 22px 0 0 !important;
+    box-shadow: 0 -24px 60px rgba(0,0,0,.42) !important;
+  }
+}
