@@ -1,0 +1,117 @@
+.rp-site-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 140 !important;
+  width: 100% !important;
+  min-height: 80px !important;
+  height: 80px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-bottom: 1px solid #322125 !important;
+  background: rgba(21, 15, 17, 0.97) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+.rp-site-header__inner {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 80px !important;
+  height: 80px !important;
+  margin: 0 !important;
+  padding: 0 80px !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto 1fr !important;
+  align-items: center !important;
+  gap: 32px !important;
+}
+
+.rp-site-header__brand {
+  justify-self: start !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 28px !important;
+  line-height: 1 !important;
+}
+
+.rp-site-header__nav {
+  justify-self: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.rp-site-header__actions {
+  justify-self: end !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 22px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.rp-site-header__search,
+.rp-site-header__cart,
+.rp-site-header__menu {
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  padding: 8px !important;
+}
+
+.rp-cart-page .rp-site-header,
+.rp-home.rp-figma-home .rp-site-header {
+  position: sticky !important;
+  top: 0 !important;
+}
+
+@media (max-width: 1100px) {
+  .rp-site-header__inner {
+    padding-inline: 40px !important;
+  }
+
+  .rp-site-header__nav {
+    gap: 24px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .rp-site-header,
+  .rp-site-header__inner {
+    min-height: 60px !important;
+    height: 60px !important;
+  }
+
+  .rp-site-header__inner {
+    padding: 0 20px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+  }
+
+  .rp-site-header__brand {
+    font-size: 22px !important;
+  }
+
+  .rp-site-header__nav {
+    display: none !important;
+  }
+
+  .rp-site-header__actions {
+    gap: 12px !important;
+  }
+
+  .rp-site-header__search,
+  .rp-site-header__cart,
+  .rp-site-header__menu {
+    width: 28px !important;
+    height: 28px !important;
+    padding: 4px !important;
+  }
+
+  .rp-site-header__menu--mobile {
+    display: grid !important;
+  }
+}
