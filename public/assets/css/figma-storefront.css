@@ -1,0 +1,725 @@
+:root {
+  --rp-figma-bg: #150f11;
+  --rp-figma-surface: #1c1518;
+  --rp-figma-card: #22171a;
+  --rp-figma-line: #322125;
+  --rp-figma-pink: #e691a8;
+  --rp-figma-pink-soft: #d1a7b2;
+  --rp-figma-white: #fff;
+  --rp-figma-cream: #fff2f4;
+}
+
+body {
+  background: var(--rp-figma-bg);
+}
+
+.rp-site-header {
+  position: sticky;
+  top: 0;
+  z-index: 70;
+  min-height: 80px;
+  border-bottom: 1px solid var(--rp-figma-line);
+  background: rgba(21, 15, 17, 0.97);
+  backdrop-filter: blur(18px);
+}
+
+.rp-site-header__inner {
+  width: 100%;
+  min-height: 80px;
+  padding: 0 80px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 32px;
+}
+
+.rp-site-header button {
+  font: inherit;
+}
+
+.rp-site-header__brand {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--rp-figma-pink);
+  cursor: pointer;
+  font-family: "Fraunces", serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.rp-site-header__brand span {
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-weight: 300;
+}
+
+.rp-site-header__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+}
+
+.rp-site-header__nav button {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--rp-figma-pink-soft);
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.rp-site-header__nav button:hover,
+.rp-site-header__nav button:focus-visible,
+.rp-site-header__nav button.is-active {
+  color: #fff;
+}
+
+.rp-site-header__actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.rp-site-header__search,
+.rp-site-header__cart,
+.rp-site-header__menu {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--rp-figma-pink);
+  cursor: pointer;
+}
+
+.rp-site-header__search svg,
+.rp-site-header__cart svg {
+  width: 20px;
+  height: 20px;
+}
+
+.rp-site-header__badge {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--rp-figma-pink);
+  color: var(--rp-figma-bg);
+  font: 700 10px/1 "DM Sans", sans-serif;
+}
+
+.rp-site-header__menu--mobile {
+  display: none;
+}
+
+.rp-site-header__hamburger {
+  display: grid;
+  gap: 3px;
+}
+
+.rp-site-header__hamburger i {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.rp-figma-home {
+  min-width: 320px;
+  overflow: clip;
+  background: var(--rp-figma-bg);
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+}
+
+.rp-figma-home button,
+.rp-figma-home a {
+  font-family: inherit;
+}
+
+.rp-figma-hero {
+  position: relative;
+  min-height: 640px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.rp-figma-hero__image,
+.rp-figma-hero__shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.rp-figma-hero__image {
+  object-fit: cover;
+}
+
+.rp-figma-hero__shade {
+  background: linear-gradient(90deg, rgba(15, 10, 13, .84) 0%, rgba(15, 10, 13, .58) 45%, rgba(15, 10, 13, .15) 72%, transparent 100%);
+}
+
+.rp-figma-hero__copy {
+  position: relative;
+  z-index: 1;
+  width: min(560px, calc(100% - 160px));
+  margin-left: 80px;
+}
+
+.rp-figma-hero__tag {
+  display: none;
+}
+
+.rp-figma-hero h1,
+.rp-figma-section h2,
+.rp-figma-promo h2,
+.rp-figma-about h2 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  letter-spacing: -0.035em;
+}
+
+.rp-figma-hero h1 {
+  font-size: clamp(44px, 4vw, 58px);
+  line-height: 1.08;
+  font-weight: 700;
+}
+
+.rp-figma-hero h1 em,
+.rp-figma-about h2 em {
+  color: var(--rp-figma-pink);
+  font-style: normal;
+}
+
+.rp-figma-hero__copy > p {
+  max-width: 540px;
+  margin: 28px 0 0;
+  color: var(--rp-figma-cream);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.rp-figma-benefits {
+  min-height: 112px;
+  padding: 30px 80px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  border-bottom: 1px solid var(--rp-figma-line);
+  background: var(--rp-figma-surface);
+}
+
+.rp-figma-benefit {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.rp-figma-benefit__icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgba(255,255,255,.04);
+  color: var(--rp-figma-pink);
+  font-size: 21px;
+}
+
+.rp-figma-benefit strong,
+.rp-figma-benefit small {
+  display: block;
+  color: var(--rp-figma-cream);
+}
+
+.rp-figma-benefit strong {
+  font-size: 15px;
+}
+
+.rp-figma-benefit small {
+  margin-top: 2px;
+  font-size: 14px;
+}
+
+.rp-figma-section {
+  padding: 78px 80px;
+}
+
+.rp-figma-section__head {
+  margin-bottom: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.rp-figma-section__head h2 {
+  font-size: 32px;
+}
+
+.rp-figma-section__head button {
+  min-height: 32px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--rp-figma-pink);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rp-figma-home__products {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.rp-figma-home__products .rp-product-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--rp-figma-line);
+  border-radius: 16px;
+  background: var(--rp-figma-card);
+  box-shadow: none;
+}
+
+.rp-figma-home__products .rp-product-card__media {
+  aspect-ratio: 1;
+  min-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #2b1d21;
+}
+
+.rp-figma-home__products .rp-product-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rp-figma-home__products .rp-product-card__body {
+  padding: 14px 2px 2px;
+}
+
+.rp-figma-home__products .rp-product-card__title {
+  margin: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-figma-home__products .rp-product-card__description {
+  margin: 5px 0 12px;
+  overflow: hidden;
+  color: var(--rp-figma-pink-soft);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-figma-home__products .rp-product-card__price {
+  color: var(--rp-figma-pink);
+  font-size: 16px;
+}
+
+.rp-figma-home__products .rp-product-card__add,
+.rp-figma-home__products .rp-product-card__stepper button {
+  border-color: var(--rp-figma-pink);
+  background: var(--rp-figma-pink);
+  color: var(--rp-figma-bg);
+}
+
+.rp-figma-promos {
+  padding: 0 80px 100px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 20px;
+}
+
+.rp-figma-promo {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid var(--rp-figma-line);
+  border-radius: 16px;
+}
+
+.rp-figma-promo > img,
+.rp-figma-promo__shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.rp-figma-promo > img {
+  object-fit: cover;
+}
+
+.rp-figma-promo__shade {
+  background: linear-gradient(90deg, rgba(21,15,17,.9), rgba(21,15,17,.28));
+}
+
+.rp-figma-promo__copy {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 75%);
+  min-height: 300px;
+  padding: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.rp-figma-promo h2 {
+  font-size: 30px;
+}
+
+.rp-figma-promo p {
+  margin: 16px 0 26px;
+  color: var(--rp-figma-cream);
+  line-height: 1.55;
+}
+
+.rp-figma-promo button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--rp-figma-pink);
+  color: var(--rp-figma-bg);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rp-figma-promo--gift .rp-figma-promo__copy {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.rp-figma-about {
+  padding: 100px 80px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, .9fr);
+  gap: 70px;
+  align-items: center;
+  border-top: 1px solid var(--rp-figma-line);
+}
+
+.rp-figma-about__copy > span {
+  display: block;
+  margin-bottom: 18px;
+  color: var(--rp-figma-pink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.rp-figma-about h2 {
+  font-size: clamp(38px, 4vw, 54px);
+  line-height: 1.05;
+}
+
+.rp-figma-about__copy p {
+  max-width: 620px;
+  margin: 26px 0 0;
+  color: var(--rp-figma-cream);
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.rp-figma-about__media {
+  position: relative;
+  min-height: 400px;
+  overflow: hidden;
+  border: 1px solid var(--rp-figma-line);
+  border-radius: 18px;
+  background: var(--rp-figma-card);
+}
+
+.rp-figma-about__media img {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  object-fit: cover;
+}
+
+.rp-figma-about__badge {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  background: rgba(21,15,17,.88);
+}
+
+.rp-figma-about__badge strong {
+  color: var(--rp-figma-pink);
+  font: 700 26px/1 "Fraunces", serif;
+}
+
+.rp-figma-about__badge span {
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.rp-figma-footer {
+  padding: 36px 80px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 32px;
+  align-items: center;
+  border-top: 1px solid var(--rp-figma-line);
+  background: #100b0d;
+}
+
+.rp-figma-footer__brand {
+  font: 700 24px/1 "Fraunces", serif;
+  color: #fff;
+}
+
+.rp-figma-footer__brand strong {
+  color: var(--rp-figma-pink);
+}
+
+.rp-figma-footer p {
+  margin: 0;
+  color: var(--rp-figma-pink-soft);
+  font-size: 13px;
+}
+
+.rp-figma-footer nav {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.rp-figma-footer nav button,
+.rp-figma-footer nav a {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rp-figma-cream);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.rp-figma-home__empty {
+  padding: 40px 0;
+  color: var(--rp-figma-pink-soft);
+}
+
+@media (max-width: 1100px) {
+  .rp-site-header__inner {
+    padding-inline: 40px;
+  }
+  .rp-site-header__nav {
+    gap: 24px;
+  }
+  .rp-figma-home__products {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .rp-figma-hero__copy {
+    margin-left: 48px;
+    width: min(560px, calc(100% - 96px));
+  }
+  .rp-figma-benefits,
+  .rp-figma-section,
+  .rp-figma-about {
+    padding-inline: 48px;
+  }
+  .rp-figma-promos {
+    padding-inline: 48px;
+  }
+}
+
+@media (max-width: 768px) {
+  .rp-site-header,
+  .rp-site-header__inner {
+    min-height: 60px;
+  }
+  .rp-site-header__inner {
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .rp-site-header__brand {
+    font-size: 22px;
+  }
+  .rp-site-header__nav {
+    display: none;
+  }
+  .rp-site-header__actions {
+    gap: 12px;
+  }
+  .rp-site-header__search,
+  .rp-site-header__cart,
+  .rp-site-header__menu {
+    width: 28px;
+    height: 28px;
+    padding: 4px;
+  }
+  .rp-site-header__menu--mobile {
+    display: grid;
+  }
+  .rp-figma-hero {
+    min-height: 520px;
+    align-items: flex-end;
+  }
+  .rp-figma-hero__shade {
+    background: linear-gradient(180deg, rgba(21,15,17,.06) 18%, rgba(21,15,17,.25) 48%, rgba(21,15,17,.92) 100%);
+  }
+  .rp-figma-hero__copy {
+    width: 100%;
+    margin: 0;
+    padding: 0 20px 36px;
+  }
+  .rp-figma-hero__tag {
+    width: max-content;
+    max-width: 100%;
+    margin-bottom: 16px;
+    padding: 7px 10px;
+    display: block;
+    border: 1px solid rgba(230,145,168,.35);
+    border-radius: 999px;
+    background: rgba(21,15,17,.7);
+    color: var(--rp-figma-pink);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .rp-figma-hero h1 {
+    font-size: clamp(36px, 11vw, 48px);
+  }
+  .rp-figma-hero__copy > p {
+    margin-top: 18px;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .rp-figma-benefits {
+    padding: 22px 20px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 12px;
+  }
+  .rp-figma-benefit {
+    gap: 10px;
+  }
+  .rp-figma-benefit__icon {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+  }
+  .rp-figma-benefit strong,
+  .rp-figma-benefit small {
+    font-size: 12px;
+  }
+  .rp-figma-section {
+    padding: 46px 20px;
+  }
+  .rp-figma-section__head {
+    margin-bottom: 22px;
+  }
+  .rp-figma-section__head h2 {
+    font-size: 24px;
+  }
+  .rp-figma-home__products {
+    margin-right: -20px;
+    padding-right: 20px;
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .rp-figma-home__products::-webkit-scrollbar {
+    display: none;
+  }
+  .rp-figma-home__products .rp-product-card {
+    width: min(70vw, 230px);
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+  .rp-figma-promos {
+    padding: 0 20px 56px;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .rp-figma-promo {
+    min-height: 260px;
+  }
+  .rp-figma-promo__copy,
+  .rp-figma-promo--gift .rp-figma-promo__copy {
+    width: 100%;
+    min-height: 260px;
+    padding: 26px;
+    justify-content: flex-end;
+  }
+  .rp-figma-promo h2 {
+    font-size: 26px;
+  }
+  .rp-figma-promo p {
+    margin: 10px 0 18px;
+    font-size: 14px;
+  }
+  .rp-figma-about {
+    padding: 56px 20px;
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+  .rp-figma-about h2 {
+    font-size: 38px;
+  }
+  .rp-figma-about__copy p {
+    margin-top: 18px;
+    font-size: 15px;
+  }
+  .rp-figma-about__media,
+  .rp-figma-about__media img {
+    min-height: 300px;
+  }
+  .rp-figma-about__badge {
+    right: 12px;
+    bottom: 12px;
+  }
+  .rp-figma-footer {
+    padding: 32px 20px;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .rp-figma-footer nav {
+    margin-top: 12px;
+    flex-wrap: wrap;
+    gap: 14px 18px;
+  }
+}
