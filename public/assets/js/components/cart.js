@@ -17,6 +17,10 @@ function cartItemMarkup({ product, quantity }) {
   return `<article class="rp-cart-item" data-cart-item="${id}">${thumbMarkup(product)}<div class="rp-cart-item__main"><strong class="rp-cart-item__name">${name}</strong><span class="rp-cart-item__unit">${formatMoney(unit)} cada</span><div class="rp-cart-item__controls"><div class="rp-cart-item__stepper" aria-label="Quantidade de ${name}"><button type="button" data-cart-delta="-1" data-product-id="${id}" aria-label="Remover uma unidade">−</button><strong data-cart-item-quantity>${quantity}</strong><button type="button" data-cart-delta="1" data-product-id="${id}" ${quantity >= Number(product.estoque || 0) ? "disabled" : ""} aria-label="Adicionar uma unidade">+</button></div><button class="rp-cart-item__trash" type="button" data-cart-remove data-product-id="${id}" aria-label="Remover ${name} do pedido"><span aria-hidden="true">Remover</span></button></div></div><strong class="rp-cart-item__price" data-cart-item-price>${formatMoney(unit * quantity)}</strong></article>`;
 }
 
+function emptyCartMarkup() {
+  return `<div class="rp-cart-overlay" aria-hidden="false"><button class="rp-cart-overlay__backdrop" type="button" data-close-cart aria-label="Fechar sacola"></button><section class="rp-cart-sheet rp-cart-sheet--empty" role="dialog" aria-modal="true" aria-labelledby="rp-cart-title" data-cart-sheet><div class="rp-cart-sheet__handle" aria-hidden="true"></div><header class="rp-cart-sheet__head"><div><span class="rp-cart-sheet__eyebrow">Sua seleção</span><h2 id="rp-cart-title">Sacola</h2></div><button type="button" class="rp-cart-sheet__close" data-close-cart aria-label="Fechar sacola">×</button></header><div class="rp-cart-empty"><div class="rp-cart-empty__icon" aria-hidden="true">♡</div><h3>Sua sacola está vazia</h3><p>Escolha seus doces favoritos e eles aparecem por aqui.</p><button class="rp-btn rp-btn--primary rp-cart-empty__cta" type="button" data-close-cart>Continuar escolhendo</button></div></section></div>`;
+}
+
 function syncThumb(row, product) {
   const url = String(product?.image_url || "");
   let thumb = row.querySelector(".rp-cart-item__thumb");
@@ -49,7 +53,7 @@ function cartMarkup(items, summary) {
 function patchOpenCart(items, summary) {
   if (typeof document === "undefined") return false;
   const sheet = document.querySelector("#rp-app [data-cart-sheet]");
-  if (!sheet) return false;
+  if (!sheet || sheet.classList.contains("rp-cart-sheet--empty")) return false;
   const itemsRoot = sheet.querySelector(".rp-cart-sheet__items");
   if (!itemsRoot) return false;
   const nextIds = new Set(items.map(({ product }) => String(product.id)));
@@ -79,10 +83,15 @@ function patchOpenCart(items, summary) {
 }
 
 export function renderCart({ open, items, summary }) {
-  if (!open || !items.length) {
+  if (!open) {
     cartMounted = false;
     stableMarkup = "";
     return "";
+  }
+  if (!items.length) {
+    cartMounted = false;
+    stableMarkup = emptyCartMarkup();
+    return stableMarkup;
   }
   if (cartMounted && stableMarkup && patchOpenCart(items, summary)) return stableMarkup;
   stableMarkup = cartMarkup(items, summary);
