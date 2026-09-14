@@ -25,7 +25,19 @@ function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
+const MAX_ITEMS_PER_PEDIDO = 50;
+const MAX_TEXT_LENGTH = 200;
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  try {
+    return await handleCheckout(request, env);
+  } catch (err) {
+    console.error("Erro inesperado no checkout", err);
+    return jsonError("Erro interno ao processar checkout", 500);
+  }
+};
+
+async function handleCheckout(request: Request, env: Env): Promise<Response> {
   let body: CheckoutBody;
   try {
     body = await request.json();
@@ -36,8 +48,23 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!Array.isArray(body.items) || body.items.length === 0) {
     return jsonError("Carrinho vazio", 400);
   }
-  if (!body.cliente?.nome?.trim() || !body.cliente?.whatsapp?.trim()) {
+  if (body.items.length > MAX_ITEMS_PER_PEDIDO) {
+    return jsonError("Carrinho com itens demais", 400);
+  }
+  if (
+    !body.items.every(
+      (i) => i && typeof i === "object" && Number.isInteger(i.id) && i.id > 0,
+    )
+  ) {
+    return jsonError("Item de carrinho inválido", 400);
+  }
+  const nome = body.cliente?.nome?.trim();
+  const whatsapp = body.cliente?.whatsapp?.trim();
+  if (!nome || !whatsapp) {
     return jsonError("Dados do cliente incompletos", 400);
+  }
+  if (nome.length > MAX_TEXT_LENGTH || whatsapp.length > MAX_TEXT_LENGTH) {
+    return jsonError("Dados do cliente inválidos", 400);
   }
 
   const ids = [...new Set(body.items.map((i) => i.id))];
@@ -70,7 +97,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   // O Mercado Pago exige e-mail do pagador; o checkout do site só coleta
   // nome e WhatsApp, então geramos um e-mail sintético só pra satisfazer a API.
-  const whatsappDigits = body.cliente.whatsapp.replace(/\D/g, "") || "cliente";
+  const whatsappDigits = whatsapp.replace(/\D/g, "") || "cliente";
   const payerEmail = `${whatsappDigits}@checkout.rpdoces.com.br`;
 
   const idempotencyKey = crypto.randomUUID();
@@ -91,7 +118,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       description: "Pedido R&P Doces",
       payment_method_id: "pix",
       date_of_expiration: expiresAt,
-      payer: { email: payerEmail, first_name: body.cliente.nome.trim() },
+      payer: { email: payerEmail, first_name: nome },
     }),
   });
 
@@ -125,4 +152,4 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     expiresAt: payment.date_of_expiration,
     totalCentavos,
   });
-};
+}
