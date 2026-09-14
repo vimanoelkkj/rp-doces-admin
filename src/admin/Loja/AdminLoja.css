@@ -1,0 +1,475 @@
+/* ═══════════════════════════════════════════
+   AdminLoja — tema claro R&P Doces
+   prefix: loj-
+   ═══════════════════════════════════════════ */
+
+/* ── Layout ── */
+.loj-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #faf6f0;
+}
+
+.loj-layout .admin-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.loj-main {
+  flex: 1;
+  padding: 48px 56px 64px;
+  max-width: 1200px;
+}
+
+/* ── Header ── */
+.loj-header {
+  margin-bottom: 32px;
+}
+
+.loj-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 36px;
+  color: #2b1d1a;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.loj-subtitle {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #63524e;
+  margin: 6px 0 0;
+}
+
+/* ── Two-column split ── */
+.loj-columns {
+  display: grid;
+  grid-template-columns: 1fr 0.82fr;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+.loj-col-left,
+.loj-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ── Panel (white card) ── */
+.loj-panel {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loj-panel-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: #2b1d1a;
+  margin: 0;
+}
+
+/* ── Field ── */
+.loj-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loj-field-label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  color: #63524e;
+}
+
+.loj-input {
+  padding: 12px 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 10px;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loj-input:focus {
+  border-color: #634738;
+}
+
+.loj-input--link {
+  color: #634738;
+}
+
+.loj-textarea {
+  padding: 12px 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 10px;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  outline: none;
+  resize: vertical;
+  min-height: 72px;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.loj-textarea:focus {
+  border-color: #634738;
+}
+
+/* ── Days picker ── */
+.loj-days-row {
+  display: flex;
+  gap: 8px;
+}
+
+.loj-day-pill {
+  padding: 6px 12px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #63524e;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.loj-day-pill:hover {
+  border-color: #634738;
+}
+
+.loj-day-pill--active {
+  background: #634738;
+  border-color: #634738;
+  color: #ffffff;
+}
+
+.loj-day-pill--active:hover {
+  background: #4a332b;
+  border-color: #4a332b;
+}
+
+/* ── Hours row ── */
+.loj-hours-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── Delivery pills ── */
+.loj-delivery-row {
+  display: flex;
+  gap: 12px;
+}
+
+.loj-delivery-pill {
+  padding: 10px 24px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  color: #63524e;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.loj-delivery-pill:hover {
+  border-color: #634738;
+}
+
+.loj-delivery-pill--active {
+  background: #634738;
+  border-color: #634738;
+  color: #ffffff;
+}
+
+/* ── Preview card ── */
+.loj-preview-card {
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loj-preview-name {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: #2b1d1a;
+}
+
+.loj-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #63524e;
+}
+
+.loj-preview-row--muted {
+  color: #8c7a76;
+}
+
+.loj-preview-address {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  color: #8c7a76;
+  padding-left: 22px;
+  line-height: 1.4;
+}
+
+/* ── Images section ── */
+.loj-images-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.loj-image-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loj-image-thumb {
+  width: 100%;
+  height: 100px;
+  border: 1px solid #eadfd3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #faf6f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loj-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.loj-image-empty {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  color: #b5a9a3;
+}
+
+.loj-image-label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: #2b1d1a;
+}
+
+.loj-image-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.loj-image-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: #634738;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.loj-image-link:hover {
+  color: #4a332b;
+}
+
+/* ── Save bar ── */
+.loj-save-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 40px;
+}
+
+.loj-btn-save {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border-radius: 100px;
+  border: none;
+  background: #634738;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.loj-btn-save:hover {
+  background: #4a332b;
+}
+
+/* ── Diagnósticos panel ── */
+.loj-diag-panel {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.loj-diag-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.loj-diag-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: #2b1d1a;
+  margin: 0;
+}
+
+.loj-diag-subtitle {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #63524e;
+  margin: 4px 0 0;
+}
+
+.loj-badge-owner {
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: #634738;
+}
+
+/* ── Diagnósticos cards grid ── */
+.loj-diag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.loj-diag-card {
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loj-diag-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.loj-diag-card-title {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #2b1d1a;
+}
+
+.loj-badge-cost {
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: #f5efe8;
+  border: 1px solid #eadfd3;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 10px;
+  color: #634738;
+}
+
+.loj-badge-test {
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: #ebf5f0;
+  border: 1px solid #d4e8dc;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 10px;
+  color: #4e8c6f;
+}
+
+.loj-diag-card-desc {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #63524e;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.loj-diag-action {
+  align-self: flex-start;
+  padding: 10px 20px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: #634738;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.loj-diag-action:hover {
+  border-color: #634738;
+  background: #f5efe8;
+}

@@ -1,0 +1,547 @@
+/* ═══════════════════════════════════════════
+   NovoProdutoModal — tema claro R&P Doces
+   ═══════════════════════════════════════════ */
+
+/* ── Overlay ── */
+.np-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(43, 29, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: npFadeIn 0.2s ease;
+}
+
+@keyframes npFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Modal ── */
+.np-modal {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 20px;
+  width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(43, 29, 26, 0.12);
+  animation: npSlideUp 0.25s ease;
+}
+
+@keyframes npSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar sutil */
+.np-modal::-webkit-scrollbar {
+  width: 6px;
+}
+.np-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+.np-modal::-webkit-scrollbar-thumb {
+  background: #eadfd3;
+  border-radius: 3px;
+}
+
+/* ── Header ── */
+.np-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 28px 32px 0;
+}
+
+.np-kicker {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: #634738;
+  text-transform: uppercase;
+}
+
+.np-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: #2b1d1a;
+  margin: 4px 0 0;
+}
+
+.np-subtitle {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8c7a76;
+  margin: 4px 0 0;
+}
+
+.np-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #634738;
+  flex-shrink: 0;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.np-close:hover {
+  background: #faf6f0;
+  border-color: #634738;
+}
+
+/* ── Body ── */
+.np-body {
+  padding: 24px 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Field ── */
+.np-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.np-field--full {
+  width: 100%;
+}
+
+.np-field label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  color: #634738;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.np-field input[type="text"],
+.np-field textarea {
+  padding: 12px 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.np-field input::placeholder,
+.np-field textarea::placeholder {
+  color: #b5a9a3;
+}
+
+.np-field input:focus,
+.np-field textarea:focus {
+  border-color: #634738;
+}
+
+.np-field textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* ── Row 2 cols ── */
+.np-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── Stepper ── */
+.np-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #faf6f0;
+  overflow: hidden;
+  height: 44px;
+}
+
+.np-stepper-btn {
+  width: 44px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #634738;
+  transition: background 0.15s;
+}
+
+.np-stepper-btn:hover {
+  background: #f5efe8;
+}
+
+.np-stepper-value {
+  flex: 1;
+  text-align: center;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #2b1d1a;
+}
+
+/* ── Emoji grid ── */
+.np-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.np-emoji-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.np-emoji-item:hover {
+  border-color: #634738;
+  background: #f5efe8;
+}
+
+.np-emoji-item--active {
+  border-color: #634738;
+  background: #f5efe8;
+}
+
+.np-emoji-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.np-emoji-label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 10px;
+  color: #634738;
+}
+
+/* ── Photo row ── */
+.np-photo-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.np-photo-preview {
+  width: 120px;
+  height: 100px;
+  border: 1px dashed #eadfd3;
+  border-radius: 12px;
+  background: #faf6f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.np-photo-preview:hover {
+  border-color: #634738;
+}
+
+.np-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.np-photo-empty {
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  color: #b5a9a3;
+}
+
+.np-photo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.np-photo-btn {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  color: #2b1d1a;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.np-photo-btn:hover {
+  color: #634738;
+}
+
+.np-photo-hint {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  color: #8c7a76;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Checkboxes grid ── */
+.np-checks-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.np-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #faf6f0;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.np-check:hover {
+  border-color: #634738;
+}
+
+.np-check input[type="checkbox"] {
+  display: none;
+}
+
+.np-check-box {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #eadfd3;
+  border-radius: 5px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  position: relative;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.np-check input:checked + .np-check-box {
+  background: #634738;
+  border-color: #634738;
+}
+
+.np-check input:checked + .np-check-box::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 5px;
+  height: 9px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.np-check div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.np-check strong {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b1d1a;
+}
+
+.np-check span {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 11px;
+  color: #8c7a76;
+  line-height: 1.4;
+}
+
+/* ── Footer ── */
+.np-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #eadfd3;
+}
+
+.np-btn-cancel {
+  padding: 11px 24px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #634738;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.np-btn-cancel:hover {
+  border-color: #634738;
+}
+
+.np-btn-save {
+  padding: 11px 24px;
+  border-radius: 100px;
+  border: none;
+  background: #634738;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.np-btn-save:hover {
+  background: #4a332b;
+}
+
+/* ── Custom Dropdown ── */
+.np-dropdown {
+  position: relative;
+}
+
+.np-dropdown-trigger {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.15s;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.np-dropdown-trigger:hover,
+.np-dropdown--open .np-dropdown-trigger {
+  border-color: #634738;
+}
+
+.np-dropdown-trigger svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.np-dropdown--open .np-dropdown-trigger svg {
+  transform: rotate(180deg);
+}
+
+.np-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  padding: 6px;
+  list-style: none;
+  margin: 0;
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(43, 29, 26, 0.1);
+  animation: npDropIn 0.15s ease;
+}
+
+@keyframes npDropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.np-dropdown-option {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.np-dropdown-option:hover {
+  background: #f5efe8;
+  color: #634738;
+}
+
+.np-dropdown-option--active {
+  background: #f5efe8;
+  font-weight: 600;
+  color: #634738;
+}

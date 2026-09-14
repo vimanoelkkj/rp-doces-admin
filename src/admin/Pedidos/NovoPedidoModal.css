@@ -1,0 +1,474 @@
+/* ═══════════════════════════════════════════
+   NovoPedidoModal — tema claro R&P Doces
+   ═══════════════════════════════════════════ */
+
+/* ── Overlay ── */
+.nped-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(43, 29, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: npedFadeIn 0.2s ease;
+}
+
+@keyframes npedFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Modal ── */
+.nped-modal {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 20px;
+  width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(43, 29, 26, 0.12);
+  animation: npedSlideUp 0.25s ease;
+}
+
+@keyframes npedSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nped-modal::-webkit-scrollbar {
+  width: 6px;
+}
+.nped-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+.nped-modal::-webkit-scrollbar-thumb {
+  background: #eadfd3;
+  border-radius: 3px;
+}
+
+/* ── Header ── */
+.nped-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 28px 32px 20px;
+}
+
+.nped-kicker {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: #634738;
+  text-transform: uppercase;
+}
+
+.nped-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: #2b1d1a;
+  margin: 4px 0 0;
+}
+
+.nped-subtitle {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8c7a76;
+  margin: 4px 0 0;
+}
+
+.nped-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #634738;
+  flex-shrink: 0;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.nped-close:hover {
+  background: #faf6f0;
+  border-color: #634738;
+}
+
+/* ── Divider ── */
+.nped-divider {
+  width: 100%;
+  height: 1px;
+  background: #eadfd3;
+}
+
+/* ── Body ── */
+.nped-body {
+  padding: 24px 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Fields ── */
+.nped-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nped-field label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b1d1a;
+}
+
+.nped-optional {
+  font-weight: 400;
+  font-size: 12px;
+  color: #8c7a76;
+  margin-left: 4px;
+}
+
+.nped-field input[type="text"],
+.nped-field textarea {
+  padding: 12px 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nped-field input::placeholder,
+.nped-field textarea::placeholder {
+  color: #b5a9a3;
+}
+
+.nped-field input:focus,
+.nped-field textarea:focus {
+  border-color: #634738;
+}
+
+.nped-field textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+/* ── Row 2 cols ── */
+.nped-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ═══════════════════════════════════════════
+   Items card
+   ═══════════════════════════════════════════ */
+.nped-items-card {
+  border: 1px solid #eadfd3;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nped-items-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.nped-items-title {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #2b1d1a;
+  display: block;
+}
+
+.nped-items-hint {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  color: #4e8c6f;
+  display: block;
+  margin-top: 2px;
+}
+
+.nped-btn-add-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 8px;
+  background: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #634738;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.nped-btn-add-item:hover {
+  background: #f5efe8;
+  border-color: #634738;
+}
+
+/* ── Item row ── */
+.nped-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nped-item-row-labels {
+  display: flex;
+  gap: 12px;
+}
+
+.nped-item-label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: #8c7a76;
+}
+
+.nped-item-label--product {
+  flex: 1;
+}
+
+.nped-item-label--qty {
+  width: 60px;
+}
+
+.nped-item-row-fields {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Qty input ── */
+.nped-qty-input {
+  width: 60px;
+  padding: 10px 8px;
+  border: 1px solid #eadfd3;
+  border-radius: 10px;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #2b1d1a;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s;
+  -moz-appearance: textfield;
+}
+
+.nped-qty-input::-webkit-inner-spin-button,
+.nped-qty-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.nped-qty-input:focus {
+  border-color: #634738;
+}
+
+/* ── Remove button ── */
+.nped-btn-remove {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8c7a76;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.nped-btn-remove:hover:not(:disabled) {
+  color: #d32f2f;
+  border-color: #d32f2f;
+  background: #fdebec;
+}
+
+.nped-btn-remove:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ═══════════════════════════════════════════
+   Custom dropdown
+   ═══════════════════════════════════════════ */
+.nped-dropdown {
+  position: relative;
+}
+
+.nped-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  text-align: left;
+}
+
+.nped-dropdown--open .nped-dropdown-trigger {
+  border-color: #634738;
+}
+
+.nped-placeholder {
+  color: #b5a9a3;
+}
+
+.nped-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  padding: 4px;
+  list-style: none;
+  margin: 0;
+  z-index: 600;
+  box-shadow: 0 8px 24px rgba(43, 29, 26, 0.1);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.nped-dropdown-option {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.nped-dropdown-option:hover {
+  background: #f5efe8;
+}
+
+.nped-dropdown-option--active {
+  background: #f5efe8;
+  color: #634738;
+  font-weight: 700;
+}
+
+/* Product dropdown wider */
+.nped-dropdown--product {
+  flex: 1;
+}
+
+.nped-dropdown-list--products .nped-dropdown-option {
+  font-size: 13px;
+}
+
+/* ═══════════════════════════════════════════
+   Footer
+   ═══════════════════════════════════════════ */
+.nped-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #eadfd3;
+}
+
+.nped-btn-cancel {
+  padding: 11px 24px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #634738;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.nped-btn-cancel:hover {
+  border-color: #634738;
+}
+
+.nped-btn-save {
+  padding: 11px 24px;
+  border-radius: 100px;
+  border: none;
+  background: #634738;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.nped-btn-save:hover {
+  background: #4a332b;
+}
+
+/* ═══════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════ */
+@media (max-width: 660px) {
+  .nped-modal {
+    width: 95vw;
+    margin: 16px;
+  }
+
+  .nped-row-2 {
+    grid-template-columns: 1fr;
+  }
+}

@@ -8,8 +8,14 @@ import PagamentoNaoAprovado from "./pages/PagamentoNaoAprovado";
 import AcompanharPedido from "./pages/AcompanharPedido";
 import PageTransition from "./components/PageTransition";
 import { CartProvider } from "./context/CartContext";
+import AdminLogin from "./admin/Login";
+import AdminDashboard from "./admin/Dashboard";
+import AdminProdutos from "./admin/Produtos";
+import AdminPedidos from "./admin/Pedidos";
+import AdminAdministradores from "./admin/Administradores";
+import AdminLoja from "./admin/Loja";
 
-function AnimatedRoutes() {
+function StorefrontRoutes() {
   const location = useLocation();
 
   return (
@@ -33,11 +39,30 @@ function AnimatedRoutes() {
   );
 }
 
+// Rotas administrativas ficam fora do PageTransition (sem a onda/animação
+// do storefront) — o admin tem sua própria identidade visual (Sidebar).
+function AdminRoutes() {
+  return (
+    <Routes>
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/produtos" element={<AdminProdutos />} />
+      <Route path="/admin/pedidos" element={<AdminPedidos />} />
+      <Route
+        path="/admin/administradores"
+        element={<AdminAdministradores />}
+      />
+      <Route path="/admin/loja" element={<AdminLoja />} />
+    </Routes>
+  );
+}
+
 export default function App() {
   return (
     <CartProvider>
       <BrowserRouter>
-        <AnimatedRoutes />
+        <StorefrontRoutes />
+        <AdminRoutes />
       </BrowserRouter>
     </CartProvider>
   );

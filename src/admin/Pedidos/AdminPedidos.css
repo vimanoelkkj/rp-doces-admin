@@ -1,0 +1,409 @@
+/* ═══════════════════════════════════════════
+   AdminPedidos — orders management page
+   ═══════════════════════════════════════════ */
+
+/* ── Header ── */
+.ped-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ped-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ped-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 36px;
+  color: #2b1d1a;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.ped-subtitle {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #63524e;
+  margin: 0;
+}
+
+.ped-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ped-btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #634738;
+  border: none;
+  border-radius: 100px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ped-btn-primary:hover {
+  background: #4a332b;
+}
+
+.ped-btn-primary svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Filters ── */
+.ped-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ped-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ped-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 340px;
+  padding: 10px 16px;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 100px;
+  transition: border-color 0.15s;
+}
+
+.ped-search:focus-within {
+  border-color: #634738;
+}
+
+.ped-search svg {
+  flex-shrink: 0;
+}
+
+.ped-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+}
+
+.ped-search input::placeholder {
+  color: #8c7a76;
+}
+
+.ped-shortcut {
+  padding: 2px 6px;
+  background: #eddcc6;
+  border-radius: 4px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  color: #634738;
+  flex-shrink: 0;
+}
+
+/* ── Tabs ── */
+.ped-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.ped-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: none;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  color: #8c7a76;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ped-tab:hover {
+  background: rgba(245, 239, 232, 0.5);
+}
+
+.ped-tab--active {
+  background: #f5efe8;
+  font-weight: 700;
+  color: #634738;
+}
+
+.ped-tab-count {
+  padding: 2px 6px;
+  background: #eddcc6;
+  border-radius: 100px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  color: #634738;
+  line-height: 1.2;
+}
+
+.ped-tab-count--active {
+  background: #d38b80;
+  color: #ffffff;
+}
+
+/* ═══════════════════════════════════════════
+   Orders table
+   ═══════════════════════════════════════════ */
+.ped-table-panel {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.ped-table-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #faf6f0;
+  border-radius: 8px 8px 0 0;
+}
+
+.ped-th {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: #8c7a76;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ped-th-id {
+  width: 100px;
+}
+
+.ped-th-client {
+  width: 200px;
+}
+
+.ped-th-status {
+  width: 140px;
+}
+
+.ped-th-payment {
+  width: 200px;
+}
+
+.ped-th-total {
+  flex: 1;
+}
+
+/* ── Table rows ── */
+.ped-table-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid #eadfd3;
+  transition: background 0.1s;
+  cursor: pointer;
+}
+
+.ped-table-row:hover {
+  background: #faf6f0;
+}
+
+.ped-table-row--last {
+  border-bottom: none;
+}
+
+.ped-td {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+}
+
+.ped-td-id {
+  width: 100px;
+  font-weight: 700;
+  color: #634738;
+}
+
+.ped-td-client {
+  width: 200px;
+  font-weight: 600;
+  color: #2b1d1a;
+}
+
+.ped-td-status {
+  width: 140px;
+}
+
+.ped-td-payment {
+  width: 200px;
+}
+
+.ped-td-total {
+  flex: 1;
+  font-weight: 700;
+  color: #2b1d1a;
+}
+
+/* ── Badges ── */
+.ped-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.ped-badge--green {
+  background: #ebf5f0;
+  color: #4e8c6f;
+}
+
+.ped-badge--orange {
+  background: #fbf3eb;
+  color: #c28343;
+}
+
+.ped-badge--blue {
+  background: #eef2fb;
+  color: #5b7ec2;
+}
+
+/* ═══════════════════════════════════════════
+   Pagination
+   ═══════════════════════════════════════════ */
+.ped-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 20px;
+}
+
+.ped-pagination-info {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8c7a76;
+}
+
+.ped-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ped-page-btn {
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ped-page-arrow {
+  width: 30px;
+  height: 30px;
+  border-radius: 100px;
+  background: #faf6f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #634738;
+}
+
+.ped-page-arrow:hover:not(:disabled) {
+  background: #f5efe8;
+}
+
+.ped-page-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ped-page-num {
+  min-width: 30px;
+  height: 30px;
+  border-radius: 100px;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  color: #634738;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ped-page-num:hover {
+  background: #f5efe8;
+}
+
+.ped-page-num--active {
+  background: #634738;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.ped-page-num--active:hover {
+  background: #4a332b;
+}
+
+/* ═══════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════ */
+@media (max-width: 1280px) {
+  .ped-filter-row {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .ped-search {
+    width: 100%;
+  }
+
+  .ped-tabs {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .ped-header-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .ped-table-panel {
+    overflow-x: auto;
+  }
+
+  .ped-table-header,
+  .ped-table-row {
+    min-width: 700px;
+  }
+
+  .ped-pagination {
+    flex-direction: column;
+    gap: 12px;
+  }
+}

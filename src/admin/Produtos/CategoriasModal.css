@@ -1,0 +1,414 @@
+/* ═══════════════════════════════════════════
+   CategoriasModal — gerenciar categorias
+   ═══════════════════════════════════════════ */
+
+.catm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(43, 29, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: catmFadeIn 0.2s ease;
+}
+
+@keyframes catmFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.catm-modal {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 20px;
+  width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(43, 29, 26, 0.12);
+  animation: catmSlideUp 0.25s ease;
+}
+
+@keyframes catmSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Header ── */
+.catm-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 28px 32px 20px;
+}
+
+.catm-kicker {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: #634738;
+  text-transform: uppercase;
+}
+
+.catm-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: #2b1d1a;
+  margin: 4px 0 0;
+}
+
+.catm-subtitle {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8c7a76;
+  margin: 4px 0 0;
+}
+
+.catm-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #634738;
+  flex-shrink: 0;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.catm-close:hover {
+  background: #faf6f0;
+  border-color: #634738;
+}
+
+/* ── Body ── */
+.catm-body {
+  padding: 0 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.catm-body::-webkit-scrollbar {
+  width: 6px;
+}
+.catm-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.catm-body::-webkit-scrollbar-thumb {
+  background: #eadfd3;
+  border-radius: 3px;
+}
+
+/* ── Nova categoria card ── */
+.catm-new-card {
+  border: 1px dashed #eadfd3;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #faf6f0;
+}
+
+.catm-new-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.catm-new-title {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #2b1d1a;
+}
+
+.catm-new-hint {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  color: #8c7a76;
+}
+
+/* ── Fields ── */
+.catm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.catm-field label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  color: #634738;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.catm-field input[type="text"] {
+  padding: 10px 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 10px;
+  background: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.catm-field input::placeholder {
+  color: #b5a9a3;
+}
+.catm-field input:focus {
+  border-color: #634738;
+}
+
+.catm-new-row {
+  display: flex;
+  gap: 16px;
+}
+
+.catm-field--name {
+  flex: 1;
+}
+.catm-field--full {
+  width: 100%;
+}
+
+/* ── Emoji inline grid (sempre visível) ── */
+.catm-emoji-inline-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.catm-emoji-option {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+  border: 1px solid transparent;
+}
+
+.catm-emoji-option:hover {
+  background: #f5efe8;
+}
+
+.catm-emoji-option--active {
+  background: #f5efe8;
+  border-color: #634738;
+}
+
+/* ── Create button ── */
+.catm-new-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.catm-btn-create {
+  border: none;
+  background: none;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #4e8c6f;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+
+.catm-btn-create:hover {
+  color: #3a7058;
+}
+.catm-btn-create:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Category cards ── */
+.catm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.catm-cat-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border: 1px solid #eadfd3;
+  border-radius: 14px;
+  background: #ffffff;
+  transition: border-color 0.15s;
+}
+
+.catm-cat-card:hover {
+  border-color: #d4c8bc;
+}
+
+.catm-cat-left {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.catm-cat-emoji {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #f5efe8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.catm-cat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.catm-cat-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.catm-cat-name {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #2b1d1a;
+}
+
+.catm-cat-slug {
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  color: #8c7a76;
+  letter-spacing: 0.3px;
+}
+
+.catm-cat-desc {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #63524e;
+  line-height: 1.4;
+}
+
+.catm-cat-stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.catm-cat-stats span {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  color: #8c7a76;
+}
+
+.catm-cat-stats strong {
+  font-weight: 700;
+  color: #634738;
+}
+
+.catm-cat-badge {
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: #8c7a76;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.catm-cat-badge--custom {
+  padding: 3px 10px;
+  background: #ebf5f0;
+  color: #4e8c6f;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+/* ── Footer ── */
+.catm-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px 24px;
+  border-top: 1px solid #eadfd3;
+  margin-top: 8px;
+}
+
+.catm-footer-count {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8c7a76;
+}
+
+.catm-btn-close {
+  padding: 10px 24px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #634738;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.catm-btn-close:hover {
+  border-color: #634738;
+}
+
+@media (max-width: 580px) {
+  .catm-modal {
+    width: 95vw;
+    margin: 16px;
+  }
+  .catm-new-row {
+    flex-direction: column;
+  }
+}
