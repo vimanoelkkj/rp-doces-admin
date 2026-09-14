@@ -2,5 +2,10 @@ name = "rp-doces"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "dist"
 
-# Bindings (D1, R2, variáveis de ambiente) serão adicionados
+[[d1_databases]]
+binding = "DB"
+database_name = "rp-doces-db"
+database_id = "c2e15599-3d68-4801-9a1c-96a84977dd7c"
+
+# R2 e variáveis de ambiente serão adicionados
 # nos commits em que forem efetivamente usados.
