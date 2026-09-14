@@ -1,16 +1,52 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,600&family=Manrope:wght@400;500;600;700&family=Inter:wght@500&display=swap");
+
 *,
 *::before,
 *::after {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
+html {
+  scroll-behavior: smooth;
 }
 
 body {
+  font-family: "Manrope", sans-serif;
+  background-color: #f5efe6;
+  color: #2b1d1a;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+.homepage {
+  position: relative;
+  overflow-x: clip;
+}
+
+/* Scrollbar invisível */
+html {
+  scrollbar-width: none; /* Firefox */
+}
+html::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+}
+
+html.menu-open,
+html.menu-open body,
+html.menu-open #root {
+  overflow: hidden !important;
+  height: 100vh !important;
 }
