@@ -1,0 +1,409 @@
+/* ===== Admin Login Page ===== */
+.admin-login-page {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #faf6f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* ===== Background Wave ===== */
+.admin-login-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.admin-login-wave svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ===== Login Card ===== */
+.admin-login-card {
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 480px;
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ===== Card Header (Logo + Badge) ===== */
+.admin-login-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-login-logo-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-login-logo-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f7ecee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-login-logo-text {
+  font-family: "Fraunces", serif;
+  font-weight: 700;
+  font-size: 26px;
+  color: #2b1d1a;
+}
+
+.admin-login-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f7ecee;
+  border-radius: 100px;
+  padding: 4px 12px;
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #634738;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ===== Form ===== */
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ===== Welcome Text (Step 1) ===== */
+.admin-login-welcome {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-login-welcome h1 {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 32px;
+  color: #2b1d1a;
+  margin: 0;
+}
+
+.admin-login-welcome p {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #63524e;
+  margin: 0;
+}
+
+/* ===== Form Area ===== */
+.admin-login-form-area {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ===== Biometry Button ===== */
+.admin-login-biometry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: #f7ecee;
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.admin-login-biometry:hover {
+  background: #f0e3e6;
+}
+
+.admin-login-biometry-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-login-biometry-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-login-biometry-text strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #634738;
+}
+
+.admin-login-biometry-text span {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c7a76;
+}
+
+/* ===== Divider ===== */
+.admin-login-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-login-divider-line {
+  flex: 1;
+  height: 1px;
+  background: #eadfd3;
+}
+
+.admin-login-divider-text {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8c7a76;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+/* ===== Input Field ===== */
+.admin-login-input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-login-label {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #634738;
+  text-transform: uppercase;
+}
+
+.admin-login-input-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1.5px solid #eadfd3;
+  border-radius: 12px;
+  padding: 16px;
+  transition: border-color 0.2s;
+}
+
+.admin-login-input-box:focus-within {
+  border-color: #d38b80;
+}
+
+.admin-login-input-box input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  color: #2b1d1a;
+}
+
+.admin-login-input-box input::placeholder {
+  color: #8c7a76;
+}
+
+/* ===== Eye Toggle (Password) ===== */
+.admin-login-eye-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* ===== Submit Button ===== */
+.admin-login-submit {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 100px;
+  background: #d38b80;
+  color: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    transform 0.15s;
+}
+
+.admin-login-submit:hover {
+  background: #c47a6f;
+  transform: translateY(-1px);
+}
+
+.admin-login-submit:active {
+  transform: translateY(0);
+}
+
+/* ===== User Identity Card (Step 2) ===== */
+.admin-login-user-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #faf6f0;
+  border: 1px solid #eadfd3;
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.admin-login-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e8c5c8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Fraunces", serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: #634738;
+  flex-shrink: 0;
+}
+
+.admin-login-user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-login-user-text strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #2b1d1a;
+}
+
+.admin-login-user-text span {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: #8c7a76;
+}
+
+.admin-login-change-user {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 100px;
+  padding: 6px 12px;
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #634738;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.admin-login-change-user:hover {
+  background: #f7ecee;
+}
+
+/* ===== Forgot Password ===== */
+.admin-login-forgot-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+.admin-login-forgot {
+  background: none;
+  border: none;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #634738;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.admin-login-forgot:hover {
+  color: #4e3529;
+  text-decoration: underline;
+}
+
+/* ===== Footer Text ===== */
+.admin-login-footer-text {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c7a76;
+  text-align: center;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+  .admin-login-page {
+    padding: 16px;
+    align-items: flex-start;
+    padding-top: 80px;
+  }
+
+  .admin-login-card {
+    padding: 32px 24px;
+    border-radius: 20px;
+    gap: 24px;
+  }
+
+  .admin-login-logo-text {
+    font-size: 22px;
+  }
+
+  .admin-login-welcome h1 {
+    font-size: 26px;
+  }
+
+  .admin-login-submit {
+    padding: 14px;
+  }
+}
