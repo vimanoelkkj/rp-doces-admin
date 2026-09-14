@@ -1,0 +1,6 @@
+name = "rp-doces"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+# Bindings (D1, R2, variáveis de ambiente) serão adicionados
+# nos commits em que forem efetivamente usados.
