@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Homepage from "./pages/Homepage";
 import Cardapio from "./pages/Cardapio";
 import PageTransition from "./components/PageTransition";
+import { CartProvider } from "./context/CartContext";
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -18,8 +19,10 @@ function AnimatedRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AnimatedRoutes />
-    </BrowserRouter>
+    <CartProvider>
+      <BrowserRouter>
+        <AnimatedRoutes />
+      </BrowserRouter>
+    </CartProvider>
   );
 }
