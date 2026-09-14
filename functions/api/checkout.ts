@@ -80,6 +80,14 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const produtosPorId = new Map(results.map((p) => [p.id, p]));
 
   let totalCentavos = 0;
+  const itensParaPersistir: {
+    produtoId: number;
+    produtoNome: string;
+    quantidade: number;
+    valorUnitarioCentavos: number;
+    valorTotalCentavos: number;
+  }[] = [];
+
   for (const item of body.items) {
     if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50) {
       return jsonError("Quantidade inválida", 400);
@@ -92,7 +100,16 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     if (item.quantity > estoqueLivre) {
       return jsonError(`Estoque insuficiente para "${produto.nome}"`, 409);
     }
-    totalCentavos += precoAtualCentavos(produto) * item.quantity;
+    const valorUnitarioCentavos = precoAtualCentavos(produto);
+    const valorTotalItemCentavos = valorUnitarioCentavos * item.quantity;
+    totalCentavos += valorTotalItemCentavos;
+    itensParaPersistir.push({
+      produtoId: produto.id,
+      produtoNome: produto.nome,
+      quantidade: item.quantity,
+      valorUnitarioCentavos,
+      valorTotalCentavos: valorTotalItemCentavos,
+    });
   }
 
   // O Mercado Pago exige e-mail do pagador; o checkout do site só coleta
@@ -101,10 +118,47 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const payerEmail = `${whatsappDigits}@checkout.rpdoces.com.br`;
 
   const idempotencyKey = crypto.randomUUID();
+  const tokenPublico = crypto.randomUUID();
   const PIX_EXPIRATION_MINUTES = 30;
   const expiresAt = new Date(
     Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000,
   ).toISOString();
+
+  // Persiste o pedido antes de chamar o Mercado Pago: se a chamada falhar,
+  // o pedido fica registrado como PENDENTE em vez de se perder.
+  const pedidoInsert = await env.DB.prepare(
+    `INSERT INTO pedidos
+       (token_publico, cliente_nome, cliente_whatsapp, recado, valor_total_centavos, idempotency_key)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      tokenPublico,
+      nome,
+      whatsapp,
+      (body.recado ?? "").slice(0, MAX_TEXT_LENGTH),
+      totalCentavos,
+      idempotencyKey,
+    )
+    .run();
+
+  const pedidoId = pedidoInsert.meta.last_row_id;
+
+  await env.DB.batch(
+    itensParaPersistir.map((item) =>
+      env.DB.prepare(
+        `INSERT INTO pedido_itens
+           (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        pedidoId,
+        item.produtoId,
+        item.produtoNome,
+        item.quantidade,
+        item.valorUnitarioCentavos,
+        item.valorTotalCentavos,
+      ),
+    ),
+  );
 
   const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
     method: "POST",
@@ -118,6 +172,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       description: "Pedido R&P Doces",
       payment_method_id: "pix",
       date_of_expiration: expiresAt,
+      external_reference: tokenPublico,
       payer: { email: payerEmail, first_name: nome },
     }),
   });
@@ -125,6 +180,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   if (!mpResponse.ok) {
     const errorBody = await mpResponse.text();
     console.error("Mercado Pago checkout error", mpResponse.status, errorBody);
+    // O pedido já está persistido (PENDENTE, sem dados de pagamento) — não é perdido.
     return jsonError("Falha ao criar pagamento Pix", 502);
   }
 
@@ -143,7 +199,26 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
 
   const txData = payment.point_of_interaction?.transaction_data;
 
+  await env.DB.prepare(
+    `UPDATE pedidos
+     SET mp_payment_id = ?, mp_status = ?, mp_qr_code = ?, mp_qr_code_base64 = ?,
+         mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+  )
+    .bind(
+      String(payment.id),
+      payment.status,
+      txData?.qr_code ?? null,
+      txData?.qr_code_base64 ?? null,
+      txData?.ticket_url ?? null,
+      payment.date_of_expiration,
+      pedidoId,
+    )
+    .run();
+
   return Response.json({
+    pedidoId,
+    tokenPublico,
     paymentId: payment.id,
     status: payment.status,
     qrCode: txData?.qr_code ?? null,
