@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ProductCard from "../components/ProductCard";
+import CartWidget from "../components/CartWidget";
 import { Product } from "../types/product";
 import { fetchProducts } from "../api/products";
+import { useCart } from "../context/CartContext";
 import { useScrollReveal } from "../hooks/useScrollReveal";
 import "./Cardapio.css";
 
@@ -17,6 +19,15 @@ export default function Cardapio() {
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [isFiltering, setIsFiltering] = useState(false);
   const [displayFilter, setDisplayFilter] = useState("Todos");
+
+  const {
+    cartItems,
+    cartOpen,
+    setCartOpen,
+    addToCart,
+    updateQuantity,
+    removeItem,
+  } = useCart();
 
   const headingRef = useScrollReveal<HTMLDivElement>(0.15);
   const bolosRef = useScrollReveal<HTMLElement>(0.1);
@@ -125,7 +136,10 @@ export default function Cardapio() {
                     className="product-card-wrapper filter-card"
                     style={{ animationDelay: `${index * 0.08}s` }}
                   >
-                    <ProductCard product={product} />
+                    <ProductCard
+                      product={product}
+                      onAddToCart={() => addToCart(product)}
+                    />
                   </div>
                 ))}
               </div>
@@ -146,7 +160,10 @@ export default function Cardapio() {
                     className="product-card-wrapper filter-card"
                     style={{ animationDelay: `${index * 0.08}s` }}
                   >
-                    <ProductCard product={product} />
+                    <ProductCard
+                      product={product}
+                      onAddToCart={() => addToCart(product)}
+                    />
                   </div>
                 ))}
               </div>
@@ -155,6 +172,14 @@ export default function Cardapio() {
         </div>
       </main>
       <Footer />
+      <CartWidget
+        items={cartItems}
+        isOpen={cartOpen}
+        onOpen={() => setCartOpen(true)}
+        onClose={() => setCartOpen(false)}
+        onUpdateQuantity={updateQuantity}
+        onRemoveItem={removeItem}
+      />
     </div>
   );
 }
