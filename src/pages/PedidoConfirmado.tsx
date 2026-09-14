@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { CartItem } from "../context/CartContext";
 import Header from "../components/Header";
@@ -8,6 +8,7 @@ import "./PedidoConfirmado.css";
 
 interface ConfirmadoState {
   pedidoId: number;
+  tokenPublico?: string;
   items: CartItem[];
   totalCentavos: number;
 }
@@ -191,6 +192,14 @@ export default function PedidoConfirmado() {
           <button className="confirmado-btn" onClick={handleBackToMenu}>
             VOLTAR AO INÍCIO
           </button>
+          {state.tokenPublico && (
+            <Link
+              to={`/pedido/${state.tokenPublico}`}
+              className="confirmado-track-link"
+            >
+              Acompanhar este pedido depois
+            </Link>
+          )}
         </div>
       </main>
 

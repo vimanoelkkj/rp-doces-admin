@@ -5,6 +5,7 @@ import Checkout from "./pages/Checkout";
 import AguardandoPagamento from "./pages/AguardandoPagamento";
 import PedidoConfirmado from "./pages/PedidoConfirmado";
 import PagamentoNaoAprovado from "./pages/PagamentoNaoAprovado";
+import AcompanharPedido from "./pages/AcompanharPedido";
 import PageTransition from "./components/PageTransition";
 import { CartProvider } from "./context/CartContext";
 
@@ -26,6 +27,7 @@ function AnimatedRoutes() {
           path="/pagamento-nao-aprovado"
           element={<PagamentoNaoAprovado />}
         />
+        <Route path="/pedido/:token" element={<AcompanharPedido />} />
       </Routes>
     </PageTransition>
   );

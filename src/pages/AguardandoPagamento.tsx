@@ -114,6 +114,7 @@ export default function AguardandoPagamento() {
         navigate("/pedido-confirmado", {
           state: {
             pedidoId: payment.pedidoId,
+            tokenPublico: payment.tokenPublico,
             items: state!.items,
             totalCentavos: payment.totalCentavos,
           },

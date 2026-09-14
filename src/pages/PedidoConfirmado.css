@@ -249,6 +249,17 @@
   background-color: #4e3429;
 }
 
+.confirmado-track-link {
+  display: block;
+  text-align: center;
+  margin-top: 12px;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #634738;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .tl-step--done span {
   text-decoration: line-through;
   color: #b5a59f;
