@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { CartItem } from "../context/CartContext";
+import { CartItem, useCart } from "../context/CartContext";
 import "./AguardandoPagamento.css";
 
 interface CheckoutState {
@@ -12,6 +12,8 @@ interface CheckoutState {
 }
 
 interface CheckoutResponse {
+  pedidoId: number;
+  tokenPublico: string;
   paymentId: number;
   status: string;
   qrCode: string | null;
@@ -21,11 +23,20 @@ interface CheckoutResponse {
   totalCentavos: number;
 }
 
+interface PedidoStatusResponse {
+  pedidoId: number;
+  statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO";
+  statusPreparo: string;
+}
+
+const POLL_INTERVAL_MS = 4000;
+
 type Status = "criando" | "pronto" | "erro";
 
 export default function AguardandoPagamento() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { clearCart } = useCart();
   const state = location.state as CheckoutState | null;
 
   const [status, setStatus] = useState<Status>("criando");
@@ -89,6 +100,61 @@ export default function AguardandoPagamento() {
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
   }, [payment?.expiresAt]);
+
+  useEffect(() => {
+    if (status !== "pronto" || !payment) return;
+
+    let cancelled = false;
+
+    const goToResult = (statusPagamento: string) => {
+      if (cancelled) return;
+      cancelled = true;
+      if (statusPagamento === "PAGO") {
+        clearCart();
+        navigate("/pedido-confirmado", {
+          state: {
+            pedidoId: payment.pedidoId,
+            items: state!.items,
+            totalCentavos: payment.totalCentavos,
+          },
+        });
+      } else {
+        navigate("/pagamento-nao-aprovado", {
+          state: { items: state!.items, totalCentavos: payment.totalCentavos },
+        });
+      }
+    };
+
+    const poll = async () => {
+      try {
+        const response = await fetch(
+          `/api/pedido-status?token=${encodeURIComponent(payment.tokenPublico)}`,
+        );
+        if (!response.ok) return;
+        const data = (await response.json()) as PedidoStatusResponse;
+        if (data.statusPagamento !== "PENDENTE") {
+          goToResult(data.statusPagamento);
+        }
+      } catch {
+        // falha de rede pontual — tenta de novo no próximo ciclo
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [status, payment, navigate, clearCart, state]);
+
+  useEffect(() => {
+    if (timeLeft === 0 && payment) {
+      navigate("/pagamento-nao-aprovado", {
+        state: { items: state!.items, totalCentavos: payment.totalCentavos },
+      });
+    }
+  }, [timeLeft, payment, navigate, state]);
 
   const handleCopy = () => {
     if (!payment?.qrCode) return;

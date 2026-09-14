@@ -1,0 +1,278 @@
+.recusado-page {
+  position: relative;
+  padding-top: 64px;
+  background-color: #faf6f0;
+  min-height: 100vh;
+}
+
+/* Onda */
+.recusado-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.recusado-wave svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Conteúdo */
+.recusado-content {
+  position: relative;
+  z-index: 1;
+  max-width: 680px;
+  margin: 40px auto 80px;
+  padding: 0 24px;
+}
+
+/* Hero */
+.recusado-hero {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.recusado-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fdecec;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+.recusado-hero h1 {
+  font-family: "Fraunces", serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: #2b1d1a;
+  margin: 0 0 8px;
+}
+.recusado-hero p {
+  font-family: "Manrope", sans-serif;
+  font-size: 15px;
+  color: #8c7a76;
+  margin: 0;
+}
+
+/* Card */
+.recusado-card {
+  background: #fffaf7;
+  border: 1px solid #eadfd3;
+  border-radius: 20px;
+  padding: 32px;
+}
+
+/* Alerta */
+.recusado-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  background: #fff8f0;
+  border: 1px solid #f0dcc8;
+  border-radius: 14px;
+}
+.recusado-alert-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.recusado-alert strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2b1d1a;
+  display: block;
+  margin-bottom: 4px;
+}
+.recusado-alert p {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #8c7a76;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.recusado-divider {
+  height: 1px;
+  background: #eadfd3;
+  margin: 24px 0;
+}
+
+.recusado-label {
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8c7a76;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+}
+
+/* Itens */
+.recusado-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.recusado-item-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.recusado-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.recusado-item-name {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2b1d1a;
+}
+.recusado-item-detail {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  color: #8c7a76;
+}
+.recusado-item-price {
+  font-family: "Fraunces", serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2b1d1a;
+}
+
+/* Resumo */
+.recusado-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #63524e;
+  margin-bottom: 8px;
+}
+.recusado-summary-total {
+  font-weight: 700;
+  color: #2b1d1a;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eadfd3;
+}
+.recusado-total-value {
+  font-family: "Fraunces", serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #d38b80;
+}
+
+/* Botões */
+.recusado-btn-primary {
+  width: 100%;
+  padding: 16px;
+  background-color: #634738;
+  color: #ffffff;
+  border: none;
+  border-radius: 100px;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-bottom: 12px;
+}
+.recusado-btn-primary:hover {
+  background-color: #4e3429;
+}
+
+.recusado-btn-secondary {
+  width: 100%;
+  padding: 12px;
+  background: none;
+  border: none;
+  color: #634738;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  margin-bottom: 16px;
+}
+
+/* WhatsApp */
+.recusado-help {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #8c7a76;
+  padding-top: 8px;
+}
+.recusado-help a {
+  color: #4caf50;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+  .recusado-page {
+    padding-top: 56px;
+  }
+
+  .recusado-content {
+    margin: 24px auto 40px;
+    padding: 0 16px;
+  }
+
+  .recusado-hero h1 {
+    font-size: 24px;
+  }
+
+  .recusado-hero p {
+    font-size: 14px;
+  }
+
+  .recusado-card {
+    padding: 24px 16px;
+    border-radius: 16px;
+  }
+
+  .recusado-alert {
+    padding: 16px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+
+  .recusado-alert strong {
+    font-size: 13px;
+  }
+
+  .recusado-alert p {
+    font-size: 12px;
+  }
+
+  .recusado-item-img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .recusado-item-price {
+    font-size: 16px;
+  }
+
+  .recusado-total-value {
+    font-size: 18px;
+  }
+}

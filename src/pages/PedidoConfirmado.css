@@ -1,0 +1,341 @@
+.confirmado-page {
+  position: relative;
+  padding-top: 64px;
+  background-color: #faf6f0;
+  min-height: 100vh;
+}
+
+/* Onda */
+.confirmado-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.confirmado-wave svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Conteúdo */
+.confirmado-content {
+  position: relative;
+  z-index: 1;
+  max-width: 680px;
+  margin: 40px auto 80px;
+  padding: 0 24px;
+}
+
+/* Hero aprovado */
+.confirmado-hero {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.confirmado-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #e8f5e9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+.confirmado-hero h1 {
+  font-family: "Fraunces", serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: #2b1d1a;
+  margin: 0 0 8px;
+}
+.confirmado-hero p {
+  font-family: "Manrope", sans-serif;
+  font-size: 15px;
+  color: #8c7a76;
+  margin: 0;
+}
+
+/* Card */
+.confirmado-card {
+  background: #fffaf7;
+  border: 1px solid #eadfd3;
+  border-radius: 20px;
+  padding: 32px;
+}
+
+.confirmado-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.confirmado-order-id {
+  font-family: "Fraunces", serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #2b1d1a;
+  margin: 0;
+}
+.confirmado-date {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  color: #8c7a76;
+}
+.confirmado-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #e8f5e9;
+  color: #4caf50;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 100px;
+}
+
+.confirmado-divider {
+  height: 1px;
+  background: #eadfd3;
+  margin: 24px 0;
+}
+
+.confirmado-label {
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8c7a76;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+}
+
+/* Timeline */
+.confirmado-timeline {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.tl-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 80px;
+}
+.tl-step span {
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  color: #8c7a76;
+  text-align: center;
+  max-width: 100px;
+}
+.tl-step--done span,
+.tl-step--current span {
+  color: #2b1d1a;
+  font-weight: 600;
+}
+.tl-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #eadfd3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tl-step--done .tl-dot {
+  background: #634738;
+}
+.tl-step--current .tl-dot {
+  background: #fff;
+  border: 3px solid #634738;
+}
+.tl-line {
+  flex: 1;
+  height: 2px;
+  background: #eadfd3;
+  margin-top: 15px;
+  min-width: 20px;
+}
+.tl-line--done {
+  background: #634738;
+}
+.tl-line--active {
+  background: linear-gradient(to right, #634738, #eadfd3);
+}
+
+/* Itens */
+.confirmado-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.confirmado-item-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.confirmado-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.confirmado-item-name {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2b1d1a;
+}
+.confirmado-item-detail {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  color: #8c7a76;
+}
+.confirmado-item-price {
+  font-family: "Fraunces", serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2b1d1a;
+}
+
+/* Resumo */
+.confirmado-bottom {
+  margin-bottom: 24px;
+}
+.confirmado-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #63524e;
+  margin-bottom: 8px;
+}
+.confirmado-summary-total {
+  font-weight: 700;
+  color: #2b1d1a;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eadfd3;
+}
+.confirmado-total-value {
+  font-family: "Fraunces", serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #4caf50;
+}
+
+/* Botão */
+.confirmado-btn {
+  width: 100%;
+  padding: 16px;
+  background-color: #634738;
+  color: #ffffff;
+  border: none;
+  border-radius: 100px;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.confirmado-btn:hover {
+  background-color: #4e3429;
+}
+
+.tl-step--done span {
+  text-decoration: line-through;
+  color: #b5a59f;
+  font-weight: 400;
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+  .confirmado-page {
+    padding-top: 56px;
+  }
+
+  .confirmado-content {
+    margin: 24px auto 40px;
+    padding: 0 16px;
+  }
+
+  .confirmado-hero h1 {
+    font-size: 24px;
+  }
+
+  .confirmado-hero p {
+    font-size: 14px;
+  }
+
+  .confirmado-card {
+    padding: 24px 16px;
+    border-radius: 16px;
+  }
+
+  .confirmado-order-id {
+    font-size: 18px;
+  }
+
+  /* Badge menor */
+  .confirmado-badge {
+    font-size: 10px;
+    padding: 4px 10px;
+    gap: 3px;
+  }
+
+  /* Timeline em lista vertical */
+  .confirmado-timeline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .tl-step {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    min-width: unset;
+    width: 100%;
+    padding: 4px 0;
+  }
+
+  .tl-step span {
+    text-align: left;
+    max-width: unset;
+    font-size: 13px;
+  }
+
+  .tl-dot {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .tl-line {
+    width: 2px;
+    height: 20px;
+    min-width: unset;
+    margin-top: 0;
+    margin-left: 13px;
+  }
+
+  .confirmado-item-img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .confirmado-item-price {
+    font-size: 16px;
+  }
+
+  .confirmado-total-value {
+    font-size: 18px;
+  }
+}
