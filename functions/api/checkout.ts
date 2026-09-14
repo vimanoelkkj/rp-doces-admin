@@ -1,0 +1,128 @@
+/// <reference types="@cloudflare/workers-types" />
+
+import { precoAtualCentavos, ProdutoRow } from "../lib/pricing";
+
+interface Env {
+  DB: D1Database;
+  MP_ACCESS_TOKEN: string;
+}
+
+interface CheckoutItemInput {
+  id: number;
+  quantity: number;
+}
+
+interface CheckoutBody {
+  items: CheckoutItemInput[];
+  cliente: {
+    nome: string;
+    whatsapp: string;
+  };
+  recado?: string;
+}
+
+function jsonError(message: string, status: number) {
+  return Response.json({ error: message }, { status });
+}
+
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  let body: CheckoutBody;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonError("JSON inválido", 400);
+  }
+
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    return jsonError("Carrinho vazio", 400);
+  }
+  if (!body.cliente?.nome?.trim() || !body.cliente?.whatsapp?.trim()) {
+    return jsonError("Dados do cliente incompletos", 400);
+  }
+
+  const ids = [...new Set(body.items.map((i) => i.id))];
+  const placeholders = ids.map(() => "?").join(",");
+  const { results } = await env.DB.prepare(
+    `SELECT id, nome, preco_centavos, preco_promocional_centavos,
+            promocao_inicio, promocao_fim, disponivel, estoque, estoque_reservado
+     FROM produtos WHERE id IN (${placeholders})`,
+  )
+    .bind(...ids)
+    .all<ProdutoRow>();
+
+  const produtosPorId = new Map(results.map((p) => [p.id, p]));
+
+  let totalCentavos = 0;
+  for (const item of body.items) {
+    if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50) {
+      return jsonError("Quantidade inválida", 400);
+    }
+    const produto = produtosPorId.get(item.id);
+    if (!produto || !produto.disponivel) {
+      return jsonError(`Produto ${item.id} indisponível`, 400);
+    }
+    const estoqueLivre = produto.estoque - produto.estoque_reservado;
+    if (item.quantity > estoqueLivre) {
+      return jsonError(`Estoque insuficiente para "${produto.nome}"`, 409);
+    }
+    totalCentavos += precoAtualCentavos(produto) * item.quantity;
+  }
+
+  // O Mercado Pago exige e-mail do pagador; o checkout do site só coleta
+  // nome e WhatsApp, então geramos um e-mail sintético só pra satisfazer a API.
+  const whatsappDigits = body.cliente.whatsapp.replace(/\D/g, "") || "cliente";
+  const payerEmail = `${whatsappDigits}@checkout.rpdoces.com.br`;
+
+  const idempotencyKey = crypto.randomUUID();
+  const PIX_EXPIRATION_MINUTES = 30;
+  const expiresAt = new Date(
+    Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000,
+  ).toISOString();
+
+  const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
+      "X-Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify({
+      transaction_amount: totalCentavos / 100,
+      description: "Pedido R&P Doces",
+      payment_method_id: "pix",
+      date_of_expiration: expiresAt,
+      payer: { email: payerEmail, first_name: body.cliente.nome.trim() },
+    }),
+  });
+
+  if (!mpResponse.ok) {
+    const errorBody = await mpResponse.text();
+    console.error("Mercado Pago checkout error", mpResponse.status, errorBody);
+    return jsonError("Falha ao criar pagamento Pix", 502);
+  }
+
+  const payment = (await mpResponse.json()) as {
+    id: number;
+    status: string;
+    date_of_expiration: string | null;
+    point_of_interaction?: {
+      transaction_data?: {
+        qr_code?: string;
+        qr_code_base64?: string;
+        ticket_url?: string;
+      };
+    };
+  };
+
+  const txData = payment.point_of_interaction?.transaction_data;
+
+  return Response.json({
+    paymentId: payment.id,
+    status: payment.status,
+    qrCode: txData?.qr_code ?? null,
+    qrCodeBase64: txData?.qr_code_base64 ?? null,
+    ticketUrl: txData?.ticket_url ?? null,
+    expiresAt: payment.date_of_expiration,
+    totalCentavos,
+  });
+};
