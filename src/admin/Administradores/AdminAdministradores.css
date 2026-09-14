@@ -1,0 +1,306 @@
+/* ═══════════════════════════════════════════
+   AdminAdministradores — tema claro R&P Doces
+   prefix: adm-
+   ═══════════════════════════════════════════ */
+
+/* ── Layout ── */
+.adm-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #faf6f0;
+}
+
+.adm-main {
+  flex: 1;
+  margin-left: 232px;
+  padding: 48px 56px 64px;
+  max-width: 1200px;
+}
+
+/* ── Header ── */
+.adm-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.adm-title {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 36px;
+  color: #2b1d1a;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.adm-subtitle {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #8c7a76;
+  margin: 6px 0 0;
+}
+
+.adm-btn-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 100px;
+  border: none;
+  background: #634738;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.adm-btn-new:hover {
+  background: #4a332b;
+}
+
+/* ── KPI strip ── */
+.adm-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.adm-kpi-card {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adm-kpi-label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: #8c7a76;
+  text-transform: uppercase;
+}
+
+.adm-kpi-value {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 32px;
+  color: #2b1d1a;
+  line-height: 1.1;
+}
+
+/* ── Cards grid ── */
+.adm-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.adm-card {
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.adm-card--full {
+  grid-column: 1 / -1;
+}
+
+/* ── Card top row ── */
+.adm-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.adm-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.adm-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.adm-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.adm-avatar span {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #634738;
+}
+
+.adm-card-name-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.adm-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-card-name {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #2b1d1a;
+}
+
+.adm-card-handle {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8c7a76;
+}
+
+/* ── Badges ── */
+.adm-badge-you {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: #d38b80;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.adm-badge-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 100px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.adm-badge-status--ativo {
+  background: #ebf5f0;
+  color: #4e8c6f;
+}
+
+.adm-badge-status--inativo {
+  background: #f5f0eb;
+  color: #8c7a76;
+}
+
+.adm-badge-level {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 100px;
+  background: #f5efe8;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  color: #634738;
+}
+
+/* ── Card details row ── */
+.adm-card-details {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.adm-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adm-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  color: #8c7a76;
+  text-transform: uppercase;
+}
+
+.adm-detail-value {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #2b1d1a;
+}
+
+/* ── Card divider ── */
+.adm-card-divider {
+  height: 1px;
+  background: #eadfd3;
+}
+
+/* ── Card actions ── */
+.adm-card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.adm-action-btn {
+  padding: 9px 20px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #634738;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.adm-action-btn:hover {
+  border-color: #634738;
+  background: #f5efe8;
+}
+
+.adm-action-btn--danger {
+  border-color: #f5d5d5;
+  color: #d32f2f;
+}
+
+.adm-action-btn--danger:hover {
+  border-color: #d32f2f;
+  background: #fdebec;
+}
