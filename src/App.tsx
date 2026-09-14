@@ -3,6 +3,8 @@ import Homepage from "./pages/Homepage";
 import Cardapio from "./pages/Cardapio";
 import Checkout from "./pages/Checkout";
 import AguardandoPagamento from "./pages/AguardandoPagamento";
+import PedidoConfirmado from "./pages/PedidoConfirmado";
+import PagamentoNaoAprovado from "./pages/PagamentoNaoAprovado";
 import PageTransition from "./components/PageTransition";
 import { CartProvider } from "./context/CartContext";
 
@@ -18,6 +20,11 @@ function AnimatedRoutes() {
         <Route
           path="/aguardando-pagamento"
           element={<AguardandoPagamento />}
+        />
+        <Route path="/pedido-confirmado" element={<PedidoConfirmado />} />
+        <Route
+          path="/pagamento-nao-aprovado"
+          element={<PagamentoNaoAprovado />}
         />
       </Routes>
     </PageTransition>
