@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 export interface CartItem {
   id: number;
@@ -6,6 +6,17 @@ export interface CartItem {
   price: number;
   image: string;
   quantity: number;
+}
+
+const STORAGE_KEY = "rp-doces:cart";
+
+function loadStoredCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 interface CartContextType {
@@ -23,8 +34,16 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>(loadStoredCart);
   const [cartOpen, setCartOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cartItems));
+    } catch {
+      // localStorage indisponível (modo privado, etc.) — carrinho segue funcionando só em memória.
+    }
+  }, [cartItems]);
 
   const addToCart = (item: Omit<CartItem, "quantity">) => {
     setCartItems((prev) => {
