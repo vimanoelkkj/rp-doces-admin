@@ -16,7 +16,13 @@ export default function Checkout() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/aguardando-pagamento");
+    navigate("/aguardando-pagamento", {
+      state: {
+        items: cartItems,
+        cliente: { nome: nome.trim(), whatsapp: whatsapp.trim() },
+        recado: recado.trim(),
+      },
+    });
   };
 
   if (cartItems.length === 0) {
