@@ -1,0 +1,163 @@
+.footer {
+  background: #f5efe6;
+  padding: 80px 80px 40px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.footer-top {
+  display: flex;
+  gap: 60px;
+  margin-bottom: 64px;
+}
+
+.footer-brand {
+  flex: 1;
+  max-width: 411px;
+}
+
+.footer-brand-name {
+  font-family: "Fraunces", serif;
+  font-weight: 700;
+  font-size: 24px;
+  color: #2b1d1a;
+  margin-bottom: 16px;
+}
+
+.footer-brand p {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #63524e;
+}
+
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.footer-col h4 {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #634738;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.footer-col a,
+.footer-col p {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  color: #63524e;
+  text-decoration: none;
+  line-height: 1.5;
+  transition: color 0.2s;
+}
+
+.footer-col a:hover {
+  color: #634738;
+}
+
+.footer-phone {
+  font-weight: 600 !important;
+  color: #2b1d1a !important;
+}
+
+.footer-branding {
+  font-family: "Fraunces", serif;
+  font-weight: 700;
+  font-size: 100px;
+  color: #2b1d1a;
+  text-align: center;
+  opacity: 0.05;
+  letter-spacing: 4px;
+  line-height: 1.2;
+  margin-bottom: 64px;
+  user-select: none;
+}
+
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(99, 71, 56, 0.1);
+  padding-top: 20px;
+}
+
+.footer-bottom p,
+.footer-bottom span {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  color: #8c7a76;
+}
+
+.footer-bottom-right {
+  display: flex;
+  gap: 24px;
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+  .footer {
+    padding: 40px 16px 24px;
+  }
+
+  .footer-top {
+    flex-direction: column;
+    gap: 32px;
+    margin-bottom: 32px;
+  }
+
+  .footer-brand {
+    max-width: 100%;
+  }
+
+  .footer-brand-name {
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+
+  .footer-brand p {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .footer-col {
+    display: none;
+  }
+
+  .footer-branding {
+    font-size: 32px;
+    letter-spacing: -1px;
+    margin-bottom: 32px;
+    opacity: 0.05;
+  }
+
+  .footer-bottom {
+    flex-direction: row;
+    gap: 12px;
+    padding-top: 16px;
+  }
+
+  .footer-bottom p,
+  .footer-bottom span {
+    font-size: 11px;
+  }
+
+  .footer-bottom-right {
+    gap: 12px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .footer {
+    padding: 48px 40px 32px;
+  }
+
+  .footer-branding {
+    font-size: 60px;
+  }
+}
