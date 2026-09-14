@@ -1,6 +1,6 @@
-INSERT INTO produtos (nome, categoria, descricao, preco_centavos, disponivel, destaque, ordem, estoque) VALUES
-  ('Encanto de frutas vermelhas', 'Bolo no Pote', 'Massa tradicional e delicada, combinada com um recheio cremoso de ninho e o sabor marcante das frutas vermelhas. Leve, equilibrado e irresistível.', 2000, 1, 0, 1, 20),
-  ('Ninho & Nutella', 'Bolo no Pote', 'Massa tradicional intercalada com um recheio de ninho e deliciosas camadas de Nutella. Cremoso, e chocolatudo.', 2000, 1, 0, 2, 20),
-  ('Prestígio cremoso', 'Bolo no Pote', 'Massa de chocolate com um delicioso recheio de coco e uma cremosa ganache de chocolate 50%, formando uma combinação clássica e irresistível.', 2000, 1, 0, 3, 20),
-  ('Tentação de maracujá', 'Bolo no Pote', 'Bolo de chocolate com camadas cremosas de mousse de maracujá e ganache de chocolate 50%. O azedinho do maracujá com a intensidade do chocolate.', 2000, 1, 0, 4, 20),
-  ('Pudim Tradicional', 'Mini Pudim', 'Textura sedosa impecável, sem furinhos, feito com leite condensado premium e calda caramelizada no ponto exato.', 1500, 1, 0, 5, 20);
+INSERT INTO produtos (nome, categoria, descricao, preco_centavos, disponivel, destaque, ordem, estoque, image_key) VALUES
+  ('Encanto de frutas vermelhas', 'Bolo no Pote', 'Massa tradicional e delicada, combinada com um recheio cremoso de ninho e o sabor marcante das frutas vermelhas. Leve, equilibrado e irresistível.', 2000, 1, 0, 1, 20, 'produto-encanto-frutas.png'),
+  ('Ninho & Nutella', 'Bolo no Pote', 'Massa tradicional intercalada com um recheio de ninho e deliciosas camadas de Nutella. Cremoso, e chocolatudo.', 2000, 1, 0, 2, 20, 'produto-ninho-nutella.png'),
+  ('Prestígio cremoso', 'Bolo no Pote', 'Massa de chocolate com um delicioso recheio de coco e uma cremosa ganache de chocolate 50%, formando uma combinação clássica e irresistível.', 2000, 1, 0, 3, 20, 'produto-prestigio.png'),
+  ('Tentação de maracujá', 'Bolo no Pote', 'Bolo de chocolate com camadas cremosas de mousse de maracujá e ganache de chocolate 50%. O azedinho do maracujá com a intensidade do chocolate.', 2000, 1, 0, 4, 20, 'produto-maracuja.png'),
+  ('Pudim Tradicional', 'Mini Pudim', 'Textura sedosa impecável, sem furinhos, feito com leite condensado premium e calda caramelizada no ponto exato.', 1500, 1, 0, 5, 20, 'produto-pudim.png');

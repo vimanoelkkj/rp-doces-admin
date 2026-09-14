@@ -1,0 +1,226 @@
+.cardapio-page {
+  background-color: #faf6f0;
+  min-height: 100vh;
+  padding-top: 80px;
+  position: relative;
+}
+
+.cardapio-content {
+  padding: 60px 80px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  position: relative;
+  z-index: 1;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.heading-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardapio-title {
+  font-family: "Fraunces", serif;
+  font-size: 48px;
+  font-weight: 600;
+  color: #2b1d1a;
+  margin: 0;
+}
+
+.cardapio-subtitle {
+  font-family: "Manrope", sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  color: #8c7a76;
+  margin: 0;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-tab {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  transition:
+    background-color 0.3s,
+    color 0.3s,
+    transform 0.2s;
+  background-color: #f7ecee;
+  color: #634738;
+}
+
+.filter-tab.active {
+  background-color: #634738;
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.filter-tab:hover:not(.active) {
+  background-color: #eadfd3;
+  transform: scale(1.05);
+}
+
+.filter-tab:active {
+  transform: scale(0.95);
+}
+
+.products-area {
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.products-area--in {
+  opacity: 1;
+  transform: translateY(0);
+}
+.products-area--out {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.filter-card {
+  animation: cardFadeIn 0.4s ease both;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.category-group {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.category-title {
+  font-family: "Fraunces", serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: #2b1d1a;
+  margin: 0;
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition:
+    opacity 0.8s ease,
+    transform 0.8s ease;
+}
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.product-card-wrapper {
+  height: 100%;
+}
+
+.cardapio-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.cardapio-wave svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+@media (max-width: 1024px) {
+  .cardapio-content {
+    padding: 40px 40px 80px;
+    gap: 40px;
+  }
+  .products-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .products-area {
+    gap: 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cardapio-page {
+    padding-top: 56px;
+  }
+  .cardapio-content {
+    padding: 24px 16px 40px;
+    gap: 32px;
+  }
+  .section-heading {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+  }
+  .heading-text {
+    align-items: center;
+  }
+  .cardapio-title {
+    font-size: 28px;
+    text-align: center;
+  }
+  .cardapio-subtitle {
+    font-size: 14px;
+    text-align: center;
+  }
+  .filter-tabs {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+  .filter-tab {
+    font-size: 13px;
+    padding: 8px 16px;
+  }
+  .products-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .products-area {
+    gap: 32px;
+  }
+  .category-group {
+    gap: 20px;
+  }
+  .category-title {
+    font-size: 20px;
+    text-align: center;
+  }
+}

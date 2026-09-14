@@ -1,14 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Homepage from "./pages/Homepage";
+import Cardapio from "./pages/Cardapio";
 import PageTransition from "./components/PageTransition";
-
-function CardapioPlaceholder() {
-  return (
-    <div style={{ padding: 32, fontFamily: "sans-serif" }}>
-      Cardápio — em construção
-    </div>
-  );
-}
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -17,7 +10,7 @@ function AnimatedRoutes() {
     <PageTransition locationKey={location.key}>
       <Routes location={location}>
         <Route path="/" element={<Homepage />} />
-        <Route path="/cardapio" element={<CardapioPlaceholder />} />
+        <Route path="/cardapio" element={<Cardapio />} />
       </Routes>
     </PageTransition>
   );
