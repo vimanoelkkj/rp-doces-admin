@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "pages:dev": "wrangler pages dev dist"
+    "pages:dev": "wrangler pages dev dist",
+    "db:migrate:local": "wrangler d1 migrations apply rp-doces-db --local",
+    "db:seed:local": "wrangler d1 execute rp-doces-db --local --file=./seed/products.sql"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -15,6 +17,7 @@
     "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
