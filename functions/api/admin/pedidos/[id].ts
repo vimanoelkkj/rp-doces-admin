@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { requireUser } from "../../../lib/auth";
+
 interface Env {
   DB: D1Database;
 }
@@ -40,8 +42,14 @@ function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
-// TODO(admin auth): proteger este endpoint quando a autenticação administrativa existir.
-export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestGet: PagesFunction<Env> = async ({
+  request,
+  env,
+  params,
+}) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return jsonError("Id inválido", 400);
@@ -77,12 +85,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   }
 };
 
-// TODO(admin auth): proteger este endpoint quando a autenticação administrativa existir.
 export const onRequestPatch: PagesFunction<Env> = async ({
   request,
   env,
   params,
 }) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return jsonError("Id inválido", 400);
