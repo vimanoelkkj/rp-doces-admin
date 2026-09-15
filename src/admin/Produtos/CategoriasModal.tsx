@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import "./CategoriasModal.css";
 
@@ -17,51 +17,17 @@ const IconClose = () => (
   </svg>
 );
 
-/* ── Types ── */
+/* ── Types (espelham o retorno de GET /api/admin/categorias) ── */
 interface Category {
-  name: string;
-  slug: string;
+  id: string;
+  nome: string;
   emoji: string;
-  description: string;
-  type: "sistema" | "personalizada";
-  totalProducts: number;
-  activeProducts: number;
-  archivedProducts: number;
+  descricao: string;
+  sistema: number;
+  total_produtos: number;
+  produtos_ativos: number;
+  produtos_arquivados: number;
 }
-
-/* ── Mock data ── */
-const INITIAL_CATEGORIES: Category[] = [
-  {
-    name: "Bolos no pote",
-    slug: "BOLO_NO_POTE",
-    emoji: "🍰",
-    description: "Bolos no pote do cardápio R&P Doces.",
-    type: "sistema",
-    totalProducts: 4,
-    activeProducts: 4,
-    archivedProducts: 0,
-  },
-  {
-    name: "Mini pudins",
-    slug: "MINI_PUDIM",
-    emoji: "🍮",
-    description: "Mini pudins do cardápio R&P Doces.",
-    type: "sistema",
-    totalProducts: 1,
-    activeProducts: 1,
-    archivedProducts: 0,
-  },
-  {
-    name: "Brownies",
-    slug: "BROWNIES",
-    emoji: "🍫",
-    description: "Brownies Teste",
-    type: "personalizada",
-    totalProducts: 0,
-    activeProducts: 0,
-    archivedProducts: 0,
-  },
-];
 
 const EMOJI_OPTIONS = [
   "🍰",
@@ -86,35 +52,59 @@ export default function CategoriasModal({
   open,
   onClose,
 }: CategoriasModalProps) {
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🍰");
   const [newDescription, setNewDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const generateSlug = (name: string) =>
-    name
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toUpperCase()
-      .replace(/\s+/g, "_")
-      .replace(/[^A-Z0-9_]/g, "");
+  const carregarCategorias = () => {
+    fetch("/api/admin/categorias")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Falha ao carregar categorias");
+        return response.json() as Promise<{ categorias: Category[] }>;
+      })
+      .then((data) => {
+        setCategories(data.categorias);
+        setError(null);
+      })
+      .catch((err) => setError(err.message));
+  };
+
+  useEffect(() => {
+    if (open) carregarCategorias();
+  }, [open]);
 
   const handleCreate = () => {
-    if (!newName.trim()) return;
-    const newCat: Category = {
-      name: newName.trim(),
-      slug: generateSlug(newName),
-      emoji: newEmoji,
-      description: newDescription.trim(),
-      type: "personalizada",
-      totalProducts: 0,
-      activeProducts: 0,
-      archivedProducts: 0,
-    };
-    setCategories((prev) => [...prev, newCat]);
-    setNewName("");
-    setNewDescription("");
-    setNewEmoji("🍰");
+    if (!newName.trim() || saving) return;
+    setSaving(true);
+    setError(null);
+    fetch("/api/admin/categorias", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: newName.trim(),
+        emoji: newEmoji,
+        descricao: newDescription.trim(),
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error ?? "Falha ao criar categoria");
+        }
+        setNewName("");
+        setNewDescription("");
+        setNewEmoji("🍰");
+        carregarCategorias();
+      })
+      .catch((err) => {
+        setError(
+          err instanceof Error ? err.message : "Falha ao criar categoria",
+        );
+      })
+      .finally(() => setSaving(false));
   };
 
   if (!open) return null;
@@ -187,47 +177,49 @@ export default function CategoriasModal({
               />
             </div>
 
+            {error && <p className="catm-error-text">{error}</p>}
+
             <div className="catm-new-footer">
               <button
                 type="button"
                 className="catm-btn-create"
                 onClick={handleCreate}
-                disabled={!newName.trim()}
+                disabled={!newName.trim() || saving}
               >
-                + Criar categoria
+                {saving ? "Criando…" : "+ Criar categoria"}
               </button>
             </div>
           </div>
 
           {/* Categories list */}
           <div className="catm-list">
-            {categories.map((cat, i) => (
-              <div className="catm-cat-card" key={i}>
+            {categories.map((cat) => (
+              <div className="catm-cat-card" key={cat.id}>
                 <div className="catm-cat-left">
                   <div className="catm-cat-emoji">{cat.emoji}</div>
                   <div className="catm-cat-info">
                     <div className="catm-cat-name-row">
-                      <span className="catm-cat-name">{cat.name}</span>
-                      <span className="catm-cat-slug">{cat.slug}</span>
+                      <span className="catm-cat-name">{cat.nome}</span>
+                      <span className="catm-cat-slug">{cat.id}</span>
                     </div>
-                    <span className="catm-cat-desc">{cat.description}</span>
+                    <span className="catm-cat-desc">{cat.descricao}</span>
                     <div className="catm-cat-stats">
                       <span>
-                        <strong>{cat.totalProducts}</strong> produtos
+                        <strong>{cat.total_produtos}</strong> produtos
                       </span>
                       <span>
-                        <strong>{cat.activeProducts}</strong> ativos
+                        <strong>{cat.produtos_ativos}</strong> ativos
                       </span>
                       <span>
-                        <strong>{cat.archivedProducts}</strong> arquivados
+                        <strong>{cat.produtos_arquivados}</strong> arquivados
                       </span>
                     </div>
                   </div>
                 </div>
                 <span
-                  className={`catm-cat-badge ${cat.type === "personalizada" ? "catm-cat-badge--custom" : ""}`}
+                  className={`catm-cat-badge ${cat.sistema === 0 ? "catm-cat-badge--custom" : ""}`}
                 >
-                  {cat.type === "sistema" ? "Sistema" : "Personalizada"}
+                  {cat.sistema === 1 ? "Sistema" : "Personalizada"}
                 </span>
               </div>
             ))}
