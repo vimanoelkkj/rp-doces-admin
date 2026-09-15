@@ -414,6 +414,13 @@
   font-size: 13px;
 }
 
+.nped-error {
+  color: #c0392b;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  margin: 0;
+}
+
 /* ═══════════════════════════════════════════
    Footer
    ═══════════════════════════════════════════ */

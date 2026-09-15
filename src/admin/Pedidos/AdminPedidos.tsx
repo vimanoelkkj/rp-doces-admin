@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AdminSidebar from "../components/AdminSidebar";
 import AdminWave from "../components/AdminWave";
 import PedidoDetalheModal from "./PedidoDetalheModal";
+import EditarPedidoModal from "./EditarPedidoModal";
 import "./AdminPedidos.css";
 import NovoPedidoModal from "./NovoPedidoModal";
 
@@ -76,6 +77,7 @@ export default function AdminPedidos() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [novoPedidoOpen, setNovoPedidoOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -306,6 +308,24 @@ export default function AdminPedidos() {
             orderId={selectedOrderId}
             onClose={() => setSelectedOrderId(null)}
             onStatusChanged={() => setRefreshKey((k) => k + 1)}
+            onEdit={() => {
+              setEditingOrderId(selectedOrderId);
+              setSelectedOrderId(null);
+            }}
+          />
+        )}
+        {editingOrderId !== null && (
+          <EditarPedidoModal
+            orderId={editingOrderId}
+            onClose={() => {
+              setSelectedOrderId(editingOrderId);
+              setEditingOrderId(null);
+            }}
+            onSaved={() => {
+              setRefreshKey((k) => k + 1);
+              setSelectedOrderId(editingOrderId);
+              setEditingOrderId(null);
+            }}
           />
         )}
         <NovoPedidoModal

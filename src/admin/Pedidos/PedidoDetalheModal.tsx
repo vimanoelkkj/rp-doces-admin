@@ -32,6 +32,7 @@ interface PedidoDetalheModalProps {
   orderId: number;
   onClose: () => void;
   onStatusChanged?: () => void;
+  onEdit?: () => void;
 }
 
 /* ── Helpers ── */
@@ -79,6 +80,7 @@ export default function PedidoDetalheModal({
   orderId,
   onClose,
   onStatusChanged,
+  onEdit,
 }: PedidoDetalheModalProps) {
   const [data, setData] = useState<PedidoDetalheResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,7 +145,11 @@ export default function PedidoDetalheModal({
                 {AVANCAR_LABEL[data.pedido.status_preparo]}
               </button>
             )}
-            <button className="pedmodal-btn-edit">Editar pedido</button>
+            {data && data.pedido.status_preparo !== "RETIRADO" && (
+              <button className="pedmodal-btn-edit" onClick={onEdit}>
+                Editar pedido
+              </button>
+            )}
             <button className="pedmodal-btn-close" onClick={onClose}>
               <svg
                 width="16"
