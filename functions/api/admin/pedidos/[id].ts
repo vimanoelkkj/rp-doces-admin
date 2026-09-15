@@ -17,6 +17,7 @@ interface PedidoDetalheRow {
 }
 
 interface PedidoItemRow {
+  produto_id: number | null;
   produto_nome: string;
   emoji: string | null;
   quantidade: number;
@@ -60,7 +61,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     }
 
     const { results: itens } = await env.DB.prepare(
-      `SELECT pi.produto_nome, p.emoji, pi.quantidade,
+      `SELECT pi.produto_id, pi.produto_nome, p.emoji, pi.quantidade,
               pi.valor_unitario_centavos, pi.valor_total_centavos
        FROM pedido_itens pi
        LEFT JOIN produtos p ON p.id = pi.produto_id
