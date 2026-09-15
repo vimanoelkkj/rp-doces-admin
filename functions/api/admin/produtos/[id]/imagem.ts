@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { requireUser } from "../../../../lib/auth";
+
 interface Env {
   DB: D1Database;
   PRODUCT_IMAGES: R2Bucket;
@@ -20,12 +22,14 @@ function imageKey(id: number, extension: string): string {
   return `product-${id}-${crypto.randomUUID()}.${extension}`;
 }
 
-// TODO(admin auth): proteger este endpoint quando a autenticação administrativa existir.
 export const onRequestPost: PagesFunction<Env> = async ({
   request,
   env,
   params,
 }) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return jsonError("Id inválido", 400);
@@ -101,8 +105,14 @@ export const onRequestPost: PagesFunction<Env> = async ({
   }
 };
 
-// TODO(admin auth): proteger este endpoint quando a autenticação administrativa existir.
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestDelete: PagesFunction<Env> = async ({
+  request,
+  env,
+  params,
+}) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return jsonError("Id inválido", 400);

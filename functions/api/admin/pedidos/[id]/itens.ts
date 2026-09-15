@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { precoAtualCentavos, ProdutoRow } from "../../../../lib/pricing";
+import { requireUser } from "../../../../lib/auth";
 
 interface Env {
   DB: D1Database;
@@ -21,12 +22,14 @@ function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
-// TODO(admin auth): proteger este endpoint quando a autenticação administrativa existir.
 export const onRequestPut: PagesFunction<Env> = async ({
   request,
   env,
   params,
 }) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return jsonError("Id inválido", 400);

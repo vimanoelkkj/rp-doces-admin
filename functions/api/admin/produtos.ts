@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { requireUser } from "../../lib/auth";
+
 interface Env {
   DB: D1Database;
 }
@@ -38,8 +40,10 @@ function validarProduto(body: ProdutoInput) {
   return null;
 }
 
-// TODO(admin auth): proteger este endpoint quando a autenticação administrativa existir.
-export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
   try {
     const { results } = await env.DB.prepare(
       `SELECT id, nome, categoria, descricao, preco_centavos, preco_promocional_centavos,
@@ -55,6 +59,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
   let body: ProdutoInput;
   try {
     body = await request.json();

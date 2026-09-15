@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useAdminTheme } from "../theme/AdminThemeContext";
+import { useAdminAuth } from "../auth/AdminAuthContext";
 import "./AdminSidebar.css";
 
 /* ── SVG icons — exported directly from Figma ── */
@@ -285,15 +286,15 @@ const systemNav: NavItem[] = [
 ];
 
 /* ── Component ── */
-interface AdminSidebarProps {
-  userName?: string;
-  userRole?: string;
-}
+const PAPEL_LABEL: Record<string, string> = {
+  OWNER: "Owner",
+  ADMIN: "Admin",
+};
 
-export default function AdminSidebar({
-  userName = "Vitor Manoel",
-  userRole = "Owner",
-}: AdminSidebarProps) {
+export default function AdminSidebar() {
+  const { user, logout } = useAdminAuth();
+  const userName = user.nome;
+  const userRole = PAPEL_LABEL[user.papel] ?? user.papel;
   const initials = userName
     .split(" ")
     .map((n) => n[0])
@@ -367,9 +368,7 @@ export default function AdminSidebar({
           <button
             className="sidebar-logout-btn"
             title="Sair"
-            onClick={() => {
-              /* navigate('/admin/login') */
-            }}
+            onClick={logout}
           >
             <svg
               width="18"
