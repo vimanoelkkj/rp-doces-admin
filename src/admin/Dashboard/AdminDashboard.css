@@ -67,6 +67,7 @@
   background: #ffffff;
   border: 1px solid #eadfd3;
   border-radius: 100px;
+  color: #634738;
   cursor: pointer;
   transition: border-color 0.15s;
 }
@@ -99,6 +100,137 @@
   background: #4a332b;
 }
 
+/* ── Date picker dropdown ── */
+.dash-date-dropdown {
+  position: relative;
+}
+
+.dash-date-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 280px;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(43, 29, 26, 0.14);
+  z-index: 50;
+  animation: dashDateFadeIn 0.15s ease;
+}
+
+@keyframes dashDateFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dash-date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.dash-date-nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #634738;
+  transition: background 0.15s;
+}
+
+.dash-date-nav-btn:hover {
+  background: #f5efe8;
+}
+
+.dash-date-month-label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b1d1a;
+}
+
+.dash-date-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.dash-date-weekday {
+  text-align: center;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  color: #8c7a76;
+  padding: 4px 0;
+}
+
+.dash-date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.dash-date-day {
+  width: 100%;
+  aspect-ratio: 1;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #2b1d1a;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.dash-date-day:hover {
+  background: #f5efe8;
+}
+
+.dash-date-day--muted {
+  color: #cbbcb4;
+}
+
+.dash-date-day--disabled {
+  color: #d8cdc6;
+  cursor: default;
+  pointer-events: none;
+}
+
+.dash-date-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.dash-date-day--today {
+  font-weight: 700;
+  color: #634738;
+}
+
+.dash-date-day--selected {
+  background: #634738;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.dash-date-day--selected:hover {
+  background: #4a332b;
+}
+
 /* ═══════════════════════════════════════════
    Results banner
    ═══════════════════════════════════════════ */
@@ -127,6 +259,20 @@
   font-weight: 400;
   font-size: 13px;
   color: #8c7a76;
+}
+
+.dash-error {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #c0392b;
+  margin: 0;
+}
+
+.dash-empty-inline {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #8c7a76;
+  margin: 0;
 }
 
 /* ═══════════════════════════════════════════
@@ -450,6 +596,7 @@
   font-weight: 700;
   font-size: 13px;
   color: #634738;
+  text-decoration: none;
   cursor: pointer;
   transition: background 0.15s;
   white-space: nowrap;
@@ -567,6 +714,11 @@
 .dash-badge--orange {
   background: #fbf3eb;
   color: #c28343;
+}
+
+.dash-badge--blue {
+  background: #eaf2fb;
+  color: #4179c2;
 }
 
 /* ═══════════════════════════════════════════

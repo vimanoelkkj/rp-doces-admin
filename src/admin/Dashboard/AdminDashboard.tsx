@@ -1,24 +1,10 @@
+import { useEffect, useState } from "react";
 import AdminSidebar from "../components/AdminSidebar";
 import AdminWave from "../components/AdminWave";
+import DatePickerDropdown from "./DatePickerDropdown";
 import "./AdminDashboard.css";
 
 /* ── Icon components ── */
-const IconCalendar = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="#634738"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <rect x="2" y="3" width="12" height="11" rx="1.5" />
-    <path d="M5 1.5v3M11 1.5v3M2 7h12" />
-  </svg>
-);
-
 const IconShield = () => (
   <svg
     width="24"
@@ -51,128 +37,100 @@ const IconAlert = () => (
   </svg>
 );
 
-/* ── Data types ── */
-interface KpiCard {
-  label: string;
-  value: string;
-  description: string;
-  warning?: { dot: string; text: string };
+/* ── Types (espelham o retorno de GET /api/admin/dashboard) ── */
+type StatusPreparo =
+  | "RECEBIDO"
+  | "EM_PREPARACAO"
+  | "PRONTO_PARA_RETIRADA"
+  | "RETIRADO";
+
+interface ValorContagem {
+  count: number;
+  total: number;
 }
 
-interface RankItem {
-  rank: number;
-  name: string;
-  units: string;
-  percent: number; // 0–100
+interface MaisVendidoRow {
+  nome: string;
+  emoji: string | null;
+  unidades: number;
 }
 
-interface OrderRow {
-  id: string;
-  client: string;
-  items: string;
-  payment: string;
-  paymentColor: string;
-  status: string;
-  statusColor: string;
-  total: string;
+interface PedidoRecenteRow {
+  id: number;
+  cliente_nome: string;
+  valor_total_centavos: number;
+  status_preparo: StatusPreparo;
+  itens_count: number;
 }
 
-/* ── Static data (matching Figma) ── */
-const kpis: KpiCard[] = [
-  {
-    label: "Recebido hoje",
-    value: "R$ 0,00",
-    description: "0 pagamentos confirmados",
-  },
-  {
-    label: "A receber",
-    value: "R$ 0,00",
-    description: "0 faturamentos agendados",
-  },
-  {
-    label: "Comandas abertas",
-    value: "0",
-    description: "Nenhuma mesa em atendimento",
-  },
-  {
-    label: "Aguardando preparo",
-    value: "0",
-    description: "Todos os pedidos já despachados",
-  },
-  {
-    label: "Catálogo",
-    value: "5",
-    description: "",
-    warning: { dot: "#c28343", text: "2 estoque baixo" },
-  },
-];
+interface DashboardResponse {
+  data: string;
+  recebidoHoje: ValorContagem;
+  aReceber: ValorContagem;
+  comandasAbertas: number;
+  aguardandoPreparo: number;
+  catalogo: { total: number; estoqueBaixo: number };
+  maisVendidos: MaisVendidoRow[];
+  pedidosRecentes: PedidoRecenteRow[];
+}
 
-const bestSellers: RankItem[] = [
-  { rank: 1, name: "Ninho & Nutella 🍫", units: "7 un.", percent: 58 },
-  { rank: 2, name: "Tentação de maracujá 💛", units: "7 un.", percent: 58 },
-  { rank: 3, name: "Prestígio cremoso 🥥", units: "6 un.", percent: 51 },
-  {
-    rank: 4,
-    name: "Encanto de frutas vermelhas 🍓",
-    units: "5 un.",
-    percent: 44,
-  },
-];
+/* ── Helpers ── */
+const formatarPreco = (centavos: number) =>
+  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
-const recentOrders: OrderRow[] = [
-  {
-    id: "RP-33",
-    client: "Mariana Alvarenga",
-    items: "2 itens",
-    payment: "Pago",
-    paymentColor: "green",
-    status: "Entregue",
-    statusColor: "green",
-    total: "R$ 41,50",
-  },
-  {
-    id: "RP-32",
-    client: "Nathália da Luz",
-    items: "2 itens",
-    payment: "Pago",
-    paymentColor: "green",
-    status: "Entregue",
-    statusColor: "green",
-    total: "R$ 41,50",
-  },
-  {
-    id: "RP-31",
-    client: "Maria Eduarda",
-    items: "1 item",
-    payment: "Pago",
-    paymentColor: "green",
-    status: "Entregue",
-    statusColor: "green",
-    total: "R$ 18,50",
-  },
-  {
-    id: "RP-22",
-    client: "Bianca Pacheco",
-    items: "1 item",
-    payment: "Pago",
-    paymentColor: "green",
-    status: "Entregue",
-    statusColor: "green",
-    total: "R$ 18,50",
-  },
-];
-
-/* ── Helper: today's date ── */
-function getTodayFormatted(): string {
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
+function formatDateISO(d: Date): string {
   const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+const statusLabel = (s: StatusPreparo) =>
+  s === "RETIRADO"
+    ? "Entregue"
+    : s === "PRONTO_PARA_RETIRADA"
+      ? "Pronto"
+      : "Em produção";
+
+const statusClass = (s: StatusPreparo) =>
+  s === "RETIRADO"
+    ? "dash-badge--green"
+    : s === "PRONTO_PARA_RETIRADA"
+      ? "dash-badge--blue"
+      : "dash-badge--orange";
+
+function isToday(d: Date): boolean {
+  const now = new Date();
+  return formatDateISO(d) === formatDateISO(now);
 }
 
 /* ── Component ── */
 export default function AdminDashboard() {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/admin/dashboard?date=${formatDateISO(selectedDate)}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Falha ao carregar dashboard");
+        return response.json() as Promise<DashboardResponse>;
+      })
+      .then((result) => {
+        setData(result);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [selectedDate]);
+
+  const maiorVendido = data?.maisVendidos.reduce(
+    (max, item) => Math.max(max, item.unidades),
+    0,
+  );
+
   return (
     <div className="admin-layout">
       <AdminWave />
@@ -188,11 +146,13 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="dash-header-actions">
-            <button className="dash-date-picker">
-              <IconCalendar />
-              <span>{getTodayFormatted()}</span>
+            <DatePickerDropdown value={selectedDate} onChange={setSelectedDate} />
+            <button
+              className="dash-btn-today"
+              onClick={() => setSelectedDate(new Date())}
+            >
+              Hoje
             </button>
-            <button className="dash-btn-today">Hoje</button>
           </div>
         </div>
 
@@ -200,33 +160,82 @@ export default function AdminDashboard() {
         <div className="dash-results-banner">
           <span className="dash-results-bold">Resultados por dia</span>
           <span className="dash-results-dot" />
-          <span className="dash-results-light">Atualizado em tempo real</span>
+          <span className="dash-results-light">
+            {isToday(selectedDate)
+              ? "Atualizado em tempo real"
+              : `Dados de ${formatDateISO(selectedDate).split("-").reverse().join("/")}`}
+          </span>
         </div>
+
+        {error && <p className="dash-error">{error}</p>}
 
         {/* ── KPI strip ── */}
         <div className="dash-kpi-strip">
-          {kpis.map((kpi) => (
-            <div className="dash-kpi-card" key={kpi.label}>
-              <span className="dash-kpi-label">{kpi.label}</span>
-              <div className="dash-kpi-value-group">
-                <span className="dash-kpi-value">{kpi.value}</span>
-                {kpi.description && (
-                  <span className="dash-kpi-desc">{kpi.description}</span>
-                )}
-                {kpi.warning && (
-                  <div className="dash-kpi-warning">
-                    <span
-                      className="dash-kpi-warning-dot"
-                      style={{ background: kpi.warning.dot }}
-                    />
-                    <span className="dash-kpi-warning-text">
-                      {kpi.warning.text}
-                    </span>
-                  </div>
-                )}
-              </div>
+          <div className="dash-kpi-card">
+            <span className="dash-kpi-label">Recebido hoje</span>
+            <div className="dash-kpi-value-group">
+              <span className="dash-kpi-value">
+                {formatarPreco(data?.recebidoHoje.total ?? 0)}
+              </span>
+              <span className="dash-kpi-desc">
+                {data?.recebidoHoje.count ?? 0} pagamento(s) confirmado(s)
+              </span>
             </div>
-          ))}
+          </div>
+          <div className="dash-kpi-card">
+            <span className="dash-kpi-label">A receber</span>
+            <div className="dash-kpi-value-group">
+              <span className="dash-kpi-value">
+                {formatarPreco(data?.aReceber.total ?? 0)}
+              </span>
+              <span className="dash-kpi-desc">
+                {data?.aReceber.count ?? 0} faturamento(s) agendado(s)
+              </span>
+            </div>
+          </div>
+          <div className="dash-kpi-card">
+            <span className="dash-kpi-label">Comandas abertas</span>
+            <div className="dash-kpi-value-group">
+              <span className="dash-kpi-value">
+                {data?.comandasAbertas ?? 0}
+              </span>
+              <span className="dash-kpi-desc">
+                {!data || data.comandasAbertas === 0
+                  ? "Nenhuma mesa em atendimento"
+                  : `${data.comandasAbertas} comanda(s) em atendimento`}
+              </span>
+            </div>
+          </div>
+          <div className="dash-kpi-card">
+            <span className="dash-kpi-label">Aguardando preparo</span>
+            <div className="dash-kpi-value-group">
+              <span className="dash-kpi-value">
+                {data?.aguardandoPreparo ?? 0}
+              </span>
+              <span className="dash-kpi-desc">
+                {!data || data.aguardandoPreparo === 0
+                  ? "Todos os pedidos já despachados"
+                  : `${data.aguardandoPreparo} pedido(s) aguardando`}
+              </span>
+            </div>
+          </div>
+          <div className="dash-kpi-card">
+            <span className="dash-kpi-label">Catálogo</span>
+            <div className="dash-kpi-value-group">
+              <span className="dash-kpi-value">{data?.catalogo.total ?? 0}</span>
+              {data && data.catalogo.estoqueBaixo > 0 && (
+                <div className="dash-kpi-warning">
+                  <span
+                    className="dash-kpi-warning-dot"
+                    style={{ background: "#c28343" }}
+                  />
+                  <span className="dash-kpi-warning-text">
+                    {data.catalogo.estoqueBaixo} estoque baixo
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── Split row ── */}
@@ -241,20 +250,29 @@ export default function AdminDashboard() {
                 Métricas de vendas acumuladas no período selecionado
               </p>
             </div>
+            {!loading && data && data.maisVendidos.length === 0 && (
+              <p className="dash-empty-inline">
+                Nenhuma venda registrada nesse dia.
+              </p>
+            )}
             <div className="dash-ranked-list">
-              {bestSellers.map((item) => (
-                <div className="dash-rank-row" key={item.rank}>
+              {data?.maisVendidos.map((item, i) => (
+                <div className="dash-rank-row" key={item.nome}>
                   <div className="dash-rank-meta">
                     <div className="dash-rank-label">
-                      <span className="dash-rank-number">{item.rank}</span>
-                      <span className="dash-rank-name">{item.name}</span>
+                      <span className="dash-rank-number">{i + 1}</span>
+                      <span className="dash-rank-name">
+                        {item.nome} {item.emoji}
+                      </span>
                     </div>
-                    <span className="dash-rank-units">{item.units}</span>
+                    <span className="dash-rank-units">{item.unidades} un.</span>
                   </div>
                   <div className="dash-progress-track">
                     <div
                       className="dash-progress-fill"
-                      style={{ width: `${item.percent}%` }}
+                      style={{
+                        width: `${maiorVendido ? (item.unidades / maiorVendido) * 100 : 0}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -268,31 +286,59 @@ export default function AdminDashboard() {
             <div className="dash-panel dash-pending-payments">
               <div className="dash-panel-header-row">
                 <h2 className="dash-panel-title">Pagamentos pendentes</h2>
-                <span className="dash-pending-value">R$ 0,00</span>
-              </div>
-              <div className="dash-empty-state">
-                <IconShield />
-                <span className="dash-empty-title">Nenhum valor pendente</span>
-                <span className="dash-empty-desc">
-                  Excelente! Todas as comandas abertas já foram resolvidas.
+                <span className="dash-pending-value">
+                  {formatarPreco(data?.aReceber.total ?? 0)}
                 </span>
               </div>
+              {!data || data.aReceber.count === 0 ? (
+                <div className="dash-empty-state">
+                  <IconShield />
+                  <span className="dash-empty-title">
+                    Nenhum valor pendente
+                  </span>
+                  <span className="dash-empty-desc">
+                    Excelente! Todas as comandas abertas já foram resolvidas.
+                  </span>
+                </div>
+              ) : (
+                <div className="dash-alert-box">
+                  <IconAlert />
+                  <div className="dash-alert-text">
+                    <span className="dash-alert-bold">
+                      {data.aReceber.count} pagamento(s) pendente(s)
+                    </span>
+                    <span className="dash-alert-desc">
+                      Aguardando confirmação do Pix.
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Attention panel */}
             <div className="dash-panel dash-attention">
               <h2 className="dash-panel-title">Precisa de atenção</h2>
-              <div className="dash-alert-box">
-                <IconAlert />
-                <div className="dash-alert-text">
-                  <span className="dash-alert-bold">
-                    2 produtos com estoque baixo
-                  </span>
-                  <span className="dash-alert-desc">
-                    Verifique os ingredientes no painel de insumos.
+              {data && data.catalogo.estoqueBaixo > 0 ? (
+                <div className="dash-alert-box">
+                  <IconAlert />
+                  <div className="dash-alert-text">
+                    <span className="dash-alert-bold">
+                      {data.catalogo.estoqueBaixo} produto(s) com estoque baixo
+                    </span>
+                    <span className="dash-alert-desc">
+                      Verifique os ingredientes no painel de insumos.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="dash-empty-state">
+                  <IconShield />
+                  <span className="dash-empty-title">Tudo em dia</span>
+                  <span className="dash-empty-desc">
+                    Nenhum produto com estoque baixo no momento.
                   </span>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -303,10 +349,12 @@ export default function AdminDashboard() {
             <div className="dash-orders-title-group">
               <h2 className="dash-orders-title">Pedidos recentes</h2>
               <p className="dash-orders-subtitle">
-                Últimos pedidos registrados no sistema hoje
+                Últimos pedidos registrados no sistema nesse dia
               </p>
             </div>
-            <button className="dash-btn-view-all">Ver todos os pedidos</button>
+            <a className="dash-btn-view-all" href="/admin/pedidos">
+              Ver todos os pedidos
+            </a>
           </div>
 
           <div className="dash-orders-table">
@@ -319,22 +367,34 @@ export default function AdminDashboard() {
               <span className="dash-th dash-th-total">Total</span>
             </div>
 
-            {recentOrders.map((order) => (
+            {!loading && data && data.pedidosRecentes.length === 0 && (
+              <p className="dash-empty-inline">
+                Nenhum pedido registrado nesse dia.
+              </p>
+            )}
+
+            {data?.pedidosRecentes.map((order) => (
               <div className="dash-table-row" key={order.id}>
-                <span className="dash-td dash-td-id">{order.id}</span>
-                <span className="dash-td dash-td-client">{order.client}</span>
-                <span className="dash-td dash-td-items">{order.items}</span>
+                <span className="dash-td dash-td-id">RP-{order.id}</span>
+                <span className="dash-td dash-td-client">
+                  {order.cliente_nome}
+                </span>
+                <span className="dash-td dash-td-items">
+                  {order.itens_count} item(s)
+                </span>
                 <span className="dash-td dash-td-payment">
-                  <span className="dash-badge dash-badge--green">
-                    {order.payment}
-                  </span>
+                  <span className="dash-badge dash-badge--green">Pago</span>
                 </span>
                 <span className="dash-td dash-td-status">
-                  <span className="dash-badge dash-badge--green">
-                    {order.status}
+                  <span
+                    className={`dash-badge ${statusClass(order.status_preparo)}`}
+                  >
+                    {statusLabel(order.status_preparo)}
                   </span>
                 </span>
-                <span className="dash-td dash-td-total">{order.total}</span>
+                <span className="dash-td dash-td-total">
+                  {formatarPreco(order.valor_total_centavos)}
+                </span>
               </div>
             ))}
           </div>
