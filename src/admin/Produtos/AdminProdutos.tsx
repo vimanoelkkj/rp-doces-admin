@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AdminSidebar from "../components/AdminSidebar";
 import NovoProdutoModal from "./NovoProdutoModal";
 import CategoriasModal from "./CategoriasModal";
@@ -35,80 +35,62 @@ const IconPlus = () => (
   </svg>
 );
 
-/* ── Types ── */
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  price: string;
-  stock: {
-    text: string;
-    type: "critical" | "available";
-  };
-  image: string; // placeholder URL or path
+/* ── Types (espelham o retorno de GET /api/admin/produtos) ── */
+export interface ProdutoAdmin {
+  id: number;
+  nome: string;
+  categoria: string;
+  descricao: string;
+  preco_centavos: number;
+  disponivel: number;
+  ativo: number;
+  destaque: number;
+  estoque: number;
+  estoque_reservado: number;
+  emoji: string;
+  image_key: string | null;
 }
 
-/* ── Static data (matching Figma) ── */
-const products: Product[] = [
-  {
-    id: "1",
-    name: "Encanto de frutas vermelhas 🍓",
-    category: "🍰 Bolos no pote",
-    description:
-      "Massa amanteigada delicada, combinada com um delicioso creme de Ninho e o doce natural de frutas vermelhas premium selecionadas.",
-    price: "R$ 20,00",
-    stock: { text: "Estoque crítico (1 disp)", type: "critical" },
-    image: "/images/frutas-vermelhas.jpg",
-  },
-  {
-    id: "2",
-    name: "Ninho & Nutella 🍫",
-    category: "🍰 Bolos no pote",
-    description:
-      "Massa de cacau macia combinada com um recheio generoso de Ninho, adicionando camadas de Nutella cremosa e aveludada.",
-    price: "R$ 20,00",
-    stock: { text: "Estoque crítico (1 disp)", type: "critical" },
-    image: "/images/ninho-nutella.jpg",
-  },
-  {
-    id: "3",
-    name: "Prestígio cremoso 🥥",
-    category: "🍰 Bolos no pote",
-    description:
-      "Massa de chocolate com um delicioso recheio cremoso de coco e uma generosa ganache de chocolate 50% para harmonização perfeita.",
-    price: "R$ 20,00",
-    stock: { text: "5 disponíveis", type: "available" },
-    image: "/images/prestigio.jpg",
-  },
-  {
-    id: "4",
-    name: "Tentação de maracujá 💛",
-    category: "🍰 Bolos no pote",
-    description:
-      "Bolo de chocolate com camadas cremosas de mousse de maracujá fresco e ganache artesanal de chocolate meio amargo.",
-    price: "R$ 20,00",
-    stock: { text: "7 disponíveis", type: "available" },
-    image: "/images/maracuja.jpg",
-  },
-  {
-    id: "5",
-    name: "Pudim 🍮",
-    category: "🍮 Sobremesas",
-    description:
-      "Pudim de leite condensado tradicional com textura super macia, sem furinhos, regado com uma calda brilhante de caramelo.",
-    price: "R$ 15,00",
-    stock: { text: "11 disponíveis", type: "available" },
-    image: "/images/pudim.jpg",
-  },
-];
-
 type FilterTab = "todos" | "ativos" | "esgotados" | "arquivados";
+
+function estoqueLivre(p: ProdutoAdmin) {
+  return p.estoque - p.estoque_reservado;
+}
+
+function stockBadge(p: ProdutoAdmin): { text: string; type: "critical" | "available" } {
+  const livre = estoqueLivre(p);
+  if (livre <= 0) return { text: "Esgotado", type: "critical" };
+  if (livre <= 2) return { text: `Estoque crítico (${livre} disp)`, type: "critical" };
+  return { text: `${livre} disponíveis`, type: "available" };
+}
 
 /* ── Component ── */
 export default function AdminProdutos() {
   const [activeTab, setActiveTab] = useState<FilterTab>("todos");
   const [searchQuery, setSearchQuery] = useState("");
+  const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [showNewProduct, setShowNewProduct] = useState(false);
+  const [categoriasOpen, setCategoriasOpen] = useState(false);
+
+  const carregarProdutos = () => {
+    setLoading(true);
+    fetch("/api/admin/produtos")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Falha ao carregar produtos");
+        return response.json() as Promise<{ produtos: ProdutoAdmin[] }>;
+      })
+      .then((data) => {
+        setProdutos(data.produtos);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(carregarProdutos, []);
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "todos", label: "Todos" },
@@ -117,15 +99,19 @@ export default function AdminProdutos() {
     { key: "arquivados", label: "Arquivados" },
   ];
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  const porTab = produtos.filter((p) => {
+    if (activeTab === "arquivados") return p.ativo === 0;
+    if (activeTab === "ativos") return p.ativo === 1;
+    if (activeTab === "esgotados") return estoqueLivre(p) <= 0;
+    return true;
+  });
+
+  const filtered = porTab.filter((p) =>
+    p.nome.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const totalActive = products.length;
-  const totalOutOfStock = 0;
-  const [showNewProduct, setShowNewProduct] = useState(false);
-
-  const [categoriasOpen, setCategoriasOpen] = useState(false);
+  const totalActive = produtos.filter((p) => p.ativo === 1).length;
+  const totalOutOfStock = produtos.filter((p) => estoqueLivre(p) <= 0).length;
 
   return (
     <div className="admin-layout">
@@ -194,37 +180,56 @@ export default function AdminProdutos() {
           </div>
         </div>
 
+        {loading && <p>Carregando produtos…</p>}
+        {error && <p>{error}</p>}
+
         {/* ── Product grid ── */}
         <div className="prod-grid">
-          {filtered.map((product) => (
-            <div className="prod-card" key={product.id}>
-              <div
-                className="prod-card-image"
-                style={{
-                  backgroundImage: `url(${product.image})`,
-                  backgroundColor: "#f0e8e0",
-                }}
-              />
-              <div className="prod-card-content">
-                <div className="prod-card-badge-row">
-                  <span className="prod-category-badge">
-                    {product.category}
-                  </span>
+          {filtered.map((product) => {
+            const badge = stockBadge(product);
+            return (
+              <div className="prod-card" key={product.id}>
+                <div
+                  className="prod-card-image"
+                  style={{
+                    backgroundImage: product.image_key
+                      ? `url(/images/${product.image_key})`
+                      : undefined,
+                    backgroundColor: "#f0e8e0",
+                  }}
+                >
+                  {!product.image_key && (
+                    <span className="prod-card-emoji">
+                      {product.emoji || "🍰"}
+                    </span>
+                  )}
                 </div>
-                <h3 className="prod-card-title">{product.name}</h3>
-                <p className="prod-card-desc">{product.description}</p>
-                <div className="prod-card-divider" />
-                <div className="prod-card-footer">
-                  <span className="prod-card-price">{product.price}</span>
-                  <span
-                    className={`prod-stock-badge prod-stock-badge--${product.stock.type}`}
-                  >
-                    {product.stock.text}
-                  </span>
+                <div className="prod-card-content">
+                  <div className="prod-card-badge-row">
+                    <span className="prod-category-badge">
+                      {product.categoria}
+                    </span>
+                  </div>
+                  <h3 className="prod-card-title">{product.nome}</h3>
+                  <p className="prod-card-desc">{product.descricao}</p>
+                  <div className="prod-card-divider" />
+                  <div className="prod-card-footer">
+                    <span className="prod-card-price">
+                      R${" "}
+                      {(product.preco_centavos / 100)
+                        .toFixed(2)
+                        .replace(".", ",")}
+                    </span>
+                    <span
+                      className={`prod-stock-badge prod-stock-badge--${badge.type}`}
+                    >
+                      {badge.text}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <CategoriasModal
           open={categoriasOpen}
@@ -233,6 +238,7 @@ export default function AdminProdutos() {
         <NovoProdutoModal
           open={showNewProduct}
           onClose={() => setShowNewProduct(false)}
+          onCreated={carregarProdutos}
         />
       </main>
     </div>
