@@ -66,6 +66,28 @@
   border-color: #634738;
 }
 
+.pedmodal-btn-advance {
+  padding: 8px 16px;
+  background: #634738;
+  border: none;
+  border-radius: 100px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pedmodal-btn-advance:hover {
+  background: #4a332b;
+}
+
+.pedmodal-btn-advance:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .pedmodal-btn-close {
   width: 40px;
   height: 40px;
