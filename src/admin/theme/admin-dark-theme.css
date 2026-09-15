@@ -310,11 +310,12 @@ html[data-admin-theme="dark"] .ped-btn-primary {
 
 /* ── Pedido Detalhe Modal ── */
 html[data-admin-theme="dark"] .pedmodal-overlay {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.88);
 }
 html[data-admin-theme="dark"] .pedmodal-card {
   background: #2b2220;
   border-color: #3d3230;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
 }
 html[data-admin-theme="dark"] .pedmodal-title,
 html[data-admin-theme="dark"] .pedmodal-item-name,
@@ -349,9 +350,6 @@ html[data-admin-theme="dark"] .pedmodal-summary-label {
 }
 html[data-admin-theme="dark"] .pedmodal-btn-close:hover {
   color: #faf6f0;
-}
-html[data-admin-theme="dark"] .pedmodal-divider {
-  background: #3d3230;
 }
 html[data-admin-theme="dark"] .pedmodal-total-value {
   color: #d38b80;
@@ -506,11 +504,12 @@ html[data-admin-theme="dark"] .loj-image-thumb {
    Novo Produto Modal
    ═══════════════════════════════════════════ */
 html[data-admin-theme="dark"] .np-overlay {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.88);
 }
 html[data-admin-theme="dark"] .np-modal {
   background: #2b2220;
   border-color: #3d3230;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 html[data-admin-theme="dark"] .np-title {
   color: #faf6f0;
@@ -555,6 +554,7 @@ html[data-admin-theme="dark"] .np-field textarea::placeholder {
 html[data-admin-theme="dark"] .np-dropdown-list {
   background: #2b2220;
   border-color: #3d3230;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 html[data-admin-theme="dark"] .np-dropdown-option {
   color: #faf6f0;
@@ -586,9 +586,6 @@ html[data-admin-theme="dark"] .np-btn-cancel {
   border-color: #3d3230;
   color: #a89b92;
 }
-html[data-admin-theme="dark"] .np-footer {
-  border-top-color: #3d3230;
-}
 html[data-admin-theme="dark"] .np-close {
   background: #1a1412;
   border-color: #3d3230;
@@ -603,11 +600,12 @@ html[data-admin-theme="dark"] .np-close:hover {
    Categorias Modal
    ═══════════════════════════════════════════ */
 html[data-admin-theme="dark"] .catm-overlay {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.88);
 }
 html[data-admin-theme="dark"] .catm-modal {
   background: #2b2220;
   border-color: #3d3230;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 html[data-admin-theme="dark"] .catm-title,
 html[data-admin-theme="dark"] .catm-cat-name {
@@ -631,9 +629,6 @@ html[data-admin-theme="dark"] .catm-cat-emoji {
 html[data-admin-theme="dark"] .catm-cat-badge--custom {
   background: #24352c;
   color: #7fc7a0;
-}
-html[data-admin-theme="dark"] .catm-footer {
-  border-top-color: #3d3230;
 }
 html[data-admin-theme="dark"] .catm-close {
   background: #1a1412;
@@ -677,13 +672,15 @@ html[data-admin-theme="dark"] .catm-btn-close {
    Novo Pedido Modal
    ═══════════════════════════════════════════ */
 html[data-admin-theme="dark"] .nped-overlay {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.88);
 }
 html[data-admin-theme="dark"] .nped-modal {
   background: #2b2220;
   border-color: #3d3230;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
-html[data-admin-theme="dark"] .nped-title {
+html[data-admin-theme="dark"] .nped-title,
+html[data-admin-theme="dark"] .nped-items-title {
   color: #faf6f0;
 }
 html[data-admin-theme="dark"] .nped-subtitle,
@@ -723,15 +720,10 @@ html[data-admin-theme="dark"] .nped-items-card {
   background: #1a1412;
   border-color: #3d3230;
 }
-html[data-admin-theme="dark"] .nped-divider {
-  background: #3d3230;
-}
-html[data-admin-theme="dark"] .nped-footer {
-  border-top-color: #3d3230;
-}
 html[data-admin-theme="dark"] .nped-dropdown-list {
   background: #1a1412;
   border-color: #3d3230;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 html[data-admin-theme="dark"] .nped-dropdown-option {
   color: #faf6f0;
@@ -755,11 +747,12 @@ html[data-admin-theme="dark"] .nped-btn-cancel {
    Novo Admin Modal
    ═══════════════════════════════════════════ */
 html[data-admin-theme="dark"] .nadm-overlay {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.88);
 }
 html[data-admin-theme="dark"] .nadm-modal {
   background: #2b2220;
   border-color: #3d3230;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 html[data-admin-theme="dark"] .nadm-title {
   color: #faf6f0;
@@ -793,9 +786,6 @@ html[data-admin-theme="dark"] .nadm-btn-cancel {
   border-color: #3d3230;
   color: #a89b92;
 }
-html[data-admin-theme="dark"] .nadm-footer {
-  border-top-color: #3d3230;
-}
 html[data-admin-theme="dark"] .nadm-close {
   background: #1a1412;
   border-color: #3d3230;
@@ -816,6 +806,7 @@ html[data-admin-theme="dark"] .nadm-eye-btn:hover {
 html[data-admin-theme="dark"] .nadm-dropdown-list {
   background: #1a1412;
   border-color: #3d3230;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 html[data-admin-theme="dark"] .nadm-dropdown-option {
   color: #faf6f0;
