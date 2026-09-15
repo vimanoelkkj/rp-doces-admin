@@ -240,6 +240,14 @@
   font-size: 13px;
 }
 
+.ped-empty-message {
+  padding: 32px 16px;
+  text-align: center;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #8c7a76;
+}
+
 .ped-td-id {
   width: 100px;
   font-weight: 700;
