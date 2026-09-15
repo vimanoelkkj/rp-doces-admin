@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AdminSidebar from "../components/AdminSidebar";
+import AdminWave from "../components/AdminWave";
 import PedidoDetalheModal from "./PedidoDetalheModal";
 import type { OrderDetail } from "./PedidoDetalheModal";
 import "./AdminPedidos.css";
@@ -115,6 +116,7 @@ export default function AdminPedidos() {
 
   return (
     <div className="admin-layout">
+      <AdminWave />
       <AdminSidebar />
 
       <main className="admin-main">

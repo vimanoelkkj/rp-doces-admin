@@ -1,4 +1,5 @@
 import AdminSidebar from "../components/AdminSidebar";
+import AdminWave from "../components/AdminWave";
 import "./AdminDashboard.css";
 
 /* ── Icon components ── */
@@ -174,6 +175,7 @@ function getTodayFormatted(): string {
 export default function AdminDashboard() {
   return (
     <div className="admin-layout">
+      <AdminWave />
       <AdminSidebar />
 
       <main className="admin-main">
