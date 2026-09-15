@@ -218,6 +218,13 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prod-card-emoji {
+  font-size: 48px;
 }
 
 .prod-card-content {

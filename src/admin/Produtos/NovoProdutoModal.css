@@ -411,6 +411,13 @@
 }
 
 /* ── Footer ── */
+.np-error {
+  color: #c0392b;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  margin: 0;
+}
+
 .np-footer {
   display: flex;
   justify-content: flex-end;
