@@ -15,6 +15,7 @@ import AdminPedidos from "./admin/Pedidos";
 import AdminAdministradores from "./admin/Administradores";
 import AdminLoja from "./admin/Loja";
 import AdminLayout from "./admin/components/AdminLayout";
+import { AdminThemeProvider } from "./admin/theme/AdminThemeContext";
 import "./admin/theme/admin-dark-theme.css";
 
 function StorefrontRoutes() {
@@ -46,7 +47,14 @@ function StorefrontRoutes() {
 function AdminRoutes() {
   return (
     <Routes>
-      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route
+        path="/admin/login"
+        element={
+          <AdminThemeProvider>
+            <AdminLogin />
+          </AdminThemeProvider>
+        }
+      />
       <Route element={<AdminLayout />}>
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/produtos" element={<AdminProdutos />} />
