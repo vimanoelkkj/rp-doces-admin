@@ -354,6 +354,10 @@ html[data-admin-theme="dark"] .pedmodal-badge--blue {
   background: #16232e;
   color: #6bb6e5;
 }
+html[data-admin-theme="dark"] .pedmodal-badge--red {
+  background: #3b1a17;
+  color: #e08276;
+}
 html[data-admin-theme="dark"] .ped-btn-primary {
   background: #d38b80;
   color: #ffffff;
@@ -381,6 +385,25 @@ html[data-admin-theme="dark"] .pedmodal-btn-advance {
 }
 html[data-admin-theme="dark"] .pedmodal-btn-advance:hover {
   background: #c17a6f;
+}
+html[data-admin-theme="dark"] .pedmodal-status-menu {
+  background: #2b2220;
+  border-color: #3d3230;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+html[data-admin-theme="dark"] .pedmodal-status-option {
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .pedmodal-status-option:hover,
+html[data-admin-theme="dark"] .pedmodal-status-option--current {
+  background: #3d3230;
+}
+html[data-admin-theme="dark"] .pedmodal-status-option--danger {
+  color: #e08276;
+}
+html[data-admin-theme="dark"] .pedmodal-status-error {
+  background: #3b1a17;
+  color: #e08276;
 }
 html[data-admin-theme="dark"] .pedmodal-btn-edit,
 html[data-admin-theme="dark"] .pedmodal-btn-close {

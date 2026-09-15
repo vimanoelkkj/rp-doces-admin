@@ -82,7 +82,7 @@ interface PedidoItemRow {
 }
 
 interface PedidoDetalheResponse {
-  pedido: { id: number; status_preparo: string };
+  pedido: { id: number; status_pedido: string };
   itens: PedidoItemRow[];
 }
 
