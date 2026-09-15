@@ -323,6 +323,33 @@
   color: #634738;
 }
 
+.np-photo-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.np-photo-remove {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  color: #c0392b;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.np-photo-remove:hover {
+  color: #96271b;
+}
+
+.np-photo-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .np-photo-hint {
   font-family: "Manrope", sans-serif;
   font-weight: 400;
