@@ -10,10 +10,10 @@ interface PedidoDetalheRow {
   id: number;
   cliente_nome: string;
   cliente_whatsapp: string;
-  recado: string;
+  observacao: string;
   valor_total_centavos: number;
   status_pagamento: string;
-  status_preparo: string;
+  status_pedido: string;
   criado_em: string;
   pago_em: string | null;
 }
@@ -28,14 +28,17 @@ interface PedidoItemRow {
 }
 
 interface StatusInput {
-  statusPreparo?: string;
+  statusPedido?: string;
 }
 
-const ORDEM_STATUS_PREPARO = [
-  "RECEBIDO",
-  "EM_PREPARACAO",
-  "PRONTO_PARA_RETIRADA",
-  "RETIRADO",
+// Mesmo enum de produção (order.model.ts / OrderStatusSelect.tsx). Sem
+// CHECK no banco de propósito — produção também valida só em código.
+const STATUS_PEDIDO_VALIDOS = [
+  "NOVO",
+  "PREPARANDO",
+  "PRONTO",
+  "ENTREGUE",
+  "CANCELADO",
 ];
 
 function jsonError(message: string, status: number) {
@@ -57,8 +60,8 @@ export const onRequestGet: PagesFunction<Env> = async ({
 
   try {
     const pedido = await env.DB.prepare(
-      `SELECT id, cliente_nome, cliente_whatsapp, recado, valor_total_centavos,
-              status_pagamento, status_preparo, criado_em, pago_em
+      `SELECT id, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
+              status_pagamento, status_pedido, criado_em, pago_em
        FROM pedidos WHERE id = ?`,
     )
       .bind(id)
@@ -105,37 +108,41 @@ export const onRequestPatch: PagesFunction<Env> = async ({
     return jsonError("JSON inválido", 400);
   }
 
-  const novoStatus = body.statusPreparo;
-  if (!novoStatus || !ORDEM_STATUS_PREPARO.includes(novoStatus)) {
+  const novoStatus = body.statusPedido;
+  if (!novoStatus || !STATUS_PEDIDO_VALIDOS.includes(novoStatus)) {
     return jsonError("Status inválido", 400);
   }
 
   try {
     const pedido = await env.DB.prepare(
-      `SELECT status_preparo FROM pedidos WHERE id = ?`,
+      `SELECT status_pagamento FROM pedidos WHERE id = ?`,
     )
       .bind(id)
-      .first<{ status_preparo: string }>();
+      .first<{ status_pagamento: string }>();
 
     if (!pedido) {
       return jsonError("Pedido não encontrado", 404);
     }
 
-    const indiceAtual = ORDEM_STATUS_PREPARO.indexOf(pedido.status_preparo);
-    const indiceNovo = ORDEM_STATUS_PREPARO.indexOf(novoStatus);
-    if (indiceNovo !== indiceAtual + 1) {
-      return jsonError("Só é possível avançar para o próximo status", 400);
+    // Guarda-corpo interino: sem pedido_pagamentos (Passo 4) ainda,
+    // status_pagamento='PAGO' é a melhor informação financeira disponível.
+    // TODO(Passo 4): trocar por uma checagem no razão financeiro real.
+    if (novoStatus === "CANCELADO" && pedido.status_pagamento === "PAGO") {
+      return jsonError(
+        "Pagamento confirmado. Faça o estorno antes de cancelar.",
+        409,
+      );
     }
 
     await env.DB.prepare(
-      `UPDATE pedidos SET status_preparo = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE pedidos SET status_pedido = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
     )
       .bind(novoStatus, id)
       .run();
 
-    return Response.json({ ok: true, statusPreparo: novoStatus });
+    return Response.json({ ok: true, statusPedido: novoStatus });
   } catch (err) {
-    console.error("Erro ao avançar status do pedido (admin)", err);
-    return jsonError("Erro interno ao avançar status do pedido", 500);
+    console.error("Erro ao alterar status do pedido (admin)", err);
+    return jsonError("Erro interno ao alterar status do pedido", 500);
   }
 };

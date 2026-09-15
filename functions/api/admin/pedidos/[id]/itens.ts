@@ -64,16 +64,16 @@ export const onRequestPut: PagesFunction<Env> = async ({
 
   try {
     const pedido = await env.DB.prepare(
-      `SELECT status_preparo FROM pedidos WHERE id = ?`,
+      `SELECT status_pedido FROM pedidos WHERE id = ?`,
     )
       .bind(id)
-      .first<{ status_preparo: string }>();
+      .first<{ status_pedido: string }>();
 
     if (!pedido) {
       return jsonError("Pedido não encontrado", 404);
     }
-    if (pedido.status_preparo === "RETIRADO") {
-      return jsonError("Pedido já retirado não pode ser editado", 400);
+    if (pedido.status_pedido === "ENTREGUE") {
+      return jsonError("Pedido já entregue não pode ser editado", 400);
     }
 
     const ids = [...new Set(body.itens.map((i) => i.produtoId))];

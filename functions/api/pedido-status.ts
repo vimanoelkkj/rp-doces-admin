@@ -27,7 +27,7 @@ async function handleStatus(request: Request, env: Env): Promise<Response> {
   }
 
   const pedido = await env.DB.prepare(
-    `SELECT id, token_publico, status_pagamento, status_preparo, mp_payment_id, pix_expira_em
+    `SELECT id, token_publico, status_pagamento, status_pedido, mp_payment_id, pix_expira_em
      FROM pedidos WHERE token_publico = ?`,
   )
     .bind(token)

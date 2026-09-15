@@ -25,8 +25,8 @@ interface CheckoutResponse {
 
 interface PedidoStatusResponse {
   pedidoId: number;
-  statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO";
-  statusPreparo: string;
+  statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO" | "REEMBOLSADO";
+  statusPedido: string;
 }
 
 const POLL_INTERVAL_MS = 4000;

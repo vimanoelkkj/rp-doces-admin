@@ -128,7 +128,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   // o pedido fica registrado como PENDENTE em vez de se perder.
   const pedidoInsert = await env.DB.prepare(
     `INSERT INTO pedidos
-       (token_publico, cliente_nome, cliente_whatsapp, recado, valor_total_centavos, idempotency_key)
+       (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos, idempotency_key)
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
     .bind(

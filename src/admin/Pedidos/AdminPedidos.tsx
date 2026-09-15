@@ -5,11 +5,7 @@ import "./AdminPedidos.css";
 import NovoPedidoModal from "./NovoPedidoModal";
 
 /* ── Types (espelham o retorno de GET /api/admin/pedidos) ── */
-type StatusPreparo =
-  | "RECEBIDO"
-  | "EM_PREPARACAO"
-  | "PRONTO_PARA_RETIRADA"
-  | "RETIRADO";
+type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
 
 type TabFilter = "todos" | "hoje" | "em_producao" | "prontos" | "entregues";
 
@@ -17,7 +13,7 @@ interface PedidoListItem {
   id: number;
   cliente_nome: string;
   valor_total_centavos: number;
-  status_preparo: StatusPreparo;
+  status_pedido: StatusPedido;
   criado_em: string;
 }
 
@@ -49,17 +45,17 @@ const TABS: { key: TabFilter; label: string }[] = [
 const formatarPreco = (centavos: number) =>
   `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
-const statusLabel = (s: StatusPreparo) =>
-  s === "RETIRADO"
+const statusLabel = (s: StatusPedido) =>
+  s === "ENTREGUE"
     ? "Entregue"
-    : s === "PRONTO_PARA_RETIRADA"
+    : s === "PRONTO"
       ? "Pronto"
       : "Em produção";
 
-const statusClass = (s: StatusPreparo) =>
-  s === "RETIRADO"
+const statusClass = (s: StatusPedido) =>
+  s === "ENTREGUE"
     ? "ped-badge--green"
-    : s === "PRONTO_PARA_RETIRADA"
+    : s === "PRONTO"
       ? "ped-badge--blue"
       : "ped-badge--orange";
 
@@ -223,9 +219,9 @@ export default function AdminPedidos() {
               </span>
               <span className="ped-td ped-td-status">
                 <span
-                  className={`ped-badge ${statusClass(pedido.status_preparo)}`}
+                  className={`ped-badge ${statusClass(pedido.status_pedido)}`}
                 >
-                  {statusLabel(pedido.status_preparo)}
+                  {statusLabel(pedido.status_pedido)}
                 </span>
               </span>
               <span className="ped-td ped-td-payment">

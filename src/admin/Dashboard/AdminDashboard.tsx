@@ -36,11 +36,7 @@ const IconAlert = () => (
 );
 
 /* ── Types (espelham o retorno de GET /api/admin/dashboard) ── */
-type StatusPreparo =
-  | "RECEBIDO"
-  | "EM_PREPARACAO"
-  | "PRONTO_PARA_RETIRADA"
-  | "RETIRADO";
+type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
 
 interface ValorContagem {
   count: number;
@@ -57,7 +53,7 @@ interface PedidoRecenteRow {
   id: number;
   cliente_nome: string;
   valor_total_centavos: number;
-  status_preparo: StatusPreparo;
+  status_pedido: StatusPedido;
   itens_count: number;
 }
 
@@ -83,17 +79,17 @@ function formatDateISO(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-const statusLabel = (s: StatusPreparo) =>
-  s === "RETIRADO"
+const statusLabel = (s: StatusPedido) =>
+  s === "ENTREGUE"
     ? "Entregue"
-    : s === "PRONTO_PARA_RETIRADA"
+    : s === "PRONTO"
       ? "Pronto"
       : "Em produção";
 
-const statusClass = (s: StatusPreparo) =>
-  s === "RETIRADO"
+const statusClass = (s: StatusPedido) =>
+  s === "ENTREGUE"
     ? "dash-badge--green"
-    : s === "PRONTO_PARA_RETIRADA"
+    : s === "PRONTO"
       ? "dash-badge--blue"
       : "dash-badge--orange";
 
@@ -381,9 +377,9 @@ export default function AdminDashboard() {
                 </span>
                 <span className="dash-td dash-td-status">
                   <span
-                    className={`dash-badge ${statusClass(order.status_preparo)}`}
+                    className={`dash-badge ${statusClass(order.status_pedido)}`}
                   >
-                    {statusLabel(order.status_preparo)}
+                    {statusLabel(order.status_pedido)}
                   </span>
                 </span>
                 <span className="dash-td dash-td-total">

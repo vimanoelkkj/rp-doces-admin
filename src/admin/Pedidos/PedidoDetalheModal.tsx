@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "./PedidoDetalheModal.css";
 
@@ -11,14 +11,16 @@ interface PedidoItemRow {
   valor_total_centavos: number;
 }
 
+type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
+
 interface PedidoRow {
   id: number;
   cliente_nome: string;
   cliente_whatsapp: string;
-  recado: string;
+  observacao: string;
   valor_total_centavos: number;
   status_pagamento: string;
-  status_preparo: "RECEBIDO" | "EM_PREPARACAO" | "PRONTO_PARA_RETIRADA" | "RETIRADO";
+  status_pedido: StatusPedido;
   criado_em: string;
   pago_em: string | null;
 }
@@ -47,32 +49,30 @@ const formatarData = (isoLike: string) =>
     minute: "2-digit",
   });
 
-const STATUS_LABEL: Record<PedidoRow["status_preparo"], string> = {
-  RECEBIDO: "Em produção",
-  EM_PREPARACAO: "Em produção",
-  PRONTO_PARA_RETIRADA: "Pronto",
-  RETIRADO: "Entregue",
+// Mesmo enum de produção (order.model.ts / OrderStatusSelect.tsx) — o admin
+// pode escolher qualquer status livremente, sem avanço linear forçado.
+const STATUS_PEDIDO_OPCOES: StatusPedido[] = [
+  "NOVO",
+  "PREPARANDO",
+  "PRONTO",
+  "ENTREGUE",
+  "CANCELADO",
+];
+
+const STATUS_LABEL: Record<StatusPedido, string> = {
+  NOVO: "Novo",
+  PREPARANDO: "Em produção",
+  PRONTO: "Pronto",
+  ENTREGUE: "Entregue",
+  CANCELADO: "Cancelado",
 };
 
-const STATUS_TYPE: Record<PedidoRow["status_preparo"], "green" | "orange" | "blue"> = {
-  RECEBIDO: "orange",
-  EM_PREPARACAO: "orange",
-  PRONTO_PARA_RETIRADA: "blue",
-  RETIRADO: "green",
-};
-
-const PROXIMO_STATUS: Record<PedidoRow["status_preparo"], PedidoRow["status_preparo"] | null> = {
-  RECEBIDO: "EM_PREPARACAO",
-  EM_PREPARACAO: "PRONTO_PARA_RETIRADA",
-  PRONTO_PARA_RETIRADA: "RETIRADO",
-  RETIRADO: null,
-};
-
-const AVANCAR_LABEL: Record<PedidoRow["status_preparo"], string> = {
-  RECEBIDO: "Marcar em preparação",
-  EM_PREPARACAO: "Marcar como pronto",
-  PRONTO_PARA_RETIRADA: "Marcar como retirado",
-  RETIRADO: "",
+const STATUS_TYPE: Record<StatusPedido, "green" | "orange" | "blue" | "red"> = {
+  NOVO: "orange",
+  PREPARANDO: "orange",
+  PRONTO: "blue",
+  ENTREGUE: "green",
+  CANCELADO: "red",
 };
 
 /* ── Component ── */
@@ -85,7 +85,10 @@ export default function PedidoDetalheModal({
   const [data, setData] = useState<PedidoDetalheResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [avancando, setAvancando] = useState(false);
+  const [alterando, setAlterando] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const statusMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -102,28 +105,45 @@ export default function PedidoDetalheModal({
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  const avancarStatus = () => {
-    if (!data) return;
-    const proximo = PROXIMO_STATUS[data.pedido.status_preparo];
-    if (!proximo) return;
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        statusMenuRef.current &&
+        !statusMenuRef.current.contains(e.target as Node)
+      ) {
+        setStatusMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [statusMenuOpen]);
 
-    setAvancando(true);
+  const alterarStatus = (novoStatus: StatusPedido) => {
+    setStatusMenuOpen(false);
+    if (!data || novoStatus === data.pedido.status_pedido) return;
+
+    setAlterando(true);
+    setStatusError(null);
     fetch(`/api/admin/pedidos/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ statusPreparo: proximo }),
+      body: JSON.stringify({ statusPedido: novoStatus }),
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error("Falha ao avançar status");
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error ?? "Falha ao alterar status");
+        }
         setData((prev) =>
           prev
-            ? { ...prev, pedido: { ...prev.pedido, status_preparo: proximo } }
+            ? { ...prev, pedido: { ...prev.pedido, status_pedido: novoStatus } }
             : prev,
         );
         onStatusChanged?.();
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setAvancando(false));
+      .catch((err) => setStatusError(err.message))
+      .finally(() => setAlterando(false));
   };
 
   return createPortal(
@@ -136,16 +156,38 @@ export default function PedidoDetalheModal({
             {data ? ` - ${data.pedido.cliente_nome}` : ""}
           </h2>
           <div className="pedmodal-header-actions">
-            {data && PROXIMO_STATUS[data.pedido.status_preparo] && (
-              <button
-                className="pedmodal-btn-advance"
-                onClick={avancarStatus}
-                disabled={avancando}
-              >
-                {AVANCAR_LABEL[data.pedido.status_preparo]}
-              </button>
+            {data && (
+              <div className="pedmodal-status-dropdown" ref={statusMenuRef}>
+                <button
+                  type="button"
+                  className="pedmodal-btn-advance"
+                  onClick={() => setStatusMenuOpen((open) => !open)}
+                  disabled={alterando}
+                >
+                  Alterar status
+                </button>
+                {statusMenuOpen && (
+                  <ul className="pedmodal-status-menu">
+                    {STATUS_PEDIDO_OPCOES.map((status) => (
+                      <li key={status}>
+                        <button
+                          type="button"
+                          className={`pedmodal-status-option${
+                            status === data.pedido.status_pedido
+                              ? " pedmodal-status-option--current"
+                              : ""
+                          }${status === "CANCELADO" ? " pedmodal-status-option--danger" : ""}`}
+                          onClick={() => alterarStatus(status)}
+                        >
+                          {STATUS_LABEL[status]}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
-            {data && data.pedido.status_preparo !== "RETIRADO" && (
+            {data && data.pedido.status_pedido !== "ENTREGUE" && (
               <button className="pedmodal-btn-edit" onClick={onEdit}>
                 Editar pedido
               </button>
@@ -174,15 +216,18 @@ export default function PedidoDetalheModal({
         {error && <div className="pedmodal-body">{error}</div>}
         {data && (
           <div className="pedmodal-body">
+            {statusError && (
+              <p className="pedmodal-status-error">{statusError}</p>
+            )}
             {/* Meta badges */}
             <div className="pedmodal-meta">
               <span className="pedmodal-badge pedmodal-badge--comanda">
                 Comanda #{data.pedido.id}
               </span>
               <span
-                className={`pedmodal-badge pedmodal-badge--${STATUS_TYPE[data.pedido.status_preparo]}`}
+                className={`pedmodal-badge pedmodal-badge--${STATUS_TYPE[data.pedido.status_pedido]}`}
               >
-                {STATUS_LABEL[data.pedido.status_preparo]}
+                {STATUS_LABEL[data.pedido.status_pedido]}
               </span>
               <span className="pedmodal-meta-date">
                 <svg

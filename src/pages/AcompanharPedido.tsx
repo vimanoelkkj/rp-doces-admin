@@ -17,15 +17,15 @@ interface PedidoDetalhe {
   valorTotalCentavos: number;
   criadoEm: string;
   itens: PedidoItem[];
-  statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO";
-  statusPreparo: "RECEBIDO" | "EM_PREPARACAO" | "PRONTO_PARA_RETIRADA" | "RETIRADO";
+  statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO" | "REEMBOLSADO";
+  statusPedido: "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
 }
 
-const STEPS: { key: PedidoDetalhe["statusPreparo"]; label: string }[] = [
-  { key: "RECEBIDO", label: "Pedido recebido" },
-  { key: "EM_PREPARACAO", label: "Em preparação" },
-  { key: "PRONTO_PARA_RETIRADA", label: "Pronto para retirada" },
-  { key: "RETIRADO", label: "Retirado" },
+const STEPS: { key: PedidoDetalhe["statusPedido"]; label: string }[] = [
+  { key: "NOVO", label: "Pedido recebido" },
+  { key: "PREPARANDO", label: "Em preparação" },
+  { key: "PRONTO", label: "Pronto para retirada" },
+  { key: "ENTREGUE", label: "Retirado" },
 ];
 
 const STATUS_PAGAMENTO_LABEL: Record<PedidoDetalhe["statusPagamento"], string> = {
@@ -33,6 +33,7 @@ const STATUS_PAGAMENTO_LABEL: Record<PedidoDetalhe["statusPagamento"], string> =
   PAGO: "✓ Confirmado",
   CANCELADO: "Pagamento não aprovado",
   EXPIRADO: "Pix expirado",
+  REEMBOLSADO: "Reembolsado",
 };
 
 export default function AcompanharPedido() {
@@ -57,7 +58,7 @@ export default function AcompanharPedido() {
   }, [token]);
 
   const currentIndex = pedido
-    ? STEPS.findIndex((s) => s.key === pedido.statusPreparo)
+    ? STEPS.findIndex((s) => s.key === pedido.statusPedido)
     : -1;
 
   return (
