@@ -867,3 +867,111 @@ html[data-admin-theme="dark"] .nadm-dropdown-option--active {
   background: #3d2e2b;
   color: #faf6f0;
 }
+
+/* ═══════════════════════════════════════════
+   Admin Login
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .admin-login-page {
+  background-color: #1a1412;
+}
+html[data-admin-theme="dark"] .admin-login-wave path {
+  fill: #2e2420;
+}
+html[data-admin-theme="dark"] .admin-login-card {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .admin-login-theme-toggle {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-theme-toggle:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-logo-text {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-badge {
+  background: #3d2e2b;
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .admin-login-welcome h1 {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-welcome p {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-biometry {
+  background: #1a1412;
+}
+html[data-admin-theme="dark"] .admin-login-biometry:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .admin-login-biometry-icon {
+  background: #2b2220;
+}
+html[data-admin-theme="dark"] .admin-login-biometry-text strong {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-biometry-text span {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-divider-line {
+  background: #3d3230;
+}
+html[data-admin-theme="dark"] .admin-login-divider-text {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-label {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-input-box {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .admin-login-input-box input {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-input-box input::placeholder {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-eye-toggle svg {
+  stroke: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-error {
+  color: #e5807a;
+}
+html[data-admin-theme="dark"] .admin-login-user-identity {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .admin-login-avatar {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-user-text strong {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-user-text span {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-change-user {
+  background: #2b2220;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-change-user:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-forgot {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .admin-login-forgot:hover {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .admin-login-footer-text {
+  color: #a89b92;
+}

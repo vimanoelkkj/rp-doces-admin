@@ -41,6 +41,31 @@
   gap: 32px;
 }
 
+/* ===== Theme toggle ===== */
+.admin-login-theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #634738;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.admin-login-theme-toggle:hover {
+  background: #f5efe8;
+  border-color: #634738;
+}
+
 /* ===== Card Header (Logo + Badge) ===== */
 .admin-login-card-header {
   display: flex;
@@ -51,19 +76,50 @@
 
 .admin-login-logo-group {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .admin-login-logo-circle {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #f7ecee;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+}
+
+.admin-login-logo-circle svg {
+  width: 44px;
+  height: 44px;
+}
+
+/* ── Cake logo — bolo parado, só velinhas piscando (mesmo padrão da sidebar) ── */
+.admin-login-cake .flame {
+  transform-origin: center bottom;
+  animation: adminLoginFlicker 1.2s ease-in-out infinite;
+}
+
+.admin-login-cake .flame-2 {
+  animation-delay: 0.3s;
+}
+
+.admin-login-cake .flame-3 {
+  animation-delay: 0.6s;
+}
+
+@keyframes adminLoginFlicker {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  30% {
+    opacity: 0.6;
+    transform: scale(0.8, 1.3) translateY(-1px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.1, 0.9) translateY(0.5px);
+  }
 }
 
 .admin-login-logo-text {
@@ -255,6 +311,14 @@
   flex-shrink: 0;
 }
 
+.admin-login-error {
+  color: #c0392b;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  margin: 0;
+  text-align: center;
+}
+
 /* ===== Submit Button ===== */
 .admin-login-submit {
   width: 100%;
@@ -275,6 +339,12 @@
 .admin-login-submit:hover {
   background: #c47a6f;
   transform: translateY(-1px);
+}
+
+.admin-login-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
 }
 
 .admin-login-submit:active {
