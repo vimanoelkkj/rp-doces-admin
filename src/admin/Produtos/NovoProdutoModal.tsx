@@ -92,6 +92,18 @@ const EMOJI_CHARS = [
   "🍪",
 ];
 
+const R2_IMAGE_KEY_PATTERN = /^product-\d+-[0-9a-f-]+\.(?:jpg|png|webp)$/i;
+
+// Fotos enviadas pelo novo upload (R2) seguem o padrão `product-{id}-{uuid}.ext`
+// e são servidas via /api/images/:key; fotos de seed antigas são arquivos
+// estáticos servidos direto de /images/:nome.
+export function imageUrlFor(key: string | null): string | null {
+  if (!key) return null;
+  return R2_IMAGE_KEY_PATTERN.test(key)
+    ? `/api/images/${encodeURIComponent(key)}`
+    : `/images/${key}`;
+}
+
 interface NovoProdutoModalProps {
   open: boolean;
   onClose: () => void;
@@ -120,15 +132,64 @@ export default function NovoProdutoModal({
   const [catOpen, setCatOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    if (!isEdit) {
+      // Sem id ainda (produto novo): só preview local, upload de verdade
+      // só é possível depois que o produto existir (mesmo padrão do backend).
       const reader = new FileReader();
       reader.onloadend = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
+      return;
     }
+
+    setUploadingImage(true);
+    setError(null);
+    const formData = new FormData();
+    formData.append("image", file);
+    fetch(`/api/admin/produtos/${produto!.id}/imagem`, {
+      method: "POST",
+      body: formData,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error ?? "Falha ao enviar imagem");
+        }
+        return response.json() as Promise<{ imageUrl: string }>;
+      })
+      .then((result) => {
+        setImagePreview(result.imageUrl);
+        onSaved?.();
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Falha ao enviar imagem");
+      })
+      .finally(() => setUploadingImage(false));
+  };
+
+  const handleRemoveImage = () => {
+    if (!isEdit || uploadingImage) return;
+    setUploadingImage(true);
+    setError(null);
+    fetch(`/api/admin/produtos/${produto!.id}/imagem`, { method: "DELETE" })
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error ?? "Falha ao remover imagem");
+        }
+        setImagePreview(null);
+        onSaved?.();
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Falha ao remover imagem");
+      })
+      .finally(() => setUploadingImage(false));
   };
 
   const resetForm = () => {
@@ -159,7 +220,7 @@ export default function NovoProdutoModal({
     setSelectedEmoji(emojiIndex >= 0 ? emojiIndex : null);
     setPrice((produto.preco_centavos / 100).toFixed(2).replace(".", ","));
     setDescription(produto.descricao);
-    setImagePreview(produto.image_key ? `/images/${produto.image_key}` : null);
+    setImagePreview(imageUrlFor(produto.image_key));
     setProdutoAtivo(produto.ativo === 1);
     setDisponivelVenda(produto.disponivel === 1);
     setDestaque(produto.destaque === 1);
@@ -351,7 +412,9 @@ export default function NovoProdutoModal({
                 {imagePreview ? (
                   <img src={imagePreview} alt="Preview" />
                 ) : (
-                  <span className="np-photo-empty">Sem foto</span>
+                  <span className="np-photo-empty">
+                    {uploadingImage ? "Enviando…" : "Sem foto"}
+                  </span>
                 )}
               </div>
               <div className="np-photo-info">
@@ -359,18 +422,30 @@ export default function NovoProdutoModal({
                   type="button"
                   className="np-photo-btn"
                   onClick={() => fileRef.current?.click()}
+                  disabled={uploadingImage}
                 >
-                  ESCOLHER FOTO
+                  {uploadingImage ? "ENVIANDO…" : "ESCOLHER FOTO"}
                 </button>
+                {isEdit && imagePreview && (
+                  <button
+                    type="button"
+                    className="np-photo-remove"
+                    onClick={handleRemoveImage}
+                    disabled={uploadingImage}
+                  >
+                    REMOVER FOTO
+                  </button>
+                )}
                 <p className="np-photo-hint">
-                  A prévia usa o enquadramento do card do site. A foto é
-                  redimensionada automaticamente e enviada em WebP.
+                  {isEdit
+                    ? "JPG, PNG ou WebP, até 5 MB."
+                    : "Salve o produto primeiro para poder enviar uma foto."}
                 </p>
               </div>
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleImageChange}
                 hidden
               />
