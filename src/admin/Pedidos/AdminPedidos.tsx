@@ -77,6 +77,7 @@ export default function AdminPedidos() {
 
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [novoPedidoOpen, setNovoPedidoOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Debounce da busca
   useEffect(() => {
@@ -108,7 +109,7 @@ export default function AdminPedidos() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [activeTab, currentPage, debouncedSearch]);
+  }, [activeTab, currentPage, debouncedSearch, refreshKey]);
 
   const pedidos = data?.pedidos ?? [];
   const total = data?.total ?? 0;
@@ -304,6 +305,7 @@ export default function AdminPedidos() {
           <PedidoDetalheModal
             orderId={selectedOrderId}
             onClose={() => setSelectedOrderId(null)}
+            onStatusChanged={() => setRefreshKey((k) => k + 1)}
           />
         )}
         <NovoPedidoModal
