@@ -44,10 +44,16 @@ export interface ProdutoAdmin {
   disponivel: number;
   ativo: number;
   destaque: number;
+  promocao_ativa: number;
   estoque: number;
   estoque_reservado: number;
   emoji: string;
   image_key: string | null;
+}
+
+interface CategoriaResumo {
+  id: string;
+  nome: string;
 }
 
 type FilterTab = "todos" | "ativos" | "esgotados" | "arquivados";
@@ -68,6 +74,7 @@ export default function AdminProdutos() {
   const [activeTab, setActiveTab] = useState<FilterTab>("todos");
   const [searchQuery, setSearchQuery] = useState("");
   const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaResumo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +100,19 @@ export default function AdminProdutos() {
   };
 
   useEffect(carregarProdutos, []);
+
+  useEffect(() => {
+    fetch("/api/admin/categorias")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Falha ao carregar categorias");
+        return response.json() as Promise<{ categorias: CategoriaResumo[] }>;
+      })
+      .then((data) => setCategorias(data.categorias))
+      .catch(() => setCategorias([]));
+  }, [categoriasOpen]);
+
+  const nomeCategoria = (id: string) =>
+    categorias.find((c) => c.id === id)?.nome ?? id;
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "todos", label: "Todos" },
@@ -210,7 +230,7 @@ export default function AdminProdutos() {
                 <div className="prod-card-content">
                   <div className="prod-card-badge-row">
                     <span className="prod-category-badge">
-                      {product.categoria}
+                      {nomeCategoria(product.categoria)}
                     </span>
                   </div>
                   <h3 className="prod-card-title">{product.nome}</h3>

@@ -16,12 +16,21 @@ interface ProdutoInput {
   ativo?: boolean;
   disponivel?: boolean;
   destaque?: boolean;
+  promocaoAtiva?: boolean;
 }
 
 const MAX_TEXT_LENGTH = 1000;
 
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
+}
+
+async function categoriaValida(db: D1Database, categoria: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT ativo FROM categorias WHERE id = ?`)
+    .bind(categoria)
+    .first<{ ativo: number }>();
+  return !!row && row.ativo === 1;
 }
 
 function validarProduto(body: ProdutoInput) {
@@ -63,6 +72,11 @@ export const onRequestPut: PagesFunction<Env> = async ({
   const erro = validarProduto(body);
   if (erro) return jsonError(erro, 400);
 
+  const categoria = body.categoria!.trim();
+  if (!(await categoriaValida(env.DB, categoria))) {
+    return jsonError("Categoria inválida ou inativa", 400);
+  }
+
   try {
     const atual = await env.DB.prepare(
       `SELECT estoque_reservado FROM produtos WHERE id = ?`,
@@ -80,12 +94,12 @@ export const onRequestPut: PagesFunction<Env> = async ({
     const result = await env.DB.prepare(
       `UPDATE produtos
        SET nome = ?, categoria = ?, descricao = ?, preco_centavos = ?, estoque = ?,
-           emoji = ?, ativo = ?, disponivel = ?, destaque = ?, atualizado_em = CURRENT_TIMESTAMP
+           emoji = ?, ativo = ?, disponivel = ?, destaque = ?, promocao_ativa = ?, atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`,
     )
       .bind(
         body.nome!.trim(),
-        body.categoria!.trim(),
+        categoria,
         (body.descricao ?? "").slice(0, MAX_TEXT_LENGTH),
         body.precoCentavos,
         body.estoque,
@@ -93,6 +107,7 @@ export const onRequestPut: PagesFunction<Env> = async ({
         body.ativo === false ? 0 : 1,
         body.disponivel === false ? 0 : 1,
         body.destaque ? 1 : 0,
+        body.promocaoAtiva ? 1 : 0,
         id,
       )
       .run();

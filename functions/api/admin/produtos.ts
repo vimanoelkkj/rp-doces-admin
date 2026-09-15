@@ -16,12 +16,21 @@ interface ProdutoInput {
   ativo?: boolean;
   disponivel?: boolean;
   destaque?: boolean;
+  promocaoAtiva?: boolean;
 }
 
 const MAX_TEXT_LENGTH = 1000;
 
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
+}
+
+async function categoriaValida(db: D1Database, categoria: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT ativo FROM categorias WHERE id = ?`)
+    .bind(categoria)
+    .first<{ ativo: number }>();
+  return !!row && row.ativo === 1;
 }
 
 function validarProduto(body: ProdutoInput) {
@@ -47,7 +56,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     const { results } = await env.DB.prepare(
       `SELECT id, nome, categoria, descricao, preco_centavos, preco_promocional_centavos,
-              promocao_inicio, promocao_fim, disponivel, ativo, destaque, ordem,
+              promocao_inicio, promocao_fim, promocao_ativa, disponivel, ativo, destaque, ordem,
               estoque, estoque_reservado, emoji, image_key
        FROM produtos ORDER BY categoria, ordem, nome`,
     ).all();
@@ -72,14 +81,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const erro = validarProduto(body);
   if (erro) return jsonError(erro, 400);
 
+  const categoria = body.categoria!.trim();
+  if (!(await categoriaValida(env.DB, categoria))) {
+    return jsonError("Categoria inválida ou inativa", 400);
+  }
+
   try {
     const result = await env.DB.prepare(
-      `INSERT INTO produtos (nome, categoria, descricao, preco_centavos, estoque, emoji, ativo, disponivel, destaque)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO produtos (nome, categoria, descricao, preco_centavos, estoque, emoji, ativo, disponivel, destaque, promocao_ativa)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         body.nome!.trim(),
-        body.categoria!.trim(),
+        categoria,
         (body.descricao ?? "").slice(0, MAX_TEXT_LENGTH),
         body.precoCentavos,
         body.estoque,
@@ -87,6 +101,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         body.ativo === false ? 0 : 1,
         body.disponivel === false ? 0 : 1,
         body.destaque ? 1 : 0,
+        body.promocaoAtiva ? 1 : 0,
       )
       .run();
 

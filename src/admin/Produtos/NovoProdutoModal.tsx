@@ -70,12 +70,12 @@ const EMOJIS = [
   { icon: <EmojiCookie />, label: "Biscoito" },
 ];
 
-const categories = [
-  "🍰 Bolos no pote",
-  "🍮 Sobremesas",
-  "🍫 Trufas",
-  "🧁 Cupcakes",
-];
+interface Categoria {
+  id: string;
+  nome: string;
+  emoji: string;
+  ativo: number;
+}
 
 // Mapeia o ícone escolhido (SVG) para um emoji de verdade, salvo no produto
 // como identificador visual enquanto não há foto.
@@ -119,7 +119,8 @@ export default function NovoProdutoModal({
 }: NovoProdutoModalProps) {
   const isEdit = produto != null;
   const [name, setName] = useState("");
-  const [category, setCategory] = useState(categories[0]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [category, setCategory] = useState("");
   const [stock, setStock] = useState(0);
   const [selectedEmoji, setSelectedEmoji] = useState<number | null>(null);
   const [price, setPrice] = useState("0,00");
@@ -194,7 +195,7 @@ export default function NovoProdutoModal({
 
   const resetForm = () => {
     setName("");
-    setCategory(categories[0]);
+    setCategory(categorias[0]?.id ?? "");
     setStock(0);
     setSelectedEmoji(null);
     setPrice("0,00");
@@ -206,6 +207,20 @@ export default function NovoProdutoModal({
     setPromocao(false);
     setError(null);
   };
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/admin/categorias")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Falha ao carregar categorias");
+        return response.json() as Promise<{ categorias: Categoria[] }>;
+      })
+      .then((data) => {
+        setCategorias(data.categorias);
+        setCategory((current) => current || data.categorias[0]?.id || "");
+      })
+      .catch(() => setCategorias([]));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -224,7 +239,7 @@ export default function NovoProdutoModal({
     setProdutoAtivo(produto.ativo === 1);
     setDisponivelVenda(produto.disponivel === 1);
     setDestaque(produto.destaque === 1);
-    setPromocao(false);
+    setPromocao(produto.promocao_ativa === 1);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, produto]);
@@ -260,6 +275,7 @@ export default function NovoProdutoModal({
           ativo: produtoAtivo,
           disponivel: disponivelVenda,
           destaque,
+          promocaoAtiva: promocao,
         }),
       });
       if (!response.ok) {
@@ -321,7 +337,11 @@ export default function NovoProdutoModal({
                   onClick={() => setCatOpen(!catOpen)}
                   onBlur={() => setTimeout(() => setCatOpen(false), 150)}
                 >
-                  <span>{category}</span>
+                  <span>
+                    {categorias.find((c) => c.id === category)
+                      ? `${categorias.find((c) => c.id === category)!.emoji} ${categorias.find((c) => c.id === category)!.nome}`
+                      : "Selecione uma categoria"}
+                  </span>
                   <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
                     <path
                       d="M1 1.5L6 6.5L11 1.5"
@@ -334,20 +354,22 @@ export default function NovoProdutoModal({
                 </button>
                 {catOpen && (
                   <ul className="np-dropdown-list">
-                    {categories.map((cat) => (
-                      <li key={cat}>
-                        <button
-                          type="button"
-                          className={`np-dropdown-option ${category === cat ? "np-dropdown-option--active" : ""}`}
-                          onClick={() => {
-                            setCategory(cat);
-                            setCatOpen(false);
-                          }}
-                        >
-                          {cat}
-                        </button>
-                      </li>
-                    ))}
+                    {categorias
+                      .filter((cat) => cat.ativo === 1 || cat.id === category)
+                      .map((cat) => (
+                        <li key={cat.id}>
+                          <button
+                            type="button"
+                            className={`np-dropdown-option ${category === cat.id ? "np-dropdown-option--active" : ""}`}
+                            onClick={() => {
+                              setCategory(cat.id);
+                              setCatOpen(false);
+                            }}
+                          >
+                            {cat.emoji} {cat.nome}
+                          </button>
+                        </li>
+                      ))}
                   </ul>
                 )}
               </div>
