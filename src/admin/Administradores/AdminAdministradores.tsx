@@ -1,6 +1,4 @@
 import { useState } from "react";
-import AdminSidebar from "../components/AdminSidebar";
-import AdminWave from "../components/AdminWave";
 import "./AdminAdministradores.css";
 import NovoAdminModal from "./NovoAdminModal";
 
@@ -132,11 +130,7 @@ export default function AdminAdministradores() {
   ).length;
 
   return (
-    <div className="adm-layout">
-      <AdminWave />
-      <AdminSidebar />
-
-      <main className="adm-main">
+    <main className="adm-main">
         {/* ── Header ── */}
         <header className="adm-header">
           <div>
@@ -254,6 +248,5 @@ export default function AdminAdministradores() {
           onClose={() => setNovoAdminOpen(false)}
         />
       </main>
-    </div>
   );
 }
