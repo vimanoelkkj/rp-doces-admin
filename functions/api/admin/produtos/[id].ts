@@ -60,6 +60,19 @@ export const onRequestPut: PagesFunction<Env> = async ({
   if (erro) return jsonError(erro, 400);
 
   try {
+    const atual = await env.DB.prepare(
+      `SELECT estoque_reservado FROM produtos WHERE id = ?`,
+    )
+      .bind(id)
+      .first<{ estoque_reservado: number }>();
+
+    if (atual && body.estoque! < atual.estoque_reservado) {
+      return jsonError(
+        `Não é possível reduzir o estoque para ${body.estoque}, pois existem ${atual.estoque_reservado} unidade(s) reservada(s) em pedidos pendentes`,
+        409,
+      );
+    }
+
     const result = await env.DB.prepare(
       `UPDATE produtos
        SET nome = ?, categoria = ?, descricao = ?, preco_centavos = ?, estoque = ?,

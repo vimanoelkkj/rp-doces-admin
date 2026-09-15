@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import type { ProdutoAdmin } from "./AdminProdutos";
 import "./NovoProdutoModal.css";
 import {
   EmojiCake,
@@ -94,14 +95,17 @@ const EMOJI_CHARS = [
 interface NovoProdutoModalProps {
   open: boolean;
   onClose: () => void;
-  onCreated?: () => void;
+  onSaved?: () => void;
+  produto?: ProdutoAdmin | null;
 }
 
 export default function NovoProdutoModal({
   open,
   onClose,
-  onCreated,
+  onSaved,
+  produto,
 }: NovoProdutoModalProps) {
+  const isEdit = produto != null;
   const [name, setName] = useState("");
   const [category, setCategory] = useState(categories[0]);
   const [stock, setStock] = useState(0);
@@ -142,6 +146,28 @@ export default function NovoProdutoModal({
     setError(null);
   };
 
+  useEffect(() => {
+    if (!open) return;
+    if (!produto) {
+      resetForm();
+      return;
+    }
+    setName(produto.nome);
+    setCategory(produto.categoria);
+    setStock(produto.estoque);
+    const emojiIndex = EMOJI_CHARS.indexOf(produto.emoji);
+    setSelectedEmoji(emojiIndex >= 0 ? emojiIndex : null);
+    setPrice((produto.preco_centavos / 100).toFixed(2).replace(".", ","));
+    setDescription(produto.descricao);
+    setImagePreview(produto.image_key ? `/images/${produto.image_key}` : null);
+    setProdutoAtivo(produto.ativo === 1);
+    setDisponivelVenda(produto.disponivel === 1);
+    setDestaque(produto.destaque === 1);
+    setPromocao(false);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, produto]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
@@ -157,8 +183,11 @@ export default function NovoProdutoModal({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch("/api/admin/produtos", {
-        method: "POST",
+      const url = isEdit
+        ? `/api/admin/produtos/${produto!.id}`
+        : "/api/admin/produtos";
+      const response = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome: name,
@@ -177,7 +206,7 @@ export default function NovoProdutoModal({
         throw new Error(body.error || "Falha ao salvar produto");
       }
       resetForm();
-      onCreated?.();
+      onSaved?.();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar produto");
@@ -194,9 +223,13 @@ export default function NovoProdutoModal({
         <div className="np-header">
           <div>
             <span className="np-kicker">CATÁLOGO</span>
-            <h2 className="np-title">Novo produto</h2>
+            <h2 className="np-title">
+              {isEdit ? "Editar produto" : "Novo produto"}
+            </h2>
             <p className="np-subtitle">
-              Cadastre um doce e ele já entra no catálogo administrativo.
+              {isEdit
+                ? "Atualize as informações deste doce no catálogo."
+                : "Cadastre um doce e ele já entra no catálogo administrativo."}
             </p>
           </div>
           <button className="np-close" onClick={onClose}>
@@ -412,7 +445,11 @@ export default function NovoProdutoModal({
               Cancelar
             </button>
             <button type="submit" className="np-btn-save" disabled={saving}>
-              {saving ? "Salvando…" : "Salvar produto"}
+              {saving
+                ? "Salvando…"
+                : isEdit
+                  ? "Salvar alterações"
+                  : "Salvar produto"}
             </button>
           </div>
         </form>
