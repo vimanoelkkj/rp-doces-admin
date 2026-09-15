@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import AdminSidebar from "../components/AdminSidebar";
-import AdminWave from "../components/AdminWave";
 import DatePickerDropdown from "./DatePickerDropdown";
 import "./AdminDashboard.css";
 
@@ -132,11 +130,7 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="admin-layout">
-      <AdminWave />
-      <AdminSidebar />
-
-      <main className="admin-main">
+    <main className="admin-main">
         {/* ── Header row ── */}
         <div className="dash-header-row">
           <div className="dash-title-group">
@@ -400,6 +394,5 @@ export default function AdminDashboard() {
           </div>
         </div>
       </main>
-    </div>
   );
 }

@@ -1,6 +1,4 @@
 import { useState } from "react";
-import AdminSidebar from "../components/AdminSidebar";
-import AdminWave from "../components/AdminWave";
 import "./AdminLoja.css";
 
 /* ── Types ── */
@@ -69,11 +67,7 @@ export default function AdminLoja() {
         : "Entregas indisponíveis";
 
   return (
-    <div className="loj-layout">
-      <AdminWave />
-      <AdminSidebar />
-
-      <main className="loj-main">
+    <main className="loj-main">
         {/* ── Header ── */}
         <header className="loj-header">
           <h1 className="loj-title">Loja</h1>
@@ -382,6 +376,5 @@ export default function AdminLoja() {
           </div>
         </section>
       </main>
-    </div>
   );
 }

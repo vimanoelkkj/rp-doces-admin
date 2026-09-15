@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import AdminSidebar from "../components/AdminSidebar";
-import AdminWave from "../components/AdminWave";
 import PedidoDetalheModal from "./PedidoDetalheModal";
 import EditarPedidoModal from "./EditarPedidoModal";
 import "./AdminPedidos.css";
@@ -121,11 +119,7 @@ export default function AdminPedidos() {
   const endItem = Math.min(currentPage * 8, total);
 
   return (
-    <div className="admin-layout">
-      <AdminWave />
-      <AdminSidebar />
-
-      <main className="admin-main">
+    <main className="admin-main">
         {/* Header */}
         <div className="ped-header-row">
           <div className="ped-title-group">
@@ -333,6 +327,5 @@ export default function AdminPedidos() {
           onClose={() => setNovoPedidoOpen(false)}
         />
       </main>
-    </div>
   );
 }
