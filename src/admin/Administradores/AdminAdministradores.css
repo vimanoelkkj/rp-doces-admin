@@ -66,6 +66,20 @@
   background: #4a332b;
 }
 
+.adm-error {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #c0392b;
+  margin: 0;
+}
+
+.adm-empty-message {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #8c7a76;
+  margin: 0;
+}
+
 /* ── KPI strip ── */
 .adm-kpi-strip {
   display: grid;

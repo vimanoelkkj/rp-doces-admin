@@ -461,6 +461,12 @@ html[data-admin-theme="dark"] .adm-badge-status--inativo {
   background: #3b1c1c;
   color: #e57373;
 }
+html[data-admin-theme="dark"] .adm-error {
+  color: #e5807a;
+}
+html[data-admin-theme="dark"] .adm-empty-message {
+  color: #a89b92;
+}
 html[data-admin-theme="dark"] .adm-btn-new {
   background: #d38b80;
   color: #ffffff;

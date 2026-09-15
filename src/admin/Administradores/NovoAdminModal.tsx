@@ -66,11 +66,28 @@ const IconChevron = () => (
 interface NovoAdminModalProps {
   open: boolean;
   onClose: () => void;
+  onSaved: () => void;
 }
 
 const LEVELS = ["Mestre", "Administrador"] as const;
+const LEVEL_TO_PAPEL: Record<string, string> = {
+  Mestre: "OWNER",
+  Administrador: "ADMIN",
+};
 
-export default function NovoAdminModal({ open, onClose }: NovoAdminModalProps) {
+function validarSenha(senha: string): string | null {
+  if (senha.length < 8) return "A senha precisa ter pelo menos 8 caracteres";
+  if (!/[A-Za-z]/.test(senha) || !/\d/.test(senha)) {
+    return "Use pelo menos uma letra e um número";
+  }
+  return null;
+}
+
+export default function NovoAdminModal({
+  open,
+  onClose,
+  onSaved,
+}: NovoAdminModalProps) {
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
@@ -80,20 +97,60 @@ export default function NovoAdminModal({ open, onClose }: NovoAdminModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [levelOpen, setLevelOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const passwordsMatch = password === confirmPassword;
+  const senhaErro = validarSenha(password);
   const canSubmit =
     name.trim() &&
     handle.trim() &&
     email.trim() &&
-    password.length >= 6 &&
+    !senhaErro &&
     passwordsMatch;
+
+  const resetForm = () => {
+    setName("");
+    setHandle("");
+    setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+    setLevel(LEVELS[0]);
+    setError(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
-    // TODO: integrar com backend
-    onClose();
+    if (!canSubmit || saving) return;
+
+    setSaving(true);
+    setError(null);
+    fetch("/api/admin/administradores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: name,
+        username: handle,
+        email,
+        senha: password,
+        papel: LEVEL_TO_PAPEL[level],
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error ?? "Falha ao criar administrador");
+        }
+        resetForm();
+        onSaved();
+        onClose();
+      })
+      .catch((err) => {
+        setError(
+          err instanceof Error ? err.message : "Falha ao criar administrador",
+        );
+      })
+      .finally(() => setSaving(false));
   };
 
   if (!open) return null;
@@ -200,7 +257,7 @@ export default function NovoAdminModal({ open, onClose }: NovoAdminModalProps) {
               <div className="nadm-input-password-wrap">
                 <input
                   type={showPassword ? "text" : "password"}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mín. 8 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -258,10 +315,12 @@ export default function NovoAdminModal({ open, onClose }: NovoAdminModalProps) {
               <path d="M10 9v5M10 6.5v0" />
             </svg>
             <p>
-              O novo administrador receberá um e-mail com as credenciais de
-              acesso. Recomendamos que altere a senha no primeiro login.
+              Compartilhe a senha com o novo administrador por um canal
+              seguro. Recomendamos que ele a altere no primeiro login.
             </p>
           </div>
+
+          {error && <p className="nadm-error-text">{error}</p>}
 
           {/* Footer */}
           <div className="nadm-footer">
@@ -271,9 +330,9 @@ export default function NovoAdminModal({ open, onClose }: NovoAdminModalProps) {
             <button
               type="submit"
               className="nadm-btn-save"
-              disabled={!canSubmit}
+              disabled={!canSubmit || saving}
             >
-              Criar conta
+              {saving ? "Criando…" : "Criar conta"}
             </button>
           </div>
         </form>
