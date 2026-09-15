@@ -1,16 +1,52 @@
-import { Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import AdminSidebar from "./AdminSidebar";
 import AdminWave from "./AdminWave";
 import { AdminThemeProvider } from "../theme/AdminThemeContext";
+import { AdminAuthProvider, type AdminUser } from "../auth/AdminAuthContext";
+
+type AuthState =
+  | { status: "loading" }
+  | { status: "authenticated"; user: AdminUser }
+  | { status: "unauthenticated" };
 
 export default function AdminLayout() {
+  const navigate = useNavigate();
+  const [auth, setAuth] = useState<AuthState>({ status: "loading" });
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Não autenticado");
+        return response.json() as Promise<{ usuario: AdminUser }>;
+      })
+      .then((data) => setAuth({ status: "authenticated", user: data.usuario }))
+      .catch(() => setAuth({ status: "unauthenticated" }));
+  }, []);
+
+  const logout = () => {
+    fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+      navigate("/admin/login");
+    });
+  };
+
+  if (auth.status === "loading") {
+    return null;
+  }
+
+  if (auth.status === "unauthenticated") {
+    return <Navigate to="/admin/login" replace />;
+  }
+
   return (
     <AdminThemeProvider>
-      <div className="admin-layout">
-        <AdminWave />
-        <AdminSidebar />
-        <Outlet />
-      </div>
+      <AdminAuthProvider user={auth.user} logout={logout}>
+        <div className="admin-layout">
+          <AdminWave />
+          <AdminSidebar />
+          <Outlet />
+        </div>
+      </AdminAuthProvider>
     </AdminThemeProvider>
   );
 }

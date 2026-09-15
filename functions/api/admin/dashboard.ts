@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { requireUser } from "../../lib/auth";
+
 interface Env {
   DB: D1Database;
 }
@@ -34,8 +36,10 @@ function jsonError(message: string, status: number) {
 
 const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-// TODO(admin auth): proteger este endpoint quando a autenticação administrativa existir.
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
   try {
     const url = new URL(request.url);
     const data = url.searchParams.get("date") ?? "";
