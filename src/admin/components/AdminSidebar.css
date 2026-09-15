@@ -8,8 +8,8 @@
   left: 0;
   width: 260px;
   height: 100vh;
-  background: #ffffff;
-  border-right: 1px solid #eadfd3;
+  background: transparent;
+  border-right: none;
   padding: 24px;
   display: flex;
   flex-direction: column;

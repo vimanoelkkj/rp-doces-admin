@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AdminSidebar from "../components/AdminSidebar";
+import AdminWave from "../components/AdminWave";
 import "./AdminAdministradores.css";
 import NovoAdminModal from "./NovoAdminModal";
 
@@ -132,6 +133,7 @@ export default function AdminAdministradores() {
 
   return (
     <div className="adm-layout">
+      <AdminWave />
       <AdminSidebar />
 
       <main className="adm-main">
