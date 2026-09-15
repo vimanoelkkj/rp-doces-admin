@@ -24,6 +24,17 @@ interface PedidoItemRow {
   valor_total_centavos: number;
 }
 
+interface StatusInput {
+  statusPreparo?: string;
+}
+
+const ORDEM_STATUS_PREPARO = [
+  "RECEBIDO",
+  "EM_PREPARACAO",
+  "PRONTO_PARA_RETIRADA",
+  "RETIRADO",
+];
+
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
@@ -62,5 +73,58 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   } catch (err) {
     console.error("Erro ao buscar pedido (admin)", err);
     return jsonError("Erro interno ao buscar pedido", 500);
+  }
+};
+
+// TODO(admin auth): proteger este endpoint quando a autenticação administrativa existir.
+export const onRequestPatch: PagesFunction<Env> = async ({
+  request,
+  env,
+  params,
+}) => {
+  const id = Number(params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return jsonError("Id inválido", 400);
+  }
+
+  let body: StatusInput;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonError("JSON inválido", 400);
+  }
+
+  const novoStatus = body.statusPreparo;
+  if (!novoStatus || !ORDEM_STATUS_PREPARO.includes(novoStatus)) {
+    return jsonError("Status inválido", 400);
+  }
+
+  try {
+    const pedido = await env.DB.prepare(
+      `SELECT status_preparo FROM pedidos WHERE id = ?`,
+    )
+      .bind(id)
+      .first<{ status_preparo: string }>();
+
+    if (!pedido) {
+      return jsonError("Pedido não encontrado", 404);
+    }
+
+    const indiceAtual = ORDEM_STATUS_PREPARO.indexOf(pedido.status_preparo);
+    const indiceNovo = ORDEM_STATUS_PREPARO.indexOf(novoStatus);
+    if (indiceNovo !== indiceAtual + 1) {
+      return jsonError("Só é possível avançar para o próximo status", 400);
+    }
+
+    await env.DB.prepare(
+      `UPDATE pedidos SET status_preparo = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+    )
+      .bind(novoStatus, id)
+      .run();
+
+    return Response.json({ ok: true, statusPreparo: novoStatus });
+  } catch (err) {
+    console.error("Erro ao avançar status do pedido (admin)", err);
+    return jsonError("Erro interno ao avançar status do pedido", 500);
   }
 };

@@ -31,6 +31,7 @@ interface PedidoDetalheResponse {
 interface PedidoDetalheModalProps {
   orderId: number;
   onClose: () => void;
+  onStatusChanged?: () => void;
 }
 
 /* ── Helpers ── */
@@ -59,14 +60,30 @@ const STATUS_TYPE: Record<PedidoRow["status_preparo"], "green" | "orange" | "blu
   RETIRADO: "green",
 };
 
+const PROXIMO_STATUS: Record<PedidoRow["status_preparo"], PedidoRow["status_preparo"] | null> = {
+  RECEBIDO: "EM_PREPARACAO",
+  EM_PREPARACAO: "PRONTO_PARA_RETIRADA",
+  PRONTO_PARA_RETIRADA: "RETIRADO",
+  RETIRADO: null,
+};
+
+const AVANCAR_LABEL: Record<PedidoRow["status_preparo"], string> = {
+  RECEBIDO: "Marcar em preparação",
+  EM_PREPARACAO: "Marcar como pronto",
+  PRONTO_PARA_RETIRADA: "Marcar como retirado",
+  RETIRADO: "",
+};
+
 /* ── Component ── */
 export default function PedidoDetalheModal({
   orderId,
   onClose,
+  onStatusChanged,
 }: PedidoDetalheModalProps) {
   const [data, setData] = useState<PedidoDetalheResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [avancando, setAvancando] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -83,6 +100,30 @@ export default function PedidoDetalheModal({
       .finally(() => setLoading(false));
   }, [orderId]);
 
+  const avancarStatus = () => {
+    if (!data) return;
+    const proximo = PROXIMO_STATUS[data.pedido.status_preparo];
+    if (!proximo) return;
+
+    setAvancando(true);
+    fetch(`/api/admin/pedidos/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ statusPreparo: proximo }),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Falha ao avançar status");
+        setData((prev) =>
+          prev
+            ? { ...prev, pedido: { ...prev.pedido, status_preparo: proximo } }
+            : prev,
+        );
+        onStatusChanged?.();
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setAvancando(false));
+  };
+
   return createPortal(
     <div className="pedmodal-overlay" onClick={onClose}>
       <div className="pedmodal-card" onClick={(e) => e.stopPropagation()}>
@@ -93,6 +134,15 @@ export default function PedidoDetalheModal({
             {data ? ` - ${data.pedido.cliente_nome}` : ""}
           </h2>
           <div className="pedmodal-header-actions">
+            {data && PROXIMO_STATUS[data.pedido.status_preparo] && (
+              <button
+                className="pedmodal-btn-advance"
+                onClick={avancarStatus}
+                disabled={avancando}
+              >
+                {AVANCAR_LABEL[data.pedido.status_preparo]}
+              </button>
+            )}
             <button className="pedmodal-btn-edit">Editar pedido</button>
             <button className="pedmodal-btn-close" onClick={onClose}>
               <svg

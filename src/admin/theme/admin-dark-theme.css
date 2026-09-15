@@ -323,6 +323,13 @@ html[data-admin-theme="dark"] .pedmodal-summary-value,
 html[data-admin-theme="dark"] .pedmodal-total-label {
   color: #faf6f0;
 }
+html[data-admin-theme="dark"] .pedmodal-btn-advance {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-advance:hover {
+  background: #c17a6f;
+}
 html[data-admin-theme="dark"] .pedmodal-btn-edit,
 html[data-admin-theme="dark"] .pedmodal-btn-close {
   background: #1a1412;
