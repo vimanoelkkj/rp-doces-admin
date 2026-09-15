@@ -88,6 +88,63 @@
   cursor: default;
 }
 
+/* ── Status dropdown ── */
+.pedmodal-status-dropdown {
+  position: relative;
+}
+
+.pedmodal-status-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(43, 29, 26, 0.14);
+  padding: 6px;
+  list-style: none;
+  margin: 0;
+  z-index: 10;
+}
+
+.pedmodal-status-option {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #634738;
+  cursor: pointer;
+}
+
+.pedmodal-status-option:hover {
+  background: #f5efe8;
+}
+
+.pedmodal-status-option--current {
+  background: #f5efe8;
+}
+
+.pedmodal-status-option--danger {
+  color: #c0392b;
+}
+
+.pedmodal-status-error {
+  margin: 0;
+  padding: 10px 14px;
+  background: #fbeceb;
+  border-radius: 10px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  color: #c0392b;
+}
+
 .pedmodal-btn-close {
   width: 40px;
   height: 40px;
@@ -157,6 +214,11 @@
 .pedmodal-badge--blue {
   background: #eef2fb;
   color: #5b7ec2;
+}
+
+.pedmodal-badge--red {
+  background: #fbeceb;
+  color: #c0392b;
 }
 
 .pedmodal-meta-date {

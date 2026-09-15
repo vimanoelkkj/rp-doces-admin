@@ -10,7 +10,7 @@ interface PedidoListRow {
   id: number;
   cliente_nome: string;
   valor_total_centavos: number;
-  status_preparo: string;
+  status_pedido: string;
   criado_em: string;
 }
 
@@ -25,9 +25,9 @@ interface CountsRow {
 const ITEMS_PER_PAGE = 8;
 const TAB_FILTERS: Record<string, string> = {
   hoje: "AND date(criado_em) = date('now')",
-  em_producao: "AND status_preparo IN ('RECEBIDO', 'EM_PREPARACAO')",
-  prontos: "AND status_preparo = 'PRONTO_PARA_RETIRADA'",
-  entregues: "AND status_preparo = 'RETIRADO'",
+  em_producao: "AND status_pedido IN ('NOVO', 'PREPARANDO')",
+  prontos: "AND status_pedido = 'PRONTO'",
+  entregues: "AND status_pedido = 'ENTREGUE'",
 };
 
 function jsonError(message: string, status: number) {
@@ -66,7 +66,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const offset = (page - 1) * ITEMS_PER_PAGE;
 
     const { results: pedidos } = await env.DB.prepare(
-      `SELECT id, cliente_nome, valor_total_centavos, status_preparo, criado_em
+      `SELECT id, cliente_nome, valor_total_centavos, status_pedido, criado_em
        FROM pedidos
        WHERE status_pagamento = 'PAGO' ${tabFilter} ${searchFilter}
        ORDER BY criado_em DESC
@@ -79,9 +79,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       `SELECT
          COUNT(*) AS todos,
          SUM(CASE WHEN date(criado_em) = date('now') THEN 1 ELSE 0 END) AS hoje,
-         SUM(CASE WHEN status_preparo IN ('RECEBIDO', 'EM_PREPARACAO') THEN 1 ELSE 0 END) AS em_producao,
-         SUM(CASE WHEN status_preparo = 'PRONTO_PARA_RETIRADA' THEN 1 ELSE 0 END) AS prontos,
-         SUM(CASE WHEN status_preparo = 'RETIRADO' THEN 1 ELSE 0 END) AS entregues
+         SUM(CASE WHEN status_pedido IN ('NOVO', 'PREPARANDO') THEN 1 ELSE 0 END) AS em_producao,
+         SUM(CASE WHEN status_pedido = 'PRONTO' THEN 1 ELSE 0 END) AS prontos,
+         SUM(CASE WHEN status_pedido = 'ENTREGUE' THEN 1 ELSE 0 END) AS entregues
        FROM pedidos WHERE status_pagamento = 'PAGO'`,
     ).first<CountsRow>())!;
 
