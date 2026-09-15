@@ -14,6 +14,8 @@ import AdminProdutos from "./admin/Produtos";
 import AdminPedidos from "./admin/Pedidos";
 import AdminAdministradores from "./admin/Administradores";
 import AdminLoja from "./admin/Loja";
+import { AdminThemeProvider } from "./admin/theme/AdminThemeContext";
+import "./admin/theme/admin-dark-theme.css";
 
 function StorefrontRoutes() {
   const location = useLocation();
@@ -45,14 +47,46 @@ function AdminRoutes() {
   return (
     <Routes>
       <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/admin/produtos" element={<AdminProdutos />} />
-      <Route path="/admin/pedidos" element={<AdminPedidos />} />
+      <Route
+        path="/admin"
+        element={
+          <AdminThemeProvider>
+            <AdminDashboard />
+          </AdminThemeProvider>
+        }
+      />
+      <Route
+        path="/admin/produtos"
+        element={
+          <AdminThemeProvider>
+            <AdminProdutos />
+          </AdminThemeProvider>
+        }
+      />
+      <Route
+        path="/admin/pedidos"
+        element={
+          <AdminThemeProvider>
+            <AdminPedidos />
+          </AdminThemeProvider>
+        }
+      />
       <Route
         path="/admin/administradores"
-        element={<AdminAdministradores />}
+        element={
+          <AdminThemeProvider>
+            <AdminAdministradores />
+          </AdminThemeProvider>
+        }
       />
-      <Route path="/admin/loja" element={<AdminLoja />} />
+      <Route
+        path="/admin/loja"
+        element={
+          <AdminThemeProvider>
+            <AdminLoja />
+          </AdminThemeProvider>
+        }
+      />
     </Routes>
   );
 }
