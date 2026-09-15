@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import NovoProdutoModal from "./NovoProdutoModal";
+import NovoProdutoModal, { imageUrlFor } from "./NovoProdutoModal";
 import CategoriasModal from "./CategoriasModal";
 import "./AdminProdutos.css";
 
@@ -196,7 +196,7 @@ export default function AdminProdutos() {
                   className="prod-card-image"
                   style={{
                     backgroundImage: product.image_key
-                      ? `url(/images/${product.image_key})`
+                      ? `url(${imageUrlFor(product.image_key)})`
                       : undefined,
                     backgroundColor: "#f0e8e0",
                   }}

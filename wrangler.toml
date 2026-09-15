@@ -7,5 +7,9 @@ binding = "DB"
 database_name = "rp-doces-db"
 database_id = "c2e15599-3d68-4801-9a1c-96a84977dd7c"
 
-# R2 e variáveis de ambiente serão adicionados
-# nos commits em que forem efetivamente usados.
+[[r2_buckets]]
+binding = "PRODUCT_IMAGES"
+bucket_name = "rp-doces-images"
+
+# Variáveis de ambiente serão adicionadas
+# nos commits em que forem efetivamente usadas.
