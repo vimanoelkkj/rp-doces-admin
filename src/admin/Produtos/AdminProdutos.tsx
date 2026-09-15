@@ -73,6 +73,9 @@ export default function AdminProdutos() {
 
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [categoriasOpen, setCategoriasOpen] = useState(false);
+  const [editingProduto, setEditingProduto] = useState<ProdutoAdmin | null>(
+    null,
+  );
 
   const carregarProdutos = () => {
     setLoading(true);
@@ -184,7 +187,11 @@ export default function AdminProdutos() {
           {filtered.map((product) => {
             const badge = stockBadge(product);
             return (
-              <div className="prod-card" key={product.id}>
+              <div
+                className="prod-card"
+                key={product.id}
+                onClick={() => setEditingProduto(product)}
+              >
                 <div
                   className="prod-card-image"
                   style={{
@@ -234,7 +241,13 @@ export default function AdminProdutos() {
         <NovoProdutoModal
           open={showNewProduct}
           onClose={() => setShowNewProduct(false)}
-          onCreated={carregarProdutos}
+          onSaved={carregarProdutos}
+        />
+        <NovoProdutoModal
+          open={editingProduto !== null}
+          produto={editingProduto}
+          onClose={() => setEditingProduto(null)}
+          onSaved={carregarProdutos}
         />
       </main>
   );
