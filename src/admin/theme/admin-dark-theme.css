@@ -1,0 +1,819 @@
+/* ═══════════════════════════════════════════
+   Admin Dark Theme — overrides via attribute
+   Nomes de classe verificados contra o código real
+   (a versão original recebida usava vários nomes
+   que não existem — ex.: .dash-layout, .np-card,
+   .adm-name — corrigidos aqui para os reais:
+   .admin-layout, .dash-panel, .adm-card-name, etc.)
+   ═══════════════════════════════════════════ */
+
+/* ── Scrollbar invisível (mesmo padrão do storefront em global.css) ── */
+html[data-admin-theme="dark"] * {
+  scrollbar-width: none;
+}
+html[data-admin-theme="dark"] *::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Page backgrounds ── */
+html[data-admin-theme="dark"] .admin-layout,
+html[data-admin-theme="dark"] .adm-layout,
+html[data-admin-theme="dark"] .loj-layout {
+  background: #1a1412;
+}
+
+/* ── Wave ── */
+html[data-admin-theme="dark"] .admin-wave svg path {
+  fill: #2e2420;
+}
+
+/* ═══════════════════════════════════════════
+   Sidebar
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .admin-sidebar {
+  background: transparent;
+  border-right: none;
+}
+html[data-admin-theme="dark"] .sidebar-logo-text {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .sidebar-logo-circle {
+  color: #c4a68f;
+}
+html[data-admin-theme="dark"] .sidebar-nav-icon,
+html[data-admin-theme="dark"] .sidebar-nav-label {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .sidebar-nav-item:hover {
+  background: rgba(61, 46, 43, 0.5);
+}
+html[data-admin-theme="dark"] .sidebar-nav-item--active {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .sidebar-nav-item--active .sidebar-nav-icon,
+html[data-admin-theme="dark"] .sidebar-nav-item--active .sidebar-nav-label {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .sidebar-divider {
+  background: #3d3230;
+}
+html[data-admin-theme="dark"] .sidebar-user-name {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .sidebar-user-role {
+  color: #c4a68f;
+}
+html[data-admin-theme="dark"] .sidebar-logout-btn {
+  background: #2b2220;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .sidebar-logout-btn:hover {
+  background: #3d2e2b;
+  border-color: #c4a68f;
+  color: #faf6f0;
+}
+
+/* ═══════════════════════════════════════════
+   Dashboard
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .dash-panel,
+html[data-admin-theme="dark"] .dash-kpi-card,
+html[data-admin-theme="dark"] .dash-alert-box {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .dash-title,
+html[data-admin-theme="dark"] .dash-panel-title,
+html[data-admin-theme="dark"] .dash-orders-title,
+html[data-admin-theme="dark"] .dash-kpi-value,
+html[data-admin-theme="dark"] .dash-rank-name,
+html[data-admin-theme="dark"] .dash-pending-value,
+html[data-admin-theme="dark"] .dash-empty-title,
+html[data-admin-theme="dark"] .dash-alert-bold,
+html[data-admin-theme="dark"] .dash-results-bold,
+html[data-admin-theme="dark"] .dash-td {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .dash-subtitle,
+html[data-admin-theme="dark"] .dash-panel-subtitle,
+html[data-admin-theme="dark"] .dash-orders-subtitle,
+html[data-admin-theme="dark"] .dash-kpi-label,
+html[data-admin-theme="dark"] .dash-kpi-desc,
+html[data-admin-theme="dark"] .dash-rank-meta,
+html[data-admin-theme="dark"] .dash-rank-units,
+html[data-admin-theme="dark"] .dash-empty-desc,
+html[data-admin-theme="dark"] .dash-alert-desc,
+html[data-admin-theme="dark"] .dash-alert-text,
+html[data-admin-theme="dark"] .dash-results-light,
+html[data-admin-theme="dark"] .dash-th {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .dash-date-picker {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .dash-date-picker span {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .dash-kpi-warning {
+  background: #3b2214;
+}
+html[data-admin-theme="dark"] .dash-kpi-warning-text {
+  color: #e5955c;
+}
+html[data-admin-theme="dark"] .dash-btn-view-all {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .dash-btn-view-all:hover {
+  background: #4a352f;
+}
+html[data-admin-theme="dark"] .dash-th,
+html[data-admin-theme="dark"] .dash-td,
+html[data-admin-theme="dark"] .dash-table-row,
+html[data-admin-theme="dark"] .dash-table-header {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .dash-table-header {
+  background: #1a1412;
+}
+html[data-admin-theme="dark"] .dash-progress-track {
+  background: #3d3230;
+}
+html[data-admin-theme="dark"] .dash-badge--green {
+  background: #182c22;
+  color: #62c584;
+}
+html[data-admin-theme="dark"] .dash-badge--orange {
+  background: #3b2214;
+  color: #e5955c;
+}
+
+/* ═══════════════════════════════════════════
+   Produtos
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .prod-card {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .prod-title,
+html[data-admin-theme="dark"] .prod-card-title,
+html[data-admin-theme="dark"] .prod-card-price,
+html[data-admin-theme="dark"] .prod-stats-bold {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .prod-subtitle,
+html[data-admin-theme="dark"] .prod-card-desc,
+html[data-admin-theme="dark"] .prod-stats-light,
+html[data-admin-theme="dark"] .prod-tab {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .prod-search {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .prod-search input {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .prod-search input::placeholder {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .prod-tab {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .prod-tab--active {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .prod-category-badge {
+  background: #3d3230;
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .prod-stock-badge--available {
+  background: #182c22;
+  color: #62c584;
+}
+html[data-admin-theme="dark"] .prod-stock-badge--critical {
+  background: #3b2214;
+  color: #e5955c;
+}
+html[data-admin-theme="dark"] .prod-btn-primary {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .prod-btn-outline {
+  background: transparent;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .prod-btn-outline:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .prod-card-divider {
+  background: #3d3230;
+}
+
+/* ═══════════════════════════════════════════
+   Pedidos
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .ped-table-panel {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .ped-title,
+html[data-admin-theme="dark"] .ped-td,
+html[data-admin-theme="dark"] .ped-tab--active {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .ped-subtitle,
+html[data-admin-theme="dark"] .ped-th,
+html[data-admin-theme="dark"] .ped-tab,
+html[data-admin-theme="dark"] .ped-tab-count,
+html[data-admin-theme="dark"] .ped-pagination-info,
+html[data-admin-theme="dark"] .ped-page-btn,
+html[data-admin-theme="dark"] .ped-shortcut {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .ped-th,
+html[data-admin-theme="dark"] .ped-td,
+html[data-admin-theme="dark"] .ped-table-row {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .ped-table-row:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .ped-table-header {
+  background: #1a1412;
+}
+html[data-admin-theme="dark"] .ped-search {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .ped-search input {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .ped-search input::placeholder {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .ped-tab--active {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .ped-shortcut,
+html[data-admin-theme="dark"] .ped-tab-count {
+  background: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .ped-page-btn,
+html[data-admin-theme="dark"] .ped-page-arrow {
+  background: #2b2220;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .ped-page-arrow:hover:not(:disabled),
+html[data-admin-theme="dark"] .ped-page-num:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .ped-page-num {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .ped-page-num--active {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .pedmodal-badge--comanda {
+  background: #3d3230;
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .ped-badge--green,
+html[data-admin-theme="dark"] .pedmodal-badge--green {
+  background: #182c22;
+  color: #62c584;
+}
+html[data-admin-theme="dark"] .ped-badge--orange,
+html[data-admin-theme="dark"] .pedmodal-badge--orange {
+  background: #3b2214;
+  color: #e5955c;
+}
+html[data-admin-theme="dark"] .ped-badge--blue,
+html[data-admin-theme="dark"] .pedmodal-badge--blue {
+  background: #16232e;
+  color: #6bb6e5;
+}
+html[data-admin-theme="dark"] .ped-btn-primary {
+  background: #d38b80;
+  color: #ffffff;
+}
+
+/* ── Pedido Detalhe Modal ── */
+html[data-admin-theme="dark"] .pedmodal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+html[data-admin-theme="dark"] .pedmodal-card {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .pedmodal-title,
+html[data-admin-theme="dark"] .pedmodal-item-name,
+html[data-admin-theme="dark"] .pedmodal-item-price,
+html[data-admin-theme="dark"] .pedmodal-summary-value,
+html[data-admin-theme="dark"] .pedmodal-total-label {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-edit,
+html[data-admin-theme="dark"] .pedmodal-btn-close {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-edit:hover,
+html[data-admin-theme="dark"] .pedmodal-btn-close:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-section-label,
+html[data-admin-theme="dark"] .pedmodal-meta-date,
+html[data-admin-theme="dark"] .pedmodal-item-qty,
+html[data-admin-theme="dark"] .pedmodal-summary-label {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-close:hover {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-divider {
+  background: #3d3230;
+}
+html[data-admin-theme="dark"] .pedmodal-total-value {
+  color: #d38b80;
+}
+html[data-admin-theme="dark"] .pedmodal-payment-method {
+  color: #a89b92;
+}
+
+/* ═══════════════════════════════════════════
+   Administradores
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .adm-card,
+html[data-admin-theme="dark"] .adm-kpi-card {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .adm-title,
+html[data-admin-theme="dark"] .adm-kpi-value,
+html[data-admin-theme="dark"] .adm-card-name,
+html[data-admin-theme="dark"] .adm-detail-value {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .adm-subtitle,
+html[data-admin-theme="dark"] .adm-kpi-label,
+html[data-admin-theme="dark"] .adm-card-handle,
+html[data-admin-theme="dark"] .adm-detail-label {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .adm-card-divider {
+  background: #3d3230;
+}
+html[data-admin-theme="dark"] .adm-badge-level {
+  background: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .adm-action-btn {
+  background: #1a1412;
+  color: #a89b92;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .adm-action-btn:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .adm-action-btn--danger {
+  border-color: #5c2a2a;
+  color: #e57373;
+}
+html[data-admin-theme="dark"] .adm-action-btn--danger:hover {
+  background: #3b1c1c;
+  border-color: #e57373;
+}
+html[data-admin-theme="dark"] .adm-badge-status--ativo {
+  background: #182c22;
+  color: #62c584;
+}
+html[data-admin-theme="dark"] .adm-badge-status--inativo {
+  background: #3b1c1c;
+  color: #e57373;
+}
+html[data-admin-theme="dark"] .adm-btn-new {
+  background: #d38b80;
+  color: #ffffff;
+}
+
+/* ═══════════════════════════════════════════
+   Loja
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .loj-panel,
+html[data-admin-theme="dark"] .loj-diag-panel,
+html[data-admin-theme="dark"] .loj-diag-card,
+html[data-admin-theme="dark"] .loj-preview-card {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .loj-title,
+html[data-admin-theme="dark"] .loj-panel-title,
+html[data-admin-theme="dark"] .loj-preview-name,
+html[data-admin-theme="dark"] .loj-diag-title,
+html[data-admin-theme="dark"] .loj-diag-card-title {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .loj-subtitle,
+html[data-admin-theme="dark"] .loj-field-label,
+html[data-admin-theme="dark"] .loj-preview-row,
+html[data-admin-theme="dark"] .loj-preview-address,
+html[data-admin-theme="dark"] .loj-preview-row--muted,
+html[data-admin-theme="dark"] .loj-diag-subtitle,
+html[data-admin-theme="dark"] .loj-diag-card-desc {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .loj-badge-owner {
+  background: #3d3230;
+  border-color: #4d4038;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .loj-badge-cost {
+  background: #3d2e2b;
+  border-color: #4d3835;
+  color: #f0c7bd;
+}
+html[data-admin-theme="dark"] .loj-badge-test {
+  background: #24352c;
+  border-color: #33473c;
+  color: #7fc7a0;
+}
+html[data-admin-theme="dark"] .loj-diag-action {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .loj-diag-action:hover {
+  background: #3d3230;
+  border-color: #634738;
+}
+html[data-admin-theme="dark"] .loj-input,
+html[data-admin-theme="dark"] .loj-textarea {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .loj-input::placeholder,
+html[data-admin-theme="dark"] .loj-textarea::placeholder {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .loj-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+html[data-admin-theme="dark"] .loj-day-pill,
+html[data-admin-theme="dark"] .loj-delivery-pill {
+  background: #3d3230;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .loj-day-pill--active,
+html[data-admin-theme="dark"] .loj-delivery-pill--active {
+  background: #d38b80;
+  border-color: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .loj-btn-save {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .loj-image-slot,
+html[data-admin-theme="dark"] .loj-image-thumb {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+
+/* ═══════════════════════════════════════════
+   Novo Produto Modal
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .np-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+html[data-admin-theme="dark"] .np-modal {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .np-title {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .np-subtitle,
+html[data-admin-theme="dark"] .np-field label,
+html[data-admin-theme="dark"] .np-photo-hint {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .np-photo-btn {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .np-field input[type="text"],
+html[data-admin-theme="dark"] .np-field textarea,
+html[data-admin-theme="dark"] .np-dropdown-trigger,
+html[data-admin-theme="dark"] .np-stepper,
+html[data-admin-theme="dark"] .np-photo-preview {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .np-stepper-value {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .np-stepper-btn:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .np-check {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .np-check strong {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .np-check span {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .np-field input::placeholder,
+html[data-admin-theme="dark"] .np-field textarea::placeholder {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .np-dropdown-list {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .np-dropdown-option {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .np-dropdown-option--active {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .np-dropdown-option:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .np-emoji-item {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .np-emoji-item--active {
+  border-color: #d38b80;
+}
+html[data-admin-theme="dark"] .np-check-box {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .np-btn-save {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .np-btn-cancel {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .np-footer {
+  border-top-color: #3d3230;
+}
+html[data-admin-theme="dark"] .np-close {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .np-close:hover {
+  background: #3d2e2b;
+  border-color: #a89b92;
+}
+
+/* ═══════════════════════════════════════════
+   Categorias Modal
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .catm-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+html[data-admin-theme="dark"] .catm-modal {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .catm-title,
+html[data-admin-theme="dark"] .catm-cat-name {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .catm-subtitle,
+html[data-admin-theme="dark"] .catm-cat-desc,
+html[data-admin-theme="dark"] .catm-cat-slug,
+html[data-admin-theme="dark"] .catm-new-hint,
+html[data-admin-theme="dark"] .catm-cat-stats span,
+html[data-admin-theme="dark"] .catm-cat-badge,
+html[data-admin-theme="dark"] .catm-field label {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .catm-cat-stats strong {
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .catm-cat-emoji {
+  background: #3d3230;
+}
+html[data-admin-theme="dark"] .catm-cat-badge--custom {
+  background: #24352c;
+  color: #7fc7a0;
+}
+html[data-admin-theme="dark"] .catm-footer {
+  border-top-color: #3d3230;
+}
+html[data-admin-theme="dark"] .catm-close {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .catm-close:hover {
+  background: #3d2e2b;
+  border-color: #a89b92;
+}
+html[data-admin-theme="dark"] .catm-field input[type="text"] {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .catm-field input::placeholder {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .catm-emoji-option {
+  background: #1a1412;
+}
+html[data-admin-theme="dark"] .catm-emoji-option:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .catm-emoji-option--active {
+  background: #3d2e2b;
+  border-color: #d38b80;
+}
+html[data-admin-theme="dark"] .catm-cat-card,
+html[data-admin-theme="dark"] .catm-new-card {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .catm-btn-close {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+
+/* ═══════════════════════════════════════════
+   Novo Pedido Modal
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .nped-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+html[data-admin-theme="dark"] .nped-modal {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .nped-title {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nped-subtitle,
+html[data-admin-theme="dark"] .nped-item-label,
+html[data-admin-theme="dark"] .nped-optional,
+html[data-admin-theme="dark"] .nped-items-hint,
+html[data-admin-theme="dark"] .nped-field label {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nped-close {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nped-close:hover {
+  background: #3d2e2b;
+  border-color: #a89b92;
+}
+html[data-admin-theme="dark"] .nped-field input[type="text"],
+html[data-admin-theme="dark"] .nped-field textarea,
+html[data-admin-theme="dark"] .nped-qty-input,
+html[data-admin-theme="dark"] .nped-dropdown-trigger,
+html[data-admin-theme="dark"] .nped-btn-add-item {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nped-btn-add-item:hover {
+  background: #3d2e2b;
+  border-color: #a89b92;
+}
+html[data-admin-theme="dark"] .nped-field input::placeholder,
+html[data-admin-theme="dark"] .nped-field textarea::placeholder {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nped-items-card {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .nped-divider {
+  background: #3d3230;
+}
+html[data-admin-theme="dark"] .nped-footer {
+  border-top-color: #3d3230;
+}
+html[data-admin-theme="dark"] .nped-dropdown-list {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .nped-dropdown-option {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nped-dropdown-option:hover,
+html[data-admin-theme="dark"] .nped-dropdown-option--active {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nped-btn-save {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .nped-btn-cancel {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+
+/* ═══════════════════════════════════════════
+   Novo Admin Modal
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .nadm-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+html[data-admin-theme="dark"] .nadm-modal {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .nadm-title {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nadm-subtitle,
+html[data-admin-theme="dark"] .nadm-field label {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nadm-field input[type="text"],
+html[data-admin-theme="dark"] .nadm-field input[type="email"],
+html[data-admin-theme="dark"] .nadm-field input[type="password"],
+html[data-admin-theme="dark"] .nadm-dropdown-trigger {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nadm-field input::placeholder {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nadm-info-box {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nadm-btn-save {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .nadm-btn-cancel {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nadm-footer {
+  border-top-color: #3d3230;
+}
+html[data-admin-theme="dark"] .nadm-close {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nadm-close:hover {
+  background: #3d2e2b;
+  border-color: #a89b92;
+}
+html[data-admin-theme="dark"] .nadm-input-prefix,
+html[data-admin-theme="dark"] .nadm-eye-btn {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nadm-eye-btn:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nadm-dropdown-list {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .nadm-dropdown-option {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nadm-dropdown-option:hover,
+html[data-admin-theme="dark"] .nadm-dropdown-option--active {
+  background: #3d2e2b;
+  color: #faf6f0;
+}

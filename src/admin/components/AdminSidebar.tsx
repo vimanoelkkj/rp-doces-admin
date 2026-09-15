@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAdminTheme } from "../theme/AdminThemeContext";
 import "./AdminSidebar.css";
 
 /* ── SVG icons — exported directly from Figma ── */
@@ -193,49 +194,41 @@ const IconBell = () => (
   </svg>
 );
 
-const IconPaint = () => (
+const IconMoon = () => (
   <svg
     width="20"
     height="20"
-    viewBox="0 0 20 20"
+    viewBox="0 0 24 24"
     fill="none"
-    xmlns="http://www.w3.org/2000/svg"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
   >
-    <path
-      d="M11.2039 6.8C11.8666 6.8 12.4039 6.26274 12.4039 5.6C12.4039 4.93726 11.8666 4.4 11.2039 4.4C10.5412 4.4 10.0039 4.93726 10.0039 5.6C10.0039 6.26274 10.5412 6.8 11.2039 6.8Z"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M14.4039 10C15.0666 10 15.6039 9.46274 15.6039 8.8C15.6039 8.13726 15.0666 7.6 14.4039 7.6C13.7412 7.6 13.2039 8.13726 13.2039 8.8C13.2039 9.46274 13.7412 10 14.4039 10Z"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M7.20391 7.6C7.86665 7.6 8.40391 7.06274 8.40391 6.4C8.40391 5.73726 7.86665 5.2 7.20391 5.2C6.54116 5.2 6.00391 5.73726 6.00391 6.4C6.00391 7.06274 6.54116 7.6 7.20391 7.6Z"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M5.60391 11.2C6.26665 11.2 6.80391 10.6627 6.80391 10C6.80391 9.33726 6.26665 8.8 5.60391 8.8C4.94116 8.8 4.40391 9.33726 4.40391 10C4.40391 10.6627 4.94116 11.2 5.60391 11.2Z"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M10.0039 2C5.60391 2 2.00391 5.6 2.00391 10C2.00391 14.4 5.60391 18 10.0039 18C10.7447 18 11.3223 17.4032 11.3223 16.6496C11.3223 16.3 11.1783 15.9816 10.9727 15.7496C10.7407 15.5184 10.6223 15.228 10.6223 14.8496C10.6193 14.6735 10.6517 14.4986 10.7177 14.3354C10.7837 14.1721 10.8819 14.0238 11.0064 13.8993C11.1309 13.7748 11.2792 13.6766 11.4425 13.6106C11.6058 13.5446 11.7806 13.5122 11.9567 13.5152H13.5535C15.9943 13.5152 17.9975 11.5128 17.9975 9.072C17.9759 5.2096 14.3727 2 10.0039 2Z"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+);
+
+const IconSun = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
   </svg>
 );
 
@@ -289,12 +282,6 @@ const systemNav: NavItem[] = [
     icon: <IconBell />,
     animClass: "sidebar-anim-notif",
   },
-  {
-    to: "/admin/tema",
-    label: "Tema Visual",
-    icon: <IconPaint />,
-    animClass: "sidebar-anim-tema",
-  },
 ];
 
 /* ── Component ── */
@@ -313,6 +300,8 @@ export default function AdminSidebar({
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const { theme, toggleTheme } = useAdminTheme();
 
   const renderNavItem = (item: NavItem) => (
     <NavLink
@@ -348,7 +337,21 @@ export default function AdminSidebar({
 
       <div className="sidebar-bottom">
         {/* System links */}
-        <nav className="sidebar-system-nav">{systemNav.map(renderNavItem)}</nav>
+        <nav className="sidebar-system-nav">
+          {systemNav.map(renderNavItem)}
+          <button
+            type="button"
+            className="sidebar-nav-item sidebar-anim-tema"
+            onClick={toggleTheme}
+          >
+            <span className="sidebar-nav-icon">
+              {theme === "light" ? <IconMoon /> : <IconSun />}
+            </span>
+            <span className="sidebar-nav-label">
+              {theme === "light" ? "Tema Escuro" : "Tema Claro"}
+            </span>
+          </button>
+        </nav>
 
         <div className="sidebar-divider" />
 
