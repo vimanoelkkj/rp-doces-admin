@@ -76,14 +76,31 @@ const categories = [
   "🧁 Cupcakes",
 ];
 
+// Mapeia o ícone escolhido (SVG) para um emoji de verdade, salvo no produto
+// como identificador visual enquanto não há foto.
+const EMOJI_CHARS = [
+  "🎂",
+  "🧁",
+  "🍮",
+  "🎉",
+  "🍓",
+  "🍫",
+  "🥥",
+  "🍋",
+  "🍯",
+  "🍪",
+];
+
 interface NovoProdutoModalProps {
   open: boolean;
   onClose: () => void;
+  onCreated?: () => void;
 }
 
 export default function NovoProdutoModal({
   open,
   onClose,
+  onCreated,
 }: NovoProdutoModalProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState(categories[0]);
@@ -97,6 +114,8 @@ export default function NovoProdutoModal({
   const [destaque, setDestaque] = useState(false);
   const [promocao, setPromocao] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,9 +127,63 @@ export default function NovoProdutoModal({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setName("");
+    setCategory(categories[0]);
+    setStock(0);
+    setSelectedEmoji(null);
+    setPrice("0,00");
+    setDescription("");
+    setImagePreview(null);
+    setProdutoAtivo(true);
+    setDisponivelVenda(true);
+    setDestaque(false);
+    setPromocao(false);
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onClose();
+    if (saving) return;
+
+    const precoCentavos = Math.round(
+      parseFloat(price.replace(",", ".")) * 100,
+    );
+    if (!Number.isFinite(precoCentavos) || precoCentavos < 1) {
+      setError("Informe um preço válido.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/produtos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: name,
+          categoria: category,
+          descricao: description,
+          precoCentavos,
+          estoque: stock,
+          emoji: selectedEmoji != null ? EMOJI_CHARS[selectedEmoji] : "",
+          ativo: produtoAtivo,
+          disponivel: disponivelVenda,
+          destaque,
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Falha ao salvar produto");
+      }
+      resetForm();
+      onCreated?.();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao salvar produto");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!open) return null;
@@ -332,12 +405,14 @@ export default function NovoProdutoModal({
             </label>
           </div>
 
+          {error && <p className="np-error">{error}</p>}
+
           <div className="np-footer">
             <button type="button" className="np-btn-cancel" onClick={onClose}>
               Cancelar
             </button>
-            <button type="submit" className="np-btn-save">
-              Salvar produto
+            <button type="submit" className="np-btn-save" disabled={saving}>
+              {saving ? "Salvando…" : "Salvar produto"}
             </button>
           </div>
         </form>
