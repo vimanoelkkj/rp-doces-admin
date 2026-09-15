@@ -1,118 +1,121 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AdminSidebar from "../components/AdminSidebar";
 import AdminWave from "../components/AdminWave";
 import PedidoDetalheModal from "./PedidoDetalheModal";
-import type { OrderDetail } from "./PedidoDetalheModal";
 import "./AdminPedidos.css";
 import NovoPedidoModal from "./NovoPedidoModal";
 
-/* ── Types ── */
-type OrderStatus = "em_producao" | "pronto" | "entregue";
-type PaymentMethod = "Dinheiro" | "Pix" | "Cartão";
+/* ── Types (espelham o retorno de GET /api/admin/pedidos) ── */
+type StatusPreparo =
+  | "RECEBIDO"
+  | "EM_PREPARACAO"
+  | "PRONTO_PARA_RETIRADA"
+  | "RETIRADO";
+
 type TabFilter = "todos" | "hoje" | "em_producao" | "prontos" | "entregues";
 
-interface Order {
-  id: string;
-  client: string;
-  status: OrderStatus;
-  payment: PaymentMethod;
-  total: string;
+interface PedidoListItem {
+  id: number;
+  cliente_nome: string;
+  valor_total_centavos: number;
+  status_preparo: StatusPreparo;
+  criado_em: string;
 }
 
-/* ── Mock data ── */
-const ORDERS: Order[] = [
-  {
-    id: "RP-33",
-    client: "RP",
-    status: "entregue",
-    payment: "Dinheiro",
-    total: "R$ 40,00",
-  },
-  {
-    id: "RP-32",
-    client: "Natália da Luz",
-    status: "entregue",
-    payment: "Pix",
-    total: "R$ 40,00",
-  },
-  {
-    id: "RP-31",
-    client: "Maria Eduarda",
-    status: "entregue",
-    payment: "Cartão",
-    total: "R$ 15,00",
-  },
-  {
-    id: "RP-22",
-    client: "Bianca Pacheco",
-    status: "entregue",
-    payment: "Cartão",
-    total: "R$ 20,00",
-  },
-  {
-    id: "RP-21",
-    client: "Paula Tempest",
-    status: "entregue",
-    payment: "Pix",
-    total: "R$ 20,00",
-  },
-  {
-    id: "RP-20",
-    client: "Eliana",
-    status: "entregue",
-    payment: "Dinheiro",
-    total: "R$ 20,00",
-  },
-  {
-    id: "RP-19",
-    client: "Silma",
-    status: "entregue",
-    payment: "Dinheiro",
-    total: "R$ 40,00",
-  },
-  {
-    id: "RP-18",
-    client: "Márcia",
-    status: "entregue",
-    payment: "Pix",
-    total: "R$ 40,00",
-  },
-];
+interface Counts {
+  todos: number;
+  hoje: number;
+  em_producao: number;
+  prontos: number;
+  entregues: number;
+}
 
-const TABS: { key: TabFilter; label: string; count: number }[] = [
-  { key: "todos", label: "Todos", count: 19 },
-  { key: "hoje", label: "Hoje", count: 0 },
-  { key: "em_producao", label: "Em produção", count: 0 },
-  { key: "prontos", label: "Prontos", count: 0 },
-  { key: "entregues", label: "Entregues", count: 19 },
-];
+interface PedidosResponse {
+  pedidos: PedidoListItem[];
+  total: number;
+  page: number;
+  totalPages: number;
+  counts: Counts;
+}
 
-const ITEMS_PER_PAGE = 8;
-const TOTAL_ORDERS = 19;
+const TABS: { key: TabFilter; label: string }[] = [
+  { key: "todos", label: "Todos" },
+  { key: "hoje", label: "Hoje" },
+  { key: "em_producao", label: "Em produção" },
+  { key: "prontos", label: "Prontos" },
+  { key: "entregues", label: "Entregues" },
+];
 
 /* ── Helpers ── */
-const statusLabel = (s: OrderStatus) =>
-  s === "em_producao" ? "Em produção" : s === "pronto" ? "Pronto" : "Entregue";
+const formatarPreco = (centavos: number) =>
+  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
-const statusClass = (s: OrderStatus) =>
-  s === "em_producao"
-    ? "ped-badge--orange"
-    : s === "pronto"
+const statusLabel = (s: StatusPreparo) =>
+  s === "RETIRADO"
+    ? "Entregue"
+    : s === "PRONTO_PARA_RETIRADA"
+      ? "Pronto"
+      : "Em produção";
+
+const statusClass = (s: StatusPreparo) =>
+  s === "RETIRADO"
+    ? "ped-badge--green"
+    : s === "PRONTO_PARA_RETIRADA"
       ? "ped-badge--blue"
-      : "ped-badge--green";
+      : "ped-badge--orange";
 
 /* ── Component ── */
 export default function AdminPedidos() {
   const [activeTab, setActiveTab] = useState<TabFilter>("todos");
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const totalPages = Math.ceil(TOTAL_ORDERS / ITEMS_PER_PAGE);
-  const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
-  const endItem = Math.min(currentPage * ITEMS_PER_PAGE, TOTAL_ORDERS);
+  const [data, setData] = useState<PedidosResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [novoPedidoOpen, setNovoPedidoOpen] = useState(false);
+
+  // Debounce da busca
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  // Volta pra página 1 quando o filtro muda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, debouncedSearch]);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams({
+      status: activeTab,
+      page: String(currentPage),
+    });
+    if (debouncedSearch) params.set("search", debouncedSearch);
+
+    fetch(`/api/admin/pedidos?${params.toString()}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Falha ao carregar pedidos");
+        return response.json() as Promise<PedidosResponse>;
+      })
+      .then((result) => {
+        setData(result);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [activeTab, currentPage, debouncedSearch]);
+
+  const pedidos = data?.pedidos ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+  const counts = data?.counts;
+  const startItem = total === 0 ? 0 : (currentPage - 1) * 8 + 1;
+  const endItem = Math.min(currentPage * 8, total);
 
   return (
     <div className="admin-layout">
@@ -186,7 +189,7 @@ export default function AdminPedidos() {
                   <span
                     className={`ped-tab-count${activeTab === tab.key ? " ped-tab-count--active" : ""}`}
                   >
-                    {tab.count}
+                    {counts ? counts[tab.key] : 0}
                   </span>
                 </button>
               ))}
@@ -205,63 +208,44 @@ export default function AdminPedidos() {
             <span className="ped-th ped-th-total">Total</span>
           </div>
 
+          {error && <div className="ped-empty-message">{error}</div>}
+          {!error && !loading && pedidos.length === 0 && (
+            <div className="ped-empty-message">Nenhum pedido encontrado.</div>
+          )}
+
           {/* Table rows */}
-          {ORDERS.map((order, i) => (
+          {pedidos.map((pedido, i) => (
             <div
-              key={order.id}
-              className={`ped-table-row${i === ORDERS.length - 1 ? " ped-table-row--last" : ""}`}
-              onClick={() =>
-                setSelectedOrder({
-                  id: order.id,
-                  number: parseInt(order.id.replace("RP-", "")),
-                  client: order.client,
-                  status: "Entregue",
-                  statusType: "green",
-                  date: "10/09, 15:14",
-                  deliveryType: "Retirada",
-                  items: [
-                    {
-                      name: "Ninho & Nutella",
-                      emoji: "🍫",
-                      qty: 1,
-                      unitPrice: "R$ 20,00",
-                      totalPrice: "R$ 20,00",
-                    },
-                    {
-                      name: "Prestígio cremoso",
-                      emoji: "🥥",
-                      qty: 1,
-                      unitPrice: "R$ 20,00",
-                      totalPrice: "R$ 20,00",
-                    },
-                  ],
-                  subtotal: order.total,
-                  total: order.total,
-                  paymentStatus: "Pago",
-                  paymentMethod: order.payment,
-                })
-              }
+              key={pedido.id}
+              className={`ped-table-row${i === pedidos.length - 1 ? " ped-table-row--last" : ""}`}
+              onClick={() => setSelectedOrderId(pedido.id)}
             >
-              <span className="ped-td ped-td-id">{order.id}</span>
-              <span className="ped-td ped-td-client">{order.client}</span>
+              <span className="ped-td ped-td-id">RP-{pedido.id}</span>
+              <span className="ped-td ped-td-client">
+                {pedido.cliente_nome}
+              </span>
               <span className="ped-td ped-td-status">
-                <span className={`ped-badge ${statusClass(order.status)}`}>
-                  {statusLabel(order.status)}
+                <span
+                  className={`ped-badge ${statusClass(pedido.status_preparo)}`}
+                >
+                  {statusLabel(pedido.status_preparo)}
                 </span>
               </span>
               <span className="ped-td ped-td-payment">
                 <span className="ped-badge ped-badge--green">
-                  ✓ Pago ({order.payment})
+                  ✓ Pago (Pix)
                 </span>
               </span>
-              <span className="ped-td ped-td-total">{order.total}</span>
+              <span className="ped-td ped-td-total">
+                {formatarPreco(pedido.valor_total_centavos)}
+              </span>
             </div>
           ))}
 
           {/* Pagination */}
           <div className="ped-pagination">
             <span className="ped-pagination-info">
-              Mostrando {startItem}-{endItem} de {TOTAL_ORDERS} pedidos
+              Mostrando {startItem}-{endItem} de {total} pedidos
             </span>
             <div className="ped-pagination-controls">
               <button
@@ -316,10 +300,10 @@ export default function AdminPedidos() {
             </div>
           </div>
         </div>
-        {selectedOrder && (
+        {selectedOrderId !== null && (
           <PedidoDetalheModal
-            order={selectedOrder}
-            onClose={() => setSelectedOrder(null)}
+            orderId={selectedOrderId}
+            onClose={() => setSelectedOrderId(null)}
           />
         )}
         <NovoPedidoModal

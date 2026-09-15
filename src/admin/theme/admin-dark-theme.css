@@ -234,6 +234,7 @@ html[data-admin-theme="dark"] .ped-tab,
 html[data-admin-theme="dark"] .ped-tab-count,
 html[data-admin-theme="dark"] .ped-pagination-info,
 html[data-admin-theme="dark"] .ped-page-btn,
+html[data-admin-theme="dark"] .ped-empty-message,
 html[data-admin-theme="dark"] .ped-shortcut {
   color: #a89b92;
 }

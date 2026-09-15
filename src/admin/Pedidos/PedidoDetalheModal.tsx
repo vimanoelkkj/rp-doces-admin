@@ -1,80 +1,96 @@
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import "./PedidoDetalheModal.css";
 
-/* ── Types ── */
-interface OrderItem {
-  name: string;
-  emoji: string;
-  qty: number;
-  unitPrice: string;
-  totalPrice: string;
+/* ── Types (espelham o retorno de GET /api/admin/pedidos/:id) ── */
+interface PedidoItemRow {
+  produto_nome: string;
+  emoji: string | null;
+  quantidade: number;
+  valor_unitario_centavos: number;
+  valor_total_centavos: number;
 }
 
-interface OrderDetail {
-  id: string;
-  number: number;
-  client: string;
-  status: string;
-  statusType: "green" | "orange" | "blue";
-  date: string;
-  deliveryType: string;
-  items: OrderItem[];
-  subtotal: string;
-  total: string;
-  paymentStatus: string;
-  paymentMethod: string;
+interface PedidoRow {
+  id: number;
+  cliente_nome: string;
+  cliente_whatsapp: string;
+  recado: string;
+  valor_total_centavos: number;
+  status_pagamento: string;
+  status_preparo: "RECEBIDO" | "EM_PREPARACAO" | "PRONTO_PARA_RETIRADA" | "RETIRADO";
+  criado_em: string;
+  pago_em: string | null;
+}
+
+interface PedidoDetalheResponse {
+  pedido: PedidoRow;
+  itens: PedidoItemRow[];
 }
 
 interface PedidoDetalheModalProps {
-  order: OrderDetail;
+  orderId: number;
   onClose: () => void;
 }
 
-/* ── Mock order (for reference / default) ── */
-export const MOCK_ORDER: OrderDetail = {
-  id: "RP-33",
-  number: 33,
-  client: "RP",
-  status: "Entregue",
-  statusType: "green",
-  date: "10/09, 15:14",
-  deliveryType: "Retirada",
-  items: [
-    {
-      name: "Ninho & Nutella",
-      emoji: "🍫",
-      qty: 1,
-      unitPrice: "R$ 20,00",
-      totalPrice: "R$ 20,00",
-    },
-    {
-      name: "Prestígio cremoso",
-      emoji: "🥥",
-      qty: 1,
-      unitPrice: "R$ 20,00",
-      totalPrice: "R$ 20,00",
-    },
-  ],
-  subtotal: "R$ 40,00",
-  total: "R$ 40,00",
-  paymentStatus: "Pago",
-  paymentMethod: "Dinheiro",
+/* ── Helpers ── */
+const formatarPreco = (centavos: number) =>
+  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+
+const formatarData = (isoLike: string) =>
+  new Date(isoLike.replace(" ", "T")).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const STATUS_LABEL: Record<PedidoRow["status_preparo"], string> = {
+  RECEBIDO: "Em produção",
+  EM_PREPARACAO: "Em produção",
+  PRONTO_PARA_RETIRADA: "Pronto",
+  RETIRADO: "Entregue",
 };
 
-export type { OrderDetail, OrderItem };
+const STATUS_TYPE: Record<PedidoRow["status_preparo"], "green" | "orange" | "blue"> = {
+  RECEBIDO: "orange",
+  EM_PREPARACAO: "orange",
+  PRONTO_PARA_RETIRADA: "blue",
+  RETIRADO: "green",
+};
 
 /* ── Component ── */
 export default function PedidoDetalheModal({
-  order,
+  orderId,
   onClose,
 }: PedidoDetalheModalProps) {
+  const [data, setData] = useState<PedidoDetalheResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/admin/pedidos/${orderId}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Falha ao carregar pedido");
+        return response.json() as Promise<PedidoDetalheResponse>;
+      })
+      .then((result) => {
+        setData(result);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [orderId]);
+
   return createPortal(
     <div className="pedmodal-overlay" onClick={onClose}>
       <div className="pedmodal-card" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="pedmodal-header">
           <h2 className="pedmodal-title">
-            Pedido #{order.number} - {order.client}
+            Pedido #{orderId}
+            {data ? ` - ${data.pedido.cliente_nome}` : ""}
           </h2>
           <div className="pedmodal-header-actions">
             <button className="pedmodal-btn-edit">Editar pedido</button>
@@ -98,82 +114,91 @@ export default function PedidoDetalheModal({
         <div className="pedmodal-divider" />
 
         {/* Body */}
-        <div className="pedmodal-body">
-          {/* Meta badges */}
-          <div className="pedmodal-meta">
-            <span className="pedmodal-badge pedmodal-badge--comanda">
-              Comanda #{order.number}
-            </span>
-            <span
-              className={`pedmodal-badge pedmodal-badge--${order.statusType}`}
-            >
-              {order.status}
-            </span>
-            <span className="pedmodal-meta-date">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="#8c7a76"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+        {loading && <div className="pedmodal-body">Carregando...</div>}
+        {error && <div className="pedmodal-body">{error}</div>}
+        {data && (
+          <div className="pedmodal-body">
+            {/* Meta badges */}
+            <div className="pedmodal-meta">
+              <span className="pedmodal-badge pedmodal-badge--comanda">
+                Comanda #{data.pedido.id}
+              </span>
+              <span
+                className={`pedmodal-badge pedmodal-badge--${STATUS_TYPE[data.pedido.status_preparo]}`}
               >
-                <rect x="2" y="3" width="12" height="11" rx="2" />
-                <line x1="2" y1="7" x2="14" y2="7" />
-                <line x1="5" y1="1.5" x2="5" y2="4" />
-                <line x1="11" y1="1.5" x2="11" y2="4" />
-              </svg>
-              {order.date} · {order.deliveryType}
-            </span>
-          </div>
+                {STATUS_LABEL[data.pedido.status_preparo]}
+              </span>
+              <span className="pedmodal-meta-date">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="#8c7a76"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="3" width="12" height="11" rx="2" />
+                  <line x1="2" y1="7" x2="14" y2="7" />
+                  <line x1="5" y1="1.5" x2="5" y2="4" />
+                  <line x1="11" y1="1.5" x2="11" y2="4" />
+                </svg>
+                {formatarData(data.pedido.criado_em)} · Retirada
+              </span>
+            </div>
 
-          {/* Items */}
-          <div className="pedmodal-items">
-            <span className="pedmodal-section-label">Itens do pedido</span>
-            {order.items.map((item, i) => (
-              <div className="pedmodal-item-row" key={i}>
-                <div className="pedmodal-item-info">
-                  <span className="pedmodal-item-name">
-                    {item.name} {item.emoji}
-                  </span>
-                  <span className="pedmodal-item-qty">
-                    {item.qty}x {item.unitPrice}
+            {/* Items */}
+            <div className="pedmodal-items">
+              <span className="pedmodal-section-label">Itens do pedido</span>
+              {data.itens.map((item, i) => (
+                <div className="pedmodal-item-row" key={i}>
+                  <div className="pedmodal-item-info">
+                    <span className="pedmodal-item-name">
+                      {item.produto_nome} {item.emoji ?? ""}
+                    </span>
+                    <span className="pedmodal-item-qty">
+                      {item.quantidade}x{" "}
+                      {formatarPreco(item.valor_unitario_centavos)}
+                    </span>
+                  </div>
+                  <span className="pedmodal-item-price">
+                    {formatarPreco(item.valor_total_centavos)}
                   </span>
                 </div>
-                <span className="pedmodal-item-price">{item.totalPrice}</span>
+              ))}
+            </div>
+
+            {/* Summary */}
+            <div className="pedmodal-summary">
+              <div className="pedmodal-summary-row">
+                <span className="pedmodal-summary-label">Subtotal</span>
+                <span className="pedmodal-summary-value">
+                  {formatarPreco(data.pedido.valor_total_centavos)}
+                </span>
               </div>
-            ))}
-          </div>
-
-          {/* Summary */}
-          <div className="pedmodal-summary">
-            <div className="pedmodal-summary-row">
-              <span className="pedmodal-summary-label">Subtotal</span>
-              <span className="pedmodal-summary-value">{order.subtotal}</span>
+              <div className="pedmodal-summary-row pedmodal-summary-row--total">
+                <span className="pedmodal-total-label">Total</span>
+                <span className="pedmodal-total-value">
+                  {formatarPreco(data.pedido.valor_total_centavos)}
+                </span>
+              </div>
             </div>
-            <div className="pedmodal-summary-row pedmodal-summary-row--total">
-              <span className="pedmodal-total-label">Total</span>
-              <span className="pedmodal-total-value">{order.total}</span>
-            </div>
-          </div>
 
-          <div className="pedmodal-divider" />
+            <div className="pedmodal-divider" />
 
-          {/* Payment */}
-          <div className="pedmodal-payment">
-            <span className="pedmodal-section-label">Pagamento</span>
-            <div className="pedmodal-payment-row">
-              <span className="pedmodal-badge pedmodal-badge--green">
-                ✓ {order.paymentStatus}
-              </span>
-              <span className="pedmodal-payment-method">
-                Método: {order.paymentMethod}
-              </span>
+            {/* Payment */}
+            <div className="pedmodal-payment">
+              <span className="pedmodal-section-label">Pagamento</span>
+              <div className="pedmodal-payment-row">
+                <span className="pedmodal-badge pedmodal-badge--green">
+                  ✓ Pago
+                </span>
+                <span className="pedmodal-payment-method">Método: Pix</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>,
     document.body,
