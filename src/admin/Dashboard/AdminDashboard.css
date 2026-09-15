@@ -17,6 +17,8 @@
   flex-direction: column;
   gap: 24px;
   max-width: 1180px;
+  position: relative;
+  z-index: 1;
 }
 
 /* ═══════════════════════════════════════════

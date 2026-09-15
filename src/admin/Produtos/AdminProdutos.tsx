@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AdminSidebar from "../components/AdminSidebar";
+import AdminWave from "../components/AdminWave";
 import NovoProdutoModal from "./NovoProdutoModal";
 import CategoriasModal from "./CategoriasModal";
 import "./AdminProdutos.css";
@@ -115,6 +116,7 @@ export default function AdminProdutos() {
 
   return (
     <div className="admin-layout">
+      <AdminWave />
       <AdminSidebar />
 
       <main className="admin-main">

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AdminSidebar from "../components/AdminSidebar";
+import AdminWave from "../components/AdminWave";
 import "./AdminLoja.css";
 
 /* ── Types ── */
@@ -69,6 +70,7 @@ export default function AdminLoja() {
 
   return (
     <div className="loj-layout">
+      <AdminWave />
       <AdminSidebar />
 
       <main className="loj-main">
