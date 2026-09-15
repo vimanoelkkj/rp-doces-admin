@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import AdminSidebar from "../components/AdminSidebar";
-import AdminWave from "../components/AdminWave";
 import NovoProdutoModal from "./NovoProdutoModal";
 import CategoriasModal from "./CategoriasModal";
 import "./AdminProdutos.css";
@@ -115,11 +113,7 @@ export default function AdminProdutos() {
   const totalOutOfStock = produtos.filter((p) => estoqueLivre(p) <= 0).length;
 
   return (
-    <div className="admin-layout">
-      <AdminWave />
-      <AdminSidebar />
-
-      <main className="admin-main">
+    <main className="admin-main">
         {/* ── Header row ── */}
         <div className="prod-header-row">
           <div className="prod-title-group">
@@ -243,6 +237,5 @@ export default function AdminProdutos() {
           onCreated={carregarProdutos}
         />
       </main>
-    </div>
   );
 }
