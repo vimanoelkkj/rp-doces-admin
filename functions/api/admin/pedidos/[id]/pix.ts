@@ -13,8 +13,8 @@ interface GerarPixInput {
   substituiId?: number;
 }
 
-function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+function jsonError(message: string, status: number, code?: string) {
+  return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
 const MENSAGENS: Record<string, string> = {
@@ -85,6 +85,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       return jsonError(
         MENSAGENS[resultado.erro] ?? "Não foi possível gerar o Pix",
         STATUS_HTTP[resultado.erro] ?? 500,
+        resultado.erro,
       );
     }
 
