@@ -188,8 +188,6 @@
 @media (max-width: 768px) {
   .product-card {
     border-radius: 20px;
-    background: #ffffff;
-    border: none;
   }
 
   .product-card:hover {
@@ -206,10 +204,6 @@
     gap: 12px;
   }
 
-  .product-category {
-    color: #d38b80;
-  }
-
   .product-name {
     font-size: 18px;
   }
@@ -217,7 +211,6 @@
   .product-description {
     font-size: 12px;
     -webkit-line-clamp: 3;
-    color: #63524e;
   }
 
   .product-footer {
@@ -231,7 +224,6 @@
   .add-button {
     width: 32px;
     height: 32px;
-    background-color: #d2baa2;
     font-size: 18px;
   }
 }
