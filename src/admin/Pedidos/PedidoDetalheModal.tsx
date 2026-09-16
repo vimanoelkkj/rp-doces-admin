@@ -22,14 +22,25 @@ interface PedidoRow {
   valor_total_centavos: number;
   status_pagamento: string;
   status_pedido: StatusPedido;
+  status_comanda: string;
   criado_em: string;
   pago_em: string | null;
+}
+
+interface PixAdminPendente {
+  id: number;
+  valorCentavos: number;
+  qrCode: string | null;
+  qrCodeBase64: string | null;
+  ticketUrl: string | null;
+  expiresAt: string | null;
 }
 
 interface PedidoDetalheResponse {
   pedido: PedidoRow;
   itens: PedidoItemRow[];
   financeiro: FinanceiroPedido;
+  pixAdminPendentes: PixAdminPendente[];
 }
 
 interface PedidoDetalheModalProps {
@@ -92,9 +103,21 @@ export default function PedidoDetalheModal({
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // Pix administrativo: `gerando` cobre a ação sem substituto; `regenerandoId`
+  // guarda qual bloco específico está em voo (desabilita só aquele botão).
+  // `pixAviso` é o caminho AMBÍGUO (MERCADO_PAGO_INDISPONIVEL) — nunca junta
+  // com `pixError` genérico, porque a ação certa é diferente: nunca convidar
+  // a tentar de novo direto, só "atualizar e conferir o que persistiu".
+  const [gerando, setGerando] = useState(false);
+  const [regenerandoId, setRegenerandoId] = useState<number | null>(null);
+  const [pixError, setPixError] = useState<string | null>(null);
+  const [pixAviso, setPixAviso] = useState<string | null>(null);
+  const [agora, setAgora] = useState(() => Date.now());
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  const carregarPedido = () => {
     setLoading(true);
-    fetch(`/api/admin/pedidos/${orderId}`)
+    return fetch(`/api/admin/pedidos/${orderId}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Falha ao carregar pedido");
         return response.json() as Promise<PedidoDetalheResponse>;
@@ -105,7 +128,62 @@ export default function PedidoDetalheModal({
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    carregarPedido();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
+
+  // Contador de expiração dos Pix pendentes — só liga o relógio quando há
+  // algo pra contar. Nunca decide sozinho que um Pix expirou: só o
+  // backend/reconciliação tem autoridade pra transicionar PENDENTE ->
+  // EXPIRADO (paymentSync.ts); aqui é só exibição de "tempo informado pelo
+  // MP já passou", não uma mudança de estado local.
+  useEffect(() => {
+    if (!data || data.pixAdminPendentes.length === 0) return;
+    const interval = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [data]);
+
+  const gerarPix = (substituiId?: number) => {
+    setPixError(null);
+    setPixAviso(null);
+    if (substituiId) setRegenerandoId(substituiId);
+    else setGerando(true);
+
+    fetch(`/api/admin/pedidos/${orderId}/pix`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(substituiId ? { substituiId } : {}),
+    })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          // Erro ambíguo (código, não texto — nunca inferir pela mensagem):
+          // nunca sabemos se o MP criou a cobrança mesmo assim. Não convida
+          // a tentar de novo, só a atualizar e conferir o que persistiu (a
+          // próxima carga do GET reflete a verdade do ledger).
+          if (body.code === "MERCADO_PAGO_INDISPONIVEL") {
+            setPixAviso(body.error ?? "Não foi possível confirmar a criação do Pix.");
+            return;
+          }
+          throw new Error(body.error ?? "Falha ao gerar Pix");
+        }
+        return carregarPedido();
+      })
+      .catch((err) => setPixError(err.message))
+      .finally(() => {
+        setGerando(false);
+        setRegenerandoId(null);
+      });
+  };
+
+  const copiarCodigo = (pixId: number, codigo: string) => {
+    navigator.clipboard.writeText(codigo);
+    setCopiedId(pixId);
+    setTimeout(() => setCopiedId((atual) => (atual === pixId ? null : atual)), 2000);
+  };
 
   useEffect(() => {
     if (!statusMenuOpen) return;
@@ -303,6 +381,111 @@ export default function PedidoDetalheModal({
                   <span className="pedmodal-payment-method">{financeiro!.detalhe}</span>
                 )}
               </div>
+
+              {pixError && <p className="pedmodal-status-error">{pixError}</p>}
+              {pixAviso && (
+                <div className="pedmodal-pix-aviso">
+                  <span>⚠ {pixAviso}</span>
+                  <button
+                    type="button"
+                    className="pedmodal-btn-edit"
+                    onClick={() => {
+                      setPixAviso(null);
+                      carregarPedido();
+                    }}
+                  >
+                    Atualizar pedido
+                  </button>
+                </div>
+              )}
+
+              {/* "Gerar Pix" só aparece sem nenhum Pix administrativo vivo —
+                  com Pix parciais aditivos já existentes, esta primeira
+                  versão só oferece regenerar cada um, não criar mais um em
+                  cima (o backend suporta; a UI não oferece isso ainda). */}
+              {data.pixAdminPendentes.length === 0 &&
+                data.pedido.status_comanda === "ABERTA" &&
+                data.financeiro.totalCentavos > data.financeiro.pagoCentavos && (
+                  <button
+                    type="button"
+                    className="pedmodal-btn-advance"
+                    onClick={() => gerarPix()}
+                    disabled={gerando}
+                  >
+                    {gerando ? "Gerando..." : "Gerar Pix"}
+                  </button>
+                )}
+
+              {data.pixAdminPendentes.map((pix) => {
+                const expiraEmMs = pix.expiresAt ? Date.parse(pix.expiresAt) : null;
+                const vencido = expiraEmMs !== null && expiraEmMs <= agora;
+                const restanteS =
+                  expiraEmMs !== null ? Math.max(0, Math.floor((expiraEmMs - agora) / 1000)) : null;
+                const minutos =
+                  restanteS !== null ? String(Math.floor(restanteS / 60)).padStart(2, "0") : null;
+                const segundos = restanteS !== null ? String(restanteS % 60).padStart(2, "0") : null;
+
+                return (
+                  <div className="pedmodal-pix-card" key={pix.id}>
+                    <span className="pedmodal-pix-valor">
+                      Pix pendente · {formatarPreco(pix.valorCentavos)}
+                    </span>
+
+                    {pix.qrCodeBase64 && (
+                      <div className="pedmodal-pix-qr">
+                        <img
+                          src={`data:image/png;base64,${pix.qrCodeBase64}`}
+                          alt="QR Code Pix"
+                        />
+                      </div>
+                    )}
+
+                    {pix.qrCode && (
+                      <>
+                        <div className="pedmodal-pix-copy-row">
+                          <span className="pedmodal-pix-copy-label">PIX COPIA E COLA</span>
+                          <button
+                            type="button"
+                            className="pedmodal-pix-copy-btn"
+                            onClick={() => copiarCodigo(pix.id, pix.qrCode!)}
+                          >
+                            {copiedId === pix.id ? "Copiado!" : "Copiar código"}
+                          </button>
+                        </div>
+                        <div className="pedmodal-pix-code-box">{pix.qrCode}</div>
+                      </>
+                    )}
+
+                    {vencido ? (
+                      <div className="pedmodal-pix-vencido">
+                        <span>Expiração informada pelo Mercado Pago atingida</span>
+                        <button
+                          type="button"
+                          className="pedmodal-btn-edit"
+                          onClick={() => carregarPedido()}
+                        >
+                          Atualizar pedido
+                        </button>
+                      </div>
+                    ) : (
+                      restanteS !== null && (
+                        <span className="pedmodal-pix-timer">
+                          ⏱ Expira em {minutos}:{segundos}
+                        </span>
+                      )
+                    )}
+
+                    <button
+                      type="button"
+                      className="pedmodal-btn-edit"
+                      onClick={() => gerarPix(pix.id)}
+                      disabled={regenerandoId === pix.id}
+                    >
+                      {regenerandoId === pix.id ? "Regenerando..." : "Regenerar Pix"}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
