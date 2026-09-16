@@ -185,18 +185,47 @@ export async function ensureLegacyPaymentMaterialized(
   }
 
   if (paymentId) {
-    await db
-      .prepare(
-        `INSERT OR IGNORE INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
-         SELECT ?, id, valor_total_centavos
-         FROM pedido_itens
-         WHERE pedido_id = ? AND valor_total_centavos > 0`,
-      )
-      .bind(paymentId, pedidoId)
-      .run();
+    await allocateFullValueAcrossItems(db, paymentId, pedidoId);
   }
 
   return { ok: true, materialized: Boolean(paymentId), paymentId: paymentId || null };
+}
+
+// Aloca 100% do valor de cada item positivo ao pagamento informado — mesma
+// primitiva usada pela materialização lazy (4b) e pela criação do pagamento
+// no checkout (4c-1). Estrutural: não afirma "isso foi pago", só "este
+// pagamento é responsável por estes itens" (ver relatório do 4b).
+export async function allocateFullValueAcrossItems(
+  db: D1Database,
+  pagamentoId: number,
+  pedidoId: number,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
+       SELECT ?, id, valor_total_centavos
+       FROM pedido_itens
+       WHERE pedido_id = ? AND valor_total_centavos > 0`,
+    )
+    .bind(pagamentoId, pedidoId)
+    .run();
+}
+
+// Verificação explícita antes de decidir: se já existe uma linha real no
+// ledger, usa ela; só materializa o legado se genuinamente não existir
+// nenhuma. Nunca "chama ensure() e torce" (guardrail do 4c-1).
+export async function resolveLedgerPaymentId(
+  db: D1Database,
+  pedidoId: number,
+): Promise<number | null> {
+  const existing = await db
+    .prepare(`SELECT id FROM pedido_pagamentos WHERE pedido_id = ? LIMIT 1`)
+    .bind(pedidoId)
+    .first<{ id: number }>();
+  if (existing) return Number(existing.id);
+
+  const materializado = await ensureLegacyPaymentMaterialized(db, pedidoId);
+  return materializado.ok ? materializado.paymentId : null;
 }
 
 // Leitura pura: nunca escreve. Se já existe uma linha real, retorna ela.

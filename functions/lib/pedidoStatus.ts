@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { resolveLedgerPaymentId } from "./comandaLedger";
+
 export interface PedidoStatusRow {
   id: number;
   token_publico: string;
@@ -36,6 +38,11 @@ export async function refreshPedidoStatus(
     };
   }
 
+  // Verificação explícita antes de decidir: se já existe ledger, sincroniza
+  // a linha existente; só materializa o legado se genuinamente não existir
+  // nenhuma (pedido criado antes do 4c-1). Nunca "ensure() e torce".
+  const pagamentoId = await resolveLedgerPaymentId(db, pedido.id);
+
   if (pedido.pix_expira_em && Date.now() > Date.parse(pedido.pix_expira_em)) {
     await db
       .prepare(
@@ -43,6 +50,14 @@ export async function refreshPedidoStatus(
       )
       .bind(pedido.id)
       .run();
+    if (pagamentoId) {
+      await db
+        .prepare(
+          `UPDATE pedido_pagamentos SET status = 'EXPIRADO', atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+        )
+        .bind(pagamentoId)
+        .run();
+    }
     return { statusPagamento: "EXPIRADO", statusPedido: pedido.status_pedido };
   }
 
@@ -66,7 +81,10 @@ export async function refreshPedidoStatus(
     };
   }
 
-  const payment = (await mpResponse.json()) as { status: string };
+  const payment = (await mpResponse.json()) as {
+    status: string;
+    date_approved?: string | null;
+  };
   const novoStatus = mapMpStatus(payment.status);
 
   if (!novoStatus) {
@@ -81,16 +99,49 @@ export async function refreshPedidoStatus(
       ? "PREPARANDO"
       : pedido.status_pedido;
 
+  // pago_em prefere a data real de aprovação do MP (date_approved) a
+  // CURRENT_TIMESTAMP (hora em que nós perguntamos); e nunca sobrescreve um
+  // pago_em já preenchido — embora isso já seja estruturalmente impossível
+  // aqui (a função retorna antes se status_pagamento já não for PENDENTE),
+  // o COALESCE é mantido por disciplina, não por necessidade estrita.
   await db
     .prepare(
       `UPDATE pedidos
        SET status_pagamento = ?, status_pedido = ?, mp_status = ?,
-           pago_em = CASE WHEN ? = 'PAGO' THEN CURRENT_TIMESTAMP ELSE pago_em END,
+           pago_em = CASE WHEN ? = 'PAGO' THEN COALESCE(pago_em, ?, CURRENT_TIMESTAMP) ELSE pago_em END,
            atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`,
     )
-    .bind(novoStatus, novoStatusPedido, payment.status, novoStatus, pedido.id)
+    .bind(
+      novoStatus,
+      novoStatusPedido,
+      payment.status,
+      novoStatus,
+      payment.date_approved ?? null,
+      pedido.id,
+    )
     .run();
+
+  if (pagamentoId) {
+    await db
+      .prepare(
+        `UPDATE pedido_pagamentos
+         SET status = ?, mp_status = ?,
+             pago_em = CASE WHEN ? = 'PAGO' THEN COALESCE(pago_em, ?, CURRENT_TIMESTAMP) ELSE pago_em END,
+             cancelado_em = CASE WHEN ? = 'CANCELADO' THEN COALESCE(cancelado_em, CURRENT_TIMESTAMP) ELSE cancelado_em END,
+             atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      )
+      .bind(
+        novoStatus,
+        payment.status,
+        novoStatus,
+        payment.date_approved ?? null,
+        novoStatus,
+        pagamentoId,
+      )
+      .run();
+  }
 
   return { statusPagamento: novoStatus, statusPedido: novoStatusPedido };
 }
