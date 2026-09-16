@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
 import "./NovoPedidoModal.css";
 
 /* ── Icons ── */
@@ -69,48 +70,37 @@ const IconRemove = () => (
 );
 
 /* ── Types ── */
-interface Product {
-  name: string;
-  emoji: string;
-  price: string;
-  available: number;
-}
-
 interface OrderItem {
-  productIndex: number | null;
-  qty: number;
+  produtoId: number | null;
+  quantidade: number;
 }
 
-/* ── Mock data ── */
-const PRODUCTS: Product[] = [
-  {
-    name: "Encanto de frutas vermelhas",
-    emoji: "🍓💗",
-    price: "R$ 20,00",
-    available: 1,
-  },
-  { name: "Ninho & Nutella", emoji: "🍫💗", price: "R$ 20,00", available: 1 },
-  { name: "Prestígio cremoso", emoji: "🥥💗", price: "R$ 20,00", available: 5 },
-  {
-    name: "Tentação de maracujá",
-    emoji: "💛💫",
-    price: "R$ 20,00",
-    available: 7,
-  },
-  { name: "Pudim", emoji: "🍮💗", price: "R$ 15,00", available: 11 },
+type MetodoPagamento = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO" | "A_COMBINAR";
+type StatusPagamento = "PENDENTE" | "PAGO";
+
+const METODO_OPTIONS: { value: MetodoPagamento; label: string }[] = [
+  { value: "DINHEIRO", label: "Dinheiro" },
+  { value: "CARTAO", label: "Cartão" },
+  { value: "PIX_EXTERNO", label: "Pix externo" },
+  { value: "A_COMBINAR", label: "A combinar" },
 ];
 
-const PAYMENT_METHODS = [
-  "Pix direto",
-  "Dinheiro",
-  "Cartão de crédito",
-  "Cartão de débito",
+const STATUS_OPTIONS: { value: StatusPagamento; label: string }[] = [
+  { value: "PENDENTE", label: "Aguardando pagamento" },
+  { value: "PAGO", label: "Já pago" },
 ];
-const PAYMENT_STATUS = ["Aguardando pagamento", "Já pago"];
+
+const MAX_ITENS_PEDIDO_MANUAL = 20;
+
+const formatarPreco = (centavos: number) =>
+  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+
+const estoqueLivre = (p: ProdutoAdmin) => Math.max(0, p.estoque - p.estoque_reservado);
 
 interface NovoPedidoModalProps {
   open: boolean;
   onClose: () => void;
+  onCreated?: () => void;
 }
 
 /* ── Custom Dropdown Hook ── */
@@ -136,19 +126,55 @@ function useDropdown() {
 export default function NovoPedidoModal({
   open,
   onClose,
+  onCreated,
 }: NovoPedidoModalProps) {
   const [clientName, setClientName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [items, setItems] = useState<OrderItem[]>([
-    { productIndex: null, qty: 1 },
+    { produtoId: null, quantidade: 1 },
   ]);
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
-  const [paymentStatus, setPaymentStatus] = useState(PAYMENT_STATUS[0]);
+  const [metodoPagamento, setMetodoPagamento] = useState<MetodoPagamento>("DINHEIRO");
+  const [statusPagamento, setStatusPagamento] = useState<StatusPagamento>("PENDENTE");
   const [observation, setObservation] = useState("");
+
+  const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Dropdowns for payment
   const payMethodDd = useDropdown();
   const payStatusDd = useDropdown();
+
+  // Reseta o formulário e recarrega o catálogo toda vez que o modal abre —
+  // sem isso, o state da última venda registrada ficaria vazando pra
+  // próxima abertura (o componente nunca desmonta, só alterna `open`).
+  useEffect(() => {
+    if (!open) return;
+    setClientName("");
+    setWhatsapp("");
+    setItems([{ produtoId: null, quantidade: 1 }]);
+    setMetodoPagamento("DINHEIRO");
+    setStatusPagamento("PENDENTE");
+    setObservation("");
+    setError(null);
+    setSaving(false);
+    setLoading(true);
+
+    fetch("/api/admin/produtos")
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Falha ao carregar produtos");
+        return r.json() as Promise<{ produtos: ProdutoAdmin[] }>;
+      })
+      .then((catalogo) => setProdutos(catalogo.produtos))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [open]);
+
+  const produtosSelecionaveis = produtos.filter(
+    (p) => p.ativo === 1 && p.disponivel === 1 && estoqueLivre(p) > 0,
+  );
+  const produtoPorId = new Map(produtos.map((p) => [p.id, p]));
 
   const updateItem = (
     index: number,
@@ -165,13 +191,69 @@ export default function NovoPedidoModal({
   };
 
   const addItem = () => {
-    setItems((prev) => [...prev, { productIndex: null, qty: 1 }]);
+    setItems((prev) =>
+      prev.length >= MAX_ITENS_PEDIDO_MANUAL
+        ? prev
+        : [...prev, { produtoId: null, quantidade: 1 }],
+    );
+  };
+
+  const selecionarMetodo = (m: MetodoPagamento) => {
+    setMetodoPagamento(m);
+    // Regra simétrica: A_COMBINAR nunca convive com "Já pago", não importa
+    // a ordem em que os dois campos são preenchidos.
+    if (m === "A_COMBINAR") setStatusPagamento("PENDENTE");
+  };
+
+  const selecionarStatus = (s: StatusPagamento) => {
+    setStatusPagamento(s);
+    if (s === "PAGO" && metodoPagamento === "A_COMBINAR") {
+      setMetodoPagamento("DINHEIRO");
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: integrar com backend
-    onClose();
+    if (saving) return;
+
+    if (items.length === 0 || items.some((i) => !i.produtoId)) {
+      setError("Selecione um produto em todos os itens");
+      return;
+    }
+    for (const item of items) {
+      const produto = item.produtoId ? produtoPorId.get(item.produtoId) : null;
+      if (produto && item.quantidade > estoqueLivre(produto)) {
+        setError(`Quantidade acima do estoque disponível para "${produto.nome}"`);
+        return;
+      }
+    }
+
+    setSaving(true);
+    fetch("/api/admin/pedidos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itens: items.map((i) => ({
+          produtoId: i.produtoId,
+          quantidade: i.quantidade,
+        })),
+        clienteNome: clientName.trim(),
+        clienteWhatsapp: whatsapp.trim(),
+        observacao: observation.trim(),
+        metodoPagamento,
+        statusPagamento,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error ?? "Falha ao registrar pedido");
+        }
+        onCreated?.();
+        onClose();
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setSaving(false));
   };
 
   if (!open) return null;
@@ -195,160 +277,175 @@ export default function NovoPedidoModal({
 
         <div className="nped-divider" />
 
-        {/* ── Form ── */}
-        <form className="nped-body" onSubmit={handleSubmit}>
-          {/* Cliente + WhatsApp */}
-          <div className="nped-row-2">
-            <div className="nped-field">
-              <label>
-                Cliente <span className="nped-optional">opcional</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Nome do cliente"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-              />
-            </div>
-            <div className="nped-field">
-              <label>
-                WhatsApp <span className="nped-optional">opcional</span>
-              </label>
-              <input
-                type="text"
-                placeholder="(31) 99999-9999"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-              />
-            </div>
-          </div>
+        {loading && <div className="nped-body">Carregando...</div>}
 
-          {/* Itens */}
-          <div className="nped-items-card">
-            <div className="nped-items-header">
-              <div>
-                <span className="nped-items-title">Itens</span>
-                <span className="nped-items-hint">
-                  O estoque será reservado ao salvar.
-                </span>
+        {!loading && (
+          <form className="nped-body" onSubmit={handleSubmit}>
+            {error && <p className="nped-error">{error}</p>}
+
+            {/* Cliente + WhatsApp */}
+            <div className="nped-row-2">
+              <div className="nped-field">
+                <label>
+                  Cliente <span className="nped-optional">opcional</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nome do cliente"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                />
               </div>
-              <button
-                type="button"
-                className="nped-btn-add-item"
-                onClick={addItem}
-              >
-                <IconPlus /> Adicionar item
+              <div className="nped-field">
+                <label>
+                  WhatsApp <span className="nped-optional">opcional</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="(31) 99999-9999"
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Itens */}
+            <div className="nped-items-card">
+              <div className="nped-items-header">
+                <div>
+                  <span className="nped-items-title">Itens</span>
+                  <span className="nped-items-hint">
+                    O estoque será reservado ao salvar.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="nped-btn-add-item"
+                  onClick={addItem}
+                  disabled={items.length >= MAX_ITENS_PEDIDO_MANUAL}
+                >
+                  <IconPlus /> Adicionar item
+                </button>
+              </div>
+
+              {items.map((item, i) => (
+                <ProductItemRow
+                  key={i}
+                  item={item}
+                  produtos={produtosSelecionaveis}
+                  onChangeProduct={(id) => updateItem(i, "produtoId", id)}
+                  onChangeQty={(qty) => updateItem(i, "quantidade", qty)}
+                  onRemove={() => removeItem(i)}
+                  canRemove={items.length > 1}
+                />
+              ))}
+            </div>
+
+            {/* Pagamento */}
+            <div className="nped-row-2">
+              <div className="nped-field">
+                <label>Forma de pagamento</label>
+                <div
+                  className={`nped-dropdown ${payMethodDd.open ? "nped-dropdown--open" : ""}`}
+                  ref={payMethodDd.ref}
+                >
+                  <button
+                    type="button"
+                    className="nped-dropdown-trigger"
+                    onClick={() => payMethodDd.setOpen(!payMethodDd.open)}
+                  >
+                    <span>
+                      {METODO_OPTIONS.find((m) => m.value === metodoPagamento)?.label}
+                    </span>
+                    <IconChevron open={payMethodDd.open} />
+                  </button>
+                  {payMethodDd.open && (
+                    <ul className="nped-dropdown-list">
+                      {METODO_OPTIONS.filter(
+                        (m) => statusPagamento !== "PAGO" || m.value !== "A_COMBINAR",
+                      ).map((m) => (
+                        <li key={m.value}>
+                          <button
+                            type="button"
+                            className={`nped-dropdown-option ${metodoPagamento === m.value ? "nped-dropdown-option--active" : ""}`}
+                            onClick={() => {
+                              selecionarMetodo(m.value);
+                              payMethodDd.setOpen(false);
+                            }}
+                          >
+                            {m.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="nped-field">
+                <label>Situação do pagamento</label>
+                <div
+                  className={`nped-dropdown ${payStatusDd.open ? "nped-dropdown--open" : ""}`}
+                  ref={payStatusDd.ref}
+                >
+                  <button
+                    type="button"
+                    className="nped-dropdown-trigger"
+                    onClick={() => payStatusDd.setOpen(!payStatusDd.open)}
+                  >
+                    <span>
+                      {STATUS_OPTIONS.find((s) => s.value === statusPagamento)?.label}
+                    </span>
+                    <IconChevron open={payStatusDd.open} />
+                  </button>
+                  {payStatusDd.open && (
+                    <ul className="nped-dropdown-list">
+                      {STATUS_OPTIONS.filter(
+                        (s) => metodoPagamento !== "A_COMBINAR" || s.value !== "PAGO",
+                      ).map((s) => (
+                        <li key={s.value}>
+                          <button
+                            type="button"
+                            className={`nped-dropdown-option ${statusPagamento === s.value ? "nped-dropdown-option--active" : ""}`}
+                            onClick={() => {
+                              selecionarStatus(s.value);
+                              payStatusDd.setOpen(false);
+                            }}
+                          >
+                            {s.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Observação */}
+            <div className="nped-field">
+              <label>
+                Observação <span className="nped-optional">opcional</span>
+              </label>
+              <textarea
+                placeholder="Ex.: buscar amanhã às 15h"
+                value={observation}
+                onChange={(e) => setObservation(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="nped-footer">
+              <button type="button" className="nped-btn-cancel" onClick={onClose}>
+                Cancelar
+              </button>
+              <button type="submit" className="nped-btn-save" disabled={saving}>
+                Registrar pedido
               </button>
             </div>
-
-            {items.map((item, i) => (
-              <ProductItemRow
-                key={i}
-                item={item}
-                onChangeProduct={(idx) => updateItem(i, "productIndex", idx)}
-                onChangeQty={(qty) => updateItem(i, "qty", qty)}
-                onRemove={() => removeItem(i)}
-                canRemove={items.length > 1}
-              />
-            ))}
-          </div>
-
-          {/* Pagamento */}
-          <div className="nped-row-2">
-            <div className="nped-field">
-              <label>Forma de pagamento</label>
-              <div
-                className={`nped-dropdown ${payMethodDd.open ? "nped-dropdown--open" : ""}`}
-                ref={payMethodDd.ref}
-              >
-                <button
-                  type="button"
-                  className="nped-dropdown-trigger"
-                  onClick={() => payMethodDd.setOpen(!payMethodDd.open)}
-                >
-                  <span>{paymentMethod}</span>
-                  <IconChevron open={payMethodDd.open} />
-                </button>
-                {payMethodDd.open && (
-                  <ul className="nped-dropdown-list">
-                    {PAYMENT_METHODS.map((m) => (
-                      <li key={m}>
-                        <button
-                          type="button"
-                          className={`nped-dropdown-option ${paymentMethod === m ? "nped-dropdown-option--active" : ""}`}
-                          onClick={() => {
-                            setPaymentMethod(m);
-                            payMethodDd.setOpen(false);
-                          }}
-                        >
-                          {m}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            <div className="nped-field">
-              <label>Situação do pagamento</label>
-              <div
-                className={`nped-dropdown ${payStatusDd.open ? "nped-dropdown--open" : ""}`}
-                ref={payStatusDd.ref}
-              >
-                <button
-                  type="button"
-                  className="nped-dropdown-trigger"
-                  onClick={() => payStatusDd.setOpen(!payStatusDd.open)}
-                >
-                  <span>{paymentStatus}</span>
-                  <IconChevron open={payStatusDd.open} />
-                </button>
-                {payStatusDd.open && (
-                  <ul className="nped-dropdown-list">
-                    {PAYMENT_STATUS.map((s) => (
-                      <li key={s}>
-                        <button
-                          type="button"
-                          className={`nped-dropdown-option ${paymentStatus === s ? "nped-dropdown-option--active" : ""}`}
-                          onClick={() => {
-                            setPaymentStatus(s);
-                            payStatusDd.setOpen(false);
-                          }}
-                        >
-                          {s}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Observação */}
-          <div className="nped-field">
-            <label>
-              Observação <span className="nped-optional">opcional</span>
-            </label>
-            <textarea
-              placeholder="Ex.: buscar amanhã às 15h"
-              value={observation}
-              onChange={(e) => setObservation(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          {/* Footer */}
-          <div className="nped-footer">
-            <button type="button" className="nped-btn-cancel" onClick={onClose}>
-              Cancelar
-            </button>
-            <button type="submit" className="nped-btn-save">
-              Registrar pedido
-            </button>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
     </div>,
     document.body,
@@ -358,7 +455,8 @@ export default function NovoPedidoModal({
 /* ── Product Item Row (sub-component) ── */
 interface ProductItemRowProps {
   item: OrderItem;
-  onChangeProduct: (index: number | null) => void;
+  produtos: ProdutoAdmin[];
+  onChangeProduct: (id: number | null) => void;
   onChangeQty: (qty: number) => void;
   onRemove: () => void;
   canRemove: boolean;
@@ -366,17 +464,19 @@ interface ProductItemRowProps {
 
 function ProductItemRow({
   item,
+  produtos,
   onChangeProduct,
   onChangeQty,
   onRemove,
   canRemove,
 }: ProductItemRowProps) {
   const dd = useDropdown();
-  const selected =
-    item.productIndex !== null ? PRODUCTS[item.productIndex] : null;
+  const selected = item.produtoId
+    ? produtos.find((p) => p.id === item.produtoId)
+    : null;
 
-  const formatProduct = (p: Product) =>
-    `${p.name} ${p.emoji} · ${p.price} · ${p.available} disp.`;
+  const formatProduct = (p: ProdutoAdmin) =>
+    `${p.nome} ${p.emoji} · ${formatarPreco(p.preco_centavos)} · ${estoqueLivre(p)} disp.`;
 
   return (
     <div className="nped-item-row">
@@ -404,13 +504,20 @@ function ProductItemRow({
           </button>
           {dd.open && (
             <ul className="nped-dropdown-list nped-dropdown-list--products">
-              {PRODUCTS.map((p, i) => (
-                <li key={i}>
+              {produtos.length === 0 && (
+                <li>
+                  <div className="nped-dropdown-option nped-placeholder">
+                    Nenhum produto disponível
+                  </div>
+                </li>
+              )}
+              {produtos.map((p) => (
+                <li key={p.id}>
                   <button
                     type="button"
-                    className={`nped-dropdown-option ${item.productIndex === i ? "nped-dropdown-option--active" : ""}`}
+                    className={`nped-dropdown-option ${item.produtoId === p.id ? "nped-dropdown-option--active" : ""}`}
                     onClick={() => {
-                      onChangeProduct(i);
+                      onChangeProduct(p.id);
                       dd.setOpen(false);
                     }}
                   >
@@ -427,10 +534,13 @@ function ProductItemRow({
           type="number"
           className="nped-qty-input"
           min={1}
-          value={item.qty}
-          onChange={(e) =>
-            onChangeQty(Math.max(1, parseInt(e.target.value) || 1))
-          }
+          max={selected ? estoqueLivre(selected) : undefined}
+          value={item.quantidade}
+          onChange={(e) => {
+            const parsed = Math.max(1, parseInt(e.target.value) || 1);
+            const limite = selected ? estoqueLivre(selected) : parsed;
+            onChangeQty(Math.min(parsed, limite || 1));
+          }}
         />
 
         {/* Remove */}
