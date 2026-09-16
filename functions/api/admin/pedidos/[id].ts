@@ -2,6 +2,7 @@
 
 import { requireUser } from "../../../lib/auth";
 import { getVirtualOrRealPayment, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
+import { liberarReservaPedido } from "../../../lib/stock";
 
 interface Env {
   DB: D1Database;
@@ -143,6 +144,13 @@ export const onRequestPatch: PagesFunction<Env> = async ({
     )
       .bind(novoStatus, id)
       .run();
+
+    // Passo 7: chegou aqui só porque o guard acima já provou líquido=0
+    // (nada retido) — o agregado é PENDENTE, então liberarReservaPedido
+    // sempre pode agir com segurança nesse ponto.
+    if (novoStatus === "CANCELADO") {
+      await liberarReservaPedido(env.DB, id);
+    }
 
     return Response.json({ ok: true, statusPedido: novoStatus });
   } catch (err) {

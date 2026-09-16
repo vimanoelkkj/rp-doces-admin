@@ -1,7 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../lib/auth";
-import { reconcilePendingPixPayments } from "../../lib/paymentSync";
+import { reconcilePendingPixPayments, liberarReservasVencidasLocalmente } from "../../lib/paymentSync";
+import { reconciliarPagosSemBaixa } from "../../lib/stock";
 
 interface Env {
   DB: D1Database;
@@ -41,12 +42,22 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if ("error" in auth) return auth.error;
 
   try {
-    // Reconciliação oportunista (Passo 6): melhor esforço, nunca deve
+    // Reconciliação oportunista (Passo 6/7): melhor esforço, nunca deve
     // impedir a listagem de carregar se falhar.
     try {
       await reconcilePendingPixPayments(env);
     } catch (err) {
       console.error("Falha na reconciliação oportunista de pagamentos PIX_MP", err);
+    }
+    try {
+      await liberarReservasVencidasLocalmente(env);
+    } catch (err) {
+      console.error("Falha na liberação local de reservas vencidas", err);
+    }
+    try {
+      await reconciliarPagosSemBaixa(env.DB);
+    } catch (err) {
+      console.error("Falha na reconciliação de pedidos pagos sem baixa de estoque", err);
     }
 
     const url = new URL(request.url);
