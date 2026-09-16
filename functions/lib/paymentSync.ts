@@ -190,12 +190,19 @@ export async function fetchMpPayment(accessToken: string, paymentId: string): Pr
 //
 // 1) Caminho direto: mp_payment_id já persistido (caso feliz, checkout já
 //    completou o roundtrip com o MP antes do webhook chegar).
-// 2) Fallback por external_reference (= token_publico): cobre a corrida
-//    checkout-ainda-não-persistiu-mp_payment_id. Nunca escolhe "o mais
-//    recente" entre candidatos — 0 candidatos é "não encontrado", >1 é
-//    "ambíguo, não decide", só exatamente 1 é resolvido. Quando resolve
-//    por aqui, persiste mp_payment_id nessa linha (protegido por CAS) para
-//    que o próximo evento já resolva pelo caminho direto.
+// 2) Fallback por external_reference = idempotency_key da tentativa (Pix
+//    administrativo, origem ADMIN — ver comandaPix.ts): idempotency_key já
+//    é único por natureza (índice único, migration 0008), então esse
+//    fallback nunca é ambíguo por construção, mesmo com múltiplos Pix
+//    administrativos pendentes no mesmo pedido.
+// 3) Fallback por external_reference = token_publico (checkout do site,
+//    inalterado): cobre a corrida checkout-ainda-não-persistiu-
+//    mp_payment_id. Nunca escolhe "o mais recente" entre candidatos — 0
+//    candidatos é "não encontrado", >1 é "ambíguo, não decide", só
+//    exatamente 1 é resolvido.
+// Quando qualquer fallback resolve, persiste mp_payment_id nessa linha
+// (protegido por CAS) para que o próximo evento já resolva pelo caminho
+// direto.
 export type ResolveWebhookPaymentResult =
   | { kind: "found"; pagamentoId: number }
   | { kind: "not_found" }
@@ -213,8 +220,30 @@ export async function resolveWebhookPayment(
     .first<{ id: number }>();
   if (direto) return { kind: "found", pagamentoId: Number(direto.id) };
 
-  const tokenPublico = String(payment.external_reference || "").trim();
-  if (!tokenPublico) return { kind: "not_found" };
+  const externalReference = String(payment.external_reference || "").trim();
+  if (!externalReference) return { kind: "not_found" };
+
+  const porIdempotencyKey = await db
+    .prepare(
+      `SELECT id FROM pedido_pagamentos
+       WHERE metodo = 'PIX_MP' AND origem = 'ADMIN' AND status = 'PENDENTE' AND idempotency_key = ?
+       LIMIT 1`,
+    )
+    .bind(externalReference)
+    .first<{ id: number }>();
+  if (porIdempotencyKey) {
+    const pagamentoId = Number(porIdempotencyKey.id);
+    await db
+      .prepare(
+        `UPDATE pedido_pagamentos SET mp_payment_id = ?, atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = 'PENDENTE' AND mp_payment_id IS NULL`,
+      )
+      .bind(mpPaymentId, pagamentoId)
+      .run();
+    return { kind: "found", pagamentoId };
+  }
+
+  const tokenPublico = externalReference;
 
   const pedido = await db
     .prepare(`SELECT id FROM pedidos WHERE token_publico = ? LIMIT 1`)
