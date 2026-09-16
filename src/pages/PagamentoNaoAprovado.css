@@ -34,15 +34,28 @@
   text-align: center;
   margin-bottom: 32px;
 }
-.recusado-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #fdecec;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.recusado-mascot {
+  width: 96px;
+  height: auto;
   margin: 0 auto 20px;
+  display: block;
+}
+
+.recusado-mascot--shake {
+  animation: shake-no 1.5s ease-in-out infinite;
+}
+
+@keyframes shake-no {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-10deg);
+  }
+  75% {
+    transform: rotate(10deg);
+  }
 }
 .recusado-hero h1 {
   font-family: "Fraunces", serif;
