@@ -57,7 +57,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
     const { count } = (await env.DB.prepare(
       `SELECT COUNT(*) AS count FROM pedidos
-       WHERE status_pagamento = 'PAGO' ${tabFilter} ${searchFilter}`,
+       WHERE status_pagamento IN ('PARCIAL', 'PAGO') ${tabFilter} ${searchFilter}`,
     )
       .bind(...searchParams)
       .first<{ count: number }>())!;
@@ -68,7 +68,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const { results: pedidos } = await env.DB.prepare(
       `SELECT id, cliente_nome, valor_total_centavos, status_pedido, criado_em
        FROM pedidos
-       WHERE status_pagamento = 'PAGO' ${tabFilter} ${searchFilter}
+       WHERE status_pagamento IN ('PARCIAL', 'PAGO') ${tabFilter} ${searchFilter}
        ORDER BY criado_em DESC
        LIMIT ? OFFSET ?`,
     )
@@ -82,7 +82,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
          SUM(CASE WHEN status_pedido IN ('NOVO', 'PREPARANDO') THEN 1 ELSE 0 END) AS em_producao,
          SUM(CASE WHEN status_pedido = 'PRONTO' THEN 1 ELSE 0 END) AS prontos,
          SUM(CASE WHEN status_pedido = 'ENTREGUE' THEN 1 ELSE 0 END) AS entregues
-       FROM pedidos WHERE status_pagamento = 'PAGO'`,
+       FROM pedidos WHERE status_pagamento IN ('PARCIAL', 'PAGO')`,
     ).first<CountsRow>())!;
 
     return Response.json({
