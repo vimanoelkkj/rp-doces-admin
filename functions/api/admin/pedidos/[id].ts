@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../../lib/auth";
-import { getVirtualOrRealPayment, hasConfirmedPayment } from "../../../lib/comandaLedger";
+import { getVirtualOrRealPayment, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
 
 interface Env {
   DB: D1Database;
@@ -127,11 +127,11 @@ export const onRequestPatch: PagesFunction<Env> = async ({
       return jsonError("Pedido não encontrado", 404);
     }
 
-    // Consulta o ledger direto: "existe dinheiro confirmado?" (soma de
-    // pedido_pagamentos.status='PAGO' > 0), não mais o agregado
-    // pedidos.status_pagamento. Bloqueia mesmo com pagamento parcial —
-    // fluxo de estorno de verdade continua sendo o Passo 5.
-    if (novoStatus === "CANCELADO" && (await hasConfirmedPayment(env.DB, id))) {
+    // Consulta o ledger direto: "existe dinheiro do cliente RETIDO?" —
+    // líquido (bruto - reembolsado), não bruto. Um pedido pago e depois
+    // totalmente reembolsado (Passo 5) tem líquido zero e pode ser
+    // cancelado sem exigir um segundo estorno que já aconteceu.
+    if (novoStatus === "CANCELADO" && (await hasNetConfirmedPayment(env.DB, id))) {
       return jsonError(
         "Pagamento confirmado. Faça o estorno antes de cancelar.",
         409,
