@@ -291,3 +291,62 @@ export async function getVirtualOrRealPayment(
       statusResult.status === "CANCELADO" ? pedido.atualizado_em : null,
   };
 }
+
+// Passo 4c-2: pedidos.status_pagamento converge para uma projeção agregada
+// (PENDENTE/PARCIAL/PAGO) derivada do ledger, em vez de espelhar o status
+// bruto da tentativa mais recente. `pedido_pagamentos.status` continua
+// sendo a fonte da verdade sobre cada tentativa individual (PAGO, CANCELADO,
+// EXPIRADO, REEMBOLSADO, FALHOU) — nenhuma dessas informações é perdida,
+// só deixa de morar na coluna agregada.
+
+export type StatusFinanceiroAgregado = "PENDENTE" | "PARCIAL" | "PAGO";
+
+// Sempre um agregado (SUM ... WHERE status='PAGO'), nunca "pega uma linha".
+// Não existe getLatestPayment() genérico neste código — cada pergunta de
+// domínio usa seu próprio filtro (ver relatório do 4c-2).
+export async function getPaidCentavos(db: D1Database, pedidoId: number): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(valor_centavos), 0) AS total
+       FROM pedido_pagamentos WHERE pedido_id = ? AND status = 'PAGO'`,
+    )
+    .bind(pedidoId)
+    .first<{ total: number }>();
+  return Number(row?.total || 0);
+}
+
+export function computeFinancialStatus(
+  totalCentavos: number,
+  pagoCentavos: number,
+): StatusFinanceiroAgregado {
+  if (pagoCentavos <= 0) return "PENDENTE";
+  if (pagoCentavos < totalCentavos) return "PARCIAL";
+  return "PAGO";
+}
+
+// Única função que escreve pedidos.status_pagamento a partir do 4c-2.
+export async function recalculatePedidoStatusPagamento(
+  db: D1Database,
+  pedidoId: number,
+): Promise<StatusFinanceiroAgregado> {
+  const pedido = await db
+    .prepare(`SELECT valor_total_centavos FROM pedidos WHERE id = ?`)
+    .bind(pedidoId)
+    .first<{ valor_total_centavos: number }>();
+  const pago = await getPaidCentavos(db, pedidoId);
+  const agregado = computeFinancialStatus(Number(pedido?.valor_total_centavos || 0), pago);
+
+  await db
+    .prepare(`UPDATE pedidos SET status_pagamento = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`)
+    .bind(agregado, pedidoId)
+    .run();
+
+  return agregado;
+}
+
+// Responde exatamente "existe dinheiro confirmado?" — a pergunta do
+// guarda-corpo de cancelamento (Passo 2/4c-2), sem depender do agregado
+// estar sincronizado.
+export async function hasConfirmedPayment(db: D1Database, pedidoId: number): Promise<boolean> {
+  return (await getPaidCentavos(db, pedidoId)) > 0;
+}
