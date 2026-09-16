@@ -124,63 +124,109 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000,
   ).toISOString();
 
-  // Persiste o pedido antes de chamar o Mercado Pago: se a chamada falhar,
-  // o pedido fica registrado como PENDENTE em vez de se perder.
-  const pedidoInsert = await env.DB.prepare(
-    `INSERT INTO pedidos
-       (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos, idempotency_key)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(
+  // Persiste pedido + itens + pagamento PENDENTE + alocações num único
+  // batch (uma transação): o registro financeiro nasce antes de chamar o
+  // Mercado Pago, sem janela entre "pagamento criado" e "alocado aos
+  // itens" — cada statement resolve o id de que precisa por subquery
+  // (token_publico / idempotency_key), sem depender de last_row_id entre
+  // statements do mesmo batch.
+  const batchResults = await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO pedidos
+         (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(
       tokenPublico,
       nome,
       whatsapp,
       (body.recado ?? "").slice(0, MAX_TEXT_LENGTH),
       totalCentavos,
       idempotencyKey,
-    )
-    .run();
-
-  const pedidoId = pedidoInsert.meta.last_row_id;
-
-  await env.DB.batch(
-    itensParaPersistir.map((item) =>
+    ),
+    ...itensParaPersistir.map((item) =>
       env.DB.prepare(
         `INSERT INTO pedido_itens
            (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+         SELECT id, ?, ?, ?, ?, ? FROM pedidos WHERE token_publico = ?`,
       ).bind(
-        pedidoId,
         item.produtoId,
         item.produtoNome,
         item.quantidade,
         item.valorUnitarioCentavos,
         item.valorTotalCentavos,
+        tokenPublico,
       ),
     ),
-  );
+    env.DB.prepare(
+      `INSERT INTO pedido_pagamentos (pedido_id, metodo, origem, valor_centavos, status, idempotency_key)
+       SELECT id, 'PIX_MP', 'SITE', ?, 'PENDENTE', ? FROM pedidos WHERE token_publico = ?`,
+    ).bind(totalCentavos, idempotencyKey, tokenPublico),
+    env.DB.prepare(
+      `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
+       SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), pi.id, pi.valor_total_centavos
+       FROM pedido_itens pi
+       JOIN pedidos p ON p.id = pi.pedido_id
+       WHERE p.token_publico = ? AND pi.valor_total_centavos > 0`,
+    ).bind(idempotencyKey, tokenPublico),
+  ]);
 
-  const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
-      "X-Idempotency-Key": idempotencyKey,
-    },
-    body: JSON.stringify({
-      transaction_amount: totalCentavos / 100,
-      description: "Pedido R&P Doces",
-      payment_method_id: "pix",
-      date_of_expiration: expiresAt,
-      external_reference: tokenPublico,
-      payer: { email: payerEmail, first_name: nome },
-    }),
-  });
+  const pedidoId = batchResults[0].meta.last_row_id;
+  const pagamentoId = batchResults[1 + itensParaPersistir.length].meta.last_row_id;
+
+  let mpResponse: Response;
+  try {
+    mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
+        "X-Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify({
+        transaction_amount: totalCentavos / 100,
+        description: "Pedido R&P Doces",
+        payment_method_id: "pix",
+        date_of_expiration: expiresAt,
+        external_reference: tokenPublico,
+        payer: { email: payerEmail, first_name: nome },
+      }),
+    });
+  } catch (err) {
+    // fetch() nunca resolveu (timeout/rede) — resultado financeiro
+    // AMBÍGUO, não sabemos se o MP chegou a criar a cobrança. O ledger
+    // fica PENDENTE (não FALHOU): marcar falha aqui seria mentira.
+    console.error("Erro de transporte ao chamar o Mercado Pago", err);
+    return jsonError("Falha ao criar pagamento Pix", 502);
+  }
 
   if (!mpResponse.ok) {
+    // O Mercado Pago respondeu e recusou — rejeição conhecida, não
+    // ambígua. O ledger já pode registrar isso com mais fidelidade que
+    // `pedidos`, que por compatibilidade do 4c-1 permanece PENDENTE.
     const errorBody = await mpResponse.text();
     console.error("Mercado Pago checkout error", mpResponse.status, errorBody);
-    // O pedido já está persistido (PENDENTE, sem dados de pagamento) — não é perdido.
+
+    let mensagemErro: string | null = null;
+    let detalheErro: string | null = null;
+    try {
+      const parsed = JSON.parse(errorBody) as {
+        message?: string;
+        cause?: unknown;
+      };
+      mensagemErro = parsed.message ?? null;
+      detalheErro = parsed.cause ? JSON.stringify(parsed.cause).slice(0, 500) : null;
+    } catch {
+      // corpo de erro não era JSON — segue sem detalhe estruturado
+    }
+
+    await env.DB.prepare(
+      `UPDATE pedido_pagamentos
+       SET status = 'FALHOU', mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    )
+      .bind(mensagemErro, detalheErro, pagamentoId)
+      .run();
+
     return jsonError("Falha ao criar pagamento Pix", 502);
   }
 
@@ -199,13 +245,13 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
 
   const txData = payment.point_of_interaction?.transaction_data;
 
-  await env.DB.prepare(
-    `UPDATE pedidos
-     SET mp_payment_id = ?, mp_status = ?, mp_qr_code = ?, mp_qr_code_base64 = ?,
-         mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
-     WHERE id = ?`,
-  )
-    .bind(
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE pedidos
+       SET mp_payment_id = ?, mp_status = ?, mp_qr_code = ?, mp_qr_code_base64 = ?,
+           mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(
       String(payment.id),
       payment.status,
       txData?.qr_code ?? null,
@@ -213,8 +259,22 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       txData?.ticket_url ?? null,
       payment.date_of_expiration,
       pedidoId,
-    )
-    .run();
+    ),
+    env.DB.prepare(
+      `UPDATE pedido_pagamentos
+       SET mp_payment_id = ?, mp_status = ?, mp_qr_code = ?, mp_qr_code_base64 = ?,
+           mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(
+      String(payment.id),
+      payment.status,
+      txData?.qr_code ?? null,
+      txData?.qr_code_base64 ?? null,
+      txData?.ticket_url ?? null,
+      payment.date_of_expiration,
+      pagamentoId,
+    ),
+  ]);
 
   return Response.json({
     pedidoId,
