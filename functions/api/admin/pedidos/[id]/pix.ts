@@ -10,6 +10,7 @@ interface Env {
 
 interface GerarPixInput {
   valorCentavos?: number;
+  substituiId?: number;
 }
 
 function jsonError(message: string, status: number) {
@@ -23,6 +24,8 @@ const MENSAGENS: Record<string, string> = {
     "Este pedido possui reembolso e ainda não suporta nova cobrança Pix após devolução parcial.",
   VALOR_INVALIDO: "Valor inválido",
   CAPACIDADE_INSUFICIENTE: "Valor acima da capacidade disponível para novas cobranças Pix",
+  PIX_PARA_SUBSTITUIR_INVALIDO:
+    "O Pix informado para substituir não está mais disponível (já foi substituído, pago ou não pertence a este pedido)",
   ESTOQUE_INSUFICIENTE: "Um ou mais itens não possuem estoque suficiente disponível.",
   MERCADO_PAGO_RECUSOU: "O Mercado Pago recusou o pagamento Pix",
   MERCADO_PAGO_INDISPONIVEL:
@@ -35,6 +38,7 @@ const STATUS_HTTP: Record<string, number> = {
   PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO: 409,
   VALOR_INVALIDO: 400,
   CAPACIDADE_INSUFICIENTE: 409,
+  PIX_PARA_SUBSTITUIR_INVALIDO: 409,
   ESTOQUE_INSUFICIENTE: 409,
   MERCADO_PAGO_RECUSOU: 502,
   MERCADO_PAGO_INDISPONIVEL: 502,
@@ -62,12 +66,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   ) {
     return jsonError("Valor inválido", 400);
   }
+  if (
+    body.substituiId !== undefined &&
+    (!Number.isSafeInteger(body.substituiId) || body.substituiId <= 0)
+  ) {
+    return jsonError("Id do Pix a substituir inválido", 400);
+  }
 
   try {
     const resultado = await createAdminPixCharge(env, {
       pedidoId: id,
       valorCentavos: body.valorCentavos,
       usuarioId: auth.user.id,
+      substituiId: body.substituiId,
     });
 
     if (!resultado.ok) {
