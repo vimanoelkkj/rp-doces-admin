@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../../lib/auth";
-import { getVirtualOrRealPayment, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
+import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
 import { liberarReservaPedido } from "../../../lib/stock";
 
 interface Env {
@@ -83,9 +83,9 @@ export const onRequestGet: PagesFunction<Env> = async ({
       .bind(id)
       .all<PedidoItemRow>();
 
-    const pagamento = await getVirtualOrRealPayment(env.DB, id);
+    const financeiro = await getFinanceiroPedido(env.DB, id);
 
-    return Response.json({ pedido, itens, pagamento });
+    return Response.json({ pedido, itens, financeiro });
   } catch (err) {
     console.error("Erro ao buscar pedido (admin)", err);
     return jsonError("Erro interno ao buscar pedido", 500);

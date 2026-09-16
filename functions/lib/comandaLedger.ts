@@ -396,6 +396,131 @@ export async function hasNetConfirmedPayment(db: D1Database, pedidoId: number): 
   return (await getNetPaidCentavos(db, pedidoId)) > 0;
 }
 
+// Projeção financeira para exibição (admin): "quanto está confirmado, e por
+// quais métodos" — não o ledger inteiro, só o que a UI precisa pra montar um
+// texto como "Pago · Cartão + Dinheiro" ou "Parcial · R$ 30 / R$ 100".
+//
+// metodosConfirmados NUNCA é um `DISTINCT metodo WHERE status='PAGO'` puro:
+// isso ignoraria reembolso. Um pagamento 100% estornado tem `status='PAGO'`
+// pra sempre (Passo 5 nunca flipa o status original), então precisaríamos
+// ver esse método como "confirmado" mesmo com pagoCentavos=0 — uma projeção
+// mentirosa. Em vez disso, cada linha de pedido_pagamentos só conta pro
+// resultado se sua contribuição LÍQUIDA própria (valor_centavos menos o que
+// foi reembolsado especificamente DAQUELE pagamento, via pedido_reembolsos.
+// pagamento_id) ainda for positiva — mesma lógica de getNetPaidCentavos,
+// só que por linha em vez de agregada pro pedido inteiro.
+export type FinanceiroPedido = {
+  status: StatusFinanceiroAgregado;
+  pagoCentavos: number;
+  totalCentavos: number;
+  metodosConfirmados: LedgerMetodo[];
+};
+
+// Ordem fixa de exibição — nunca a ordem incidental de retorno do SQLite,
+// que dependeria de id/inserção e produziria "Cartão + Dinheiro" numa carga
+// e "Dinheiro + Cartão" na próxima pro mesmo pedido.
+const ORDEM_METODOS_EXIBICAO: LedgerMetodo[] = [
+  "PIX_MP",
+  "PIX_EXTERNO",
+  "CARTAO",
+  "DINHEIRO",
+  "A_COMBINAR",
+];
+
+function ordenarMetodos(metodos: Iterable<string>): LedgerMetodo[] {
+  const presentes = new Set(metodos);
+  return ORDEM_METODOS_EXIBICAO.filter((m) => presentes.has(m));
+}
+
+const METODOS_CONFIRMADOS_QUERY = `
+  SELECT pp.pedido_id AS pedido_id, pp.metodo AS metodo
+  FROM pedido_pagamentos pp
+  WHERE pp.status = 'PAGO'
+    AND pp.valor_centavos > COALESCE(
+      (SELECT SUM(r.valor_centavos) FROM pedido_reembolsos r
+       WHERE r.pagamento_id = pp.id AND r.status = 'REEMBOLSADO'), 0)
+`;
+
+export async function getFinanceiroPedido(db: D1Database, pedidoId: number): Promise<FinanceiroPedido> {
+  const pedido = await db
+    .prepare(`SELECT valor_total_centavos, status_pagamento FROM pedidos WHERE id = ?`)
+    .bind(pedidoId)
+    .first<{ valor_total_centavos: number; status_pagamento: string }>();
+
+  const pagoCentavos = await getNetPaidCentavos(db, pedidoId);
+
+  const { results } = await db
+    .prepare(`${METODOS_CONFIRMADOS_QUERY} AND pp.pedido_id = ?`)
+    .bind(pedidoId)
+    .all<{ metodo: string }>();
+
+  return {
+    status: (pedido?.status_pagamento as StatusFinanceiroAgregado) ?? "PENDENTE",
+    pagoCentavos,
+    totalCentavos: Number(pedido?.valor_total_centavos || 0),
+    metodosConfirmados: ordenarMetodos(results.map((r) => r.metodo)),
+  };
+}
+
+// Mesma projeção, em lote, pra telas de listagem — três queries no total
+// pra página inteira (bruto pago, reembolsado, métodos com contribuição
+// líquida), nunca uma consulta por linha.
+export async function getFinanceirosPorPedidos(
+  db: D1Database,
+  pedidos: { id: number; valorTotalCentavos: number; statusPagamento: string }[],
+): Promise<Map<number, FinanceiroPedido>> {
+  const resultado = new Map<number, FinanceiroPedido>();
+  if (pedidos.length === 0) return resultado;
+
+  const ids = pedidos.map((p) => p.id);
+  const placeholders = ids.map(() => "?").join(",");
+
+  const [brutoRows, reembolsoRows, metodoRows] = await Promise.all([
+    db
+      .prepare(
+        `SELECT pedido_id, COALESCE(SUM(valor_centavos), 0) AS total
+         FROM pedido_pagamentos WHERE pedido_id IN (${placeholders}) AND status = 'PAGO'
+         GROUP BY pedido_id`,
+      )
+      .bind(...ids)
+      .all<{ pedido_id: number; total: number }>(),
+    db
+      .prepare(
+        `SELECT pedido_id, COALESCE(SUM(valor_centavos), 0) AS total
+         FROM pedido_reembolsos WHERE pedido_id IN (${placeholders}) AND status = 'REEMBOLSADO'
+         GROUP BY pedido_id`,
+      )
+      .bind(...ids)
+      .all<{ pedido_id: number; total: number }>(),
+    db
+      .prepare(`${METODOS_CONFIRMADOS_QUERY} AND pp.pedido_id IN (${placeholders})`)
+      .bind(...ids)
+      .all<{ pedido_id: number; metodo: string }>(),
+  ]);
+
+  const brutoPorPedido = new Map(brutoRows.results.map((r) => [r.pedido_id, Number(r.total)]));
+  const reembolsoPorPedido = new Map(reembolsoRows.results.map((r) => [r.pedido_id, Number(r.total)]));
+  const metodosPorPedido = new Map<number, Set<string>>();
+  for (const row of metodoRows.results) {
+    const set = metodosPorPedido.get(row.pedido_id) ?? new Set<string>();
+    set.add(row.metodo);
+    metodosPorPedido.set(row.pedido_id, set);
+  }
+
+  for (const p of pedidos) {
+    const bruto = brutoPorPedido.get(p.id) ?? 0;
+    const reembolsado = reembolsoPorPedido.get(p.id) ?? 0;
+    resultado.set(p.id, {
+      status: p.statusPagamento as StatusFinanceiroAgregado,
+      pagoCentavos: Math.max(0, bruto - reembolsado),
+      totalCentavos: p.valorTotalCentavos,
+      metodosConfirmados: ordenarMetodos(metodosPorPedido.get(p.id) ?? []),
+    });
+  }
+
+  return resultado;
+}
+
 // Passo 4d: pagamentos administrativos (DINHEIRO/CARTAO/PIX_EXTERNO) e
 // alocação em cascata (waterfall) — semântica DIFERENTE de
 // allocateFullValueAcrossItems. Aquela diz "esta cobrança cobre

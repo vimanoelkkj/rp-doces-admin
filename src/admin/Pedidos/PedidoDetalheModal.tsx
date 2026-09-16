@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "./PedidoDetalheModal.css";
+import { formatarFinanceiro, type FinanceiroPedido } from "./formatarFinanceiro";
 
 /* ── Types (espelham o retorno de GET /api/admin/pedidos/:id) ── */
 interface PedidoItemRow {
@@ -28,6 +29,7 @@ interface PedidoRow {
 interface PedidoDetalheResponse {
   pedido: PedidoRow;
   itens: PedidoItemRow[];
+  financeiro: FinanceiroPedido;
 }
 
 interface PedidoDetalheModalProps {
@@ -145,6 +147,8 @@ export default function PedidoDetalheModal({
       .catch((err) => setStatusError(err.message))
       .finally(() => setAlterando(false));
   };
+
+  const financeiro = data ? formatarFinanceiro(data.financeiro) : null;
 
   return createPortal(
     <div className="pedmodal-overlay" onClick={onClose}>
@@ -292,10 +296,12 @@ export default function PedidoDetalheModal({
             <div className="pedmodal-payment">
               <span className="pedmodal-section-label">Pagamento</span>
               <div className="pedmodal-payment-row">
-                <span className="pedmodal-badge pedmodal-badge--green">
-                  ✓ Pago
+                <span className={`pedmodal-badge pedmodal-badge--${financeiro!.cor}`}>
+                  {financeiro!.badge}
                 </span>
-                <span className="pedmodal-payment-method">Método: Pix</span>
+                {financeiro!.detalhe && (
+                  <span className="pedmodal-payment-method">{financeiro!.detalhe}</span>
+                )}
               </div>
             </div>
           </div>

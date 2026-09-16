@@ -3,6 +3,7 @@ import PedidoDetalheModal from "./PedidoDetalheModal";
 import EditarPedidoModal from "./EditarPedidoModal";
 import "./AdminPedidos.css";
 import NovoPedidoModal from "./NovoPedidoModal";
+import { formatarFinanceiroTexto, type FinanceiroPedido } from "./formatarFinanceiro";
 
 /* ── Types (espelham o retorno de GET /api/admin/pedidos) ── */
 type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
@@ -15,6 +16,7 @@ interface PedidoListItem {
   valor_total_centavos: number;
   status_pedido: StatusPedido;
   criado_em: string;
+  financeiro: FinanceiroPedido;
 }
 
 interface Counts {
@@ -225,8 +227,8 @@ export default function AdminPedidos() {
                 </span>
               </span>
               <span className="ped-td ped-td-payment">
-                <span className="ped-badge ped-badge--green">
-                  ✓ Pago (Pix)
+                <span className={`ped-badge ped-badge--${formatarFinanceiroTexto(pedido.financeiro).cor}`}>
+                  {formatarFinanceiroTexto(pedido.financeiro).texto}
                 </span>
               </span>
               <span className="ped-td ped-td-total">
