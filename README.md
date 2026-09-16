@@ -109,6 +109,13 @@ Fecha o gap de overselling (`checkout.ts` só *lia* `estoque_reservado`, nunca e
 - Transição de filtro de categoria: conteúdo tinha fade suave mas o container pulava de altura seco (arrastando o footer junto de golpe) — animação de altura implementada corretamente (cuidado: um container flex com altura fixa comprime os próprios filhos em vez de deixar vazar, então a medição de altura real precisa vir de um wrapper interno sem altura restringida, não do próprio elemento animado).
 - Cores do card de produto (`ProductCard.css`) divergiam entre desktop e mobile por causa de um `@media (max-width: 768px)` que sobrescrevia cores deliberadamente — unificado para usar a paleta do desktop em ambos.
 
+### Tela de loading do checkout (2026-09-16)
+Ilustrações mascote (bolinho no pote — feliz, triste, empurrando carrinho; `src/assets/*-image.png`) enxertadas nas telas **existentes** (não substituídas — timeline/itens/resumo/WhatsApp de `PedidoConfirmado`/`PagamentoNaoAprovado` continuam intactos):
+- **`AguardandoPagamento.tsx`, estado "criando"**: agora tem 2 sub-etapas visuais fake (`loadingStep` 1/2) — "Preparando seu pedido..." (bolinho+carrinho) → "Gerando pagamento..." (ícone Pix girando). É **uma única chamada de rede** (`POST /api/checkout`); a progressão é puramente estética, com tempo mínimo por etapa (`MIN_STEP_DURATION_MS`) e tempo mínimo total (`MIN_TOTAL_LOADING_MS`) garantindo que ambas apareçam mesmo com rede instantânea.
+- **Novo estado "processando"** (mesmo arquivo): depois que o polling detecta que o pagamento saiu de `PENDENTE` (aprovado ou não), mostra uma transição breve (ícone de relógio, sem barra de progresso, `PROCESSANDO_DELAY_MS`) antes de navegar pro resultado — nunca substitui a tela real do QR Code, que continua aparecendo normalmente enquanto o cliente não paga.
+- **`PedidoConfirmado.tsx`**: ícone de check trocado pelo bolinho feliz (bounce).
+- **`PagamentoNaoAprovado.tsx`**: ícone de X trocado pelo bolinho triste (shake).
+
 ---
 
 ## O que falta
@@ -119,7 +126,6 @@ Ordem sugerida (não travada — pode mudar por decisão):
 2. **Pix administrativo / regeneração** — gerar ou regenerar cobrança Pix pelo admin fora do checkout do cliente.
 3. **Refund automático via Mercado Pago** — hoje só existe reembolso manual (Passo 5); produção integra refund direto na API do MP.
 4. **Exchange / correções de item** (`pedido_item_correcoes`) — trocar produto de pedido já pago, com reembolso parcial e reforço/baixa de estoque.
-5. **Tela de loading fake** na transição carrinho → checkout → Pix → processamento → aprovado/não aprovado (puramente UX, sem gap de backend).
 
 ## Dívidas conhecidas (documentadas, não esquecer)
 
