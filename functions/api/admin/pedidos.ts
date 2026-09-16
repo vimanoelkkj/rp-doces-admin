@@ -4,7 +4,8 @@ import { requireUser } from "../../lib/auth";
 import { reconcilePendingPixPayments, liberarReservasVencidasLocalmente } from "../../lib/paymentSync";
 import { baixarEstoquePedido, reconciliarPagosSemBaixa } from "../../lib/stock";
 import { precoAtualCentavos, ProdutoRow } from "../../lib/pricing";
-import type { LedgerMetodo } from "../../lib/comandaLedger";
+import { getFinanceirosPorPedidos } from "../../lib/comandaLedger";
+import type { FinanceiroPedido, LedgerMetodo } from "../../lib/comandaLedger";
 
 interface Env {
   DB: D1Database;
@@ -15,8 +16,13 @@ interface PedidoListRow {
   id: number;
   cliente_nome: string;
   valor_total_centavos: number;
+  status_pagamento: string;
   status_pedido: string;
   criado_em: string;
+}
+
+interface PedidoListItem extends PedidoListRow {
+  financeiro: FinanceiroPedido;
 }
 
 interface CountsRow {
@@ -89,7 +95,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const offset = (page - 1) * ITEMS_PER_PAGE;
 
     const { results: pedidos } = await env.DB.prepare(
-      `SELECT id, cliente_nome, valor_total_centavos, status_pedido, criado_em
+      `SELECT id, cliente_nome, valor_total_centavos, status_pagamento, status_pedido, criado_em
        FROM pedidos
        WHERE status_pagamento IN ('PARCIAL', 'PAGO') ${tabFilter} ${searchFilter}
        ORDER BY criado_em DESC
@@ -97,6 +103,26 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     )
       .bind(...searchParams, ITEMS_PER_PAGE, offset)
       .all<PedidoListRow>();
+
+    // Lote único pra página inteira (no máximo ITEMS_PER_PAGE pedidos) —
+    // nunca uma consulta financeira por linha.
+    const financeiroPorPedido = await getFinanceirosPorPedidos(
+      env.DB,
+      pedidos.map((p) => ({
+        id: p.id,
+        valorTotalCentavos: p.valor_total_centavos,
+        statusPagamento: p.status_pagamento,
+      })),
+    );
+    const pedidosComFinanceiro: PedidoListItem[] = pedidos.map((p) => ({
+      ...p,
+      financeiro: financeiroPorPedido.get(p.id) ?? {
+        status: p.status_pagamento as FinanceiroPedido["status"],
+        pagoCentavos: 0,
+        totalCentavos: p.valor_total_centavos,
+        metodosConfirmados: [],
+      },
+    }));
 
     const counts = (await env.DB.prepare(
       `SELECT
@@ -109,7 +135,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     ).first<CountsRow>())!;
 
     return Response.json({
-      pedidos,
+      pedidos: pedidosComFinanceiro,
       total: count,
       page,
       totalPages,
