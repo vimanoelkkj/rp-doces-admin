@@ -321,6 +321,7 @@ export default function AdminPedidos() {
         <NovoPedidoModal
           open={novoPedidoOpen}
           onClose={() => setNovoPedidoOpen(false)}
+          onCreated={() => setRefreshKey((k) => k + 1)}
         />
       </main>
   );
