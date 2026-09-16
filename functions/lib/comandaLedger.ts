@@ -674,18 +674,29 @@ export async function registerAdminPayment(
   const waterfall = computeWaterfallAllocations(itens, params.valorCentavos);
   if (!waterfall.ok) return { ok: false, erro: waterfall.erro };
 
-  // Placeholder financeiro criado na abertura manual do pedido (metodo
-  // escolhido na hora, status PENDENTE, origem ADMIN — nunca um Pix do
-  // site, que sempre nasce com origem SITE). Sem cancelar isso aqui, ele
-  // fica órfão para sempre ao lado do pagamento PAGO que estamos prestes a
-  // inserir — mesmo bug documentado em produção. Nunca cancela pagamento
-  // PENDENTE de origem SITE (Pix do cliente ainda pode confirmar sozinho).
-  const pendenteAnterior = await db
+  // Placeholders financeiros PURAMENTE LOCAIS criados na abertura manual do
+  // pedido (ex.: A_COMBINAR) — nunca um PIX_MP, mesmo PENDENTE e mesmo sem
+  // mp_payment_id ainda gravado: `metodo='PIX_MP'` por si só já representa
+  // uma cobrança que pode estar viva no Mercado Pago (Pix administrativo,
+  // passo futuro), e um pagamento manual não tem autoridade pra fingir que
+  // ela deixou de existir — só o Mercado Pago decide isso. Cancela TODOS os
+  // placeholders locais elegíveis (nunca LIMIT 1): se por algum motivo mais
+  // de um existir, um `LIMIT 1` deixaria os demais órfãos ao lado do
+  // pagamento PAGO que estamos prestes a inserir — mesmo bug documentado em
+  // produção. Nunca cancela PENDENTE de origem SITE (Pix do cliente ainda
+  // pode confirmar sozinho).
+  const placeholdersLocais = await db
     .prepare(
-      `SELECT id FROM pedido_pagamentos WHERE pedido_id = ? AND status = 'PENDENTE' AND origem = 'ADMIN' LIMIT 1`,
+      `SELECT id FROM pedido_pagamentos
+       WHERE pedido_id = ? AND status = 'PENDENTE' AND origem = 'ADMIN' AND metodo != 'PIX_MP'
+       ORDER BY id ASC`,
     )
     .bind(params.pedidoId)
-    .first<{ id: number }>();
+    .all<{ id: number }>();
+  // Só um pode ir no `substitui_pagamento_id` (é uma FK simples) — é uma
+  // trilha de auditoria best-effort, não a fonte de verdade do cancelamento
+  // (que é a condição do UPDATE abaixo, aplicada a todos os elegíveis).
+  const primeiroPlaceholderLocal = placeholdersLocais.results[0]?.id ?? null;
 
   // Chave técnica de correlação dentro do batch — identifica unicamente
   // esta operação financeira, mas NÃO significa retry idempotente do
@@ -719,7 +730,7 @@ export async function registerAdminPayment(
         params.usuarioId,
         observacao,
         idempotencyKey,
-        pendenteAnterior?.id ?? null,
+        primeiroPlaceholderLocal,
         params.valorCentavos,
         params.pedidoId,
       ),
@@ -731,15 +742,15 @@ export async function registerAdminPayment(
         )
         .bind(idempotencyKey, a.itemId, a.valorCentavos),
     ),
-    ...(pendenteAnterior
+    ...(placeholdersLocais.results.length > 0
       ? [
           db
             .prepare(
               `UPDATE pedido_pagamentos SET status = 'CANCELADO', cancelado_em = CURRENT_TIMESTAMP
-               WHERE id = ? AND status = 'PENDENTE'
+               WHERE pedido_id = ? AND status = 'PENDENTE' AND origem = 'ADMIN' AND metodo != 'PIX_MP'
                  AND EXISTS (SELECT 1 FROM pedido_pagamentos WHERE idempotency_key = ?)`,
             )
-            .bind(pendenteAnterior.id, idempotencyKey),
+            .bind(params.pedidoId, idempotencyKey),
         ]
       : []),
   ];
