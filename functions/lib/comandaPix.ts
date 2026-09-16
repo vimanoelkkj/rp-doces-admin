@@ -1,9 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 
-// Pix administrativo (geração pelo admin, fora do checkout do cliente) —
-// Payments API, não Orders API (produção usa Orders API; decisão deliberada
-// de não copiar de carona, documentada no README). Este módulo só cobre
-// GERAR — regeneração e cancelamento autônomo são passos futuros.
+// Pix administrativo (geração e regeneração pelo admin, fora do checkout do
+// cliente) — Payments API, não Orders API (produção usa Orders API; decisão
+// deliberada de não copiar de carona, documentada no README). Cancelamento
+// autônomo (sem substituto) fica fora de escopo: a Payments API não tem
+// cancelamento real de Pix pendente, então essa ação só faria sentido como
+// "esconder da UI sem substituir" — semanticamente estranho sem um Pix novo.
 //
 // external_reference: SITE continua usando `token_publico` do pedido
 // (checkout.ts intocado). ADMIN usa o `idempotency_key` da própria
@@ -45,6 +47,8 @@ export interface GerarPixAdminParams {
   pedidoId: number;
   valorCentavos?: number;
   usuarioId: number;
+  /** Regeneração: id do Pix administrativo sendo substituído. `undefined`/`null` = geração normal. */
+  substituiId?: number | null;
 }
 
 export interface GerarPixAdminSucesso {
@@ -67,6 +71,7 @@ export interface GerarPixAdminFalha {
     | "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO"
     | "VALOR_INVALIDO"
     | "CAPACIDADE_INSUFICIENTE"
+    | "PIX_PARA_SUBSTITUIR_INVALIDO"
     | "ESTOQUE_INSUFICIENTE"
     | "MERCADO_PAGO_RECUSOU"
     | "MERCADO_PAGO_INDISPONIVEL";
@@ -85,12 +90,26 @@ const MAX_TEXT_LENGTH = 200;
 // codes simultaneamente pagáveis somando mais que o saldo devido é
 // exatamente o oversell financeiro que essa conta impede.
 //
-// `substituiId`: null numa geração normal. Numa regeneração (passo futuro),
-// é o id do Pix sendo substituído — precisa ser excluído da soma mesmo
-// antes de o substituto existir, porque o `NOT EXISTS` sozinho não
-// conseguiria reconhecer uma substituição que está sendo criada no mesmo
-// INSERT (o substituto ainda não tem linha na tabela no instante em que o
-// `WHERE` é avaliado).
+// `substituiId`: null numa geração normal; numa regeneração, é o id do Pix
+// sendo substituído — precisa ser excluído da soma mesmo antes de o
+// substituto existir, porque o `NOT EXISTS` sozinho não conseguiria
+// reconhecer uma substituição que está sendo criada no mesmo INSERT (o
+// substituto ainda não tem linha na tabela no instante em que o `WHERE` é
+// avaliado).
+//
+// "Já tem substituto" só conta se o substituto estiver VIVO
+// (`PENDENTE`/`PAGO`) — nunca um substituto que morreu (`FALHOU`/
+// `CANCELADO`/`EXPIRADO`). Sem esse filtro de status, uma regeneração
+// rejeitada pelo Mercado Pago trancaria o Pix original pra sempre: ele
+// ficaria excluído da capacidade e "já substituído" indefinidamente, mesmo
+// o substituto nunca tendo virado dinheiro nem QR válido — o pedido
+// ficaria sem nenhum Pix administrativo utilizável.
+const SUCESSOR_VIVO = `NOT EXISTS (
+  SELECT 1 FROM pedido_pagamentos sub
+  WHERE sub.substitui_pagamento_id = %ALVO%
+    AND sub.status IN ('PENDENTE', 'PAGO')
+)`;
+
 const CAPACIDADE_COBRAVEL_SQL = `(
   SELECT p.valor_total_centavos
     - COALESCE((SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id = p.id AND status = 'PAGO'), 0)
@@ -98,7 +117,7 @@ const CAPACIDADE_COBRAVEL_SQL = `(
         SELECT SUM(pp.valor_centavos) FROM pedido_pagamentos pp
         WHERE pp.pedido_id = p.id AND pp.metodo = 'PIX_MP' AND pp.origem = 'ADMIN' AND pp.status = 'PENDENTE'
           AND pp.id != COALESCE(?, -1)
-          AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos sub WHERE sub.substitui_pagamento_id = pp.id)
+          AND ${SUCESSOR_VIVO.replace("%ALVO%", "pp.id")}
       ), 0)
   FROM pedidos p WHERE p.id = ?
 )`;
@@ -146,9 +165,30 @@ export async function createAdminPixCharge(
     }
   }
 
+  const substituiId = params.substituiId ?? null;
+
+  // Pré-checagem só pra UX (mensagem de erro cedo, antes de montar o
+  // batch) — a proteção real contra corrida é a condição idêntica
+  // reavaliada atomicamente dentro do próprio INSERT, mais abaixo. Duas
+  // regenerações do mesmo A simultâneas NUNCA podem ambas suceder: a
+  // condição de "A ainda é substituível" (pertence a este pedido, é
+  // PIX_MP/ADMIN/PENDENTE, e ninguém mais já o substituiu) precisa valer
+  // no instante exato da escrita, não apenas neste SELECT anterior.
+  if (substituiId !== null) {
+    const substituivel = await db
+      .prepare(
+        `SELECT 1 FROM pedido_pagamentos a
+         WHERE a.id = ? AND a.pedido_id = ? AND a.metodo = 'PIX_MP' AND a.origem = 'ADMIN' AND a.status = 'PENDENTE'
+           AND ${SUCESSOR_VIVO.replace("%ALVO%", "a.id")}`,
+      )
+      .bind(substituiId, params.pedidoId)
+      .first();
+    if (!substituivel) return { ok: false, erro: "PIX_PARA_SUBSTITUIR_INVALIDO" };
+  }
+
   // Leitura prévia só pra UX (mensagem de erro cedo / default de valor) —
   // a proteção real é o CAS na escrita, avaliado de novo no INSERT abaixo.
-  const capacidadePrevia = await getCapacidadeCobravel(db, params.pedidoId, null);
+  const capacidadePrevia = await getCapacidadeCobravel(db, params.pedidoId, substituiId);
   const valorCentavos = params.valorCentavos ?? capacidadePrevia;
   if (!Number.isSafeInteger(valorCentavos) || valorCentavos <= 0) {
     return { ok: false, erro: "VALOR_INVALIDO" };
@@ -212,8 +252,21 @@ export async function createAdminPixCharge(
            pedido_id, metodo, origem, valor_centavos, status,
            registrado_por_usuario_id, idempotency_key, substitui_pagamento_id
          )
-         SELECT ?, ?, 'ADMIN', ?, 'PENDENTE', ?, ?, NULL
-         WHERE ? <= ${CAPACIDADE_COBRAVEL_SQL}`,
+         SELECT ?, ?, 'ADMIN', ?, 'PENDENTE', ?, ?, ?
+         WHERE ? <= ${CAPACIDADE_COBRAVEL_SQL}
+           AND (
+             ? IS NULL
+             OR (
+               EXISTS (
+                 SELECT 1 FROM pedido_pagamentos a
+                 WHERE a.id = ? AND a.pedido_id = ? AND a.metodo = 'PIX_MP' AND a.origem = 'ADMIN' AND a.status = 'PENDENTE'
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM pedido_pagamentos suc
+                 WHERE suc.substitui_pagamento_id = ? AND suc.status IN ('PENDENTE', 'PAGO')
+               )
+             )
+           )`,
       )
       .bind(
         params.pedidoId,
@@ -221,9 +274,14 @@ export async function createAdminPixCharge(
         valorCentavos,
         params.usuarioId,
         idempotencyKey,
+        substituiId,
         valorCentavos,
-        null,
+        substituiId,
         params.pedidoId,
+        substituiId,
+        substituiId,
+        params.pedidoId,
+        substituiId,
       ),
     ...waterfall.alocacoes.map((a) =>
       db
@@ -249,7 +307,14 @@ export async function createAdminPixCharge(
   const pagamentoStmtIndex = itensParaReserva.length + (precisaReReservar ? 1 : 0);
   const pagamentoId = Number(batchResults[pagamentoStmtIndex]?.meta?.last_row_id || 0);
   if (!pagamentoId) {
-    return { ok: false, erro: "CAPACIDADE_INSUFICIENTE" };
+    // CAS na escrita recusou: outra requisição consumiu a capacidade ou (numa
+    // regeneração) já substituiu o mesmo `substituiId` entre nossa leitura e
+    // o commit. Nada foi gravado (rollback do batch inteiro). Não dá pra
+    // distinguir as duas causas só pelo resultado do INSERT — quando havia
+    // um `substituiId`, essa é a causa mais provável e mais acionável pro
+    // admin (a fila é "quem pediu para substituir A primeiro"), então é o
+    // erro reportado nesse caso.
+    return { ok: false, erro: substituiId !== null ? "PIX_PARA_SUBSTITUIR_INVALIDO" : "CAPACIDADE_INSUFICIENTE" };
   }
 
   // Só "dona" da reserva se ESTA transação genuinamente a criou (changes=1
