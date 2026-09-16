@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { precoAtualCentavos, ProdutoRow } from "../lib/pricing";
+import { liberarReservaPedido } from "../lib/stock";
 
 interface Env {
   DB: D1Database;
@@ -124,51 +125,75 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000,
   ).toISOString();
 
-  // Persiste pedido + itens + pagamento PENDENTE + alocações num único
-  // batch (uma transação): o registro financeiro nasce antes de chamar o
-  // Mercado Pago, sem janela entre "pagamento criado" e "alocado aos
-  // itens" — cada statement resolve o id de que precisa por subquery
-  // (token_publico / idempotency_key), sem depender de last_row_id entre
-  // statements do mesmo batch.
-  const batchResults = await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO pedidos
-         (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      tokenPublico,
-      nome,
-      whatsapp,
-      (body.recado ?? "").slice(0, MAX_TEXT_LENGTH),
-      totalCentavos,
-      idempotencyKey,
-    ),
-    ...itensParaPersistir.map((item) =>
+  // Persiste pedido + itens + pagamento PENDENTE + alocações + reserva de
+  // estoque num único batch (uma transação): o registro financeiro nasce
+  // antes de chamar o Mercado Pago, sem janela entre "pagamento criado" e
+  // "alocado aos itens" — cada statement resolve o id de que precisa por
+  // subquery (token_publico / idempotency_key), sem depender de
+  // last_row_id entre statements do mesmo batch.
+  //
+  // Passo 7: reserva_expira_em nasce com uma estimativa (+31min, 1min de
+  // folga sobre o TTL de 30min do Pix) porque a reserva precisa proteger
+  // a concorrência ANTES de sabermos a expiração real do MP — é
+  // sincronizada com o valor real assim que o MP responde (mais abaixo).
+  // A proteção real contra overselling não é nenhum WHERE aqui: é o CHECK
+  // (estoque_reservado <= estoque) de `produtos`, avaliado por linha no
+  // instante de cada UPDATE — se violar, o batch inteiro (pedido, itens,
+  // pagamento, alocações, reserva) é revertido.
+  let batchResults;
+  try {
+    batchResults = await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO pedido_itens
-           (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
-         SELECT id, ?, ?, ?, ?, ? FROM pedidos WHERE token_publico = ?`,
+        `INSERT INTO pedidos
+           (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
+            idempotency_key, reserva_status, reserva_expira_em)
+         VALUES (?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'))`,
       ).bind(
-        item.produtoId,
-        item.produtoNome,
-        item.quantidade,
-        item.valorUnitarioCentavos,
-        item.valorTotalCentavos,
         tokenPublico,
+        nome,
+        whatsapp,
+        (body.recado ?? "").slice(0, MAX_TEXT_LENGTH),
+        totalCentavos,
+        idempotencyKey,
       ),
-    ),
-    env.DB.prepare(
-      `INSERT INTO pedido_pagamentos (pedido_id, metodo, origem, valor_centavos, status, idempotency_key)
-       SELECT id, 'PIX_MP', 'SITE', ?, 'PENDENTE', ? FROM pedidos WHERE token_publico = ?`,
-    ).bind(totalCentavos, idempotencyKey, tokenPublico),
-    env.DB.prepare(
-      `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
-       SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), pi.id, pi.valor_total_centavos
-       FROM pedido_itens pi
-       JOIN pedidos p ON p.id = pi.pedido_id
-       WHERE p.token_publico = ? AND pi.valor_total_centavos > 0`,
-    ).bind(idempotencyKey, tokenPublico),
-  ]);
+      ...itensParaPersistir.map((item) =>
+        env.DB.prepare(
+          `INSERT INTO pedido_itens
+             (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
+           SELECT id, ?, ?, ?, ?, ? FROM pedidos WHERE token_publico = ?`,
+        ).bind(
+          item.produtoId,
+          item.produtoNome,
+          item.quantidade,
+          item.valorUnitarioCentavos,
+          item.valorTotalCentavos,
+          tokenPublico,
+        ),
+      ),
+      env.DB.prepare(
+        `INSERT INTO pedido_pagamentos (pedido_id, metodo, origem, valor_centavos, status, idempotency_key)
+         SELECT id, 'PIX_MP', 'SITE', ?, 'PENDENTE', ? FROM pedidos WHERE token_publico = ?`,
+      ).bind(totalCentavos, idempotencyKey, tokenPublico),
+      env.DB.prepare(
+        `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
+         SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), pi.id, pi.valor_total_centavos
+         FROM pedido_itens pi
+         JOIN pedidos p ON p.id = pi.pedido_id
+         WHERE p.token_publico = ? AND pi.valor_total_centavos > 0`,
+      ).bind(idempotencyKey, tokenPublico),
+      ...itensParaPersistir.map((item) =>
+        env.DB.prepare(
+          `UPDATE produtos SET estoque_reservado = estoque_reservado + ?, atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+        ).bind(item.quantidade, item.produtoId),
+      ),
+    ]);
+  } catch (err) {
+    if (String((err as Error)?.message || "").includes("CHECK")) {
+      return jsonError("Um ou mais produtos não possuem estoque suficiente disponível.", 409);
+    }
+    throw err;
+  }
 
   const pedidoId = batchResults[0].meta.last_row_id;
   const pagamentoId = batchResults[1 + itensParaPersistir.length].meta.last_row_id;
@@ -227,6 +252,12 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       .bind(mensagemErro, detalheErro, pagamentoId)
       .run();
 
+    // Rejeição definitiva e conhecida (não ambígua): a reserva pode ser
+    // liberada com segurança. O agregado do pedido aqui é trivialmente
+    // PENDENTE (o pagamento acabou de nascer), então o guard interno de
+    // liberarReservaPedido nunca barra esta chamada.
+    await liberarReservaPedido(env.DB, pedidoId);
+
     return jsonError("Falha ao criar pagamento Pix", 502);
   }
 
@@ -245,11 +276,21 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
 
   const txData = payment.point_of_interaction?.transaction_data;
 
+  // Passo 7: sincroniza reserva_expira_em com a expiração REAL do Pix
+  // agora que o MP respondeu — deixa de usar a estimativa de +31min e
+  // passa a usar o TTL real + 1min de folga, para não ter dois relógios
+  // (o nosso e o do MP) fingindo que começaram juntos.
+  const reservaExpiraEm = payment.date_of_expiration
+    ? new Date(Date.parse(payment.date_of_expiration) + 60_000).toISOString()
+    : null;
+
   await env.DB.batch([
     env.DB.prepare(
       `UPDATE pedidos
        SET mp_payment_id = ?, mp_status = ?, mp_qr_code = ?, mp_qr_code_base64 = ?,
-           mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
+           mp_ticket_url = ?, pix_expira_em = ?,
+           reserva_expira_em = COALESCE(?, reserva_expira_em),
+           atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`,
     ).bind(
       String(payment.id),
@@ -258,6 +299,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       txData?.qr_code_base64 ?? null,
       txData?.ticket_url ?? null,
       payment.date_of_expiration,
+      reservaExpiraEm,
       pedidoId,
     ),
     env.DB.prepare(

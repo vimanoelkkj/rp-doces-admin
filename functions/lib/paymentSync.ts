@@ -8,7 +8,9 @@
 // Continuamos na Payments API (/v1/payments), não na Orders API que
 // produção usa hoje — decisão explícita, não migramos de carona aqui.
 
-import { recalculatePedidoStatusPagamento, LedgerStatus } from "./comandaLedger";
+import { LedgerStatus } from "./comandaLedger";
+import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
+import { liberarReservaPedido } from "./stock";
 
 export type MpMappedStatus = "PAGO" | "CANCELADO" | "EXPIRADO";
 
@@ -110,7 +112,16 @@ async function applyLedgerTransition(
 
   const transicionou = atual.status !== novoStatus;
   if (transicionou) {
-    await recalculatePedidoStatusPagamento(db, atual.pedido_id);
+    // Passo 7: reconcilia o agregado e, se ele fechar em PAGO, converte a
+    // reserva em baixa física (pedidoReconcile.ts). Para EXPIRADO/CANCELADO,
+    // tenta liberar a reserva — a própria função só libera se o agregado
+    // ainda estiver genuinamente PENDENTE (guard no próprio write), nunca
+    // se um pedido PARCIAL tiver essa tentativa vindo de uma perna Pix
+    // morta: dívida operacional conhecida, não resolvida aqui.
+    await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
+    if (novoStatus === "CANCELADO" || novoStatus === "EXPIRADO") {
+      await liberarReservaPedido(db, atual.pedido_id);
+    }
   }
 
   return { ok: true, status: novoStatus, transicionou };
@@ -313,6 +324,47 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
         });
       } catch (err) {
         console.error("Falha ao reconciliar pagamento PIX_MP pendente", row.id, err);
+      }
+    }),
+  );
+}
+
+const RESERVA_VENCIDA_BATCH_SIZE = 10;
+
+// Passo 7: fecha o gap "ninguém nunca visitou este pedido nem chegou
+// webhook" para a expiração local do Pix — mesma checagem que
+// `refreshPedidoStatus` já faz por visita do cliente (`pix_expira_em`
+// vencido, sem precisar consultar o MP: o TTL real já veio do MP na
+// criação da cobrança), agora também disparada oportunisticamente pela
+// abertura do painel admin. `reserva_expira_em` já embute a folga de 1
+// minuto sobre `pix_expira_em`, então não há corrida "liberamos enquanto
+// ainda podia ser pago" — reaproveita expireLocalPayment/
+// applyLedgerTransition, não reimplementa a regra.
+export async function liberarReservasVencidasLocalmente(env: { DB: D1Database }): Promise<void> {
+  const { results } = await env.DB.prepare(
+    `SELECT pp.id AS pagamento_id
+     FROM pedidos p
+     JOIN pedido_pagamentos pp ON pp.pedido_id = p.id
+     WHERE p.status_pagamento = 'PENDENTE'
+       AND p.reserva_status = 'ATIVA'
+       AND pp.metodo = 'PIX_MP' AND pp.origem = 'SITE' AND pp.status = 'PENDENTE'
+       AND p.reserva_expira_em IS NOT NULL
+       AND datetime(p.reserva_expira_em) <= datetime('now')
+     ORDER BY p.reserva_expira_em ASC
+     LIMIT ?`,
+  )
+    .bind(RESERVA_VENCIDA_BATCH_SIZE)
+    .all<{ pagamento_id: number }>();
+
+  const pendentes = results || [];
+  if (!pendentes.length) return;
+
+  await Promise.allSettled(
+    pendentes.map(async (row) => {
+      try {
+        await expireLocalPayment(env.DB, row.pagamento_id);
+      } catch (err) {
+        console.error("Falha ao liberar reserva vencida localmente", row.pagamento_id, err);
       }
     }),
   );

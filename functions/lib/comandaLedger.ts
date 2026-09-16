@@ -1,5 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 
+// Import circular deliberado com pedidoReconcile.ts: aquele módulo importa
+// `recalculatePedidoStatusPagamento` daqui, e este arquivo importa
+// `reconcilePedidoAfterFinancialChange` de lá. Seguro porque ambos os usos
+// só acontecem dentro de corpos de função, nunca durante a avaliação do
+// módulo — é a ponte deliberada entre financeiro e físico (Passo 7),
+// nunca o inverso (comandaLedger.ts nunca importa stock.ts diretamente).
+import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
+
 // Passo 4b: materialização lazy de pagamentos legados em `pedido_pagamentos`
 // + leitura (real ou virtual) sem nunca escrever no caminho de leitura.
 //
@@ -590,7 +598,7 @@ export async function registerAdminPayment(
     return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
   }
 
-  const statusFinanceiro = await recalculatePedidoStatusPagamento(db, params.pedidoId);
+  const statusFinanceiro = await reconcilePedidoAfterFinancialChange(db, params.pedidoId);
   const saldo = await getComandaSaldo(db, params.pedidoId);
 
   return { ok: true, pagamentoId, statusFinanceiro, saldoCentavos: saldo.saldo };
@@ -708,7 +716,7 @@ export async function registerManualRefund(
   }
 
   const reembolsoId = Number(result.meta.last_row_id);
-  const statusFinanceiro = await recalculatePedidoStatusPagamento(db, params.pedidoId);
+  const statusFinanceiro = await reconcilePedidoAfterFinancialChange(db, params.pedidoId);
   const saldo = await getComandaSaldo(db, params.pedidoId);
 
   return { ok: true, reembolsoId, statusFinanceiro, saldoCentavos: saldo.saldo };
