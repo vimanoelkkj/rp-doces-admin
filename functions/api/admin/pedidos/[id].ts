@@ -2,6 +2,7 @@
 
 import { requireUser } from "../../../lib/auth";
 import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
+import { getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
 import { liberarReservaPedido } from "../../../lib/stock";
 
 interface Env {
@@ -16,6 +17,7 @@ interface PedidoDetalheRow {
   valor_total_centavos: number;
   status_pagamento: string;
   status_pedido: string;
+  status_comanda: string;
   criado_em: string;
   pago_em: string | null;
 }
@@ -63,7 +65,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
   try {
     const pedido = await env.DB.prepare(
       `SELECT id, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
-              status_pagamento, status_pedido, criado_em, pago_em
+              status_pagamento, status_pedido, status_comanda, criado_em, pago_em
        FROM pedidos WHERE id = ?`,
     )
       .bind(id)
@@ -84,8 +86,9 @@ export const onRequestGet: PagesFunction<Env> = async ({
       .all<PedidoItemRow>();
 
     const financeiro = await getFinanceiroPedido(env.DB, id);
+    const pixAdminPendentes = await getPixAdminPendentesAtivos(env.DB, id);
 
-    return Response.json({ pedido, itens, financeiro });
+    return Response.json({ pedido, itens, financeiro, pixAdminPendentes });
   } catch (err) {
     console.error("Erro ao buscar pedido (admin)", err);
     return jsonError("Erro interno ao buscar pedido", 500);

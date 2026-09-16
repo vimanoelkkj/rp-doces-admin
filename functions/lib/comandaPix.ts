@@ -134,6 +134,57 @@ export async function getCapacidadeCobravel(
   return Math.max(0, Number(row?.capacidade || 0));
 }
 
+export interface PixAdminPendente {
+  id: number;
+  valorCentavos: number;
+  qrCode: string | null;
+  qrCodeBase64: string | null;
+  ticketUrl: string | null;
+  expiresAt: string | null;
+}
+
+interface PixAdminPendenteRow {
+  id: number;
+  valor_centavos: number;
+  mp_qr_code: string | null;
+  mp_qr_code_base64: string | null;
+  mp_ticket_url: string | null;
+  pix_expira_em: string | null;
+}
+
+// Leitura pura — nenhuma escrita, nenhuma decisão financeira nova. Reaproveita
+// a MESMA definição de "ainda vivo" usada pela regeneração (SUCESSOR_VIVO):
+// um pedido pode legitimamente ter vários PIX_MP/ADMIN/PENDENTE simultâneos
+// (Pix parciais aditivos, não uma cadeia de substituição entre si) — por
+// isso é uma LISTA, nunca "o mais recente". `expiresAt` vencido não é
+// escondido/filtrado aqui: só o backend/reconciliação (paymentSync.ts) tem
+// autoridade para transicionar PENDENTE -> EXPIRADO; esta função devolve o
+// que o ledger diz agora, sem inventar estado.
+export async function getPixAdminPendentesAtivos(
+  db: D1Database,
+  pedidoId: number,
+): Promise<PixAdminPendente[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, valor_centavos, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
+       FROM pedido_pagamentos pp
+       WHERE pp.pedido_id = ? AND pp.metodo = 'PIX_MP' AND pp.origem = 'ADMIN' AND pp.status = 'PENDENTE'
+         AND ${SUCESSOR_VIVO.replace("%ALVO%", "pp.id")}
+       ORDER BY id ASC`,
+    )
+    .bind(pedidoId)
+    .all<PixAdminPendenteRow>();
+
+  return (results || []).map((r) => ({
+    id: r.id,
+    valorCentavos: r.valor_centavos,
+    qrCode: r.mp_qr_code,
+    qrCodeBase64: r.mp_qr_code_base64,
+    ticketUrl: r.mp_ticket_url,
+    expiresAt: r.pix_expira_em,
+  }));
+}
+
 export async function createAdminPixCharge(
   env: Env,
   params: GerarPixAdminParams,
