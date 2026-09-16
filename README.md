@@ -35,6 +35,7 @@ npm run pages:dev     # wrangler pages dev dist → serve tudo em http://127.0.0
 Só `npm run dev` (Vite puro) serve pra iterar rápido no frontend, mas **sem** `/api/*` funcionando (sem Functions, sem D1).
 
 Migrations locais:
+
 ```bash
 npm run db:migrate:local
 ```
@@ -44,9 +45,11 @@ npm run db:migrate:local
 ### Banco de produção (real)
 
 O D1 remoto de produção (`rp-doces-db`) **nunca foi escrito** por este projeto — só leitura, sempre:
+
 ```bash
 npx wrangler d1 execute rp-doces-db --remote --command "SELECT ..."
 ```
+
 Nunca rodar `wrangler pages dev --remote` contra ele sem entender que isso faz o site local **escrever de verdade** em produção. Nunca projetar colunas com PII em queries de produção (`cliente_email`, `cliente_whatsapp`, `cliente_nome`, `token_publico`, `mp_qr_code`, `pix_copia_cola`).
 
 ---
@@ -66,15 +69,19 @@ Nunca rodar `wrangler pages dev --remote` contra ele sem entender que isso faz o
 ## O que já foi feito
 
 ### Fundação (storefront + admin básico)
+
 Scaffold do projeto, catálogo de produtos, carrinho (persistido em localStorage), checkout Pix, acompanhamento de pedido, estrutura do admin (dashboard, login, CRUD de produtos com upload de imagem via R2, CRUD de administradores, listagem/detalhe de pedidos, tema dark).
 
 ### Passo 2 — Reconciliação de schema `pedidos`
+
 Schema de `pedidos` trazido para bater com produção: `status_pedido` (NOVO/PREPARANDO/PRONTO/ENTREGUE/CANCELADO), `status_comanda`, `origem_pedido`, colunas de reserva (`reserva_status/reserva_expira_em/reserva_liberada_em`, ainda dormentes na época), `arquivado`, trigger de encerramento de comanda em status terminal.
 
 ### Passo 3 — Auditoria de `pedido_itens`
+
 `criado_em`, `estoque_baixado_em`, `adicionado_por_usuario_id`, `adicionado_em`.
 
 ### Passo 4 — Ledger financeiro (4a–4d)
+
 - **4a**: schema do razão financeiro — `pedido_pagamentos` + `pedido_pagamento_alocacoes`, sem mudar comportamento ainda.
 - **4b**: materialização lazy de pagamentos legados (lê `pedidos` antigos e projeta como se fossem uma linha de ledger, sem nunca escrever no caminho de leitura).
 - **4c-1**: checkout passa a escrever no ledger em paralelo aos campos legados de `pedidos`.
@@ -82,10 +89,13 @@ Schema de `pedidos` trazido para bater com produção: `status_pedido` (NOVO/PRE
 - **4d**: pagamentos manuais do admin (`DINHEIRO`, `CARTAO`, `PIX_EXTERNO`) com alocação em cascata (waterfall) sobre os itens, concorrência resolvida via padrão "INSERT condicional que aciona violação de constraint e derruba o batch inteiro" (sem compensação pós-commit).
 
 ### Passo 5 — Reembolsos manuais
+
 `pedido_reembolsos` (schema idêntico ao de produção). Modelo **bruto / reembolsado / líquido**: pagamento original nunca é mutado (nunca vira `REEMBOLSADO`), reembolso é um fato independente. `recalculatePedidoStatusPagamento`, `getComandaSaldo` e o guard de cancelamento usam líquido. Reembolso restrito a métodos manuais (`DINHEIRO/CARTAO/PIX_EXTERNO`) — PIX_MP fica de fora (exige integração com o MP, fora de escopo). Bloqueio temporário: novo pagamento admin é recusado (`PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO`) se já existe reembolso e ainda falta líquido a cobrir — evita que a waterfall (que não conhece reembolsos) misalocasse dinheiro.
 
 ### Passo 6 — Reconciliação server-side de pagamentos
+
 Fecha o gap "pagamento fica PENDENTE pra sempre se o cliente fechar a aba". Três caminhos independentes convergindo num único helper (`functions/lib/paymentSync.ts::syncPaymentFromMp`):
+
 - **Webhook** (`functions/api/webhooks/mercadopago.ts`) — validação HMAC-SHA256 timing-safe (protocolo idêntico ao de produção), nunca confia no payload (sempre busca a Payment fresca no MP antes de mutar), resolve o pagamento por `mp_payment_id` direto ou por fallback via `external_reference = token_publico` (nunca escolhe "o mais recente" entre candidatos — 0 é not-found, 1 resolve e associa, >1 é ambíguo e não decide).
 - **Reconciliação oportunista do admin** (`GET /api/admin/pedidos` dispara `reconcilePendingPixPayments`, throttle 15s / lote de 4).
 - **Polling do cliente** (`refreshPedidoStatus`, pré-existente, refatorado pra reusar o mesmo helper).
@@ -93,7 +103,8 @@ Fecha o gap "pagamento fica PENDENTE pra sempre se o cliente fechar a aba". Trê
 Matriz de transição do pagamento individual: `PENDENTE → PAGO/CANCELADO/EXPIRADO` permitido; qualquer terminal → outra coisa, recusado (idempotente, nunca regride); `REEMBOLSADO` nunca é tocado por esse caminho. CAS (compare-and-swap) contra o status lido protege contra corrida entre chamadores concorrentes.
 
 ### Passo 7 — Reserva / baixa / liberação de estoque
-Fecha o gap de overselling (`checkout.ts` só *lia* `estoque_reservado`, nunca escrevia nada). Peça central de segurança: **`CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque)`** em `produtos` (migração 0001, já existia dormente) — não é um `WHERE` manual, é a constraint do banco que derruba o `batch()` inteiro (atômico) se duas compras disputarem a última unidade.
+
+Fecha o gap de overselling (`checkout.ts` só _lia_ `estoque_reservado`, nunca escrevia nada). Peça central de segurança: **`CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque)`** em `produtos` (migração 0001, já existia dormente) — não é um `WHERE` manual, é a constraint do banco que derruba o `batch()` inteiro (atômico) se duas compras disputarem a última unidade.
 
 - **Reserva**: criada no mesmo batch atômico do checkout, antes de chamar o MP. TTL em duas fases: nasce como `now + 31min` (proteção imediata), sincronizado para `date_of_expiration` real do MP `+ 1min` assim que a resposta chega.
 - **Baixa**: `functions/lib/stock.ts::baixarEstoquePedido`, disparada por `functions/lib/pedidoReconcile.ts::reconcilePedidoAfterFinancialChange` — uma ponte explícita que roda depois de **qualquer** recálculo financeiro (`recalculatePedidoStatusPagamento`) e converte a reserva em baixa física só quando o agregado fecha em `PAGO`. Todos os write-paths financeiros (sync com MP, pagamento manual do admin, reembolso) passam por essa ponte — nenhum "esquece" de considerar estoque.
@@ -103,6 +114,7 @@ Fecha o gap de overselling (`checkout.ts` só *lia* `estoque_reservado`, nunca e
 - **Dívida deliberada**: pedido `PARCIAL` (algum pagamento já confirmado) cuja perna Pix expira **não** tem a reserva liberada automaticamente — fica presa até ação manual (cancelamento, que só é permitido com líquido=0). Decisão consciente: mais vale prender estoque do que vender de baixo do nariz de quem já pagou parte.
 
 ### Correções de frontend (2026-09-16)
+
 - Bug do cardápio "vazio": `GET /api/produtos` devolvia `categoria` como slug cru do banco (`BOLO_NO_POTE`), mas o frontend comparava com o nome de exibição (`"Bolo no Pote"`) — nunca batia, lista ficava vazia mesmo com produtos existindo. Corrigido com `LEFT JOIN` em `categorias` devolvendo `categoria_nome`.
 - Onda decorativa do cardápio vazava sobre o footer quando havia zero produtos (catálogo vazio ou filtro sem resultado) — adicionado estado vazio explícito com altura mínima compensando a proporção da onda.
 - Footer usando cor de fundo diferente da página do cardápio — corrigido com override escopado (Footer é componente compartilhado por 7 páginas com fundos diferentes, não mudar globalmente).
@@ -110,11 +122,15 @@ Fecha o gap de overselling (`checkout.ts` só *lia* `estoque_reservado`, nunca e
 - Cores do card de produto (`ProductCard.css`) divergiam entre desktop e mobile por causa de um `@media (max-width: 768px)` que sobrescrevia cores deliberadamente — unificado para usar a paleta do desktop em ambos.
 
 ### Tela de loading do checkout (2026-09-16)
+
 Ilustrações mascote (bolinho no pote — feliz, triste, empurrando carrinho; `src/assets/*-image.png`) enxertadas nas telas **existentes** (não substituídas — timeline/itens/resumo/WhatsApp de `PedidoConfirmado`/`PagamentoNaoAprovado` continuam intactos):
+
 - **`AguardandoPagamento.tsx`, estado "criando"**: agora tem 2 sub-etapas visuais fake (`loadingStep` 1/2) — "Preparando seu pedido..." (bolinho+carrinho) → "Gerando pagamento..." (ícone Pix girando). É **uma única chamada de rede** (`POST /api/checkout`); a progressão é puramente estética, com tempo mínimo por etapa (`MIN_STEP_DURATION_MS`) e tempo mínimo total (`MIN_TOTAL_LOADING_MS`) garantindo que ambas apareçam mesmo com rede instantânea.
 - **Novo estado "processando"** (mesmo arquivo): depois que o polling detecta que o pagamento saiu de `PENDENTE` (aprovado ou não), mostra uma transição breve (ícone de relógio, sem barra de progresso, `PROCESSANDO_DELAY_MS`) antes de navegar pro resultado — nunca substitui a tela real do QR Code, que continua aparecendo normalmente enquanto o cliente não paga.
 - **`PedidoConfirmado.tsx`**: ícone de check trocado pelo bolinho feliz (bounce).
 - **`PagamentoNaoAprovado.tsx`**: ícone de X trocado pelo bolinho triste (shake).
+  Ainda tem que fazer alkgumas melhorias, como definir onde cada tela vai aparecer, por quanto tempo.
+  Por mais que o commit esteja no repositório online, consideramos ele como commit temp, coisa que iremos averiguar mais tarde!
 
 ---
 
