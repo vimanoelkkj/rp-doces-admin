@@ -79,7 +79,33 @@
   transform: scale(0.95);
 }
 
+.cardapio-empty-state {
+  font-family: "Manrope", sans-serif;
+  font-size: 16px;
+  color: #8c7a76;
+  /* Compensa a proporção da onda decorativa (viewBox 1440x500, ~34.7vw de
+     altura) para que o footer nunca fique sob ela quando não há produtos
+     a exibir — sem isso, o conteúdo real fica curto demais e a onda
+     (position: absolute) vaza por cima do rodapé. */
+  min-height: clamp(240px, 40vw, 480px);
+  display: flex;
+  align-items: flex-start;
+  padding-top: 24px;
+}
+
+/* Wrapper externo: só controla a altura animada + o corte visual durante
+   a transição de filtro. Não pode ser um flex container com altura fixa
+   — um flex container comprime os próprios filhos pra caber na altura
+   disponível em vez de deixá-los vazar, o que mascarava a altura real do
+   conteúdo (scrollHeight sempre reportava a própria altura travada). */
 .products-area {
+  overflow: hidden;
+  transition: height 0.35s ease;
+}
+
+/* Wrapper interno: nunca tem altura restringida — é nele que medimos a
+   altura natural do conteúdo e aplicamos o fade de opacidade/transform. */
+.products-area-inner {
   display: flex;
   flex-direction: column;
   gap: 56px;
@@ -146,6 +172,13 @@
 
 .product-card-wrapper {
   height: 100%;
+}
+
+/* Footer é compartilhado por várias páginas com fundos diferentes
+   (Footer.css usa #f5efe6); aqui ele precisa casar com o fundo desta
+   página (#faf6f0) para não criar uma quebra visual sutil na transição. */
+.cardapio-page .footer {
+  background: #faf6f0;
 }
 
 .cardapio-wave {
