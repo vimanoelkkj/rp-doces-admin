@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { CartItem } from "../context/CartContext";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import sadBoloImage from "../assets/sad-bolo-image.png";
 import "./PagamentoNaoAprovado.css";
 
 interface RecusadoState {
@@ -51,16 +52,12 @@ export default function PagamentoNaoAprovado() {
       <main className="recusado-content">
         {/* Hero */}
         <div className="recusado-hero">
-          <div className="recusado-icon">
-            <svg width="22" height="22" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M1 1L13 13M13 1L1 13"
-                stroke="#D38B80"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
+          <img
+            src={sadBoloImage}
+            alt=""
+            aria-hidden="true"
+            className="recusado-mascot recusado-mascot--shake"
+          />
           <h1>Pagamento não aprovado</h1>
           <p>Houve um problema com o seu pagamento</p>
         </div>
