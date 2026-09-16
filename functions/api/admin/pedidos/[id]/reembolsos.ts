@@ -1,28 +1,28 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../../../lib/auth";
-import { registerAdminPayment, MetodoManual } from "../../../../lib/comandaLedger";
+import { registerManualRefund } from "../../../../lib/comandaLedger";
 
 interface Env {
   DB: D1Database;
 }
 
-interface PagamentoManualInput {
-  metodo?: string;
+interface ReembolsoInput {
+  pagamentoId?: number;
   valorCentavos?: number;
-  observacao?: string;
+  motivo?: string;
 }
-
-const METODOS_VALIDOS = new Set(["DINHEIRO", "CARTAO", "PIX_EXTERNO"]);
 
 const MENSAGENS: Record<string, string> = {
   PEDIDO_NAO_ENCONTRADO: "Pedido não encontrado",
-  COMANDA_ENCERRADA: "Esta comanda já foi encerrada",
-  VALOR_ACIMA_DO_SALDO: "Valor acima do saldo em aberto",
-  SALDO_INSUFICIENTE_CONCORRENCIA:
-    "O saldo mudou antes da confirmação. Atualize e tente novamente.",
-  PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO:
-    "Este pedido possui reembolso e ainda não suporta novo pagamento após devolução parcial.",
+  STATUS_PEDIDO_NAO_REEMBOLSAVEL:
+    "Pedidos entregues ou cancelados não podem ser reembolsados",
+  PAGAMENTO_NAO_ENCONTRADO: "Pagamento não encontrado ou não confirmado",
+  METODO_NAO_REEMBOLSAVEL_MANUALMENTE:
+    "Este pagamento exige reembolso pelo Mercado Pago, fora do escopo deste fluxo",
+  VALOR_INVALIDO: "Valor inválido",
+  SALDO_REEMBOLSAVEL_INSUFICIENTE:
+    "O saldo reembolsável mudou antes da confirmação. Atualize e tente novamente.",
 };
 
 function jsonError(message: string, status: number) {
@@ -38,34 +38,33 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     return jsonError("Id inválido", 400);
   }
 
-  let body: PagamentoManualInput;
+  let body: ReembolsoInput;
   try {
     body = await request.json();
   } catch {
     return jsonError("JSON inválido", 400);
   }
 
-  const metodo = body.metodo;
-  if (!metodo || !METODOS_VALIDOS.has(metodo)) {
-    return jsonError("Método de pagamento inválido", 400);
+  if (!Number.isInteger(body.pagamentoId) || body.pagamentoId! <= 0) {
+    return jsonError("Pagamento inválido", 400);
   }
   if (!Number.isInteger(body.valorCentavos) || body.valorCentavos! <= 0) {
     return jsonError("Valor inválido", 400);
   }
 
   try {
-    const resultado = await registerAdminPayment(env.DB, {
+    const resultado = await registerManualRefund(env.DB, {
       pedidoId: id,
-      metodo: metodo as MetodoManual,
+      pagamentoId: body.pagamentoId!,
       valorCentavos: body.valorCentavos!,
       usuarioId: auth.user.id,
-      observacao: body.observacao,
+      motivo: body.motivo,
     });
 
     if (!resultado.ok) {
       const status = resultado.erro === "PEDIDO_NAO_ENCONTRADO" ? 404 : 409;
       return jsonError(
-        MENSAGENS[resultado.erro ?? ""] ?? "Não foi possível registrar o pagamento",
+        MENSAGENS[resultado.erro ?? ""] ?? "Não foi possível registrar o reembolso",
         status,
       );
     }
@@ -73,14 +72,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     return Response.json(
       {
         ok: true,
-        pagamentoId: resultado.pagamentoId,
+        reembolsoId: resultado.reembolsoId,
         statusFinanceiro: resultado.statusFinanceiro,
         saldoCentavos: resultado.saldoCentavos,
       },
       { status: 201 },
     );
   } catch (err) {
-    console.error("Erro ao registrar pagamento manual (admin)", err);
-    return jsonError("Erro interno ao registrar pagamento", 500);
+    console.error("Erro ao registrar reembolso manual (admin)", err);
+    return jsonError("Erro interno ao registrar reembolso", 500);
   }
 };

@@ -324,7 +324,33 @@ export function computeFinancialStatus(
   return "PAGO";
 }
 
+// Passo 5: dinheiro devolvido. Nunca muta pedido_pagamentos — o reembolso
+// vive inteiramente em pedido_reembolsos, como um evento independente.
+export async function getRefundedCentavos(db: D1Database, pedidoId: number): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(valor_centavos), 0) AS total
+       FROM pedido_reembolsos WHERE pedido_id = ? AND status = 'REEMBOLSADO'`,
+    )
+    .bind(pedidoId)
+    .first<{ total: number }>();
+  return Number(row?.total || 0);
+}
+
+// Líquido = bruto recebido - devolvido confirmado. É isso que responde
+// "quanto do dinheiro do cliente ainda está retido", não o bruto sozinho —
+// um pagamento de R$100 com R$100 de reembolso contribui zero, nunca um
+// número negativo (por isso nunca flipamos o status do pagamento original:
+// ver nota em registerManualRefund).
+export async function getNetPaidCentavos(db: D1Database, pedidoId: number): Promise<number> {
+  const bruto = await getPaidCentavos(db, pedidoId);
+  const reembolsado = await getRefundedCentavos(db, pedidoId);
+  return Math.max(0, bruto - reembolsado);
+}
+
 // Única função que escreve pedidos.status_pagamento a partir do 4c-2.
+// A partir do Passo 5, usa o LÍQUIDO (bruto - reembolsado), não o bruto —
+// senão um pedido totalmente reembolsado continuaria marcado PAGO.
 export async function recalculatePedidoStatusPagamento(
   db: D1Database,
   pedidoId: number,
@@ -333,8 +359,8 @@ export async function recalculatePedidoStatusPagamento(
     .prepare(`SELECT valor_total_centavos FROM pedidos WHERE id = ?`)
     .bind(pedidoId)
     .first<{ valor_total_centavos: number }>();
-  const pago = await getPaidCentavos(db, pedidoId);
-  const agregado = computeFinancialStatus(Number(pedido?.valor_total_centavos || 0), pago);
+  const pagoLiquido = await getNetPaidCentavos(db, pedidoId);
+  const agregado = computeFinancialStatus(Number(pedido?.valor_total_centavos || 0), pagoLiquido);
 
   await db
     .prepare(`UPDATE pedidos SET status_pagamento = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`)
@@ -344,11 +370,12 @@ export async function recalculatePedidoStatusPagamento(
   return agregado;
 }
 
-// Responde exatamente "existe dinheiro confirmado?" — a pergunta do
-// guarda-corpo de cancelamento (Passo 2/4c-2), sem depender do agregado
-// estar sincronizado.
-export async function hasConfirmedPayment(db: D1Database, pedidoId: number): Promise<boolean> {
-  return (await getPaidCentavos(db, pedidoId)) > 0;
+// Responde exatamente "existe dinheiro do cliente retido?" — a pergunta do
+// guarda-corpo de cancelamento (Passo 2), agora em cima do LÍQUIDO. Um
+// pedido pago e depois totalmente reembolsado tem líquido zero e pode ser
+// cancelado sem exigir um segundo estorno que já aconteceu.
+export async function hasNetConfirmedPayment(db: D1Database, pedidoId: number): Promise<boolean> {
+  return (await getNetPaidCentavos(db, pedidoId)) > 0;
 }
 
 // Passo 4d: pagamentos administrativos (DINHEIRO/CARTAO/PIX_EXTERNO) e
@@ -415,6 +442,13 @@ export function computeWaterfallAllocations(
   return { ok: true, alocacoes };
 }
 
+// Saldo em aberto = total - LÍQUIDO (não bruto) — desde o Passo 5. Um
+// pedido pago e parcialmente reembolsado tem saldo aberto de novo (o
+// reembolso reabre o direito de cobrar aquele valor), mesmo que
+// registerAdminPayment ainda recuse aceitar um novo pagamento nesse caso
+// (ver comentário lá) — o número do saldo em si precisa estar certo
+// independente disso, senão a UI mostraria "faltam R$30" e "saldo=0" ao
+// mesmo tempo.
 export async function getComandaSaldo(
   db: D1Database,
   pedidoId: number,
@@ -423,7 +457,7 @@ export async function getComandaSaldo(
     .prepare(`SELECT valor_total_centavos FROM pedidos WHERE id = ?`)
     .bind(pedidoId)
     .first<{ valor_total_centavos: number }>();
-  const pago = await getPaidCentavos(db, pedidoId);
+  const pago = await getNetPaidCentavos(db, pedidoId);
   const total = Number(pedido?.valor_total_centavos || 0);
   return { total, pago, saldo: Math.max(0, total - pago) };
 }
@@ -437,7 +471,8 @@ export interface RegisterAdminPaymentResult {
     | "PEDIDO_NAO_ENCONTRADO"
     | "COMANDA_ENCERRADA"
     | "VALOR_ACIMA_DO_SALDO"
-    | "SALDO_INSUFICIENTE_CONCORRENCIA";
+    | "SALDO_INSUFICIENTE_CONCORRENCIA"
+    | "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO";
 }
 
 // Lê o saldo, calcula a cascata em memória, e só então grava — pagamento +
@@ -472,6 +507,26 @@ export async function registerAdminPayment(
   if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
   if (pedido.status_comanda !== "ABERTA") return { ok: false, erro: "COMANDA_ENCERRADA" };
 
+  // Passo 5, limitação explícita e temporária: se este pedido já tem algum
+  // reembolso confirmado, o waterfall (getItensComSaldo) ainda não sabe
+  // reabrir a alocação do item que foi parcialmente devolvido — as
+  // alocações do pagamento original continuam intactas, "cobrindo" os
+  // itens mesmo que o dinheiro tenha voltado em parte. Aceitar um novo
+  // pagamento aqui distribuiria dinheiro de verdade sobre uma leitura de
+  // saldo por item que já sabemos estar desatualizada. Preferível recusar
+  // explicitamente a criar uma alocação sutilmente errada — ver relatório
+  // do Passo 5 (reembolso ↔ alocações fica pra investigação futura).
+  const temReembolso = await db
+    .prepare(`SELECT 1 FROM pedido_reembolsos WHERE pedido_id = ? AND status = 'REEMBOLSADO' LIMIT 1`)
+    .bind(params.pedidoId)
+    .first();
+  if (temReembolso) {
+    const saldoAtual = await getComandaSaldo(db, params.pedidoId);
+    if (saldoAtual.pago < saldoAtual.total) {
+      return { ok: false, erro: "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO" };
+    }
+  }
+
   const itens = await getItensComSaldo(db, params.pedidoId);
   const waterfall = computeWaterfallAllocations(itens, params.valorCentavos);
   if (!waterfall.ok) return { ok: false, erro: waterfall.erro };
@@ -482,6 +537,10 @@ export async function registerAdminPayment(
   const idempotencyKey = crypto.randomUUID();
   const observacao = (params.observacao ?? "").slice(0, 300);
 
+  // A condição abaixo continua em cima do BRUTO (soma de pedido_pagamentos
+  // PAGO), não do líquido — e isso é seguro porque, se este pedido já
+  // tivesse algum reembolso, já teríamos recusado acima. Sem reembolso,
+  // bruto e líquido são idênticos por definição.
   const statements = [
     db
       .prepare(
@@ -535,4 +594,122 @@ export async function registerAdminPayment(
   const saldo = await getComandaSaldo(db, params.pedidoId);
 
   return { ok: true, pagamentoId, statusFinanceiro, saldoCentavos: saldo.saldo };
+}
+
+// Passo 5: reembolso manual (sem falar com o Mercado Pago). Nunca muta
+// pedido_pagamentos — grava só em pedido_reembolsos. O pagamento original
+// continua PAGO pra sempre, mesmo devolvido 100%: ver a nota no relatório
+// do Passo 5 sobre por que flipar o status pra 'REEMBOLSADO' produziria
+// uma armadilha matemática (bruto deixaria de contar o pagamento, mas o
+// reembolso continuaria sendo subtraído, gerando contribuição negativa).
+
+const METODOS_MANUAIS_REEMBOLSAVEIS: ReadonlySet<string> = new Set([
+  "DINHEIRO",
+  "CARTAO",
+  "PIX_EXTERNO",
+]);
+
+const STATUS_PEDIDO_REEMBOLSAVEIS: ReadonlySet<string> = new Set([
+  "NOVO",
+  "PREPARANDO",
+  "PRONTO",
+]);
+
+export interface RegisterRefundResult {
+  ok: boolean;
+  reembolsoId?: number;
+  statusFinanceiro?: StatusFinanceiroAgregado;
+  saldoCentavos?: number;
+  erro?:
+    | "PEDIDO_NAO_ENCONTRADO"
+    | "STATUS_PEDIDO_NAO_REEMBOLSAVEL"
+    | "PAGAMENTO_NAO_ENCONTRADO"
+    | "METODO_NAO_REEMBOLSAVEL_MANUALMENTE"
+    | "VALOR_INVALIDO"
+    | "SALDO_REEMBOLSAVEL_INSUFICIENTE";
+}
+
+export async function registerManualRefund(
+  db: D1Database,
+  params: {
+    pedidoId: number;
+    pagamentoId: number;
+    valorCentavos: number;
+    usuarioId: number;
+    motivo?: string;
+  },
+): Promise<RegisterRefundResult> {
+  const pedido = await db
+    .prepare(`SELECT status_pedido FROM pedidos WHERE id = ?`)
+    .bind(params.pedidoId)
+    .first<{ status_pedido: string }>();
+  if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
+  if (!STATUS_PEDIDO_REEMBOLSAVEIS.has(pedido.status_pedido)) {
+    return { ok: false, erro: "STATUS_PEDIDO_NAO_REEMBOLSAVEL" };
+  }
+
+  const pagamento = await db
+    .prepare(
+      `SELECT id, metodo, valor_centavos, status
+       FROM pedido_pagamentos WHERE id = ? AND pedido_id = ? LIMIT 1`,
+    )
+    .bind(params.pagamentoId, params.pedidoId)
+    .first<{ id: number; metodo: string; valor_centavos: number; status: string }>();
+  if (!pagamento || pagamento.status !== "PAGO") {
+    return { ok: false, erro: "PAGAMENTO_NAO_ENCONTRADO" };
+  }
+  if (!METODOS_MANUAIS_REEMBOLSAVEIS.has(pagamento.metodo)) {
+    // Cobre PIX_MP (exige reembolso via API do Mercado Pago, fora deste
+    // passo) e OUTRO (existe no schema por paridade com produção, mas
+    // este endpoint não aceita criar pagamentos com esse método, então
+    // também não reembolsa).
+    return { ok: false, erro: "METODO_NAO_REEMBOLSAVEL_MANUALMENTE" };
+  }
+
+  if (!Number.isSafeInteger(params.valorCentavos) || params.valorCentavos <= 0) {
+    return { ok: false, erro: "VALOR_INVALIDO" };
+  }
+
+  const idempotencyKey = crypto.randomUUID();
+  const motivo = (params.motivo ?? "").slice(0, 300);
+
+  const result = await db
+    .prepare(
+      `INSERT INTO pedido_reembolsos (
+         pedido_id, pagamento_id, origem, metodo, valor_centavos, status,
+         idempotency_key, registrado_por_usuario_id, motivo, devolveu_estoque, concluido_em
+       )
+       SELECT ?, ?, 'MANUAL', ?, ?, 'REEMBOLSADO', ?, ?, ?, 0, CURRENT_TIMESTAMP
+       WHERE ? <= (
+         SELECT pp.valor_centavos - COALESCE(
+           (SELECT SUM(valor_centavos) FROM pedido_reembolsos WHERE pagamento_id = pp.id AND status = 'REEMBOLSADO'), 0)
+         FROM pedido_pagamentos pp WHERE pp.id = ?
+       )`,
+    )
+    .bind(
+      params.pedidoId,
+      params.pagamentoId,
+      pagamento.metodo,
+      params.valorCentavos,
+      idempotencyKey,
+      params.usuarioId,
+      motivo,
+      params.valorCentavos,
+      params.pagamentoId,
+    )
+    .run();
+
+  if (Number(result?.meta?.changes || 0) === 0) {
+    // Saldo reembolsável recalculado no momento da escrita não cobriu o
+    // valor pedido — outra requisição pode ter consumido o saldo entre
+    // nossa leitura e o commit. Determinístico, sem DELETE de compensação
+    // (mesmo padrão do 4d).
+    return { ok: false, erro: "SALDO_REEMBOLSAVEL_INSUFICIENTE" };
+  }
+
+  const reembolsoId = Number(result.meta.last_row_id);
+  const statusFinanceiro = await recalculatePedidoStatusPagamento(db, params.pedidoId);
+  const saldo = await getComandaSaldo(db, params.pedidoId);
+
+  return { ok: true, reembolsoId, statusFinanceiro, saldoCentavos: saldo.saldo };
 }
