@@ -1,9 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../lib/auth";
+import { reconcilePendingPixPayments } from "../../lib/paymentSync";
 
 interface Env {
   DB: D1Database;
+  MP_ACCESS_TOKEN?: string;
 }
 
 interface PedidoListRow {
@@ -39,6 +41,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if ("error" in auth) return auth.error;
 
   try {
+    // Reconciliação oportunista (Passo 6): melhor esforço, nunca deve
+    // impedir a listagem de carregar se falhar.
+    try {
+      await reconcilePendingPixPayments(env);
+    } catch (err) {
+      console.error("Falha na reconciliação oportunista de pagamentos PIX_MP", err);
+    }
+
     const url = new URL(request.url);
     const search = (url.searchParams.get("search") ?? "").trim().slice(0, 100);
     const tab = url.searchParams.get("status") ?? "todos";
