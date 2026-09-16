@@ -142,7 +142,7 @@ Frontend (`NovoPedidoModal.tsx`) ligado à API real sem alterar CSS/layout. Esto
 
 Durante os testes apareceu `"✓ Pago (Pix)"` **hardcoded** na listagem e no detalhe do pedido (resíduo de quando só existia Pix) — motivou uma projeção financeira nova (`getFinanceiroPedido`/`getFinanceirosPorPedidos`, `{status, pagoCentavos, totalCentavos, metodosConfirmados}`) em vez de expor o ledger inteiro. `metodosConfirmados` não é `DISTINCT metodo WHERE status='PAGO'` ingênuo — cada linha só conta se sua contribuição líquida PRÓPRIA (valor menos reembolso daquele `pagamento_id` específico) ainda for positiva, testado com refund 100%, parcial e multi-pagamento com refund de uma perna só.
 
-### Passo 9 — Pix administrativo (em andamento: geração pronta, regeneração/cancelamento pendentes)
+### Passo 9 — Pix administrativo (fechado ponta a ponta: geração, regeneração e frontend)
 
 Fix preventivo isolado primeiro: `registerAdminPayment` agora só cancela placeholders puramente locais (`metodo != 'PIX_MP'`, nunca depende de `mp_payment_id`) — um `PIX_MP/PENDENTE` (mesmo `origem='ADMIN'`) nunca é cancelado por um pagamento manual, porque representa uma cobrança que pode estar viva no Mercado Pago e só o MP decide se ela deixou de existir. Cancela todos os placeholders locais elegíveis (nunca `LIMIT 1`, determinístico mesmo com sujeira histórica).
 
@@ -154,9 +154,13 @@ Reserva de estoque: uma reserva `ATIVA` preexistente **nunca** é recriada, libe
 
 `pedidos.mp_payment_id`/`mp_qr_code`/etc **nunca** são gravados para Pix administrativo — esses campos são do modelo legado de 1-Pix-por-pedido do site; com múltiplos Pix administrativos possíveis, só `pedido_pagamentos` guarda essa informação por tentativa.
 
-**Dívida documentada (não resolvida incidentalmente)**: se um Pix administrativo "substituído" (por regeneração, passo futuro) for pago de verdade no Mercado Pago depois de outro já ter confirmado o mesmo pedido, isso é overpayment — `getPaidCentavos`/`getComandaSaldo` não têm proteção contra pagar mais que o total (saturam/somam sem cap). Dinheiro real excedente sem representação de "crédito" ainda. Documentado aqui deliberadamente, não construído — só vira urgente quando a regeneração (próximo commit deste passo) entrar.
+**Regeneração**: `substituiId` opcional em `createAdminPixCharge` — Pix B aponta `substitui_pagamento_id` pro Pix A, que **nunca** vira estado terminal enquanto ainda puder ser pago de verdade no MP (continua `PENDENTE`, reconciliável). Achado de teste corrigido antes do commit: "Pix substituído" só conta com sucessor **vivo** (`PENDENTE`/`PAGO`) — um sucessor morto (`FALHOU`/`CANCELADO`/`EXPIRADO`) libera o original pra nova tentativa (`SUCESSOR_VIVO`, constante única reaproveitada em toda leitura relacionada a substituição, nunca duas semânticas divergentes). A condição de "A ainda é substituível" é parte do `WHERE` atômico do próprio `INSERT`, não só de um pré-check — testado com 5 regenerações concorrentes do mesmo Pix, exatamente 1 sucessor criado. Cadeia A→B→C funciona (regenerar de novo usa `substituiId=B`, nunca reescreve a partir de A).
 
-`CANCELAR_PIX` autônomo (cancelar sem gerar substituto) ficou fora de escopo: a Payments API não tem cancelamento real de Pix pendente, então essa ação só faria sentido como "esconder da UI sem substituir", semanticamente estranho sem um Pix novo — avaliar de novo quando/se fizer falta.
+**Frontend** (`PedidoDetalheModal.tsx`): `GET /pedidos/:id` ganhou `status_comanda` e `pixAdminPendentes[]` (**lista**, nunca singular — Pix parciais aditivos coexistem legitimamente, `getPixAdminPendentesAtivos` reaproveita a mesma `SUCESSOR_VIVO`). Seção "Pagamento" ganhou "Gerar Pix" (só sem Pix vivo, comanda `ABERTA`, saldo>0) e um bloco por Pix vivo (QR/copia-cola/contador/"Regenerar"), CSS novo restrito ao namespace `pedmodal-pix-*`, sem tocar no Figma existente. Erro do `POST /pix` ganhou campo `code` estruturado (não só mensagem) pra distinguir `MERCADO_PAGO_INDISPONIVEL` (ambíguo) de forma confiável — esse erro mostra aviso diferenciado com "Atualizar pedido" em vez de convidar a um retry que poderia duplicar a cobrança. Pix com prazo do MP vencido mas ledger ainda `PENDENTE` **nunca é escondido nem tem estado inventado** pelo frontend — só o backend/reconciliação tem autoridade pra transicionar `PENDENTE → EXPIRADO`.
+
+**Dívida documentada (não resolvida incidentalmente)**: se um Pix administrativo "substituído" for pago de verdade no Mercado Pago depois de outro já ter confirmado o mesmo pedido, isso é overpayment — `getPaidCentavos`/`getComandaSaldo` não têm proteção contra pagar mais que o total (saturam/somam sem cap). Dinheiro real excedente sem representação de "crédito" ainda. Documentado deliberadamente, não construído.
+
+`CANCELAR_PIX` autônomo (cancelar sem gerar substituto) ficou fora de escopo: a Payments API não tem cancelamento real de Pix pendente, então essa ação só faria sentido como "esconder da UI sem substituir", semanticamente estranho sem um Pix novo — avaliar de novo quando/se fizer falta. UI também não oferece criar um Pix aditivo extra quando já há Pix vivos (só regenerar os existentes), nem valor customizado no "Gerar Pix" (sempre capacidade cheia) — decisões de escopo da v1, não limitações do backend.
 
 ---
 
@@ -165,9 +169,10 @@ Reserva de estoque: uma reserva `ATIVA` preexistente **nunca** é recriada, libe
 Ordem sugerida (não travada — pode mudar por decisão):
 
 1. ~~Criação manual de pedido pelo admin~~ — feito, Passo 8.
-2. **Pix administrativo — regeneração e cancelamento** — geração pronta (Passo 9); falta regenerar (Pix B substitui Pix A via `substitui_pagamento_id`, A permanece `PENDENTE`/reconciliável — nunca vira estado terminal enquanto ainda puder ser pago de verdade no MP) e decidir se `CANCELAR_PIX` autônomo faz falta. Falta também wiring de frontend (não existe nenhum controle/mock hoje).
-3. **Refund automático via Mercado Pago** — hoje só existe reembolso manual (Passo 5); produção integra refund direto na API do MP.
-4. **Exchange / correções de item** (`pedido_item_correcoes`) — trocar produto de pedido já pago, com reembolso parcial e reforço/baixa de estoque.
+2. ~~Pix administrativo (geração, regeneração, frontend)~~ — feito, Passo 9. `CANCELAR_PIX` autônomo descartado deliberadamente (ver Passo 9).
+3. **Comanda como balcão de atendimento** — reabrir comanda fechada pra adicionar item depois da entrega, lançamentos incrementais sem falsificar histórico, possivelmente consolidar novas compras da mesma cliente no mesmo dia numa comanda só (identidade por WhatsApp normalizado, nunca nome), exclusão/arquivamento seguro. Investigação própria antes de codar — não é puxadinho de nenhum passo anterior.
+4. **Refund automático via Mercado Pago** — hoje só existe reembolso manual (Passo 5); produção integra refund direto na API do MP.
+5. **Exchange / correções de item** (`pedido_item_correcoes`) — trocar produto de pedido já pago, com reembolso parcial e reforço/baixa de estoque.
 
 ## Dívidas conhecidas (documentadas, não esquecer)
 
@@ -175,8 +180,9 @@ Ordem sugerida (não travada — pode mudar por decisão):
 - **Webhook do MP não está plugado em produção de verdade**: código pronto (Passo 6), falta configurar `MP_WEBHOOK_SECRET` no Cloudflare Pages real e cadastrar a URL pública no app do Mercado Pago — até lá, só a reconciliação oportunista do admin cobre o gap em produção real.
 - **`PARCIAL` + Pix expirado**: reserva de estoque fica presa até ação manual (Passo 7, decisão consciente) — vale também para Pix administrativo (Passo 9), política mantida idêntica, não redesenhada.
 - **Imports circulares** (`comandaLedger.ts` ↔ `pedidoReconcile.ts`, `paymentSync.ts` ↔ `stock.ts`): funcionam (confirmado no bundler do wrangler, não só no `tsc`), mas são dívida arquitetural — quebrar via módulo-folha compartilhado se crescerem.
-- **Overpayment de Pix administrativo substituído** (Passo 9): se um Pix "substituído" for pago de verdade no MP depois do substituto já ter confirmado, o ledger soma sem cap — dinheiro real excedente sem representação de crédito. Documentado, não construído (ver Passo 9).
-- **Varreduras de expiração (`reconcilePendingPixPayments`/`liberarReservasVencidasLocalmente`) ainda só cobrem `origem='SITE'`** — Pix administrativo pendente que expira sem pagamento não é liberado automaticamente ainda; fica para quando a regeneração (Passo 9) entrar, junto da decisão de "reserva é do pedido, não do Pix individual" quando dois Pix administrativos coexistirem.
+- **Overpayment de Pix administrativo substituído** (Passo 9): se um Pix "substituído" for pago de verdade no MP depois do substituto já ter confirmado, o ledger soma sem cap — dinheiro real excedente sem representação de crédito. Documentado, não construído.
+- **Varreduras de expiração (`reconcilePendingPixPayments`/`liberarReservasVencidasLocalmente`) ainda só cobrem `origem='SITE'`** — Pix administrativo pendente que expira sem pagamento não é liberado automaticamente pelo backend; a UI já mostra isso corretamente (aviso "expiração atingida" + "Atualizar pedido" + "Regenerar"), então o gap é só de automação, não de visibilidade. Falta também decidir, ao estender isso pra `ADMIN`, que "reserva é do pedido, não do Pix individual" quando dois Pix administrativos coexistirem (não liberar a reserva do pedido só porque UM dos Pix ativos expirou, se outro ainda estiver vivo).
+- **UI do Pix administrativo (v1, decisões de escopo, não limitações do backend)**: não oferece criar um Pix aditivo extra quando já há Pix vivos (só regenerar os existentes); não tem campo de valor customizado no "Gerar Pix" (sempre a capacidade cheia).
 
 ## Migrations aplicadas (ordem)
 
