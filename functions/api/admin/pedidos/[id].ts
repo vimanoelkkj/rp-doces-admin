@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../../lib/auth";
-import { getVirtualOrRealPayment } from "../../../lib/comandaLedger";
+import { getVirtualOrRealPayment, hasConfirmedPayment } from "../../../lib/comandaLedger";
 
 interface Env {
   DB: D1Database;
@@ -118,19 +118,20 @@ export const onRequestPatch: PagesFunction<Env> = async ({
 
   try {
     const pedido = await env.DB.prepare(
-      `SELECT status_pagamento FROM pedidos WHERE id = ?`,
+      `SELECT id FROM pedidos WHERE id = ?`,
     )
       .bind(id)
-      .first<{ status_pagamento: string }>();
+      .first<{ id: number }>();
 
     if (!pedido) {
       return jsonError("Pedido não encontrado", 404);
     }
 
-    // Guarda-corpo interino: sem pedido_pagamentos (Passo 4) ainda,
-    // status_pagamento='PAGO' é a melhor informação financeira disponível.
-    // TODO(Passo 4): trocar por uma checagem no razão financeiro real.
-    if (novoStatus === "CANCELADO" && pedido.status_pagamento === "PAGO") {
+    // Consulta o ledger direto: "existe dinheiro confirmado?" (soma de
+    // pedido_pagamentos.status='PAGO' > 0), não mais o agregado
+    // pedidos.status_pagamento. Bloqueia mesmo com pagamento parcial —
+    // fluxo de estorno de verdade continua sendo o Passo 5.
+    if (novoStatus === "CANCELADO" && (await hasConfirmedPayment(env.DB, id))) {
       return jsonError(
         "Pagamento confirmado. Faça o estorno antes de cancelar.",
         409,
