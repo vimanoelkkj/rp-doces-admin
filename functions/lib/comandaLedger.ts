@@ -350,3 +350,189 @@ export async function recalculatePedidoStatusPagamento(
 export async function hasConfirmedPayment(db: D1Database, pedidoId: number): Promise<boolean> {
   return (await getPaidCentavos(db, pedidoId)) > 0;
 }
+
+// Passo 4d: pagamentos administrativos (DINHEIRO/CARTAO/PIX_EXTERNO) e
+// alocação em cascata (waterfall) — semântica DIFERENTE de
+// allocateFullValueAcrossItems. Aquela diz "esta cobrança cobre
+// estruturalmente todos os itens" (usada por materialização legada e pelo
+// Pix do checkout, que nasce cobrindo o pedido inteiro mesmo PENDENTE).
+// Esta diz "estes X centavos efetivamente PAGOS precisam ser distribuídos
+// pelo saldo ainda aberto dos itens" — nunca aloca mais do que o valor do
+// pagamento, nunca mais do que o saldo aberto de cada item.
+
+export type MetodoManual = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO";
+
+export interface ItemComSaldo {
+  itemId: number;
+  valorTotalCentavos: number;
+  pagoPorOutrosCentavos: number;
+}
+
+// Só considera dinheiro de pagamentos com status='PAGO' — a alocação
+// estrutural de um Pix SITE ainda PENDENTE nunca conta como saldo
+// consumido (é exatamente o que separa este helper de
+// allocateFullValueAcrossItems).
+export async function getItensComSaldo(db: D1Database, pedidoId: number): Promise<ItemComSaldo[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT pi.id AS itemId, pi.valor_total_centavos AS valorTotalCentavos,
+              COALESCE(SUM(CASE WHEN pp.status = 'PAGO' THEN a.valor_centavos ELSE 0 END), 0) AS pagoPorOutrosCentavos
+       FROM pedido_itens pi
+       LEFT JOIN pedido_pagamento_alocacoes a ON a.pedido_item_id = pi.id
+       LEFT JOIN pedido_pagamentos pp ON pp.id = a.pagamento_id
+       WHERE pi.pedido_id = ?
+       GROUP BY pi.id, pi.valor_total_centavos
+       ORDER BY pi.id ASC`,
+    )
+    .bind(pedidoId)
+    .all<ItemComSaldo>();
+  return results;
+}
+
+// Pura e determinística, sem D1: do item mais antigo (id ASC) pro mais
+// novo, preenche o saldo aberto de cada um até o valor do pagamento
+// acabar. Se não couber inteiro, falha sem propor nenhuma alocação parcial
+// inválida.
+export function computeWaterfallAllocations(
+  itens: ItemComSaldo[],
+  valorCentavos: number,
+):
+  | { ok: true; alocacoes: { itemId: number; valorCentavos: number }[] }
+  | { ok: false; erro: "VALOR_ACIMA_DO_SALDO" } {
+  let restante = valorCentavos;
+  const alocacoes: { itemId: number; valorCentavos: number }[] = [];
+
+  for (const item of itens) {
+    if (restante <= 0) break;
+    const aberto = item.valorTotalCentavos - item.pagoPorOutrosCentavos;
+    if (aberto <= 0) continue;
+    const parcela = Math.min(aberto, restante);
+    alocacoes.push({ itemId: item.itemId, valorCentavos: parcela });
+    restante -= parcela;
+  }
+
+  if (restante > 0) return { ok: false, erro: "VALOR_ACIMA_DO_SALDO" };
+  return { ok: true, alocacoes };
+}
+
+export async function getComandaSaldo(
+  db: D1Database,
+  pedidoId: number,
+): Promise<{ total: number; pago: number; saldo: number }> {
+  const pedido = await db
+    .prepare(`SELECT valor_total_centavos FROM pedidos WHERE id = ?`)
+    .bind(pedidoId)
+    .first<{ valor_total_centavos: number }>();
+  const pago = await getPaidCentavos(db, pedidoId);
+  const total = Number(pedido?.valor_total_centavos || 0);
+  return { total, pago, saldo: Math.max(0, total - pago) };
+}
+
+export interface RegisterAdminPaymentResult {
+  ok: boolean;
+  pagamentoId?: number;
+  statusFinanceiro?: StatusFinanceiroAgregado;
+  saldoCentavos?: number;
+  erro?:
+    | "PEDIDO_NAO_ENCONTRADO"
+    | "COMANDA_ENCERRADA"
+    | "VALOR_ACIMA_DO_SALDO"
+    | "SALDO_INSUFICIENTE_CONCORRENCIA";
+}
+
+// Lê o saldo, calcula a cascata em memória, e só então grava — pagamento +
+// alocações no MESMO batch(), atômico. A condição de saldo do INSERT do
+// pagamento é reavaliada NO MOMENTO DA ESCRITA (subquery, não o valor lido
+// em JS antes): se duas requisições concorrentes disputarem o mesmo saldo,
+// a que commitar primeiro vence; quando a segunda executar a mesma
+// condição, o saldo já está reduzido de verdade e ela falha de forma
+// determinística (zero linhas no INSERT do pagamento -> subquery das
+// alocações resolve pagamento_id=NULL -> constraint NOT NULL derruba o
+// batch inteiro -> nenhum DELETE de compensação necessário).
+//
+// Dívida residual conhecida e aceita: isso fecha com certeza o
+// overpayment agregado do pedido (SUM(pagamentos PAGO) <= valor_total),
+// mas não torna a distribuição por item serializável — duas requisições
+// concorrentes ainda podem calcular a cascata sobre a mesma fotografia
+// antiga dos itens antes de uma delas commitar.
+export async function registerAdminPayment(
+  db: D1Database,
+  params: {
+    pedidoId: number;
+    metodo: MetodoManual;
+    valorCentavos: number;
+    usuarioId: number;
+    observacao?: string;
+  },
+): Promise<RegisterAdminPaymentResult> {
+  const pedido = await db
+    .prepare(`SELECT status_comanda FROM pedidos WHERE id = ?`)
+    .bind(params.pedidoId)
+    .first<{ status_comanda: string }>();
+  if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
+  if (pedido.status_comanda !== "ABERTA") return { ok: false, erro: "COMANDA_ENCERRADA" };
+
+  const itens = await getItensComSaldo(db, params.pedidoId);
+  const waterfall = computeWaterfallAllocations(itens, params.valorCentavos);
+  if (!waterfall.ok) return { ok: false, erro: waterfall.erro };
+
+  // Chave técnica de correlação dentro do batch — identifica unicamente
+  // esta operação financeira, mas NÃO significa retry idempotente do
+  // cliente ainda (gerada pelo servidor a cada chamada).
+  const idempotencyKey = crypto.randomUUID();
+  const observacao = (params.observacao ?? "").slice(0, 300);
+
+  const statements = [
+    db
+      .prepare(
+        `INSERT INTO pedido_pagamentos (
+           pedido_id, metodo, origem, valor_centavos, status,
+           registrado_por_usuario_id, observacao, idempotency_key, pago_em
+         )
+         SELECT ?, ?, 'ADMIN', ?, 'PAGO', ?, ?, ?, CURRENT_TIMESTAMP
+         WHERE ? <= (
+           SELECT p.valor_total_centavos - COALESCE(
+             (SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id = p.id AND status = 'PAGO'), 0)
+           FROM pedidos p WHERE p.id = ?
+         )`,
+      )
+      .bind(
+        params.pedidoId,
+        params.metodo,
+        params.valorCentavos,
+        params.usuarioId,
+        observacao,
+        idempotencyKey,
+        params.valorCentavos,
+        params.pedidoId,
+      ),
+    ...waterfall.alocacoes.map((a) =>
+      db
+        .prepare(
+          `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
+           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`,
+        )
+        .bind(idempotencyKey, a.itemId, a.valorCentavos),
+    ),
+  ];
+
+  let batchResults;
+  try {
+    batchResults = await db.batch(statements);
+  } catch {
+    // A condição de saldo falhou na escrita: outra requisição consumiu o
+    // saldo entre nossa leitura e o commit. Nada foi gravado (rollback do
+    // batch inteiro) — não há nada para compensar manualmente.
+    return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
+  }
+
+  const pagamentoId = Number(batchResults[0]?.meta?.last_row_id || 0);
+  if (!pagamentoId) {
+    return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
+  }
+
+  const statusFinanceiro = await recalculatePedidoStatusPagamento(db, params.pedidoId);
+  const saldo = await getComandaSaldo(db, params.pedidoId);
+
+  return { ok: true, pagamentoId, statusFinanceiro, saldoCentavos: saldo.saldo };
+}

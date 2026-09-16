@@ -1,0 +1,84 @@
+/// <reference types="@cloudflare/workers-types" />
+
+import { requireUser } from "../../../../lib/auth";
+import { registerAdminPayment, MetodoManual } from "../../../../lib/comandaLedger";
+
+interface Env {
+  DB: D1Database;
+}
+
+interface PagamentoManualInput {
+  metodo?: string;
+  valorCentavos?: number;
+  observacao?: string;
+}
+
+const METODOS_VALIDOS = new Set(["DINHEIRO", "CARTAO", "PIX_EXTERNO"]);
+
+const MENSAGENS: Record<string, string> = {
+  PEDIDO_NAO_ENCONTRADO: "Pedido não encontrado",
+  COMANDA_ENCERRADA: "Esta comanda já foi encerrada",
+  VALOR_ACIMA_DO_SALDO: "Valor acima do saldo em aberto",
+  SALDO_INSUFICIENTE_CONCORRENCIA:
+    "O saldo mudou antes da confirmação. Atualize e tente novamente.",
+};
+
+function jsonError(message: string, status: number) {
+  return Response.json({ error: message }, { status });
+}
+
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
+  const auth = await requireUser(env.DB, request);
+  if ("error" in auth) return auth.error;
+
+  const id = Number(params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return jsonError("Id inválido", 400);
+  }
+
+  let body: PagamentoManualInput;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonError("JSON inválido", 400);
+  }
+
+  const metodo = body.metodo;
+  if (!metodo || !METODOS_VALIDOS.has(metodo)) {
+    return jsonError("Método de pagamento inválido", 400);
+  }
+  if (!Number.isInteger(body.valorCentavos) || body.valorCentavos! <= 0) {
+    return jsonError("Valor inválido", 400);
+  }
+
+  try {
+    const resultado = await registerAdminPayment(env.DB, {
+      pedidoId: id,
+      metodo: metodo as MetodoManual,
+      valorCentavos: body.valorCentavos!,
+      usuarioId: auth.user.id,
+      observacao: body.observacao,
+    });
+
+    if (!resultado.ok) {
+      const status = resultado.erro === "PEDIDO_NAO_ENCONTRADO" ? 404 : 409;
+      return jsonError(
+        MENSAGENS[resultado.erro ?? ""] ?? "Não foi possível registrar o pagamento",
+        status,
+      );
+    }
+
+    return Response.json(
+      {
+        ok: true,
+        pagamentoId: resultado.pagamentoId,
+        statusFinanceiro: resultado.statusFinanceiro,
+        saldoCentavos: resultado.saldoCentavos,
+      },
+      { status: 201 },
+    );
+  } catch (err) {
+    console.error("Erro ao registrar pagamento manual (admin)", err);
+    return jsonError("Erro interno ao registrar pagamento", 500);
+  }
+};
