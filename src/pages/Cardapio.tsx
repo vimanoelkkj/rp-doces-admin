@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ProductCard from "../components/ProductCard";
@@ -19,6 +19,8 @@ export default function Cardapio() {
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [isFiltering, setIsFiltering] = useState(false);
   const [displayFilter, setDisplayFilter] = useState("Todos");
+  const [containerHeight, setContainerHeight] = useState<number | "auto">("auto");
+  const productsAreaRef = useRef<HTMLDivElement>(null);
 
   const {
     cartItems,
@@ -45,6 +47,14 @@ export default function Cardapio() {
     setActiveFilter(cat);
     setIsFiltering(true);
 
+    // Trava a altura atual antes de trocar o conteúdo, para poder animar
+    // suavemente até a altura do novo filtro — sem isso, o container (e
+    // tudo que vem depois dele, como o Footer) pula de golpe pra nova
+    // altura no meio da transição de fade.
+    if (productsAreaRef.current) {
+      setContainerHeight(productsAreaRef.current.scrollHeight);
+    }
+
     // Fade out → troca conteúdo → fade in
     setTimeout(() => {
       setDisplayFilter(cat);
@@ -52,6 +62,29 @@ export default function Cardapio() {
         setIsFiltering(false);
       });
     }, 250);
+  };
+
+  // Depois que o conteúdo troca (displayFilter muda), mede a altura real
+  // do novo conteúdo e anima até ela. Só faz isso quando já estamos numa
+  // transição (containerHeight travado em número pelo handleFilterChange
+  // acima) — no carregamento inicial containerHeight continua "auto" e
+  // nada é animado aqui.
+  useLayoutEffect(() => {
+    if (typeof containerHeight === "number" && productsAreaRef.current) {
+      setContainerHeight(productsAreaRef.current.scrollHeight);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayFilter]);
+
+  const handleContainerTransitionEnd = (
+    event: React.TransitionEvent<HTMLDivElement>,
+  ) => {
+    // Libera para "auto" só depois que a animação de altura (não a de
+    // opacidade/transform, que rodam em paralelo) termina, pra manter o
+    // layout correto em resizes futuros sem travar numa altura antiga.
+    if (event.propertyName === "height") {
+      setContainerHeight("auto");
+    }
   };
 
   const filteredProducts =
@@ -120,9 +153,23 @@ export default function Cardapio() {
         {error && <p className="cardapio-subtitle">{error}</p>}
 
         <div
-          className={`products-area ${isFiltering ? "products-area--out" : "products-area--in"}`}
+          className="products-area"
+          style={{
+            height: containerHeight === "auto" ? "auto" : `${containerHeight}px`,
+          }}
+          onTransitionEnd={handleContainerTransitionEnd}
         >
-          {groupedProducts["Bolo no Pote"].length > 0 && (
+          <div
+            ref={productsAreaRef}
+            className={`products-area-inner ${isFiltering ? "products-area--out" : "products-area--in"}`}
+          >
+            {!loading && !error && filteredProducts.length === 0 && (
+              <p className="cardapio-empty-state">
+                Nenhum produto disponível no momento.
+              </p>
+            )}
+
+            {groupedProducts["Bolo no Pote"].length > 0 && (
             <section
               className="category-group scroll-reveal revealed"
               aria-label="Bolos no pote"
@@ -169,6 +216,7 @@ export default function Cardapio() {
               </div>
             </section>
           )}
+          </div>
         </div>
       </main>
       <Footer />
