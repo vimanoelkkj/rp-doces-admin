@@ -4,6 +4,7 @@ interface ProdutoApiRow {
   id: number;
   nome: string;
   categoria: string;
+  categoria_nome: string;
   descricao: string;
   preco_centavos: number;
   preco_promocional_centavos: number | null;
@@ -37,7 +38,7 @@ function toProduct(row: ProdutoApiRow): Product {
   return {
     id: row.id,
     name: row.nome,
-    category: row.categoria,
+    category: row.categoria_nome,
     description: row.descricao || undefined,
     price: centavos / 100,
     image: imageUrlFor(row.image_key),

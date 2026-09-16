@@ -8,6 +8,7 @@ interface ProdutoRow {
   id: number;
   nome: string;
   categoria: string;
+  categoria_nome: string;
   descricao: string;
   preco_centavos: number;
   preco_promocional_centavos: number | null;
@@ -22,12 +23,14 @@ interface ProdutoRow {
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const { results } = await env.DB.prepare(
-    `SELECT id, nome, categoria, descricao, preco_centavos,
-            preco_promocional_centavos, promocao_inicio, promocao_fim,
-            destaque, ordem, estoque, estoque_reservado, image_key
-     FROM produtos
-     WHERE disponivel = 1
-     ORDER BY categoria, ordem, nome`,
+    `SELECT p.id, p.nome, p.categoria, COALESCE(c.nome, p.categoria) AS categoria_nome,
+            p.descricao, p.preco_centavos,
+            p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim,
+            p.destaque, p.ordem, p.estoque, p.estoque_reservado, p.image_key
+     FROM produtos p
+     LEFT JOIN categorias c ON c.id = p.categoria
+     WHERE p.disponivel = 1
+     ORDER BY p.categoria, p.ordem, p.nome`,
   ).all<ProdutoRow>();
 
   return Response.json({ produtos: results });
