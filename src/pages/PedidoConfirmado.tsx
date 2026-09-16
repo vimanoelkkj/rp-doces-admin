@@ -4,6 +4,7 @@ import { useCart } from "../context/CartContext";
 import { CartItem } from "../context/CartContext";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import happyBoloImage from "../assets/happy-bolo-image.png";
 import "./PedidoConfirmado.css";
 
 interface ConfirmadoState {
@@ -56,17 +57,12 @@ export default function PedidoConfirmado() {
       <main className="confirmado-content">
         {/* Seção Aprovado */}
         <div className="confirmado-hero">
-          <div className="confirmado-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M5 13L9 17L19 7"
-                stroke="#4CAF50"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+          <img
+            src={happyBoloImage}
+            alt=""
+            aria-hidden="true"
+            className="confirmado-mascot confirmado-mascot--bounce"
+          />
           <h1>Pagamento aprovado!</h1>
           <p>Seu pedido foi confirmado com sucesso</p>
         </div>
