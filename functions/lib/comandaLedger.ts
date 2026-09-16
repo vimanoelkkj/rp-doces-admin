@@ -241,6 +241,14 @@ export async function resolveLedgerPaymentId(
 // `pedidos` — a mesma semântica de `legacyPayment()` de produção. Para
 // PARCIAL (agregado, não representável como um único pagamento) retorna
 // null: nem a leitura finge que existe um pagamento único ali.
+//
+// Um pedido pode ter mais de uma linha em pedido_pagamentos (ex.: o
+// placeholder PENDENTE criado na abertura manual do pedido, cancelado só
+// quando o pagamento real chega via registerAdminPayment) — "a mais antiga"
+// nunca é a resposta certa para "qual pagamento mostrar", porque o
+// placeholder cancelado sempre nasce primeiro (id menor) que o pagamento
+// real. PAGO vence qualquer coisa; CANCELADO só aparece se não houver mais
+// nada; empates dentro da mesma prioridade resolvem pelo mais recente.
 export async function getVirtualOrRealPayment(
   db: D1Database,
   pedidoId: number,
@@ -251,7 +259,9 @@ export async function getVirtualOrRealPayment(
               mp_order_id, mp_payment_id, mp_status, mp_status_detail,
               mp_ticket_url, mp_qr_code, mp_qr_code_base64, pix_expira_em,
               criado_em, atualizado_em, pago_em, cancelado_em
-       FROM pedido_pagamentos WHERE pedido_id = ? ORDER BY id ASC LIMIT 1`,
+       FROM pedido_pagamentos WHERE pedido_id = ?
+       ORDER BY CASE status WHEN 'PAGO' THEN 0 WHEN 'CANCELADO' THEN 2 ELSE 1 END, id DESC
+       LIMIT 1`,
     )
     .bind(pedidoId)
     .first<PagamentoLedgerBase & { id: number }>();
@@ -539,6 +549,19 @@ export async function registerAdminPayment(
   const waterfall = computeWaterfallAllocations(itens, params.valorCentavos);
   if (!waterfall.ok) return { ok: false, erro: waterfall.erro };
 
+  // Placeholder financeiro criado na abertura manual do pedido (metodo
+  // escolhido na hora, status PENDENTE, origem ADMIN — nunca um Pix do
+  // site, que sempre nasce com origem SITE). Sem cancelar isso aqui, ele
+  // fica órfão para sempre ao lado do pagamento PAGO que estamos prestes a
+  // inserir — mesmo bug documentado em produção. Nunca cancela pagamento
+  // PENDENTE de origem SITE (Pix do cliente ainda pode confirmar sozinho).
+  const pendenteAnterior = await db
+    .prepare(
+      `SELECT id FROM pedido_pagamentos WHERE pedido_id = ? AND status = 'PENDENTE' AND origem = 'ADMIN' LIMIT 1`,
+    )
+    .bind(params.pedidoId)
+    .first<{ id: number }>();
+
   // Chave técnica de correlação dentro do batch — identifica unicamente
   // esta operação financeira, mas NÃO significa retry idempotente do
   // cliente ainda (gerada pelo servidor a cada chamada).
@@ -554,9 +577,10 @@ export async function registerAdminPayment(
       .prepare(
         `INSERT INTO pedido_pagamentos (
            pedido_id, metodo, origem, valor_centavos, status,
-           registrado_por_usuario_id, observacao, idempotency_key, pago_em
+           registrado_por_usuario_id, observacao, idempotency_key, pago_em,
+           substitui_pagamento_id
          )
-         SELECT ?, ?, 'ADMIN', ?, 'PAGO', ?, ?, ?, CURRENT_TIMESTAMP
+         SELECT ?, ?, 'ADMIN', ?, 'PAGO', ?, ?, ?, CURRENT_TIMESTAMP, ?
          WHERE ? <= (
            SELECT p.valor_total_centavos - COALESCE(
              (SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id = p.id AND status = 'PAGO'), 0)
@@ -570,6 +594,7 @@ export async function registerAdminPayment(
         params.usuarioId,
         observacao,
         idempotencyKey,
+        pendenteAnterior?.id ?? null,
         params.valorCentavos,
         params.pedidoId,
       ),
@@ -581,6 +606,17 @@ export async function registerAdminPayment(
         )
         .bind(idempotencyKey, a.itemId, a.valorCentavos),
     ),
+    ...(pendenteAnterior
+      ? [
+          db
+            .prepare(
+              `UPDATE pedido_pagamentos SET status = 'CANCELADO', cancelado_em = CURRENT_TIMESTAMP
+               WHERE id = ? AND status = 'PENDENTE'
+                 AND EXISTS (SELECT 1 FROM pedido_pagamentos WHERE idempotency_key = ?)`,
+            )
+            .bind(pendenteAnterior.id, idempotencyKey),
+        ]
+      : []),
   ];
 
   let batchResults;
