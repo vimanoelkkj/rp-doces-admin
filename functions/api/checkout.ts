@@ -2,6 +2,24 @@
 
 import { precoAtualCentavos, ProdutoRow } from "../lib/pricing";
 import { liberarReservaPedido } from "../lib/stock";
+import { postPagamentoMp } from "../lib/mpPost";
+import {
+  buscarOperacao,
+  chaveMp,
+  chavePagamento,
+  chavePedido,
+  conflitoOperacao,
+  fingerprint,
+  fontePedidoComPagamento,
+  OPERACAO_HTTP_STATUS,
+  OPERACAO_MENSAGENS,
+  parseOperationKey,
+  parseResultado,
+  prepareClaimOperacao,
+  registrarFase,
+  type IdentidadeEsperada,
+  type OperacaoRow,
+} from "../lib/operacoes";
 
 interface Env {
   DB: D1Database;
@@ -20,14 +38,37 @@ interface CheckoutBody {
     whatsapp: string;
   };
   recado?: string;
+  /**
+   * A1: identidade da FINALIZAÇÃO, criada pelo cliente antes do primeiro
+   * POST. O carrinho não serve: ele representa a intenção de compra em
+   * construção, não uma operação de checkout.
+   */
+  operationKey?: string;
 }
 
-function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+interface CheckoutSucesso {
+  pedidoId: number;
+  tokenPublico: string;
+  paymentId: number | string;
+  status: string;
+  qrCode: string | null;
+  qrCodeBase64: string | null;
+  ticketUrl: string | null;
+  expiresAt: string | null;
+  totalCentavos: number;
+}
+
+function jsonError(message: string, status: number, code?: string) {
+  return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
 const MAX_ITEMS_PER_PEDIDO = 50;
 const MAX_TEXT_LENGTH = 200;
+const PIX_EXPIRATION_MINUTES = 30;
+
+const MENSAGEM_MP_RECUSOU = "Falha ao criar pagamento Pix";
+const MENSAGEM_MP_INDISPONIVEL =
+  "Não foi possível confirmar com o Mercado Pago se o Pix foi criado. Acompanhe o pedido em instantes.";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
@@ -66,6 +107,38 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   }
   if (nome.length > MAX_TEXT_LENGTH || whatsapp.length > MAX_TEXT_LENGTH) {
     return jsonError("Dados do cliente inválidos", 400);
+  }
+
+  const recado = (body.recado ?? "").slice(0, MAX_TEXT_LENGTH);
+
+  const chave = parseOperationKey(body.operationKey);
+  if (!chave.ok) {
+    return jsonError(OPERACAO_MENSAGENS.OPERATION_KEY_INVALIDA, 400, chave.erro);
+  }
+  const operationKey = chave.key;
+  const identidade: IdentidadeEsperada = {
+    tipo: "CHECKOUT_SITE",
+    escopo: "SITE",
+    atorUsuarioId: null,
+    // Itens (ids + quantidades, ordenados), cliente e recado. Preços são
+    // resolvidos pelo servidor e congelados no pedido, não na identidade.
+    fingerprint: fingerprint({
+      itens: [...body.items]
+        .map((i) => [i.id, i.quantity] as [number, number])
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+      nome,
+      whatsapp,
+      recado,
+    }),
+  };
+
+  // Lookup ANTES dos guards de catálogo/estoque: retry, abort, remontagem,
+  // reload ou perda da resposta HTTP não podem virar um segundo pedido, um
+  // segundo Pix ou uma segunda reserva — mesmo que o estoque já não permita
+  // criar um pedido igual agora.
+  const existente = await buscarOperacao(env.DB, operationKey);
+  if (existente) {
+    return await replayCheckout(env, existente, identidade);
   }
 
   const ids = [...new Set(body.items.map((i) => i.id))];
@@ -118,12 +191,32 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const whatsappDigits = whatsapp.replace(/\D/g, "") || "cliente";
   const payerEmail = `${whatsappDigits}@checkout.rpdoces.com.br`;
 
-  const idempotencyKey = crypto.randomUUID();
+  // A1: identidades técnicas DERIVADAS da operation key. Os UNIQUEs já
+  // existentes de `pedidos.idempotency_key` e
+  // `pedido_pagamentos.idempotency_key` passam a garantir atomicamente que a
+  // mesma finalização produz UM pedido, UM conjunto de itens, UMA tentativa
+  // Pix e UMA reserva. `token_publico` continua aleatório: é identificador
+  // público de acompanhamento e nunca deve ser derivável de uma key.
+  const idempotencyKeyPedido = chavePedido(operationKey);
+  const idempotencyKey = chavePagamento(operationKey);
+  const mpIdempotencyKey = chaveMp(operationKey);
   const tokenPublico = crypto.randomUUID();
-  const PIX_EXPIRATION_MINUTES = 30;
   const expiresAt = new Date(
     Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000,
   ).toISOString();
+
+  // Conteúdo original do POST, persistido ANTES do envio. É o que permite
+  // que a mesma operação seja reconhecida/retomada com segurança depois de
+  // um resultado ambíguo, preservando valor, expiração, referência externa e
+  // dados do pagador — hoje parte disso só existia em memória.
+  const mpRequest = {
+    transaction_amount: totalCentavos / 100,
+    description: "Pedido R&P Doces",
+    payment_method_id: "pix",
+    date_of_expiration: expiresAt,
+    external_reference: tokenPublico,
+    payer: { email: payerEmail, first_name: nome },
+  };
 
   // Persiste pedido + itens + pagamento PENDENTE + alocações + reserva de
   // estoque num único batch (uma transação): o registro financeiro nasce
@@ -152,9 +245,9 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
         tokenPublico,
         nome,
         whatsapp,
-        (body.recado ?? "").slice(0, MAX_TEXT_LENGTH),
+        recado,
         totalCentavos,
-        idempotencyKey,
+        idempotencyKeyPedido,
       ),
       ...itensParaPersistir.map((item) =>
         env.DB.prepare(
@@ -187,8 +280,25 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
            WHERE id = ?`,
         ).bind(item.quantidade, item.produtoId),
       ),
+      // Claim A1 por último e condicionado ao pedido E ao pagamento
+      // recém-criados: tudo numa única transação. `fase='LOCAL_CRIADA'`
+      // porque o envio ao Mercado Pago ainda não aconteceu, e o conteúdo
+      // original do POST já fica persistido junto com a key MP estável.
+      prepareClaimOperacao(env.DB, {
+        key: operationKey,
+        ...identidade,
+        fase: "LOCAL_CRIADA",
+        mpIdempotencyKey,
+        mpRequest: JSON.stringify(mpRequest),
+        fonte: fontePedidoComPagamento(idempotencyKeyPedido, idempotencyKey),
+      }),
     ]);
   } catch (err) {
+    // Disputa da mesma operation key (UNIQUE de `pedidos.idempotency_key` ou
+    // de `operation_key`): o batch do perdedor é revertido inteiro — nenhum
+    // pedido, nenhuma reserva, nenhum POST — e ele recupera a vencedora.
+    const vencedora = await buscarOperacao(env.DB, operationKey);
+    if (vencedora) return await replayCheckout(env, vencedora, identidade);
     if (String((err as Error)?.message || "").includes("CHECK")) {
       return jsonError("Um ou mais produtos não possuem estoque suficiente disponível.", 409);
     }
@@ -198,58 +308,40 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const pedidoId = batchResults[0].meta.last_row_id;
   const pagamentoId = batchResults[1 + itensParaPersistir.length].meta.last_row_id;
 
-  let mpResponse: Response;
-  try {
-    mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
-        "X-Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify({
-        transaction_amount: totalCentavos / 100,
-        description: "Pedido R&P Doces",
-        payment_method_id: "pix",
-        date_of_expiration: expiresAt,
-        external_reference: tokenPublico,
-        payer: { email: payerEmail, first_name: nome },
-      }),
+  const envio = await postPagamentoMp(env.MP_ACCESS_TOKEN, mpIdempotencyKey, mpRequest);
+
+  if (envio.resultado === "AMBIGUO") {
+    // Timeout, erro de transporte, 5xx/408/429 ou corpo ilegível: NÃO é
+    // possível provar se o Mercado Pago criou a cobrança. Antes do A1 um 5xx
+    // caía no mesmo caminho da recusa definitiva (gravava FALHOU e liberava a
+    // reserva) — uma rejeição inventada. Agora a operação permanece
+    // INCONCLUSIVA e recuperável: ledger continua PENDENTE, reserva intacta
+    // (B4), nenhuma key nova, nenhum pedido novo, nenhum sucesso nem
+    // rejeição inventados. Um retry com a mesma key recupera esta operação.
+    console.error("Resultado ambíguo ao criar pagamento Pix (checkout)", {
+      pedidoId,
+      motivo: envio.motivo,
+      httpStatus: envio.httpStatus,
     });
-  } catch (err) {
-    // fetch() nunca resolveu (timeout/rede) — resultado financeiro
-    // AMBÍGUO, não sabemos se o MP chegou a criar a cobrança. O ledger
-    // fica PENDENTE (não FALHOU): marcar falha aqui seria mentira.
-    console.error("Erro de transporte ao chamar o Mercado Pago", err);
-    return jsonError("Falha ao criar pagamento Pix", 502);
+    await registrarFase(env.DB, operationKey, {
+      fase: "ENVIO_INCONCLUSIVO",
+      erro: `AMBIGUO:${envio.motivo}`,
+    });
+    return jsonError(MENSAGEM_MP_INDISPONIVEL, 502, "MERCADO_PAGO_INDISPONIVEL");
   }
 
-  if (!mpResponse.ok) {
-    // O Mercado Pago respondeu e recusou — rejeição conhecida, não
+  if (envio.resultado === "RECUSA_DEFINITIVA") {
+    // O Mercado Pago respondeu e recusou — rejeição COMPROVADA, não
     // ambígua. O ledger já pode registrar isso com mais fidelidade que
     // `pedidos`, que por compatibilidade do 4c-1 permanece PENDENTE.
-    const errorBody = await mpResponse.text();
-    console.error("Mercado Pago checkout error", mpResponse.status, errorBody);
-
-    let mensagemErro: string | null = null;
-    let detalheErro: string | null = null;
-    try {
-      const parsed = JSON.parse(errorBody) as {
-        message?: string;
-        cause?: unknown;
-      };
-      mensagemErro = parsed.message ?? null;
-      detalheErro = parsed.cause ? JSON.stringify(parsed.cause).slice(0, 500) : null;
-    } catch {
-      // corpo de erro não era JSON — segue sem detalhe estruturado
-    }
+    console.error("Mercado Pago checkout error", envio.httpStatus, envio.mensagem);
 
     await env.DB.prepare(
       `UPDATE pedido_pagamentos
        SET status = 'FALHOU', mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND status = 'PENDENTE'`,
     )
-      .bind(mensagemErro, detalheErro, pagamentoId)
+      .bind(envio.mensagem, envio.detalhe, pagamentoId)
       .run();
 
     // Rejeição definitiva e conhecida (não ambígua): a reserva pode ser
@@ -257,22 +349,17 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     // pagamento confirmado concorrente pode ter passado a reter a reserva.
     await liberarReservaPedido(env.DB, pedidoId);
 
-    return jsonError("Falha ao criar pagamento Pix", 502);
+    // Terminal: um retry da MESMA key devolve esta mesma recusa, sem novo
+    // POST e sem nenhuma escrita adicional.
+    await registrarFase(env.DB, operationKey, {
+      fase: "RECUSADA",
+      erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`,
+    });
+
+    return jsonError(MENSAGEM_MP_RECUSOU, 502, "MERCADO_PAGO_RECUSOU");
   }
 
-  const payment = (await mpResponse.json()) as {
-    id: number;
-    status: string;
-    date_of_expiration: string | null;
-    point_of_interaction?: {
-      transaction_data?: {
-        qr_code?: string;
-        qr_code_base64?: string;
-        ticket_url?: string;
-      };
-    };
-  };
-
+  const payment = envio.payment;
   const txData = payment.point_of_interaction?.transaction_data;
 
   // Passo 7: sincroniza reserva_expira_em com a expiração REAL do Pix
@@ -282,6 +369,28 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const reservaExpiraEm = payment.date_of_expiration
     ? new Date(Date.parse(payment.date_of_expiration) + 60_000).toISOString()
     : null;
+
+  const sucesso: CheckoutSucesso = {
+    pedidoId,
+    tokenPublico,
+    paymentId: payment.id,
+    status: payment.status,
+    qrCode: txData?.qr_code ?? null,
+    qrCodeBase64: txData?.qr_code_base64 ?? null,
+    ticketUrl: txData?.ticket_url ?? null,
+    expiresAt: payment.date_of_expiration,
+    totalCentavos,
+  };
+
+  // Registra a identidade remota e o resultado ANTES de gravar os detalhes
+  // locais. Se a gravação local a seguir falhar, o retry com a MESMA key
+  // recupera este resultado em vez de criar outro pedido e outro POST: o
+  // recurso remoto já existe e já tem nome.
+  await registrarFase(env.DB, operationKey, {
+    fase: "REMOTO_CONHECIDO",
+    mpPaymentId: String(payment.id),
+    resultado: JSON.stringify(sucesso),
+  });
 
   await env.DB.batch([
     env.DB.prepare(
@@ -317,15 +426,92 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     ),
   ]);
 
-  return Response.json({
-    pedidoId,
-    tokenPublico,
-    paymentId: payment.id,
-    status: payment.status,
-    qrCode: txData?.qr_code ?? null,
-    qrCodeBase64: txData?.qr_code_base64 ?? null,
-    ticketUrl: txData?.ticket_url ?? null,
-    expiresAt: payment.date_of_expiration,
-    totalCentavos,
-  });
+  await registrarFase(env.DB, operationKey, { fase: "CONCLUIDA" });
+
+  return Response.json(sucesso);
+}
+
+// A1 — replay do checkout. NUNCA cria outro pedido, outra tentativa, outra
+// reserva, outra key nem faz outro POST. Nunca libera a reserva: um retry
+// não é uma rejeição.
+async function replayCheckout(
+  env: Env,
+  operacao: OperacaoRow,
+  identidade: IdentidadeEsperada,
+): Promise<Response> {
+  const conflito = conflitoOperacao(operacao, identidade);
+  if (conflito) {
+    return jsonError(OPERACAO_MENSAGENS[conflito], OPERACAO_HTTP_STATUS[conflito], conflito);
+  }
+
+  // Recusa comprovada é terminal: repetir a mesma intenção devolve a mesma
+  // recusa. Uma nova finalização explícita do cliente usa uma key nova.
+  if (operacao.fase === "RECUSADA") {
+    return jsonError(MENSAGEM_MP_RECUSOU, 502, "MERCADO_PAGO_RECUSOU");
+  }
+
+  const snapshot = parseResultado<CheckoutSucesso>(operacao);
+  if (snapshot) return Response.json(snapshot);
+
+  // Sem snapshot: reconstrói a partir das linhas persistidas.
+  const linha = operacao.pedido_id
+    ? await env.DB.prepare(
+        `SELECT p.id AS pedido_id, p.token_publico, p.valor_total_centavos,
+                pp.mp_payment_id, pp.mp_status, pp.mp_qr_code, pp.mp_qr_code_base64,
+                pp.mp_ticket_url, pp.pix_expira_em
+         FROM pedidos p
+         JOIN pedido_pagamentos pp ON pp.id = ?
+         WHERE p.id = ? LIMIT 1`,
+      )
+        .bind(operacao.pagamento_id, operacao.pedido_id)
+        .first<{
+          pedido_id: number;
+          token_publico: string;
+          valor_total_centavos: number;
+          mp_payment_id: string | null;
+          mp_status: string | null;
+          mp_qr_code: string | null;
+          mp_qr_code_base64: string | null;
+          mp_ticket_url: string | null;
+          pix_expira_em: string | null;
+        }>()
+    : null;
+
+  if (!linha) {
+    return jsonError(
+      OPERACAO_MENSAGENS.OPERACAO_INCOMPLETA,
+      OPERACAO_HTTP_STATUS.OPERACAO_INCOMPLETA,
+      "OPERACAO_INCOMPLETA",
+    );
+  }
+
+  if (linha.mp_payment_id) {
+    return Response.json({
+      pedidoId: linha.pedido_id,
+      tokenPublico: linha.token_publico,
+      paymentId: linha.mp_payment_id,
+      status: linha.mp_status ?? "pending",
+      qrCode: linha.mp_qr_code,
+      qrCodeBase64: linha.mp_qr_code_base64,
+      ticketUrl: linha.mp_ticket_url,
+      expiresAt: linha.pix_expira_em,
+      totalCentavos: linha.valor_total_centavos,
+    } satisfies CheckoutSucesso);
+  }
+
+  // Operação local criada, mas sem recurso remoto conhecido: o envio não
+  // chegou a produzir um resultado que possamos provar. Nada de reenvio
+  // automático aqui (ver limite conservador do relatório A1) e nada de
+  // inventar sucesso ou rejeição — a operação segue a MESMA, inconclusiva e
+  // recuperável por webhook/reconciliação. O cliente recebe o token para
+  // acompanhar o pedido que JÁ existe.
+  return Response.json(
+    {
+      error: OPERACAO_MENSAGENS.OPERACAO_EM_PROCESSAMENTO,
+      code: "OPERACAO_EM_PROCESSAMENTO",
+      pedidoId: linha.pedido_id,
+      tokenPublico: linha.token_publico,
+    },
+    { status: OPERACAO_HTTP_STATUS.OPERACAO_EM_PROCESSAMENTO },
+  );
 }

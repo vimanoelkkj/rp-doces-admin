@@ -2,6 +2,11 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { registerManualRefund } from "../../../../lib/comandaLedger";
+import {
+  OPERACAO_HTTP_STATUS,
+  OPERACAO_MENSAGENS,
+  parseOperationKey,
+} from "../../../../lib/operacoes";
 
 interface Env {
   DB: D1Database;
@@ -11,6 +16,7 @@ interface ReembolsoInput {
   pagamentoId?: number;
   valorCentavos?: number;
   motivo?: string;
+  operationKey?: string;
 }
 
 const MENSAGENS: Record<string, string> = {
@@ -23,10 +29,11 @@ const MENSAGENS: Record<string, string> = {
   VALOR_INVALIDO: "Valor inválido",
   SALDO_REEMBOLSAVEL_INSUFICIENTE:
     "O saldo reembolsável mudou antes da confirmação. Atualize e tente novamente.",
+  ...OPERACAO_MENSAGENS,
 };
 
-function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+function jsonError(message: string, status: number, code?: string) {
+  return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -52,6 +59,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     return jsonError("Valor inválido", 400);
   }
 
+  // A1: obrigatória. Um refund duplicado registra uma devolução que não
+  // aconteceu — é o caso mais sensível junto com o pagamento manual.
+  const chave = parseOperationKey(body.operationKey);
+  if (!chave.ok) {
+    return jsonError(MENSAGENS.OPERATION_KEY_INVALIDA, 400, chave.erro);
+  }
+
   try {
     const resultado = await registerManualRefund(env.DB, {
       pedidoId: id,
@@ -59,13 +73,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       valorCentavos: body.valorCentavos!,
       usuarioId: auth.user.id,
       motivo: body.motivo,
+      operationKey: chave.key,
     });
 
     if (!resultado.ok) {
-      const status = resultado.erro === "PEDIDO_NAO_ENCONTRADO" ? 404 : 409;
+      const status =
+        resultado.erro === "PEDIDO_NAO_ENCONTRADO"
+          ? 404
+          : OPERACAO_HTTP_STATUS[resultado.erro ?? ""] ?? 409;
       return jsonError(
         MENSAGENS[resultado.erro ?? ""] ?? "Não foi possível registrar o reembolso",
         status,
+        resultado.erro,
       );
     }
 
@@ -75,6 +94,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         reembolsoId: resultado.reembolsoId,
         statusFinanceiro: resultado.statusFinanceiro,
         saldoCentavos: resultado.saldoCentavos,
+        ...(resultado.replay ? { replay: true } : {}),
       },
       { status: 201 },
     );

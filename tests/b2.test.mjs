@@ -48,7 +48,8 @@ test('A: real checkout creation then authoritative GET approval preserves normal
     return Response.json({id:101,status:'pending',date_of_expiration:'2099-01-01',point_of_interaction:{transaction_data:{qr_code:'fake'}}});
   });
   const response=await app.checkout.onRequestPost({env:env(db),request:new Request('https://local.test/api/checkout',{
-    method:'POST',body:JSON.stringify({items:[{id:1,quantity:2}],cliente:{nome:'Teste',whatsapp:'000'}}),
+    // operationKey: contrato A1, obrigatório no endpoint. Asserções inalteradas.
+    method:'POST',body:JSON.stringify({items:[{id:1,quantity:2}],cliente:{nome:'Teste',whatsapp:'000'},operationKey:'b2-checkout-a'}),
   })});
   assert.equal(response.status,200);
   const checkout=await response.json();
@@ -176,9 +177,14 @@ for(const both of [false,true]) test(`I/J: real admin regeneration keeps A recon
   const session=await app.auth.createSession(db,1);
   let remoteId=200;
   t.mock.method(globalThis,'fetch',async ()=>Response.json({id:++remoteId,status:'pending',date_of_expiration:'2099-01-01'}));
+  // operationKey: contrato A1, obrigatório no endpoint. Uma key por chamada,
+  // porque cada chamada aqui é uma intenção distinta (gerar, depois regenerar).
+  let opSeq=0;
   const create=async substituiId=>{
+    const operationKey=`b2-pix-${++opSeq}`;
     const r=await app.adminPix.onRequestPost({env:env(db),params:{id:'1'},request:new Request('https://local.test/api/admin/pedidos/1/pix',{
-      method:'POST',headers:{Cookie:session.cookie.split(';')[0]},body:JSON.stringify(substituiId?{substituiId}:{}),
+      method:'POST',headers:{Cookie:session.cookie.split(';')[0]},
+      body:JSON.stringify(substituiId?{substituiId,operationKey}:{operationKey}),
     })});
     assert.equal(r.status,201); return r.json();
   };

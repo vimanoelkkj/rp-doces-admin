@@ -263,7 +263,8 @@ for(const path of ['ADMIN','SITE']) for(const status of ['approved','cancelled',
     if(path==='ADMIN') assert.equal((await create(db,{valorCentavos:10000})).erro,'MERCADO_PAGO_RECUSOU');
     else {
       const r=await app.checkout.onRequestPost({env:env(db),request:new Request('https://local.test/api/checkout',{
-        method:'POST',body:JSON.stringify({items:[{id:1,quantity:2}],cliente:{nome:'Teste',whatsapp:'000'}}),
+        // operationKey: contrato A1, obrigatório no endpoint. Asserções inalteradas.
+        method:'POST',body:JSON.stringify({items:[{id:1,quantity:2}],cliente:{nome:'Teste',whatsapp:'000'},operationKey:`b4-checkout-${status}`}),
       })});
       assert.equal(r.status,502);
     }

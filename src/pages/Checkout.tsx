@@ -3,6 +3,11 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
+import {
+  gravarOperationKey,
+  novaOperationKey,
+  SLOT_CHECKOUT,
+} from "../lib/operationKey";
 import "./Checkout.css";
 
 export default function Checkout() {
@@ -16,11 +21,18 @@ export default function Checkout() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A1: a identidade da finalização nasce AQUI, antes do primeiro POST
+    // (que só acontece na próxima tela). Submeter o formulário de novo é uma
+    // finalização explicitamente nova e recebe uma key nova; retry, abort e
+    // remontagem da MESMA finalização reaproveitam esta.
+    const operationKey = novaOperationKey();
+    gravarOperationKey(SLOT_CHECKOUT, operationKey);
     navigate("/aguardando-pagamento", {
       state: {
         items: cartItems,
         cliente: { nome: nome.trim(), whatsapp: whatsapp.trim() },
         recado: recado.trim(),
+        operationKey,
       },
     });
   };

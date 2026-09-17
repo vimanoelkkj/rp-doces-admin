@@ -21,7 +21,7 @@ src/          frontend (storefront + admin)
 functions/    Cloudflare Pages Functions (API)
   api/          endpoints HTTP
   lib/          lógica de negócio compartilhada (ledger, estoque, sync com MP)
-migrations/   migrations do D1, numeradas e incrementais (0001 → 0011 hoje)
+migrations/   migrations do D1, numeradas e incrementais (0001 → 0012 hoje)
 ```
 
 ## Rodando localmente
@@ -223,6 +223,105 @@ Functions conserva somente os dois erros anteriores de `auth.ts` (59 TS2345,
 temporários locais; exports completos antes/depois permaneceram idênticos.
 Editor incremental e idempotência A1 continuam trabalhos separados.
 
+## A1 — Identidade lógica estável das operações (idempotência)
+
+A investigação pré-implementação está preservada em
+`docs/investigacoes/A1-IDEMPOTENCIA.md` (HEAD `0e388ef`, 38 cenários
+reproduzidos). Ela descreve o estado **anterior** a esta correção: cada POST
+gerava uma identidade nova no servidor, então retry, timeout, abort,
+remontagem, reload, resposta HTTP perdida ou concorrência podiam transformar
+a mesma intenção em duas operações.
+
+**Contrato.** Toda operação de escrita financeira/criação passa a exigir uma
+`operationKey` criada pelo **cliente antes do primeiro envio**. A key é
+estável durante retries da mesma intenção, diferente para uma intenção nova,
+vinculada a tipo/escopo/ator e independente de valor, horário, WhatsApp ou
+hash do carrinho. Junto dela vai um **fingerprint canônico versionado** do
+conteúdo, que existe só para detectar reutilização *incompatível* da mesma
+key — nunca para deduplicar por payload (duas intenções diferentes podem ter
+payload idêntico e continuam sendo duas operações legítimas).
+
+- mesma key + mesmo payload → mesma operação, mesmo resultado lógico;
+- mesma key + payload incompatível → `409` estável, zero escrita financeira;
+- key nova → intenção nova, sujeita aos guards normais do domínio.
+
+Endpoints cobertos: `POST /api/checkout`, `POST /api/admin/pedidos`,
+`POST /api/admin/pedidos/:id/pagamentos`, `.../reembolsos` e `.../pix`
+(geração e regeneração).
+
+**Persistência.** Migration aditiva `0012_operacoes_idempotencia.sql`, uma
+tabela (`pedido_operacoes`) com `UNIQUE(operation_key)`. Nenhuma tabela
+financeira foi reconstruída, nenhuma migration antiga foi alterada, nenhum
+histórico foi reescrito. Ela guarda key, tipo, escopo/ator, fingerprint
+versionado, pedido/pagamento/reembolso resultantes, resultado para replay,
+identidade da tentativa MP (`mp_idempotency_key`, `mp_request`,
+`mp_payment_id`) e a **fase** que distingue operação local criada, envio
+remoto inconclusivo, recurso remoto conhecido, concluída e recusada. Não é
+framework de jobs, não tem cron nem sweep novo.
+
+**Atomicidade.** O claim é o último statement do MESMO batch do fato, e é
+`INSERT ... SELECT` condicionado à existência do fato (resolvido pelas chaves
+derivadas). Se o guard de domínio recusou a escrita, a fonte não devolve
+linha e nenhuma operação é registrada — nunca sobra claim órfão. Nunca
+`INSERT OR IGNORE` seguindo com os efeitos como se o claim tivesse sido
+adquirido. As identidades técnicas passam a ser **derivadas** da key
+(`a1:<key>`, `a1:<key>:pag`, `a1:<key>:ref`, `a1:<key>:mp`), o que transforma
+os UNIQUEs já existentes de `pedidos.idempotency_key`,
+`pedido_pagamentos.idempotency_key` e `pedido_reembolsos.idempotency_key`
+numa segunda proteção atômica independente da tabela de operações. Na disputa
+pela mesma key, o batch do perdedor é revertido inteiro e ele **relê a
+vencedora** em vez de devolver um erro que convidaria a criar um segundo
+fato. `token_publico` continua aleatório de propósito: é identificador
+público de acompanhamento e não pode ser derivável de uma key.
+
+**Lookup antes dos guards de estado.** Cada writer procura a operação pela
+key ANTES dos guards que dependem do estado atual. É isso que permite
+recuperar um sucesso anterior cuja resposta HTTP se perdeu: o pedido pode ter
+virado `PAGO`, o saldo reembolsável pode ter mudado, o estoque pode não
+permitir mais criar um pedido igual, e o retry ainda recupera a operação
+original em vez de ser reinterpretado como uma tentativa nova contra o estado
+novo. Replay de operação local é reconstruído a partir das linhas
+persistidas; operações MP usam o snapshot de resultado com fallback para as
+linhas.
+
+**Ambiguidade do POST ao Mercado Pago** (achado da investigação, corrigido
+só no necessário para o A1): `functions/lib/mpPost.ts` separa
+`RECUSA_DEFINITIVA` (4xx de negócio) de `AMBIGUO` (transporte, timeout, 408,
+429, 5xx, 2xx sem `id` utilizável). Antes, qualquer não-2xx gravava `FALHOU`
+e liberava reserva — uma rejeição inventada. Agora o resultado ambíguo mantém
+a operação inconclusiva e recuperável: ledger continua `PENDENTE`, reserva
+intacta, `fase='ENVIO_INCONCLUSIVO'`, **nenhuma** key nova, nenhum pedido
+novo, nenhuma tentativa nova, nenhum reenvio automático, nenhum sucesso nem
+rejeição inventados. Um retry da mesma key devolve `OPERACAO_EM_PROCESSAMENTO`
+com o pedido que já existe. A recusa comprovada continua gravando `FALHOU` +
+liberação (guards B4 intactos) e fica terminal: o retry devolve a mesma
+recusa sem novo POST. Permanecemos na **Payments API**; a matriz de transição
+e a autoridade do GET verificado (B2) não mudaram. Um prazo explícito de 20s
+foi adicionado ao POST justamente para que um envio pendurado termine como
+ambíguo recuperável.
+
+**Frontend (apenas funcional; zero mudança de layout/CSS).**
+`src/lib/operationKey.ts` cria e preserva a identidade. No site, a key nasce
+no submit de `Checkout.tsx` (nova finalização explícita = key nova) e é
+preservada em `sessionStorage` + `useRef` por `AguardandoPagamento.tsx`, de
+modo que retry, abort, remontagem e StrictMode reaproveitem a MESMA
+identidade; `OPERACAO_EM_PROCESSAMENTO` leva para o acompanhamento do pedido
+que já existe, nunca dispara outro checkout. No admin, `NovoPedidoModal`
+mantém a key enquanto o conteúdo do formulário for o mesmo (conteúdo alterado
+= intenção nova = key nova) e `PedidoDetalheModal` guarda uma key por
+intenção de cobrança (`novo` / `regen:<id>`), preservando-a no caminho
+ambíguo e descartando-a quando a ação se resolve. Nenhuma tela nova foi
+criada para os endpoints de pagamento/refund.
+
+**Testes.** `tests/a1.test.mjs` (40 verificações) não repete a investigação —
+prova a correção, com código real, D1 local descartável criado pelas
+migrations e provedor simulado. Cobre replay, conflito de payload/tipo/escopo,
+keys distintas ainda aditivas, concorrência com barreira determinística
+(pagamento, refund, pedido ADMIN, checkout, Pix, regeneração), falha antes da
+persistência, commit concluído com resposta perdida, timeout/5xx/2xx ilegível
+do MP, recurso remoto conhecido com falha local posterior, disputa da última
+unidade e as regressões B1/B2/B3/B4.
+
 ## O que falta
 
 Ordem sugerida (não travada — pode mudar por decisão):
@@ -257,4 +356,5 @@ Ordem sugerida (não travada — pode mudar por decisão):
 0009_reembolsos.sql                            pedido_reembolsos
 0010_pedido_pagamentos_mp_payment_id_index.sql índice para resolução direta do webhook
 0011_pedidos_reserva_ativa_index.sql           índice para varredura de reservas vencidas
+0012_operacoes_idempotencia.sql                pedido_operacoes (identidade lógica/idempotência A1)
 ```

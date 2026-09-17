@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { novaOperationKey } from "../../lib/operationKey";
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
 import "./NovoPedidoModal.css";
@@ -142,6 +143,16 @@ export default function NovoPedidoModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A1: identidade da intenção de registrar ESTA venda. Precisa existir
+  // antes do primeiro POST e continuar a mesma enquanto o conteúdo do
+  // formulário for o mesmo — um retry depois de erro de rede ou de resposta
+  // perdida recupera o pedido original em vez de criar um segundo pedido
+  // (que, nascendo PAGO, também produziria uma segunda baixa de estoque).
+  // Se o operador ALTERA o formulário e envia de novo, isso é uma intenção
+  // diferente e recebe uma key nova.
+  const operationKeyRef = useRef<string | null>(null);
+  const assinaturaRef = useRef<string | null>(null);
+
   // Dropdowns for payment
   const payMethodDd = useDropdown();
   const payStatusDd = useDropdown();
@@ -160,6 +171,9 @@ export default function NovoPedidoModal({
     setError(null);
     setSaving(false);
     setLoading(true);
+    // Nova abertura do modal = nova intenção de venda.
+    operationKeyRef.current = null;
+    assinaturaRef.current = null;
 
     fetch("/api/admin/produtos")
       .then(async (r) => {
@@ -228,21 +242,31 @@ export default function NovoPedidoModal({
       }
     }
 
+    const payload = {
+      itens: items.map((i) => ({
+        produtoId: i.produtoId,
+        quantidade: i.quantidade,
+      })),
+      clienteNome: clientName.trim(),
+      clienteWhatsapp: whatsapp.trim(),
+      observacao: observation.trim(),
+      metodoPagamento,
+      statusPagamento,
+    };
+
+    // Mesmo conteúdo => mesma key (retry da mesma intenção).
+    // Conteúdo alterado => key nova (intenção diferente).
+    const assinatura = JSON.stringify(payload);
+    if (assinaturaRef.current !== assinatura || !operationKeyRef.current) {
+      operationKeyRef.current = novaOperationKey();
+      assinaturaRef.current = assinatura;
+    }
+
     setSaving(true);
     fetch("/api/admin/pedidos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        itens: items.map((i) => ({
-          produtoId: i.produtoId,
-          quantidade: i.quantidade,
-        })),
-        clienteNome: clientName.trim(),
-        clienteWhatsapp: whatsapp.trim(),
-        observacao: observation.trim(),
-        metodoPagamento,
-        statusPagamento,
-      }),
+      body: JSON.stringify({ ...payload, operationKey: operationKeyRef.current }),
     })
       .then(async (response) => {
         if (!response.ok) {
