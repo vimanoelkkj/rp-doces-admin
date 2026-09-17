@@ -435,16 +435,21 @@ test('B2: verified MP approval now recovers local expiration', async t => {
   converted(await state(db));
 });
 
-test('B4 release policy remains unchanged; generic reconciliation never releases', async t => {
+test('generic reconciliation never releases even with only expired payments', async t => {
   const db=await fixture(t);
   await app.sync.expireLocalPayment(db,1);
   await db.prepare("UPDATE pedidos SET reserva_status='ATIVA' WHERE id=1").run();
   await db.prepare('UPDATE produtos SET estoque_reservado=2 WHERE id=1').run();
   await reconcile(db);
   assert.equal((await state(db)).pedido.reserva_status,'ATIVA');
-  await db.prepare("UPDATE pedido_pagamentos SET status='PENDENTE' WHERE id=1").run();
+  assert.equal((await state(db)).produtos[0].estoque_reservado,2);
+});
+
+test('B4 protects another pending Pix when one payment is cancelled', async t => {
+  const db=await fixture(t);
   await db.prepare("INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,idempotency_key) VALUES(1,'PIX_MP','ADMIN',5000,'PENDENTE','second')").run();
   t.mock.method(globalThis, 'fetch', async () => Response.json({id:101,status:'cancelled'}));
   await app.sync.syncPaymentFromMp(db,1,await app.sync.fetchMpPayment('fake','101'));
-  assert.equal((await state(db)).pedido.reserva_status,'LIBERADA'); // known B4, deliberately not fixed
+  assert.equal((await state(db)).pedido.reserva_status,'ATIVA');
+  assert.equal((await state(db)).produtos[0].estoque_reservado,2);
 });

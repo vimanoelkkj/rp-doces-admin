@@ -148,9 +148,8 @@ export const onRequestPatch: PagesFunction<Env> = async ({
       .bind(novoStatus, id)
       .run();
 
-    // Passo 7: chegou aqui só porque o guard acima já provou líquido=0
-    // (nada retido) — o agregado é PENDENTE, então liberarReservaPedido
-    // sempre pode agir com segurança nesse ponto.
+    // Cancelar o pedido não terminaliza cobranças MP. A liberação revalida
+    // o líquido e a ausência de Pix pendente dentro da transação física.
     if (novoStatus === "CANCELADO") {
       await liberarReservaPedido(env.DB, id);
     }

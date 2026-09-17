@@ -19,6 +19,8 @@ const bundle = await build({
       export * as adminRefund from './functions/api/admin/pedidos/[id]/reembolsos';
       export * as checkout from './functions/api/checkout';
       export * as adminPix from './functions/api/admin/pedidos/[id]/pix';
+      export * as pix from './functions/lib/comandaPix';
+      export * as adminOrder from './functions/api/admin/pedidos/[id]';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },

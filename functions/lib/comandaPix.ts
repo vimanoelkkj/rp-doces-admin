@@ -252,26 +252,23 @@ export async function createAdminPixCharge(
   const waterfall = computeWaterfallAllocations(itens, valorCentavos);
   if (!waterfall.ok) return { ok: false, erro: "VALOR_INVALIDO" };
 
-  // Reserva ATIVA preexistente nunca é tocada (nem recriada, nem tem TTL
-  // renovado) — só o caso órfão (SITE cujo Pix expirou/foi rejeitado antes
-  // de qualquer ação administrativa) precisa readquirir reserva. Pedido
-  // MANUAL sempre nasce ATIVA (Commit B), então nunca cai neste ramo.
-  const precisaReReservar = pedido.reserva_status !== "ATIVA";
-  let itensParaReserva: PedidoItemParaReserva[] = [];
-  if (precisaReReservar) {
-    const { results } = await db
-      .prepare(`SELECT id, produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?`)
-      .bind(params.pedidoId)
-      .all<PedidoItemParaReserva>();
-    itensParaReserva = (results || []).filter((i) => i.produto_id !== null);
-  }
+  // Reserva ainda ATIVA na escrita não é recriada nem tem TTL renovado.
+  // A leitura inicial pode perder uma corrida para a liberação. Sempre
+  // preparamos a aquisição; somente os guards no batch decidem se ela ocorre.
+  const { results: itensReserva } = await db
+    .prepare(`SELECT id, produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?`)
+    .bind(params.pedidoId)
+    .all<PedidoItemParaReserva>();
+  const itensParaReserva = (itensReserva || []).filter((i) => i.produto_id !== null);
+  const podeAdquirirReserva = `reserva_status IN ('SEM_RESERVA', 'LIBERADA') AND estoque_baixado_em IS NULL
+    AND NOT EXISTS (SELECT 1 FROM pedido_itens pi WHERE pi.pedido_id = pedidos.id AND pi.estoque_baixado_em IS NOT NULL)`;
 
   const idempotencyKey = crypto.randomUUID();
   const externalReference = idempotencyKey; // trava 2: identidade inequívoca por tentativa, nunca token_publico
 
   // Ordem importa: os incrementos de estoque_reservado (se houver) e o
   // flip de reserva_status precisam rodar ANTES do INSERT do pagamento,
-  // guardados pela condição `reserva_status != 'ATIVA'` capturada no
+  // guardados pela condição de reserva adquirível reavaliada no
   // início desta transação — nunca o estado pós-flip da própria transação.
   // Isso é o que torna o re-reserve seguro contra duas gerações
   // concorrentes no mesmo pedido órfão: a segunda a commitar já vê
@@ -282,21 +279,17 @@ export async function createAdminPixCharge(
       db
         .prepare(
           `UPDATE produtos SET estoque_reservado = estoque_reservado + ?, atualizado_em = CURRENT_TIMESTAMP
-           WHERE id = ? AND EXISTS (SELECT 1 FROM pedidos WHERE id = ? AND reserva_status != 'ATIVA')`,
+           WHERE id = ? AND EXISTS (SELECT 1 FROM pedidos WHERE id = ? AND ${podeAdquirirReserva})`,
         )
         .bind(item.quantidade, item.produto_id, params.pedidoId),
     ),
-    ...(precisaReReservar
-      ? [
-          db
-            .prepare(
-              `UPDATE pedidos SET reserva_status = 'ATIVA', reserva_expira_em = datetime('now', '+31 minutes'),
-                 atualizado_em = CURRENT_TIMESTAMP
-               WHERE id = ? AND reserva_status != 'ATIVA'`,
-            )
-            .bind(params.pedidoId),
-        ]
-      : []),
+    db
+      .prepare(
+        `UPDATE pedidos SET reserva_status = 'ATIVA', reserva_expira_em = datetime('now', '+31 minutes'),
+           atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ? AND ${podeAdquirirReserva}`,
+      )
+      .bind(params.pedidoId),
     db
       .prepare(
         `INSERT INTO pedido_pagamentos (
@@ -305,6 +298,8 @@ export async function createAdminPixCharge(
          )
          SELECT ?, ?, 'ADMIN', ?, 'PENDENTE', ?, ?, ?
          WHERE ? <= ${CAPACIDADE_COBRAVEL_SQL}
+           AND EXISTS (SELECT 1 FROM pedidos WHERE id = ? AND reserva_status = 'ATIVA' AND estoque_baixado_em IS NULL
+             AND NOT EXISTS (SELECT 1 FROM pedido_itens pi WHERE pi.pedido_id = pedidos.id AND pi.estoque_baixado_em IS NOT NULL))
            AND (
              ? IS NULL
              OR (
@@ -328,6 +323,7 @@ export async function createAdminPixCharge(
         substituiId,
         valorCentavos,
         substituiId,
+        params.pedidoId,
         params.pedidoId,
         substituiId,
         substituiId,
@@ -354,8 +350,8 @@ export async function createAdminPixCharge(
     throw err;
   }
 
-  const reservaFlipIndex = itensParaReserva.length; // só existe se precisaReReservar
-  const pagamentoStmtIndex = itensParaReserva.length + (precisaReReservar ? 1 : 0);
+  const reservaFlipIndex = itensParaReserva.length;
+  const pagamentoStmtIndex = itensParaReserva.length + 1;
   const pagamentoId = Number(batchResults[pagamentoStmtIndex]?.meta?.last_row_id || 0);
   if (!pagamentoId) {
     // CAS na escrita recusou: outra requisição consumiu a capacidade ou (numa
@@ -373,7 +369,7 @@ export async function createAdminPixCharge(
   // (changes=0), esta operação não pode compensar aquela reserva numa
   // falha do MP a seguir, porque não foi ela quem a adquiriu.
   const reservaCriadaPorEstaOperacao =
-    precisaReReservar && Number(batchResults[reservaFlipIndex]?.meta?.changes || 0) === 1;
+    Number(batchResults[reservaFlipIndex]?.meta?.changes || 0) === 1;
 
   const whatsappDigits = pedido.cliente_whatsapp.replace(/\D/g, "") || "cliente";
   const payerEmail = `${whatsappDigits}@checkout.rpdoces.com.br`;
@@ -414,7 +410,7 @@ export async function createAdminPixCharge(
 
     await db
       .prepare(
-        `UPDATE pedido_pagamentos SET status = 'FALHOU', atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE pedido_pagamentos SET status = 'FALHOU', atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDENTE'`,
       )
       .bind(pagamentoId)
       .run();
