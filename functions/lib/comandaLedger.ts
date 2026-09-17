@@ -8,6 +8,20 @@
 // nunca o inverso (comandaLedger.ts nunca importa stock.ts diretamente).
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
+import {
+  buscarOperacao,
+  chavePagamento,
+  chaveReembolso,
+  conflitoOperacao,
+  fingerprint,
+  fontePagamento,
+  fonteReembolso,
+  parseOperationKey,
+  prepareClaimOperacao,
+  type ConflitoOperacao,
+  type IdentidadeEsperada,
+  type OperacaoRow,
+} from "./operacoes";
 
 // Passo 4b: materialização lazy de pagamentos legados em `pedido_pagamentos`
 // + leitura (real ou virtual) sem nunca escrever no caminho de leitura.
@@ -609,12 +623,17 @@ export interface RegisterAdminPaymentResult {
   pagamentoId?: number;
   statusFinanceiro?: StatusFinanceiroAgregado;
   saldoCentavos?: number;
+  /** true quando a resposta recuperou uma operação já persistida (A1). */
+  replay?: boolean;
   erro?:
     | "PEDIDO_NAO_ENCONTRADO"
     | "COMANDA_ENCERRADA"
     | "VALOR_ACIMA_DO_SALDO"
     | "SALDO_INSUFICIENTE_CONCORRENCIA"
-    | "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO";
+    | "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO"
+    | "OPERATION_KEY_INVALIDA"
+    | "OPERACAO_INCOMPLETA"
+    | ConflitoOperacao;
 }
 
 // Somente após a confirmação da escrita financeira. Uma falha derivada não
@@ -640,6 +659,45 @@ async function reconcilePersistedAdminFact(
   }
 }
 
+// A1 — replay de uma operação LOCAL já persistida (pagamento manual /
+// refund manual / criação ADMIN). Nunca cria um fato novo: valida a
+// compatibilidade da key e devolve o MESMO id, reconciliando pelo B3
+// (convergente e idempotente) para que o estado derivado continue correto
+// mesmo que a resposta original tenha se perdido.
+//
+// Para operações locais o replay é reconstruído a partir das LINHAS
+// persistidas, não de um snapshot JSON: as linhas são a fonte da verdade e
+// nunca podem divergir de si mesmas.
+async function replayOperacaoLocal(
+  db: D1Database,
+  operacao: OperacaoRow,
+  esperado: IdentidadeEsperada,
+  fato: "PAGAMENTO" | "REEMBOLSO",
+): Promise<
+  | {
+      ok: true;
+      id: number;
+      statusFinanceiro?: StatusFinanceiroAgregado;
+      saldoCentavos?: number;
+    }
+  | { ok: false; erro: ConflitoOperacao | "OPERACAO_INCOMPLETA" }
+> {
+  const conflito = conflitoOperacao(operacao, esperado);
+  if (conflito) return { ok: false, erro: conflito };
+
+  const id = Number(
+    (fato === "PAGAMENTO" ? operacao.pagamento_id : operacao.reembolso_id) || 0,
+  );
+  const pedidoId = Number(operacao.pedido_id || 0);
+  // Operação local só é registrada junto com o fato, no mesmo batch — um
+  // claim sem fato não deveria existir. Se existir, é estado corrompido:
+  // reporta em vez de recriar o fato financeiro por conta própria.
+  if (!id || !pedidoId) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
+
+  const derivados = await reconcilePersistedAdminFact(db, pedidoId, fato, id);
+  return { ok: true, id, ...derivados };
+}
+
 // Lê o saldo, calcula a cascata em memória, e só então grava — pagamento +
 // alocações no MESMO batch(), atômico. A condição de saldo do INSERT do
 // pagamento é reavaliada NO MOMENTO DA ESCRITA (subquery, não o valor lido
@@ -663,8 +721,57 @@ export async function registerAdminPayment(
     valorCentavos: number;
     usuarioId: number;
     observacao?: string;
+    /**
+     * A1: identidade lógica criada pelo cliente ANTES do primeiro envio.
+     * Obrigatória no endpoint HTTP; opcional aqui porque o helper também é
+     * chamado por caminhos internos que não representam uma intenção
+     * repetível do operador.
+     */
+    operationKey?: string | null;
   },
 ): Promise<RegisterAdminPaymentResult> {
+  const observacao = (params.observacao ?? "").slice(0, 300);
+
+  // A1 — identidade da intenção. O fingerprint cobre exatamente o conteúdo
+  // que define "este recebimento", já normalizado do mesmo jeito que será
+  // persistido: pedido, método, valor e observação.
+  let operationKey: string | null = null;
+  let identidade: IdentidadeEsperada | null = null;
+  if (params.operationKey != null) {
+    const parsed = parseOperationKey(params.operationKey);
+    if (!parsed.ok) return { ok: false, erro: parsed.erro };
+    operationKey = parsed.key;
+    identidade = {
+      tipo: "PAGAMENTO_ADMIN",
+      escopo: "ADMIN",
+      atorUsuarioId: params.usuarioId,
+      fingerprint: fingerprint({
+        pedidoId: params.pedidoId,
+        metodo: params.metodo,
+        valorCentavos: params.valorCentavos,
+        observacao,
+      }),
+    };
+
+    // Lookup ANTES dos guards dependentes do estado atual: se a resposta
+    // HTTP anterior se perdeu e o pedido já mudou de estado (por exemplo
+    // ficou PAGO), o retry precisa RECUPERAR o pagamento original em vez de
+    // ser reinterpretado como uma nova tentativa contra o estado novo.
+    const existente = await buscarOperacao(db, operationKey);
+    if (existente) {
+      const replay = await replayOperacaoLocal(db, existente, identidade, "PAGAMENTO");
+      return replay.ok
+        ? {
+            ok: true,
+            pagamentoId: replay.id,
+            replay: true,
+            statusFinanceiro: replay.statusFinanceiro,
+            saldoCentavos: replay.saldoCentavos,
+          }
+        : { ok: false, erro: replay.erro };
+    }
+  }
+
   const pedido = await db
     .prepare(`SELECT status_comanda FROM pedidos WHERE id = ?`)
     .bind(params.pedidoId)
@@ -720,11 +827,13 @@ export async function registerAdminPayment(
   // (que é a condição do UPDATE abaixo, aplicada a todos os elegíveis).
   const primeiroPlaceholderLocal = placeholdersLocais.results[0]?.id ?? null;
 
-  // Chave técnica de correlação dentro do batch — identifica unicamente
-  // esta operação financeira, mas NÃO significa retry idempotente do
-  // cliente ainda (gerada pelo servidor a cada chamada).
-  const idempotencyKey = crypto.randomUUID();
-  const observacao = (params.observacao ?? "").slice(0, 300);
+  // Chave técnica de correlação dentro do batch. A partir do A1 ela é
+  // DERIVADA da operation key quando existe uma: o UNIQUE parcial de
+  // `pedido_pagamentos.idempotency_key` passa a ser uma segunda proteção
+  // atômica — o mesmo pagamento não pode nascer duas vezes para a mesma
+  // intenção, nem sob concorrência, nem depois de um retry. Sem operation
+  // key (caminho interno), continua sendo um UUID por chamada.
+  const idempotencyKey = operationKey ? chavePagamento(operationKey) : crypto.randomUUID();
 
   // A condição abaixo continua em cima do BRUTO (soma de pedido_pagamentos
   // PAGO), não do líquido — e isso é seguro porque, se este pedido já
@@ -775,20 +884,61 @@ export async function registerAdminPayment(
             .bind(params.pedidoId, idempotencyKey),
         ]
       : []),
+    // Claim A1 por último e CONDICIONADO ao fato: se o guard de saldo
+    // recusou a escrita do pagamento, a fonte não devolve linha e nenhuma
+    // operação é registrada — nunca sobra um claim apontando para um
+    // pagamento que não existe. Continua atômico: claim e fato estão no
+    // MESMO batch (uma transação), então ou os dois existem ou nenhum.
+    ...(operationKey && identidade
+      ? [
+          prepareClaimOperacao(db, {
+            key: operationKey,
+            ...identidade,
+            fase: "CONCLUIDA",
+            fonte: fontePagamento(idempotencyKey),
+          }),
+        ]
+      : []),
   ];
+
+  // A1 — recuperação da operação vencedora numa disputa pela mesma key.
+  // Duas requisições concorrentes com a mesma key colidem no UNIQUE de
+  // `pedido_pagamentos.idempotency_key` (ou no de `operation_key`); o batch
+  // do perdedor é revertido inteiro e ele relê a vencedora em vez de
+  // devolver um erro que convidaria a criar um segundo fato financeiro.
+  const recuperarVencedora = async (): Promise<RegisterAdminPaymentResult | null> => {
+    if (!operationKey || !identidade) return null;
+    const vencedora = await buscarOperacao(db, operationKey);
+    if (!vencedora) return null;
+    const replay = await replayOperacaoLocal(db, vencedora, identidade, "PAGAMENTO");
+    return replay.ok
+      ? {
+          ok: true,
+          pagamentoId: replay.id,
+          replay: true,
+          statusFinanceiro: replay.statusFinanceiro,
+          saldoCentavos: replay.saldoCentavos,
+        }
+      : { ok: false, erro: replay.erro };
+  };
 
   let batchResults;
   try {
     batchResults = await db.batch(statements);
   } catch {
-    // A condição de saldo falhou na escrita: outra requisição consumiu o
-    // saldo entre nossa leitura e o commit. Nada foi gravado (rollback do
-    // batch inteiro) — não há nada para compensar manualmente.
+    // Pode ser a condição de saldo (outra requisição consumiu o saldo entre
+    // nossa leitura e o commit) ou a disputa da mesma operation key. Nada
+    // foi gravado (rollback do batch inteiro) — não há nada para compensar.
+    // A releitura por key distingue os dois casos de forma determinística.
+    const vencedora = await recuperarVencedora();
+    if (vencedora) return vencedora;
     return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
   }
 
   const pagamentoId = Number(batchResults[0]?.meta?.last_row_id || 0);
   if (!pagamentoId) {
+    const vencedora = await recuperarVencedora();
+    if (vencedora) return vencedora;
     return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
   }
 
@@ -820,13 +970,18 @@ export interface RegisterRefundResult {
   reembolsoId?: number;
   statusFinanceiro?: StatusFinanceiroAgregado;
   saldoCentavos?: number;
+  /** true quando a resposta recuperou uma operação já persistida (A1). */
+  replay?: boolean;
   erro?:
     | "PEDIDO_NAO_ENCONTRADO"
     | "STATUS_PEDIDO_NAO_REEMBOLSAVEL"
     | "PAGAMENTO_NAO_ENCONTRADO"
     | "METODO_NAO_REEMBOLSAVEL_MANUALMENTE"
     | "VALOR_INVALIDO"
-    | "SALDO_REEMBOLSAVEL_INSUFICIENTE";
+    | "SALDO_REEMBOLSAVEL_INSUFICIENTE"
+    | "OPERATION_KEY_INVALIDA"
+    | "OPERACAO_INCOMPLETA"
+    | ConflitoOperacao;
 }
 
 export async function registerManualRefund(
@@ -837,8 +992,50 @@ export async function registerManualRefund(
     valorCentavos: number;
     usuarioId: number;
     motivo?: string;
+    /** A1: ver nota em `registerAdminPayment`. */
+    operationKey?: string | null;
   },
 ): Promise<RegisterRefundResult> {
+  const motivo = (params.motivo ?? "").slice(0, 300);
+
+  // A1 — identidade da intenção de devolver dinheiro. Uma mudança posterior
+  // do saldo reembolsável não pode transformar o retry desta mesma intenção
+  // numa nova devolução.
+  let operationKey: string | null = null;
+  let identidade: IdentidadeEsperada | null = null;
+  if (params.operationKey != null) {
+    const parsed = parseOperationKey(params.operationKey);
+    if (!parsed.ok) return { ok: false, erro: parsed.erro };
+    operationKey = parsed.key;
+    identidade = {
+      tipo: "REFUND_ADMIN",
+      escopo: "ADMIN",
+      atorUsuarioId: params.usuarioId,
+      fingerprint: fingerprint({
+        pedidoId: params.pedidoId,
+        pagamentoId: params.pagamentoId,
+        valorCentavos: params.valorCentavos,
+        motivo,
+      }),
+    };
+
+    // Lookup antes dos guards de estado (status do pedido, método,
+    // saldo reembolsável).
+    const existente = await buscarOperacao(db, operationKey);
+    if (existente) {
+      const replay = await replayOperacaoLocal(db, existente, identidade, "REEMBOLSO");
+      return replay.ok
+        ? {
+            ok: true,
+            reembolsoId: replay.id,
+            replay: true,
+            statusFinanceiro: replay.statusFinanceiro,
+            saldoCentavos: replay.saldoCentavos,
+          }
+        : { ok: false, erro: replay.erro };
+    }
+  }
+
   const pedido = await db
     .prepare(`SELECT status_pedido FROM pedidos WHERE id = ?`)
     .bind(params.pedidoId)
@@ -870,10 +1067,11 @@ export async function registerManualRefund(
     return { ok: false, erro: "VALOR_INVALIDO" };
   }
 
-  const idempotencyKey = crypto.randomUUID();
-  const motivo = (params.motivo ?? "").slice(0, 300);
+  // Derivada da operation key quando existe: o UNIQUE de
+  // `pedido_reembolsos.idempotency_key` garante at-most-once do refund em si.
+  const idempotencyKey = operationKey ? chaveReembolso(operationKey) : crypto.randomUUID();
 
-  const result = await db
+  const insercao = db
     .prepare(
       `INSERT INTO pedido_reembolsos (
          pedido_id, pagamento_id, origem, metodo, valor_centavos, status,
@@ -896,14 +1094,59 @@ export async function registerManualRefund(
       motivo,
       params.valorCentavos,
       params.pagamentoId,
-    )
-    .run();
+    );
+
+  const recuperarVencedora = async (): Promise<RegisterRefundResult | null> => {
+    if (!operationKey || !identidade) return null;
+    const vencedora = await buscarOperacao(db, operationKey);
+    if (!vencedora) return null;
+    const replay = await replayOperacaoLocal(db, vencedora, identidade, "REEMBOLSO");
+    return replay.ok
+      ? {
+          ok: true,
+          reembolsoId: replay.id,
+          replay: true,
+          statusFinanceiro: replay.statusFinanceiro,
+          saldoCentavos: replay.saldoCentavos,
+        }
+      : { ok: false, erro: replay.erro };
+  };
+
+  // Com operation key, o refund e o claim vivem no MESMO batch (atômico).
+  // Sem key, o caminho continua sendo exatamente o `.run()` de uma única
+  // instrução que já existia — nenhuma mudança de comportamento nos
+  // chamadores internos.
+  let result;
+  try {
+    result = operationKey && identidade
+      ? (
+          await db.batch([
+            insercao,
+            prepareClaimOperacao(db, {
+              key: operationKey,
+              ...identidade,
+              fase: "CONCLUIDA",
+              fonte: fonteReembolso(idempotencyKey),
+            }),
+          ])
+        )[0]
+      : await insercao.run();
+  } catch (err) {
+    // Disputa da mesma key (UNIQUE de `idempotency_key` do refund ou de
+    // `operation_key`): o batch do perdedor foi revertido inteiro e ele
+    // recupera a vencedora. Qualquer outra falha continua propagando, como
+    // antes — não é papel deste helper mascarar erro inesperado.
+    const vencedora = await recuperarVencedora();
+    if (vencedora) return vencedora;
+    throw err;
+  }
 
   if (Number(result?.meta?.changes || 0) === 0) {
     // Saldo reembolsável recalculado no momento da escrita não cobriu o
     // valor pedido — outra requisição pode ter consumido o saldo entre
     // nossa leitura e o commit. Determinístico, sem DELETE de compensação
-    // (mesmo padrão do 4d).
+    // (mesmo padrão do 4d). O claim também não foi inserido: sua fonte
+    // depende da existência do refund.
     return { ok: false, erro: "SALDO_REEMBOLSAVEL_INSUFICIENTE" };
   }
 

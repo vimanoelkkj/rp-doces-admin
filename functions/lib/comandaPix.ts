@@ -22,6 +22,22 @@ import {
   type LedgerMetodo,
 } from "./comandaLedger";
 import { liberarReservaPedido } from "./stock";
+import { postPagamentoMp } from "./mpPost";
+import {
+  buscarOperacao,
+  chaveMp,
+  chavePagamento,
+  conflitoOperacao,
+  fingerprint,
+  fontePagamento,
+  parseOperationKey,
+  parseResultado,
+  prepareClaimOperacao,
+  registrarFase,
+  type ConflitoOperacao,
+  type IdentidadeEsperada,
+  type OperacaoRow,
+} from "./operacoes";
 
 interface Env {
   DB: D1Database;
@@ -49,6 +65,11 @@ export interface GerarPixAdminParams {
   usuarioId: number;
   /** Regeneração: id do Pix administrativo sendo substituído. `undefined`/`null` = geração normal. */
   substituiId?: number | null;
+  /**
+   * A1: identidade lógica da intenção (gerar ou regenerar), criada pelo
+   * cliente antes do primeiro envio. Obrigatória no endpoint HTTP.
+   */
+  operationKey?: string | null;
 }
 
 export interface GerarPixAdminSucesso {
@@ -61,6 +82,8 @@ export interface GerarPixAdminSucesso {
   qrCodeBase64: string | null;
   ticketUrl: string | null;
   expiresAt: string | null;
+  /** true quando a resposta recuperou uma operação já persistida (A1). */
+  replay?: boolean;
 }
 
 export interface GerarPixAdminFalha {
@@ -74,7 +97,11 @@ export interface GerarPixAdminFalha {
     | "PIX_PARA_SUBSTITUIR_INVALIDO"
     | "ESTOQUE_INSUFICIENTE"
     | "MERCADO_PAGO_RECUSOU"
-    | "MERCADO_PAGO_INDISPONIVEL";
+    | "MERCADO_PAGO_INDISPONIVEL"
+    | "OPERATION_KEY_INVALIDA"
+    | "OPERACAO_INCOMPLETA"
+    | "OPERACAO_EM_PROCESSAMENTO"
+    | ConflitoOperacao;
 }
 
 export type GerarPixAdminResult = GerarPixAdminSucesso | GerarPixAdminFalha;
@@ -185,11 +212,99 @@ export async function getPixAdminPendentesAtivos(
   }));
 }
 
+// A1 — replay de uma operação de Pix administrativo. Nunca faz outro POST,
+// nunca cria outra tentativa, nunca mexe na reserva.
+async function replayPixAdmin(
+  db: D1Database,
+  operacao: OperacaoRow,
+  identidade: IdentidadeEsperada,
+): Promise<GerarPixAdminResult> {
+  const conflito = conflitoOperacao(operacao, identidade);
+  if (conflito) return { ok: false, erro: conflito };
+
+  // Recusa comprovada do Mercado Pago é terminal para esta key.
+  if (operacao.fase === "RECUSADA") return { ok: false, erro: "MERCADO_PAGO_RECUSOU" };
+
+  const snapshot = parseResultado<GerarPixAdminSucesso>(operacao);
+  if (snapshot) return { ...snapshot, ok: true, replay: true };
+
+  const pagamento = operacao.pagamento_id
+    ? await db
+        .prepare(
+          `SELECT id, valor_centavos, mp_payment_id, mp_status, mp_qr_code,
+                  mp_qr_code_base64, mp_ticket_url, pix_expira_em
+           FROM pedido_pagamentos WHERE id = ? LIMIT 1`,
+        )
+        .bind(operacao.pagamento_id)
+        .first<{
+          id: number;
+          valor_centavos: number;
+          mp_payment_id: string | null;
+          mp_status: string | null;
+          mp_qr_code: string | null;
+          mp_qr_code_base64: string | null;
+          mp_ticket_url: string | null;
+          pix_expira_em: string | null;
+        }>()
+    : null;
+
+  if (!pagamento) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
+
+  if (pagamento.mp_payment_id) {
+    return {
+      ok: true,
+      replay: true,
+      pagamentoId: pagamento.id,
+      valorCentavos: pagamento.valor_centavos,
+      mpPaymentId: pagamento.mp_payment_id,
+      mpStatus: pagamento.mp_status ?? "pending",
+      qrCode: pagamento.mp_qr_code,
+      qrCodeBase64: pagamento.mp_qr_code_base64,
+      ticketUrl: pagamento.mp_ticket_url,
+      expiresAt: pagamento.pix_expira_em,
+    };
+  }
+
+  // Tentativa local existe, recurso remoto não é conhecido: a operação
+  // continua a MESMA, inconclusiva. Sem reenvio automático, sem nova key,
+  // sem inventar sucesso/rejeição e sem tocar na reserva do pedido (B4).
+  return { ok: false, erro: "OPERACAO_EM_PROCESSAMENTO" };
+}
+
 export async function createAdminPixCharge(
   env: Env,
   params: GerarPixAdminParams,
 ): Promise<GerarPixAdminResult> {
   const db = env.DB;
+
+  // A1 — identidade da intenção, antes de qualquer guard de estado.
+  // Regeneração é uma operação PRÓPRIA (tipo distinto): uma nova
+  // regeneração iniciada explicitamente pelo usuário recebe uma key nova; o
+  // retry da mesma regeneração recupera o MESMO sucessor, mesmo que ele
+  // já tenha expirado depois.
+  let operationKey: string | null = null;
+  let identidade: IdentidadeEsperada | null = null;
+  if (params.operationKey != null) {
+    const parsed = parseOperationKey(params.operationKey);
+    if (!parsed.ok) return { ok: false, erro: parsed.erro };
+    operationKey = parsed.key;
+    identidade = {
+      tipo: params.substituiId == null ? "PIX_ADMIN" : "PIX_ADMIN_REGENERACAO",
+      escopo: "ADMIN",
+      atorUsuarioId: params.usuarioId,
+      // `valorCentavos` ausente = "modo automático" (capacidade cheia). O
+      // valor resolvido é congelado no pagamento persistido, então o retry
+      // NÃO recalcula uma cobrança diferente porque a capacidade mudou.
+      fingerprint: fingerprint({
+        pedidoId: params.pedidoId,
+        valorCentavos: params.valorCentavos ?? null,
+        substituiId: params.substituiId ?? null,
+      }),
+    };
+
+    const existente = await buscarOperacao(db, operationKey);
+    if (existente) return await replayPixAdmin(db, existente, identidade);
+  }
 
   const pedido = await db
     .prepare(
@@ -263,8 +378,31 @@ export async function createAdminPixCharge(
   const podeAdquirirReserva = `reserva_status IN ('SEM_RESERVA', 'LIBERADA') AND estoque_baixado_em IS NULL
     AND NOT EXISTS (SELECT 1 FROM pedido_itens pi WHERE pi.pedido_id = pedidos.id AND pi.estoque_baixado_em IS NOT NULL)`;
 
-  const idempotencyKey = crypto.randomUUID();
+  // A1: derivada da operation key quando existe — o UNIQUE parcial de
+  // `pedido_pagamentos.idempotency_key` garante at-most-once da tentativa.
+  const idempotencyKey = operationKey ? chavePagamento(operationKey) : crypto.randomUUID();
   const externalReference = idempotencyKey; // trava 2: identidade inequívoca por tentativa, nunca token_publico
+  // Key MP estável por operação lógica: timeout, 5xx ou resposta local
+  // perdida NUNCA geram uma key nova (era a causa de um segundo POST lógico
+  // com outra identidade).
+  const mpIdempotencyKey = operationKey ? chaveMp(operationKey) : idempotencyKey;
+
+  const whatsappDigits = pedido.cliente_whatsapp.replace(/\D/g, "") || "cliente";
+  const payerEmail = `${whatsappDigits}@checkout.rpdoces.com.br`;
+  const expiresAtEstimado = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000).toISOString();
+
+  // Conteúdo original do POST, persistido junto com o claim (antes do
+  // envio): preserva valor resolvido, expiração, referência externa e dados
+  // do pagador necessários para que a MESMA operação possa ser reconhecida
+  // com segurança depois de um resultado ambíguo.
+  const mpRequest = {
+    transaction_amount: valorCentavos / 100,
+    description: "Pedido R&P Doces",
+    payment_method_id: "pix",
+    date_of_expiration: expiresAtEstimado,
+    external_reference: externalReference,
+    payer: { email: payerEmail, first_name: pedido.cliente_nome.slice(0, MAX_TEXT_LENGTH) },
+  };
 
   // Ordem importa: os incrementos de estoque_reservado (se houver) e o
   // flip de reserva_status precisam rodar ANTES do INSERT do pagamento,
@@ -338,12 +476,34 @@ export async function createAdminPixCharge(
         )
         .bind(idempotencyKey, a.itemId, a.valorCentavos),
     ),
+    // Claim A1 por último e condicionado à tentativa recém-criada: se o CAS
+    // de capacidade/substituição recusou, nada é registrado. Mesmo batch,
+    // mesma transação: claim, reserva, pagamento e alocações são atômicos.
+    ...(operationKey && identidade
+      ? [
+          prepareClaimOperacao(db, {
+            key: operationKey,
+            ...identidade,
+            fase: "LOCAL_CRIADA",
+            mpIdempotencyKey,
+            mpRequest: JSON.stringify(mpRequest),
+            fonte: fontePagamento(idempotencyKey),
+          }),
+        ]
+      : []),
   ];
 
   let batchResults;
   try {
     batchResults = await db.batch(statements);
   } catch (err) {
+    // Disputa da mesma key: o batch do perdedor foi revertido inteiro
+    // (nenhuma reserva, nenhuma tentativa, nenhum POST) e ele recupera a
+    // operação vencedora em vez de criar um segundo Pix.
+    if (operationKey && identidade) {
+      const vencedora = await buscarOperacao(db, operationKey);
+      if (vencedora) return await replayPixAdmin(db, vencedora, identidade);
+    }
     if (String((err as Error)?.message || "").includes("CHECK")) {
       return { ok: false, erro: "ESTOQUE_INSUFICIENTE" };
     }
@@ -371,42 +531,32 @@ export async function createAdminPixCharge(
   const reservaCriadaPorEstaOperacao =
     Number(batchResults[reservaFlipIndex]?.meta?.changes || 0) === 1;
 
-  const whatsappDigits = pedido.cliente_whatsapp.replace(/\D/g, "") || "cliente";
-  const payerEmail = `${whatsappDigits}@checkout.rpdoces.com.br`;
-  const expiresAtEstimado = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000).toISOString();
+  const envio = await postPagamentoMp(env.MP_ACCESS_TOKEN, mpIdempotencyKey, mpRequest);
 
-  let mpResponse: Response;
-  try {
-    mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
-        "X-Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify({
-        transaction_amount: valorCentavos / 100,
-        description: "Pedido R&P Doces",
-        payment_method_id: "pix",
-        date_of_expiration: expiresAtEstimado,
-        external_reference: externalReference,
-        payer: { email: payerEmail, first_name: pedido.cliente_nome.slice(0, MAX_TEXT_LENGTH) },
-      }),
+  if (envio.resultado === "AMBIGUO") {
+    // Resultado AMBÍGUO (transporte, timeout, 5xx/408/429, corpo ilegível):
+    // não sabemos se o MP chegou a criar a cobrança. Ledger fica PENDENTE
+    // (não FALHOU) e a reserva NÃO é tocada — marcar qualquer um dos dois
+    // aqui seria mentira. Antes do A1, um 5xx caía no mesmo caminho da
+    // recusa comprovada. Reconciliação (webhook ou oportunista) resolve
+    // depois; um retry com a MESMA key recupera esta operação.
+    console.error("Resultado ambíguo ao criar Pix administrativo", {
+      pedidoId: params.pedidoId,
+      motivo: envio.motivo,
+      httpStatus: envio.httpStatus,
     });
-  } catch (err) {
-    // Transporte nunca resolveu — resultado AMBÍGUO, não sabemos se o MP
-    // chegou a criar a cobrança. Ledger fica PENDENTE (não FALHOU) e a
-    // reserva (se criada agora) NÃO é tocada: marcar qualquer um dos dois
-    // aqui seria mentira. Reconciliação (webhook ou oportunista) resolve
-    // depois, do mesmo jeito que o checkout do site já lida com isso.
-    console.error("Erro de transporte ao chamar o Mercado Pago (Pix administrativo)", err);
+    if (operationKey) {
+      await registrarFase(db, operationKey, {
+        fase: "ENVIO_INCONCLUSIVO",
+        erro: `AMBIGUO:${envio.motivo}`,
+      });
+    }
     return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
   }
 
-  if (!mpResponse.ok) {
-    // Rejeição definitiva e conhecida (não ambígua).
-    const errorBody = await mpResponse.text();
-    console.error("Mercado Pago recusou Pix administrativo", mpResponse.status, errorBody);
+  if (envio.resultado === "RECUSA_DEFINITIVA") {
+    // Rejeição COMPROVADAMENTE definitiva.
+    console.error("Mercado Pago recusou Pix administrativo", envio.httpStatus, envio.mensagem);
 
     await db
       .prepare(
@@ -422,26 +572,45 @@ export async function createAdminPixCharge(
       await liberarReservaPedido(db, params.pedidoId);
     }
 
+    if (operationKey) {
+      await registrarFase(db, operationKey, {
+        fase: "RECUSADA",
+        erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`,
+      });
+    }
+
     return { ok: false, erro: "MERCADO_PAGO_RECUSOU" };
   }
 
-  const payment = (await mpResponse.json()) as {
-    id: number;
-    status: string;
-    date_of_expiration: string | null;
-    point_of_interaction?: {
-      transaction_data?: {
-        qr_code?: string;
-        qr_code_base64?: string;
-        ticket_url?: string;
-      };
-    };
-  };
+  const payment = envio.payment;
   const txData = payment.point_of_interaction?.transaction_data;
 
   const reservaExpiraEmSincronizada = payment.date_of_expiration
     ? new Date(Date.parse(payment.date_of_expiration) + 60_000).toISOString()
     : null;
+
+  const sucesso: GerarPixAdminSucesso = {
+    ok: true,
+    pagamentoId,
+    valorCentavos,
+    mpPaymentId: String(payment.id),
+    mpStatus: payment.status,
+    qrCode: txData?.qr_code ?? null,
+    qrCodeBase64: txData?.qr_code_base64 ?? null,
+    ticketUrl: txData?.ticket_url ?? null,
+    expiresAt: payment.date_of_expiration,
+  };
+
+  // Identidade remota e resultado registrados ANTES da gravação local: se
+  // ela falhar, um retry com a mesma key recupera este resultado em vez de
+  // fazer outro POST com outra identidade.
+  if (operationKey) {
+    await registrarFase(db, operationKey, {
+      fase: "REMOTO_CONHECIDO",
+      mpPaymentId: String(payment.id),
+      resultado: JSON.stringify(sucesso),
+    });
+  }
 
   const statementsPosSucesso = [
     db
@@ -477,15 +646,9 @@ export async function createAdminPixCharge(
   }
   await db.batch(statementsPosSucesso);
 
-  return {
-    ok: true,
-    pagamentoId,
-    valorCentavos,
-    mpPaymentId: String(payment.id),
-    mpStatus: payment.status,
-    qrCode: txData?.qr_code ?? null,
-    qrCodeBase64: txData?.qr_code_base64 ?? null,
-    ticketUrl: txData?.ticket_url ?? null,
-    expiresAt: payment.date_of_expiration,
-  };
+  if (operationKey) {
+    await registrarFase(db, operationKey, { fase: "CONCLUIDA" });
+  }
+
+  return sucesso;
 }

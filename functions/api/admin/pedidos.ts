@@ -7,6 +7,20 @@ import { reconcilePedidosDivergentes } from "../../lib/pedidoReconcile";
 import { precoAtualCentavos, ProdutoRow } from "../../lib/pricing";
 import { getFinanceirosPorPedidos } from "../../lib/comandaLedger";
 import type { FinanceiroPedido, LedgerMetodo } from "../../lib/comandaLedger";
+import {
+  buscarOperacao,
+  chavePagamento,
+  chavePedido,
+  conflitoOperacao,
+  fingerprint,
+  fontePedidoComPagamento,
+  OPERACAO_HTTP_STATUS,
+  OPERACAO_MENSAGENS,
+  parseOperationKey,
+  prepareClaimOperacao,
+  type IdentidadeEsperada,
+  type OperacaoRow,
+} from "../../lib/operacoes";
 
 interface Env {
   DB: D1Database;
@@ -42,8 +56,8 @@ const TAB_FILTERS: Record<string, string> = {
   entregues: "AND status_pedido = 'ENTREGUE'",
 };
 
-function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+function jsonError(message: string, status: number, code?: string) {
+  return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -176,6 +190,7 @@ interface CriarPedidoManualBody {
   observacao?: string;
   metodoPagamento?: string;
   statusPagamento?: string;
+  operationKey?: string;
 }
 
 interface ProdutoManualRow extends ProdutoRow {
@@ -258,6 +273,69 @@ function validarMetodoEStatus(
   return { ok: true, metodo: metodo as LedgerMetodo, status: status as "PENDENTE" | "PAGO" };
 }
 
+// A1 — replay da criação de pedido ADMIN. Reconstruído a partir das linhas
+// persistidas (fonte da verdade), nunca de um snapshot que poderia divergir.
+// A baixa física é retentada porque `baixarEstoquePedido` é idempotente por
+// pedido (guarda em `estoque_baixado_em IS NULL`): o retry RECUPERA uma baixa
+// que tenha falhado, e nunca produz uma segunda.
+async function replayPedidoManual(
+  env: Env,
+  operacao: OperacaoRow,
+  identidade: IdentidadeEsperada,
+  statusPagamento: "PENDENTE" | "PAGO",
+): Promise<Response> {
+  const conflito = conflitoOperacao(operacao, identidade);
+  if (conflito) {
+    return jsonError(OPERACAO_MENSAGENS[conflito], OPERACAO_HTTP_STATUS[conflito], conflito);
+  }
+
+  const pedido = operacao.pedido_id
+    ? await env.DB.prepare(
+        `SELECT id, token_publico, valor_total_centavos, estoque_baixado_em
+         FROM pedidos WHERE id = ? LIMIT 1`,
+      )
+        .bind(operacao.pedido_id)
+        .first<{
+          id: number;
+          token_publico: string;
+          valor_total_centavos: number;
+          estoque_baixado_em: string | null;
+        }>()
+    : null;
+
+  if (!pedido || !operacao.pagamento_id) {
+    return jsonError(
+      OPERACAO_MENSAGENS.OPERACAO_INCOMPLETA,
+      OPERACAO_HTTP_STATUS.OPERACAO_INCOMPLETA,
+      "OPERACAO_INCOMPLETA",
+    );
+  }
+
+  let estoqueBaixado = pedido.estoque_baixado_em !== null;
+  if (statusPagamento === "PAGO" && !estoqueBaixado) {
+    try {
+      const baixa = await baixarEstoquePedido(env.DB, pedido.id);
+      estoqueBaixado = baixa.ok && baixa.baixado;
+    } catch (err) {
+      console.error("Falha ao retentar baixa de estoque em replay de pedido manual", pedido.id, err);
+    }
+  }
+
+  return Response.json(
+    {
+      ok: true,
+      pedidoId: pedido.id,
+      pagamentoId: operacao.pagamento_id,
+      tokenPublico: pedido.token_publico,
+      valorTotalCentavos: pedido.valor_total_centavos,
+      statusPagamento,
+      estoqueBaixado,
+      replay: true,
+    },
+    { status: 201 },
+  );
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
@@ -280,6 +358,47 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const clienteNome = (body.clienteNome ?? "").trim().slice(0, MAX_TEXT_LENGTH_MANUAL);
   const clienteWhatsapp = (body.clienteWhatsapp ?? "").trim().slice(0, MAX_TEXT_LENGTH_MANUAL);
   const observacao = (body.observacao ?? "").trim().slice(0, MAX_TEXT_LENGTH_MANUAL);
+
+  // A1: identidade da intenção de criar esta venda, obrigatória. Um retry de
+  // um pedido que nasce PAGO criaria outro pedido pago E outra baixa física
+  // de estoque — nem o limite financeiro do pedido anterior protege contra
+  // isso, porque o pedido é outro.
+  const chave = parseOperationKey(body.operationKey);
+  if (!chave.ok) {
+    return jsonError(OPERACAO_MENSAGENS.OPERATION_KEY_INVALIDA, 400, chave.erro);
+  }
+  const operationKey = chave.key;
+  const identidade: IdentidadeEsperada = {
+    tipo: "PEDIDO_ADMIN",
+    escopo: "ADMIN",
+    atorUsuarioId: auth.user.id,
+    // Itens normalizados e ordenados: a mesma intenção montada em outra
+    // ordem na tela continua sendo a mesma intenção. Preços NÃO entram —
+    // são resolvidos pelo servidor e congelados no pedido persistido.
+    fingerprint: fingerprint({
+      itens: [...itensResult.itens]
+        .sort((a, b) => a.produtoId - b.produtoId)
+        .map((i) => [i.produtoId, i.quantidade]),
+      clienteNome,
+      clienteWhatsapp,
+      observacao,
+      metodoPagamento,
+      statusPagamento,
+    }),
+  };
+
+  try {
+    // Lookup ANTES dos guards de catálogo/estoque: um retry cujo resultado
+    // HTTP se perdeu precisa recuperar o pedido original mesmo que o estoque
+    // já não permita criar um pedido igual agora.
+    const existente = await buscarOperacao(env.DB, operationKey);
+    if (existente) {
+      return await replayPedidoManual(env, existente, identidade, statusPagamento);
+    }
+  } catch (err) {
+    console.error("Erro ao recuperar operação de criação de pedido (admin)", err);
+    return jsonError("Erro interno ao criar pedido", 500);
+  }
 
   try {
     const ids = [...new Set(itensResult.itens.map((i) => i.produtoId))];
@@ -327,8 +446,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       });
     }
 
+    // `token_publico` continua ALEATÓRIO de propósito: é o identificador
+    // público de acompanhamento do pedido e não pode ser derivado de uma key
+    // conhecida pelo operador. A idempotência não precisa dele — as chaves
+    // derivadas abaixo já tornam a criação at-most-once, e num retry o
+    // pedido não é recriado (o replay devolve o token persistido).
     const tokenPublico = crypto.randomUUID();
-    const idempotencyKey = crypto.randomUUID();
+    // A1: derivadas da operation key. `pedidos.idempotency_key` é NOT NULL
+    // UNIQUE, então a criação do pedido é atomicamente at-most-once por
+    // intenção — inclusive sob concorrência e inclusive quando ele nasce PAGO.
+    const idempotencyKeyPedido = chavePedido(operationKey);
+    const idempotencyKey = chavePagamento(operationKey);
 
     const statements = [
       env.DB.prepare(
@@ -342,7 +470,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         clienteWhatsapp,
         observacao,
         totalCentavos,
-        idempotencyKey,
+        idempotencyKeyPedido,
         statusPagamento,
         nascePago ? 1 : 0,
       ),
@@ -391,12 +519,30 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
            WHERE id = ?`,
         ).bind(item.quantidade, item.produtoId),
       ),
+      // Claim A1 por último e condicionado à existência do pedido E do
+      // pagamento recém-criados. Tudo no mesmo batch: ou a intenção fica
+      // registrada junto com o pedido, os itens, o pagamento, as alocações e
+      // a reserva, ou nada existe.
+      prepareClaimOperacao(env.DB, {
+        key: operationKey,
+        ...identidade,
+        fase: "CONCLUIDA",
+        fonte: fontePedidoComPagamento(idempotencyKeyPedido, idempotencyKey),
+      }),
     ];
 
     let batchResults;
     try {
       batchResults = await env.DB.batch(statements);
     } catch (err) {
+      // A disputa da mesma operation key (UNIQUE de
+      // `pedidos.idempotency_key` ou de `operation_key`) reverte o batch
+      // inteiro do perdedor, que então recupera a operação vencedora em vez
+      // de criar um segundo pedido.
+      const vencedora = await buscarOperacao(env.DB, operationKey);
+      if (vencedora) {
+        return await replayPedidoManual(env, vencedora, identidade, statusPagamento);
+      }
       if (String((err as Error)?.message || "").includes("CHECK")) {
         return jsonError("Um ou mais produtos não possuem estoque suficiente disponível.", 409);
       }
