@@ -56,7 +56,7 @@ interface PagamentoRow {
 
 // Núcleo compartilhado: aplica (ou recusa) uma transição já mapeada, com
 // CAS contra o status lido (evita pisar em uma mudança concorrente) e
-// recalcula o agregado só quando a transição realmente aconteceu.
+// reconcilia o pedido mesmo quando a transição já aconteceu antes.
 // `mpStatusRaw`/`mpStatusDetail` são gravados para diagnóstico mesmo
 // quando a transição do ledger é recusada pela matriz (permite auditar
 // "o MP mandou X, mas não aplicamos porque Y" sem perder o dado bruto).
@@ -84,6 +84,12 @@ async function applyLedgerTransition(
   }
 
   if (!isTransitionAllowed(atual.status, novoStatus)) {
+    await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
+    return { ok: true, status: atual.status, transicionou: false };
+  }
+
+  if (atual.status === novoStatus) {
+    await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
     return { ok: true, status: atual.status, transicionou: false };
   }
 
@@ -103,6 +109,7 @@ async function applyLedgerTransition(
   if (!aplicou) {
     // Estado já era o mesmo (no-op) ou perdeu a corrida do CAS para outro
     // chamador concorrente — recarrega o estado real antes de responder.
+    await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
     const pos = await db
       .prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
       .bind(pagamentoId)
@@ -111,6 +118,7 @@ async function applyLedgerTransition(
   }
 
   const transicionou = atual.status !== novoStatus;
+  await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
   if (transicionou) {
     // Passo 7: reconcilia o agregado e, se ele fechar em PAGO, converte a
     // reserva em baixa física (pedidoReconcile.ts). Para EXPIRADO/CANCELADO,
@@ -118,7 +126,6 @@ async function applyLedgerTransition(
     // ainda estiver genuinamente PENDENTE (guard no próprio write), nunca
     // se um pedido PARCIAL tiver essa tentativa vindo de uma perna Pix
     // morta: dívida operacional conhecida, não resolvida aqui.
-    await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
     if (novoStatus === "CANCELADO" || novoStatus === "EXPIRADO") {
       await liberarReservaPedido(db, atual.pedido_id);
     }
@@ -146,9 +153,10 @@ export async function syncPaymentFromMp(
       .bind(mp.status, mp.statusDetail ?? null, pagamentoId)
       .run();
     const atual = await db
-      .prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
+      .prepare(`SELECT status, pedido_id FROM pedido_pagamentos WHERE id = ?`)
       .bind(pagamentoId)
-      .first<{ status: LedgerStatus }>();
+      .first<{ status: LedgerStatus; pedido_id: number }>();
+    if (atual) await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
     return { ok: true, status: atual?.status ?? null, transicionou: false };
   }
 

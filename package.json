@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test": "node --test tests/b3.test.mjs",
     "preview": "vite preview",
     "pages:dev": "wrangler pages dev dist",
     "db:migrate:local": "wrangler d1 migrations apply rp-doces-db --local",

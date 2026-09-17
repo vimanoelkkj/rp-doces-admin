@@ -1,9 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
+
 // Passo 7: efeitos físicos de estoque (reserva/baixa/liberação). Este
 // módulo não sabe nada sobre múltiplos pagamentos, waterfall ou o
-// agregado financeiro — só reage a `pedidos.status_pagamento` já
-// resolvido. Quem decide QUANDO chamar isso é `pedidoReconcile.ts`
+// agregado financeiro — reaproveita a instrução SQL de projeção para
+// revalidá-la na transação física. Quem decide QUANDO chamar é `pedidoReconcile.ts`
 // (baixa, a partir de qualquer mudança financeira) e os pontos de
 // transição de pagamento individual / cancelamento (liberação).
 //
@@ -20,7 +22,7 @@ export type BaixaResultado =
   | {
       ok: false;
       baixado: false;
-      erro: "ITENS_NAO_ENCONTRADOS" | "ESTOQUE_INSUFICIENTE";
+      erro: "ITENS_NAO_ENCONTRADOS" | "ESTOQUE_INSUFICIENTE" | "ESTADO_ESTOQUE_INCONSISTENTE";
     };
 
 export type LiberacaoResultado =
@@ -44,12 +46,27 @@ interface ItemPedidoRow {
 // obsoleto no instante da escrita.
 export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Promise<BaixaResultado> {
   const pedido = await db
-    .prepare(`SELECT status_pagamento, estoque_baixado_em FROM pedidos WHERE id = ? LIMIT 1`)
+    .prepare(`SELECT status_pagamento, estoque_baixado_em, reserva_status FROM pedidos WHERE id = ? LIMIT 1`)
     .bind(pedidoId)
-    .first<{ status_pagamento: string; estoque_baixado_em: string | null }>();
+    .first<{ status_pagamento: string; estoque_baixado_em: string | null; reserva_status: string }>();
 
   if (!pedido || pedido.status_pagamento !== "PAGO" || pedido.estoque_baixado_em) {
     return { ok: true, baixado: false };
+  }
+
+  if (pedido.reserva_status === "CONVERTIDA") {
+    return { ok: false, baixado: false, erro: "ESTADO_ESTOQUE_INCONSISTENTE" };
+  }
+  const itemJaBaixado = await db.prepare(
+    `SELECT id FROM pedido_itens WHERE pedido_id = ? AND estoque_baixado_em IS NOT NULL LIMIT 1`,
+  ).bind(pedidoId).first();
+  if (itemJaBaixado) {
+    // Outra baixa completa pode ter terminado entre as leituras acima.
+    const concluido = await db.prepare(`SELECT estoque_baixado_em FROM pedidos WHERE id = ?`)
+      .bind(pedidoId).first<{ estoque_baixado_em: string | null }>();
+    return concluido?.estoque_baixado_em
+      ? { ok: true, baixado: false }
+      : { ok: false, baixado: false, erro: "ESTADO_ESTOQUE_INCONSISTENTE" };
   }
 
   const { results } = await db
@@ -62,9 +79,17 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
     .all<ItemPedidoRow>();
 
   const itens = results || [];
-  if (!itens.length) return { ok: false, baixado: false, erro: "ITENS_NAO_ENCONTRADOS" };
+  if (!itens.length) {
+    const concluido = await db.prepare(`SELECT estoque_baixado_em FROM pedidos WHERE id = ?`)
+      .bind(pedidoId).first<{ estoque_baixado_em: string | null }>();
+    return concluido?.estoque_baixado_em
+      ? { ok: true, baixado: false }
+      : { ok: false, baixado: false, erro: "ITENS_NAO_ENCONTRADOS" };
+  }
 
-  const statements = [];
+  // Reavalia o líquido na MESMA transação da baixa. Um refund registrado
+  // depois da projeção anterior impede a baixa, mesmo antes de ser projetado.
+  const statements = [preparePedidoFinancialProjection(db, pedidoId)];
 
   for (const item of itens) {
     if (!item.produto_id) continue; // item avulso sem produto vinculado: nada físico a baixar
@@ -89,6 +114,9 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
            WHERE id = ?
              AND EXISTS (
                SELECT 1 FROM pedidos WHERE id = ? AND status_pagamento = 'PAGO' AND estoque_baixado_em IS NULL
+             )
+             AND EXISTS (
+               SELECT 1 FROM pedido_itens WHERE id = ? AND pedido_id = ? AND estoque_baixado_em IS NULL
              )`,
         )
         .bind(
@@ -99,6 +127,8 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
           pedidoId,
           item.quantidade,
           item.produto_id,
+          pedidoId,
+          item.id,
           pedidoId,
         ),
     );
@@ -141,7 +171,10 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
     // detectável, não silencioso — e a reconciliação oportunista do admin
     // tenta de novo nas próximas cargas do painel.
     console.error("Falha ao converter reserva em baixa de estoque", pedidoId, err);
-    return { ok: false, baixado: false, erro: "ESTOQUE_INSUFICIENTE" };
+    if (String((err as Error)?.message || "").includes("CHECK constraint failed: estoque")) {
+      return { ok: false, baixado: false, erro: "ESTOQUE_INSUFICIENTE" };
+    }
+    throw err; // Falha transitória/inesperada deve ser visível ao chamador/retry.
   }
 }
 
@@ -208,38 +241,4 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
     console.error("Falha ao liberar reserva de estoque", pedidoId, err);
     return { ok: false, liberado: false, erro: "ERRO_TRANSACIONAL_LIBERACAO" };
   }
-}
-
-const RECONCILIAR_PAGOS_SEM_BAIXA_BATCH_SIZE = 4;
-
-// Passo 7: gêmea de `reconcilePendingPixPayments`/`liberarReservasVencidasLocalmente`
-// (Passo 6/7), chamada oportunisticamente por GET /api/admin/pedidos. Cobre
-// o caso documentado no relatório do Passo 7: um pedido PAGO cuja reserva
-// já tinha sido liberada por uma expiração concorrente pode ficar
-// temporariamente com estoque_baixado_em NULL se o estoque físico não
-// comportava a conversão naquele instante — nunca silencioso, sempre
-// retentado aqui até o estoque permitir ou alguém resolver manualmente.
-export async function reconciliarPagosSemBaixa(db: D1Database): Promise<void> {
-  const { results } = await db
-    .prepare(
-      `SELECT id FROM pedidos
-       WHERE status_pagamento = 'PAGO' AND estoque_baixado_em IS NULL
-       ORDER BY atualizado_em ASC
-       LIMIT ?`,
-    )
-    .bind(RECONCILIAR_PAGOS_SEM_BAIXA_BATCH_SIZE)
-    .all<{ id: number }>();
-
-  const pendentes = results || [];
-  if (!pendentes.length) return;
-
-  await Promise.allSettled(
-    pendentes.map(async (row) => {
-      try {
-        await baixarEstoquePedido(db, row.id);
-      } catch (err) {
-        console.error("Falha ao reconciliar pedido pago sem baixa de estoque", row.id, err);
-      }
-    }),
-  );
 }
