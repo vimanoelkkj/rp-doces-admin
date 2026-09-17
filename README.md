@@ -186,6 +186,18 @@ No SITE, timer zero ou resposta `EXPIRADO` mantém mensagem inconclusiva e polli
 
 `npm test` roda as suítes B2/B3 com `node:test`. O cenário de timer/effects/navegação monta os componentes reais com React DOM e `jsdom` (somente devDependency), pois o harness financeiro não possuía DOM e testes de helpers/SSR não exercitariam essa corrida. A verificação visual em navegador é separada desses testes de comportamento.
 
+## B4 — Reserva por pedido com múltiplos Pix
+
+`liberarReservaPedido` revalida a projeção financeira no mesmo batch dos decrementos e do flip para `LIBERADA`. Todos usam o mesmo predicado: reserva `ATIVA`, ausência de marcas de baixa no pedido/itens, líquido zero (`PENDENTE`) e nenhum `PIX_MP/PENDENTE` do pedido. A retenção inclui SITE/ADMIN, substituídos, sucessores, Pix aditivos, tentativas sem ID remoto/QR e prazo vencido ainda não terminalizado no ledger. Placeholders locais não-PIX_MP não contam. `PARCIAL` continua retendo reserva; refund não repõe estoque.
+
+Geração/regeneração ADMIN sempre prepara a aquisição condicional no batch: uma leitura anterior de `ATIVA` não permite criar Pix sem reserva caso uma liberação vença a corrida. Readquisição ocorre uma única vez, sujeita às constraints de estoque, junto com pagamento/alocações; falta de estoque reverte tudo antes do POST MP. Reserva ativa não tem incremento/TTL duplicado e reserva convertida ou estoque baixado não são reabertos. Guards de capacidade/substituição permanecem. Escritas de `FALHOU` por recusa de POST SITE/ADMIN agora exigem `PENDENTE`, preservando terminalizações concorrentes.
+
+`paymentSync` finaliza a tentativa pelo estado persistido após reconciliar. `PIX_MP/CANCELADO` e `PIX_MP/EXPIRADO` repetem a tentativa de liberação mesmo em igualdade de estado ou CAS perdido; falha transacional deixa log e é propagada para permitir retry. A matriz/autoridade B2 e a reconciliação genérica B3 não mudaram. Cancelamento operacional não terminaliza cobranças Pix e também respeita a retenção por Pix pendente.
+
+**Limites deliberados, demonstrados em testes:** não foi criado sweep de liberações. Se houver interrupção após gravar `CANCELADO` e antes de liberar, o B3 não encontra divergência financeira e o sweep financeiro não seleciona `CANCELADO`; polling público retorna cedo nesse estado. A reserva pode ficar presa sem novo webhook/retry explícito. `EXPIRADO` com ID remoto pode ser retentado pelo sweep financeiro existente; sem ID remoto, também pode permanecer preso até retry explícito (o sweep local só seleciona `PENDENTE`). Repetir a finalização recupera ambos sem novo pagamento. Compensação ADMIN por `FALHOU` continua restrita à operação que adquiriu a reserva: se A adquiriu, B compartilhou, A falhou enquanto B estava pendente e depois B também falhou, a reserva pode permanecer ativa. Cadeias somente `FALHOU` continuam dívida separada.
+
+Regressões em `tests/b4.test.mjs`: A–H, concorrência com hooks/barreiras determinísticos, rollback, criação versus liberação, POST tardio, compensação, retries e limites de recuperação. O teste antigo que fixava a política B4 defeituosa foi alterado deliberadamente; a garantia de que o reconciliador genérico nunca libera foi preservada como teste separado.
+
 ## O que falta
 
 Ordem sugerida (não travada — pode mudar por decisão):
@@ -203,7 +215,7 @@ Ordem sugerida (não travada — pode mudar por decisão):
 - **`PARCIAL` + Pix expirado**: reserva de estoque fica presa até ação manual (Passo 7, decisão consciente) — vale também para Pix administrativo (Passo 9), política mantida idêntica, não redesenhada.
 - **Imports circulares** (`comandaLedger.ts` ↔ `pedidoReconcile.ts`, `paymentSync.ts` ↔ `stock.ts`): funcionam (confirmado no bundler do wrangler, não só no `tsc`), mas são dívida arquitetural — quebrar via módulo-folha compartilhado se crescerem.
 - **Overpayment de Pix administrativo substituído** (Passo 9): se um Pix "substituído" for pago de verdade no MP depois do substituto já ter confirmado, o ledger soma sem cap — dinheiro real excedente sem representação de crédito. Documentado, não construído.
-- **Expiração local de reservas (`liberarReservasVencidasLocalmente`) só cobre `origem='SITE'`** — a varredura financeira `reconcilePendingPixPayments` já consulta SITE e ADMIN, inclusive expirados após B2. O botão "Atualizar pedido" no detalhe administrativo apenas relê o banco; recuperação remota ocorre por webhook/listagem. B4 segue aberto: uma tentativa terminalizada pode liberar a reserva mesmo com outro Pix pendente. Estender expiração local para ADMIN ou redesenhar essa política exige trabalho separado.
+- **Expiração local de reservas (`liberarReservasVencidasLocalmente`) só cobre `origem='SITE'`** — a varredura financeira `reconcilePendingPixPayments` já consulta SITE e ADMIN, inclusive expirados após B2. O botão "Atualizar pedido" no detalhe administrativo apenas relê o banco; recuperação remota ocorre por webhook/listagem. B4 protege outros Pix pendentes; as janelas de liberação interrompida e cadeias `FALHOU` estão descritas acima. Estender expiração local para ADMIN ou criar sweep de liberações exige trabalho separado.
 - **UI do Pix administrativo (v1, decisões de escopo, não limitações do backend)**: não oferece criar um Pix aditivo extra quando já há Pix vivos (só regenerar os existentes); não tem campo de valor customizado no "Gerar Pix" (sempre a capacidade cheia).
 
 ## Migrations aplicadas (ordem)

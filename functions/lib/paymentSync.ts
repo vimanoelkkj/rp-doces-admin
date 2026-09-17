@@ -59,6 +59,18 @@ function isTransitionAllowed(statusAtual: string, novoStatus: MpMappedStatus, mp
     (statusAtual === "EXPIRADO" && novoStatus === "PAGO" && mp !== undefined && verifiedMpResponses.has(mp));
 }
 
+// Finalização específica do Pix, repetível mesmo sem uma nova transição.
+// A reconciliação financeira B3 continua sem responsabilidade de liberação.
+async function finalizePayment(db: D1Database, pagamentoId: number, pedidoId: number): Promise<void> {
+  await reconcilePedidoAfterFinancialChange(db, pedidoId);
+  const atual = await db.prepare(`SELECT metodo, status FROM pedido_pagamentos WHERE id = ?`)
+    .bind(pagamentoId).first<{ metodo: string; status: LedgerStatus }>();
+  if (atual?.metodo === "PIX_MP" && (atual.status === "CANCELADO" || atual.status === "EXPIRADO")) {
+    const liberacao = await liberarReservaPedido(db, pedidoId);
+    if (!liberacao.ok) throw new Error(liberacao.erro); // log no helper; permite retry do chamador
+  }
+}
+
 interface PagamentoRow {
   id: number;
   pedido_id: number;
@@ -105,7 +117,7 @@ async function applyLedgerTransition(
   }
 
   if (!novoStatus || !isTransitionAllowed(atual.status, novoStatus, mp) || atual.status === novoStatus) {
-    await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
+    await finalizePayment(db, pagamentoId, atual.pedido_id);
     const pos = await db.prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
       .bind(pagamentoId).first<{ status: LedgerStatus }>();
     return { ok: true, status: pos?.status ?? atual.status, transicionou: false };
@@ -132,7 +144,7 @@ async function applyLedgerTransition(
   if (!aplicou) {
     // Estado já era o mesmo (no-op) ou perdeu a corrida do CAS para outro
     // chamador concorrente — recarrega o estado real antes de responder.
-    await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
+    await finalizePayment(db, pagamentoId, atual.pedido_id);
     const pos = await db
       .prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
       .bind(pagamentoId)
@@ -141,18 +153,7 @@ async function applyLedgerTransition(
   }
 
   const transicionou = atual.status !== novoStatus;
-  await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
-  if (transicionou) {
-    // Passo 7: reconcilia o agregado e, se ele fechar em PAGO, converte a
-    // reserva em baixa física (pedidoReconcile.ts). Para EXPIRADO/CANCELADO,
-    // tenta liberar a reserva — a própria função só libera se o agregado
-    // ainda estiver genuinamente PENDENTE (guard no próprio write), nunca
-    // se um pedido PARCIAL tiver essa tentativa vindo de uma perna Pix
-    // morta: dívida operacional conhecida, não resolvida aqui.
-    if (novoStatus === "CANCELADO" || novoStatus === "EXPIRADO") {
-      await liberarReservaPedido(db, atual.pedido_id);
-    }
-  }
+  await finalizePayment(db, pagamentoId, atual.pedido_id);
 
   return { ok: true, status: novoStatus, transicionou };
 }
@@ -403,7 +404,7 @@ const RESERVA_VENCIDA_BATCH_SIZE = 10;
 // criação da cobrança), agora também disparada oportunisticamente pela
 // abertura do painel admin. A folga de 1 minuto é operacional e não prova
 // ausência de pagamento. Approved posterior continua recuperável pelo B2.
-// Reaproveita expireLocalPayment/applyLedgerTransition; política B4 intacta.
+// Reaproveita expireLocalPayment/applyLedgerTransition e a proteção B4.
 export async function liberarReservasVencidasLocalmente(env: { DB: D1Database }): Promise<void> {
   const { results } = await env.DB.prepare(
     `SELECT pp.id AS pagamento_id

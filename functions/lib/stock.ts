@@ -3,9 +3,9 @@
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 
 // Passo 7: efeitos físicos de estoque (reserva/baixa/liberação). Este
-// módulo não sabe nada sobre múltiplos pagamentos, waterfall ou o
-// agregado financeiro — reaproveita a instrução SQL de projeção para
-// revalidá-la na transação física. Quem decide QUANDO chamar é `pedidoReconcile.ts`
+// módulo revalida a projeção financeira e, na liberação, a ausência de
+// Pix pendente na transação física. Não cria fatos financeiros ou alocações.
+// Quem decide QUANDO chamar é `pedidoReconcile.ts`
 // (baixa, a partir de qualquer mudança financeira) e os pontos de
 // transição de pagamento individual / cancelamento (liberação).
 //
@@ -178,9 +178,18 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
   }
 }
 
+// O mesmo predicado protege todos os produtos e o marcador do pedido.
+// Substituição, prazo ou falta de ID remoto não tornam um Pix PENDENTE morto.
+const RESERVA_LIBERAVEL_SQL = `reserva_status = 'ATIVA'
+  AND estoque_baixado_em IS NULL AND status_pagamento = 'PENDENTE'
+  AND NOT EXISTS (SELECT 1 FROM pedido_itens pi
+                  WHERE pi.pedido_id = pedidos.id AND pi.estoque_baixado_em IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos pp
+                  WHERE pp.pedido_id = pedidos.id AND pp.metodo = 'PIX_MP' AND pp.status = 'PENDENTE')`;
+
 // Libera atomicamente a reserva de um pedido cujo Pix expirou ou foi
 // cancelado — só quando o agregado financeiro ainda está genuinamente
-// PENDENTE (nenhum centavo confirmado). Um pedido PARCIAL nunca tem sua
+// PENDENTE (líquido zero) e nenhum Pix continua PENDENTE. Um pedido PARCIAL nunca tem sua
 // reserva liberada por esta função: é dívida operacional conhecida e
 // deliberada (ver relatório do Passo 7), não um bug a esconder atrás de
 // uma liberação automática que vender-ia mercadoria já parcialmente paga.
@@ -206,7 +215,9 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
 
   const itens = results || [];
 
-  const statements = itens.map((item) =>
+  // O ledger pode ter mudado após a projeção anterior: revalidar no batch.
+  const statements = [preparePedidoFinancialProjection(db, pedidoId)];
+  statements.push(...itens.map((item) =>
     db
       .prepare(
         `UPDATE produtos SET
@@ -214,11 +225,11 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
            atualizado_em = CURRENT_TIMESTAMP
          WHERE id = ?
            AND EXISTS (
-             SELECT 1 FROM pedidos WHERE id = ? AND reserva_status = 'ATIVA' AND status_pagamento = 'PENDENTE'
+             SELECT 1 FROM pedidos WHERE id = ? AND ${RESERVA_LIBERAVEL_SQL}
            )`,
       )
       .bind(item.quantidade, item.produto_id, pedidoId),
-  );
+  ));
 
   statements.push(
     db
@@ -227,7 +238,7 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
            reserva_status = 'LIBERADA',
            reserva_liberada_em = CURRENT_TIMESTAMP,
            atualizado_em = CURRENT_TIMESTAMP
-         WHERE id = ? AND reserva_status = 'ATIVA' AND status_pagamento = 'PENDENTE'`,
+         WHERE id = ? AND ${RESERVA_LIBERAVEL_SQL}`,
       )
       .bind(pedidoId),
   );
