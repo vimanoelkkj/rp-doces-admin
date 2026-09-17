@@ -247,15 +247,14 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     await env.DB.prepare(
       `UPDATE pedido_pagamentos
        SET status = 'FALHOU', mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+       WHERE id = ? AND status = 'PENDENTE'`,
     )
       .bind(mensagemErro, detalheErro, pagamentoId)
       .run();
 
     // Rejeição definitiva e conhecida (não ambígua): a reserva pode ser
-    // liberada com segurança. O agregado do pedido aqui é trivialmente
-    // PENDENTE (o pagamento acabou de nascer), então o guard interno de
-    // liberarReservaPedido nunca barra esta chamada.
+    // liberada se os guards transacionais ainda permitirem: outro Pix ou
+    // pagamento confirmado concorrente pode ter passado a reter a reserva.
     await liberarReservaPedido(env.DB, pedidoId);
 
     return jsonError("Falha ao criar pagamento Pix", 502);
