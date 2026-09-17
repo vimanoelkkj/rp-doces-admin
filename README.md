@@ -164,6 +164,16 @@ Reserva de estoque: uma reserva `ATIVA` preexistente **nunca** é recriada, libe
 
 ---
 
+## B3 — Reconciliação financeira repetível
+
+`reconcilePedidoAfterFinancialChange` converge por pedido a partir do ledger real: projeta o líquido em SQL no instante da escrita e tenta a baixa somente quando o agregado é `PAGO`. O resultado distingue situação financeira de pendências físicas. A transação de estoque revalida o líquido, preserva as marcações de baixa e propaga falhas inesperadas para permitir retry; refund não repõe estoque.
+
+Webhook/sincronização e polling repetem a reconciliação mesmo sem nova transição. No GET administrativo, `reconcilePedidosDivergentes` substitui `reconciliarPagosSemBaixa`: procura divergências financeiras e pedidos pagos sem baixa, em lotes de quatro, antes da expiração local. Não depende de `mp_payment_id` nem materializa pedidos sem ledger. A matriz de transição (B2), política de liberação (B4), edição de itens (B1) e idempotência de requisições (A1) permanecem fora desta correção.
+
+Após a persistência de pagamento/reembolso administrativo, falhas de reconciliação ou leitura de saldo preservam a resposta de sucesso com o ID gravado. Os campos derivados opcionais são omitidos nessa falha, sem inventar valores. O log identifica pedido, operação e fato financeiro persistido; a recuperação oportunista continua responsável pela divergência. Erros anteriores à persistência mantêm o tratamento existente. Isso não implementa idempotência de requisições (A1).
+
+Regressões: `npm test` executa 34 casos com `node:test`, código de produção e D1 local descartável via Miniflare, com respostas do MP simuladas. Os schemas são criados a partir das migrations existentes, sem acessar D1 remoto ou a base local de desenvolvimento. A suíte cobre falhas parciais, concorrência, rollback, pagamento parcial, refund, reserva liberada, respostas administrativas após persistência e os caminhos de recuperação. Usa `miniflare` e `esbuild` já presentes na árvore de dependências do Wrangler.
+
 ## O que falta
 
 Ordem sugerida (não travada — pode mudar por decisão):

@@ -7,6 +7,7 @@
 // módulo — é a ponte deliberada entre financeiro e físico (Passo 7),
 // nunca o inverso (comandaLedger.ts nunca importa stock.ts diretamente).
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
+import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 
 // Passo 4b: materialização lazy de pagamentos legados em `pedido_pagamentos`
 // + leitura (real ou virtual) sem nunca escrever no caminho de leitura.
@@ -372,20 +373,12 @@ export async function getNetPaidCentavos(db: D1Database, pedidoId: number): Prom
 export async function recalculatePedidoStatusPagamento(
   db: D1Database,
   pedidoId: number,
-): Promise<StatusFinanceiroAgregado> {
-  const pedido = await db
-    .prepare(`SELECT valor_total_centavos FROM pedidos WHERE id = ?`)
-    .bind(pedidoId)
-    .first<{ valor_total_centavos: number }>();
-  const pagoLiquido = await getNetPaidCentavos(db, pedidoId);
-  const agregado = computeFinancialStatus(Number(pedido?.valor_total_centavos || 0), pagoLiquido);
-
-  await db
-    .prepare(`UPDATE pedidos SET status_pagamento = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`)
-    .bind(agregado, pedidoId)
-    .run();
-
-  return agregado;
+): Promise<StatusFinanceiroAgregado | null> {
+  // Calculado no instante da escrita, nunca sobre um snapshot carregado em JS.
+  // null significa pedido ausente ou legado sem ledger; não materializa aqui.
+  const row = await preparePedidoFinancialProjection(db, pedidoId)
+    .first<{ status_pagamento: StatusFinanceiroAgregado }>();
+  return row?.status_pagamento ?? null;
 }
 
 // Responde exatamente "existe dinheiro do cliente retido?" — a pergunta do
@@ -618,6 +611,29 @@ export interface RegisterAdminPaymentResult {
     | "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO";
 }
 
+// Somente após a confirmação da escrita financeira. Uma falha derivada não
+// pode induzir o operador a registrar o mesmo fato novamente (A1 é separado).
+async function reconcilePersistedAdminFact(
+  db: D1Database,
+  pedidoId: number,
+  operacao: "PAGAMENTO" | "REEMBOLSO",
+  fatoId: number,
+): Promise<{ statusFinanceiro?: StatusFinanceiroAgregado; saldoCentavos?: number }> {
+  try {
+    const reconciliacao = await reconcilePedidoAfterFinancialChange(db, pedidoId);
+    if (!reconciliacao.ok) throw new Error(reconciliacao.motivo);
+    const saldo = await getComandaSaldo(db, pedidoId);
+    return { statusFinanceiro: reconciliacao.statusFinanceiro, saldoCentavos: saldo.saldo };
+  } catch (err) {
+    console.error("Fato financeiro administrativo persistido; falha nos efeitos derivados", {
+      pedidoId, operacao, fatoId,
+    }, err);
+    // Não inventa saldo/status nem tenta uma nova leitura que pode falhar.
+    // A divergência persistida continua elegível para recuperação pelo B3.
+    return {};
+  }
+}
+
 // Lê o saldo, calcula a cascata em memória, e só então grava — pagamento +
 // alocações no MESMO batch(), atômico. A condição de saldo do INSERT do
 // pagamento é reavaliada NO MOMENTO DA ESCRITA (subquery, não o valor lido
@@ -770,10 +786,8 @@ export async function registerAdminPayment(
     return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
   }
 
-  const statusFinanceiro = await reconcilePedidoAfterFinancialChange(db, params.pedidoId);
-  const saldo = await getComandaSaldo(db, params.pedidoId);
-
-  return { ok: true, pagamentoId, statusFinanceiro, saldoCentavos: saldo.saldo };
+  const derivados = await reconcilePersistedAdminFact(db, params.pedidoId, "PAGAMENTO", pagamentoId);
+  return { ok: true, pagamentoId, ...derivados };
 }
 
 // Passo 5: reembolso manual (sem falar com o Mercado Pago). Nunca muta
@@ -888,8 +902,6 @@ export async function registerManualRefund(
   }
 
   const reembolsoId = Number(result.meta.last_row_id);
-  const statusFinanceiro = await reconcilePedidoAfterFinancialChange(db, params.pedidoId);
-  const saldo = await getComandaSaldo(db, params.pedidoId);
-
-  return { ok: true, reembolsoId, statusFinanceiro, saldoCentavos: saldo.saldo };
+  const derivados = await reconcilePersistedAdminFact(db, params.pedidoId, "REEMBOLSO", reembolsoId);
+  return { ok: true, reembolsoId, ...derivados };
 }

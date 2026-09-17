@@ -2,7 +2,8 @@
 
 import { requireUser } from "../../lib/auth";
 import { reconcilePendingPixPayments, liberarReservasVencidasLocalmente } from "../../lib/paymentSync";
-import { baixarEstoquePedido, reconciliarPagosSemBaixa } from "../../lib/stock";
+import { baixarEstoquePedido } from "../../lib/stock";
+import { reconcilePedidosDivergentes } from "../../lib/pedidoReconcile";
 import { precoAtualCentavos, ProdutoRow } from "../../lib/pricing";
 import { getFinanceirosPorPedidos } from "../../lib/comandaLedger";
 import type { FinanceiroPedido, LedgerMetodo } from "../../lib/comandaLedger";
@@ -58,14 +59,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       console.error("Falha na reconciliação oportunista de pagamentos PIX_MP", err);
     }
     try {
+      await reconcilePedidosDivergentes(env.DB);
+    } catch (err) {
+      console.error("Falha na reconciliação de pedidos com ledger", err);
+    }
+    try {
       await liberarReservasVencidasLocalmente(env);
     } catch (err) {
       console.error("Falha na liberação local de reservas vencidas", err);
-    }
-    try {
-      await reconciliarPagosSemBaixa(env.DB);
-    } catch (err) {
-      console.error("Falha na reconciliação de pedidos pagos sem baixa de estoque", err);
     }
 
     const url = new URL(request.url);
@@ -414,7 +415,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           // Estoque físico insuficiente no instante da conversão (corrida
           // com outra venda entre a reserva acima e este passo). O pedido
           // continua PAGO — não silencioso, será retentado pela
-          // reconciliação oportunista (reconciliarPagosSemBaixa) na próxima
+          // reconciliação oportunista (reconcilePedidosDivergentes) na próxima
           // carga do painel admin.
           console.error(
             "Pedido manual criado como PAGO sem baixa imediata de estoque",
