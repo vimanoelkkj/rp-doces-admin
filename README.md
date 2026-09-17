@@ -322,25 +322,168 @@ persistência, commit concluído com resposta perdida, timeout/5xx/2xx ilegível
 do MP, recurso remoto conhecido com falha local posterior, disputa da última
 unidade e as regressões B1/B2/B3/B4.
 
+## Blockers de go-live (B-1, B-2, B-3) — resolvidos
+
+Depois do A1, uma triagem das dívidas restantes definiu o menor conjunto de
+correções necessário para aceitar o primeiro pedido real com segurança
+financeira, de estoque e operacional. Foram três, cada uma num commit próprio.
+
+### B-1 — Pedido MANUAL/PENDENTE visível + política de reserva do balcão
+
+A listagem administrativa filtrava só `status_pagamento IN ('PARCIAL','PAGO')`
+nas três queries (contagem, página e contadores das abas). Como o default do
+"Novo pedido" é `DINHEIRO`/`PENDENTE`, **o caminho principal do balcão criava
+um pedido invisível** — com estoque reservado e sem nenhuma outra tela por onde
+alcançá-lo: detalhe, troca de status, pagamento manual e geração de Pix ficavam
+inacessíveis exatamente para os pedidos que mais precisavam deles.
+
+Um predicado único (`PEDIDOS_OPERACIONAIS_SQL`) passou a alimentar as três
+queries: `status_pagamento IN ('PARCIAL','PAGO') OR origem_pedido = 'MANUAL'`.
+Pedido de balcão é compromisso real assumido pela operadora, então entra
+independente do status financeiro. Pedido SITE `PENDENTE` continua
+deliberadamente fora — é carrinho não pago, não compromisso — e entra quando
+vira `PARCIAL`/`PAGO`, como sempre.
+
+**Política de reserva decidida explicitamente:** a reserva do pedido MANUAL
+nasce `ATIVA` com `reserva_expira_em` NULL e **não expira sozinha**. Expirar
+automaticamente seria o comportamento errado — venderia o doce recém-prometido
+no balcão. Por isso `liberarReservasVencidasLocalmente` continua restrita a
+`origem='SITE'` e nenhum cron/sweep foi criado. O que torna isso seguro é a
+liberação explícita que já existe e segue protegida pelo B4: cancelar libera
+(placeholder local não é `PIX_MP/PENDENTE`), pagar converte em baixa física. O
+defeito nunca foi a falta de TTL — era a invisibilidade.
+
+Sem migration e sem mudança de frontend (`formatarFinanceiro` já tratava
+`PENDENTE`).
+
+### B-2 — Registro manual de estorno de `PIX_MP`
+
+`METODOS_MANUAIS_REEMBOLSAVEIS` excluía `PIX_MP` e o guard de cancelamento
+exige líquido zero ("Faça o estorno antes de cancelar"). Resultado: cliente
+paga Pix, desiste, a operadora devolve o dinheiro por fora — e o pedido ficava
+`PAGO` para sempre, impossível de cancelar ou estornar, recuperável só com SQL
+direto no banco.
+
+`PIX_MP` passou a ser **registrável**, o que **não** significa chamar a API de
+refund do Mercado Pago (segue fora de escopo; nenhuma chamada remota acontece
+neste caminho). `origem='MANUAL'` é deliberado: descreve quem criou o fato — o
+operador, não uma integração. O estorno continua sendo um fato novo e
+independente: o pagamento original nunca é mutado, allocations são preservadas,
+teto reembolsável e projeção B3 seguem valendo, e **estoque não é reposto**.
+
+`refunded`/`charged_back` foram investigados e **deliberadamente não
+sincronizados**: `mapMpStatus` devolve `null` para os dois, então o GET
+verificado apenas registra o status bruto e nunca inventa uma devolução.
+
+Sem migration.
+
+### B-3 — Recuperação de `ENVIO_INCONCLUSIVO`
+
+O A1 criou a fase `ENVIO_INCONCLUSIVO` (timeout, transporte, 408/429/5xx, 2xx
+sem `id` utilizável) — mas ela era **estado morto**: nada no código a lia. Sem
+`mp_payment_id`, `reconcilePendingPixPayments` não seleciona a tentativa e o
+polling público não consulta o provedor, então a única recuperação era o
+webhook. Se ele não chegasse, uma cobrança realmente criada e realmente paga
+nunca seria descoberta.
+
+**Contrato confirmado na documentação oficial da Mercado Pago antes de escrever
+código:** `GET /v1/payments/search` é read-only, exige `sort` e `criteria`,
+aceita `external_reference` como filtro, responde
+`{paging:{total,limit,offset}, results:[...]}`, devolve **200 com `results`
+vazio** quando não há correspondência, limite padrão 30, e cobre os **últimos
+doze meses**.
+
+`functions/lib/mpSearch.ts` faz a observação read-only e **só propõe um id** —
+nunca tem autoridade financeira. A orquestração
+(`paymentSync.ts::recuperarOperacoesInconclusivas`) encadeia os mecanismos que
+já existiam, sem duplicar lógica financeira:
+
+```
+busca read-only (propõe id)
+  → fetchMpPayment      (ÚNICA fonte de autoridade financeira — B2)
+  → resolveWebhookPayment (associação guardada por CAS, sem duplicar)
+  → syncPaymentFromMp   (matriz de transição + reconciliação B3 + B4)
+```
+
+Invariante central: uma operação inconclusiva pode significar que o provedor
+não criou nada **ou** que criou e perdemos a resposta. A recuperação nunca
+assume nenhuma das duas. Zero resultados **não** produz `FALHOU`/`CANCELADO` nem
+libera reserva; múltiplos candidatos **não** são resolvidos arbitrariamente
+(ficam visíveis para intervenção); falha de observação não é rejeição e é
+repetível. Nunca faz POST, nunca gera identidade nova, nunca cria pedido,
+tentativa ou fato financeiro.
+
+Achado durante os testes: a seleção inicial exigia `status='PENDENTE'`, o que
+abandonaria o caso mais caro — cobrança criada, paga, e com prazo local vencido
+antes de descobrirmos. Passou a aceitar `PENDENTE, EXPIRADO`, coerente com os
+fallbacks do webhook e com `reconcilePendingPixPayments`; a promoção
+`EXPIRADO → PAGO` continua exigindo autoridade do GET verificado (B2).
+
+Dispara na reconciliação oportunista do `GET /api/admin/pedidos`, em lote de 4
+com throttle de 60s adquirido antes de qualquer chamada externa — **sem cron,
+sem infraestrutura de jobs**. O caso deixou de ser cego: `GET /pedidos/:id`
+expõe `operacoesInconclusivas` e o detalhe administrativo mostra um aviso
+reusando o bloco já existente. Sem migration.
+
 ## O que falta
 
-Ordem sugerida (não travada — pode mudar por decisão):
+Caminho mínimo até o **primeiro pedido real**. Os três blockers de código estão
+feitos; o que resta não é código de domínio, com uma exceção opcional.
 
-1. ~~Criação manual de pedido pelo admin~~ — feito, Passo 8.
-2. ~~Pix administrativo (geração, regeneração, frontend)~~ — feito, Passo 9. `CANCELAR_PIX` autônomo descartado deliberadamente (ver Passo 9).
-3. **Comanda como balcão de atendimento** — reabrir comanda fechada pra adicionar item depois da entrega, lançamentos incrementais sem falsificar histórico, possivelmente consolidar novas compras da mesma cliente no mesmo dia numa comanda só (identidade por WhatsApp normalizado, nunca nome), exclusão/arquivamento seguro. Investigação própria antes de codar — não é puxadinho de nenhum passo anterior.
-4. **Refund automático via Mercado Pago** — hoje só existe reembolso manual (Passo 5); produção integra refund direto na API do MP.
-5. **Exchange / correções de item** (`pedido_item_correcoes`) — trocar produto de pedido já pago, com reembolso parcial e reforço/baixa de estoque.
+1. **Revisão adversarial final única** — do fluxo completo (A1 + B1/B2/B3/B4 +
+   B-1/B-2/B-3), uma vez só. É a próxima etapa.
+2. **Webhook do MP em produção** — configurar `MP_WEBHOOK_SECRET` no Cloudflare
+   Pages real e cadastrar a URL pública no app do Mercado Pago. Hoje, sem o
+   segredo, `webhooks/mercadopago.ts` devolve **503 para todo evento**. Zero
+   código; validar com evento real do MP em ambiente de teste primeiro.
+3. **B5 — cutover seguro do D1 de produção.** Etapa própria e **blocker de
+   deploy**: as migrations `0006`, `0007` e `0008` fazem `DROP TABLE` em
+   `pedidos` e `pedido_itens` com rebuild. Aplicar a cadeia contra o D1 real
+   **destruiria pedidos e itens históricos**, com cascades para ledger e
+   reembolsos. `PRAGMA defer_foreign_keys=ON` não protege contra isso. Exige:
+   backup/export, inspeção do schema remoto e do histórico real de migrations,
+   comparação produção × rebuild, auditoria de duplicatas de `mp_payment_id`
+   (decide o UNIQUE), **migration de compatibilidade em vez do replay das
+   rebuilds**, plano de rollback (rollback de código Cloudflare ≠ rollback de
+   D1) e smoke pós-cutover. Nunca misturar com correção de domínio.
+4. **Backup verificado** de produção, depois **cutover**, depois **deploy**.
+5. **Smoke de produção** — incluindo evento real de webhook e um Pix de valor
+   mínimo ponta a ponta.
+6. **Primeiro pedido real.**
+
+Opcional antes do go-live, barato e não bloqueante: exibir os valores no badge
+financeiro quando `pagoCentavos > totalCentavos` (hoje um overpayment aparece
+igual a um pagamento exato — ver dívidas) e um diálogo mínimo de estorno no
+admin, caso estorno precise ser rotina desde o primeiro dia.
+
+Evolução de produto, explicitamente fora do caminho crítico:
+
+- **Comanda como balcão de atendimento** — reabrir comanda fechada pra adicionar item depois da entrega, lançamentos incrementais sem falsificar histórico, possivelmente consolidar novas compras da mesma cliente no mesmo dia numa comanda só (identidade por WhatsApp normalizado, nunca nome), exclusão/arquivamento seguro. Investigação própria antes de codar — não é puxadinho de nenhum passo anterior.
+- **Refund automático via Mercado Pago** — diferente do B-2, que só *registra* um estorno já feito por fora; produção integra refund direto na API do MP.
+- **Exchange / correções de item** (`pedido_item_correcoes`) — trocar produto de pedido já pago, com reembolso parcial e reforço/baixa de estoque.
+- **Editor incremental de itens** — B1 mantém a edição destrutiva bloqueada com `409`.
 
 ## Dívidas conhecidas (documentadas, não esquecer)
 
-- **Frontend do estorno**: backend de refund existe (Passo 5), mas não há dialog no admin ligando "cancelar" → "reembolsar" — fluxo manual via endpoint direto até hoje.
-- **Webhook do MP não está plugado em produção de verdade**: código pronto (Passo 6), falta configurar `MP_WEBHOOK_SECRET` no Cloudflare Pages real e cadastrar a URL pública no app do Mercado Pago — até lá, só a reconciliação oportunista do admin cobre o gap em produção real.
+Blockers (não são dívidas — impedem o go-live, ver "O que falta"):
+
+- **Webhook do MP não está plugado em produção de verdade**: código pronto (Passo 6), falta configurar `MP_WEBHOOK_SECRET` no Cloudflare Pages real e cadastrar a URL pública no app do Mercado Pago. **Sem o segredo o endpoint devolve 503 para todo evento.** Depois do B-3 a recuperação read-only é um segundo caminho independente, mas o webhook continua sendo o mais rápido.
+- **B5 — cutover do D1**: `0006`/`0007`/`0008` fazem `DROP TABLE` em `pedidos`/`pedido_itens`. Ver "O que falta".
+
+Dívidas aceitas para o primeiro go-live:
+
+- **Overpayment**: o ledger preserva corretamente todos os fatos (nada é apagado ou ignorado), a baixa física continua acontecendo no máximo uma vez e a reserva `CONVERTIDA` não é reaberta. Porém `formatarFinanceiro` só exibe valores quando o status é `PARCIAL` — um pedido de R$ 50 que recebeu R$ 100 aparece como "✓ Pago · Pix", igual a um pagamento exato. O excedente vem correto na API (`pagoCentavos`) e **não é renderizado**. Exige a operadora regenerar Pix *e* a cliente pagar os dois. Mitigação barata descrita em "O que falta"; tratamento operacional de crédito continua não construído.
+- **`pedido_pagamentos.mp_payment_id` sem UNIQUE** (migration 0010 cria índice comum): o A1 eliminou o caminho realista de duas linhas locais para o mesmo pagamento remoto (uma key ⇒ uma linha, `X-Idempotency-Key` derivada e estável), e todos os leitores falham em segurança — `resolveWebhookPayment` devolve `ambiguous` sem decidir, `applyLedgerTransition` exige exatamente uma linha vinculada e lança em divergência, e o UPDATE de aprovação repete o `NOT EXISTS` dentro da escrita. `pedidos.mp_payment_id` *é* UNIQUE e protege o caminho SITE. O que resta é auditoria de duplicatas **históricas** em produção: assunto do B5, não código.
+- **Sem UI de estorno**: o backend existe (Passo 5, ampliado no B-2 para `PIX_MP`), mas não há dialog no admin ligando "cancelar" → "reembolsar" — chamada direta ao endpoint, que depois do A1 exige gerar uma `operationKey`.
 - **`PARCIAL` + Pix expirado**: reserva de estoque fica presa até ação manual (Passo 7, decisão consciente) — vale também para Pix administrativo (Passo 9), política mantida idêntica, não redesenhada.
-- **Imports circulares** (`comandaLedger.ts` ↔ `pedidoReconcile.ts`, `paymentSync.ts` ↔ `stock.ts`): funcionam (confirmado no bundler do wrangler, não só no `tsc`), mas são dívida arquitetural — quebrar via módulo-folha compartilhado se crescerem.
-- **Overpayment de Pix administrativo substituído** (Passo 9): se um Pix "substituído" for pago de verdade no MP depois do substituto já ter confirmado, o ledger soma sem cap — dinheiro real excedente sem representação de crédito. Documentado, não construído.
-- **Expiração local de reservas (`liberarReservasVencidasLocalmente`) só cobre `origem='SITE'`** — a varredura financeira `reconcilePendingPixPayments` já consulta SITE e ADMIN, inclusive expirados após B2. O botão "Atualizar pedido" no detalhe administrativo apenas relê o banco; recuperação remota ocorre por webhook/listagem. B4 protege outros Pix pendentes; as janelas de liberação interrompida e cadeias `FALHOU` estão descritas acima. Estender expiração local para ADMIN ou criar sweep de liberações exige trabalho separado.
+- **Waterfall entre duas intenções legítimas distintas** não é serializável por item: o teto agregado do pedido (`SUM(PAGO) <= total`) continua garantido, só a atribuição por item pode ficar torta. O caso perigoso (retry) foi resolvido pelo A1.
+- **Janela residual B4**: falha de infra entre persistir o estado terminal e liberar a reserva pode deixá-la `ATIVA`; repetir a finalização recupera, e o sweep financeiro cobre `EXPIRADO` com `mp_payment_id`.
+- **Refund não repõe estoque** (deliberado): ajuste manual pela tela de produtos.
+- **Perdedor de corrida em operação MP** recebe `OPERACAO_EM_PROCESSAMENTO` em vez do sucesso: correto (não inventa resultado); impacto só de UX, e o retry posterior devolve a operação persistida.
+- **Expiração local de reservas (`liberarReservasVencidasLocalmente`) só cobre `origem='SITE'`** — decisão reafirmada no B-1 para o pedido MANUAL (ver política lá). A varredura financeira `reconcilePendingPixPayments` já consulta SITE e ADMIN, inclusive expirados após B2, e o B-3 cobre as tentativas sem `mp_payment_id`. B4 protege outros Pix pendentes. Criar sweep de liberações continua sendo trabalho separado.
 - **UI do Pix administrativo (v1, decisões de escopo, não limitações do backend)**: não oferece criar um Pix aditivo extra quando já há Pix vivos (só regenerar os existentes); não tem campo de valor customizado no "Gerar Pix" (sempre a capacidade cheia).
+- **Imports circulares** (`comandaLedger.ts` ↔ `pedidoReconcile.ts`, `paymentSync.ts` ↔ `stock.ts`): funcionam (confirmado no bundler do wrangler, não só no `tsc`), mas são dívida arquitetural — quebrar via módulo-folha compartilhado se crescerem.
+- **Wrangler 3.114 desatualizado** (avisa para migrar ao 4.x); `pages dev` não aceita `--config`, o que obriga a trocar o `wrangler.toml` temporariamente em smokes locais.
 
 ## Migrations aplicadas (ordem)
 
