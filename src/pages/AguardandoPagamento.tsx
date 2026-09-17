@@ -1,8 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { CartItem, useCart } from "../context/CartContext";
+import {
+  gravarOperationKey,
+  lerOperationKey,
+  novaOperationKey,
+  SLOT_CHECKOUT,
+} from "../lib/operationKey";
 import cakeCartImage from "../assets/cake-cart-image.png";
 import "./AguardandoPagamento.css";
 
@@ -10,6 +16,7 @@ interface CheckoutState {
   items: CartItem[];
   cliente: { nome: string; whatsapp: string };
   recado?: string;
+  operationKey?: string;
 }
 
 interface CheckoutResponse {
@@ -58,6 +65,20 @@ export default function AguardandoPagamento() {
   const { clearCart } = useCart();
   const state = location.state as CheckoutState | null;
 
+  // A1: a MESMA identidade durante todo o ciclo de vida desta finalização.
+  // `useRef` a resolve UMA vez por montagem e o `sessionStorage` a preserva
+  // entre remontagens, StrictMode e retry — assim uma resposta HTTP perdida,
+  // um abort ou um remount não viram um segundo pedido. Prioridade:
+  // navegação (criada no Checkout) > sessão > geração local de último
+  // recurso (mantém a página funcional mesmo sem storage disponível).
+  const operationKeyRef = useRef<string | null>(null);
+  if (operationKeyRef.current === null) {
+    const resolvida =
+      state?.operationKey ?? lerOperationKey(SLOT_CHECKOUT) ?? novaOperationKey();
+    gravarOperationKey(SLOT_CHECKOUT, resolvida);
+    operationKeyRef.current = resolvida;
+  }
+
   const [status, setStatus] = useState<Status>("criando");
   const [loadingStep, setLoadingStep] = useState<LoadingStep>(1);
   const [payment, setPayment] = useState<CheckoutResponse | null>(null);
@@ -93,17 +114,29 @@ export default function AguardandoPagamento() {
         })),
         cliente: state.cliente,
         recado: state.recado,
+        // A1: mesma finalização, mesma key — em toda tentativa.
+        operationKey: operationKeyRef.current,
       }),
     })
       .then(async (response) => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
+          // A1: a operação já foi iniciada e o resultado remoto ainda não é
+          // conhecido. O pedido JÁ existe — nunca disparar outro checkout
+          // (isso criaria outro pedido, outra reserva e outra cobrança).
+          // Segue para a tela de acompanhamento que já existe.
+          if (body.code === "OPERACAO_EM_PROCESSAMENTO" && body.tokenPublico) {
+            if (!cancelled) {
+              navigate(`/pedido/${encodeURIComponent(body.tokenPublico)}`);
+            }
+            return null;
+          }
           throw new Error(body.error || "Falha ao criar pagamento Pix");
         }
         return response.json() as Promise<CheckoutResponse>;
       })
       .then((data) => {
-        if (cancelled) return;
+        if (cancelled || !data) return;
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, MIN_TOTAL_LOADING_MS - elapsed);
         setTimeout(() => {

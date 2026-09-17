@@ -2,6 +2,11 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { registerAdminPayment, MetodoManual } from "../../../../lib/comandaLedger";
+import {
+  OPERACAO_HTTP_STATUS,
+  OPERACAO_MENSAGENS,
+  parseOperationKey,
+} from "../../../../lib/operacoes";
 
 interface Env {
   DB: D1Database;
@@ -11,6 +16,7 @@ interface PagamentoManualInput {
   metodo?: string;
   valorCentavos?: number;
   observacao?: string;
+  operationKey?: string;
 }
 
 const METODOS_VALIDOS = new Set(["DINHEIRO", "CARTAO", "PIX_EXTERNO"]);
@@ -23,10 +29,11 @@ const MENSAGENS: Record<string, string> = {
     "O saldo mudou antes da confirmação. Atualize e tente novamente.",
   PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO:
     "Este pedido possui reembolso e ainda não suporta novo pagamento após devolução parcial.",
+  ...OPERACAO_MENSAGENS,
 };
 
-function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+function jsonError(message: string, status: number, code?: string) {
+  return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -53,6 +60,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     return jsonError("Valor inválido", 400);
   }
 
+  // A1: a identidade da intenção é obrigatória e precisa ter sido criada
+  // pelo cliente ANTES do primeiro envio. Sem ela, um retry voltaria a ser
+  // indistinguível de um segundo recebimento legítimo.
+  const chave = parseOperationKey(body.operationKey);
+  if (!chave.ok) {
+    return jsonError(MENSAGENS.OPERATION_KEY_INVALIDA, 400, chave.erro);
+  }
+
   try {
     const resultado = await registerAdminPayment(env.DB, {
       pedidoId: id,
@@ -60,22 +75,32 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       valorCentavos: body.valorCentavos!,
       usuarioId: auth.user.id,
       observacao: body.observacao,
+      operationKey: chave.key,
     });
 
     if (!resultado.ok) {
-      const status = resultado.erro === "PEDIDO_NAO_ENCONTRADO" ? 404 : 409;
+      const status =
+        resultado.erro === "PEDIDO_NAO_ENCONTRADO"
+          ? 404
+          : OPERACAO_HTTP_STATUS[resultado.erro ?? ""] ?? 409;
       return jsonError(
         MENSAGENS[resultado.erro ?? ""] ?? "Não foi possível registrar o pagamento",
         status,
+        resultado.erro,
       );
     }
 
+    // Replay devolve o MESMO resultado lógico e o MESMO status: para o
+    // cliente, repetir a mesma intenção é indistinguível de tê-la executado
+    // uma vez. `replay` existe só para observabilidade, nunca como um
+    // resultado diferente.
     return Response.json(
       {
         ok: true,
         pagamentoId: resultado.pagamentoId,
         statusFinanceiro: resultado.statusFinanceiro,
         saldoCentavos: resultado.saldoCentavos,
+        ...(resultado.replay ? { replay: true } : {}),
       },
       { status: 201 },
     );

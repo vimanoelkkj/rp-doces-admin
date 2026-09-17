@@ -2,6 +2,11 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { createAdminPixCharge } from "../../../../lib/comandaPix";
+import {
+  OPERACAO_HTTP_STATUS,
+  OPERACAO_MENSAGENS,
+  parseOperationKey,
+} from "../../../../lib/operacoes";
 
 interface Env {
   DB: D1Database;
@@ -11,6 +16,7 @@ interface Env {
 interface GerarPixInput {
   valorCentavos?: number;
   substituiId?: number;
+  operationKey?: string;
 }
 
 function jsonError(message: string, status: number, code?: string) {
@@ -30,6 +36,7 @@ const MENSAGENS: Record<string, string> = {
   MERCADO_PAGO_RECUSOU: "O Mercado Pago recusou o pagamento Pix",
   MERCADO_PAGO_INDISPONIVEL:
     "Não foi possível confirmar com o Mercado Pago se o Pix foi criado. Verifique novamente em instantes.",
+  ...OPERACAO_MENSAGENS,
 };
 
 const STATUS_HTTP: Record<string, number> = {
@@ -42,6 +49,7 @@ const STATUS_HTTP: Record<string, number> = {
   ESTOQUE_INSUFICIENTE: 409,
   MERCADO_PAGO_RECUSOU: 502,
   MERCADO_PAGO_INDISPONIVEL: 502,
+  ...OPERACAO_HTTP_STATUS,
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -73,12 +81,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     return jsonError("Id do Pix a substituir inválido", 400);
   }
 
+  // A1: obrigatória. Sem ela, um retry de "Gerar Pix"/"Regenerar" criaria
+  // outra cobrança pagável com outra identidade no Mercado Pago.
+  const chave = parseOperationKey(body.operationKey);
+  if (!chave.ok) {
+    return jsonError(MENSAGENS.OPERATION_KEY_INVALIDA, 400, chave.erro);
+  }
+
   try {
     const resultado = await createAdminPixCharge(env, {
       pedidoId: id,
       valorCentavos: body.valorCentavos,
       usuarioId: auth.user.id,
       substituiId: body.substituiId,
+      operationKey: chave.key,
     });
 
     if (!resultado.ok) {
@@ -100,6 +116,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         qrCodeBase64: resultado.qrCodeBase64,
         ticketUrl: resultado.ticketUrl,
         expiresAt: resultado.expiresAt,
+        ...(resultado.replay ? { replay: true } : {}),
       },
       { status: 201 },
     );

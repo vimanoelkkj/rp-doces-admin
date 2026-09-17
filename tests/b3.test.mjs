@@ -5,14 +5,16 @@ import { app, fixture, state, barrier, isProjection, isPhysical, refund } from '
 const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
 const approve = async db => app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment('fake', '101'));
 
-async function adminOperation(db, kind, amount) {
+// operationKey: contrato A1, obrigatório nos endpoints. Uma key fixa por
+// helper mantém as asserções B3 inalteradas (cada teste usa um D1 novo).
+async function adminOperation(db, kind, amount, operationKey = `b3-${kind}-${amount}`) {
   const session = await app.auth.createSession(db, 1);
   return () => app[kind === 'PAGAMENTO' ? 'adminPayment' : 'adminRefund'].onRequestPost({
     request: new Request('https://local.test/api/admin/pedidos/1', {
       method: 'POST', headers: {Cookie: session.cookie.split(';')[0], 'Content-Type': 'application/json'},
       body: JSON.stringify(kind === 'PAGAMENTO'
-        ? {metodo: 'DINHEIRO', valorCentavos: amount}
-        : {pagamentoId: 1, valorCentavos: amount}),
+        ? {metodo: 'DINHEIRO', valorCentavos: amount, operationKey}
+        : {pagamentoId: 1, valorCentavos: amount, operationKey}),
     }),
     env: {DB: db}, params: {id: '1'},
   });
@@ -130,10 +132,12 @@ for (const kind of ['PAGAMENTO', 'REEMBOLSO']) {
     const call = await adminOperation(db, kind, 3000);
     const before = await state(db);
     const log = t.mock.method(console, 'error', () => {});
+    // A1 tornou a escrita do refund atômica com o claim da operação, então
+    // ela também viaja num batch. O ponto de injeção continua sendo o mesmo
+    // ("antes do commit financeiro") e as asserções não mudaram.
     db.hook = (s, op) => {
-      if (kind === 'PAGAMENTO'
-        ? op === 'batch' && s[0].sql.includes('INSERT INTO pedido_pagamentos')
-        : op === 'run' && s[0].sql.includes('INSERT INTO pedido_reembolsos')) {
+      if ((op === 'batch' || op === 'run') && s[0].sql.includes(
+        kind === 'PAGAMENTO' ? 'INSERT INTO pedido_pagamentos' : 'INSERT INTO pedido_reembolsos')) {
         db.hook = null;
         throw new Error('injected pre-commit failure');
       }

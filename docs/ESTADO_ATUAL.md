@@ -385,9 +385,20 @@ Não criar novo sweep/cron silenciosamente ao trabalhar em outra tarefa.
 
 # B1 — Edição destrutiva dos itens do pedido
 
-**STATUS: CONTENÇÃO IMPLEMENTADA E VALIDADA LOCALMENTE, SEM COMMIT**
+**STATUS: RESOLVIDO (CONTENÇÃO COMMITADA)**
 
-A contenção B1 está implementada no working tree e aguarda revisão do usuário. A1 é o próximo blocker; não foi implementado nesta tarefa.
+Commit:
+
+`0e388ef`
+
+Mensagem:
+
+`rp-doces: bloqueia edicao destrutiva de itens`
+
+Correção de divergência documental: uma versão anterior deste arquivo
+descrevia o B1 como "implementado no working tree, sem commit". Isso deixou
+de ser verdade quando `0e388ef` entrou na branch. O bloqueio server-side está
+commitado e permanece intacto após o A1.
 
 Endpoint:
 
@@ -673,24 +684,125 @@ Validação local da contenção B1 (2026-09-17)
 - Nenhuma alteração de frontend, migration, B2/B3/B4 ou dívida adjacente.
 - Nenhum commit, push, deploy ou acesso a D1 remoto realizado.
 
-Próximo blocker: A1
+---
 
-Depois da contenção B1:
+# A1 — Identidade lógica estável das operações
 
-A1 — identidade estável/idempotência das operações
+**STATUS: IMPLEMENTADO E VALIDADO LOCALMENTE, SEM COMMIT**
 
-Existem riscos conhecidos de retry criar operações logicamente duplicadas.
+Está no working tree e aguarda revisão. A investigação
+pré-implementação permanece em `docs/investigacoes/A1-IDEMPOTENCIA.md` como
+registro histórico do estado ANTERIOR — ela não foi reescrita e não
+representa o estado pós-fix.
 
-Pontos importantes:
+## Propriedade fundamental
 
-pagamento manual ADMIN;
-refund;
-checkout SITE.
+- mesma intenção + mesma operation key + mesmo payload → mesma operação e
+  mesmo resultado lógico;
+- mesma operation key + payload incompatível → conflito estável, sem nova
+  escrita financeira;
+- nova operation key → nova intenção legítima, sujeita aos guards normais do
+  domínio.
 
-Pagamento manual e refund são particularmente sensíveis porque um retry pode
-criar um novo fato financeiro real enquanto ainda existir saldo disponível.
+Retry, timeout, abort, reload, remontagem, resposta HTTP perdida e
+concorrência NÃO transformam automaticamente a mesma intenção numa operação
+nova.
 
-Não resolver A1 acidentalmente durante B1.
+## Contrato da key
+
+A `operationKey` é criada pelo CLIENTE antes da primeira tentativa de envio e
+é obrigatória nos seis fluxos: checkout SITE, criação de pedido ADMIN,
+pagamento manual ADMIN, refund manual ADMIN, criação de Pix ADMIN e
+regeneração/substituição de Pix ADMIN.
+
+Ela é estável durante retries, diferente para uma intenção nova, vinculada a
+tipo/escopo/ator, e independente de valor, horário, WhatsApp ou hash do
+carrinho. O carrinho não é identidade: representa intenção de compra em
+construção, não uma operação de checkout.
+
+Um fingerprint canônico versionado acompanha a key. Ele serve SOMENTE para
+detectar reutilização incompatível da mesma key. Não deduplicar por payload:
+duas intenções diferentes podem ter payload idêntico e continuam sendo duas
+operações legítimas.
+
+## Persistência
+
+Migration aditiva `0012_operacoes_idempotencia.sql`, tabela
+`pedido_operacoes`, `UNIQUE(operation_key)` global.
+
+Nenhuma tabela financeira reconstruída, nenhuma migration antiga alterada,
+nenhum histórico reescrito. Não é framework de jobs, não há cron/sweep novo.
+
+A tabela preserva key, tipo, escopo/ator, fingerprint versionado,
+pedido/pagamento/reembolso resultantes, resultado para replay, identidade da
+tentativa remota (`mp_idempotency_key`, `mp_request`, `mp_payment_id`) e a
+fase: `LOCAL_CRIADA`, `ENVIO_INCONCLUSIVO`, `REMOTO_CONHECIDO`, `CONCLUIDA`,
+`RECUSADA`. `CONCLUIDA` e `RECUSADA` são terminais — resposta tardia do
+provedor nunca reabre operação resolvida.
+
+## Atomicidade e concorrência
+
+O claim é o último statement do MESMO batch do fato e é um
+`INSERT ... SELECT` condicionado à existência do fato. Guard de domínio que
+recusa a escrita faz a fonte não devolver linha: nenhuma operação registrada,
+nenhum claim órfão.
+
+Não é usado `INSERT OR IGNORE` seguindo com os efeitos como se o claim tivesse
+sido adquirido.
+
+As identidades técnicas são derivadas da key (`a1:<key>`, `a1:<key>:pag`,
+`a1:<key>:ref`, `a1:<key>:mp`), transformando os UNIQUEs já existentes de
+`pedidos.idempotency_key`, `pedido_pagamentos.idempotency_key` e
+`pedido_reembolsos.idempotency_key` numa segunda proteção atômica.
+
+Na disputa pela mesma key, apenas uma operação lógica vence; o batch do
+perdedor é revertido inteiro e ele relê a vencedora. `token_publico` continua
+aleatório: é identificador público de acompanhamento e não deve ser derivável
+de uma key.
+
+## Lookup antes dos guards de estado
+
+Cada writer procura a operação pela key ANTES dos guards dependentes do estado
+atual. É o que recupera um sucesso anterior cuja resposta se perdeu: o pedido
+pode ter virado `PAGO`, o saldo reembolsável pode ter mudado, o estoque pode
+não permitir mais criar um pedido igual — e o retry ainda recupera a operação
+original, sem ser reinterpretado como tentativa nova contra o estado novo.
+
+## Ambiguidade do POST ao Mercado Pago
+
+`functions/lib/mpPost.ts` separa rejeição comprovadamente definitiva (4xx de
+negócio) de resultado ambíguo (transporte, timeout, 408, 429, 5xx, 2xx sem
+`id` utilizável).
+
+Antes do A1, qualquer não-2xx podia gravar `FALHOU` e liberar reserva — uma
+rejeição inventada. Resultado ambíguo agora NÃO gera key nova, pedido novo,
+tentativa nova, liberação de reserva, sucesso inventado nem rejeição
+inventada: a operação permanece inconclusiva e recuperável
+(`ENVIO_INCONCLUSIVO`), e o retry da mesma key devolve
+`OPERACAO_EM_PROCESSAMENTO` apontando para o pedido que já existe. Não há
+reenvio automático.
+
+Permanece na Payments API. A matriz de transição e a autoridade do GET
+verificado (B2) não mudaram; isto não é uma reescrita do B2.
+
+## Frontend
+
+Alterações exclusivamente funcionais para identidade/retry. Nenhuma mudança
+de layout, CSS, animação ou aparência. Nenhuma tela nova.
+
+## Validação local (2026-09-17)
+
+- `npm test`: 232/232, sendo 40 verificações novas em `tests/a1.test.mjs`.
+- `npm run build` aprovado; `git diff --check` aprovado.
+- Type-check das Functions: somente os dois erros de baseline conhecidos
+  (`auth.ts:59` TS2345, `auth.ts:87` TS2322), sem erros novos. Eles NÃO foram
+  corrigidos dentro do A1.
+- Smoke HTTP local com `wrangler pages dev`, configuração e D1 temporários
+  exclusivamente locais e descartáveis, sem credenciais e sem nenhuma chamada
+  ao provedor real. Servidor encerrado e artefatos temporários removidos.
+- Nenhum commit, push, deploy ou acesso a D1 remoto.
+
+---
 
 B5 — Cutover do D1 de produção
 
@@ -727,7 +839,6 @@ Dívidas deliberadas
 As seguintes dívidas são conhecidas e não devem ser resolvidas silenciosamente
 como efeito colateral:
 
-A1 — idempotência;
 overpayment;
 refund → retorno de estoque;
 cadeias exclusivamente FALHOU;
@@ -833,12 +944,12 @@ Resolvidos
 B3 — convergência financeira
 B2 — recuperação verificada de Pix expirado
 B4 — segurança de reserva com múltiplos Pix
+B1 — contenção da edição destrutiva de itens (commit 0e388ef)
 Atual
-B1 — contenção implementada e validada localmente
+A1 — identidade lógica/idempotência implementada e validada localmente
 aguardando revisão do usuário, sem commit
 Depois
-revisar o diff da contenção B1 e aguardar autorização explícita antes de commit;
-A1 — idempotência;
+revisar o diff do A1 e aguardar autorização explícita antes de commit;
 revisão final focada do fluxo de primeira compra;
 B5 — planejamento e execução segura do cutover do D1;
 smoke tests de produção;

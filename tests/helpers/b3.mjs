@@ -22,6 +22,9 @@ const bundle = await build({
       export * as pix from './functions/lib/comandaPix';
       export * as adminOrder from './functions/api/admin/pedidos/[id]';
       export * as adminItems from './functions/api/admin/pedidos/[id]/itens';
+      export * as operacoes from './functions/lib/operacoes';
+      export * as mpPost from './functions/lib/mpPost';
+      export * as adminCreate from './functions/api/admin/pedidos';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
@@ -114,6 +117,7 @@ export async function state(db) {
     pagamentos: (await db.prepare('SELECT * FROM pedido_pagamentos ORDER BY id').all()).results,
     alocacoes: (await db.prepare('SELECT * FROM pedido_pagamento_alocacoes ORDER BY id').all()).results,
     refunds: (await db.prepare('SELECT * FROM pedido_reembolsos ORDER BY id').all()).results,
+    operacoes: (await db.prepare('SELECT * FROM pedido_operacoes ORDER BY id').all()).results,
   };
 }
 
