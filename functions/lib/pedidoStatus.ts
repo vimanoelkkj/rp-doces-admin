@@ -2,6 +2,7 @@
 
 import { resolveLedgerPaymentId } from "./comandaLedger";
 import { syncPaymentFromMp, expireLocalPayment } from "./paymentSync";
+import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 
 export interface PedidoStatusRow {
   id: number;
@@ -46,11 +47,16 @@ export async function refreshPedidoStatus(
   const pagamentoId = await resolveLedgerPaymentId(db, pedido.id);
   const statusEspecificoAtual = await statusDoPagamento(db, pagamentoId);
 
-  if (pedido.status_pagamento !== "PENDENTE") {
+  // Antes de qualquer retorno por agregado/prazo, recupera efeitos locais
+  // incompletos. Não precisa consultar o MP para reconhecer ledger já PAGO.
+  const reconciliacao = await reconcilePedidoAfterFinancialChange(db, pedido.id);
+  const statusAgregado = reconciliacao.ok ? reconciliacao.statusFinanceiro : pedido.status_pagamento;
+
+  if (statusAgregado !== "PENDENTE" || statusEspecificoAtual === "PAGO") {
     // Agregado já resolvido (PARCIAL/PAGO): pré-4d, com no máximo 1
     // pagamento por pedido, não há mais nada a verificar no MP.
     return {
-      statusPagamento: statusEspecificoAtual ?? pedido.status_pagamento,
+      statusPagamento: statusEspecificoAtual ?? statusAgregado,
       statusPedido: pedido.status_pedido,
     };
   }
