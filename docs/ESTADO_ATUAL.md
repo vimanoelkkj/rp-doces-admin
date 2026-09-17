@@ -843,3 +843,30 @@ revisão final focada do fluxo de primeira compra;
 B5 — planejamento e execução segura do cutover do D1;
 smoke tests de produção;
 primeiro go-live.
+
+
+## Investigação A1
+
+A investigação completa de identidade/idempotência está preservada em:
+
+`docs/investigacoes/A1-IDEMPOTENCIA.md`
+
+Não repetir a investigação integral em novas sessões.
+
+Ela contém:
+- writers mapeados;
+- 38 cenários reproduzidos;
+- concorrência/TOCTOU;
+- comportamento de pagamento manual;
+- refunds;
+- checkout SITE;
+- pedido/Pix ADMIN;
+- Mercado Pago;
+- definição de identidade lógica;
+- alternativas avaliadas;
+- plano de implementação;
+- dívidas deliberadamente fora do A1.
+
+O documento representa o estado anterior à implementação A1.
+Sempre comparar com o código/HEAD atual antes de assumir que um achado continua
+aberto.
