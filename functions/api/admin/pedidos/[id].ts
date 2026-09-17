@@ -4,6 +4,7 @@ import { requireUser } from "../../../lib/auth";
 import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
 import { getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
 import { liberarReservaPedido } from "../../../lib/stock";
+import { listarOperacoesInconclusivasDoPedido } from "../../../lib/operacoes";
 
 interface Env {
   DB: D1Database;
@@ -88,7 +89,26 @@ export const onRequestGet: PagesFunction<Env> = async ({
     const financeiro = await getFinanceiroPedido(env.DB, id);
     const pixAdminPendentes = await getPixAdminPendentesAtivos(env.DB, id);
 
-    return Response.json({ pedido, itens, financeiro, pixAdminPendentes });
+    // B-3: cobranças cujo envio ao Mercado Pago ficou inconclusivo. Leitura
+    // pura — não inventa estado nem decide nada. Existe para que o caso pare
+    // de ser cego: a recuperação read-only tenta convergir sozinha, e o que
+    // não converge (ambiguidade, provedor indisponível) fica visível aqui
+    // para intervenção em vez de silenciosamente preso.
+    const operacoesInconclusivas = (
+      await listarOperacoesInconclusivasDoPedido(env.DB, id)
+    ).map((o) => ({
+      tipo: o.tipo,
+      diagnostico: o.erro,
+      atualizadoEm: o.atualizado_em,
+    }));
+
+    return Response.json({
+      pedido,
+      itens,
+      financeiro,
+      pixAdminPendentes,
+      operacoesInconclusivas,
+    });
   } catch (err) {
     console.error("Erro ao buscar pedido (admin)", err);
     return jsonError("Erro interno ao buscar pedido", 500);

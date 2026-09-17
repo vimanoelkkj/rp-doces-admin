@@ -1,7 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../lib/auth";
-import { reconcilePendingPixPayments, liberarReservasVencidasLocalmente } from "../../lib/paymentSync";
+import {
+  reconcilePendingPixPayments,
+  liberarReservasVencidasLocalmente,
+  recuperarOperacoesInconclusivas,
+} from "../../lib/paymentSync";
 import { baixarEstoquePedido } from "../../lib/stock";
 import { reconcilePedidosDivergentes } from "../../lib/pedidoReconcile";
 import { precoAtualCentavos, ProdutoRow } from "../../lib/pricing";
@@ -101,6 +105,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       await reconcilePedidosDivergentes(env.DB);
     } catch (err) {
       console.error("Falha na reconciliação de pedidos com ledger", err);
+    }
+    // B-3: operações cujo envio ao Mercado Pago ficou inconclusivo deixam de
+    // ser estado morto. Observação read-only pela identidade persistida,
+    // reaproveitando esta reconciliação oportunista — sem cron/sweep novo.
+    try {
+      await recuperarOperacoesInconclusivas(env);
+    } catch (err) {
+      console.error("Falha na recuperação de operações inconclusivas", err);
     }
     try {
       await liberarReservasVencidasLocalmente(env);
