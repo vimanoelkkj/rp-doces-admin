@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { app, fixture, state, barrier, isProjection, isPhysical, refund } from './helpers/b3.mjs';
 
 const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
-const approve = db => app.sync.syncPaymentFromMp(db, 1, { status: 'approved' });
+const approve = async db => app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment('fake', '101'));
 
 async function adminOperation(db, kind, amount) {
   const session = await app.auth.createSession(db, 1);
@@ -417,26 +417,34 @@ test('manual payment uses the convergent result without changing registration se
 
 test('non-terminal MP snapshot still repairs persisted PAGO; terminal matrix stays unchanged', async t => {
   const db=await fixture(t,{paid:true});
-  const result=await app.sync.syncPaymentFromMp(db,1,{status:'pending'});
+  t.mock.method(globalThis, 'fetch', async () => Response.json({id:101,status:'pending'}));
+  const result=await app.sync.syncPaymentFromMp(db,1,await app.sync.fetchMpPayment('fake','101'));
   assert.equal(result.transicionou,false);
   assert.equal(result.status,'PAGO');
   converted(await state(db));
   await db.prepare("UPDATE pedidos SET status_pagamento='PENDENTE' WHERE id=1").run();
-  assert.equal((await app.sync.syncPaymentFromMp(db,1,{status:'cancelled'})).status,'PAGO');
+  t.mock.method(globalThis, 'fetch', async () => Response.json({id:101,status:'cancelled'}));
+  assert.equal((await app.sync.syncPaymentFromMp(db,1,await app.sync.fetchMpPayment('fake','101'))).status,'PAGO');
   converted(await state(db));
 });
 
-test('B2 matrix and B4 release policy remain unchanged; generic reconciliation never releases', async t => {
+test('B2: verified MP approval now recovers local expiration', async t => {
   const db=await fixture(t);
   await app.sync.expireLocalPayment(db,1);
-  assert.equal((await approve(db)).status,'EXPIRADO');
-  assert.equal((await state(db)).pedido.status_pagamento,'PENDENTE');
+  assert.equal((await approve(db)).status,'PAGO');
+  converted(await state(db));
+});
+
+test('B4 release policy remains unchanged; generic reconciliation never releases', async t => {
+  const db=await fixture(t);
+  await app.sync.expireLocalPayment(db,1);
   await db.prepare("UPDATE pedidos SET reserva_status='ATIVA' WHERE id=1").run();
   await db.prepare('UPDATE produtos SET estoque_reservado=2 WHERE id=1').run();
   await reconcile(db);
   assert.equal((await state(db)).pedido.reserva_status,'ATIVA');
   await db.prepare("UPDATE pedido_pagamentos SET status='PENDENTE' WHERE id=1").run();
   await db.prepare("INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,idempotency_key) VALUES(1,'PIX_MP','ADMIN',5000,'PENDENTE','second')").run();
-  await app.sync.syncPaymentFromMp(db,1,{status:'cancelled'});
+  t.mock.method(globalThis, 'fetch', async () => Response.json({id:101,status:'cancelled'}));
+  await app.sync.syncPaymentFromMp(db,1,await app.sync.fetchMpPayment('fake','101'));
   assert.equal((await state(db)).pedido.reserva_status,'LIBERADA'); // known B4, deliberately not fixed
 });

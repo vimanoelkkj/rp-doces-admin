@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { resolveLedgerPaymentId } from "./comandaLedger";
-import { syncPaymentFromMp, expireLocalPayment } from "./paymentSync";
+import { syncPaymentFromMp, expireLocalPayment, fetchMpPayment, resolveWebhookPayment } from "./paymentSync";
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 
 export interface PedidoStatusRow {
@@ -27,8 +27,8 @@ async function statusDoPagamento(db: D1Database, pagamentoId: number | null): Pr
   return row?.status ?? null;
 }
 
-// Se o pedido ainda está PENDENTE (agregado), checa expiração local e
-// consulta o Mercado Pago quando necessário. Nunca sobrescreve um
+// Consulta a tentativa SITE, inclusive expirada, antes da expiração local.
+// O agregado financeiro não bloqueia a consulta de uma tentativa. Nunca sobrescreve um
 // status_pedido mais avançado que NOVO.
 //
 // pedidos.status_pagamento passou a ser só a projeção agregada
@@ -44,7 +44,7 @@ export async function refreshPedidoStatus(
   // Verificação explícita antes de decidir: se já existe ledger, usa a
   // linha existente; só materializa o legado se genuinamente não existir
   // nenhuma (pedido criado antes do 4c-1). Nunca "ensure() e torce".
-  const pagamentoId = await resolveLedgerPaymentId(db, pedido.id);
+  const pagamentoId = await resolveLedgerPaymentId(db, pedido.id, pedido.mp_payment_id);
   const statusEspecificoAtual = await statusDoPagamento(db, pagamentoId);
 
   // Antes de qualquer retorno por agregado/prazo, recupera efeitos locais
@@ -52,9 +52,7 @@ export async function refreshPedidoStatus(
   const reconciliacao = await reconcilePedidoAfterFinancialChange(db, pedido.id);
   const statusAgregado = reconciliacao.ok ? reconciliacao.statusFinanceiro : pedido.status_pagamento;
 
-  if (statusAgregado !== "PENDENTE" || statusEspecificoAtual === "PAGO") {
-    // Agregado já resolvido (PARCIAL/PAGO): pré-4d, com no máximo 1
-    // pagamento por pedido, não há mais nada a verificar no MP.
+  if (statusEspecificoAtual && statusEspecificoAtual !== "PENDENTE" && statusEspecificoAtual !== "EXPIRADO") {
     return {
       statusPagamento: statusEspecificoAtual ?? statusAgregado,
       statusPedido: pedido.status_pedido,
@@ -62,60 +60,46 @@ export async function refreshPedidoStatus(
   }
 
   if (!pagamentoId) {
-    // Não deveria acontecer com o pedido ainda PENDENTE (Passo 4b garante
-    // materialização), mas sem uma linha de ledger não há o que sincronizar.
+    // Sem tentativa SITE inequívoca, não consulta nem expira um pagamento
+    // administrativo escolhido arbitrariamente; responde a projeção atual.
     return {
-      statusPagamento: statusEspecificoAtual ?? pedido.status_pagamento,
+      statusPagamento: statusEspecificoAtual ?? statusAgregado,
       statusPedido: pedido.status_pedido,
     };
   }
 
-  if (pedido.pix_expira_em && Date.now() > Date.parse(pedido.pix_expira_em)) {
+  const tentativa = await db.prepare(`SELECT mp_payment_id, pix_expira_em FROM pedido_pagamentos WHERE id = ?`)
+    .bind(pagamentoId).first<{ mp_payment_id: string | null; pix_expira_em: string | null }>();
+  const mpId = tentativa?.mp_payment_id ?? pedido.mp_payment_id;
+  let payment;
+  if (mpId && mpAccessToken) {
+    try {
+      payment = await fetchMpPayment(mpAccessToken, mpId);
+    } catch (err) {
+      // Falha do GET não comprova rejeição. Só o prazo, abaixo, pode encerrar
+      // operacionalmente o QR; a tentativa continua financeiramente recuperável.
+      console.error("Falha ao consultar pagamento no Mercado Pago", pedido.id, err);
+    }
+  }
+
+  let transicionou = false;
+  if (payment) {
+    const resolved = await resolveWebhookPayment(db, payment);
+    if (resolved.kind !== "found" || resolved.pagamentoId !== pagamentoId) {
+      throw new Error("IDENTIDADE_PAGAMENTO_SITE_DIVERGENTE");
+    }
+    // Fora do catch de rede: falha derivada B3 não é falha de consulta MP.
+    transicionou = (await syncPaymentFromMp(db, pagamentoId, payment)).transicionou;
+  }
+
+  const expiraEm = tentativa?.pix_expira_em ?? pedido.pix_expira_em;
+  if (expiraEm && Date.now() >= Date.parse(expiraEm)) {
+    // Guard atômico preserva PAGO concorrente. Não devolve EXPIRADO literal.
     await expireLocalPayment(db, pagamentoId);
-    return { statusPagamento: "EXPIRADO", statusPedido: pedido.status_pedido };
   }
-
-  if (!pedido.mp_payment_id) {
-    return {
-      statusPagamento: statusEspecificoAtual ?? pedido.status_pagamento,
-      statusPedido: pedido.status_pedido,
-    };
-  }
-
-  const mpResponse = await fetch(
-    `https://api.mercadopago.com/v1/payments/${pedido.mp_payment_id}`,
-    { headers: { Authorization: `Bearer ${mpAccessToken}` } },
-  );
-
-  if (!mpResponse.ok) {
-    console.error("Falha ao consultar pagamento no Mercado Pago", mpResponse.status);
-    return {
-      statusPagamento: statusEspecificoAtual ?? pedido.status_pagamento,
-      statusPedido: pedido.status_pedido,
-    };
-  }
-
-  const payment = (await mpResponse.json()) as {
-    status: string;
-    status_detail?: string | null;
-    date_approved?: string | null;
-  };
-
-  const sincronizado = await syncPaymentFromMp(db, pagamentoId, {
-    status: payment.status,
-    statusDetail: payment.status_detail ?? null,
-    dateApproved: payment.date_approved ?? null,
-  });
-
-  if (!sincronizado.transicionou || !sincronizado.status) {
-    return {
-      statusPagamento: sincronizado.status ?? statusEspecificoAtual ?? pedido.status_pagamento,
-      statusPedido: pedido.status_pedido,
-    };
-  }
-
+  const statusPagamento = await statusDoPagamento(db, pagamentoId) ?? statusAgregado;
   const novoStatusPedido =
-    sincronizado.status === "PAGO" && pedido.status_pedido === "NOVO"
+    transicionou && statusPagamento === "PAGO" && pedido.status_pedido === "NOVO"
       ? "PREPARANDO"
       : pedido.status_pedido;
 
@@ -132,5 +116,5 @@ export async function refreshPedidoStatus(
       .run();
   }
 
-  return { statusPagamento: sincronizado.status, statusPedido: novoStatusPedido };
+  return { statusPagamento, statusPedido: novoStatusPedido };
 }

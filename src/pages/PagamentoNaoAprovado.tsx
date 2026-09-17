@@ -70,8 +70,8 @@ export default function PagamentoNaoAprovado() {
             <div>
               <strong>O que aconteceu?</strong>
               <p>
-                O tempo para pagamento expirou ou ocorreu um erro na transação.
-                Nenhum valor foi cobrado.
+                Não recebemos confirmação de aprovação deste pagamento.
+                Se você já pagou, confira o comprovante e fale conosco antes de tentar novamente.
               </p>
             </div>
           </div>
@@ -108,7 +108,7 @@ export default function PagamentoNaoAprovado() {
             <span>R$ {totalPrice.toFixed(2).replace(".", ",")}</span>
           </div>
           <div className="recusado-summary-row recusado-summary-total">
-            <span>Valor não cobrado</span>
+            <span>Valor do pedido</span>
             <span className="recusado-total-value">
               R$ {totalPrice.toFixed(2).replace(".", ",")}
             </span>
