@@ -25,7 +25,7 @@ const MENSAGENS: Record<string, string> = {
     "Pedidos entregues ou cancelados não podem ser reembolsados",
   PAGAMENTO_NAO_ENCONTRADO: "Pagamento não encontrado ou não confirmado",
   METODO_NAO_REEMBOLSAVEL_MANUALMENTE:
-    "Este pagamento exige reembolso pelo Mercado Pago, fora do escopo deste fluxo",
+    "O método deste pagamento não permite registrar estorno manual",
   VALOR_INVALIDO: "Valor inválido",
   SALDO_REEMBOLSAVEL_INSUFICIENTE:
     "O saldo reembolsável mudou antes da confirmação. Atualize e tente novamente.",

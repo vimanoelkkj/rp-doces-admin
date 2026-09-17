@@ -953,10 +953,32 @@ export async function registerAdminPayment(
 // uma armadilha matemática (bruto deixaria de contar o pagamento, mas o
 // reembolso continuaria sendo subtraído, gerando contribuição negativa).
 
+// B-2 — métodos cujo estorno pode ser REGISTRADO manualmente no ledger.
+//
+// `PIX_MP` entrou aqui, e isso NÃO significa que passamos a chamar a API de
+// refund do Mercado Pago (continua fora de escopo, nenhuma chamada remota
+// acontece neste caminho). Significa apenas que a operadora pode registrar
+// no ledger um estorno que ela JÁ executou por fora do sistema — no painel
+// do Mercado Pago ou por outro meio.
+//
+// Sem isso o sistema tinha um beco sem saída com dinheiro real: cliente paga
+// Pix, desiste, a operadora devolve o valor, e o ledger continuava afirmando
+// que o dinheiro estava retido. O guard de cancelamento exige líquido zero
+// ("Faça o estorno antes de cancelar"), então o pedido ficava PAGO para
+// sempre, impossível de cancelar, e só recuperável com SQL direto no banco.
+//
+// `origem='MANUAL'` (gravado abaixo) continua correto e é deliberado: descreve
+// QUEM criou este fato — o operador, não a nossa integração. `'MERCADO_PAGO'`
+// fica reservado para quando/se existir sincronização automática de refund,
+// que não é isto.
+//
+// `OUTRO` segue fora: existe no schema por paridade com produção, mas este
+// endpoint não cria pagamentos com esse método, então também não os estorna.
 const METODOS_MANUAIS_REEMBOLSAVEIS: ReadonlySet<string> = new Set([
   "DINHEIRO",
   "CARTAO",
   "PIX_EXTERNO",
+  "PIX_MP",
 ]);
 
 const STATUS_PEDIDO_REEMBOLSAVEIS: ReadonlySet<string> = new Set([
@@ -1056,12 +1078,16 @@ export async function registerManualRefund(
     return { ok: false, erro: "PAGAMENTO_NAO_ENCONTRADO" };
   }
   if (!METODOS_MANUAIS_REEMBOLSAVEIS.has(pagamento.metodo)) {
-    // Cobre PIX_MP (exige reembolso via API do Mercado Pago, fora deste
-    // passo) e OUTRO (existe no schema por paridade com produção, mas
-    // este endpoint não aceita criar pagamentos com esse método, então
-    // também não reembolsa).
+    // Sobra `OUTRO`: existe no schema por paridade com produção, mas este
+    // endpoint não aceita criar pagamentos com esse método, então também
+    // não os estorna. `PIX_MP` passou a ser registrável no B-2 — ver a nota
+    // em METODOS_MANUAIS_REEMBOLSAVEIS.
     return { ok: false, erro: "METODO_NAO_REEMBOLSAVEL_MANUALMENTE" };
   }
+  // O estorno só pode ser registrado sobre um pagamento efetivamente
+  // confirmado (`status = 'PAGO'`, validado acima) — e o registro NUNCA muta
+  // o pagamento original, que permanece um fato histórico íntegro. Nenhuma
+  // chamada remota ao Mercado Pago acontece aqui, inclusive para PIX_MP.
 
   if (!Number.isSafeInteger(params.valorCentavos) || params.valorCentavos <= 0) {
     return { ok: false, erro: "VALOR_INVALIDO" };
