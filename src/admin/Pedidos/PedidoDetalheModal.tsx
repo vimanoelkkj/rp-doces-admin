@@ -42,6 +42,12 @@ interface PedidoDetalheResponse {
   itens: PedidoItemRow[];
   financeiro: FinanceiroPedido;
   pixAdminPendentes: PixAdminPendente[];
+  /** B-3: cobranças sem confirmação do Mercado Pago (leitura, nunca decisão). */
+  operacoesInconclusivas: {
+    tipo: string;
+    diagnostico: string | null;
+    atualizadoEm: string;
+  }[];
 }
 
 interface PedidoDetalheModalProps {
@@ -410,6 +416,25 @@ export default function PedidoDetalheModal({
                   <span className="pedmodal-payment-method">{financeiro!.detalhe}</span>
                 )}
               </div>
+
+              {/* B-3: cobrança cujo envio ao Mercado Pago ficou inconclusivo.
+                  Reusa o mesmo bloco de aviso do caminho ambíguo, porque a
+                  ação correta é idêntica: nunca tentar de novo às cegas, só
+                  reler o que persistiu. A recuperação read-only roda sozinha
+                  na carga da listagem; este bloco existe para o caso não
+                  convergir. Nenhum estado é inventado aqui. */}
+              {data.operacoesInconclusivas.length > 0 && (
+                <div className="pedmodal-pix-aviso">
+                  <span>
+                    ⚠ {data.operacoesInconclusivas.length === 1 ? "Uma cobrança" : "Cobranças"} deste
+                    pedido não teve confirmação do Mercado Pago. Verificamos automaticamente; não
+                    gere outra sem conferir.
+                  </span>
+                  <button type="button" className="pedmodal-btn-edit" onClick={carregarPedido}>
+                    Atualizar pedido
+                  </button>
+                </div>
+              )}
 
               {pixError && <p className="pedmodal-status-error">{pixError}</p>}
               {pixAviso && (

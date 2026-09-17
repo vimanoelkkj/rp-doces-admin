@@ -316,6 +316,128 @@ export const OPERACAO_HTTP_STATUS: Record<string, number> = {
   OPERACAO_EM_PROCESSAMENTO: 409,
 };
 
+// B-3 — operações cujo envio ao provedor não produziu resultado provável.
+//
+// `ENVIO_INCONCLUSIVO`: o POST ocorreu e não sabemos se o recurso remoto
+// existe. `LOCAL_CRIADA` além do prazo do POST é igualmente inconclusiva: o
+// worker pode ter morrido entre o claim e o registro do resultado, e o
+// estado ficaria indistinguível para sempre.
+//
+// O corte por idade evita disputar com uma requisição ainda em voo (o POST
+// tem prazo próprio de 20s) — nunca é uma prova de nada, só um limiar
+// operacional.
+export const RECUPERACAO_APOS_SEGUNDOS = 60;
+
+export interface OperacaoInconclusiva {
+  operation_key: string;
+  tipo: OperacaoTipo;
+  fase: OperacaoFase;
+  pedido_id: number | null;
+  pagamento_id: number | null;
+  mp_request: string | null;
+  erro: string | null;
+  atualizado_em: string;
+}
+
+const OPERACAO_INCONCLUSIVA_SQL = `
+  SELECT o.operation_key, o.tipo, o.fase, o.pedido_id, o.pagamento_id,
+         o.mp_request, o.erro, o.atualizado_em
+  FROM pedido_operacoes o
+  JOIN pedido_pagamentos pp ON pp.id = o.pagamento_id
+  WHERE o.fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')
+    AND o.mp_idempotency_key IS NOT NULL
+    AND o.mp_payment_id IS NULL
+    AND pp.mp_payment_id IS NULL
+    AND pp.metodo = 'PIX_MP'
+    AND pp.status IN ('PENDENTE', 'EXPIRADO')
+`;
+
+// Candidatas à recuperação read-only, em lote pequeno e mais antigas
+// primeiro. Só entram tentativas Pix sem identidade remota: uma tentativa já
+// associada não precisa de busca.
+//
+// `EXPIRADO` participa junto com `PENDENTE` de propósito, pelo mesmo motivo
+// que os fallbacks do webhook e `reconcilePendingPixPayments` já aceitam os
+// dois: a expiração é OPERACIONAL (o prazo local do QR venceu) e nunca prova
+// ausência de pagamento. Excluir `EXPIRADO` aqui abandonaria exatamente o
+// caso mais caro — a cobrança que o provedor criou, o cliente pagou, e cujo
+// prazo local venceu antes de descobrirmos. A promoção segue exigindo
+// autoridade do GET verificado (B2); esta seleção não decide nada.
+//
+// Os demais estados terminais (`PAGO`, `CANCELADO`, `FALHOU`, `REEMBOLSADO`)
+// continuam fora: não devem ser reabertos por esta via.
+export async function listarOperacoesInconclusivas(
+  db: D1Database,
+  limite: number,
+): Promise<OperacaoInconclusiva[]> {
+  const { results } = await db
+    .prepare(
+      `${OPERACAO_INCONCLUSIVA_SQL}
+         AND datetime(o.atualizado_em) <= datetime('now', '-' || ? || ' seconds')
+       ORDER BY o.atualizado_em ASC, o.id ASC
+       LIMIT ?`,
+    )
+    .bind(RECUPERACAO_APOS_SEGUNDOS, limite)
+    .all<OperacaoInconclusiva>();
+  return results || [];
+}
+
+// Visibilidade operacional (sem corte por idade): o que ainda não convergiu
+// para este pedido, para o admin poder agir em vez de olhar um estado cego.
+export async function listarOperacoesInconclusivasDoPedido(
+  db: D1Database,
+  pedidoId: number,
+): Promise<OperacaoInconclusiva[]> {
+  const { results } = await db
+    .prepare(`${OPERACAO_INCONCLUSIVA_SQL} AND o.pedido_id = ? ORDER BY o.id ASC`)
+    .bind(pedidoId)
+    .all<OperacaoInconclusiva>();
+  return results || [];
+}
+
+// Claim de throttle da recuperação: mesma ideia do `reconcilePendingPixPayments`.
+// Move só `atualizado_em` da OPERAÇÃO — nunca toca fato financeiro nem
+// timestamp histórico. Concorrência e falha de rede também respeitam o prazo.
+export async function claimRecuperacao(db: D1Database, key: string): Promise<boolean> {
+  const claim = await db
+    .prepare(
+      `UPDATE pedido_operacoes SET atualizado_em = CURRENT_TIMESTAMP
+       WHERE operation_key = ? AND fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')
+         AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')`,
+    )
+    .bind(key, RECUPERACAO_APOS_SEGUNDOS)
+    .run();
+  return Number(claim?.meta?.changes || 0) > 0;
+}
+
+// Diagnóstico da última observação. `erro` é sobrescrito de propósito (é o
+// estado corrente da recuperação, não um histórico), e a fase não regride:
+// `CONCLUIDA`/`RECUSADA` continuam terminais pelo guard de `registrarFase`.
+export async function registrarObservacao(
+  db: D1Database,
+  key: string,
+  diagnostico: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE pedido_operacoes SET erro = ?, atualizado_em = CURRENT_TIMESTAMP
+       WHERE operation_key = ? AND fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')`,
+    )
+    .bind(diagnostico, key)
+    .run();
+}
+
+export function externalReferenceDaOperacao(operacao: OperacaoInconclusiva): string | null {
+  if (!operacao.mp_request) return null;
+  try {
+    const request = JSON.parse(operacao.mp_request) as { external_reference?: unknown };
+    const referencia = String(request?.external_reference ?? "").trim();
+    return referencia || null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseResultado<T>(operacao: OperacaoRow): T | null {
   if (!operacao.resultado) return null;
   try {

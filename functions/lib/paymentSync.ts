@@ -11,6 +11,14 @@
 import { LedgerStatus } from "./comandaLedger";
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 import { liberarReservaPedido } from "./stock";
+import { buscarPagamentosPorReferenciaExterna } from "./mpSearch";
+import {
+  claimRecuperacao,
+  externalReferenceDaOperacao,
+  listarOperacoesInconclusivas,
+  registrarFase,
+  registrarObservacao,
+} from "./operacoes";
 
 export type MpMappedStatus = "PAGO" | "CANCELADO" | "EXPIRADO";
 
@@ -390,6 +398,129 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
         await syncPaymentFromMp(env.DB, row.id, payment);
       } catch (err) {
         console.error("Falha ao reconciliar pagamento PIX_MP pendente/expirado", row.id, err);
+      }
+    }),
+  );
+}
+
+const RECUPERACAO_BATCH_SIZE = 4;
+
+// B-3 — recuperação de operações cujo envio ao Mercado Pago ficou
+// INCONCLUSIVO (timeout, transporte, 408/429/5xx, 2xx sem id utilizável).
+//
+// Antes, `fase='ENVIO_INCONCLUSIVO'` era estado MORTO: nada no código o lia.
+// Sem `mp_payment_id`, `reconcilePendingPixPayments` não seleciona a
+// tentativa e o polling público não consulta o provedor — então a única
+// recuperação possível era o webhook. Se ele não chegasse, uma cobrança
+// realmente criada e realmente paga nunca seria descoberta.
+//
+// INVARIANTE CENTRAL: uma operação inconclusiva pode significar (A) o
+// provedor não criou nada, ou (B) criou e perdemos a resposta. Esta função
+// NUNCA assume A nem B. Ela apenas OBSERVA o provedor com uma operação de
+// leitura, pela identidade que o A1 já persistiu, e delega toda decisão
+// financeira aos mecanismos existentes:
+//
+//   busca read-only (propõe um id)
+//     -> fetchMpPayment (ÚNICA fonte de autoridade financeira — B2)
+//     -> resolveWebhookPayment (associação guardada por CAS, sem duplicar)
+//     -> syncPaymentFromMp (matriz de transição + reconciliação B3 + B4)
+//
+// Nunca faz POST, nunca gera nova identidade, nunca cria pedido, tentativa
+// ou fato financeiro, e nunca libera reserva por conta própria: a liberação
+// só acontece dentro de `finalizePayment`, sob os guards do B4, quando o
+// estado terminal foi estabelecido pelos mecanismos autoritativos.
+//
+// Não é cron nem job: roda oportunisticamente, junto das reconciliações que
+// já existem no GET administrativo, em lote pequeno e com throttle.
+export async function recuperarOperacoesInconclusivas(
+  env: { DB: D1Database; MP_ACCESS_TOKEN?: string },
+): Promise<void> {
+  if (!env.MP_ACCESS_TOKEN) return;
+
+  const candidatas = await listarOperacoesInconclusivas(env.DB, RECUPERACAO_BATCH_SIZE);
+  if (!candidatas.length) return;
+
+  await Promise.allSettled(
+    candidatas.map(async (operacao) => {
+      try {
+        // Throttle adquirido ANTES de qualquer chamada externa: concorrência
+        // e falhas de rede não viram uma rajada de buscas.
+        if (!(await claimRecuperacao(env.DB, operacao.operation_key))) return;
+
+        const referencia = externalReferenceDaOperacao(operacao);
+        if (!referencia) {
+          await registrarObservacao(env.DB, operacao.operation_key, "BUSCA:REFERENCIA_AUSENTE");
+          return;
+        }
+
+        const busca = await buscarPagamentosPorReferenciaExterna(env.MP_ACCESS_TOKEN!, referencia);
+
+        if (busca.resultado === "INDISPONIVEL") {
+          // Não observamos nada. Isso não é rejeição, não perde identidade e
+          // pode ser repetido no próximo ciclo.
+          await registrarObservacao(env.DB, operacao.operation_key, `BUSCA:INDISPONIVEL:${busca.motivo}`);
+          return;
+        }
+
+        if (busca.resultado === "NENHUM") {
+          // Zero compatíveis NÃO prova que o provedor não criou o recurso.
+          // Nada de FALHOU, nada de CANCELADO, nada de liberar reserva.
+          await registrarObservacao(env.DB, operacao.operation_key, "BUSCA:NENHUM");
+          return;
+        }
+
+        if (busca.resultado === "AMBIGUO") {
+          // Mais de um candidato: não escolhemos arbitrariamente e não
+          // estabelecemos verdade financeira. Fica visível para intervenção.
+          console.error("Recuperação de operação inconclusiva: múltiplos candidatos no Mercado Pago", {
+            operationKey: operacao.operation_key,
+            pedidoId: operacao.pedido_id,
+            candidatos: busca.mpPaymentIds,
+          });
+          await registrarObservacao(
+            env.DB,
+            operacao.operation_key,
+            `BUSCA:AMBIGUO:${busca.quantidade}`,
+          );
+          return;
+        }
+
+        // Exatamente um candidato. A partir daqui a busca não decide mais
+        // nada: o GET verificado é que produz autoridade financeira.
+        const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN!, busca.mpPaymentId);
+        const resolvido = await resolveWebhookPayment(env.DB, payment);
+
+        if (resolvido.kind !== "found") {
+          console.error("Recuperação de operação inconclusiva: associação não resolvida", {
+            operationKey: operacao.operation_key,
+            pedidoId: operacao.pedido_id,
+            mpPaymentId: busca.mpPaymentId,
+            kind: resolvido.kind,
+          });
+          await registrarObservacao(
+            env.DB,
+            operacao.operation_key,
+            `BUSCA:ASSOCIACAO_${resolvido.kind.toUpperCase()}`,
+          );
+          return;
+        }
+
+        // Identidade remota agora é conhecida. A fase deixa de ser
+        // inconclusiva e o replay da MESMA operationKey (A1) passa a
+        // recuperar o resultado a partir das linhas persistidas.
+        await registrarFase(env.DB, operacao.operation_key, {
+          fase: "REMOTO_CONHECIDO",
+          mpPaymentId: busca.mpPaymentId,
+        });
+
+        // Estado financeiro decidido só aqui, pelo caminho compartilhado.
+        await syncPaymentFromMp(env.DB, resolvido.pagamentoId, payment);
+      } catch (err) {
+        console.error(
+          "Falha ao recuperar operação inconclusiva",
+          operacao.operation_key,
+          err,
+        );
       }
     }),
   );
