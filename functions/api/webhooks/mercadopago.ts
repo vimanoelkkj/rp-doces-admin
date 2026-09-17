@@ -83,11 +83,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return ok();
     }
 
-    await syncPaymentFromMp(env.DB, resolved.pagamentoId, {
-      status: payment.status,
-      statusDetail: payment.status_detail ?? null,
-      dateApproved: payment.date_approved ?? null,
-    });
+    await syncPaymentFromMp(env.DB, resolved.pagamentoId, payment);
 
     return ok();
   } catch (err) {

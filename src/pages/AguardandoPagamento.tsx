@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { CartItem, useCart } from "../context/CartContext";
@@ -26,7 +26,7 @@ interface CheckoutResponse {
 
 interface PedidoStatusResponse {
   pedidoId: number;
-  statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO" | "REEMBOLSADO";
+  statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO" | "REEMBOLSADO" | "FALHOU";
   statusPedido: string;
 }
 
@@ -65,6 +65,8 @@ export default function AguardandoPagamento() {
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [resultadoPendente, setResultadoPendente] = useState<string | null>(null);
+  const [expiradoNoServidor, setExpiradoNoServidor] = useState(false);
+  const prazoEncerrado = timeLeft === 0 || expiradoNoServidor;
 
   useEffect(() => {
     if (!state || state.items.length === 0) {
@@ -142,6 +144,8 @@ export default function AguardandoPagamento() {
     if (status !== "pronto" || !payment) return;
 
     let cancelled = false;
+    let inFlight = false;
+    const controller = new AbortController();
 
     const goToResult = (statusPagamento: string) => {
       if (cancelled) return;
@@ -153,17 +157,24 @@ export default function AguardandoPagamento() {
     };
 
     const poll = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
       try {
         const response = await fetch(
           `/api/pedido-status?token=${encodeURIComponent(payment.tokenPublico)}`,
+          { signal: controller.signal },
         );
-        if (!response.ok) return;
+        if (cancelled || !response.ok) return;
         const data = (await response.json()) as PedidoStatusResponse;
-        if (data.statusPagamento !== "PENDENTE") {
+        if (cancelled) return;
+        if (data.statusPagamento === "EXPIRADO") setExpiradoNoServidor(true);
+        if (["PAGO", "CANCELADO", "FALHOU"].includes(data.statusPagamento)) {
           goToResult(data.statusPagamento);
         }
       } catch {
         // falha de rede pontual — tenta de novo no próximo ciclo
+      } finally {
+        inFlight = false;
       }
     };
 
@@ -171,17 +182,10 @@ export default function AguardandoPagamento() {
     const interval = setInterval(poll, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
+      controller.abort();
       clearInterval(interval);
     };
   }, [status, payment, navigate, clearCart, state]);
-
-  useEffect(() => {
-    if (timeLeft === 0 && payment) {
-      navigate("/pagamento-nao-aprovado", {
-        state: { items: state!.items, totalCentavos: payment.totalCentavos },
-      });
-    }
-  }, [timeLeft, payment, navigate, state]);
 
   useEffect(() => {
     if (status !== "processando" || !resultadoPendente || !payment) return;
@@ -208,7 +212,7 @@ export default function AguardandoPagamento() {
   }, [status, resultadoPendente, payment, navigate, clearCart, state]);
 
   const handleCopy = () => {
-    if (!payment?.qrCode) return;
+    if (!payment?.qrCode || prazoEncerrado) return;
     navigator.clipboard.writeText(payment.qrCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -328,11 +332,13 @@ export default function AguardandoPagamento() {
             <div className="aguardando-step">
               <h1 className="payment-title">Aguardando pagamento</h1>
               <p className="payment-subtitle">
-                Escaneie o QR Code abaixo para pagar via Pix
+                {prazoEncerrado
+                  ? "Prazo do QR encerrado. Ainda não confirmamos o pagamento."
+                  : "Escaneie o QR Code abaixo para pagar via Pix"}
               </p>
 
               <div className="qr-code">
-                {payment.qrCodeBase64 ? (
+                {!prazoEncerrado && payment.qrCodeBase64 ? (
                   <img
                     src={`data:image/png;base64,${payment.qrCodeBase64}`}
                     alt="QR Code Pix"
@@ -342,17 +348,17 @@ export default function AguardandoPagamento() {
 
               <div className="pix-copy-row">
                 <span className="pix-copy-label">PIX COPIA E COLA</span>
-                <button className="pix-copy-btn" onClick={handleCopy}>
+                <button className="pix-copy-btn" onClick={handleCopy} disabled={prazoEncerrado}>
                   {copied ? "Copiado!" : "Copiar código"}
                 </button>
               </div>
-              <div className="pix-code-box">{payment.qrCode}</div>
+              <div className="pix-code-box">{prazoEncerrado ? "Código Pix com prazo encerrado" : payment.qrCode}</div>
 
               {timeLeft != null && (
                 <div className="pix-timer">
-                  ⏱ Expira em{" "}
+                  ⏱ {prazoEncerrado ? "Prazo encerrado" : "Expira em"}{" "}
                   <strong>
-                    {minutes}:{seconds}
+                    {prazoEncerrado ? "00:00" : `${minutes}:${seconds}`}
                   </strong>
                 </div>
               )}
@@ -378,6 +384,7 @@ export default function AguardandoPagamento() {
               <p className="payment-notice">
                 O pedido será confirmado automaticamente assim que o pagamento
                 for recebido.
+                {prazoEncerrado && <> <Link to={`/pedido/${encodeURIComponent(payment.tokenPublico)}`}>Acompanhar pedido</Link></>}
               </p>
             </div>
           )}

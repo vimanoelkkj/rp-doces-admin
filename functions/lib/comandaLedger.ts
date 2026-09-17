@@ -226,15 +226,21 @@ export async function allocateFullValueAcrossItems(
 export async function resolveLedgerPaymentId(
   db: D1Database,
   pedidoId: number,
+  mpPaymentId: string | null = null,
 ): Promise<number | null> {
-  const existing = await db
+  const anyLedger = await db
     .prepare(`SELECT id FROM pedido_pagamentos WHERE pedido_id = ? LIMIT 1`)
     .bind(pedidoId)
     .first<{ id: number }>();
-  if (existing) return Number(existing.id);
-
-  const materializado = await ensureLegacyPaymentMaterialized(db, pedidoId);
-  return materializado.ok ? materializado.paymentId : null;
+  if (!anyLedger) await ensureLegacyPaymentMaterialized(db, pedidoId);
+  // Este resolver pertence ao polling do checkout. Nunca seleciona um Pix
+  // ADMIN ou outro pagamento do pedido só por ter sido o primeiro inserido.
+  const { results } = await db.prepare(
+    `SELECT id FROM pedido_pagamentos WHERE pedido_id = ? AND origem = 'SITE' AND metodo = 'PIX_MP'
+       AND (? IS NULL OR mp_payment_id = ? OR mp_payment_id IS NULL) LIMIT 2`,
+  ).bind(pedidoId, mpPaymentId, mpPaymentId).all<{ id: number }>();
+  if (results.length > 1) throw new Error("TENTATIVA_SITE_AMBIGUA");
+  return results[0]?.id ?? null;
 }
 
 // Leitura pura: nunca escreve. Se já existe uma linha real, retorna ela.

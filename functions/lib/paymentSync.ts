@@ -14,10 +14,19 @@ import { liberarReservaPedido } from "./stock";
 
 export type MpMappedStatus = "PAGO" | "CANCELADO" | "EXPIRADO";
 
-export interface MpPaymentSnapshot {
-  status: string;
-  statusDetail?: string | null;
-  dateApproved?: string | null;
+// A marca privada só nasce no GET abaixo. Payloads e metadados persistidos
+// não satisfazem este contrato, inclusive em runtime. Não é estado no banco.
+const MP_GET_VERIFIED = Symbol("MP_GET_VERIFIED");
+// Identidade fraca, sem cache de dados nem retenção entre requisições.
+// Copiar um objeto verificado e trocar status/id não transfere autoridade.
+const verifiedMpResponses = new WeakSet<MpPaymentResponse>();
+export interface MpPaymentResponse {
+  readonly id: number | string;
+  readonly status: string;
+  readonly status_detail?: string | null;
+  readonly date_approved?: string | null;
+  readonly external_reference?: string | null;
+  readonly [MP_GET_VERIFIED]: true;
 }
 
 export interface SyncPaymentResult {
@@ -40,12 +49,14 @@ export function mapMpStatus(mpStatus: string): MpMappedStatus | null {
 // Matriz de transição de pedido_pagamentos.status (Passo 6, aprovada):
 // PENDENTE -> PAGO/CANCELADO/EXPIRADO: permitido.
 // Qualquer estado -> ele mesmo: no-op idempotente, permitido.
-// PAGO/CANCELADO/EXPIRADO/FALHOU/REEMBOLSADO -> qualquer outra coisa: recusado.
+// EXPIRADO -> PAGO: apenas com resposta verificada de GET MP.
+// PAGO/CANCELADO/FALHOU/REEMBOLSADO -> outra coisa: recusado.
 // REEMBOLSADO nunca é alcançado por este caminho (reembolso é evento e
 // tabela separados — Passo 5); a exclusão aqui é só a última linha de defesa.
-function isTransitionAllowed(statusAtual: string, novoStatus: MpMappedStatus): boolean {
+function isTransitionAllowed(statusAtual: string, novoStatus: MpMappedStatus, mp?: MpPaymentResponse): boolean {
   if (statusAtual === novoStatus) return true;
-  return statusAtual === "PENDENTE";
+  return statusAtual === "PENDENTE" ||
+    (statusAtual === "EXPIRADO" && novoStatus === "PAGO" && mp !== undefined && verifiedMpResponses.has(mp));
 }
 
 interface PagamentoRow {
@@ -57,42 +68,52 @@ interface PagamentoRow {
 // Núcleo compartilhado: aplica (ou recusa) uma transição já mapeada, com
 // CAS contra o status lido (evita pisar em uma mudança concorrente) e
 // reconcilia o pedido mesmo quando a transição já aconteceu antes.
-// `mpStatusRaw`/`mpStatusDetail` são gravados para diagnóstico mesmo
+// `mp_status`/`mp_status_detail` são gravados para diagnóstico mesmo
 // quando a transição do ledger é recusada pela matriz (permite auditar
 // "o MP mandou X, mas não aplicamos porque Y" sem perder o dado bruto).
-// Quando `null`/`undefined` (caminho de expiração local, sem MP
-// envolvido), esses campos simplesmente não são tocados.
+// Sem resposta MP, este núcleo privado só aceita expiração operacional.
 async function applyLedgerTransition(
   db: D1Database,
   pagamentoId: number,
-  novoStatus: MpMappedStatus,
-  meta: { mpStatusRaw?: string | null; mpStatusDetail?: string | null; dateApproved?: string | null } = {},
+  novoStatus: MpMappedStatus | null,
+  mp?: MpPaymentResponse,
 ): Promise<SyncPaymentResult> {
+  if (mp) {
+    if (!verifiedMpResponses.has(mp)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
+    const { results: vinculados } = await db.prepare(
+      `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`,
+    ).bind(String(mp.id)).all<{ id: number }>();
+    if (vinculados.length !== 1 || vinculados[0].id !== pagamentoId) {
+      throw new Error("IDENTIDADE_PAGAMENTO_MP_AMBIGUA_OU_DIVERGENTE");
+    }
+  } else if (novoStatus !== "EXPIRADO") {
+    throw new Error("TRANSICAO_LOCAL_INVALIDA");
+  }
   const atual = await db
     .prepare(`SELECT id, pedido_id, status FROM pedido_pagamentos WHERE id = ?`)
     .bind(pagamentoId)
     .first<PagamentoRow>();
   if (!atual) return { ok: false, status: null, transicionou: false };
 
-  if (meta.mpStatusRaw !== undefined && meta.mpStatusRaw !== null) {
+  if (mp) {
     await db
       .prepare(
         `UPDATE pedido_pagamentos SET mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
       )
-      .bind(meta.mpStatusRaw, meta.mpStatusDetail ?? null, pagamentoId)
+      .bind(mp.status, mp.status_detail ?? null, pagamentoId)
       .run();
   }
 
-  if (!isTransitionAllowed(atual.status, novoStatus)) {
+  if (!novoStatus || !isTransitionAllowed(atual.status, novoStatus, mp) || atual.status === novoStatus) {
     await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
-    return { ok: true, status: atual.status, transicionou: false };
+    const pos = await db.prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
+      .bind(pagamentoId).first<{ status: LedgerStatus }>();
+    return { ok: true, status: pos?.status ?? atual.status, transicionou: false };
   }
 
-  if (atual.status === novoStatus) {
-    await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
-    return { ok: true, status: atual.status, transicionou: false };
-  }
-
+  // A aprovação pode ter lido PENDENTE e perdido a corrida para a expiração.
+  // Revalida os estados elegíveis na própria escrita, sem retry recursivo.
+  const origemGuard = mp && novoStatus === "PAGO" ? "status IN ('PENDENTE', 'EXPIRADO')" : "status = 'PENDENTE'";
   const result = await db
     .prepare(
       `UPDATE pedido_pagamentos
@@ -100,9 +121,11 @@ async function applyLedgerTransition(
            pago_em = CASE WHEN ? = 'PAGO' THEN COALESCE(pago_em, ?, CURRENT_TIMESTAMP) ELSE pago_em END,
            cancelado_em = CASE WHEN ? IN ('CANCELADO', 'EXPIRADO') THEN COALESCE(cancelado_em, CURRENT_TIMESTAMP) ELSE cancelado_em END,
            atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ? AND status = ?`,
+       WHERE id = ? AND ${origemGuard}
+         ${mp ? "AND metodo = 'PIX_MP' AND mp_payment_id = ? AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos outro WHERE outro.mp_payment_id = ? AND outro.metodo = 'PIX_MP' AND outro.id != pedido_pagamentos.id)" : ""}`,
     )
-    .bind(novoStatus, novoStatus, meta.dateApproved ?? null, novoStatus, pagamentoId, atual.status)
+    .bind(novoStatus, novoStatus, mp?.date_approved ?? null, novoStatus, pagamentoId,
+      ...(mp ? [String(mp.id), String(mp.id)] : []))
     .run();
 
   const aplicou = Number(result?.meta?.changes || 0) > 0;
@@ -139,32 +162,10 @@ async function applyLedgerTransition(
 export async function syncPaymentFromMp(
   db: D1Database,
   pagamentoId: number,
-  mp: MpPaymentSnapshot,
+  mp: MpPaymentResponse,
 ): Promise<SyncPaymentResult> {
-  const novoStatus = mapMpStatus(mp.status);
-
-  if (!novoStatus) {
-    // Estado do MP ainda não é final (ex.: in_process) — só registra o
-    // retrato bruto para diagnóstico, sem tentar nenhuma transição.
-    await db
-      .prepare(
-        `UPDATE pedido_pagamentos SET mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
-      )
-      .bind(mp.status, mp.statusDetail ?? null, pagamentoId)
-      .run();
-    const atual = await db
-      .prepare(`SELECT status, pedido_id FROM pedido_pagamentos WHERE id = ?`)
-      .bind(pagamentoId)
-      .first<{ status: LedgerStatus; pedido_id: number }>();
-    if (atual) await reconcilePedidoAfterFinancialChange(db, atual.pedido_id);
-    return { ok: true, status: atual?.status ?? null, transicionou: false };
-  }
-
-  return applyLedgerTransition(db, pagamentoId, novoStatus, {
-    mpStatusRaw: mp.status,
-    mpStatusDetail: mp.statusDetail ?? null,
-    dateApproved: mp.dateApproved ?? null,
-  });
+  if (!verifiedMpResponses.has(mp)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
+  return applyLedgerTransition(db, pagamentoId, mapMpStatus(mp.status), mp);
 }
 
 // Caminho local de expiração (pix_expira_em vencido), sem nenhum dado do
@@ -174,24 +175,37 @@ export async function expireLocalPayment(db: D1Database, pagamentoId: number): P
   return applyLedgerTransition(db, pagamentoId, "EXPIRADO");
 }
 
-export interface MpPaymentResponse {
-  id: number;
-  status: string;
-  status_detail?: string | null;
-  date_approved?: string | null;
-  external_reference?: string | null;
-}
+// Não havia timeout de GET MP no projeto. Um único limite inclui leitura
+// do corpo e evita prender polling/lote administrativo por tempo indefinido.
+export const MP_PAYMENT_GET_TIMEOUT_MS = 5000;
 
 export async function fetchMpPayment(accessToken: string, paymentId: string): Promise<MpPaymentResponse> {
-  const response = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!response.ok) {
-    const err = new Error(`Mercado Pago respondeu ${response.status}`) as Error & { status?: number };
-    err.status = response.status;
-    throw err;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MP_PAYMENT_GET_TIMEOUT_MS);
+  try {
+    const response = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` }, signal: controller.signal,
+    });
+    if (!response.ok) {
+      const err = new Error(`Mercado Pago respondeu ${response.status}`) as Error & { status?: number };
+      err.status = response.status;
+      throw err;
+    }
+    const payment = await response.json() as Omit<MpPaymentResponse, typeof MP_GET_VERIFIED>;
+    if (!payment || String(payment.id) !== paymentId || typeof payment.status !== "string" || !payment.status) {
+      throw new Error("RESPOSTA_MP_INVALIDA_OU_ID_DIVERGENTE");
+    }
+    const verified = Object.freeze({
+      id: payment.id, status: payment.status,
+      status_detail: payment.status_detail, date_approved: payment.date_approved,
+      external_reference: payment.external_reference,
+      [MP_GET_VERIFIED]: true as const,
+    });
+    verifiedMpResponses.add(verified);
+    return verified;
+  } finally {
+    clearTimeout(timer);
   }
-  return (await response.json()) as MpPaymentResponse;
 }
 
 // Resolução do pagamento a ser sincronizado, para o webhook.
@@ -220,13 +234,15 @@ export async function resolveWebhookPayment(
   db: D1Database,
   payment: MpPaymentResponse,
 ): Promise<ResolveWebhookPaymentResult> {
+  if (!verifiedMpResponses.has(payment)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
   const mpPaymentId = String(payment.id);
 
-  const direto = await db
-    .prepare(`SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 1`)
+  const { results: diretos } = await db
+    .prepare(`SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`)
     .bind(mpPaymentId)
-    .first<{ id: number }>();
-  if (direto) return { kind: "found", pagamentoId: Number(direto.id) };
+    .all<{ id: number }>();
+  if (diretos.length > 1) return { kind: "ambiguous" };
+  if (diretos.length === 1) return { kind: "found", pagamentoId: Number(diretos[0].id) };
 
   const externalReference = String(payment.external_reference || "").trim();
   if (!externalReference) return { kind: "not_found" };
@@ -234,21 +250,13 @@ export async function resolveWebhookPayment(
   const porIdempotencyKey = await db
     .prepare(
       `SELECT id FROM pedido_pagamentos
-       WHERE metodo = 'PIX_MP' AND origem = 'ADMIN' AND status = 'PENDENTE' AND idempotency_key = ?
+       WHERE metodo = 'PIX_MP' AND origem = 'ADMIN' AND status IN ('PENDENTE', 'EXPIRADO') AND idempotency_key = ?
        LIMIT 1`,
     )
     .bind(externalReference)
     .first<{ id: number }>();
   if (porIdempotencyKey) {
-    const pagamentoId = Number(porIdempotencyKey.id);
-    await db
-      .prepare(
-        `UPDATE pedido_pagamentos SET mp_payment_id = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE id = ? AND status = 'PENDENTE' AND mp_payment_id IS NULL`,
-      )
-      .bind(mpPaymentId, pagamentoId)
-      .run();
-    return { kind: "found", pagamentoId };
+    return associateWebhookPayment(db, Number(porIdempotencyKey.id), mpPaymentId);
   }
 
   const tokenPublico = externalReference;
@@ -262,7 +270,8 @@ export async function resolveWebhookPayment(
   const { results: candidatos } = await db
     .prepare(
       `SELECT id FROM pedido_pagamentos
-       WHERE pedido_id = ? AND metodo = 'PIX_MP' AND origem = 'SITE' AND status = 'PENDENTE'`,
+       WHERE pedido_id = ? AND metodo = 'PIX_MP' AND origem = 'SITE' AND status IN ('PENDENTE', 'EXPIRADO')
+       LIMIT 2`,
     )
     .bind(pedido.id)
     .all<{ id: number }>();
@@ -270,16 +279,31 @@ export async function resolveWebhookPayment(
   if (!candidatos || candidatos.length === 0) return { kind: "not_found" };
   if (candidatos.length > 1) return { kind: "ambiguous" };
 
-  const pagamentoId = Number(candidatos[0].id);
+  return associateWebhookPayment(db, Number(candidatos[0].id), mpPaymentId);
+}
+
+async function associateWebhookPayment(db: D1Database, pagamentoId: number, mpPaymentId: string): Promise<ResolveWebhookPaymentResult> {
   await db
     .prepare(
       `UPDATE pedido_pagamentos SET mp_payment_id = ?, atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ? AND status = 'PENDENTE' AND mp_payment_id IS NULL`,
+       WHERE id = ? AND status IN ('PENDENTE', 'EXPIRADO') AND mp_payment_id IS NULL
+         AND (origem = 'ADMIN' OR (
+           SELECT COUNT(*) FROM pedido_pagamentos candidato
+           WHERE candidato.pedido_id = pedido_pagamentos.pedido_id AND candidato.metodo = 'PIX_MP'
+             AND candidato.origem = 'SITE' AND candidato.status IN ('PENDENTE', 'EXPIRADO')
+         ) = 1)
+         AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos WHERE mp_payment_id = ? AND metodo = 'PIX_MP')`,
     )
-    .bind(mpPaymentId, pagamentoId)
+    .bind(mpPaymentId, pagamentoId, mpPaymentId)
     .run();
-
-  return { kind: "found", pagamentoId };
+  // Outro evento pode ter associado outro ID ou concluído a mesma associação.
+  // Nunca retorna o candidato sem verificar quem de fato ficou com o ID.
+  const { results } = await db.prepare(
+    `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`,
+  ).bind(mpPaymentId).all<{ id: number }>();
+  return results.length === 1 && results[0].id === pagamentoId
+    ? { kind: "found", pagamentoId }
+    : { kind: "ambiguous" };
 }
 
 function hex(buffer: ArrayBuffer): string {
@@ -339,7 +363,7 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
 
   const { results } = await env.DB.prepare(
     `SELECT id, mp_payment_id FROM pedido_pagamentos
-     WHERE metodo = 'PIX_MP' AND status = 'PENDENTE' AND mp_payment_id IS NOT NULL
+     WHERE metodo = 'PIX_MP' AND status IN ('PENDENTE', 'EXPIRADO') AND mp_payment_id IS NOT NULL
        AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
      ORDER BY atualizado_em ASC, id ASC
      LIMIT ?`,
@@ -353,14 +377,18 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
   await Promise.allSettled(
     pendentes.map(async (row) => {
       try {
+        // Claim por candidato: concorrência e falhas de rede também respeitam
+        // o throttle. Não altera fatos nem timestamps históricos financeiros.
+        const claim = await env.DB.prepare(
+          `UPDATE pedido_pagamentos SET atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ? AND status IN ('PENDENTE', 'EXPIRADO')
+             AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')`,
+        ).bind(row.id, RECONCILE_AFTER_SECONDS).run();
+        if (!claim.meta.changes) return;
         const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN!, row.mp_payment_id);
-        await syncPaymentFromMp(env.DB, row.id, {
-          status: payment.status,
-          statusDetail: payment.status_detail ?? null,
-          dateApproved: payment.date_approved ?? null,
-        });
+        await syncPaymentFromMp(env.DB, row.id, payment);
       } catch (err) {
-        console.error("Falha ao reconciliar pagamento PIX_MP pendente", row.id, err);
+        console.error("Falha ao reconciliar pagamento PIX_MP pendente/expirado", row.id, err);
       }
     }),
   );
@@ -373,10 +401,9 @@ const RESERVA_VENCIDA_BATCH_SIZE = 10;
 // `refreshPedidoStatus` já faz por visita do cliente (`pix_expira_em`
 // vencido, sem precisar consultar o MP: o TTL real já veio do MP na
 // criação da cobrança), agora também disparada oportunisticamente pela
-// abertura do painel admin. `reserva_expira_em` já embute a folga de 1
-// minuto sobre `pix_expira_em`, então não há corrida "liberamos enquanto
-// ainda podia ser pago" — reaproveita expireLocalPayment/
-// applyLedgerTransition, não reimplementa a regra.
+// abertura do painel admin. A folga de 1 minuto é operacional e não prova
+// ausência de pagamento. Approved posterior continua recuperável pelo B2.
+// Reaproveita expireLocalPayment/applyLedgerTransition; política B4 intacta.
 export async function liberarReservasVencidasLocalmente(env: { DB: D1Database }): Promise<void> {
   const { results } = await env.DB.prepare(
     `SELECT pp.id AS pagamento_id

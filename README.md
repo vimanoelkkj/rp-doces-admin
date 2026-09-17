@@ -100,7 +100,7 @@ Fecha o gap "pagamento fica PENDENTE pra sempre se o cliente fechar a aba". Trê
 - **Reconciliação oportunista do admin** (`GET /api/admin/pedidos` dispara `reconcilePendingPixPayments`, throttle 15s / lote de 4).
 - **Polling do cliente** (`refreshPedidoStatus`, pré-existente, refatorado pra reusar o mesmo helper).
 
-Matriz de transição do pagamento individual: `PENDENTE → PAGO/CANCELADO/EXPIRADO` permitido; qualquer terminal → outra coisa, recusado (idempotente, nunca regride); `REEMBOLSADO` nunca é tocado por esse caminho. CAS (compare-and-swap) contra o status lido protege contra corrida entre chamadores concorrentes.
+Matriz de transição do pagamento individual: `PENDENTE → PAGO/CANCELADO/EXPIRADO` permitido. Após B2, `EXPIRADO → PAGO` também é permitido exclusivamente com resposta verificada do GET MP; os demais terminais não mudam. Guards na escrita protegem contra expiração/aprovação concorrentes; igualdade de estado continua idempotente.
 
 ### Passo 7 — Reserva / baixa / liberação de estoque
 
@@ -172,7 +172,19 @@ Webhook/sincronização e polling repetem a reconciliação mesmo sem nova trans
 
 Após a persistência de pagamento/reembolso administrativo, falhas de reconciliação ou leitura de saldo preservam a resposta de sucesso com o ID gravado. Os campos derivados opcionais são omitidos nessa falha, sem inventar valores. O log identifica pedido, operação e fato financeiro persistido; a recuperação oportunista continua responsável pela divergência. Erros anteriores à persistência mantêm o tratamento existente. Isso não implementa idempotência de requisições (A1).
 
-Regressões: `npm test` executa 34 casos com `node:test`, código de produção e D1 local descartável via Miniflare, com respostas do MP simuladas. Os schemas são criados a partir das migrations existentes, sem acessar D1 remoto ou a base local de desenvolvimento. A suíte cobre falhas parciais, concorrência, rollback, pagamento parcial, refund, reserva liberada, respostas administrativas após persistência e os caminhos de recuperação. Usa `miniflare` e `esbuild` já presentes na árvore de dependências do Wrangler.
+Regressões B3: código de produção e D1 local descartável via Miniflare, com respostas do MP simuladas. Os schemas são criados a partir das migrations existentes, sem acessar D1 remoto ou a base local de desenvolvimento. A suíte cobre falhas parciais, concorrência, rollback, pagamento parcial, refund, reserva liberada, respostas administrativas após persistência e os caminhos de recuperação. Usa `miniflare` e `esbuild` já presentes na árvore de dependências do Wrangler. A expectativa que preservava o B2 antigo foi substituída, separando a regressão B4 em outro teste.
+
+## B2 — Aprovação autoritativa após expiração operacional
+
+`EXPIRADO` não comprova ausência de pagamento. `fetchMpPayment` faz GET autenticado, valida o ID retornado e produz uma resposta imutável com marca de tipo privada e identidade verificada em memória (referência fraca, sem cache financeiro). `syncPaymentFromMp` recusa snapshots fabricados ou cópias alteradas. Payload de webhook, relógio e `mp_status` persistido não autorizam aprovação. Somente esse GET permite `EXPIRADO → PAGO`; `CANCELADO`, `FALHOU` e `REEMBOLSADO` continuam protegidos. `refunded`/`charged_back` continuam sem suporte de lançamento automático.
+
+O UPDATE de aprovação revalida `PENDENTE/EXPIRADO` e a identidade MP dentro da escrita, inclusive quando a expiração venceu entre SELECT e UPDATE. Fallbacks do webhook aceitam expirados, recusam ambiguidades/associações conflitantes e confirmam a associação após o CAS. O polling identifica a tentativa SITE, reconcilia pelo B3, consulta MP antes da expiração local e responde o estado persistido. Agregado `PARCIAL/PAGO` não impede consultar outra tentativa elegível. Pix ADMIN substituído continua reconciliável: dois approved registram os dois fatos, sem cap/refund automático nem dupla baixa (overpayment permanece dívida).
+
+GET MP tem um único timeout de 5 segundos (`MP_PAYMENT_GET_TIMEOUT_MS`), incluindo corpo da resposta; não havia helper/configuração anterior. Timeout/HTTP não-2xx não criam rejeição financeira: o prazo local ainda pode encerrar operacionalmente o QR, sem bloquear approved posterior. A varredura da listagem admin inclui `PENDENTE/EXPIRADO`, SITE e ADMIN, com no máximo 4 candidatos por chamada, throttle de 15 segundos adquirido atomicamente antes do GET, sem recursão/paginação/corte por idade. Falhas são isoladas e também respeitam throttle. A expiração de reservas continua local e restrita a SITE, com a política B4 intacta.
+
+No SITE, timer zero ou resposta `EXPIRADO` mantém mensagem inconclusiva e polling, desabilita o QR vencido e oferece o acompanhamento existente. Não dispara novo checkout nem navega para falha. Polls não se sobrepõem; respostas após saída são ignoradas. Layout, CSS e animações existentes foram preservados; a tela de falha não afirma mais que nenhum valor foi cobrado.
+
+`npm test` roda as suítes B2/B3 com `node:test`. O cenário de timer/effects/navegação monta os componentes reais com React DOM e `jsdom` (somente devDependency), pois o harness financeiro não possuía DOM e testes de helpers/SSR não exercitariam essa corrida. A verificação visual em navegador é separada desses testes de comportamento.
 
 ## O que falta
 
@@ -191,7 +203,7 @@ Ordem sugerida (não travada — pode mudar por decisão):
 - **`PARCIAL` + Pix expirado**: reserva de estoque fica presa até ação manual (Passo 7, decisão consciente) — vale também para Pix administrativo (Passo 9), política mantida idêntica, não redesenhada.
 - **Imports circulares** (`comandaLedger.ts` ↔ `pedidoReconcile.ts`, `paymentSync.ts` ↔ `stock.ts`): funcionam (confirmado no bundler do wrangler, não só no `tsc`), mas são dívida arquitetural — quebrar via módulo-folha compartilhado se crescerem.
 - **Overpayment de Pix administrativo substituído** (Passo 9): se um Pix "substituído" for pago de verdade no MP depois do substituto já ter confirmado, o ledger soma sem cap — dinheiro real excedente sem representação de crédito. Documentado, não construído.
-- **Varreduras de expiração (`reconcilePendingPixPayments`/`liberarReservasVencidasLocalmente`) ainda só cobrem `origem='SITE'`** — Pix administrativo pendente que expira sem pagamento não é liberado automaticamente pelo backend; a UI já mostra isso corretamente (aviso "expiração atingida" + "Atualizar pedido" + "Regenerar"), então o gap é só de automação, não de visibilidade. Falta também decidir, ao estender isso pra `ADMIN`, que "reserva é do pedido, não do Pix individual" quando dois Pix administrativos coexistirem (não liberar a reserva do pedido só porque UM dos Pix ativos expirou, se outro ainda estiver vivo).
+- **Expiração local de reservas (`liberarReservasVencidasLocalmente`) só cobre `origem='SITE'`** — a varredura financeira `reconcilePendingPixPayments` já consulta SITE e ADMIN, inclusive expirados após B2. O botão "Atualizar pedido" no detalhe administrativo apenas relê o banco; recuperação remota ocorre por webhook/listagem. B4 segue aberto: uma tentativa terminalizada pode liberar a reserva mesmo com outro Pix pendente. Estender expiração local para ADMIN ou redesenhar essa política exige trabalho separado.
 - **UI do Pix administrativo (v1, decisões de escopo, não limitações do backend)**: não oferece criar um Pix aditivo extra quando já há Pix vivos (só regenerar os existentes); não tem campo de valor customizado no "Gerar Pix" (sempre a capacidade cheia).
 
 ## Migrations aplicadas (ordem)
