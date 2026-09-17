@@ -198,6 +198,31 @@ Geração/regeneração ADMIN sempre prepara a aquisição condicional no batch:
 
 Regressões em `tests/b4.test.mjs`: A–H, concorrência com hooks/barreiras determinísticos, rollback, criação versus liberação, POST tardio, compensação, retries e limites de recuperação. O teste antigo que fixava a política B4 defeituosa foi alterado deliberadamente; a garantia de que o reconciliador genérico nunca libera foi preservada como teste separado.
 
+## B1 — Contenção da edição destrutiva de itens
+
+`PUT /api/admin/pedidos/:id/itens` preserva autenticação, valida ID/payload
+(inclusive JSON `null`) e consulta somente a existência do pedido. Entradas
+inválidas retornam `400`, pedido inexistente retorna `404` e todo pedido
+existente com requisição válida retorna `409 / EDICAO_ITENS_BLOQUEADA`:
+"A edição de itens está temporariamente indisponível. Nenhuma alteração foi salva."
+
+O caminho de DELETE/INSERT/UPDATE foi removido. O endpoint não consulta catálogo,
+financeiro ou estoque para decidir a negativa, não chama materialização ou
+reconciliação e não realiza escritas de domínio. Isso também vale para
+`ENTREGUE`, `CANCELADO` e pedidos aparentemente virgens. O frontend existente
+exibe a mensagem retornada, sem mudança visual.
+
+`tests/b1.test.mjs` acrescenta 65 verificações com o endpoint real, D1 local
+descartável, snapshots integrais e observação separada das consultas do editor.
+Doze cenários concorrentes controlam duas ordens para materialização legada,
+pagamento manual, refund, baixa física, liberação e aprovação MP tardia simulada;
+as alterações legítimas dessas operações são verificadas separadamente.
+Validação local: 192/192 testes, build e diff check aprovados; type-check das
+Functions conserva somente os dois erros anteriores de `auth.ts` (59 TS2345,
+87 TS2322). Os 21 testes HTTP via Wrangler Pages usaram configuração e D1
+temporários locais; exports completos antes/depois permaneceram idênticos.
+Editor incremental e idempotência A1 continuam trabalhos separados.
+
 ## O que falta
 
 Ordem sugerida (não travada — pode mudar por decisão):

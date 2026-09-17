@@ -385,9 +385,9 @@ Não criar novo sweep/cron silenciosamente ao trabalhar em outra tarefa.
 
 # B1 — Edição destrutiva dos itens do pedido
 
-**STATUS: INVESTIGADO, NÃO IMPLEMENTADO**
+**STATUS: CONTENÇÃO IMPLEMENTADA E VALIDADA LOCALMENTE, SEM COMMIT**
 
-Este é o blocker atual.
+A contenção B1 está implementada no working tree e aguarda revisão do usuário. A1 é o próximo blocker; não foi implementado nesta tarefa.
 
 Endpoint:
 
@@ -395,19 +395,19 @@ Endpoint:
 
 ## Problema
 
-O algoritmo atual essencialmente executa:
+Antes da contenção, o algoritmo executava:
 
 1. DELETE de todos os itens antigos;
 2. INSERT dos novos itens;
 3. UPDATE do total do pedido.
 
-O batch é transacional.
+O batch era transacional.
 
-Porém, a operação inteira é semanticamente destrutiva.
+Porém, a operação inteira era semanticamente destrutiva.
 
-O endpoint atualmente aceita muito mais estados do que deveria.
+O endpoint aceitava muito mais estados do que deveria.
 
-Foi confirmado que pode aceitar pedidos:
+Foi confirmado que podia aceitar pedidos:
 
 - `NOVO`;
 - `PREPARANDO`;
@@ -566,7 +566,7 @@ Fluxo conceitual:
 4. retornar conflito;
 5. executar ZERO escritas de domínio.
 
-Resposta sugerida:
+Resposta implementada:
 
 HTTP `409`
 
@@ -594,14 +594,15 @@ decidir essa negativa.
 
 Nenhuma transação destrutiva deve ser executada.
 
-Escopo previsto da implementação B1
+Escopo da implementação B1
 
-Arquivos esperados:
+Arquivos alterados:
 
 functions/api/admin/pedidos/[id]/itens.ts
 tests/helpers/b3.mjs
 tests/b1.test.mjs
-README.md, caso seja necessário sincronizar documentação
+README.md
+docs/ESTADO_ATUAL.md
 
 Nenhuma migration é esperada.
 
@@ -616,7 +617,7 @@ reserva;
 política financeira.
 Testes B1
 
-A implementação deve provar bloqueio em cenários como:
+A implementação prova bloqueio em cenários como:
 
 pedido aparentemente virgem;
 PENDENTE + ATIVA;
@@ -649,6 +650,28 @@ estoque reservado inalterado.
 Também testar concorrência com operações financeiras e de estoque.
 
 A edição bloqueada nunca deve produzir escrita de domínio.
+
+Validação local da contenção B1 (2026-09-17)
+
+- Caminho destrutivo removido; somente autenticação, validação e SELECT de existência.
+- JSON null, primitivas, arrays e itens inválidos retornam 400 controlado.
+- Toda requisição válida para pedido existente retorna 409 e o código documentado.
+- 65 verificações B1: estados de domínio, contrato HTTP e 12 interleavings
+  determinísticos (duas ordens por operação concorrente).
+- Materialização legada, pagamento manual, refund, baixa física, liberação e
+  aprovação MP tardia simulada mantêm seus efeitos legítimos; o editor é
+  observado separadamente e emite somente SELECTs, sem escritas de domínio.
+- Snapshots integrais preservam pedido, itens/auditoria, pagamentos, alocações,
+  refunds, reserva e estoque nas edições bloqueadas.
+- npm test: 192/192 aprovados, incluindo B2/B3/B4 sem alterar seus testes.
+- npm run build e git diff --check aprovados.
+- Type-check das Functions comparado antes/depois: somente auth.ts:59 TS2345
+  e auth.ts:87 TS2322, sem novos erros.
+- 21 testes HTTP com wrangler pages dev, configuração temporária sem credenciais
+  e D1 exclusivamente local descartável. Exports completos antes/depois
+  idênticos byte a byte. Servidor encerrado após a validação.
+- Nenhuma alteração de frontend, migration, B2/B3/B4 ou dívida adjacente.
+- Nenhum commit, push, deploy ou acesso a D1 remoto realizado.
 
 Próximo blocker: A1
 
@@ -766,7 +789,7 @@ Regras de trabalho para agentes
 Antes de alterar backend/domínio:
 
 leia README.md;
-leia docs/ESTADO-ATUAL.md;
+leia docs/ESTADO_ATUAL.md;
 investigue o código atual;
 investigue migrations relevantes;
 confirme branch/HEAD/status;
@@ -811,11 +834,10 @@ B3 — convergência financeira
 B2 — recuperação verificada de Pix expirado
 B4 — segurança de reserva com múltiplos Pix
 Atual
-B1 — investigado
-contenção definida
-implementação pendente
+B1 — contenção implementada e validada localmente
+aguardando revisão do usuário, sem commit
 Depois
-implementar e revisar contenção B1;
+revisar o diff da contenção B1 e aguardar autorização explícita antes de commit;
 A1 — idempotência;
 revisão final focada do fluxo de primeira compra;
 B5 — planejamento e execução segura do cutover do D1;
