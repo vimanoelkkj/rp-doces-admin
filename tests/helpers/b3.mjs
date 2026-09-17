@@ -17,6 +17,8 @@ const bundle = await build({
       export * as admin from './functions/api/admin/pedidos';
       export * as adminPayment from './functions/api/admin/pedidos/[id]/pagamentos';
       export * as adminRefund from './functions/api/admin/pedidos/[id]/reembolsos';
+      export * as checkout from './functions/api/checkout';
+      export * as adminPix from './functions/api/admin/pedidos/[id]/pix';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
@@ -44,6 +46,11 @@ const bridge = `export default { async fetch(request, env) {
 }}`;
 
 export async function fixture(t, { paid = false, reserve = 'ATIVA', ledger = true } = {}) {
+  // Rede MP simulada; a autoridade continua nascendo no GET de produção.
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (!String(url).startsWith('https://api.mercadopago.com/v1/payments/')) throw new Error('unexpected network');
+    return Response.json({id: Number(String(url).split('/').at(-1)), status: 'approved'});
+  });
   const mf = new Miniflare({
     modules: true, script: bridge, cf: false,
     d1Databases: ['DB'], d1Persist: false,
