@@ -56,6 +56,31 @@ const TAB_FILTERS: Record<string, string> = {
   entregues: "AND status_pedido = 'ENTREGUE'",
 };
 
+// B-1 — quais pedidos pertencem à operação do balcão.
+//
+// Antes: somente `status_pagamento IN ('PARCIAL','PAGO')`. Isso escondia por
+// completo os pedidos criados pelo próprio admin que nascem PENDENTE — e
+// esse é o caminho DEFAULT do "Novo pedido" (DINHEIRO/PENDENTE), além de
+// todo `A_COMBINAR`. O pedido existia, reservava estoque, e não havia
+// nenhuma outra listagem por onde alcançá-lo: o detalhe, a troca de status,
+// o registro de pagamento e a geração de Pix ficavam inacessíveis
+// exatamente para os pedidos que mais precisavam deles.
+//
+// `origem_pedido = 'MANUAL'` entra INDEPENDENTE do status financeiro porque
+// um pedido de balcão é um compromisso real assumido pela operadora no
+// instante em que ela o registrou — inclusive quando o pagamento ficou para
+// depois. É a mesma razão pela qual a reserva dele não expira sozinha (ver
+// nota de política na criação, abaixo).
+//
+// Pedido SITE PENDENTE continua deliberadamente FORA: é carrinho não pago,
+// não um compromisso. Ele entra na listagem no instante em que vira
+// PARCIAL/PAGO, como sempre. Isso não é efeito colateral — é o recorte.
+//
+// Um único predicado alimenta contagem, página e contadores das abas; nunca
+// três cópias que possam divergir e produzir "8 de 12" numa aba vazia.
+const PEDIDOS_OPERACIONAIS_SQL =
+  "(status_pagamento IN ('PARCIAL', 'PAGO') OR origem_pedido = 'MANUAL')";
+
 function jsonError(message: string, status: number, code?: string) {
   return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
@@ -101,7 +126,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
     const { count } = (await env.DB.prepare(
       `SELECT COUNT(*) AS count FROM pedidos
-       WHERE status_pagamento IN ('PARCIAL', 'PAGO') ${tabFilter} ${searchFilter}`,
+       WHERE ${PEDIDOS_OPERACIONAIS_SQL} ${tabFilter} ${searchFilter}`,
     )
       .bind(...searchParams)
       .first<{ count: number }>())!;
@@ -112,7 +137,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const { results: pedidos } = await env.DB.prepare(
       `SELECT id, cliente_nome, valor_total_centavos, status_pagamento, status_pedido, criado_em
        FROM pedidos
-       WHERE status_pagamento IN ('PARCIAL', 'PAGO') ${tabFilter} ${searchFilter}
+       WHERE ${PEDIDOS_OPERACIONAIS_SQL} ${tabFilter} ${searchFilter}
        ORDER BY criado_em DESC
        LIMIT ? OFFSET ?`,
     )
@@ -146,7 +171,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
          SUM(CASE WHEN status_pedido IN ('NOVO', 'PREPARANDO') THEN 1 ELSE 0 END) AS em_producao,
          SUM(CASE WHEN status_pedido = 'PRONTO' THEN 1 ELSE 0 END) AS prontos,
          SUM(CASE WHEN status_pedido = 'ENTREGUE' THEN 1 ELSE 0 END) AS entregues
-       FROM pedidos WHERE status_pagamento IN ('PARCIAL', 'PAGO')`,
+       FROM pedidos WHERE ${PEDIDOS_OPERACIONAIS_SQL}`,
     ).first<CountsRow>())!;
 
     return Response.json({
@@ -446,6 +471,31 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       });
     }
 
+    // B-1 — POLÍTICA DE RESERVA DO PEDIDO MANUAL (decisão explícita).
+    //
+    // A reserva nasce `ATIVA` com `reserva_expira_em` deliberadamente NULL:
+    // um pedido de balcão NÃO tem prazo de pagamento como um Pix tem. O TTL
+    // de 31 minutos do checkout existe porque lá a reserva protege uma
+    // cobrança remota com vencimento próprio; aqui não há cobrança remota
+    // nenhuma enquanto o método for local.
+    //
+    // Expirar essa reserva automaticamente seria o comportamento ERRADO:
+    // venderia para outra pessoa o doce que a operadora acabou de prometer
+    // no balcão, sem ninguém pedir. Por isso `liberarReservasVencidasLocalmente`
+    // continua restrita a `origem='SITE'` e NÃO foi estendida aqui, e nenhum
+    // cron/sweep novo foi criado.
+    //
+    // O que torna essa reserva sem prazo segura é a LIBERAÇÃO EXPLÍCITA, que
+    // já existe e continua protegida pelo B4:
+    //   * cancelar o pedido (PATCH status CANCELADO) chama
+    //     `liberarReservaPedido`, cujo predicado exige líquido zero, ausência
+    //     de baixa física e ausência de qualquer `PIX_MP/PENDENTE` — um
+    //     placeholder local (A_COMBINAR/DINHEIRO/...) não retém reserva;
+    //   * pagar converte a reserva em baixa física (`baixarEstoquePedido`).
+    // E o que faltava para isso ser operável era exatamente a visibilidade
+    // corrigida em `PEDIDOS_OPERACIONAIS_SQL`: reserva sem prazo só é segura
+    // quando o pedido é visível e cancelável.
+    //
     // `token_publico` continua ALEATÓRIO de propósito: é o identificador
     // público de acompanhamento do pedido e não pode ser derivado de uma key
     // conhecida pelo operador. A idempotência não precisa dele — as chaves
