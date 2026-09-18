@@ -19,6 +19,18 @@ interface PixDiagnosticoResultado {
   expiresAt: string | null;
 }
 
+interface PixReembolsoResultado {
+  refundId: string;
+  status: string;
+}
+
+const STATUS_PIX_LABEL: Record<string, string> = {
+  PAGO: "Pago",
+  PENDENTE: "Aguardando pagamento",
+  CANCELADO: "Cancelado",
+  EXPIRADO: "Expirado",
+};
+
 function formatarHorario(iso: string): string {
   const data = new Date(iso);
   if (Number.isNaN(data.getTime())) return iso;
@@ -76,6 +88,17 @@ export default function AdminLoja() {
   // estado sozinho não bastaria para barrar o segundo e o terceiro clique.
   const pixEmVooRef = useRef(false);
 
+  const [pixStatus, setPixStatus] = useState<string | null>(null);
+  const [pixStatusLoading, setPixStatusLoading] = useState(false);
+  const [pixStatusError, setPixStatusError] = useState<string | null>(null);
+  const pixStatusEmVooRef = useRef(false);
+
+  const [refundLoading, setRefundLoading] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundResultado, setRefundResultado] = useState<PixReembolsoResultado | null>(null);
+  const refundOperationKeyRef = useRef<string | null>(null);
+  const refundEmVooRef = useRef(false);
+
   const [testeLoading, setTesteLoading] = useState(false);
   const [testeError, setTesteError] = useState<string | null>(null);
   const [testeEnviado, setTesteEnviado] = useState(false);
@@ -86,6 +109,13 @@ export default function AdminLoja() {
     pixEmVooRef.current = true;
     setPixLoading(true);
     setPixError(null);
+    // Um Pix novo apaga status/estorno do diagnóstico anterior — cada
+    // `mpPaymentId` tem seu próprio ciclo de verificação e estorno.
+    setPixStatus(null);
+    setPixStatusError(null);
+    setRefundResultado(null);
+    setRefundError(null);
+    refundOperationKeyRef.current = null;
     if (!pixOperationKeyRef.current) {
       pixOperationKeyRef.current = novaOperationKey();
     }
@@ -108,6 +138,63 @@ export default function AdminLoja() {
     } finally {
       pixEmVooRef.current = false;
       setPixLoading(false);
+    }
+  };
+
+  const verificarPixDiagnostico = async () => {
+    if (pixStatusEmVooRef.current || !pixResultado) return;
+    pixStatusEmVooRef.current = true;
+    setPixStatusLoading(true);
+    setPixStatusError(null);
+    try {
+      const response = await fetch(
+        `/api/admin/diagnosticos/pix-status?mpPaymentId=${encodeURIComponent(pixResultado.mpPaymentId)}`,
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setPixStatusError(data?.error || "Não foi possível verificar o pagamento");
+        return;
+      }
+      setPixStatus(data.status);
+    } catch {
+      setPixStatusError("Falha de conexão ao verificar o pagamento");
+    } finally {
+      pixStatusEmVooRef.current = false;
+      setPixStatusLoading(false);
+    }
+  };
+
+  const testarReembolsoPixDiagnostico = async () => {
+    if (refundEmVooRef.current || !pixResultado) return;
+    refundEmVooRef.current = true;
+    setRefundLoading(true);
+    setRefundError(null);
+    if (!refundOperationKeyRef.current) {
+      refundOperationKeyRef.current = novaOperationKey();
+    }
+    try {
+      const response = await fetch("/api/admin/diagnosticos/pix-reembolso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mpPaymentId: pixResultado.mpPaymentId,
+          operationKey: refundOperationKeyRef.current,
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setRefundError(data?.error || "Não foi possível estornar o Pix de diagnóstico");
+        return;
+      }
+      setRefundResultado(data);
+      // Sucesso encerra esta intenção — repetir estorno do MESMO pagamento
+      // não é uma nova intenção, então o botão fica desabilitado depois.
+      refundOperationKeyRef.current = null;
+    } catch {
+      setRefundError("Falha de conexão ao estornar o Pix de diagnóstico");
+    } finally {
+      refundEmVooRef.current = false;
+      setRefundLoading(false);
     }
   };
 
@@ -496,6 +583,48 @@ export default function AdminLoja() {
                     <p className="loj-diag-pix-expira">
                       Expira às {formatarHorario(pixResultado.expiresAt)}
                     </p>
+                  )}
+
+                  <div className="loj-diag-pix-status-row">
+                    <button
+                      type="button"
+                      className="loj-diag-pix-copy-btn"
+                      onClick={verificarPixDiagnostico}
+                      disabled={pixStatusLoading}
+                    >
+                      {pixStatusLoading ? "Verificando..." : "Verificar pagamento"}
+                    </button>
+                    {pixStatus && (
+                      <span
+                        className={`loj-diag-pix-status loj-diag-pix-status--${pixStatus.toLowerCase()}`}
+                      >
+                        {STATUS_PIX_LABEL[pixStatus] ?? pixStatus}
+                      </span>
+                    )}
+                  </div>
+                  {pixStatusError && <p className="loj-diag-error">{pixStatusError}</p>}
+
+                  {pixStatus === "PAGO" && (
+                    <div className="loj-diag-pix-refund">
+                      <button
+                        type="button"
+                        className="loj-diag-pix-copy-btn"
+                        onClick={testarReembolsoPixDiagnostico}
+                        disabled={refundLoading || !!refundResultado}
+                      >
+                        {refundLoading
+                          ? "Estornando..."
+                          : refundResultado
+                            ? "Estornado"
+                            : "Testar reembolso"}
+                      </button>
+                      {refundResultado && (
+                        <p className="loj-diag-success">
+                          Estorno confirmado (MP #{refundResultado.refundId}).
+                        </p>
+                      )}
+                      {refundError && <p className="loj-diag-error">{refundError}</p>}
+                    </div>
                   )}
                 </div>
               )}

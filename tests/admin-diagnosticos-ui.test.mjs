@@ -71,12 +71,20 @@ function diagCard(titulo) {
     .find(card => card.querySelector('.loj-diag-card-title').textContent.trim() === titulo);
 }
 
-async function montar(t, {pix, teste} = {}) {
+async function montar(t, {pix, teste, status, refund} = {}) {
   let pixChamadas = 0;
   t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
     const href = String(url);
     if (href.endsWith('/api/admin/notificacoes')) {
       return Response.json({notificacoes: [], naoLidas: 0});
+    }
+    if (href.includes('/api/admin/diagnosticos/pix-status')) {
+      if (typeof status === 'function') return status(href, options);
+      return Response.json({ok: true, status: 'PENDENTE'});
+    }
+    if (href.endsWith('/api/admin/diagnosticos/pix-reembolso')) {
+      if (typeof refund === 'function') return refund(options);
+      return Response.json({ok: true, refundId: '9001', status: 'approved'}, {status: 201});
     }
     if (href.endsWith('/api/admin/diagnosticos/pix')) {
       pixChamadas++;
@@ -215,6 +223,101 @@ test('Pedido de teste: erro aparece no card sem quebrar o botão', async t => {
 
     assert.match(card.querySelector('.loj-diag-error').textContent, /Erro interno/);
     assert.equal(botao.disabled, false);
+  } finally {
+    await desmontar(root);
+  }
+});
+
+test('Pix de diagnóstico: verificar pagamento mostra confirmação visual de "Pago" e libera o reembolso de teste', async t => {
+  const {root} = await montar(t, {
+    status: async () => Response.json({ok: true, status: 'PAGO'}),
+  });
+  try {
+    const card = diagCard('Pix real de diagnóstico');
+    await ui.act(async () => card.querySelector('.loj-diag-action').click());
+    await flush();
+
+    const verificar = card.querySelector('.loj-diag-pix-status-row .loj-diag-pix-copy-btn');
+    assert.equal(verificar.textContent, 'Verificar pagamento');
+    assert.equal(card.querySelector('.loj-diag-pix-status'), null, 'sem status antes de verificar');
+
+    await ui.act(async () => verificar.click());
+    await flush();
+
+    const status = card.querySelector('.loj-diag-pix-status');
+    assert.ok(status, 'confirmação visual do pagamento aparece após verificar');
+    assert.match(status.textContent, /Pago/);
+    assert.ok(status.className.includes('loj-diag-pix-status--pago'));
+
+    const reembolso = card.querySelector('.loj-diag-pix-refund .loj-diag-pix-copy-btn');
+    assert.ok(reembolso, 'botão de testar reembolso só aparece depois de confirmado o pagamento');
+    assert.equal(reembolso.textContent, 'Testar reembolso');
+  } finally {
+    await desmontar(root);
+  }
+});
+
+test('Pix de diagnóstico: enquanto pendente, não mostra opção de reembolso', async t => {
+  const {root} = await montar(t, {
+    status: async () => Response.json({ok: true, status: 'PENDENTE'}),
+  });
+  try {
+    const card = diagCard('Pix real de diagnóstico');
+    await ui.act(async () => card.querySelector('.loj-diag-action').click());
+    await flush();
+    await ui.act(async () => card.querySelector('.loj-diag-pix-status-row .loj-diag-pix-copy-btn').click());
+    await flush();
+
+    assert.match(card.querySelector('.loj-diag-pix-status').textContent, /Aguardando pagamento/);
+    assert.equal(card.querySelector('.loj-diag-pix-refund'), null);
+  } finally {
+    await desmontar(root);
+  }
+});
+
+test('Pix de diagnóstico: testar reembolso confirma o estorno e trava o botão', async t => {
+  const {root} = await montar(t, {
+    status: async () => Response.json({ok: true, status: 'PAGO'}),
+    refund: async () => Response.json({ok: true, refundId: '9001', status: 'approved'}, {status: 201}),
+  });
+  try {
+    const card = diagCard('Pix real de diagnóstico');
+    await ui.act(async () => card.querySelector('.loj-diag-action').click());
+    await flush();
+    await ui.act(async () => card.querySelector('.loj-diag-pix-status-row .loj-diag-pix-copy-btn').click());
+    await flush();
+
+    const reembolsoBtn = card.querySelector('.loj-diag-pix-refund .loj-diag-pix-copy-btn');
+    await ui.act(async () => reembolsoBtn.click());
+    await flush();
+
+    assert.equal(reembolsoBtn.textContent, 'Estornado');
+    assert.equal(reembolsoBtn.disabled, true);
+    assert.match(card.querySelector('.loj-diag-pix-refund .loj-diag-success').textContent, /9001/);
+  } finally {
+    await desmontar(root);
+  }
+});
+
+test('Pix de diagnóstico: erro no estorno aparece no card, nunca finge sucesso', async t => {
+  const {root} = await montar(t, {
+    status: async () => Response.json({ok: true, status: 'PAGO'}),
+    refund: async () => Response.json({error: 'O Mercado Pago recusou o estorno de diagnóstico', code: 'MERCADO_PAGO_RECUSOU'}, {status: 502}),
+  });
+  try {
+    const card = diagCard('Pix real de diagnóstico');
+    await ui.act(async () => card.querySelector('.loj-diag-action').click());
+    await flush();
+    await ui.act(async () => card.querySelector('.loj-diag-pix-status-row .loj-diag-pix-copy-btn').click());
+    await flush();
+
+    const reembolsoBtn = card.querySelector('.loj-diag-pix-refund .loj-diag-pix-copy-btn');
+    await ui.act(async () => reembolsoBtn.click());
+    await flush();
+
+    assert.equal(reembolsoBtn.textContent, 'Testar reembolso', 'não finge sucesso, permanece disponível para nova tentativa');
+    assert.equal(reembolsoBtn.disabled, false);
+    assert.match(card.querySelector('.loj-diag-pix-refund .loj-diag-error').textContent, /recusou/);
   } finally {
     await desmontar(root);
   }

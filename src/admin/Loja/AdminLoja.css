@@ -570,12 +570,63 @@
   border-color: #634738;
 }
 
+.loj-diag-pix-copy-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  border-color: #eadfd3;
+}
+
 .loj-diag-pix-expira {
   font-family: "Manrope", sans-serif;
   font-weight: 400;
   font-size: 11px;
   color: #63524e;
   margin: 0;
+}
+
+/* ── Verificação de status e estorno de teste ── */
+.loj-diag-pix-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.loj-diag-pix-status {
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.loj-diag-pix-status--pago {
+  background: #ebf5f0;
+  border: 1px solid #d4e8dc;
+  color: #4e8c6f;
+}
+
+.loj-diag-pix-status--pendente {
+  background: #f5efe8;
+  border: 1px solid #eadfd3;
+  color: #634738;
+}
+
+.loj-diag-pix-status--cancelado,
+.loj-diag-pix-status--expirado {
+  background: #f7e9e7;
+  border: 1px solid #ecd3ce;
+  color: #a83b3b;
+}
+
+.loj-diag-pix-refund {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid #eadfd3;
 }
 
 /* ═══════════════════════════════════════════

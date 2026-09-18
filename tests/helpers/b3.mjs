@@ -33,6 +33,9 @@ const bundle = await build({
       export * as adminNotificacoes from './functions/api/admin/notificacoes';
       export * as diagnosticoPix from './functions/api/admin/diagnosticos/pix';
       export * as diagnosticoPedidoTeste from './functions/api/admin/diagnosticos/pedido-teste';
+      export * as diagnosticoPixStatus from './functions/api/admin/diagnosticos/pix-status';
+      export * as diagnosticoPixReembolso from './functions/api/admin/diagnosticos/pix-reembolso';
+      export * as paymentSync from './functions/lib/paymentSync';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
