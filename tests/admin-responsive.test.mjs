@@ -182,3 +182,16 @@ test('estilos estruturais cobrem páginas, barra inferior, overlays e dark mode'
   }
   assert.match(dark, /\.admin-mobile-header/);
 });
+
+test('listagem de pedidos vira cartão empilhado no mobile, sem forçar rolagem horizontal', async () => {
+  const css = await readFile(
+    new URL('../src/admin/Pedidos/AdminPedidos.css', import.meta.url), 'utf8',
+  );
+  const mobile = css.slice(css.indexOf('@media (max-width: 600px)'));
+  assert.match(mobile, /\.ped-table-header\s*\{[^}]*display:\s*none/,
+    'cabeçalho de colunas não faz sentido empilhado');
+  assert.match(mobile, /\.ped-table-row\s*\{[^}]*display:\s*grid/,
+    'cada linha vira um cartão em grid, não uma linha larga com scroll');
+  assert.doesNotMatch(mobile, /min-width:\s*660px/,
+    'o min-width que forçava a rolagem lateral no mobile foi removido');
+});

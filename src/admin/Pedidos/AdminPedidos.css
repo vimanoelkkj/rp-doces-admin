@@ -452,11 +452,57 @@
 
   .ped-table-panel {
     padding: 16px;
+    overflow-x: visible;
   }
 
-  .ped-table-header,
+  /* A tabela vira uma lista de cartões: os rótulos de coluna não fazem
+     sentido empilhados, e a linha de dados usa grid nomeado em vez do
+     scroll horizontal de min-width que forçava a rolagem lateral. */
+  .ped-table-header {
+    display: none;
+  }
+
   .ped-table-row {
-    min-width: 660px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "id total"
+      "client client"
+      "status payment";
+    column-gap: 10px;
+    row-gap: 8px;
+    min-width: 0;
+    padding: 14px 16px;
+  }
+
+  .ped-td-id,
+  .ped-td-client,
+  .ped-td-status,
+  .ped-td-payment,
+  .ped-td-total {
+    width: auto;
+  }
+
+  .ped-td-id {
+    grid-area: id;
+  }
+
+  .ped-td-total {
+    grid-area: total;
+    text-align: right;
+  }
+
+  .ped-td-client {
+    grid-area: client;
+  }
+
+  .ped-td-status {
+    grid-area: status;
+  }
+
+  .ped-td-payment {
+    grid-area: payment;
+    justify-self: end;
   }
 
   .ped-pagination-controls {
