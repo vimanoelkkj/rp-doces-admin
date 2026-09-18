@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
+import PortalDropdown from "../components/PortalDropdown";
+import { useAdminModal } from "../components/useAdminModal";
 import "./NovoPedidoModal.css";
 
 /* ── Icons ── */
@@ -89,7 +91,6 @@ interface PedidoDetalheResponse {
 interface EditarPedidoModalProps {
   orderId: number;
   onClose: () => void;
-  onSaved: () => void;
 }
 
 const formatarPreco = (centavos: number) =>
@@ -99,11 +100,16 @@ const formatarPreco = (centavos: number) =>
 function useDropdown() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -111,20 +117,19 @@ function useDropdown() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  return { open, setOpen, ref };
+  return { open, setOpen, ref, menuRef };
 }
 
 /* ── Component ── */
 export default function EditarPedidoModal({
   orderId,
   onClose,
-  onSaved,
 }: EditarPedidoModalProps) {
   const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
   const [items, setItems] = useState<EditItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const modalProps = useAdminModal(true, onClose);
 
   useEffect(() => {
     setLoading(true);
@@ -174,36 +179,12 @@ export default function EditarPedidoModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0 || items.some((i) => !i.produtoId)) {
-      setError("Selecione um produto em todos os itens");
-      return;
-    }
-
-    setSaving(true);
-    fetch(`/api/admin/pedidos/${orderId}/itens`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        itens: items.map((i) => ({
-          produtoId: i.produtoId,
-          quantidade: i.quantidade,
-        })),
-      }),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          throw new Error(body.error ?? "Falha ao salvar alterações");
-        }
-        onSaved();
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setSaving(false));
+    setError("A edição de itens está temporariamente indisponível. Nenhuma alteração foi salva.");
   };
 
   return createPortal(
-    <div className="nped-overlay" onClick={onClose}>
-      <div className="nped-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="nped-overlay" {...modalProps}>
+      <div className="nped-modal">
         {/* ── Header ── */}
         <div className="nped-header">
           <div>
@@ -225,6 +206,9 @@ export default function EditarPedidoModal({
         {!loading && (
           <form className="nped-body" onSubmit={handleSubmit}>
             {error && <p className="nped-error">{error}</p>}
+            <p className="nped-blocked-notice">
+              A edição de itens está temporariamente indisponível. Os itens abaixo são somente para consulta.
+            </p>
 
             <div className="nped-items-card">
               <div className="nped-items-header">
@@ -238,6 +222,7 @@ export default function EditarPedidoModal({
                   type="button"
                   className="nped-btn-add-item"
                   onClick={addItem}
+                  disabled
                 >
                   <IconPlus /> Adicionar item
                 </button>
@@ -252,6 +237,7 @@ export default function EditarPedidoModal({
                   onChangeQty={(qty) => updateItem(i, "quantidade", qty)}
                   onRemove={() => removeItem(i)}
                   canRemove={items.length > 1}
+                  disabled
                 />
               ))}
             </div>
@@ -264,7 +250,7 @@ export default function EditarPedidoModal({
               >
                 Cancelar
               </button>
-              <button type="submit" className="nped-btn-save" disabled={saving}>
+              <button type="submit" className="nped-btn-save" disabled>
                 Salvar alterações
               </button>
             </div>
@@ -284,6 +270,7 @@ interface ProductItemRowProps {
   onChangeQty: (qty: number) => void;
   onRemove: () => void;
   canRemove: boolean;
+  disabled: boolean;
 }
 
 function ProductItemRow({
@@ -293,6 +280,7 @@ function ProductItemRow({
   onChangeQty,
   onRemove,
   canRemove,
+  disabled,
 }: ProductItemRowProps) {
   const dd = useDropdown();
   const selected = item.produtoId
@@ -318,15 +306,20 @@ function ProductItemRow({
           <button
             type="button"
             className="nped-dropdown-trigger"
-            onClick={() => dd.setOpen(!dd.open)}
+            onClick={() => !disabled && dd.setOpen(!dd.open)}
+            disabled={disabled}
           >
             <span className={selected ? "" : "nped-placeholder"}>
               {selected ? formatProduct(selected) : "Selecionar produto..."}
             </span>
             <IconChevron open={dd.open} />
           </button>
-          {dd.open && (
-            <ul className="nped-dropdown-list nped-dropdown-list--products">
+          <PortalDropdown
+            open={dd.open}
+            anchorRef={dd.ref}
+            menuRef={dd.menuRef}
+            className="nped-dropdown-list nped-dropdown-list--products"
+          >
               {produtos.map((p) => (
                 <li key={p.id}>
                   <button
@@ -341,8 +334,7 @@ function ProductItemRow({
                   </button>
                 </li>
               ))}
-            </ul>
-          )}
+          </PortalDropdown>
         </div>
 
         <input
@@ -350,6 +342,7 @@ function ProductItemRow({
           className="nped-qty-input"
           min={1}
           value={item.quantidade}
+          disabled={disabled}
           onChange={(e) =>
             onChangeQty(Math.max(1, parseInt(e.target.value) || 1))
           }
@@ -359,7 +352,7 @@ function ProductItemRow({
           type="button"
           className="nped-btn-remove"
           onClick={onRemove}
-          disabled={!canRemove}
+          disabled={disabled || !canRemove}
         >
           <IconRemove />
         </button>

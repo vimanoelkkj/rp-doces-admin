@@ -20,6 +20,7 @@ import {
   type IdentidadeEsperada,
   type OperacaoRow,
 } from "../lib/operacoes";
+import { isValidWhatsappBr, normalizeWhatsappBr } from "../../shared/whatsapp";
 
 interface Env {
   DB: D1Database;
@@ -101,11 +102,12 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     return jsonError("Item de carrinho inválido", 400);
   }
   const nome = body.cliente?.nome?.trim();
-  const whatsapp = body.cliente?.whatsapp?.trim();
+  const whatsappInput = body.cliente?.whatsapp?.trim() ?? "";
+  const whatsapp = normalizeWhatsappBr(whatsappInput);
   if (!nome || !whatsapp) {
     return jsonError("Dados do cliente incompletos", 400);
   }
-  if (nome.length > MAX_TEXT_LENGTH || whatsapp.length > MAX_TEXT_LENGTH) {
+  if (nome.length > MAX_TEXT_LENGTH || !isValidWhatsappBr(whatsappInput)) {
     return jsonError("Dados do cliente inválidos", 400);
   }
 
@@ -248,9 +250,9 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       env.DB.prepare(
         `INSERT INTO pedidos
            (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
-            idempotency_key, reserva_status, reserva_expira_em,
+            idempotency_key, reserva_status, reserva_expira_em, status_pedido,
             cliente_email, produto_nome, quantidade, valor_unitario_centavos)
-         VALUES (?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'), '', '', 1, 0)`,
+         VALUES (?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'), 'NOVO', '', '', 1, 0)`,
       ).bind(
         tokenPublico,
         nome,

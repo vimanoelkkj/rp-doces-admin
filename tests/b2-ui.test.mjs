@@ -49,7 +49,7 @@ const bundle=await build({
 const ui=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text+'\n//# sourceURL=b2-ui-bundle.mjs').toString('base64')}`);
 const container=document.getElementById('root');
 const flush=()=>ui.act(async()=>{await new Promise(setImmediate);});
-const initial={items:[{id:1,name:'Bolo',price:50,image:'',quantity:2}],cliente:{nome:'Teste',whatsapp:'000'}};
+const initial={items:[{id:1,name:'Bolo',price:50,image:'',quantity:2}],cliente:{nome:'Teste',whatsapp:'11999999999'}};
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 async function mount(t,respond){
   // Usa o relógio do contexto do teste; cada teste restaura mocks/timers.

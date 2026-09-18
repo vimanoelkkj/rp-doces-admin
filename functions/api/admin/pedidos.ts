@@ -25,6 +25,7 @@ import {
   type IdentidadeEsperada,
   type OperacaoRow,
 } from "../../lib/operacoes";
+import { isValidWhatsappBr, normalizeWhatsappBr } from "../../../shared/whatsapp";
 
 interface Env {
   DB: D1Database;
@@ -47,6 +48,7 @@ interface PedidoListItem extends PedidoListRow {
 interface CountsRow {
   todos: number;
   hoje: number;
+  novos: number;
   em_producao: number;
   prontos: number;
   entregues: number;
@@ -55,7 +57,8 @@ interface CountsRow {
 const ITEMS_PER_PAGE = 8;
 const TAB_FILTERS: Record<string, string> = {
   hoje: "AND date(criado_em) = date('now')",
-  em_producao: "AND status_pedido IN ('NOVO', 'PREPARANDO')",
+  novos: "AND status_pedido = 'NOVO'",
+  em_producao: "AND status_pedido = 'PREPARANDO'",
   prontos: "AND status_pedido = 'PRONTO'",
   entregues: "AND status_pedido = 'ENTREGUE'",
 };
@@ -180,7 +183,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       `SELECT
          COUNT(*) AS todos,
          SUM(CASE WHEN date(criado_em) = date('now') THEN 1 ELSE 0 END) AS hoje,
-         SUM(CASE WHEN status_pedido IN ('NOVO', 'PREPARANDO') THEN 1 ELSE 0 END) AS em_producao,
+         SUM(CASE WHEN status_pedido = 'NOVO' THEN 1 ELSE 0 END) AS novos,
+         SUM(CASE WHEN status_pedido = 'PREPARANDO' THEN 1 ELSE 0 END) AS em_producao,
          SUM(CASE WHEN status_pedido = 'PRONTO' THEN 1 ELSE 0 END) AS prontos,
          SUM(CASE WHEN status_pedido = 'ENTREGUE' THEN 1 ELSE 0 END) AS entregues
        FROM pedidos WHERE ${PEDIDOS_OPERACIONAIS_SQL}`,
@@ -393,7 +397,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const nascePago = statusPagamento === "PAGO";
 
   const clienteNome = (body.clienteNome ?? "").trim().slice(0, MAX_TEXT_LENGTH_MANUAL);
-  const clienteWhatsapp = (body.clienteWhatsapp ?? "").trim().slice(0, MAX_TEXT_LENGTH_MANUAL);
+  const clienteWhatsappInput = (body.clienteWhatsapp ?? "").trim();
+  if (clienteWhatsappInput && !isValidWhatsappBr(clienteWhatsappInput)) {
+    return jsonError("WhatsApp inválido", 400);
+  }
+  const clienteWhatsapp = normalizeWhatsappBr(clienteWhatsappInput);
   const observacao = (body.observacao ?? "").trim().slice(0, MAX_TEXT_LENGTH_MANUAL);
 
   // A1: identidade da intenção de criar esta venda, obrigatória. Um retry de
@@ -529,9 +537,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       env.DB.prepare(
         `INSERT INTO pedidos
            (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
-            idempotency_key, origem_pedido, reserva_status, status_pagamento, pago_em,
+            idempotency_key, origem_pedido, reserva_status, status_pagamento, status_pedido, pago_em,
             cliente_email, produto_nome, quantidade, valor_unitario_centavos)
-         VALUES (?, ?, ?, ?, ?, ?, 'MANUAL', 'ATIVA', ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
+         VALUES (?, ?, ?, ?, ?, ?, 'MANUAL', 'ATIVA', ?, 'NOVO', CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
                  '', '', 1, 0)`,
       ).bind(
         tokenPublico,
