@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import PedidoDetalheModal from "./PedidoDetalheModal";
 import EditarPedidoModal from "./EditarPedidoModal";
 import "./AdminPedidos.css";
@@ -80,7 +81,29 @@ export default function AdminPedidos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  // HUMAN-14: as notificações levam ao pedido exato via `?pedido=<id>`, que é
+  // o destino real da ação contextual. Sem isso a notificação só conseguiria
+  // apontar para a lista inteira.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pedidoNaUrl = Number(searchParams.get("pedido"));
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(
+    Number.isInteger(pedidoNaUrl) && pedidoNaUrl > 0 ? pedidoNaUrl : null,
+  );
+
+  useEffect(() => {
+    if (Number.isInteger(pedidoNaUrl) && pedidoNaUrl > 0) setSelectedOrderId(pedidoNaUrl);
+  }, [pedidoNaUrl]);
+
+  // Fechar o detalhe limpa o parâmetro, para que voltar/atualizar não reabra
+  // um modal que o operador já dispensou.
+  const fecharDetalhe = () => {
+    setSelectedOrderId(null);
+    if (searchParams.has("pedido")) {
+      const proximos = new URLSearchParams(searchParams);
+      proximos.delete("pedido");
+      setSearchParams(proximos, { replace: true });
+    }
+  };
   const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [novoPedidoOpen, setNovoPedidoOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -306,11 +329,11 @@ export default function AdminPedidos() {
         {selectedOrderId !== null && (
           <PedidoDetalheModal
             orderId={selectedOrderId}
-            onClose={() => setSelectedOrderId(null)}
+            onClose={fecharDetalhe}
             onStatusChanged={() => setRefreshKey((k) => k + 1)}
             onEdit={() => {
               setEditingOrderId(selectedOrderId);
-              setSelectedOrderId(null);
+              fecharDetalhe();
             }}
           />
         )}

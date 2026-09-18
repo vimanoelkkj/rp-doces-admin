@@ -1,22 +1,17 @@
-export interface ProdutoRow {
+import { precoVigenteCentavos, type PromocaoCampos } from "../../shared/promocao";
+
+export interface ProdutoRow extends PromocaoCampos {
   id: number;
   nome: string;
-  preco_centavos: number;
-  preco_promocional_centavos: number | null;
-  promocao_inicio: string | null;
-  promocao_fim: string | null;
   disponivel: number;
   estoque: number;
   estoque_reservado: number;
 }
 
+// HUMAN-12: a regra de vigência vive em `shared/promocao.ts`, importada
+// também pelo catálogo público — admin e catálogo não podem divergir.
+// Esta função continua sendo o ponto por onde todo write-path autoritativo
+// (checkout do site e criação manual do admin) resolve preço.
 export function precoAtualCentavos(p: ProdutoRow, now = Date.now()): number {
-  if (p.preco_promocional_centavos == null) return p.preco_centavos;
-  if (p.promocao_inicio && now < Date.parse(p.promocao_inicio)) {
-    return p.preco_centavos;
-  }
-  if (p.promocao_fim && now > Date.parse(p.promocao_fim)) {
-    return p.preco_centavos;
-  }
-  return p.preco_promocional_centavos;
+  return precoVigenteCentavos(p, now);
 }

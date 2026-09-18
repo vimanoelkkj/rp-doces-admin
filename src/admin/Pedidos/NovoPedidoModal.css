@@ -146,7 +146,13 @@
   margin-left: 4px;
 }
 
+/* HUMAN-17: `tel` entra junto com `text`. O campo WhatsApp passou a
+   type="tel" no HUMAN-04 (inputMode/teclado numérico) e escapou deste
+   seletor, ficando com o visual branco nativo do navegador ao lado do
+   campo Cliente. Correção puramente visual — máscara, validação e
+   normalização do HUMAN-04 continuam intactas. */
 .nped-field input[type="text"],
+.nped-field input[type="tel"],
 .nped-field textarea {
   padding: 12px 14px;
   border: 1px solid #eadfd3;
@@ -321,6 +327,14 @@
   color: #d32f2f;
   border-color: #d32f2f;
   background: #fdebec;
+}
+
+/* HUMAN-16: o alvo clicável e a semântica destrutiva discreta permanecem;
+   só faltava um foco visível por teclado, que o hover sozinho não dá. */
+.nped-btn-remove:focus-visible {
+  outline: none;
+  border-color: #634738;
+  box-shadow: 0 0 0 2px rgba(99, 71, 56, 0.3);
 }
 
 .nped-btn-remove:disabled {

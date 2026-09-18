@@ -31,14 +31,28 @@ export default function ProductCard({
         />
       </div>
       <div className="product-info">
-        <span className="product-category">{product.category}</span>
+        <div className="product-meta-row">
+          <span className="product-category">{product.category}</span>
+          {/* HUMAN-12: selo só aparece com promoção vigente. Estrutura do
+              card preservada — é um acréscimo ao lado da categoria. */}
+          {product.originalPrice != null && (
+            <span className="product-promo-badge">Promoção</span>
+          )}
+        </div>
         <h3 className="product-name">{product.name}</h3>
         {product.description && (
           <p className="product-description">{product.description}</p>
         )}
         <div className="product-footer">
-          <span className="product-price">
-            R$ {product.price.toFixed(2).replace(".", ",")}
+          <span className="product-prices">
+            {product.originalPrice != null && (
+              <span className="product-price-original">
+                R$ {product.originalPrice.toFixed(2).replace(".", ",")}
+              </span>
+            )}
+            <span className="product-price">
+              R$ {product.price.toFixed(2).replace(".", ",")}
+            </span>
           </span>
           <button
             className={`add-button${justAdded ? " add-button--added" : ""}`}

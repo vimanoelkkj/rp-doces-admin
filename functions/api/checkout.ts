@@ -147,7 +147,8 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const placeholders = ids.map(() => "?").join(",");
   const { results } = await env.DB.prepare(
     `SELECT id, nome, preco_centavos, preco_promocional_centavos,
-            promocao_inicio, promocao_fim, disponivel, estoque, estoque_reservado
+            promocao_ativa, promocao_inicio, promocao_fim,
+            disponivel, estoque, estoque_reservado
      FROM produtos WHERE id IN (${placeholders})`,
   )
     .bind(...ids)

@@ -1,28 +1,17 @@
 import { Product } from "../types/product";
+import { promocaoVigente, type PromocaoCampos } from "../../shared/promocao";
 
-interface ProdutoApiRow {
+interface ProdutoApiRow extends PromocaoCampos {
   id: number;
   nome: string;
   categoria: string;
   categoria_nome: string;
   descricao: string;
-  preco_centavos: number;
-  preco_promocional_centavos: number | null;
-  promocao_inicio: string | null;
-  promocao_fim: string | null;
   destaque: number;
   ordem: number;
   estoque: number;
   estoque_reservado: number;
   image_key: string | null;
-}
-
-function isPromoActive(row: ProdutoApiRow): boolean {
-  if (row.preco_promocional_centavos == null) return false;
-  const now = Date.now();
-  if (row.promocao_inicio && now < Date.parse(row.promocao_inicio)) return false;
-  if (row.promocao_fim && now > Date.parse(row.promocao_fim)) return false;
-  return true;
 }
 
 // TODO: quando as imagens forem servidas via R2, trocar só esta função pela URL do endpoint de imagens.
@@ -31,7 +20,12 @@ function imageUrlFor(imageKey: string | null): string {
 }
 
 function toProduct(row: ProdutoApiRow): Product {
-  const centavos = isPromoActive(row)
+  // HUMAN-12: mesma regra do backend (`shared/promocao.ts`). `price` continua
+  // sendo o preço a cobrar agora; `originalPrice` só existe quando há
+  // promoção vigente, e serve apenas para o card mostrar o valor riscado.
+  // Nada disso é enviado ao checkout — o servidor recalcula.
+  const emPromocao = promocaoVigente(row);
+  const centavos = emPromocao
     ? row.preco_promocional_centavos!
     : row.preco_centavos;
 
@@ -41,6 +35,7 @@ function toProduct(row: ProdutoApiRow): Product {
     category: row.categoria_nome,
     description: row.descricao || undefined,
     price: centavos / 100,
+    originalPrice: emPromocao ? row.preco_centavos / 100 : undefined,
     image: imageUrlFor(row.image_key),
   };
 }

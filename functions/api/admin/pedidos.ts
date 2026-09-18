@@ -450,7 +450,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const placeholders = ids.map(() => "?").join(",");
     const { results } = await env.DB.prepare(
       `SELECT id, nome, preco_centavos, preco_promocional_centavos,
-              promocao_inicio, promocao_fim, disponivel, ativo, estoque, estoque_reservado
+              promocao_ativa, promocao_inicio, promocao_fim,
+              disponivel, ativo, estoque, estoque_reservado
        FROM produtos WHERE id IN (${placeholders})`,
     )
       .bind(...ids)
