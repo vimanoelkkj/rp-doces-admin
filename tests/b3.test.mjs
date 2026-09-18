@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { app, fixture, state, barrier, isProjection, isPhysical, refund } from './helpers/b3.mjs';
+import { app, fixture, state, barrier, isProjection, isPhysical, refund, withWaitUntil } from './helpers/b3.mjs';
 
 const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
 const approve = async db => app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment('fake', '101'));
@@ -396,12 +396,20 @@ test('admin GET repairs a paid ledger before the stale reservation expiration sw
   const db=await fixture(t,{paid:true});
   await db.prepare("UPDATE pedidos SET reserva_expira_em='2000-01-01' WHERE id=1").run();
   const session=await app.auth.createSession(db,1);
-  const response=await app.admin.onRequestGet({
+  const list=()=>withWaitUntil(app.admin.onRequestGet, {
     request:new Request('https://local.test/api/admin/pedidos',{headers:{Cookie:session.cookie.split(';')[0]}}),env:{DB:db},
   });
-  assert.equal(response.status,200);
-  assert.equal((await response.json()).total,1);
+  // The repair now runs off `context.waitUntil` instead of blocking the
+  // response (deliberate since "stop blocking orders list on Mercado
+  // Pago"), so the FIRST response can still read the pre-repair projection.
+  // `withWaitUntil` still lets the test wait for that background work
+  // deterministically; the repair itself is what this test verifies, via
+  // the ledger/stock state and a second listing read.
+  const first=await list();
+  assert.equal(first.status,200);
   converted(await state(db));
+  const second=await list();
+  assert.equal((await second.json()).total,1,'a leitura seguinte já reflete o reparo feito em segundo plano');
 });
 
 test('manual payment uses the convergent result without changing registration semantics', async t => {

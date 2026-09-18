@@ -132,6 +132,19 @@ export async function state(db) {
   };
 }
 
+// Pages Functions context carries `waitUntil` for background work that must
+// not block the response (e.g. the opportunistic reconciliation kicked off
+// by GET /api/admin/pedidos). Tests still need that work to have finished
+// before asserting on its effects, so this captures whatever gets handed to
+// `waitUntil` and awaits it after the handler returns — deterministic here,
+// non-blocking in production, same as `context.waitUntil` promises.
+export async function withWaitUntil(handler, context) {
+  const tasks = [];
+  const response = await handler({ ...context, waitUntil: (p) => tasks.push(p) });
+  await Promise.allSettled(tasks);
+  return response;
+}
+
 export function barrier(parties) {
   let arrived = 0;
   let release;
