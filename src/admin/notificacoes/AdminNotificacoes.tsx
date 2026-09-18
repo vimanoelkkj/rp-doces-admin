@@ -42,6 +42,12 @@ const ICONES: Record<Notificacao["tipo"], React.ReactNode> = {
       <path d="M8 5v3.4M8 10.8v.2" />
     </svg>
   ),
+  TESTE: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2h4M8 2v3.5l3.2 6a1.6 1.6 0 01-1.4 2.5H6.2a1.6 1.6 0 01-1.4-2.5L8 5.5" />
+    </svg>
+  ),
 };
 
 // Tempo relativo simples e honesto: nunca inventa precisão que não temos.

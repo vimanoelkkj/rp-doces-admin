@@ -559,6 +559,43 @@ html[data-admin-theme="dark"] .loj-diag-action:hover {
   background: #3d3230;
   border-color: #634738;
 }
+html[data-admin-theme="dark"] .loj-diag-action:disabled {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .loj-diag-error {
+  color: #e59a9a;
+}
+html[data-admin-theme="dark"] .loj-diag-success {
+  color: #7fc7a0;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-result {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-valor {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-qr {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-copy-label,
+html[data-admin-theme="dark"] .loj-diag-pix-expira {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-code-box code {
+  background: #2b2220;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-copy-btn {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-copy-btn:hover {
+  border-color: #634738;
+}
 html[data-admin-theme="dark"] .loj-input,
 html[data-admin-theme="dark"] .loj-textarea {
   background: #1a1412;

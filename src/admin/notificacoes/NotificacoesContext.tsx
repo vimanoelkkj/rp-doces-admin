@@ -17,7 +17,7 @@ import {
 // visibilidade), com dedupe — exatamente o padrão que o HUMAN-11 já usa em
 // `useCatalogProducts`. Sem polling, sem realtime, sem WebSocket.
 
-export type NotificacaoTipo = "PEDIDO" | "PAGAMENTO" | "ESTOQUE" | "OPERACAO";
+export type NotificacaoTipo = "PEDIDO" | "PAGAMENTO" | "ESTOQUE" | "OPERACAO" | "TESTE";
 
 export interface Notificacao {
   chave: string;

@@ -16,7 +16,7 @@
 
 import { listarOperacoesInconclusivasRecentes } from "./operacoes";
 
-export type NotificacaoTipo = "PEDIDO" | "PAGAMENTO" | "ESTOQUE" | "OPERACAO";
+export type NotificacaoTipo = "PEDIDO" | "PAGAMENTO" | "ESTOQUE" | "OPERACAO" | "TESTE";
 
 export interface Notificacao {
   /** Identidade estável do EVENTO (não da linha de leitura). */
@@ -161,6 +161,34 @@ async function operacoesInconclusivas(db: D1Database): Promise<NotificacaoDeriva
   }));
 }
 
+/**
+ * Diagnóstico permanente do Admin > Loja: "Pedido de produto de teste".
+ *
+ * Deriva de `admin_diagnostico_eventos`, isolada de `pedidos`. Título e
+ * descrição deixam explícito que é simulação; `destino: null` de propósito
+ * — nunca aponta para um `/admin/pedidos/:id` que não existe.
+ */
+async function eventosDeTeste(db: D1Database): Promise<NotificacaoDerivada[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, criado_em FROM admin_diagnostico_eventos
+       WHERE tipo = 'PEDIDO_TESTE'
+       ORDER BY criado_em DESC, id DESC
+       LIMIT ?`,
+    )
+    .bind(LIMITE_POR_TIPO)
+    .all<{ id: number; criado_em: string }>();
+
+  return (results || []).map((e) => ({
+    chave: `teste:${e.id}:pedido`,
+    tipo: "TESTE" as const,
+    titulo: "Pedido de teste",
+    descricao: "Simulação disparada manualmente — não é um pedido real.",
+    em: e.criado_em,
+    destino: null,
+  }));
+}
+
 /** Todos os eventos derivados agora, sem estado de leitura. */
 export async function derivarNotificacoes(db: D1Database): Promise<NotificacaoDerivada[]> {
   const grupos = await Promise.all([
@@ -168,11 +196,29 @@ export async function derivarNotificacoes(db: D1Database): Promise<NotificacaoDe
     pagamentosConfirmados(db),
     estoqueNoLimite(db),
     operacoesInconclusivas(db),
+    eventosDeTeste(db),
   ]);
   return grupos
     .flat()
     .sort((a, b) => Date.parse(b.em || "") - Date.parse(a.em || ""))
     .slice(0, LIMITE_TOTAL);
+}
+
+/**
+ * Registra o disparo do diagnóstico "Pedido de produto de teste". Escreve
+ * SOMENTE em `admin_diagnostico_eventos` — nenhum pedido, pagamento, item ou
+ * produto é tocado. `usuarioId` é só rastreabilidade (quem disparou), não
+ * afeta a derivação nem a visibilidade da notificação para outros operadores.
+ */
+export async function registrarEventoPedidoTeste(
+  db: D1Database,
+  usuarioId: number,
+): Promise<number> {
+  const result = await db
+    .prepare(`INSERT INTO admin_diagnostico_eventos (tipo, usuario_id) VALUES ('PEDIDO_TESTE', ?)`)
+    .bind(usuarioId)
+    .run();
+  return Number(result.meta.last_row_id);
 }
 
 export interface NotificacoesDoUsuario {

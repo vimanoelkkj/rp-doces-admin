@@ -469,6 +469,114 @@
   background: #f5efe8;
 }
 
+.loj-diag-action:disabled {
+  opacity: 0.6;
+  cursor: default;
+  background: #ffffff;
+  border-color: #eadfd3;
+}
+
+.loj-diag-error {
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: #a83b3b;
+  margin: 0;
+}
+
+.loj-diag-success {
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: #4e8c6f;
+  margin: 0;
+}
+
+/* ── Resultado do Pix de diagnóstico ── */
+.loj-diag-pix-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f5efe8;
+  border: 1px solid #eadfd3;
+}
+
+.loj-diag-pix-valor {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b1d1a;
+  margin: 0;
+}
+
+.loj-diag-pix-qr {
+  width: 140px;
+  height: 140px;
+  border-radius: 8px;
+  border: 1px solid #eadfd3;
+  align-self: center;
+}
+
+.loj-diag-pix-copy-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loj-diag-pix-copy-label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  color: #63524e;
+}
+
+.loj-diag-pix-code-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loj-diag-pix-code-box code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  font-size: 11px;
+  color: #2b1d1a;
+}
+
+.loj-diag-pix-copy-btn {
+  padding: 8px 14px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  color: #634738;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.loj-diag-pix-copy-btn:hover {
+  border-color: #634738;
+}
+
+.loj-diag-pix-expira {
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 11px;
+  color: #63524e;
+  margin: 0;
+}
+
 /* ═══════════════════════════════════════════
    Responsive
    ═══════════════════════════════════════════ */
