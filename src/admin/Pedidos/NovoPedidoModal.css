@@ -505,12 +505,65 @@
    Responsive
    ═══════════════════════════════════════════ */
 @media (max-width: 660px) {
+  .nped-overlay {
+    padding: 12px;
+  }
+
   .nped-modal {
-    width: 95vw;
-    margin: 16px;
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    margin: 0;
+    border-radius: 16px;
+    overscroll-behavior: contain;
+  }
+
+  .nped-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding: 20px 18px 14px;
+    background: #ffffff;
+    border-bottom: 1px solid #eadfd3;
+  }
+
+  .nped-header > div:first-child {
+    min-width: 0;
+    padding-right: 8px;
+  }
+
+  .nped-title,
+  .nped-subtitle {
+    overflow-wrap: anywhere;
+  }
+
+  .nped-body {
+    padding: 18px;
+    gap: 18px;
   }
 
   .nped-row-2 {
     grid-template-columns: 1fr;
+  }
+
+  .nped-items-card {
+    padding: 16px;
+  }
+
+  .nped-items-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .nped-item-row-fields > * {
+    min-width: 0;
+  }
+
+  .nped-footer {
+    flex-direction: column-reverse;
+  }
+
+  .nped-btn-cancel,
+  .nped-btn-save {
+    width: 100%;
   }
 }

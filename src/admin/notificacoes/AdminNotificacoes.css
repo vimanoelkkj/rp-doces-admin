@@ -210,4 +210,22 @@
     flex-direction: column;
     align-items: stretch;
   }
+
+  .notif-title {
+    font-size: 28px;
+  }
+
+  .notif-mark-all {
+    width: 100%;
+  }
+
+  .notif-row {
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .notif-row-desc,
+  .notif-row-title {
+    overflow-wrap: anywhere;
+  }
 }

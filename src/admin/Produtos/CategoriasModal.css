@@ -410,11 +410,51 @@
 }
 
 @media (max-width: 580px) {
-  .catm-modal {
-    width: 95vw;
-    margin: 16px;
+  .catm-overlay {
+    padding: 12px;
   }
+
+  .catm-modal {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    margin: 0;
+    border-radius: 16px;
+  }
+
+  .catm-header {
+    padding: 20px 18px 16px;
+  }
+
+  .catm-header > div:first-child {
+    min-width: 0;
+    padding-right: 8px;
+  }
+
+  .catm-title,
+  .catm-subtitle {
+    overflow-wrap: anywhere;
+  }
+
+  .catm-body {
+    padding-inline: 18px;
+    overscroll-behavior: contain;
+  }
+
+  .catm-new-card {
+    padding: 16px;
+  }
+
   .catm-new-row {
     flex-direction: column;
+  }
+
+  .catm-footer {
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 18px 18px;
+  }
+
+  .catm-btn-close {
+    flex-shrink: 0;
   }
 }

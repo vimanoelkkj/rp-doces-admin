@@ -338,11 +338,48 @@
     width: 100%;
   }
 
+  .prod-search input {
+    min-width: 0;
+  }
+
   .prod-tabs {
     flex-wrap: wrap;
   }
 
   .prod-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .prod-title {
+    font-size: 28px;
+  }
+
+  .prod-header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .prod-btn-outline,
+  .prod-btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .prod-tabs,
+  .prod-stats-line,
+  .prod-card-badge-row,
+  .prod-card-footer {
+    flex-wrap: wrap;
+  }
+
+  .prod-card-image {
+    height: 160px;
+  }
+
+  .prod-card-content {
+    padding: 18px;
   }
 }

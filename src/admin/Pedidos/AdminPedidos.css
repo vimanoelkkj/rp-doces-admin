@@ -178,6 +178,8 @@
   border: 1px solid #eadfd3;
   border-radius: 16px;
   padding: 24px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
 }
 
 .ped-table-header {
@@ -407,7 +409,7 @@
   }
 
   .ped-table-panel {
-    overflow-x: auto;
+    padding: 20px;
   }
 
   .ped-table-header,
@@ -418,5 +420,47 @@
   .ped-pagination {
     flex-direction: column;
     gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .ped-title {
+    font-size: 28px;
+  }
+
+  .ped-header-actions,
+  .ped-btn-primary,
+  .ped-search {
+    width: 100%;
+  }
+
+  .ped-btn-primary {
+    justify-content: center;
+  }
+
+  .ped-search input {
+    min-width: 0;
+  }
+
+  .ped-tabs {
+    gap: 6px;
+  }
+
+  .ped-tab {
+    padding: 8px 12px;
+  }
+
+  .ped-table-panel {
+    padding: 16px;
+  }
+
+  .ped-table-header,
+  .ped-table-row {
+    min-width: 660px;
+  }
+
+  .ped-pagination-controls {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }

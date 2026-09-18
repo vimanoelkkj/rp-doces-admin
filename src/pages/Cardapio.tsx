@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ProductCard from "../components/ProductCard";
@@ -6,16 +6,18 @@ import CartWidget from "../components/CartWidget";
 import { useCatalogProducts } from "../hooks/useCatalogProducts";
 import { useCart } from "../context/CartContext";
 import { useScrollReveal } from "../hooks/useScrollReveal";
+import { catalogCategories } from "./catalogCategories";
 import "./Cardapio.css";
 
-const categories = ["Todos", "Bolos no pote", "Mini pudins"];
+type CategoryFilter = string | null;
 
 export default function Cardapio() {
   const { products, loading, error } = useCatalogProducts();
+  const categories = useMemo(() => catalogCategories(products), [products]);
 
-  const [activeFilter, setActiveFilter] = useState("Todos");
+  const [activeFilter, setActiveFilter] = useState<CategoryFilter>(null);
   const [isFiltering, setIsFiltering] = useState(false);
-  const [displayFilter, setDisplayFilter] = useState("Todos");
+  const [displayFilter, setDisplayFilter] = useState<CategoryFilter>(null);
   const [containerHeight, setContainerHeight] = useState<number | "auto">("auto");
   const productsAreaRef = useRef<HTMLDivElement>(null);
 
@@ -29,10 +31,8 @@ export default function Cardapio() {
   } = useCart();
 
   const headingRef = useScrollReveal<HTMLDivElement>(0.15);
-  const bolosRef = useScrollReveal<HTMLElement>(0.1);
-  const pudinsRef = useScrollReveal<HTMLElement>(0.1);
 
-  const handleFilterChange = (cat: string) => {
+  const handleFilterChange = (cat: CategoryFilter) => {
     if (cat === activeFilter) return;
     setActiveFilter(cat);
     setIsFiltering(true);
@@ -66,6 +66,17 @@ export default function Cardapio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayFilter]);
 
+  // Se uma revalidação remover a categoria selecionada, volta para a visão
+  // completa em vez de manter uma aba órfã e um catálogo aparentemente vazio.
+  useEffect(() => {
+    if (activeFilter !== null && !categories.includes(activeFilter)) {
+      setActiveFilter(null);
+      setDisplayFilter(null);
+      setIsFiltering(false);
+      setContainerHeight("auto");
+    }
+  }, [activeFilter, categories]);
+
   const handleContainerTransitionEnd = (
     event: React.TransitionEvent<HTMLDivElement>,
   ) => {
@@ -78,22 +89,18 @@ export default function Cardapio() {
   };
 
   const filteredProducts =
-    displayFilter === "Todos"
+    displayFilter === null
       ? products
-      : products.filter((p) => {
-          if (displayFilter === "Bolos no pote")
-            return p.category === "Bolo no Pote";
-          if (displayFilter === "Mini pudins")
-            return p.category === "Mini Pudim";
-          return true;
-        });
+      : products.filter((product) => product.category.trim() === displayFilter);
 
-  const groupedProducts = {
-    "Bolo no Pote": filteredProducts.filter(
-      (p) => p.category === "Bolo no Pote",
-    ),
-    "Mini Pudim": filteredProducts.filter((p) => p.category === "Mini Pudim"),
-  };
+  const groupedProducts = categories
+    .map((category) => ({
+      category,
+      products: filteredProducts.filter(
+        (product) => product.category.trim() === category,
+      ),
+    }))
+    .filter((group) => group.products.length > 0);
 
   return (
     <div className="cardapio-page">
@@ -125,15 +132,23 @@ export default function Cardapio() {
             role="tablist"
             aria-label="Filtrar produtos"
           >
-            {categories.map((cat) => (
+            <button
+              role="tab"
+              aria-selected={activeFilter === null}
+              className={`filter-tab ${activeFilter === null ? "active" : ""}`}
+              onClick={() => handleFilterChange(null)}
+            >
+              Todos
+            </button>
+            {categories.map((category) => (
               <button
-                key={cat}
+                key={category}
                 role="tab"
-                aria-selected={activeFilter === cat}
-                className={`filter-tab ${activeFilter === cat ? "active" : ""}`}
-                onClick={() => handleFilterChange(cat)}
+                aria-selected={activeFilter === category}
+                className={`filter-tab ${activeFilter === category ? "active" : ""}`}
+                onClick={() => handleFilterChange(category)}
               >
-                {cat}
+                {category}
               </button>
             ))}
           </div>
@@ -159,53 +174,29 @@ export default function Cardapio() {
               </p>
             )}
 
-            {groupedProducts["Bolo no Pote"].length > 0 && (
-            <section
-              className="category-group scroll-reveal revealed"
-              aria-label="Bolos no pote"
-              ref={bolosRef}
-            >
-              <h2 className="category-title">Bolos no pote</h2>
-              <div className="products-grid">
-                {groupedProducts["Bolo no Pote"].map((product, index) => (
-                  <div
-                    key={product.id}
-                    className="product-card-wrapper filter-card"
-                    style={{ animationDelay: `${index * 0.08}s` }}
-                  >
-                    <ProductCard
-                      product={product}
-                      onAddToCart={() => addToCart(product)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {groupedProducts["Mini Pudim"].length > 0 && (
-            <section
-              className="category-group scroll-reveal revealed"
-              aria-label="Mini pudins"
-              ref={pudinsRef}
-            >
-              <h2 className="category-title">Mini pudins</h2>
-              <div className="products-grid">
-                {groupedProducts["Mini Pudim"].map((product, index) => (
-                  <div
-                    key={product.id}
-                    className="product-card-wrapper filter-card"
-                    style={{ animationDelay: `${index * 0.08}s` }}
-                  >
-                    <ProductCard
-                      product={product}
-                      onAddToCart={() => addToCart(product)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+            {groupedProducts.map(({ category, products: categoryProducts }) => (
+              <section
+                key={category}
+                className="category-group scroll-reveal revealed"
+                aria-label={category}
+              >
+                <h2 className="category-title">{category}</h2>
+                <div className="products-grid">
+                  {categoryProducts.map((product, index) => (
+                    <div
+                      key={product.id}
+                      className="product-card-wrapper filter-card"
+                      style={{ animationDelay: `${index * 0.08}s` }}
+                    >
+                      <ProductCard
+                        product={product}
+                        onAddToCart={() => addToCart(product)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
       </main>
