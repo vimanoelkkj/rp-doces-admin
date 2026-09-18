@@ -38,15 +38,6 @@ html[data-admin-theme="dark"] .admin-mobile-header {
   background: rgba(26, 20, 18, 0.96);
   border-bottom-color: #3d3230;
 }
-html[data-admin-theme="dark"] .admin-mobile-menu-btn,
-html[data-admin-theme="dark"] .admin-sidebar-close {
-  background: #2b2220;
-  border-color: #3d3230;
-  color: #faf6f0;
-}
-html[data-admin-theme="dark"] .admin-sidebar-backdrop {
-  background: rgba(0, 0, 0, 0.72);
-}
 html[data-admin-theme="dark"] .sidebar-logo-text {
   color: #faf6f0;
 }
@@ -87,17 +78,8 @@ html[data-admin-theme="dark"] .sidebar-logout-btn:hover {
   color: #faf6f0;
 }
 html[data-admin-theme="dark"] .sidebar-nav-item:focus-visible,
-html[data-admin-theme="dark"] .sidebar-logout-btn:focus-visible,
-html[data-admin-theme="dark"] .admin-mobile-menu-btn:focus-visible,
-html[data-admin-theme="dark"] .admin-sidebar-close:focus-visible {
+html[data-admin-theme="dark"] .sidebar-logout-btn:focus-visible {
   outline-color: #d38b80;
-}
-
-@media (max-width: 900px) {
-  html[data-admin-theme="dark"] .admin-sidebar {
-    background: #1a1412;
-    border-right-color: #3d3230;
-  }
 }
 
 /* ═══════════════════════════════════════════
