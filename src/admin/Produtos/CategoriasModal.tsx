@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
+import { EMOJI_OPTIONS } from "./EmojiIcons";
 import "./CategoriasModal.css";
 
 /* ── Icons ── */
@@ -30,19 +31,6 @@ interface Category {
   produtos_arquivados: number;
 }
 
-const EMOJI_OPTIONS = [
-  "🍰",
-  "🧁",
-  "🍮",
-  "🍫",
-  "🍪",
-  "🍓",
-  "🥥",
-  "🍋",
-  "🍯",
-  "🎂",
-];
-
 interface CategoriasModalProps {
   open: boolean;
   onClose: () => void;
@@ -56,7 +44,7 @@ export default function CategoriasModal({
   const modalProps = useAdminModal(open, onClose);
   const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState("");
-  const [newEmoji, setNewEmoji] = useState("🍰");
+  const [newEmoji, setNewEmoji] = useState(EMOJI_OPTIONS[0].char);
   const [newDescription, setNewDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +86,7 @@ export default function CategoriasModal({
         }
         setNewName("");
         setNewDescription("");
-        setNewEmoji("🍰");
+        setNewEmoji(EMOJI_OPTIONS[0].char);
         carregarCategorias();
       })
       .catch((err) => {
@@ -139,32 +127,33 @@ export default function CategoriasModal({
               </span>
             </div>
 
-            {/* Nome + Emoji */}
-            <div className="catm-new-row">
-              <div className="catm-field catm-field--name">
-                <label>NOME</label>
-                <input
-                  type="text"
-                  placeholder="Ex.: Brownies"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                />
-              </div>
+            {/* Nome */}
+            <div className="catm-field catm-field--full">
+              <label>NOME</label>
+              <input
+                type="text"
+                placeholder="Ex.: Brownies"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
 
-              <div className="catm-field">
-                <label>EMOJI</label>
-                <div className="catm-emoji-inline-grid">
-                  {EMOJI_OPTIONS.map((em) => (
-                    <button
-                      key={em}
-                      type="button"
-                      className={`catm-emoji-option ${newEmoji === em ? "catm-emoji-option--active" : ""}`}
-                      onClick={() => setNewEmoji(em)}
-                    >
-                      {em}
-                    </button>
-                  ))}
-                </div>
+            {/* Emoji — mesmo conjunto (e mesma UI) do modal de novo produto,
+                para não divergir em quais emojis existem em cada tela. */}
+            <div className="catm-field catm-field--full">
+              <label>EMOJI</label>
+              <div className="catm-emoji-grid">
+                {EMOJI_OPTIONS.map((em) => (
+                  <button
+                    key={em.char}
+                    type="button"
+                    className={`catm-emoji-item${newEmoji === em.char ? " catm-emoji-item--active" : ""}`}
+                    onClick={() => setNewEmoji(em.char)}
+                  >
+                    <span className="catm-emoji-icon">{em.icon}</span>
+                    <span className="catm-emoji-label">{em.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 

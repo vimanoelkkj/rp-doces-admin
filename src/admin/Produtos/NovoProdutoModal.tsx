@@ -9,18 +9,7 @@ import {
 } from "../../lib/brl";
 import { estadoPromocao } from "../../../shared/promocao";
 import "./NovoProdutoModal.css";
-import {
-  EmojiCake,
-  EmojiCupcake,
-  EmojiPudding,
-  EmojiPartyCake,
-  EmojiStrawberry,
-  EmojiChocolate,
-  EmojiCoconut,
-  EmojiLemon,
-  EmojiHoney,
-  EmojiCookie,
-} from "./EmojiIcons";
+import { EMOJI_OPTIONS } from "./EmojiIcons";
 
 const IconClose = () => (
   <svg
@@ -64,40 +53,12 @@ const IconPlus = () => (
   </svg>
 );
 
-const EMOJIS = [
-  { icon: <EmojiCake />, label: "Bolo" },
-  { icon: <EmojiCupcake />, label: "Cupcake" },
-  { icon: <EmojiPudding />, label: "Pudim" },
-  { icon: <EmojiPartyCake />, label: "Bolo de festa" },
-  { icon: <EmojiStrawberry />, label: "Morango" },
-  { icon: <EmojiChocolate />, label: "Chocolate" },
-  { icon: <EmojiCoconut />, label: "Coco" },
-  { icon: <EmojiLemon />, label: "Limão" },
-  { icon: <EmojiHoney />, label: "Mel" },
-  { icon: <EmojiCookie />, label: "Biscoito" },
-];
-
 interface Categoria {
   id: string;
   nome: string;
   emoji: string;
   ativo: number;
 }
-
-// Mapeia o ícone escolhido (SVG) para um emoji de verdade, salvo no produto
-// como identificador visual enquanto não há foto.
-const EMOJI_CHARS = [
-  "🎂",
-  "🧁",
-  "🍮",
-  "🎉",
-  "🍓",
-  "🍫",
-  "🥥",
-  "🍋",
-  "🍯",
-  "🍪",
-];
 
 // HUMAN-12: `<input type="datetime-local">` fala em horário LOCAL
 // ("2026-09-20T18:30"), enquanto a coluna guarda instante em ISO UTC —
@@ -264,7 +225,7 @@ export default function NovoProdutoModal({
     setName(produto.nome);
     setCategory(produto.categoria);
     setStock(String(produto.estoque));
-    const emojiIndex = EMOJI_CHARS.indexOf(produto.emoji);
+    const emojiIndex = EMOJI_OPTIONS.findIndex((e) => e.char === produto.emoji);
     setSelectedEmoji(emojiIndex >= 0 ? emojiIndex : null);
     setPrice(formatCentsAsBrlInput(produto.preco_centavos));
     setDescription(produto.descricao);
@@ -346,7 +307,7 @@ export default function NovoProdutoModal({
           descricao: description,
           precoCentavos,
           estoque,
-          emoji: selectedEmoji != null ? EMOJI_CHARS[selectedEmoji] : "",
+          emoji: selectedEmoji != null ? EMOJI_OPTIONS[selectedEmoji].char : "",
           ativo: produtoAtivo,
           disponivel: disponivelVenda,
           destaque,
@@ -510,7 +471,7 @@ export default function NovoProdutoModal({
           <div className="np-field np-field--full">
             <label>EMOJI</label>
             <div className="np-emoji-grid">
-              {EMOJIS.map((e, i) => (
+              {EMOJI_OPTIONS.map((e, i) => (
                 <button
                   key={i}
                   type="button"

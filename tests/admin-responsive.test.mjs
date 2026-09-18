@@ -195,3 +195,40 @@ test('listagem de pedidos vira cartão empilhado no mobile, sem forçar rolagem 
   assert.doesNotMatch(mobile, /min-width:\s*660px/,
     'o min-width que forçava a rolagem lateral no mobile foi removido');
 });
+
+test('pedidos recentes do Dashboard viram cartão empilhado no mobile', async () => {
+  const css = await readFile(
+    new URL('../src/admin/Dashboard/AdminDashboard.css', import.meta.url), 'utf8',
+  );
+  const mobile = css.slice(css.indexOf('@media (max-width: 600px)'));
+  assert.match(mobile, /\.dash-table-header\s*\{[^}]*display:\s*none/,
+    'cabeçalho de colunas não faz sentido empilhado');
+  assert.match(mobile, /\.dash-table-row\s*\{[^}]*display:\s*grid/,
+    'cada linha vira um cartão em grid, não uma linha larga com scroll');
+  assert.doesNotMatch(mobile, /min-width:\s*760px/,
+    'o min-width que forçava a rolagem lateral no mobile foi removido');
+});
+
+test('modal de categorias não estoura/sobrepõe o selo Sistema/Personalizada no mobile', async () => {
+  const css = await readFile(
+    new URL('../src/admin/Produtos/CategoriasModal.css', import.meta.url), 'utf8',
+  );
+  const mobile = css.slice(css.indexOf('@media (max-width: 580px)'));
+  assert.match(mobile, /\.catm-cat-card\s*\{[^}]*flex-wrap:\s*wrap/,
+    'o card quebra linha em vez de empurrar o selo para fora da tela');
+  assert.match(mobile, /\.catm-cat-left\s*\{[^}]*flex:\s*1 1 100%/,
+    'o conteúdo ocupa a largura toda, jogando o selo para a linha seguinte');
+});
+
+test('emoji do modal de categorias usa o mesmo catálogo do modal de novo produto', async () => {
+  const [categorias, novoProduto] = await Promise.all([
+    readFile(new URL('../src/admin/Produtos/CategoriasModal.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/admin/Produtos/NovoProdutoModal.tsx', import.meta.url), 'utf8'),
+  ]);
+  for (const src of [categorias, novoProduto]) {
+    assert.match(src, /import\s*\{\s*EMOJI_OPTIONS\s*\}\s*from\s*"\.\/EmojiIcons"/,
+      'ambos os modais importam o mesmo catálogo de emojis, em vez de listas locais divergentes');
+  }
+  assert.doesNotMatch(categorias, /const EMOJI_OPTIONS\s*=/,
+    'o modal de categorias não tem mais sua própria lista de emojis');
+});

@@ -190,47 +190,53 @@
   border-color: #634738;
 }
 
-.catm-new-row {
-  display: flex;
-  gap: 16px;
-}
-
-.catm-field--name {
-  flex: 1;
-}
 .catm-field--full {
   width: 100%;
 }
 
-/* ── Emoji inline grid (sempre visível) ── */
-.catm-emoji-inline-grid {
+/* ── Emoji grid — mesma UI do modal de novo produto (ícone + rótulo),
+   para os dois modais nunca divergirem em quais emojis existem. ── */
+.catm-emoji-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
+  gap: 8px;
 }
 
-.catm-emoji-option {
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 8px;
-  background: #ffffff;
-  font-size: 17px;
-  cursor: pointer;
+.catm-emoji-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  transition: background 0.1s;
-  border: 1px solid transparent;
+  gap: 4px;
+  padding: 10px 4px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
-.catm-emoji-option:hover {
-  background: #f5efe8;
-}
-
-.catm-emoji-option--active {
-  background: #f5efe8;
+.catm-emoji-item:hover {
   border-color: #634738;
+  background: #f5efe8;
+}
+
+.catm-emoji-item--active {
+  border-color: #634738;
+  background: #f5efe8;
+}
+
+.catm-emoji-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.catm-emoji-label {
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 10px;
+  color: #634738;
 }
 
 .catm-error-text {
@@ -444,8 +450,40 @@
     padding: 16px;
   }
 
-  .catm-new-row {
-    flex-direction: column;
+  .catm-emoji-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* O card de categoria tinha largura fixa de conteúdo (nome + slug + stats)
+     empurrando o selo "Sistema/Personalizada" pra fora da tela. Em vez de
+     rolar, o card agora quebra linha: conteúdo ocupa a largura toda e o
+     selo desce para a linha seguinte. */
+  .catm-cat-card {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .catm-cat-left {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .catm-cat-info {
+    min-width: 0;
+  }
+
+  .catm-cat-name-row {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .catm-cat-slug {
+    overflow-wrap: anywhere;
+  }
+
+  .catm-cat-stats {
+    flex-wrap: wrap;
+    row-gap: 4px;
   }
 
   .catm-footer {

@@ -824,11 +824,63 @@
 
   .dash-orders-table {
     margin-inline: -2px;
+    overflow-x: visible;
   }
 
-  .dash-table-header,
+  /* Mesma solução do Admin > Pedidos: em vez de forçar a rolagem lateral
+     larga usada nos breakpoints de tablet acima, cada linha vira um
+     cartão em grid nomeado. */
+  .dash-table-header {
+    display: none;
+  }
+
   .dash-table-row {
-    min-width: 760px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "id total"
+      "client client"
+      "items items"
+      "payment status";
+    column-gap: 10px;
+    row-gap: 8px;
+    min-width: 0;
+    padding: 14px 16px;
+  }
+
+  .dash-td-id,
+  .dash-td-client,
+  .dash-td-items,
+  .dash-td-payment,
+  .dash-td-status,
+  .dash-td-total {
+    width: auto;
+  }
+
+  .dash-td-id {
+    grid-area: id;
+  }
+
+  .dash-td-total {
+    grid-area: total;
+    text-align: right;
+  }
+
+  .dash-td-client {
+    grid-area: client;
+  }
+
+  .dash-td-items {
+    grid-area: items;
+  }
+
+  .dash-td-payment {
+    grid-area: payment;
+  }
+
+  .dash-td-status {
+    grid-area: status;
+    justify-self: end;
   }
 
   .dash-rank-name,
