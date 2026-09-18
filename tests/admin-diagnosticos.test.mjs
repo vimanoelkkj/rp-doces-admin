@@ -158,6 +158,179 @@ test('Pix de diagnóstico nunca escreve em pedidos, pagamentos ou estoque', asyn
   assert.deepEqual(await state(db), antes, 'nenhuma tabela de domínio foi tocada');
 });
 
+/* ────────────────── Status e estorno do Pix de diagnóstico ────────────────── */
+
+function pixStatusRequest(session, mpPaymentId = '555') {
+  return new Request(`https://local.test/api/admin/diagnosticos/pix-status?mpPaymentId=${mpPaymentId}`, {
+    headers: {...(session ? {Cookie: cookieDe(session)} : {})},
+  });
+}
+
+function pixRefundRequest(session, body = {mpPaymentId: '555', operationKey: 'diag-refund-000001'}) {
+  return new Request('https://local.test/api/admin/diagnosticos/pix-reembolso', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: 'https://local.test',
+      ...(session ? {Cookie: cookieDe(session)} : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+test('OWNER consulta o status do Pix de diagnóstico', async t => {
+  const {db, owner} = await bancada(t);
+  t.mock.method(globalThis, 'fetch', async url => {
+    assert.equal(url, 'https://api.mercadopago.com/v1/payments/555');
+    return Response.json({id: 555, status: 'approved'});
+  });
+  const response = await app.diagnosticoPixStatus.onRequestGet({request: pixStatusRequest(owner), env: pixEnv(db)});
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.status, 'PAGO');
+});
+
+test('status ainda pendente/in_process aparece como PENDENTE, nunca como pago', async t => {
+  const {db, owner} = await bancada(t);
+  t.mock.method(globalThis, 'fetch', async () => Response.json({id: 555, status: 'in_process'}));
+  const response = await app.diagnosticoPixStatus.onRequestGet({request: pixStatusRequest(owner), env: pixEnv(db)});
+  const body = await response.json();
+  assert.equal(body.status, 'PENDENTE');
+});
+
+test('ADMIN recebe 403 ao consultar status do Pix de diagnóstico', async t => {
+  const {db, admin} = await bancada(t);
+  const response = await app.diagnosticoPixStatus.onRequestGet({request: pixStatusRequest(admin), env: pixEnv(db)});
+  assert.equal(response.status, 403);
+});
+
+test('sem sessão recebe 401 ao consultar status', async t => {
+  const {db} = await bancada(t);
+  const response = await app.diagnosticoPixStatus.onRequestGet({request: pixStatusRequest(null), env: pixEnv(db)});
+  assert.equal(response.status, 401);
+});
+
+test('mpPaymentId inválido é rejeitado na consulta de status', async t => {
+  const {db, owner} = await bancada(t);
+  const response = await app.diagnosticoPixStatus.onRequestGet({
+    request: pixStatusRequest(owner, 'nao-e-numero'), env: pixEnv(db),
+  });
+  assert.equal(response.status, 400);
+});
+
+test('falha ao consultar o Mercado Pago nunca finge um status', async t => {
+  const {db, owner} = await bancada(t);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('offline'); });
+  const response = await app.diagnosticoPixStatus.onRequestGet({request: pixStatusRequest(owner), env: pixEnv(db)});
+  assert.equal(response.status, 502);
+});
+
+test('consulta de status nunca escreve em pedido_pagamentos', async t => {
+  const {db, owner} = await bancada(t);
+  t.mock.method(globalThis, 'fetch', async () => Response.json({id: 555, status: 'approved'}));
+  const antes = await state(db);
+  await app.diagnosticoPixStatus.onRequestGet({request: pixStatusRequest(owner), env: pixEnv(db)});
+  assert.deepEqual(await state(db), antes);
+});
+
+function mockMpRefundSucesso(t, refundId = 9001) {
+  return t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.equal(url, 'https://api.mercadopago.com/v1/payments/555/refunds');
+    return Response.json({id: refundId, payment_id: 555, status: 'approved'}, {status: 201});
+  });
+}
+
+test('OWNER estorna o Pix de diagnóstico com sucesso', async t => {
+  const {db, owner} = await bancada(t);
+  const mock = mockMpRefundSucesso(t);
+  const response = await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(owner), env: pixEnv(db)});
+  assert.equal(response.status, 201);
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.refundId, '9001');
+  assert.equal(body.status, 'approved');
+  assert.equal(mock.mock.calls[0].arguments[1].method, 'POST');
+});
+
+test('ADMIN recebe 403 ao tentar estornar o Pix de diagnóstico', async t => {
+  const {db, admin} = await bancada(t);
+  const response = await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(admin), env: pixEnv(db)});
+  assert.equal(response.status, 403);
+});
+
+test('sem sessão recebe 401 no estorno', async t => {
+  const {db} = await bancada(t);
+  const response = await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(null), env: pixEnv(db)});
+  assert.equal(response.status, 401);
+});
+
+test('origem inválida é recusada no estorno', async t => {
+  const {db, owner} = await bancada(t);
+  const request = new Request('https://local.test/api/admin/diagnosticos/pix-reembolso', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', Origin: 'https://evil.test', Cookie: cookieDe(owner)},
+    body: JSON.stringify({mpPaymentId: '555', operationKey: 'diag-refund-000001'}),
+  });
+  const response = await app.diagnosticoPixReembolso.onRequestPost({request, env: pixEnv(db)});
+  assert.equal(response.status, 403);
+});
+
+test('mpPaymentId ou operationKey inválidos são rejeitados no estorno', async t => {
+  const {db, owner} = await bancada(t);
+  const semId = await app.diagnosticoPixReembolso.onRequestPost({
+    request: pixRefundRequest(owner, {mpPaymentId: 'abc', operationKey: 'diag-refund-000001'}), env: pixEnv(db),
+  });
+  assert.equal(semId.status, 400);
+  const semChave = await app.diagnosticoPixReembolso.onRequestPost({
+    request: pixRefundRequest(owner, {mpPaymentId: '555', operationKey: 'curta'}), env: pixEnv(db),
+  });
+  assert.equal(semChave.status, 400);
+});
+
+test('MP_ACCESS_TOKEN ausente nunca finge um estorno', async t => {
+  const {db, owner} = await bancada(t);
+  const response = await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(owner), env: {DB: db}});
+  assert.equal(response.status, 503);
+});
+
+test('recusa definitiva do estorno vira erro explícito, nunca sucesso', async t => {
+  const {db, owner} = await bancada(t);
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({message: 'cannot refund'}, {status: 400}));
+  const response = await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(owner), env: pixEnv(db)});
+  assert.equal(response.status, 502);
+  const body = await response.json();
+  assert.equal(body.code, 'MERCADO_PAGO_RECUSOU');
+});
+
+test('resultado ambíguo do estorno nunca vira sucesso', async t => {
+  const {db, owner} = await bancada(t);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('offline'); });
+  const response = await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(owner), env: pixEnv(db)});
+  assert.equal(response.status, 502);
+  const body = await response.json();
+  assert.equal(body.code, 'MERCADO_PAGO_INDISPONIVEL');
+});
+
+test('mesma operationKey de estorno deriva a mesma X-Idempotency-Key', async t => {
+  const {db, owner} = await bancada(t);
+  const mock = mockMpRefundSucesso(t);
+  const corpo = {mpPaymentId: '555', operationKey: 'diag-refund-000002'};
+  await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(owner, corpo), env: pixEnv(db)});
+  await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(owner, corpo), env: pixEnv(db)});
+  const chaves = mock.mock.calls.map(c => c.arguments[1].headers['X-Idempotency-Key']);
+  assert.equal(chaves.length, 2);
+  assert.equal(chaves[0], chaves[1]);
+});
+
+test('estorno de diagnóstico nunca escreve em pedido_pagamentos nem pedido_reembolsos', async t => {
+  const {db, owner} = await bancada(t);
+  mockMpRefundSucesso(t);
+  const antes = await state(db);
+  await app.diagnosticoPixReembolso.onRequestPost({request: pixRefundRequest(owner), env: pixEnv(db)});
+  assert.deepEqual(await state(db), antes);
+});
+
 /* ─────────────────────────── Pedido de teste ─────────────────────────── */
 
 test('OWNER dispara o pedido de teste com sucesso', async t => {
