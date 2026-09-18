@@ -610,6 +610,8 @@
 .dash-orders-table {
   display: flex;
   flex-direction: column;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
 }
 
 .dash-table-header {
@@ -746,18 +748,14 @@
   .dash-td-client {
     width: 200px;
   }
+
+  .dash-table-header,
+  .dash-table-row {
+    min-width: 760px;
+  }
 }
 
 @media (max-width: 768px) {
-  .admin-sidebar {
-    display: none;
-  }
-
-  .admin-main {
-    margin-left: 0;
-    padding: 24px 16px;
-  }
-
   .dash-title {
     font-size: 28px;
   }
@@ -767,16 +765,76 @@
     gap: 16px;
   }
 
+  .dash-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .dash-results-banner,
+  .dash-panel-header-row,
+  .dash-rank-meta {
+    flex-wrap: wrap;
+  }
+
   .dash-kpi-card {
     flex: 1 1 calc(50% - 8px);
   }
 
+  .dash-table-header,
+  .dash-table-row {
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 600px) {
+  .dash-kpi-strip {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .dash-kpi-card {
+    min-width: 0;
+  }
+
+  .dash-panel {
+    padding: 18px;
+  }
+
+  .dash-header-actions,
+  .dash-date-dropdown,
+  .dash-date-picker,
+  .dash-btn-today {
+    width: 100%;
+  }
+
+  .dash-date-picker {
+    justify-content: space-between;
+  }
+
+  .dash-date-panel {
+    left: 0;
+    right: auto;
+    width: min(280px, calc(100vw - 32px));
+  }
+
+  .dash-orders-header {
+    flex-direction: column;
+    gap: 14px;
+  }
+
   .dash-orders-table {
-    overflow-x: auto;
+    margin-inline: -2px;
   }
 
   .dash-table-header,
   .dash-table-row {
-    min-width: 900px;
+    min-width: 760px;
+  }
+
+  .dash-rank-name,
+  .dash-alert-desc,
+  .dash-panel-subtitle,
+  .dash-orders-subtitle {
+    overflow-wrap: anywhere;
   }
 }

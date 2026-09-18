@@ -468,3 +468,86 @@
   border-color: #634738;
   background: #f5efe8;
 }
+
+/* ═══════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════ */
+@media (max-width: 1150px) {
+  .loj-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .loj-diag-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .loj-title {
+    font-size: 28px;
+  }
+
+  .loj-header,
+  .loj-columns {
+    margin-bottom: 24px;
+  }
+
+  .loj-col-left,
+  .loj-col-right {
+    gap: 20px;
+  }
+
+  .loj-panel,
+  .loj-diag-panel {
+    padding: 18px;
+  }
+
+  .loj-days-row,
+  .loj-delivery-row,
+  .loj-image-actions {
+    flex-wrap: wrap;
+  }
+
+  .loj-delivery-pill {
+    flex: 1 1 130px;
+    padding-inline: 16px;
+  }
+
+  .loj-preview-row,
+  .loj-diag-card-header,
+  .loj-diag-header {
+    flex-wrap: wrap;
+  }
+
+  .loj-preview-row span,
+  .loj-preview-address,
+  .loj-diag-card-desc {
+    overflow-wrap: anywhere;
+  }
+
+  .loj-save-bar,
+  .loj-btn-save {
+    width: 100%;
+  }
+
+  .loj-btn-save {
+    justify-content: center;
+  }
+
+  .loj-diag-header {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .loj-hours-row,
+  .loj-images-row {
+    grid-template-columns: 1fr;
+  }
+
+  .loj-diag-action {
+    width: 100%;
+  }
+}

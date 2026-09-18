@@ -456,8 +456,73 @@
 
 /* ── Responsive ── */
 @media (max-width: 820px) {
+  .pedmodal-overlay {
+    padding: 12px;
+  }
+
   .pedmodal-card {
-    width: 95vw;
-    margin: 16px;
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    margin: 0;
+    border-radius: 16px;
+    overscroll-behavior: contain;
+  }
+
+  .pedmodal-header {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px;
+    background: #ffffff;
+    border-bottom: 1px solid #eadfd3;
+  }
+
+  .pedmodal-title {
+    min-width: 0;
+    font-size: 24px;
+    overflow-wrap: anywhere;
+  }
+
+  .pedmodal-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pedmodal-body {
+    padding: 18px;
+  }
+
+  .pedmodal-meta-date {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .pedmodal-pix-aviso,
+  .pedmodal-pix-vencido {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 520px) {
+  .pedmodal-header {
+    flex-direction: column;
+  }
+
+  .pedmodal-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .pedmodal-btn-close {
+    margin-left: auto;
+  }
+
+  .pedmodal-item-row,
+  .pedmodal-summary-row,
+  .pedmodal-pix-copy-row {
+    gap: 12px;
   }
 }

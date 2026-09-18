@@ -1,7 +1,9 @@
-import { NavLink } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAdminTheme } from "../theme/AdminThemeContext";
 import { useAdminAuth } from "../auth/AdminAuthContext";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
+import { useAdminModal } from "./useAdminModal";
 import "./AdminSidebar.css";
 
 /* ── SVG icons — exported directly from Figma ── */
@@ -239,7 +241,6 @@ interface NavItem {
   to: string;
   label: string;
   icon: React.ReactNode;
-  badge?: number;
   animClass?: string;
 }
 
@@ -260,7 +261,6 @@ const mainNav: NavItem[] = [
     to: "/admin/pedidos",
     label: "Pedidos",
     icon: <IconBag />,
-    badge: 4,
     animClass: "sidebar-anim-pedidos",
   },
   {
@@ -293,6 +293,7 @@ const PAPEL_LABEL: Record<string, string> = {
 };
 
 export default function AdminSidebar() {
+  const location = useLocation();
   const { user, logout } = useAdminAuth();
   const userName = user.nome;
   const userRole = PAPEL_LABEL[user.papel] ?? user.papel;
@@ -305,18 +306,75 @@ export default function AdminSidebar() {
 
   const { theme, toggleTheme } = useAdminTheme();
   // HUMAN-14: contagem REAL de notificações não lidas deste operador,
-  // derivada de fatos do domínio. Substitui a ausência de badge no item
-  // Notificações; o badge numérico do item Pedidos é outro assunto (resíduo
-  // de mock do design inicial) e não foi tocado aqui.
+  // derivada de fatos do domínio.
   const { naoLidas } = useNotificacoes();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuWasOpen = useRef(false);
+
+  const closeMenu = () => setMenuOpen(false);
+  const backdropProps = useAdminModal(menuOpen, closeMenu);
+
+  useEffect(() => {
+    closeMenu();
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      if (menuWasOpen.current) menuButtonRef.current?.focus();
+      menuWasOpen.current = false;
+      return;
+    }
+
+    menuWasOpen.current = true;
+    closeButtonRef.current?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMenu();
+        return;
+      }
+      if (event.key !== "Tab" || !sidebarRef.current) return;
+
+      const focusable = Array.from(
+        sidebarRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const desktopQuery = window.matchMedia("(min-width: 901px)");
+    const onBreakpointChange = (event: MediaQueryListEvent) => {
+      if (event.matches) closeMenu();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    desktopQuery.addEventListener("change", onBreakpointChange);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      desktopQuery.removeEventListener("change", onBreakpointChange);
+    };
+  }, [menuOpen]);
 
   const renderNavItem = (item: NavItem) => {
-    const badge = item.to === "/admin/notificacoes" ? naoLidas : item.badge;
+    const badge = item.to === "/admin/notificacoes" ? naoLidas : undefined;
     return (
       <NavLink
         key={item.to}
         to={item.to}
         end={item.to === "/admin"}
+        onClick={closeMenu}
         className={({ isActive }) =>
           `sidebar-nav-item ${item.animClass || ""}${isActive ? " sidebar-nav-item--active" : ""}`
         }
@@ -331,71 +389,135 @@ export default function AdminSidebar() {
   };
 
   return (
-    <aside className="admin-sidebar">
-      <div className="sidebar-top">
-        {/* Logo */}
+    <>
+      <header className="admin-mobile-header">
         <div className="sidebar-logo">
           <div className="sidebar-logo-circle">
             <IconCakeLogo />
           </div>
-          <span className="sidebar-logo-text">R&P Doces</span>
+          <span className="sidebar-logo-text">R&amp;P Doces</span>
         </div>
+        <button
+          ref={menuButtonRef}
+          type="button"
+          className="admin-mobile-menu-btn"
+          aria-label={
+            menuOpen
+              ? "Fechar menu administrativo"
+              : "Abrir menu administrativo"
+          }
+          aria-expanded={menuOpen}
+          aria-controls="admin-navigation"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+      </header>
 
-        {/* Main nav */}
-        <nav className="sidebar-main-nav">{mainNav.map(renderNavItem)}</nav>
-      </div>
+      <div
+        className={`admin-sidebar-backdrop${menuOpen ? " admin-sidebar-backdrop--open" : ""}`}
+        aria-hidden="true"
+        {...backdropProps}
+      />
 
-      <div className="sidebar-bottom">
-        {/* System links */}
-        <nav className="sidebar-system-nav">
-          {systemNav.map(renderNavItem)}
-          <button
-            type="button"
-            className="sidebar-nav-item sidebar-anim-tema"
-            onClick={toggleTheme}
+      <aside
+        ref={sidebarRef}
+        id="admin-navigation"
+        className={`admin-sidebar${menuOpen ? " admin-sidebar--open" : ""}`}
+        aria-label="Navegação administrativa"
+      >
+        <button
+          ref={closeButtonRef}
+          type="button"
+          className="admin-sidebar-close"
+          aria-label="Fechar menu administrativo"
+          onClick={closeMenu}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            aria-hidden="true"
           >
-            <span className="sidebar-nav-icon">
-              {theme === "light" ? <IconMoon /> : <IconSun />}
-            </span>
-            <span className="sidebar-nav-label">
-              {theme === "light" ? "Tema Escuro" : "Tema Claro"}
-            </span>
-          </button>
-        </nav>
-
-        <div className="sidebar-divider" />
-
-        {/* User profile */}
-        <div className="sidebar-user">
-          <div className="sidebar-user-avatar">
-            <span>{initials}</span>
-          </div>
-          <div className="sidebar-user-info">
-            <span className="sidebar-user-name">{userName}</span>
-            <span className="sidebar-user-role">{userRole}</span>
-          </div>
-          <button
-            className="sidebar-logout-btn"
-            title="Sair"
-            onClick={logout}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
+            <path
+              d="M4 4L16 16M16 4L4 16"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="1.8"
               strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
+            />
+          </svg>
+        </button>
+        <div className="sidebar-top">
+          {/* Logo */}
+          <div className="sidebar-logo">
+            <div className="sidebar-logo-circle">
+              <IconCakeLogo />
+            </div>
+            <span className="sidebar-logo-text">R&P Doces</span>
+          </div>
+
+          {/* Main nav */}
+          <nav className="sidebar-main-nav">{mainNav.map(renderNavItem)}</nav>
         </div>
-      </div>
-    </aside>
+
+        <div className="sidebar-bottom">
+          {/* System links */}
+          <nav className="sidebar-system-nav">
+            {systemNav.map(renderNavItem)}
+            <button
+              type="button"
+              className="sidebar-nav-item sidebar-anim-tema"
+              onClick={() => {
+                toggleTheme();
+                closeMenu();
+              }}
+            >
+              <span className="sidebar-nav-icon">
+                {theme === "light" ? <IconMoon /> : <IconSun />}
+              </span>
+              <span className="sidebar-nav-label">
+                {theme === "light" ? "Tema Escuro" : "Tema Claro"}
+              </span>
+            </button>
+          </nav>
+
+          <div className="sidebar-divider" />
+
+          {/* User profile */}
+          <div className="sidebar-user">
+            <div className="sidebar-user-avatar">
+              <span>{initials}</span>
+            </div>
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name">{userName}</span>
+              <span className="sidebar-user-role">{userRole}</span>
+            </div>
+            <button
+              className="sidebar-logout-btn"
+              title="Sair"
+              onClick={logout}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }
