@@ -62,13 +62,20 @@ interface PedidoDetalheModalProps {
 const formatarPreco = (centavos: number) =>
   `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
-const formatarData = (isoLike: string) =>
-  new Date(isoLike.replace(" ", "T")).toLocaleString("pt-BR", {
+const formatarData = (isoLike: string) => {
+  // SQLite CURRENT_TIMESTAMP é UTC e chega como "YYYY-MM-DD HH:mm:ss".
+  // Sem o sufixo Z, o navegador interpretava esse valor como horário LOCAL,
+  // exibindo o pedido com deslocamento de fuso (ex.: +3h no UTC-3).
+  const iso = isoLike.replace(" ", "T");
+  const comFuso = /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(iso) ? iso : `${iso}Z`;
+
+  return new Date(comFuso).toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
   });
+};
 
 // Mesmo enum de produção (order.model.ts / OrderStatusSelect.tsx) — o admin
 // pode escolher qualquer status livremente, sem avanço linear forçado.
