@@ -596,6 +596,29 @@ html[data-admin-theme="dark"] .loj-diag-pix-copy-btn {
 html[data-admin-theme="dark"] .loj-diag-pix-copy-btn:hover {
   border-color: #634738;
 }
+html[data-admin-theme="dark"] .loj-diag-pix-copy-btn:disabled {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-status--pago {
+  background: #24352c;
+  border-color: #33473c;
+  color: #7fc7a0;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-status--pendente {
+  background: #3d2e2b;
+  border-color: #4d3835;
+  color: #f0c7bd;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-status--cancelado,
+html[data-admin-theme="dark"] .loj-diag-pix-status--expirado {
+  background: #3b2220;
+  border-color: #4d2e2b;
+  color: #e59a9a;
+}
+html[data-admin-theme="dark"] .loj-diag-pix-refund {
+  border-top-color: #3d3230;
+}
 html[data-admin-theme="dark"] .loj-input,
 html[data-admin-theme="dark"] .loj-textarea {
   background: #1a1412;
