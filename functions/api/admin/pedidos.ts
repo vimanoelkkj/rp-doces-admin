@@ -521,11 +521,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const idempotencyKey = chavePagamento(operationKey);
 
     const statements = [
+      // B5: colunas do modelo legado "um produto por pedido" que o `pedidos`
+      // histórico de produção exige como NOT NULL sem DEFAULT. Preenchidas
+      // com valores neutros por compatibilidade estrutural — a composição
+      // real é `pedido_itens` e o total é `valor_total_centavos`. Ver a nota
+      // completa em `migrations/0013_pedidos_compat_colunas_legadas.sql`.
       env.DB.prepare(
         `INSERT INTO pedidos
            (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
-            idempotency_key, origem_pedido, reserva_status, status_pagamento, pago_em)
-         VALUES (?, ?, ?, ?, ?, ?, 'MANUAL', 'ATIVA', ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END)`,
+            idempotency_key, origem_pedido, reserva_status, status_pagamento, pago_em,
+            cliente_email, produto_nome, quantidade, valor_unitario_centavos)
+         VALUES (?, ?, ?, ?, ?, ?, 'MANUAL', 'ATIVA', ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
+                 '', '', 1, 0)`,
       ).bind(
         tokenPublico,
         clienteNome,
