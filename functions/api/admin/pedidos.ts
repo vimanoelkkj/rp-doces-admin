@@ -92,30 +92,46 @@ function jsonError(message: string, status: number, code?: string) {
   return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+async function reconcileMercadoPagoEmBackground(env: Env): Promise<void> {
+  const [pixPendentes, operacoesInconclusivas] = await Promise.allSettled([
+    reconcilePendingPixPayments(env),
+    recuperarOperacoesInconclusivas(env),
+  ]);
+
+  if (pixPendentes.status === "rejected") {
+    console.error(
+      "Falha na reconciliação oportunista de pagamentos PIX_MP",
+      pixPendentes.reason,
+    );
+  }
+  if (operacoesInconclusivas.status === "rejected") {
+    console.error(
+      "Falha na recuperação de operações inconclusivas",
+      operacoesInconclusivas.reason,
+    );
+  }
+}
+
+export const onRequestGet: PagesFunction<Env> = async (context) => {
+  const { request, env } = context;
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 
   try {
-    // Reconciliação oportunista (Passo 6/7): melhor esforço, nunca deve
-    // impedir a listagem de carregar se falhar.
-    try {
-      await reconcilePendingPixPayments(env);
-    } catch (err) {
-      console.error("Falha na reconciliação oportunista de pagamentos PIX_MP", err);
-    }
+    // As reconciliações que dependem de rede externa (Mercado Pago) são
+    // melhor-esforço e NÃO fazem parte da resposta da listagem. Antes elas
+    // eram aguardadas aqui e cada abertura/troca de filtro podia pagar até
+    // vários segundos de latência do provedor. waitUntil mantém o worker vivo
+    // para concluí-las depois que a resposta já puder ser enviada.
+    context.waitUntil(reconcileMercadoPagoEmBackground(env));
+
+    // Reconciliações puramente locais no D1 continuam síncronas: são rápidas
+    // e mantêm a projeção/listagem internamente consistente sem depender de
+    // rede externa.
     try {
       await reconcilePedidosDivergentes(env.DB);
     } catch (err) {
       console.error("Falha na reconciliação de pedidos com ledger", err);
-    }
-    // B-3: operações cujo envio ao Mercado Pago ficou inconclusivo deixam de
-    // ser estado morto. Observação read-only pela identidade persistida,
-    // reaproveitando esta reconciliação oportunista — sem cron/sweep novo.
-    try {
-      await recuperarOperacoesInconclusivas(env);
-    } catch (err) {
-      console.error("Falha na recuperação de operações inconclusivas", err);
     }
     try {
       await liberarReservasVencidasLocalmente(env);
