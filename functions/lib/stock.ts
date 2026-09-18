@@ -178,14 +178,23 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
   }
 }
 
+// "Existe cobrança Pix viva neste pedido?" — a pergunta pertence ao PEDIDO,
+// nunca a uma tentativa. Substituição, prazo local vencido ou falta de ID
+// remoto não tornam um Pix PENDENTE morto; só o ledger o terminaliza.
+// Correlaciona com `pedidos` do statement que a embute, então serve tanto
+// numa subconsulta quanto no WHERE de um UPDATE sobre `pedidos`.
+//
+// Exportada porque mais de uma decisão depende dela (liberação de reserva e
+// cancelamento operacional do pedido): duas cópias divergiriam com o tempo.
+export const PIX_MP_PENDENTE_NO_PEDIDO_SQL = `EXISTS (SELECT 1 FROM pedido_pagamentos pp
+                  WHERE pp.pedido_id = pedidos.id AND pp.metodo = 'PIX_MP' AND pp.status = 'PENDENTE')`;
+
 // O mesmo predicado protege todos os produtos e o marcador do pedido.
-// Substituição, prazo ou falta de ID remoto não tornam um Pix PENDENTE morto.
 const RESERVA_LIBERAVEL_SQL = `reserva_status = 'ATIVA'
   AND estoque_baixado_em IS NULL AND status_pagamento = 'PENDENTE'
   AND NOT EXISTS (SELECT 1 FROM pedido_itens pi
                   WHERE pi.pedido_id = pedidos.id AND pi.estoque_baixado_em IS NOT NULL)
-  AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos pp
-                  WHERE pp.pedido_id = pedidos.id AND pp.metodo = 'PIX_MP' AND pp.status = 'PENDENTE')`;
+  AND NOT ${PIX_MP_PENDENTE_NO_PEDIDO_SQL}`;
 
 // Libera atomicamente a reserva de um pedido cujo Pix expirou ou foi
 // cancelado — só quando o agregado financeiro ainda está genuinamente

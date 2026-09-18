@@ -237,12 +237,19 @@ test('expired without remote ID remains retained after interrupted finalization 
   await app.sync.expireLocalPayment(db,1); released(await state(db));
 });
 
-test('operational cancellation retains live Pix and never terminalizes the payment',async t=>{
+// A política mudou deliberadamente: cancelar com Pix vivo passou a ser
+// RECUSADO (ver tests/cancelamento-pix.test.mjs). O que este teste guarda
+// continua valendo e é o que importa aqui: a tentativa nunca é terminalizada
+// pelo cancelamento e a reserva do pedido não se move.
+test('operational cancellation is refused and never terminalizes the live Pix',async t=>{
   const db=await fixture(t); const session=await app.auth.createSession(db,1);
   const r=await app.adminOrder.onRequestPatch({env:env(db),params:{id:'1'},request:new Request('https://local.test/api/admin/pedidos/1',{
     method:'PATCH',headers:{Cookie:session.cookie.split(';')[0]},body:JSON.stringify({statusPedido:'CANCELADO'}),
   })});
-  assert.equal(r.status,200); reserved(await state(db));
+  assert.equal(r.status,409);
+  assert.equal((await r.json()).code,'PEDIDO_COM_PIX_PENDENTE');
+  reserved(await state(db));
+  assert.equal((await state(db)).pedido.status_pedido,'NOVO');
   assert.equal((await state(db)).pagamentos[0].status,'PENDENTE');
 });
 
