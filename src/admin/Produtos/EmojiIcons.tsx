@@ -223,3 +223,27 @@ export const EmojiCookie = () => (
     <circle cx="14.5" cy="17.5" r=".7" fill="currentColor" />
   </svg>
 );
+
+export interface EmojiOption {
+  /** Emoji de verdade, salvo no produto/categoria como identificador visual. */
+  char: string;
+  icon: React.ReactNode;
+  label: string;
+}
+
+// Fonte única do conjunto de emojis do catálogo — usado pelo modal de novo
+// produto E pelo modal de categorias, para que os dois nunca fiquem com
+// opções diferentes (era exatamente o que acontecia antes: cada modal tinha
+// sua própria lista, em ordem e composição diferentes).
+export const EMOJI_OPTIONS: EmojiOption[] = [
+  { char: "🎂", icon: <EmojiCake />, label: "Bolo" },
+  { char: "🧁", icon: <EmojiCupcake />, label: "Cupcake" },
+  { char: "🍮", icon: <EmojiPudding />, label: "Pudim" },
+  { char: "🎉", icon: <EmojiPartyCake />, label: "Bolo de festa" },
+  { char: "🍓", icon: <EmojiStrawberry />, label: "Morango" },
+  { char: "🍫", icon: <EmojiChocolate />, label: "Chocolate" },
+  { char: "🥥", icon: <EmojiCoconut />, label: "Coco" },
+  { char: "🍋", icon: <EmojiLemon />, label: "Limão" },
+  { char: "🍯", icon: <EmojiHoney />, label: "Mel" },
+  { char: "🍪", icon: <EmojiCookie />, label: "Biscoito" },
+];
