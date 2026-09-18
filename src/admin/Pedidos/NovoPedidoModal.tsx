@@ -2,6 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { novaOperationKey } from "../../lib/operationKey";
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
+import PortalDropdown from "../components/PortalDropdown";
+import { useAdminModal } from "../components/useAdminModal";
+import {
+  formatWhatsappBr,
+  isValidWhatsappBr,
+  normalizeWhatsappBr,
+} from "../../../shared/whatsapp";
 import "./NovoPedidoModal.css";
 
 /* ── Icons ── */
@@ -108,11 +115,16 @@ interface NovoPedidoModalProps {
 function useDropdown() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -120,7 +132,7 @@ function useDropdown() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  return { open, setOpen, ref };
+  return { open, setOpen, ref, menuRef };
 }
 
 /* ── Component ── */
@@ -142,6 +154,7 @@ export default function NovoPedidoModal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const modalProps = useAdminModal(open, onClose);
 
   // A1: identidade da intenção de registrar ESTA venda. Precisa existir
   // antes do primeiro POST e continuar a mesma enquanto o conteúdo do
@@ -234,6 +247,10 @@ export default function NovoPedidoModal({
       setError("Selecione um produto em todos os itens");
       return;
     }
+    if (whatsapp && !isValidWhatsappBr(whatsapp)) {
+      setError("Informe um WhatsApp brasileiro válido com DDD");
+      return;
+    }
     for (const item of items) {
       const produto = item.produtoId ? produtoPorId.get(item.produtoId) : null;
       if (produto && item.quantidade > estoqueLivre(produto)) {
@@ -248,7 +265,7 @@ export default function NovoPedidoModal({
         quantidade: i.quantidade,
       })),
       clienteNome: clientName.trim(),
-      clienteWhatsapp: whatsapp.trim(),
+      clienteWhatsapp: normalizeWhatsappBr(whatsapp),
       observacao: observation.trim(),
       metodoPagamento,
       statusPagamento,
@@ -283,8 +300,8 @@ export default function NovoPedidoModal({
   if (!open) return null;
 
   return createPortal(
-    <div className="nped-overlay" onClick={onClose}>
-      <div className="nped-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="nped-overlay" {...modalProps}>
+      <div className="nped-modal">
         {/* ── Header ── */}
         <div className="nped-header">
           <div>
@@ -325,10 +342,12 @@ export default function NovoPedidoModal({
                   WhatsApp <span className="nped-optional">opcional</span>
                 </label>
                 <input
-                  type="text"
+                  type="tel"
                   placeholder="(31) 99999-9999"
                   value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
+                  onChange={(e) => setWhatsapp(formatWhatsappBr(e.target.value))}
+                  inputMode="tel"
+                  maxLength={15}
                 />
               </div>
             </div>
@@ -526,8 +545,12 @@ function ProductItemRow({
             </span>
             <IconChevron open={dd.open} />
           </button>
-          {dd.open && (
-            <ul className="nped-dropdown-list nped-dropdown-list--products">
+          <PortalDropdown
+            open={dd.open}
+            anchorRef={dd.ref}
+            menuRef={dd.menuRef}
+            className="nped-dropdown-list nped-dropdown-list--products"
+          >
               {produtos.length === 0 && (
                 <li>
                   <div className="nped-dropdown-option nped-placeholder">
@@ -549,8 +572,7 @@ function ProductItemRow({
                   </button>
                 </li>
               ))}
-            </ul>
-          )}
+          </PortalDropdown>
         </div>
 
         {/* Qty */}

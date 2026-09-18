@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "./AdminProdutos";
+import { useAdminModal } from "../components/useAdminModal";
+import {
+  formatBrlInput,
+  formatCentsAsBrlInput,
+  parseBrlInputToCents,
+} from "../../lib/brl";
 import "./NovoProdutoModal.css";
 import {
   EmojiCake,
@@ -121,7 +127,7 @@ export default function NovoProdutoModal({
   const [name, setName] = useState("");
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [category, setCategory] = useState("");
-  const [stock, setStock] = useState(0);
+  const [stock, setStock] = useState("0");
   const [selectedEmoji, setSelectedEmoji] = useState<number | null>(null);
   const [price, setPrice] = useState("0,00");
   const [description, setDescription] = useState("");
@@ -135,6 +141,7 @@ export default function NovoProdutoModal({
   const [error, setError] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const modalProps = useAdminModal(open, onClose);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -196,7 +203,7 @@ export default function NovoProdutoModal({
   const resetForm = () => {
     setName("");
     setCategory(categorias[0]?.id ?? "");
-    setStock(0);
+    setStock("0");
     setSelectedEmoji(null);
     setPrice("0,00");
     setDescription("");
@@ -230,10 +237,10 @@ export default function NovoProdutoModal({
     }
     setName(produto.nome);
     setCategory(produto.categoria);
-    setStock(produto.estoque);
+    setStock(String(produto.estoque));
     const emojiIndex = EMOJI_CHARS.indexOf(produto.emoji);
     setSelectedEmoji(emojiIndex >= 0 ? emojiIndex : null);
-    setPrice((produto.preco_centavos / 100).toFixed(2).replace(".", ","));
+    setPrice(formatCentsAsBrlInput(produto.preco_centavos));
     setDescription(produto.descricao);
     setImagePreview(imageUrlFor(produto.image_key));
     setProdutoAtivo(produto.ativo === 1);
@@ -248,13 +255,16 @@ export default function NovoProdutoModal({
     e.preventDefault();
     if (saving) return;
 
-    const precoCentavos = Math.round(
-      parseFloat(price.replace(",", ".")) * 100,
-    );
-    if (!Number.isFinite(precoCentavos) || precoCentavos < 1) {
+    const precoCentavos = parseBrlInputToCents(price);
+    if (precoCentavos === null || precoCentavos < 1) {
       setError("Informe um preço válido.");
       return;
     }
+    if (!/^\d+$/.test(stock) || !Number.isSafeInteger(Number(stock))) {
+      setError("Informe um estoque inteiro válido.");
+      return;
+    }
+    const estoque = Number(stock);
 
     setSaving(true);
     setError(null);
@@ -270,7 +280,7 @@ export default function NovoProdutoModal({
           categoria: category,
           descricao: description,
           precoCentavos,
-          estoque: stock,
+          estoque,
           emoji: selectedEmoji != null ? EMOJI_CHARS[selectedEmoji] : "",
           ativo: produtoAtivo,
           disponivel: disponivelVenda,
@@ -295,8 +305,8 @@ export default function NovoProdutoModal({
   if (!open) return null;
 
   return createPortal(
-    <div className="np-overlay" onClick={onClose}>
-      <div className="np-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="np-overlay" {...modalProps}>
+      <div className="np-modal">
         <div className="np-header">
           <div>
             <span className="np-kicker">CATÁLOGO</span>
@@ -381,15 +391,24 @@ export default function NovoProdutoModal({
                 <button
                   type="button"
                   className="np-stepper-btn"
-                  onClick={() => setStock(Math.max(0, stock - 1))}
+                  onClick={() => setStock(String(Math.max(0, Number(stock || 0) - 1)))}
                 >
                   <IconMinus />
                 </button>
-                <span className="np-stepper-value">{stock}</span>
+                <input
+                  type="text"
+                  className="np-stepper-value"
+                  value={stock}
+                  inputMode="numeric"
+                  aria-label="Estoque"
+                  onChange={(e) => {
+                    if (/^\d*$/.test(e.target.value)) setStock(e.target.value);
+                  }}
+                />
                 <button
                   type="button"
                   className="np-stepper-btn"
-                  onClick={() => setStock(stock + 1)}
+                  onClick={() => setStock(String(Number(stock || 0) + 1))}
                 >
                   <IconPlus />
                 </button>
@@ -420,7 +439,8 @@ export default function NovoProdutoModal({
               type="text"
               placeholder="0,00"
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              onChange={(e) => setPrice(formatBrlInput(e.target.value))}
+              inputMode="decimal"
             />
           </div>
 

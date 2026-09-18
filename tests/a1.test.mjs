@@ -286,7 +286,7 @@ const criarPedido = (db, session, body) =>
       body: JSON.stringify({
         itens: [{produtoId: 1, quantidade: 2}],
         clienteNome: 'Balcao',
-        clienteWhatsapp: '000',
+        clienteWhatsapp: '11999999999',
         metodoPagamento: 'DINHEIRO',
         statusPagamento: 'PAGO',
         ...body,
@@ -392,7 +392,7 @@ const checkout = (db, body) =>
       method: 'POST',
       body: JSON.stringify({
         items: [{id: 1, quantity: 2}],
-        cliente: {nome: 'Teste', whatsapp: '000'},
+        cliente: {nome: 'Teste', whatsapp: '11999999999'},
         ...body,
       }),
     }),

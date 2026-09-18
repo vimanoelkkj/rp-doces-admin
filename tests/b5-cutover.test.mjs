@@ -45,7 +45,7 @@ async function pedidoAdmin(db, itens, operationKey = KEY_ADMIN, extra = {}) {
       method: 'POST',
       headers: { Cookie: session.cookie.split(';')[0], 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        clienteNome: 'Balcao Teste', clienteWhatsapp: '11888888888',
+        clienteNome: 'Balcao Teste', clienteWhatsapp: '11988888888',
         itens, metodoPagamento: 'DINHEIRO', statusPagamento: 'PENDENTE',
         operationKey, ...extra,
       }),

@@ -8,7 +8,7 @@ import { formatarFinanceiroTexto, type FinanceiroPedido } from "./formatarFinanc
 /* ── Types (espelham o retorno de GET /api/admin/pedidos) ── */
 type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
 
-type TabFilter = "todos" | "hoje" | "em_producao" | "prontos" | "entregues";
+type TabFilter = "todos" | "hoje" | "novos" | "em_producao" | "prontos" | "entregues";
 
 interface PedidoListItem {
   id: number;
@@ -22,6 +22,7 @@ interface PedidoListItem {
 interface Counts {
   todos: number;
   hoje: number;
+  novos: number;
   em_producao: number;
   prontos: number;
   entregues: number;
@@ -38,6 +39,7 @@ interface PedidosResponse {
 const TABS: { key: TabFilter; label: string }[] = [
   { key: "todos", label: "Todos" },
   { key: "hoje", label: "Hoje" },
+  { key: "novos", label: "Novos" },
   { key: "em_producao", label: "Em produção" },
   { key: "prontos", label: "Prontos" },
   { key: "entregues", label: "Entregues" },
@@ -47,19 +49,25 @@ const TABS: { key: TabFilter; label: string }[] = [
 const formatarPreco = (centavos: number) =>
   `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
-const statusLabel = (s: StatusPedido) =>
-  s === "ENTREGUE"
-    ? "Entregue"
-    : s === "PRONTO"
-      ? "Pronto"
-      : "Em produção";
+const STATUS_LABEL: Record<StatusPedido, string> = {
+  NOVO: "Novo",
+  PREPARANDO: "Em produção",
+  PRONTO: "Pronto",
+  ENTREGUE: "Entregue",
+  CANCELADO: "Cancelado",
+};
 
-const statusClass = (s: StatusPedido) =>
-  s === "ENTREGUE"
-    ? "ped-badge--green"
-    : s === "PRONTO"
-      ? "ped-badge--blue"
-      : "ped-badge--orange";
+export const statusLabel = (status: StatusPedido) => STATUS_LABEL[status];
+
+const STATUS_CLASS: Record<StatusPedido, string> = {
+  NOVO: "ped-badge--orange",
+  PREPARANDO: "ped-badge--orange",
+  PRONTO: "ped-badge--blue",
+  ENTREGUE: "ped-badge--green",
+  CANCELADO: "ped-badge--red",
+};
+
+const statusClass = (status: StatusPedido) => STATUS_CLASS[status];
 
 /* ── Component ── */
 export default function AdminPedidos() {
@@ -310,11 +318,6 @@ export default function AdminPedidos() {
           <EditarPedidoModal
             orderId={editingOrderId}
             onClose={() => {
-              setSelectedOrderId(editingOrderId);
-              setEditingOrderId(null);
-            }}
-            onSaved={() => {
-              setRefreshKey((k) => k + 1);
               setSelectedOrderId(editingOrderId);
               setEditingOrderId(null);
             }}

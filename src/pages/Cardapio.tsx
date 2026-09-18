@@ -1,10 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ProductCard from "../components/ProductCard";
 import CartWidget from "../components/CartWidget";
-import { Product } from "../types/product";
-import { fetchProducts } from "../api/products";
+import { useCatalogProducts } from "../hooks/useCatalogProducts";
 import { useCart } from "../context/CartContext";
 import { useScrollReveal } from "../hooks/useScrollReveal";
 import "./Cardapio.css";
@@ -12,9 +11,7 @@ import "./Cardapio.css";
 const categories = ["Todos", "Bolos no pote", "Mini pudins"];
 
 export default function Cardapio() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { products, loading, error } = useCatalogProducts();
 
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [isFiltering, setIsFiltering] = useState(false);
@@ -34,13 +31,6 @@ export default function Cardapio() {
   const headingRef = useScrollReveal<HTMLDivElement>(0.15);
   const bolosRef = useScrollReveal<HTMLElement>(0.1);
   const pudinsRef = useScrollReveal<HTMLElement>(0.1);
-
-  useEffect(() => {
-    fetchProducts()
-      .then(setProducts)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
 
   const handleFilterChange = (cat: string) => {
     if (cat === activeFilter) return;

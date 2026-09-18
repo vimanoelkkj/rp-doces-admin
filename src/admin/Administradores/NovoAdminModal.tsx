@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useAdminModal } from "../components/useAdminModal";
 import "./NovoAdminModal.css";
 
 /* ── Icons ── */
@@ -88,6 +89,7 @@ export default function NovoAdminModal({
   onClose,
   onSaved,
 }: NovoAdminModalProps) {
+  const modalProps = useAdminModal(open, onClose);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
@@ -156,8 +158,8 @@ export default function NovoAdminModal({
   if (!open) return null;
 
   return createPortal(
-    <div className="nadm-overlay" onClick={onClose}>
-      <div className="nadm-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="nadm-overlay" {...modalProps}>
+      <div className="nadm-modal">
         {/* ── Header ── */}
         <div className="nadm-header">
           <div>

@@ -4,6 +4,11 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
 import {
+  formatWhatsappBr,
+  isValidWhatsappBr,
+  normalizeWhatsappBr,
+} from "../../shared/whatsapp";
+import {
   gravarOperationKey,
   novaOperationKey,
   SLOT_CHECKOUT,
@@ -16,11 +21,17 @@ export default function Checkout() {
 
   const [nome, setNome] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [whatsappError, setWhatsappError] = useState<string | null>(null);
   const [recado, setRecado] = useState("");
   const [pagamento, setPagamento] = useState("pix");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidWhatsappBr(whatsapp)) {
+      setWhatsappError("Informe um WhatsApp brasileiro válido com DDD.");
+      return;
+    }
+    const whatsappNormalizado = normalizeWhatsappBr(whatsapp);
     // A1: a identidade da finalização nasce AQUI, antes do primeiro POST
     // (que só acontece na próxima tela). Submeter o formulário de novo é uma
     // finalização explicitamente nova e recebe uma key nova; retry, abort e
@@ -30,7 +41,7 @@ export default function Checkout() {
     navigate("/aguardando-pagamento", {
       state: {
         items: cartItems,
-        cliente: { nome: nome.trim(), whatsapp: whatsapp.trim() },
+        cliente: { nome: nome.trim(), whatsapp: whatsappNormalizado },
         recado: recado.trim(),
         operationKey,
       },
@@ -135,9 +146,18 @@ export default function Checkout() {
                   className="form-input"
                   placeholder="(31) 99999-9999"
                   value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
+                  onChange={(e) => {
+                    setWhatsapp(formatWhatsappBr(e.target.value));
+                    setWhatsappError(null);
+                  }}
+                  inputMode="tel"
+                  maxLength={15}
+                  aria-invalid={whatsappError ? true : undefined}
                   required
                 />
+                {whatsappError && (
+                  <span className="checkout-field-error">{whatsappError}</span>
+                )}
               </div>
 
               <div className="form-group">

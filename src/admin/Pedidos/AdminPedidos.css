@@ -294,6 +294,11 @@
   color: #c28343;
 }
 
+.ped-badge--red {
+  color: #a7372e;
+  background: #fdebea;
+}
+
 .ped-badge--blue {
   background: #eef2fb;
   color: #5b7ec2;

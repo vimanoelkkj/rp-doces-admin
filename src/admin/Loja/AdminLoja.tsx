@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./AdminLoja.css";
+import { formatScheduleText } from "./scheduleText";
 
 /* ── Types ── */
 interface DayToggle {
@@ -53,11 +54,7 @@ export default function AdminLoja() {
   };
 
   /* Prévia helpers */
-  const activeDays = days.filter((d) => d.active);
-  const scheduleText =
-    activeDays.length > 0
-      ? `${activeDays[0].label} a ${activeDays[activeDays.length - 1].label}: ${openTime.replace(":", "h")} às ${closeTime.replace(":", "h")}`
-      : "Fechado";
+  const scheduleText = formatScheduleText(days, openTime, closeTime);
 
   const deliveryLabel =
     deliveryStatus === "available"

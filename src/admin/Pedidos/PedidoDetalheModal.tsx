@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { novaOperationKey } from "../../lib/operationKey";
 import { createPortal } from "react-dom";
+import { useAdminModal } from "../components/useAdminModal";
 import "./PedidoDetalheModal.css";
 import { formatarFinanceiro, type FinanceiroPedido } from "./formatarFinanceiro";
 
@@ -102,6 +103,7 @@ export default function PedidoDetalheModal({
   onStatusChanged,
   onEdit,
 }: PedidoDetalheModalProps) {
+  const modalProps = useAdminModal(true, onClose);
   const [data, setData] = useState<PedidoDetalheResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -264,8 +266,8 @@ export default function PedidoDetalheModal({
   const financeiro = data ? formatarFinanceiro(data.financeiro) : null;
 
   return createPortal(
-    <div className="pedmodal-overlay" onClick={onClose}>
-      <div className="pedmodal-card" onClick={(e) => e.stopPropagation()}>
+    <div className="pedmodal-overlay" {...modalProps}>
+      <div className="pedmodal-card">
         {/* Header */}
         <div className="pedmodal-header">
           <h2 className="pedmodal-title">
