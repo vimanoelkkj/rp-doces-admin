@@ -23,8 +23,26 @@
 - Os commits funcionais até `b0bdf77` passaram a constar no upstream durante
   este checkpoint; o commit deste documento permanece local. Nenhum deploy do
   rebuild foi realizado ou identificado nesta sessão.
-- A validação humana continua aberta. HUMAN-17 é a próxima correção técnica
-  pequena; HUMAN-12/14/15/16 aguardam Figma.
+- **Segunda rodada humana encerrada (Fase 5.4).** HUMAN-12, HUMAN-14,
+  HUMAN-15 e HUMAN-17 foram aprovados no reteste manual do proprietário;
+  HUMAN-16 ficou aprovado tecnicamente. Commit funcional da rodada:
+  `bf23857f3b5316dbb72a0838b14178ecd13a6acf`.
+- **A migration `0014_notificacao_leituras.sql` existe, mas produção NÃO a
+  possui.** Antes de qualquer deploy é obrigatória uma etapa separada e
+  explicitamente autorizada de compatibilidade aditiva. Ver seção 2.
+- **Divergência detectada ao fechar este checkpoint:** esta sessão nunca
+  executou `git push`, mas ao reconferir o estado antes de finalizar o
+  documento, `origin/rebuild-from-scratch` já continha `bf23857` mais dois
+  commits adicionais — `eef745a` (`make admin responsive`) e `297b9d9`
+  (`add floating mobile bottom navigation`), ambos do mesmo autor do
+  repositório, só CSS/layout do admin (responsividade e navegação inferior
+  mobile), sem tocar `functions/`, `shared/` ou migrations. Padrão já
+  registrado neste checkpoint antes (avanço do upstream por processo
+  paralelo). HEAD local passou a ser `297b9d9` por fast-forward, sem
+  divergência nem reescrita de histórico; `bf23857` permanece intacto na
+  cadeia. Suíte revalidada nesse HEAD: 345/345, build e diff-check
+  aprovados. Nenhum push, deploy ou escrita em produção foi feito por esta
+  sessão.
 
 O hash do commit que contém este próprio arquivo não pode ser gravado dentro
 dele sem tornar o commit autorreferente. Ao retomar, obtenha o HEAD atual com:
@@ -35,6 +53,48 @@ git show -s --format="%H%n%s" HEAD
 ```
 
 ## 1. Estado Git atual
+
+Estado verificado logo após o reteste humano da Fase 5.4, quando o commit
+funcional era o topo local:
+
+| Item | Estado verificado |
+| --- | --- |
+| Branch | `rebuild-from-scratch` |
+| HEAD | `bf23857f3b5316dbb72a0838b14178ecd13a6acf` |
+| Commit | `rp-doces: implement post-test improvements` |
+| Upstream | `origin/rebuild-from-scratch` |
+| Ahead/behind | `1 / 0` |
+| Working tree | limpa |
+| `npm test` | 341/341 |
+| `npm run build` | aprovado |
+| `git diff --check` | aprovado |
+| Push de `bf23857` por esta sessão | **não realizado** |
+| Deploy | **não realizado** |
+
+**Reconferido ao fechar este checkpoint (estado mais atual e autoritativo):**
+
+| Item | Estado verificado |
+| --- | --- |
+| Branch | `rebuild-from-scratch` |
+| HEAD | `297b9d94452e2191abc00649045c3023a281f70f` |
+| Commit | `rp-doces: add floating mobile bottom navigation` |
+| Commits à frente de `bf23857` na mesma linha | `eef745a` (`make admin responsive`), `297b9d9` (`add floating mobile bottom navigation`) — só CSS/layout do admin, sem tocar `functions/`, `shared/` ou migrations |
+| Upstream | `origin/rebuild-from-scratch` (já contém os três commits) |
+| Ahead/behind | `0 / 0` |
+| Working tree | limpa (após o commit deste checkpoint) |
+| `npm test` neste HEAD | 345/345 |
+| `npm run build` | aprovado |
+| `git diff --check` | aprovado |
+| Push de `bf23857`/`eef745a`/`297b9d9` por esta sessão | **não realizado** — chegaram ao upstream por processo externo/paralelo, mesmo padrão já registrado abaixo para `ac06e5d → b0bdf77` |
+| Deploy | **não realizado** por esta sessão |
+
+`bf23857` permanece intacto e sem reescrita na cadeia; o avanço foi só
+fast-forward. Nenhuma investigação adicional das duas mudanças
+responsivas foi feita nesta rodada — elas pertencem a outra frente de
+trabalho (UI mobile do admin), fora do escopo HUMAN-12/14/15/16/17.
+
+O histórico abaixo descreve a inspeção anterior (Fase 5.3) e é mantido como
+registro; o upstream passou a ser `origin/rebuild-from-scratch`.
 
 Estado diretamente verificado antes da criação deste documento:
 
@@ -110,10 +170,34 @@ do cutover concluído.
 > [!CAUTION]
 > **NUNCA executar `wrangler d1 migrations apply --remote`.**
 >
-> As migrations normais `0001` a `0013` pertencem a bancos novos e não devem
+> As migrations normais `0001` a `0014` pertencem a bancos novos e não devem
 > ser aplicadas à produção histórica. Em especial, `0006`, `0007` e `0008`
 > reconstruiriam tabelas com risco de cascata destrutiva. A `0013` também não
 > deve ser aplicada à produção, onde as colunas legadas já existem.
+
+### Migration 0014 — pendência obrigatória antes do deploy
+
+`migrations/0014_notificacao_leituras.sql` foi criada na Fase 5.4 para o
+HUMAN-14. Situação atual:
+
+- criada no repositório e **testada somente em D1 LOCAL isolado**
+  (`.wrangler/human-test-f54`, com `--local --persist-to`);
+- **NÃO aplicada em produção**;
+- **produção NÃO possui a tabela `notificacao_leituras`**.
+
+Consequência prática: se o rebuild for publicado antes dessa adaptação, a
+página de Notificações e o badge falharão em produção, porque a tabela de
+estado de leitura não existe lá. Os demais fluxos não dependem dela.
+
+Antes do deploy é obrigatória uma **etapa separada e explicitamente
+autorizada** de compatibilidade aditiva, na mesma cautela do B5: script
+próprio (no molde de `scripts/b5-production-compat.sql`), revisão,
+validação e autorização explícita. Não usar o fluxo normal de migrations
+contra o D1 remoto, e não criar esse script sem autorização.
+
+A migration é puramente aditiva (`CREATE TABLE` + dois índices, sem tocar
+tabela existente), então o rollback é `DROP TABLE` sem perda de dado de
+domínio — só estado de leitura.
 
 Regras permanentes:
 
@@ -248,6 +332,87 @@ regressões automatizadas. Resultado final: 306/306 testes, build aprovado,
 Não refazer essas investigações sem evidência de regressão. Preserve as
 invariantes B1/B2/B3/B4/A1 e o cutover B5.
 
+### Fase 5.4 — HUMAN-12/14/15/16/17
+
+Commit funcional: `bf23857f3b5316dbb72a0838b14178ecd13a6acf` —
+`rp-doces: implement post-test improvements`. 34 arquivos, 341/341 testes,
+build aprovado, `git diff --check` aprovado, type-check das Functions sem
+erros novos além do baseline de `auth.ts`.
+
+O código exportado pelo Figma foi usado como especificação auxiliar. Nenhum
+componente dele foi copiado, nenhum componente existente foi substituído,
+nenhum segundo design system foi introduzido.
+
+**HUMAN-12 — promoção.** A regra de vigência passou a ser única, em
+`shared/promocao.ts`, importada pelo backend e pelo catálogo (mesmo padrão
+de `shared/whatsapp.ts`), com `promocao_ativa` como fonte única de
+ativação. Cinco estados: desligada, sem preço, futura, vigente e expirada.
+A expiração é consequência de avaliar a regra a cada leitura — não existe
+cron. Datas persistidas em ISO UTC (`Z`), com parser que também aceita o
+formato do SQLite como UTC. O admin passou a persistir
+`preco_promocional_centavos`, `promocao_inicio` e `promocao_fim`; antes só
+gravava o booleano. Sem migration: as colunas existem desde 0001/0005.
+Checkout e criação manual continuam autoridade do preço.
+
+**HUMAN-14 — notificações.** Ver seção própria abaixo.
+
+**HUMAN-15.** O ícone da prévia da loja deixou de ser um retângulo com
+faixa (lia-se como cartão) e passou a ser o balão com o fone. Só o desenho
+mudou.
+
+**HUMAN-16.** `.nped-btn-remove` não tinha override no tema escuro e
+herdava fundo branco. Ganhou base dark derivada do `.nped-close` já
+aprovado, hover destrutivo próprio e `focus-visible` nos dois temas. Alvo
+clicável, `type="button"` e `disabled` preservados. **B1 intacto.**
+
+**HUMAN-17.** O CSS estilizava `input[type="text"]` e o HUMAN-04 mudou o
+campo para `type="tel"`, nos dois arquivos de tema. `tel` foi incluído.
+Máscara, `inputMode`, `maxLength`, validação e normalização intactos.
+
+**Flakiness do A1 diagnosticada e resolvida.** A falha intermitente
+registrada na Fase 5.3 reapareceu e foi capturada: nos testes de
+concorrência com a mesma operation key, o perdedor da corrida tem DOIS
+desfechos legítimos — `409 OPERACAO_EM_PROCESSAMENTO` se reler antes de a
+vencedora concluir o POST, ou sucesso com replay apontando para a mesma
+operação se reler depois. O teste fixava um dos desfechos, o que é assumir
+um timing. As asserções passaram a aceitar ambos, mantendo integral o
+invariante forte (um pedido, uma tentativa, uma operação, um POST, uma
+reserva). **Era defeito do teste, não do código.** Depois da correção:
+12/12 execuções isoladas e várias suítes completas estáveis.
+
+### Fase 5.4 — HUMAN-14, arquitetura das notificações
+
+Nenhuma notificação é materializada. Cada uma é **derivada na leitura** de
+um fato que já existe no domínio; só o estado de leitura é persistido. Isso
+evita criar uma segunda verdade que poderia divergir do ledger/estoque.
+
+Eventos implementados e formação das chaves:
+
+| Evento | Fato de origem | Chave |
+| --- | --- | --- |
+| Pedido aguardando preparo | `pedidos` com `status_pedido='NOVO'` e o recorte operacional do B-1 (`PARCIAL`/`PAGO` ou `MANUAL`) | `pedido:<id>:novo` |
+| Pagamento confirmado | `pedido_pagamentos` com `status='PAGO'` e `pago_em` | `pagamento:<id>:pago` |
+| Estoque baixo/esgotado | `produtos` ativos com `estoque - estoque_reservado <= 3` | `estoque:<id>:baixo` / `estoque:<id>:esgotado` |
+| Cobrança sem confirmação do MP | `pedido_operacoes` no mesmo predicado da recuperação read-only do B-3 | `operacao:<operation_key>` |
+
+Propriedades: carrinho não pago do site não notifica; o nível faz parte da
+chave do estoque, então marcar "baixo" não esconde o "esgotado" posterior;
+quando o fato muda, a notificação deixa de ser derivada e some sozinha.
+
+Leitura: `INSERT OR IGNORE` contra `UNIQUE(usuario_id, chave)` — idempotente
+e por operador. "Marcar todas" é resolvido no servidor, derivando de novo,
+sem confiar na lista que o cliente está vendo. Só chaves deriváveis agora
+podem ser marcadas.
+
+Badge: o item **Notificações** da barra lateral passou a exibir a contagem
+real de não lidas. Atualização por eventos naturais (montagem, `focus`,
+`visibilitychange`) com dedupe — sem polling e sem realtime.
+
+Rota: `/admin/notificacoes` já existia no menu e não tinha destino; agora é
+a superfície real, dentro do layout administrativo atual. Nenhum header com
+sino foi criado. Ações contextuais levam ao pedido exato via
+`?pedido=<id>`, ou a `/admin/produtos` no caso de estoque.
+
 ## 4. Primeira rodada de teste humano
 
 “Retestado pelo proprietário” é conservador: somente fatos explicitamente
@@ -267,12 +432,32 @@ não substituem essa coluna.
 | HUMAN-09 | Estoque só aceitava `-/+`. | Centro editável pelo teclado, apenas inteiro não negativo, sem spinner nativo. | Sim. | Confirmação final não registrada. | Retestar Ctrl+A, vazio, letras, decimal e botões. |
 | HUMAN-10 | Não existe backup/reversão da imagem anterior. | Upload troca `image_key` após gravar o novo R2 e apaga o antigo em best effort; há janelas de objetos órfãos e nenhum versionamento. | Não. | Não se aplica. | Melhoria arquitetural futura; não é blocker imediato salvo nova decisão. |
 | HUMAN-11 | Catálogo aberto não refletia disponibilidade sem F5. | Revalida ao montar, recuperar foco ou visibility, com dedupe e sem polling. | Sim. | Confirmação final não registrada. | Retestar admin e catálogo em abas separadas. |
-| HUMAN-12 | Promoção sem configuração de preço/agendamento. | Campos existem, mas o checkbox está funcionalmente desconectado da regra pública e faltam formulário/regra única. | Não. | Sim: proprietário confirmou que continua sem configuração. | Figma define UX; depois implementar arquitetura já existente. |
+| HUMAN-12 | Promoção sem configuração de preço/agendamento. | Regra única em `shared/promocao.ts`; modal persiste preço promocional e agendamento; card mostra preço riscado e selo. | Sim, Fase 5.4. | **Sim — APROVADO.** Vigente aparece no card com selo e riscado; desligar remove na hora; religar recupera a configuração salva; pedido manual usou o preço promocional (normal R$ 40,00, promocional R$ 29,90, pedido criado por R$ 29,90). | Encerrado. |
 | HUMAN-13 | Sete dias apareciam como “Seg a Dom”. | Admin mostra `Todos os dias: 09h00 às 20h00`; site público ainda usa texto fixo independente. | Sim no admin. | Confirmação final não registrada. | Retestar sete dias e subconjuntos; tratar integração pública em escopo próprio. |
-| HUMAN-14 | Notificações abre área vazia. | Não há rota real, backend, tabela, polling, eventos ou som; badge é fixo e botões de teste não têm ação. | Não. | Não se aplica. | Figma define painel/modal; evitar sistema grande antes da definição. |
-| HUMAN-15 | Ícone de WhatsApp no preview parece cartão. | Visual atual permanece. | Não. | Achado humano original confirmado. | Figma entrega o ícone/estado correto. |
-| HUMAN-16 | Botões X de remover item destoam no dark mode. | Visual atual permanece. | Não. | Achado humano original confirmado. | Figma usa o X de fechar modal como referência para normal/hover/focus. |
-| HUMAN-17 | WhatsApp ficou branco/nativo e inconsistente no modal de venda manual. | Causa confirmada: CSS estiliza `.nped-field input[type="text"]`, mas WhatsApp passou a `type="tel"`. Máscara/validação estão corretas. | Não. | Sim, novo achado do reteste. | Claude/Codex inclui `tel` na linguagem visual existente, sem mudar comportamento. |
+| HUMAN-14 | Notificações abre área vazia. | Rota real, eventos derivados de fatos existentes, leitura persistida em `notificacao_leituras`, badge real, marcar uma/todas. | Sim, Fase 5.4. | **Sim — APROVADO.** Página renderiza; não lidas têm indicador; badge reflete a quantidade; clicar marca como lida, reduz o badge na hora, navega para Pedidos e abre o pedido; o estado lido persiste ao voltar; "Marcar todas" limpa indicadores, zera o badge e fica sem efeito quando não há não lidas. | Encerrado. Falta só a compatibilidade da 0014 em produção (seção 2). |
+| HUMAN-15 | Ícone de WhatsApp no preview parece cartão. | Balão com fone; tamanho, stroke, cor e alinhamento preservados. | Sim, Fase 5.4. | **Sim — APROVADO** visualmente. | Encerrado. |
+| HUMAN-16 | Botões X de remover item destoam no dark mode. | Base dark derivada do `.nped-close`, hover destrutivo próprio e `focus-visible` nos dois temas. | Sim, Fase 5.4. | **Aprovado TECNICAMENTE.** Não foi possível observar o botão habilitado porque o B1 continua corretamente bloqueando a edição destrutiva. B1 **não** deve ser afrouxado para permitir inspeção visual. A validação automatizada é o critério desta fase. | Encerrado sob esse critério. Reavaliar visualmente só quando/se existir editor incremental. |
+| HUMAN-17 | WhatsApp ficou branco/nativo e inconsistente no modal de venda manual. | `input[type="tel"]` incluído nos dois temas; comportamento do HUMAN-04 intacto. | Sim, Fase 5.4. | **Sim — APROVADO.** Visual igual aos demais inputs no dark; máscara e validação funcionam; número brasileiro inválido recusado; número válido permitiu criar o pedido normalmente. | Encerrado. |
+
+## 4.1 Pendências registradas na Fase 5.4 (não implementadas nesta rodada)
+
+Registradas para decisão futura, sem correção automática:
+
+- **A. Badge hardcoded `4` no item Pedidos da barra lateral.** Era resíduo do
+  mock inicial do design (commit `0f3b88c`, "telas navegáveis com os dados
+  mockados do design"), sem semântica definida (quantos? novos? em
+  produção?). **Atualização:** o commit concorrente `eef745a`
+  (`make admin responsive`, fora desta rodada) removeu esse valor fixo ao
+  reescrever `AdminSidebar.tsx`; hoje só o item Notificações recebe um
+  badge, e é o valor real de não lidas. Pendência tecnicamente resolvida
+  como efeito colateral de outra frente de trabalho, não desta fase — sem
+  decisão explícita sobre o que (se algo) o item Pedidos deveria exibir.
+- **B. Categorias públicas hardcoded em `Cardapio.tsx`.** A lista de
+  categorias do cardápio público é fixa no código
+  (`["Todos", "Bolos no pote", "Mini pudins"]`), descoberta durante o
+  laboratório local: produtos cadastrados em categorias fora dessa lista
+  ficam ocultos do cardápio, mesmo disponíveis e com estoque. Não corrigida
+  nesta rodada — fora do escopo HUMAN-12/14/15/16/17.
 
 ## 5. Responsabilidades e autoridade
 
