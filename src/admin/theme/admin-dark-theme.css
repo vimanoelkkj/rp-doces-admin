@@ -876,15 +876,20 @@ html[data-admin-theme="dark"] .catm-field input[type="text"] {
 html[data-admin-theme="dark"] .catm-field input::placeholder {
   color: #a89b92;
 }
-html[data-admin-theme="dark"] .catm-emoji-option {
+html[data-admin-theme="dark"] .catm-emoji-item {
   background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
 }
-html[data-admin-theme="dark"] .catm-emoji-option:hover {
+html[data-admin-theme="dark"] .catm-emoji-item:hover {
   background: #3d2e2b;
 }
-html[data-admin-theme="dark"] .catm-emoji-option--active {
+html[data-admin-theme="dark"] .catm-emoji-item--active {
   background: #3d2e2b;
   border-color: #d38b80;
+}
+html[data-admin-theme="dark"] .catm-emoji-label {
+  color: #d9c9be;
 }
 html[data-admin-theme="dark"] .catm-cat-card,
 html[data-admin-theme="dark"] .catm-new-card {
