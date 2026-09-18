@@ -120,17 +120,18 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if ("error" in auth) return auth.error;
 
   try {
-    // Nenhuma rotina de manutenção/reconciliação participa do caminho crítico
-    // da listagem. Até as rotinas "só D1" podem fazer varreduras e múltiplas
-    // escritas no banco histórico; esperar por elas aqui fazia a navegação
-    // para Pedidos parecer travada. Todas continuam rodando em melhor-esforço,
-    // mas somente depois que a resposta da listagem já pode ser enviada.
-    context.waitUntil(reconcilePedidosEmBackground(env));
-
     const url = new URL(request.url);
     const search = (url.searchParams.get("search") ?? "").trim().slice(0, 100);
     const tab = url.searchParams.get("status") ?? "todos";
     const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+
+    // Manutenção oportunista só nasce na abertura canônica da tela.
+    // Paginação, filtros e busca são caminhos puramente de leitura: disparar
+    // as quatro reconciliações em TODA troca de página criava concorrência
+    // desnecessária no mesmo D1 enquanto a próxima página estava sendo lida.
+    if (page === 1 && tab === "todos" && !search) {
+      context.waitUntil(reconcilePedidosEmBackground(env));
+    }
 
     const tabFilter = TAB_FILTERS[tab] ?? "";
 
