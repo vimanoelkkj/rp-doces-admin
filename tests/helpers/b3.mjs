@@ -31,6 +31,8 @@ const bundle = await build({
       export * as adminProdutoId from './functions/api/admin/produtos/[id]';
       export * as notificacoes from './functions/lib/notificacoes';
       export * as adminNotificacoes from './functions/api/admin/notificacoes';
+      export * as diagnosticoPix from './functions/api/admin/diagnosticos/pix';
+      export * as diagnosticoPedidoTeste from './functions/api/admin/diagnosticos/pedido-teste';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
