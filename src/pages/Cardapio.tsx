@@ -9,6 +9,9 @@ import { useScrollReveal } from "../hooks/useScrollReveal";
 import { catalogCategories } from "./catalogCategories";
 import "./Cardapio.css";
 
+// `null` = "Todos", opção sintética da interface (nunca uma categoria
+// persistida). Qualquer outro valor é o SLUG canônico da categoria
+// (`categorias.id`), nunca o nome de exibição.
 type CategoryFilter = string | null;
 
 export default function Cardapio() {
@@ -69,7 +72,7 @@ export default function Cardapio() {
   // Se uma revalidação remover a categoria selecionada, volta para a visão
   // completa em vez de manter uma aba órfã e um catálogo aparentemente vazio.
   useEffect(() => {
-    if (activeFilter !== null && !categories.includes(activeFilter)) {
+    if (activeFilter !== null && !categories.some((c) => c.slug === activeFilter)) {
       setActiveFilter(null);
       setDisplayFilter(null);
       setIsFiltering(false);
@@ -91,14 +94,13 @@ export default function Cardapio() {
   const filteredProducts =
     displayFilter === null
       ? products
-      : products.filter((product) => product.category.trim() === displayFilter);
+      : products.filter((product) => product.categorySlug === displayFilter);
 
   const groupedProducts = categories
-    .map((category) => ({
-      category,
-      products: filteredProducts.filter(
-        (product) => product.category.trim() === category,
-      ),
+    .map(({ slug, nome }) => ({
+      slug,
+      nome,
+      products: filteredProducts.filter((product) => product.categorySlug === slug),
     }))
     .filter((group) => group.products.length > 0);
 
@@ -140,15 +142,15 @@ export default function Cardapio() {
             >
               Todos
             </button>
-            {categories.map((category) => (
+            {categories.map(({ slug, nome }) => (
               <button
-                key={category}
+                key={slug}
                 role="tab"
-                aria-selected={activeFilter === category}
-                className={`filter-tab ${activeFilter === category ? "active" : ""}`}
-                onClick={() => handleFilterChange(category)}
+                aria-selected={activeFilter === slug}
+                className={`filter-tab ${activeFilter === slug ? "active" : ""}`}
+                onClick={() => handleFilterChange(slug)}
               >
-                {category}
+                {nome}
               </button>
             ))}
           </div>
@@ -174,13 +176,13 @@ export default function Cardapio() {
               </p>
             )}
 
-            {groupedProducts.map(({ category, products: categoryProducts }) => (
+            {groupedProducts.map(({ slug, nome, products: categoryProducts }) => (
               <section
-                key={category}
+                key={slug}
                 className="category-group scroll-reveal revealed"
-                aria-label={category}
+                aria-label={nome}
               >
-                <h2 className="category-title">{category}</h2>
+                <h2 className="category-title">{nome}</h2>
                 <div className="products-grid">
                   {categoryProducts.map((product, index) => (
                     <div
