@@ -4,6 +4,7 @@ import AdminSidebar from "./AdminSidebar";
 import AdminWave from "./AdminWave";
 import { AdminThemeProvider } from "../theme/AdminThemeContext";
 import { AdminAuthProvider, type AdminUser } from "../auth/AdminAuthContext";
+import { NotificacoesProvider } from "../notificacoes/NotificacoesContext";
 
 type AuthState =
   | { status: "loading" }
@@ -41,11 +42,15 @@ export default function AdminLayout() {
   return (
     <AdminThemeProvider>
       <AdminAuthProvider user={auth.user} logout={logout}>
-        <div className="admin-layout">
-          <AdminWave />
-          <AdminSidebar />
-          <Outlet />
-        </div>
+        {/* HUMAN-14: o badge da navegação e a página de Notificações leem a
+            mesma contagem — marcar como lida reflete nos dois sem recarregar. */}
+        <NotificacoesProvider>
+          <div className="admin-layout">
+            <AdminWave />
+            <AdminSidebar />
+            <Outlet />
+          </div>
+        </NotificacoesProvider>
       </AdminAuthProvider>
     </AdminThemeProvider>
   );

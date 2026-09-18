@@ -602,13 +602,82 @@ html[data-admin-theme="dark"] .np-photo-hint {
 html[data-admin-theme="dark"] .np-photo-btn {
   color: #faf6f0;
 }
+/* HUMAN-12: `datetime-local` do agendamento entra no mesmo tratamento. */
 html[data-admin-theme="dark"] .np-field input[type="text"],
+html[data-admin-theme="dark"] .np-field input[type="datetime-local"],
 html[data-admin-theme="dark"] .np-field textarea,
 html[data-admin-theme="dark"] .np-dropdown-trigger,
 html[data-admin-theme="dark"] .np-stepper,
 html[data-admin-theme="dark"] .np-photo-preview {
   background: #1a1412;
   border-color: #3d3230;
+  color: #faf6f0;
+}
+/* HUMAN-12: bloco da promoção no dark. O ícone nativo do seletor de data é
+   escuro por padrão e some sobre fundo escuro — `color-scheme` faz o
+   navegador desenhar o controle na variante certa. */
+html[data-admin-theme="dark"] .np-promo-box {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .np-promo-hint {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .np-field input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════
+   HUMAN-14 — Notificações (tema escuro)
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .notif-title,
+html[data-admin-theme="dark"] .notif-empty-title,
+html[data-admin-theme="dark"] .notif-row-title {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .notif-subtitle,
+html[data-admin-theme="dark"] .notif-loading,
+html[data-admin-theme="dark"] .notif-empty-subtitle,
+html[data-admin-theme="dark"] .notif-row-desc,
+html[data-admin-theme="dark"] .notif-row-time,
+html[data-admin-theme="dark"] .notif-empty-icon {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .notif-panel {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .notif-mark-all {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .notif-mark-all:hover:not(:disabled) {
+  background: #3d2e2b;
+  border-color: #a89b92;
+}
+html[data-admin-theme="dark"] .notif-mark-all:focus-visible {
+  border-color: #a89b92;
+  box-shadow: 0 0 0 2px rgba(250, 246, 240, 0.35);
+}
+html[data-admin-theme="dark"] .notif-row {
+  border-top-color: #3d3230;
+}
+html[data-admin-theme="dark"] .notif-row:hover,
+html[data-admin-theme="dark"] .notif-row:focus-visible {
+  background: #362c2a;
+}
+html[data-admin-theme="dark"] .notif-row:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(250, 246, 240, 0.35);
+}
+html[data-admin-theme="dark"] .notif-row--unread {
+  background: #332724;
+}
+html[data-admin-theme="dark"] .notif-row--unread:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .notif-row-icon {
+  background: #3d3230;
   color: #faf6f0;
 }
 html[data-admin-theme="dark"] .np-stepper-value {
@@ -779,7 +848,29 @@ html[data-admin-theme="dark"] .nped-close:hover {
   background: #3d2e2b;
   border-color: #a89b92;
 }
+/* HUMAN-16: o X de remover item não tinha override dark nenhum, então
+   caía no `background:#ffffff` do tema claro — um quadrado branco com X
+   cinza no meio do modal escuro. Usa a mesma base do `.nped-close` já
+   aprovado (fundo do modal, borda discreta, ícone secundário), mas com
+   hover destrutivo próprio para não confundir "remover" com "fechar". */
+html[data-admin-theme="dark"] .nped-btn-remove {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .nped-btn-remove:hover:not(:disabled) {
+  background: #4d2d28;
+  border-color: #d38b80;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .nped-btn-remove:focus-visible {
+  border-color: #a89b92;
+  box-shadow: 0 0 0 2px rgba(250, 246, 240, 0.35);
+}
+/* HUMAN-17: ver nota em NovoPedidoModal.css — `tel` precisa do mesmo
+   tratamento dark que `text`, senão o WhatsApp fica branco nativo. */
 html[data-admin-theme="dark"] .nped-field input[type="text"],
+html[data-admin-theme="dark"] .nped-field input[type="tel"],
 html[data-admin-theme="dark"] .nped-field textarea,
 html[data-admin-theme="dark"] .nped-qty-input,
 html[data-admin-theme="dark"] .nped-dropdown-trigger,

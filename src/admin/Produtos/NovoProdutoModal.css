@@ -141,7 +141,11 @@
   letter-spacing: 0.4px;
 }
 
+/* HUMAN-12: `datetime-local` usa o mesmo tratamento dos demais campos —
+   sem isso o agendamento apareceria como input branco nativo, o mesmo
+   defeito que o HUMAN-17 corrigiu no modal de venda manual. */
 .np-field input[type="text"],
+.np-field input[type="datetime-local"],
 .np-field textarea {
   padding: 12px 14px;
   border: 1px solid #eadfd3;
@@ -449,6 +453,26 @@
 }
 
 /* ── Footer ── */
+/* ── HUMAN-12: bloco de configuração da promoção ──
+   Agrupa os campos que só existem com a promoção ligada, reusando
+   np-field/np-row-2. Não é um modal novo nem uma seção redesenhada. */
+.np-promo-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  background: #f5ede6;
+}
+
+.np-promo-hint {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  color: #63524e;
+  margin: 0;
+}
+
 .np-error {
   color: #c0392b;
   font-family: "Manrope", sans-serif;
