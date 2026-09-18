@@ -33,6 +33,11 @@ function toProduct(row: ProdutoApiRow): Product {
     id: row.id,
     name: row.nome,
     category: row.categoria_nome,
+    // `row.categoria` é o id/slug canônico (`categorias.id`), já retornado
+    // pela API pública e antes descartado aqui — só o nome de exibição
+    // chegava ao frontend. Nenhuma mudança de backend foi necessária: o
+    // campo já existia na resposta.
+    categorySlug: row.categoria,
     description: row.descricao || undefined,
     price: centavos / 100,
     originalPrice: emPromocao ? row.preco_centavos / 100 : undefined,
