@@ -236,11 +236,21 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   let batchResults;
   try {
     batchResults = await env.DB.batch([
+      // B5: `cliente_email`, `produto_nome`, `quantidade` e
+      // `valor_unitario_centavos` são colunas do modelo legado
+      // "um produto por pedido" que o `pedidos` histórico de produção exige
+      // como NOT NULL sem DEFAULT. São preenchidas com valores NEUTROS por
+      // compatibilidade estrutural e nada mais: a composição do pedido é
+      // `pedido_itens` e o total é `valor_total_centavos`. `quantidade` é 1
+      // porque o CHECK de produção exige `>= 1` — é o menor valor legal, não
+      // uma afirmação sobre o pedido. `produto_id` fica NULL, como já
+      // acontece nos pedidos multi-item históricos.
       env.DB.prepare(
         `INSERT INTO pedidos
            (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
-            idempotency_key, reserva_status, reserva_expira_em)
-         VALUES (?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'))`,
+            idempotency_key, reserva_status, reserva_expira_em,
+            cliente_email, produto_nome, quantidade, valor_unitario_centavos)
+         VALUES (?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'), '', '', 1, 0)`,
       ).bind(
         tokenPublico,
         nome,
