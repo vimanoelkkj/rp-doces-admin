@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { CartItem } from "../context/CartContext";
@@ -14,17 +14,63 @@ interface ConfirmadoState {
   totalCentavos: number;
 }
 
+type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
+
+interface PedidoStatusResponse {
+  statusPedido: StatusPedido;
+}
+
 export default function PedidoConfirmado() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as ConfirmadoState | null;
   const { clearCart } = useCart();
+  const [statusPedido, setStatusPedido] = useState<StatusPedido>("PREPARANDO");
 
   useEffect(() => {
     if (!state) {
       navigate("/", { replace: true });
     }
   }, [state, navigate]);
+
+  const atualizarStatus = useCallback(async () => {
+    if (!state?.tokenPublico) return;
+
+    try {
+      const response = await fetch(
+        `/api/pedido?token=${encodeURIComponent(state.tokenPublico)}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) return;
+      const pedido = (await response.json()) as PedidoStatusResponse;
+      setStatusPedido(pedido.statusPedido);
+    } catch {
+      // Falha pontual de rede não muda a tela; tenta novamente no próximo ciclo.
+    }
+  }, [state?.tokenPublico]);
+
+  useEffect(() => {
+    if (!state?.tokenPublico) return;
+
+    void atualizarStatus();
+
+    if (statusPedido === "ENTREGUE" || statusPedido === "CANCELADO") return;
+
+    const interval = window.setInterval(() => void atualizarStatus(), 10_000);
+    const aoFocar = () => void atualizarStatus();
+    const aoFicarVisivel = () => {
+      if (document.visibilityState === "visible") void atualizarStatus();
+    };
+
+    window.addEventListener("focus", aoFocar);
+    document.addEventListener("visibilitychange", aoFicarVisivel);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", aoFocar);
+      document.removeEventListener("visibilitychange", aoFicarVisivel);
+    };
+  }, [state?.tokenPublico, statusPedido, atualizarStatus]);
 
   const handleBackToMenu = () => {
     clearCart();
@@ -123,21 +169,79 @@ export default function PedidoConfirmado() {
               </div>
               <span>Pagamento confirmado</span>
             </div>
-            <div className="tl-line tl-line--active" />
-            <div className="tl-step tl-step--current">
+            <div
+              className={`tl-line ${
+                statusPedido === "PRONTO" || statusPedido === "ENTREGUE"
+                  ? "tl-line--done"
+                  : "tl-line--active"
+              }`}
+            />
+            <div
+              className={`tl-step ${
+                statusPedido === "PRONTO" || statusPedido === "ENTREGUE"
+                  ? "tl-step--done"
+                  : "tl-step--current"
+              }`}
+            >
               <div className="tl-dot">
-                <span className="tl-dots">
-                  <span />
-                  <span />
-                  <span />
-                </span>
+                {statusPedido === "PRONTO" || statusPedido === "ENTREGUE" ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M5 13L9 17L19 7"
+                      stroke="#fff"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <span className="tl-dots">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                )}
               </div>
               <span>Em preparação</span>
             </div>
-            <div className="tl-line" />
-            <div className="tl-step">
-              <div className="tl-dot" />
-              <span>Pronto para retirada</span>
+            <div
+              className={`tl-line ${
+                statusPedido === "ENTREGUE"
+                  ? "tl-line--done"
+                  : statusPedido === "PRONTO"
+                    ? "tl-line--active"
+                    : ""
+              }`}
+            />
+            <div
+              className={`tl-step ${
+                statusPedido === "ENTREGUE"
+                  ? "tl-step--done"
+                  : statusPedido === "PRONTO"
+                    ? "tl-step--current"
+                    : ""
+              }`}
+            >
+              <div className="tl-dot">
+                {statusPedido === "ENTREGUE" ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M5 13L9 17L19 7"
+                      stroke="#fff"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : statusPedido === "PRONTO" ? (
+                  <span className="tl-dots">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                ) : null}
+              </div>
+              <span>{statusPedido === "ENTREGUE" ? "Retirado" : "Pronto para retirada"}</span>
             </div>
           </div>
 
