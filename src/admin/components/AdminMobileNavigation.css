@@ -1,0 +1,392 @@
+/* Bottom navigation mobile: usa a paleta, os ícones e o movimento da sidebar. */
+.admin-mobile-bottom-nav,
+.admin-mobile-sheet-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .admin-mobile-bottom-nav {
+    position: fixed;
+    z-index: 350;
+    right: 12px;
+    bottom: calc(var(--admin-mobile-nav-offset) + env(safe-area-inset-bottom));
+    left: 12px;
+    height: var(--admin-mobile-nav-height);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: stretch;
+    max-width: 560px;
+    margin-inline: auto;
+    padding: 5px;
+    border: 1px solid #eadfd3;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 8px 30px rgba(69, 47, 42, 0.13);
+    backdrop-filter: blur(14px);
+  }
+
+  .admin-mobile-nav-item {
+    position: relative;
+    min-width: 0;
+    min-height: 58px;
+    padding: 5px 2px 4px;
+    border: 0;
+    border-radius: 18px;
+    background: transparent;
+    color: #8c7a76;
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    transition:
+      color 0.15s ease,
+      background 0.15s ease,
+      transform 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .admin-mobile-nav-item::after {
+    content: "";
+    position: absolute;
+    bottom: 3px;
+    width: 14px;
+    height: 2px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0;
+    transform: scaleX(0.4);
+    transition:
+      opacity 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .admin-mobile-nav-item--active {
+    background: #f5efe8;
+    color: #634738;
+  }
+
+  .admin-mobile-nav-item--active::after {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
+  .admin-mobile-nav-item:active {
+    transform: scale(0.96);
+  }
+
+  .admin-mobile-nav-item:focus-visible,
+  .admin-mobile-sheet-item:focus-visible,
+  .admin-mobile-sheet-heading button:focus-visible {
+    outline: 2px solid #634738;
+    outline-offset: 2px;
+  }
+
+  .admin-mobile-nav-icon {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .admin-mobile-nav-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .admin-mobile-nav-label {
+    max-width: 100%;
+    overflow: hidden;
+    font-family: "Manrope", sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-mobile-nav-item--active .admin-mobile-nav-label {
+    font-weight: 800;
+  }
+
+  .admin-mobile-nav-badge {
+    position: absolute;
+    top: -5px;
+    right: -9px;
+    min-width: 17px;
+    height: 17px;
+    padding-inline: 4px;
+    border: 2px solid #ffffff;
+    border-radius: 999px;
+    background: #d38b80;
+    color: #ffffff;
+    font-family: "Manrope", sans-serif;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 13px;
+    text-align: center;
+  }
+
+  /* Mesmas famílias de movimento dos ícones da sidebar desktop, no toque. */
+  .admin-mobile-nav-item--dashboard:active .admin-mobile-nav-icon {
+    animation: iconSpin 0.5s ease;
+  }
+
+  .admin-mobile-nav-item--produtos:active .admin-mobile-nav-icon {
+    animation: iconBounce 0.45s ease;
+  }
+
+  .admin-mobile-nav-item--pedidos:active .admin-mobile-nav-icon {
+    animation: iconSwingBag 0.5s ease;
+    transform-origin: top center;
+  }
+
+  .admin-mobile-nav-item--loja:active .admin-mobile-nav-icon {
+    animation: iconSwing 0.5s ease;
+    transform-origin: top center;
+  }
+
+  .admin-mobile-nav-item--mais:active .admin-mobile-nav-icon {
+    animation: iconPulse 0.5s ease;
+  }
+
+  .admin-mobile-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 400;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: rgba(43, 29, 26, 0.45);
+    transition:
+      opacity 0.2s ease,
+      visibility 0.2s ease;
+  }
+
+  .admin-mobile-sheet-backdrop--open {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .admin-mobile-more-sheet {
+    position: absolute;
+    right: 12px;
+    bottom: calc(var(--admin-mobile-nav-space) + 8px);
+    left: 12px;
+    max-width: 560px;
+    margin-inline: auto;
+    padding: 10px 18px 18px;
+    border: 1px solid #eadfd3;
+    border-radius: 24px 24px 20px 20px;
+    background: #faf6f0;
+    box-shadow: 0 16px 44px rgba(43, 29, 26, 0.2);
+    transform: translateY(22px);
+    transition: transform 0.22s ease;
+  }
+
+  .admin-mobile-sheet-backdrop--open .admin-mobile-more-sheet {
+    transform: translateY(0);
+  }
+
+  .admin-mobile-sheet-handle {
+    width: 36px;
+    height: 4px;
+    margin: 0 auto 8px;
+    border-radius: 999px;
+    background: #d8cbc1;
+  }
+
+  .admin-mobile-sheet-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .admin-mobile-sheet-heading h2 {
+    margin: 0;
+    color: #2b1d1a;
+    font-family: "Fraunces", serif;
+    font-size: 20px;
+  }
+
+  .admin-mobile-sheet-heading button {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #eadfd3;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #634738;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .admin-mobile-sheet-links {
+    display: grid;
+    gap: 4px;
+  }
+
+  .admin-mobile-sheet-item {
+    width: 100%;
+    min-height: 48px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #63524e;
+    font-family: "Manrope", sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .admin-mobile-sheet-item--active {
+    background: #f5efe8;
+    color: #634738;
+    font-weight: 800;
+  }
+
+  .admin-mobile-sheet-item:active .admin-mobile-sheet-icon {
+    transform: scale(0.9);
+  }
+
+  .admin-mobile-sheet-item--admins:active .admin-mobile-sheet-icon {
+    animation: iconWave 0.5s ease;
+  }
+
+  .admin-mobile-sheet-item--notifications:active .admin-mobile-sheet-icon {
+    animation: iconRing 0.5s ease;
+    transform-origin: top center;
+  }
+
+  .admin-mobile-sheet-item--theme:active .admin-mobile-sheet-icon {
+    animation: iconPulse 0.5s ease;
+  }
+
+  .admin-mobile-sheet-icon {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .admin-mobile-sheet-badge {
+    min-width: 22px;
+    margin-left: auto;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #d38b80;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .admin-mobile-sheet-user {
+    margin-top: 12px;
+    padding: 14px 4px 0;
+    border-top: 1px solid #eadfd3;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-bottom-nav {
+    border-color: #3d3230;
+    background: rgba(43, 34, 32, 0.96);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-nav-item {
+    color: #a89b92;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-nav-item--active {
+    background: #3d2e2b;
+    color: #faf6f0;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-nav-badge {
+    border-color: #2b2220;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-sheet-backdrop {
+    background: rgba(0, 0, 0, 0.72);
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-more-sheet {
+    border-color: #3d3230;
+    background: #1a1412;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-sheet-handle {
+    background: #5b4a45;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-sheet-heading h2,
+  html[data-admin-theme="dark"] .admin-mobile-sheet-item--active {
+    color: #faf6f0;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-sheet-heading button {
+    border-color: #3d3230;
+    background: #2b2220;
+    color: #faf6f0;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-sheet-item {
+    color: #a89b92;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-sheet-item--active {
+    background: #3d2e2b;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-sheet-user {
+    border-top-color: #3d3230;
+  }
+
+  html[data-admin-theme="dark"] .admin-mobile-nav-item:focus-visible,
+  html[data-admin-theme="dark"] .admin-mobile-sheet-item:focus-visible,
+  html[data-admin-theme="dark"] .admin-mobile-sheet-heading button:focus-visible {
+    outline-color: #d38b80;
+  }
+}
+
+@media (max-width: 370px) {
+  .admin-mobile-bottom-nav {
+    right: 8px;
+    left: 8px;
+  }
+
+  .admin-mobile-nav-label {
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-mobile-bottom-nav *,
+  .admin-mobile-sheet-backdrop,
+  .admin-mobile-more-sheet {
+    animation: none !important;
+    transition: none !important;
+  }
+}

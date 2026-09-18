@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import AdminSidebar from "./AdminSidebar";
+import AdminMobileBottomNav from "./AdminMobileBottomNav";
 import AdminWave from "./AdminWave";
 import { AdminThemeProvider } from "../theme/AdminThemeContext";
 import { AdminAuthProvider, type AdminUser } from "../auth/AdminAuthContext";
@@ -49,6 +50,7 @@ export default function AdminLayout() {
             <AdminWave />
             <AdminSidebar />
             <Outlet />
+            <AdminMobileBottomNav />
           </div>
         </NotificacoesProvider>
       </AdminAuthProvider>
