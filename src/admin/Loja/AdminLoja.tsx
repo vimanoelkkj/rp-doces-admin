@@ -1,11 +1,28 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import "./AdminLoja.css";
 import { formatScheduleText } from "./scheduleText";
+import { novaOperationKey } from "../../lib/operationKey";
+import { useNotificacoes } from "../notificacoes/NotificacoesContext";
 
 /* ── Types ── */
 interface DayToggle {
   label: string;
   active: boolean;
+}
+
+interface PixDiagnosticoResultado {
+  valorCentavos: number;
+  mpPaymentId: string;
+  qrCode: string | null;
+  qrCodeBase64: string | null;
+  ticketUrl: string | null;
+  expiresAt: string | null;
+}
+
+function formatarHorario(iso: string): string {
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return iso;
+  return data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 /* ── Component ── */
@@ -46,6 +63,89 @@ export default function AdminLoja() {
   /* Imagens */
   const [heroImg, setHeroImg] = useState<string | null>("/images/hero.jpg");
   const [storyImg, setStoryImg] = useState<string | null>("/images/story.jpg");
+
+  /* Diagnósticos permanentes */
+  const { revalidar: revalidarNotificacoes } = useNotificacoes();
+  const [pixLoading, setPixLoading] = useState(false);
+  const [pixError, setPixError] = useState<string | null>(null);
+  const [pixResultado, setPixResultado] = useState<PixDiagnosticoResultado | null>(null);
+  const [pixCopiado, setPixCopiado] = useState(false);
+  const pixOperationKeyRef = useRef<string | null>(null);
+  // Guarda SÍNCRONA contra duplo-clique: cliques na mesma rajada acontecem
+  // antes de o React aplicar o `setPixLoading(true)` do primeiro, então o
+  // estado sozinho não bastaria para barrar o segundo e o terceiro clique.
+  const pixEmVooRef = useRef(false);
+
+  const [testeLoading, setTesteLoading] = useState(false);
+  const [testeError, setTesteError] = useState<string | null>(null);
+  const [testeEnviado, setTesteEnviado] = useState(false);
+  const testeEmVooRef = useRef(false);
+
+  const gerarPixDiagnostico = async () => {
+    if (pixEmVooRef.current) return;
+    pixEmVooRef.current = true;
+    setPixLoading(true);
+    setPixError(null);
+    if (!pixOperationKeyRef.current) {
+      pixOperationKeyRef.current = novaOperationKey();
+    }
+    try {
+      const response = await fetch("/api/admin/diagnosticos/pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationKey: pixOperationKeyRef.current }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setPixError(data?.error || "Não foi possível gerar o Pix de diagnóstico");
+        return;
+      }
+      setPixResultado(data);
+      // Sucesso encerra esta intenção — o próximo clique é um Pix novo.
+      pixOperationKeyRef.current = null;
+    } catch {
+      setPixError("Falha de conexão ao gerar o Pix de diagnóstico");
+    } finally {
+      pixEmVooRef.current = false;
+      setPixLoading(false);
+    }
+  };
+
+  const copiarPixDiagnostico = async () => {
+    if (!pixResultado?.qrCode) return;
+    try {
+      await navigator.clipboard.writeText(pixResultado.qrCode);
+      setPixCopiado(true);
+      setTimeout(() => setPixCopiado(false), 2000);
+    } catch {
+      // Sem clipboard disponível: o código continua selecionável na caixa.
+    }
+  };
+
+  const dispararPedidoTeste = async () => {
+    if (testeEmVooRef.current) return;
+    testeEmVooRef.current = true;
+    setTesteLoading(true);
+    setTesteError(null);
+    try {
+      const response = await fetch("/api/admin/diagnosticos/pedido-teste", {
+        method: "POST",
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setTesteError(data?.error || "Não foi possível disparar o pedido de teste");
+        return;
+      }
+      setTesteEnviado(true);
+      revalidarNotificacoes();
+      setTimeout(() => setTesteEnviado(false), 4000);
+    } catch {
+      setTesteError("Falha de conexão ao disparar o pedido de teste");
+    } finally {
+      testeEmVooRef.current = false;
+      setTesteLoading(false);
+    }
+  };
 
   const toggleDay = (index: number) => {
     setDays((prev) =>
@@ -357,7 +457,48 @@ export default function AdminLoja() {
                 Cria um Pix real de centavos para confirmar que a integração com
                 o banco está de pé e ativa.
               </p>
-              <button className="loj-diag-action">Gerar QR Code Pix</button>
+              <button
+                className="loj-diag-action"
+                onClick={gerarPixDiagnostico}
+                disabled={pixLoading}
+              >
+                {pixLoading ? "Gerando..." : "Gerar QR Code Pix"}
+              </button>
+              {pixError && <p className="loj-diag-error">{pixError}</p>}
+              {pixResultado && (
+                <div className="loj-diag-pix-result">
+                  <p className="loj-diag-pix-valor">
+                    R$ {(pixResultado.valorCentavos / 100).toFixed(2).replace(".", ",")}
+                  </p>
+                  {pixResultado.qrCodeBase64 && (
+                    <img
+                      className="loj-diag-pix-qr"
+                      src={`data:image/png;base64,${pixResultado.qrCodeBase64}`}
+                      alt="QR Code do Pix de diagnóstico"
+                    />
+                  )}
+                  {pixResultado.qrCode && (
+                    <div className="loj-diag-pix-copy-row">
+                      <span className="loj-diag-pix-copy-label">Pix copia e cola</span>
+                      <div className="loj-diag-pix-code-box">
+                        <code>{pixResultado.qrCode}</code>
+                        <button
+                          type="button"
+                          className="loj-diag-pix-copy-btn"
+                          onClick={copiarPixDiagnostico}
+                        >
+                          {pixCopiado ? "Copiado!" : "Copiar"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {pixResultado.expiresAt && (
+                    <p className="loj-diag-pix-expira">
+                      Expira às {formatarHorario(pixResultado.expiresAt)}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Pedido teste */}
@@ -373,7 +514,19 @@ export default function AdminLoja() {
                 se as notificações e sons do painel administrativo estão
                 operando.
               </p>
-              <button className="loj-diag-action">Disparar pedido teste</button>
+              <button
+                className="loj-diag-action"
+                onClick={dispararPedidoTeste}
+                disabled={testeLoading}
+              >
+                {testeLoading ? "Enviando..." : "Disparar pedido teste"}
+              </button>
+              {testeError && <p className="loj-diag-error">{testeError}</p>}
+              {testeEnviado && (
+                <p className="loj-diag-success">
+                  Evento de teste registrado — confira nas notificações.
+                </p>
+              )}
             </div>
           </div>
         </section>
