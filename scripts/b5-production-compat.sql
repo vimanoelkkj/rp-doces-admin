@@ -29,9 +29,16 @@
 -- IDEMPOTÊNCIA
 --
 -- Os `IF NOT EXISTS` existem para tornar a reexecução segura, NÃO para
--- mascarar incompatibilidade: se `pedido_operacoes` já existir com schema
--- divergente, este script silencia, mas a validação obrigatória (abaixo)
--- falha. Sempre rodar a validação depois — ela é a autoridade, não o script.
+-- mascarar incompatibilidade. São duas redes independentes:
+--
+--   1. o próprio script falha se houver uma `pedido_operacoes` homônima com
+--      estrutura divergente — o `CREATE TABLE IF NOT EXISTS` silencia, mas os
+--      `CREATE INDEX` seguintes referenciam colunas que não existiriam e
+--      quebram na hora (verificado em teste);
+--   2. `scripts/b5-production-validate.sql` confere o schema resultante
+--      coluna a coluna e é a autoridade final.
+--
+-- Sempre rodar a validação depois. Um script que "passou" não é prova.
 --
 -- COMO APLICAR (Fase 3, somente depois de backup + ensaio em clone):
 --   npx wrangler d1 execute <banco> --file=scripts/b5-production-compat.sql

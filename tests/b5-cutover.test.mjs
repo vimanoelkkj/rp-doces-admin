@@ -113,6 +113,23 @@ test('a validação B5 aprova tudo depois da aplicação e reprova antes', async
   assert.ok(depois.length >= 12, 'a validação cobre as verificações esperadas');
 });
 
+test('pedido_operacoes homônima e divergente é rejeitada, nunca aceita em silêncio', async t => {
+  const db = await bancoProducao(t);
+  // Alguém já criou uma tabela com esse nome e estrutura errada.
+  await db.prepare(`CREATE TABLE pedido_operacoes (id INTEGER PRIMARY KEY, operation_key TEXT)`).run();
+
+  // Rede 1: o `CREATE TABLE IF NOT EXISTS` silencia, mas os índices seguintes
+  // referenciam colunas que não existem e derrubam o script.
+  await assert.rejects(aplicarB5(db), /no such column/i);
+
+  // Rede 2: a validação confere o schema e acusa, independentemente do script.
+  const falhas = (await validarB5(db)).filter(l => l.resultado === 'FALHA').map(l => l.verificacao);
+  assert.ok(falhas.includes('pedido_operacoes: 18 colunas'));
+  assert.ok(falhas.includes('pedido_operacoes: colunas esperadas'));
+  assert.ok(falhas.includes('pedido_operacoes: NOT NULL obrigatorios'));
+  assert.ok(falhas.includes('pedido_operacoes: indices de apoio'));
+});
+
 test('aplicar o script duas vezes é seguro e não duplica objetos', async t => {
   const db = await bancoProducao(t);
   await aplicarB5(db);
