@@ -320,3 +320,68 @@
   border-color: #d32f2f;
   background: #fdebec;
 }
+
+/* ═══════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════ */
+@media (max-width: 1150px) {
+  .adm-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-card--full {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .adm-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .adm-title {
+    font-size: 28px;
+  }
+
+  .adm-btn-new {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .adm-kpi-strip {
+    grid-template-columns: 1fr;
+    margin-bottom: 24px;
+  }
+
+  .adm-card {
+    padding: 18px;
+    gap: 16px;
+  }
+
+  .adm-card-top,
+  .adm-card-name-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .adm-card-identity,
+  .adm-card-name-group {
+    min-width: 0;
+  }
+
+  .adm-card-details {
+    gap: 18px;
+  }
+
+  .adm-detail,
+  .adm-action-btn {
+    width: 100%;
+  }
+
+  .adm-detail-value,
+  .adm-card-name,
+  .adm-card-handle {
+    overflow-wrap: anywhere;
+  }
+}
