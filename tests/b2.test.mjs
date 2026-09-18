@@ -49,7 +49,7 @@ test('A: real checkout creation then authoritative GET approval preserves normal
   });
   const response=await app.checkout.onRequestPost({env:env(db),request:new Request('https://local.test/api/checkout',{
     // operationKey: contrato A1, obrigatório no endpoint. Asserções inalteradas.
-    method:'POST',body:JSON.stringify({items:[{id:1,quantity:2}],cliente:{nome:'Teste',whatsapp:'000'},operationKey:'b2-checkout-a'}),
+    method:'POST',body:JSON.stringify({items:[{id:1,quantity:2}],cliente:{nome:'Teste',whatsapp:'11999999999'},operationKey:'b2-checkout-a'}),
   })});
   assert.equal(response.status,200);
   const checkout=await response.json();

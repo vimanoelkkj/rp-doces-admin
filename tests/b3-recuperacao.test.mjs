@@ -78,7 +78,7 @@ async function siteInconclusivo(t, {postar, remoto} = {}) {
       method: 'POST',
       body: JSON.stringify({
         items: [{id: 1, quantity: 2}],
-        cliente: {nome: 'Teste', whatsapp: '000'},
+        cliente: {nome: 'Teste', whatsapp: '11999999999'},
         operationKey: uuid('site'),
       }),
     }),
@@ -471,7 +471,7 @@ test('13/15. recuperação repetida é idempotente: mesmo mp_payment_id e mesmos
       method: 'POST',
       body: JSON.stringify({
         items: [{id: 1, quantity: 2}],
-        cliente: {nome: 'Teste', whatsapp: '000'},
+        cliente: {nome: 'Teste', whatsapp: '11999999999'},
         operationKey: uuid('site'),
       }),
     }),

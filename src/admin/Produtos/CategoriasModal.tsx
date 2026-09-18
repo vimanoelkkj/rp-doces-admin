@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAdminModal } from "../components/useAdminModal";
 import "./CategoriasModal.css";
 
 /* ── Icons ── */
@@ -52,6 +53,7 @@ export default function CategoriasModal({
   open,
   onClose,
 }: CategoriasModalProps) {
+  const modalProps = useAdminModal(open, onClose);
   const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🍰");
@@ -110,8 +112,8 @@ export default function CategoriasModal({
   if (!open) return null;
 
   return createPortal(
-    <div className="catm-overlay" onClick={onClose}>
-      <div className="catm-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="catm-overlay" {...modalProps}>
+      <div className="catm-modal">
         {/* ── Header ── */}
         <div className="catm-header">
           <div>

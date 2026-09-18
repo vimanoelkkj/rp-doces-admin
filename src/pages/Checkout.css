@@ -167,6 +167,11 @@
   border-color: #d38b80;
 }
 
+.checkout-field-error {
+  color: #b3261e;
+  font-size: 12px;
+}
+
 /* Pagamento */
 .payment-option {
   display: flex;

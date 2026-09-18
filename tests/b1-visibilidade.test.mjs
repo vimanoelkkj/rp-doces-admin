@@ -37,7 +37,7 @@ function criarManual(db, session, body) {
       body: JSON.stringify({
         itens: [{produtoId: 1, quantidade: 2}],
         clienteNome: 'Balcao',
-        clienteWhatsapp: '000',
+        clienteWhatsapp: '11999999999',
         metodoPagamento: 'DINHEIRO',
         statusPagamento: 'PENDENTE',
         ...body,
@@ -68,6 +68,7 @@ test('MANUAL/PENDENTE (default do Novo Pedido) aparece na listagem e o detalhe a
   assert.equal(lista.pedidos.length, 1);
   assert.equal(lista.pedidos[0].id, criado.pedidoId);
   assert.equal(lista.pedidos[0].status_pagamento, 'PENDENTE');
+  assert.equal(lista.pedidos[0].status_pedido, 'NOVO');
   assert.equal(lista.pedidos[0].financeiro.status, 'PENDENTE');
   assert.equal(lista.pedidos[0].financeiro.pagoCentavos, 0);
 
@@ -139,7 +140,8 @@ test('contagens das abas e paginação usam o mesmo critério da listagem', asyn
   assert.equal(p1.pedidos.length, 8);
   assert.equal(p1.counts.todos, 9, 'contador da aba bate com o total da listagem');
   assert.equal(p1.counts.hoje, 9);
-  assert.equal(p1.counts.em_producao, 9, 'todos nascem NOVO');
+  assert.equal(p1.counts.novos, 9, 'todos nascem NOVO');
+  assert.equal(p1.counts.em_producao, 0, 'NOVO não é produção iniciada');
   assert.equal(p1.counts.prontos, 0);
   assert.equal(p1.counts.entregues, 0);
 
@@ -148,13 +150,18 @@ test('contagens das abas e paginação usam o mesmo critério da listagem', asyn
   const ids = [...p1.pedidos, ...p2.pedidos].map(p => p.id);
   assert.equal(new Set(ids).size, 9, 'nenhuma linha repetida ou perdida entre páginas');
 
+  const novos = await listagem(db, session, '?status=novos');
+  assert.equal(novos.total, 9);
+  assert.ok(novos.pedidos.every(p => p.status_pedido === 'NOVO'));
+
   // Aba filtrada por status operacional permanece coerente com seu contador.
   await db.prepare("UPDATE pedidos SET status_pedido='PRONTO' WHERE id=(SELECT MIN(id) FROM pedidos WHERE origem_pedido='MANUAL')").run();
   const prontos = await listagem(db, session, '?status=prontos');
   assert.equal(prontos.total, 1);
   assert.equal(prontos.pedidos.length, 1);
   assert.equal(prontos.counts.prontos, 1);
-  assert.equal(prontos.counts.em_producao, 8);
+  assert.equal(prontos.counts.novos, 8);
+  assert.equal(prontos.counts.em_producao, 0);
 });
 
 test('busca alcança o pedido de balcão pendente por id e por nome', async t => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useAdminModal } from "../components/useAdminModal";
 import "./NovoAdminModal.css";
 
 const IconClose = () => (
@@ -29,6 +30,7 @@ export default function AlterarSenhaModal({
   onClose,
   onSaved,
 }: AlterarSenhaModalProps) {
+  const modalProps = useAdminModal(adminId != null, onClose);
   const [senha, setSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
   const [saving, setSaving] = useState(false);
@@ -67,8 +69,8 @@ export default function AlterarSenhaModal({
   if (adminId == null) return null;
 
   return createPortal(
-    <div className="nadm-overlay" onClick={onClose}>
-      <div className="nadm-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="nadm-overlay" {...modalProps}>
+      <div className="nadm-modal">
         <div className="nadm-header">
           <div>
             <span className="nadm-kicker">EQUIPE</span>
