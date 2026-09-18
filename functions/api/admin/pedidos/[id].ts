@@ -3,7 +3,7 @@
 import { requireUser } from "../../../lib/auth";
 import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
 import { getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
-import { liberarReservaPedido } from "../../../lib/stock";
+import { liberarReservaPedido, PIX_MP_PENDENTE_NO_PEDIDO_SQL } from "../../../lib/stock";
 import { listarOperacoesInconclusivasDoPedido } from "../../../lib/operacoes";
 
 interface Env {
@@ -46,8 +46,8 @@ const STATUS_PEDIDO_VALIDOS = [
   "CANCELADO",
 ];
 
-function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+function jsonError(message: string, status: number, code?: string) {
+  return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({
@@ -162,11 +162,37 @@ export const onRequestPatch: PagesFunction<Env> = async ({
       );
     }
 
-    await env.DB.prepare(
-      `UPDATE pedidos SET status_pedido = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+    // Cancelar com Pix vivo terminava num estado operacional impossível de
+    // defender: o guard financeiro acima só prova que o líquido é zero AGORA,
+    // e uma cobrança `PIX_MP/PENDENTE` é exatamente a situação em que isso
+    // ainda pode mudar. Quando o cliente pagava depois, webhook/recuperação
+    // preservavam corretamente a verdade financeira e o pedido terminava
+    // CANCELADO + PAGO + estoque baixado.
+    //
+    // A recusa é decidida DENTRO da própria escrita, nunca por um SELECT
+    // anterior: uma criação de Pix ADMIN, um webhook ou a recuperação B-3
+    // concorrente não podem fazer nascer um Pix pendente entre a checagem e
+    // o UPDATE. O predicado é o mesmo do B4 — a política pertence ao PEDIDO,
+    // e Pix terminalizado (FALHOU/EXPIRADO/CANCELADO/PAGO) não bloqueia.
+    //
+    // Isto NÃO toca o Pix: nada vira CANCELADO/FALHOU, nada é enviado ao
+    // Mercado Pago e nenhuma verdade financeira muda. É só o pedido que
+    // deixa de poder mudar de estado enquanto a cobrança é inconclusiva.
+    const alteracao = await env.DB.prepare(
+      `UPDATE pedidos SET status_pedido = ?, atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND (? <> 'CANCELADO' OR NOT ${PIX_MP_PENDENTE_NO_PEDIDO_SQL})`,
     )
-      .bind(novoStatus, id)
+      .bind(novoStatus, id, novoStatus)
       .run();
+
+    if (Number(alteracao?.meta?.changes || 0) === 0) {
+      // O pedido foi confirmado acima, então só o guard do Pix recusa aqui.
+      return jsonError(
+        "Este pedido possui um Pix pendente de confirmação. Aguarde a confirmação ou o encerramento do Pix antes de cancelar.",
+        409,
+        "PEDIDO_COM_PIX_PENDENTE",
+      );
+    }
 
     // Cancelar o pedido não terminaliza cobranças MP. A liberação revalida
     // o líquido e a ausência de Pix pendente dentro da transação física.
