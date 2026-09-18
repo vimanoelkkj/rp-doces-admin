@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PedidoDetalheModal from "./PedidoDetalheModal";
 import EditarPedidoModal from "./EditarPedidoModal";
@@ -80,6 +80,8 @@ export default function AdminPedidos() {
   const [data, setData] = useState<PedidosResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pageCacheRef = useRef<Map<number, PedidosResponse>>(new Map());
+  const inFlightRef = useRef<Map<number, Promise<PedidosResponse>>>(new Map());
 
   // HUMAN-14: as notificações levam ao pedido exato via `?pedido=<id>`, que é
   // o destino real da ação contextual. Sem isso a notificação só conseguiria
@@ -119,25 +121,83 @@ export default function AdminPedidos() {
     setCurrentPage(1);
   }, [activeTab, debouncedSearch]);
 
+  // O cache vale somente para o filtro/busca/versão atual da listagem.
+  // Assim a paginação pode ser instantânea sem manter dados antigos depois
+  // de criar/alterar um pedido.
   useEffect(() => {
-    setLoading(true);
-    const params = new URLSearchParams({
-      status: activeTab,
-      page: String(currentPage),
-    });
-    if (debouncedSearch) params.set("search", debouncedSearch);
+    pageCacheRef.current.clear();
+    inFlightRef.current.clear();
+  }, [activeTab, debouncedSearch, refreshKey]);
 
-    fetch(`/api/admin/pedidos?${params.toString()}`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Falha ao carregar pedidos");
-        return response.json() as Promise<PedidosResponse>;
-      })
+  useEffect(() => {
+    let cancelled = false;
+
+    const carregarPagina = (page: number): Promise<PedidosResponse> => {
+      const cached = pageCacheRef.current.get(page);
+      if (cached) return Promise.resolve(cached);
+
+      const emVoo = inFlightRef.current.get(page);
+      if (emVoo) return emVoo;
+
+      const params = new URLSearchParams({
+        status: activeTab,
+        page: String(page),
+      });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+
+      const requisicao = fetch(`/api/admin/pedidos?${params.toString()}`)
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Falha ao carregar pedidos");
+          return response.json() as Promise<PedidosResponse>;
+        })
+        .then((result) => {
+          pageCacheRef.current.set(page, result);
+          return result;
+        })
+        .finally(() => {
+          inFlightRef.current.delete(page);
+        });
+
+      inFlightRef.current.set(page, requisicao);
+      return requisicao;
+    };
+
+    const cached = pageCacheRef.current.get(currentPage);
+    if (cached) {
+      setData(cached);
+      setError(null);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    carregarPagina(currentPage)
       .then((result) => {
+        if (cancelled) return;
         setData(result);
         setError(null);
+        setLoading(false);
+
+        // Deixa as páginas vizinhas prontas antes do clique. A listagem tem
+        // só 8 itens por página, então o custo é pequeno e a troca seguinte
+        // não precisa esperar um round-trip completo ao D1.
+        for (const page of [currentPage - 1, currentPage + 1]) {
+          if (page < 1 || page > result.totalPages) continue;
+          void carregarPagina(page).catch(() => {
+            // Prefetch é melhor-esforço; erro só importa quando a página
+            // realmente for aberta pelo operador.
+          });
+        }
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab, currentPage, debouncedSearch, refreshKey]);
 
   const pedidos = data?.pedidos ?? [];
