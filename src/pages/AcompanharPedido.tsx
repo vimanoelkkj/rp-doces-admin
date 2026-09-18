@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -42,20 +42,60 @@ export default function AcompanharPedido() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!token) return;
-    fetch(`/api/pedido?token=${encodeURIComponent(token)}`)
-      .then(async (response) => {
+  const carregarPedido = useCallback(
+    async (mostrarLoading = false) => {
+      if (!token) return;
+      if (mostrarLoading) setLoading(true);
+
+      try {
+        const response = await fetch(
+          `/api/pedido?token=${encodeURIComponent(token)}`,
+          { cache: "no-store" },
+        );
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error || "Pedido não encontrado");
         }
-        return response.json() as Promise<PedidoDetalhe>;
-      })
-      .then(setPedido)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [token]);
+
+        setPedido((await response.json()) as PedidoDetalhe);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Falha ao atualizar pedido");
+      } finally {
+        if (mostrarLoading) setLoading(false);
+      }
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    void carregarPedido(true);
+  }, [carregarPedido]);
+
+  useEffect(() => {
+    if (!pedido) return;
+    if (pedido.statusPedido === "ENTREGUE" || pedido.statusPedido === "CANCELADO") {
+      return;
+    }
+
+    // Acompanhamento leve: mantém o status operacional sincronizado com o
+    // admin sem WebSocket e sem recarregar a página inteira.
+    const atualizar = () => void carregarPedido(false);
+    const interval = window.setInterval(atualizar, 10_000);
+    const aoFocar = () => atualizar();
+    const aoFicarVisivel = () => {
+      if (document.visibilityState === "visible") atualizar();
+    };
+
+    window.addEventListener("focus", aoFocar);
+    document.addEventListener("visibilitychange", aoFicarVisivel);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", aoFocar);
+      document.removeEventListener("visibilitychange", aoFicarVisivel);
+    };
+  }, [pedido?.statusPedido, carregarPedido]);
 
   const currentIndex = pedido
     ? STEPS.findIndex((s) => s.key === pedido.statusPedido)
