@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {app, fixture, state, barrier} from './helpers/b3.mjs';
+import {app, fixture, state, barrier, withWaitUntil} from './helpers/b3.mjs';
 
 const env = db => ({DB:db,MP_ACCESS_TOKEN:'fake',MP_WEBHOOK_SECRET:'b2-local-only'});
 const expired = db => db.prepare("UPDATE pedidos SET pix_expira_em='2000-01-01',reserva_expira_em='2000-01-02' WHERE id=1").run();
@@ -26,7 +26,7 @@ async function hook(db, id=101, payloadStatus='approved', signatureValid=true) {
 }
 async function list(db) {
   const session=await app.auth.createSession(db,1);
-  return app.admin.onRequestGet({request:new Request('https://local.test/api/admin/pedidos',{
+  return withWaitUntil(app.admin.onRequestGet, {request:new Request('https://local.test/api/admin/pedidos',{
     headers:{Cookie:session.cookie.split(';')[0]},
   }),env:env(db)});
 }

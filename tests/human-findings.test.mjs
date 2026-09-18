@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
-import {app, fixture} from './helpers/b3.mjs';
+import {app, fixture, withWaitUntil} from './helpers/b3.mjs';
 
 const utilitiesBundle = await build({
   stdin: {
@@ -47,7 +47,7 @@ async function cleanFixture(t) {
 }
 
 async function list(db, session, status = 'todos') {
-  const response = await app.adminCreate.onRequestGet({
+  const response = await withWaitUntil(app.adminCreate.onRequestGet, {
     env: {DB: db},
     request: new Request(`https://local.test/api/admin/pedidos?status=${status}`, {
       headers: {Cookie: cookieDe(session)},
