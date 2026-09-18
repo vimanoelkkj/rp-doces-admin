@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {app, fixture, state} from './helpers/b3.mjs';
+import {app, fixture, state, withWaitUntil} from './helpers/b3.mjs';
 
 // B-1 — pedido MANUAL/PENDENTE operacionalmente visível + política de
 // reserva do pedido de balcão.
@@ -14,7 +14,7 @@ const cookieDe = session => session.cookie.split(';')[0];
 const uuid = n => `b1v-${n}-0000-4000-8000-000000000000`;
 
 function listar(db, session, query = '') {
-  return app.adminCreate.onRequestGet({
+  return withWaitUntil(app.adminCreate.onRequestGet, {
     env: {DB: db},
     request: new Request(`https://local.test/api/admin/pedidos${query}`, {
       headers: {Cookie: cookieDe(session)},
