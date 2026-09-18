@@ -14,9 +14,9 @@ interface ProdutoApiRow extends PromocaoCampos {
   image_key: string | null;
 }
 
-// TODO: quando as imagens forem servidas via R2, trocar só esta função pela URL do endpoint de imagens.
+// As imagens públicas são servidas pela Pages Function em /api/images/:key.
 function imageUrlFor(imageKey: string | null): string {
-  return imageKey ? `/images/${imageKey}` : "";
+  return imageKey ? `/api/images/${encodeURIComponent(imageKey)}` : "";
 }
 
 function toProduct(row: ProdutoApiRow): Product {
