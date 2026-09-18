@@ -92,24 +92,26 @@ function jsonError(message: string, status: number, code?: string) {
   return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
-async function reconcileMercadoPagoEmBackground(env: Env): Promise<void> {
-  const [pixPendentes, operacoesInconclusivas] = await Promise.allSettled([
+async function reconcilePedidosEmBackground(env: Env): Promise<void> {
+  const resultados = await Promise.allSettled([
     reconcilePendingPixPayments(env),
+    reconcilePedidosDivergentes(env.DB),
     recuperarOperacoesInconclusivas(env),
+    liberarReservasVencidasLocalmente(env),
   ]);
 
-  if (pixPendentes.status === "rejected") {
-    console.error(
-      "Falha na reconciliação oportunista de pagamentos PIX_MP",
-      pixPendentes.reason,
-    );
-  }
-  if (operacoesInconclusivas.status === "rejected") {
-    console.error(
-      "Falha na recuperação de operações inconclusivas",
-      operacoesInconclusivas.reason,
-    );
-  }
+  const rotulos = [
+    "reconciliação oportunista de pagamentos PIX_MP",
+    "reconciliação de pedidos com ledger",
+    "recuperação de operações inconclusivas",
+    "liberação local de reservas vencidas",
+  ];
+
+  resultados.forEach((resultado, indice) => {
+    if (resultado.status === "rejected") {
+      console.error(`Falha na ${rotulos[indice]}`, resultado.reason);
+    }
+  });
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
@@ -118,26 +120,12 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   if ("error" in auth) return auth.error;
 
   try {
-    // As reconciliações que dependem de rede externa (Mercado Pago) são
-    // melhor-esforço e NÃO fazem parte da resposta da listagem. Antes elas
-    // eram aguardadas aqui e cada abertura/troca de filtro podia pagar até
-    // vários segundos de latência do provedor. waitUntil mantém o worker vivo
-    // para concluí-las depois que a resposta já puder ser enviada.
-    context.waitUntil(reconcileMercadoPagoEmBackground(env));
-
-    // Reconciliações puramente locais no D1 continuam síncronas: são rápidas
-    // e mantêm a projeção/listagem internamente consistente sem depender de
-    // rede externa.
-    try {
-      await reconcilePedidosDivergentes(env.DB);
-    } catch (err) {
-      console.error("Falha na reconciliação de pedidos com ledger", err);
-    }
-    try {
-      await liberarReservasVencidasLocalmente(env);
-    } catch (err) {
-      console.error("Falha na liberação local de reservas vencidas", err);
-    }
+    // Nenhuma rotina de manutenção/reconciliação participa do caminho crítico
+    // da listagem. Até as rotinas "só D1" podem fazer varreduras e múltiplas
+    // escritas no banco histórico; esperar por elas aqui fazia a navegação
+    // para Pedidos parecer travada. Todas continuam rodando em melhor-esforço,
+    // mas somente depois que a resposta da listagem já pode ser enviada.
+    context.waitUntil(reconcilePedidosEmBackground(env));
 
     const url = new URL(request.url);
     const search = (url.searchParams.get("search") ?? "").trim().slice(0, 100);
@@ -155,25 +143,43 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       searchParams.push(`%${idPart}%`, `%${search}%`);
     }
 
-    const { count } = (await env.DB.prepare(
-      `SELECT COUNT(*) AS count FROM pedidos
-       WHERE ${PEDIDOS_OPERACIONAIS_SQL} ${tabFilter} ${searchFilter}`,
-    )
-      .bind(...searchParams)
-      .first<{ count: number }>())!;
-
-    const totalPages = Math.max(1, Math.ceil(count / ITEMS_PER_PAGE));
     const offset = (page - 1) * ITEMS_PER_PAGE;
 
-    const { results: pedidos } = await env.DB.prepare(
-      `SELECT id, cliente_nome, valor_total_centavos, status_pagamento, status_pedido, criado_em
-       FROM pedidos
-       WHERE ${PEDIDOS_OPERACIONAIS_SQL} ${tabFilter} ${searchFilter}
-       ORDER BY criado_em DESC
-       LIMIT ? OFFSET ?`,
-    )
-      .bind(...searchParams, ITEMS_PER_PAGE, offset)
-      .all<PedidoListRow>();
+    // As três leituras independentes da tela saem juntas. Antes eram
+    // round-trips sequenciais ao D1 (count -> página -> financeiros -> counts).
+    // Agora count, página e contadores são buscados em paralelo; só a projeção
+    // financeira depende da lista de ids retornada.
+    const [countRow, pedidosResult, counts] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM pedidos
+         WHERE ${PEDIDOS_OPERACIONAIS_SQL} ${tabFilter} ${searchFilter}`,
+      )
+        .bind(...searchParams)
+        .first<{ count: number }>(),
+      env.DB.prepare(
+        `SELECT id, cliente_nome, valor_total_centavos, status_pagamento, status_pedido, criado_em
+         FROM pedidos
+         WHERE ${PEDIDOS_OPERACIONAIS_SQL} ${tabFilter} ${searchFilter}
+         ORDER BY criado_em DESC
+         LIMIT ? OFFSET ?`,
+      )
+        .bind(...searchParams, ITEMS_PER_PAGE, offset)
+        .all<PedidoListRow>(),
+      env.DB.prepare(
+        `SELECT
+           COUNT(*) AS todos,
+           SUM(CASE WHEN date(criado_em) = date('now') THEN 1 ELSE 0 END) AS hoje,
+           SUM(CASE WHEN status_pedido = 'NOVO' THEN 1 ELSE 0 END) AS novos,
+           SUM(CASE WHEN status_pedido = 'PREPARANDO' THEN 1 ELSE 0 END) AS em_producao,
+           SUM(CASE WHEN status_pedido = 'PRONTO' THEN 1 ELSE 0 END) AS prontos,
+           SUM(CASE WHEN status_pedido = 'ENTREGUE' THEN 1 ELSE 0 END) AS entregues
+         FROM pedidos WHERE ${PEDIDOS_OPERACIONAIS_SQL}`,
+      ).first<CountsRow>(),
+    ]);
+
+    const count = Number(countRow?.count ?? 0);
+    const totalPages = Math.max(1, Math.ceil(count / ITEMS_PER_PAGE));
+    const pedidos = pedidosResult.results ?? [];
 
     // Lote único pra página inteira (no máximo ITEMS_PER_PAGE pedidos) —
     // nunca uma consulta financeira por linha.
@@ -195,23 +201,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       },
     }));
 
-    const counts = (await env.DB.prepare(
-      `SELECT
-         COUNT(*) AS todos,
-         SUM(CASE WHEN date(criado_em) = date('now') THEN 1 ELSE 0 END) AS hoje,
-         SUM(CASE WHEN status_pedido = 'NOVO' THEN 1 ELSE 0 END) AS novos,
-         SUM(CASE WHEN status_pedido = 'PREPARANDO' THEN 1 ELSE 0 END) AS em_producao,
-         SUM(CASE WHEN status_pedido = 'PRONTO' THEN 1 ELSE 0 END) AS prontos,
-         SUM(CASE WHEN status_pedido = 'ENTREGUE' THEN 1 ELSE 0 END) AS entregues
-       FROM pedidos WHERE ${PEDIDOS_OPERACIONAIS_SQL}`,
-    ).first<CountsRow>())!;
-
     return Response.json({
       pedidos: pedidosComFinanceiro,
       total: count,
       page,
       totalPages,
-      counts,
+      counts: counts ?? {
+        todos: 0,
+        hoje: 0,
+        novos: 0,
+        em_producao: 0,
+        prontos: 0,
+        entregues: 0,
+      },
     });
   } catch (err) {
     console.error("Erro ao listar pedidos (admin)", err);
