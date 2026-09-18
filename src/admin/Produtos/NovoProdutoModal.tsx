@@ -7,6 +7,7 @@ import {
   formatCentsAsBrlInput,
   parseBrlInputToCents,
 } from "../../lib/brl";
+import { estadoPromocao } from "../../../shared/promocao";
 import "./NovoProdutoModal.css";
 import {
   EmojiCake,
@@ -98,6 +99,25 @@ const EMOJI_CHARS = [
   "🍪",
 ];
 
+// HUMAN-12: `<input type="datetime-local">` fala em horário LOCAL
+// ("2026-09-20T18:30"), enquanto a coluna guarda instante em ISO UTC —
+// inequívoco para os dois lados da regra compartilhada. Estas duas funções
+// são o único ponto de conversão, para não espalhar ambiguidade de fuso.
+function isoParaDatetimeLocal(iso: string | null): string {
+  if (!iso) return "";
+  const instante = Date.parse(iso);
+  if (!Number.isFinite(instante)) return "";
+  const local = new Date(instante - new Date(instante).getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function datetimeLocalParaIso(valor: string): string | null {
+  if (!valor) return null;
+  const instante = Date.parse(valor);
+  if (!Number.isFinite(instante)) return null;
+  return new Date(instante).toISOString();
+}
+
 const R2_IMAGE_KEY_PATTERN = /^product-\d+-[0-9a-f-]+\.(?:jpg|png|webp)$/i;
 
 // Fotos enviadas pelo novo upload (R2) seguem o padrão `product-{id}-{uuid}.ext`
@@ -136,6 +156,9 @@ export default function NovoProdutoModal({
   const [disponivelVenda, setDisponivelVenda] = useState(true);
   const [destaque, setDestaque] = useState(false);
   const [promocao, setPromocao] = useState(false);
+  const [promoPrice, setPromoPrice] = useState("0,00");
+  const [promoInicio, setPromoInicio] = useState("");
+  const [promoFim, setPromoFim] = useState("");
   const [catOpen, setCatOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -212,6 +235,9 @@ export default function NovoProdutoModal({
     setDisponivelVenda(true);
     setDestaque(false);
     setPromocao(false);
+    setPromoPrice("0,00");
+    setPromoInicio("");
+    setPromoFim("");
     setError(null);
   };
 
@@ -247,6 +273,13 @@ export default function NovoProdutoModal({
     setDisponivelVenda(produto.disponivel === 1);
     setDestaque(produto.destaque === 1);
     setPromocao(produto.promocao_ativa === 1);
+    setPromoPrice(
+      produto.preco_promocional_centavos != null
+        ? formatCentsAsBrlInput(produto.preco_promocional_centavos)
+        : "0,00",
+    );
+    setPromoInicio(isoParaDatetimeLocal(produto.promocao_inicio));
+    setPromoFim(isoParaDatetimeLocal(produto.promocao_fim));
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, produto]);
@@ -265,6 +298,38 @@ export default function NovoProdutoModal({
       return;
     }
     const estoque = Number(stock);
+
+    // HUMAN-12: espelha as regras do servidor para dar feedback imediato. O
+    // backend revalida tudo — esta checagem é conveniência, não autoridade.
+    const promoCentavos = promocao ? parseBrlInputToCents(promoPrice) : null;
+    const promoInicioIso = datetimeLocalParaIso(promoInicio);
+    const promoFimIso = datetimeLocalParaIso(promoFim);
+    if (promocao) {
+      if (promoCentavos === null || promoCentavos < 1) {
+        setError("Informe o preço promocional para ativar a promoção.");
+        return;
+      }
+      if (promoCentavos >= precoCentavos) {
+        setError("O preço promocional precisa ser menor que o preço normal.");
+        return;
+      }
+      if (promoInicio && promoInicioIso === null) {
+        setError("Data de início da promoção inválida.");
+        return;
+      }
+      if (promoFim && promoFimIso === null) {
+        setError("Data de término da promoção inválida.");
+        return;
+      }
+      if (
+        promoInicioIso !== null &&
+        promoFimIso !== null &&
+        Date.parse(promoFimIso) <= Date.parse(promoInicioIso)
+      ) {
+        setError("O término da promoção precisa ser depois do início.");
+        return;
+      }
+    }
 
     setSaving(true);
     setError(null);
@@ -286,6 +351,9 @@ export default function NovoProdutoModal({
           disponivel: disponivelVenda,
           destaque,
           promocaoAtiva: promocao,
+          precoPromocionalCentavos: promoCentavos,
+          promocaoInicio: promoInicioIso,
+          promocaoFim: promoFimIso,
         }),
       });
       if (!response.ok) {
@@ -301,6 +369,29 @@ export default function NovoProdutoModal({
       setSaving(false);
     }
   };
+
+  // HUMAN-12: o aviso de vigência é calculado pela MESMA função que o
+  // catálogo e o checkout usam (`shared/promocao.ts`), não por uma lógica
+  // paralela do formulário. Se o admin diz "vigente", o cliente vê o preço
+  // promocional — por construção, não por coincidência.
+  const promoCentavosPreview = parseBrlInputToCents(promoPrice);
+  const precoCentavosPreview = parseBrlInputToCents(price);
+  const promoEstado = estadoPromocao({
+    preco_centavos: precoCentavosPreview ?? 0,
+    preco_promocional_centavos: promoCentavosPreview,
+    promocao_ativa: promocao ? 1 : 0,
+    promocao_inicio: datetimeLocalParaIso(promoInicio),
+    promocao_fim: datetimeLocalParaIso(promoFim),
+  });
+  const promoHint = {
+    DESLIGADA: "Promoção desligada: o catálogo mostra o preço normal.",
+    SEM_PRECO: "Informe o preço promocional para a promoção valer.",
+    FUTURA: "Agendada: o preço promocional começa a valer na data de início.",
+    VIGENTE: promoInicio || promoFim
+      ? "Vigente agora: o catálogo já mostra o preço promocional."
+      : "Vigente agora e sem prazo: vale até você desligar.",
+    EXPIRADA: "Período encerrado: o catálogo voltou ao preço normal.",
+  }[promoEstado];
 
   if (!open) return null;
 
@@ -554,6 +645,45 @@ export default function NovoProdutoModal({
               </div>
             </label>
           </div>
+
+          {/* HUMAN-12: os campos da promoção só aparecem com o checkbox
+              ligado — antes ele não configurava nada. Mesma linguagem visual
+              do resto do formulário (np-field / np-row-2), sem modal novo. */}
+          {promocao && (
+            <div className="np-promo-box np-field--full">
+              <div className="np-field np-field--full">
+                <label>PREÇO PROMOCIONAL</label>
+                <input
+                  type="text"
+                  placeholder="0,00"
+                  value={promoPrice}
+                  onChange={(e) => setPromoPrice(formatBrlInput(e.target.value))}
+                  inputMode="decimal"
+                />
+              </div>
+
+              <div className="np-row-2">
+                <div className="np-field">
+                  <label>INÍCIO — OPCIONAL</label>
+                  <input
+                    type="datetime-local"
+                    value={promoInicio}
+                    onChange={(e) => setPromoInicio(e.target.value)}
+                  />
+                </div>
+                <div className="np-field">
+                  <label>TÉRMINO — OPCIONAL</label>
+                  <input
+                    type="datetime-local"
+                    value={promoFim}
+                    onChange={(e) => setPromoFim(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <p className="np-promo-hint">{promoHint}</p>
+            </div>
+          )}
 
           {error && <p className="np-error">{error}</p>}
 

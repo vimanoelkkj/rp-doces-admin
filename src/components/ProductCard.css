@@ -91,6 +91,43 @@
   color: #2b1d1a;
 }
 
+/* ── HUMAN-12: promoção vigente ──
+   Acréscimos ao card existente, na mesma linguagem visual: a cor de accent
+   e a tipografia já usadas aqui. O preço promocional continua sendo o
+   `.product-price` (principal); o normal entra acima dele, riscado e
+   secundário. */
+.product-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-promo-badge {
+  font-family: "Manrope", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: #634738;
+  background: #f5ede6;
+  border-radius: 4px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.product-prices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.product-price-original {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c7a76;
+  text-decoration: line-through;
+}
+
 /* Botao + */
 .add-button {
   width: 36px;

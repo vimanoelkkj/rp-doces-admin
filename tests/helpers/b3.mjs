@@ -25,6 +25,12 @@ const bundle = await build({
       export * as operacoes from './functions/lib/operacoes';
       export * as mpPost from './functions/lib/mpPost';
       export * as adminCreate from './functions/api/admin/pedidos';
+      export * as promocao from './shared/promocao';
+      export * as produtos from './functions/api/produtos';
+      export * as adminProdutos from './functions/api/admin/produtos';
+      export * as adminProdutoId from './functions/api/admin/produtos/[id]';
+      export * as notificacoes from './functions/lib/notificacoes';
+      export * as adminNotificacoes from './functions/api/admin/notificacoes';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },

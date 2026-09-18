@@ -6,18 +6,11 @@ interface Env {
   DB: D1Database;
 }
 
-interface ProdutoInput {
-  nome?: string;
-  categoria?: string;
-  descricao?: string;
-  precoCentavos?: number;
-  estoque?: number;
-  emoji?: string;
-  ativo?: boolean;
-  disponivel?: boolean;
-  destaque?: boolean;
-  promocaoAtiva?: boolean;
-}
+import {
+  normalizarPromocao,
+  type ProdutoInput,
+  validarProdutoPromocao,
+} from "../../../lib/produtoPromocao";
 
 const MAX_TEXT_LENGTH = 1000;
 
@@ -46,7 +39,7 @@ function validarProduto(body: ProdutoInput) {
   if (!Number.isInteger(body.estoque) || body.estoque! < 0) {
     return "Estoque inválido";
   }
-  return null;
+  return validarProdutoPromocao(body);
 }
 
 export const onRequestPut: PagesFunction<Env> = async ({
@@ -91,10 +84,13 @@ export const onRequestPut: PagesFunction<Env> = async ({
       );
     }
 
+    const promocao = normalizarPromocao(body);
     const result = await env.DB.prepare(
       `UPDATE produtos
        SET nome = ?, categoria = ?, descricao = ?, preco_centavos = ?, estoque = ?,
-           emoji = ?, ativo = ?, disponivel = ?, destaque = ?, promocao_ativa = ?, atualizado_em = CURRENT_TIMESTAMP
+           emoji = ?, ativo = ?, disponivel = ?, destaque = ?,
+           promocao_ativa = ?, preco_promocional_centavos = ?,
+           promocao_inicio = ?, promocao_fim = ?, atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`,
     )
       .bind(
@@ -107,7 +103,10 @@ export const onRequestPut: PagesFunction<Env> = async ({
         body.ativo === false ? 0 : 1,
         body.disponivel === false ? 0 : 1,
         body.destaque ? 1 : 0,
-        body.promocaoAtiva ? 1 : 0,
+        promocao.promocaoAtiva,
+        promocao.precoPromocionalCentavos,
+        promocao.promocaoInicio,
+        promocao.promocaoFim,
         id,
       )
       .run();

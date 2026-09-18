@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useAdminTheme } from "../theme/AdminThemeContext";
 import { useAdminAuth } from "../auth/AdminAuthContext";
+import { useNotificacoes } from "../notificacoes/NotificacoesContext";
 import "./AdminSidebar.css";
 
 /* ── SVG icons — exported directly from Figma ── */
@@ -303,23 +304,31 @@ export default function AdminSidebar() {
     .slice(0, 2);
 
   const { theme, toggleTheme } = useAdminTheme();
+  // HUMAN-14: contagem REAL de notificações não lidas deste operador,
+  // derivada de fatos do domínio. Substitui a ausência de badge no item
+  // Notificações; o badge numérico do item Pedidos é outro assunto (resíduo
+  // de mock do design inicial) e não foi tocado aqui.
+  const { naoLidas } = useNotificacoes();
 
-  const renderNavItem = (item: NavItem) => (
-    <NavLink
-      key={item.to}
-      to={item.to}
-      end={item.to === "/admin"}
-      className={({ isActive }) =>
-        `sidebar-nav-item ${item.animClass || ""}${isActive ? " sidebar-nav-item--active" : ""}`
-      }
-    >
-      <span className="sidebar-nav-icon">{item.icon}</span>
-      <span className="sidebar-nav-label">{item.label}</span>
-      {item.badge !== undefined && (
-        <span className="sidebar-nav-badge">{item.badge}</span>
-      )}
-    </NavLink>
-  );
+  const renderNavItem = (item: NavItem) => {
+    const badge = item.to === "/admin/notificacoes" ? naoLidas : item.badge;
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        end={item.to === "/admin"}
+        className={({ isActive }) =>
+          `sidebar-nav-item ${item.animClass || ""}${isActive ? " sidebar-nav-item--active" : ""}`
+        }
+      >
+        <span className="sidebar-nav-icon">{item.icon}</span>
+        <span className="sidebar-nav-label">{item.label}</span>
+        {badge !== undefined && badge > 0 && (
+          <span className="sidebar-nav-badge">{badge > 9 ? "9+" : badge}</span>
+        )}
+      </NavLink>
+    );
+  };
 
   return (
     <aside className="admin-sidebar">

@@ -12,6 +12,9 @@ interface ProdutoRow {
   descricao: string;
   preco_centavos: number;
   preco_promocional_centavos: number | null;
+  // HUMAN-12: o catálogo público precisa da fonte única de ativação para
+  // aplicar exatamente a mesma regra do backend (`shared/promocao.ts`).
+  promocao_ativa: number;
   promocao_inicio: string | null;
   promocao_fim: string | null;
   destaque: number;
@@ -25,7 +28,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const { results } = await env.DB.prepare(
     `SELECT p.id, p.nome, p.categoria, COALESCE(c.nome, p.categoria) AS categoria_nome,
             p.descricao, p.preco_centavos,
-            p.preco_promocional_centavos, p.promocao_inicio, p.promocao_fim,
+            p.preco_promocional_centavos, p.promocao_ativa,
+            p.promocao_inicio, p.promocao_fim,
             p.destaque, p.ordem, p.estoque, p.estoque_reservado, p.image_key
      FROM produtos p
      LEFT JOIN categorias c ON c.id = p.categoria

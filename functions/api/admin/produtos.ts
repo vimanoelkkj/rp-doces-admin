@@ -6,18 +6,11 @@ interface Env {
   DB: D1Database;
 }
 
-interface ProdutoInput {
-  nome?: string;
-  categoria?: string;
-  descricao?: string;
-  precoCentavos?: number;
-  estoque?: number;
-  emoji?: string;
-  ativo?: boolean;
-  disponivel?: boolean;
-  destaque?: boolean;
-  promocaoAtiva?: boolean;
-}
+import {
+  normalizarPromocao,
+  type ProdutoInput,
+  validarProdutoPromocao,
+} from "../../lib/produtoPromocao";
 
 const MAX_TEXT_LENGTH = 1000;
 
@@ -46,7 +39,7 @@ function validarProduto(body: ProdutoInput) {
   if (!Number.isInteger(body.estoque) || body.estoque! < 0) {
     return "Estoque inválido";
   }
-  return null;
+  return validarProdutoPromocao(body);
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -86,10 +79,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return jsonError("Categoria inválida ou inativa", 400);
   }
 
+  const promocao = normalizarPromocao(body);
+
   try {
     const result = await env.DB.prepare(
-      `INSERT INTO produtos (nome, categoria, descricao, preco_centavos, estoque, emoji, ativo, disponivel, destaque, promocao_ativa)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO produtos (nome, categoria, descricao, preco_centavos, estoque, emoji, ativo, disponivel, destaque,
+                             promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         body.nome!.trim(),
@@ -101,7 +97,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         body.ativo === false ? 0 : 1,
         body.disponivel === false ? 0 : 1,
         body.destaque ? 1 : 0,
-        body.promocaoAtiva ? 1 : 0,
+        promocao.promocaoAtiva,
+        promocao.precoPromocionalCentavos,
+        promocao.promocaoInicio,
+        promocao.promocaoFim,
       )
       .run();
 

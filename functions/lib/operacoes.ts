@@ -395,6 +395,21 @@ export async function listarOperacoesInconclusivasDoPedido(
   return results || [];
 }
 
+// HUMAN-14: as mesmas operações, sem recorte por pedido, para a derivação de
+// notificações. Reaproveita o MESMO predicado — o que a notificação chama de
+// "cobrança sem confirmação" é exatamente o que a recuperação read-only
+// considera inconclusivo, nunca uma segunda definição paralela.
+export async function listarOperacoesInconclusivasRecentes(
+  db: D1Database,
+  limite: number,
+): Promise<OperacaoInconclusiva[]> {
+  const { results } = await db
+    .prepare(`${OPERACAO_INCONCLUSIVA_SQL} ORDER BY o.atualizado_em DESC, o.id DESC LIMIT ?`)
+    .bind(limite)
+    .all<OperacaoInconclusiva>();
+  return results || [];
+}
+
 // Claim de throttle da recuperação: mesma ideia do `reconcilePendingPixPayments`.
 // Move só `atualizado_em` da OPERAÇÃO — nunca toca fato financeiro nem
 // timestamp histórico. Concorrência e falha de rede também respeitam o prazo.

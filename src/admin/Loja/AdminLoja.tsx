@@ -244,8 +244,13 @@ export default function AdminLoja() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <rect x="1.5" y="2.5" width="11" height="9" rx="1.5" />
-                    <path d="M1.5 5.5h11" />
+                    {/* HUMAN-15: era um retângulo com uma faixa — lia-se como
+                        cartão de crédito, não como WhatsApp. Agora é o balão
+                        com o fone. Só o desenho mudou: tamanho, stroke, cor,
+                        alinhamento e espaçamento da linha continuam iguais
+                        aos dos outros ícones da prévia. */}
+                    <path d="M2.4 11.6l.7-2.4a4.9 4.9 0 112 1.9l-2.7.5z" />
+                    <path d="M5.6 5.6c.2 1.6 1.4 2.8 3 3 .4 0 .7-.2.8-.5l.2-.4-1-.6-.5.5c-.7-.3-1.2-.8-1.5-1.5l.5-.5-.6-1-.4.2c-.3.1-.5.4-.5.8z" />
                   </svg>
                   <span>WhatsApp: {whatsapp}</span>
                 </div>

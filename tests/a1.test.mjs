@@ -436,18 +436,24 @@ test('checkout: mesma key concorrente => uma operação; o perdedor não reserva
   );
   db.hook = null;
 
-  // Exatamente uma operação lógica vence. O perdedor recupera a vencedora,
-  // e nesta corrida ela ainda não sabe o resultado remoto — então a resposta
-  // honesta é "em processamento", nunca um sucesso inventado, nunca uma
-  // rejeição inventada e nunca uma segunda operação.
+  // Uma operação lógica vence e o perdedor recupera a vencedora. Ele pode
+  // legitimamente ver DOIS desfechos, conforme releia antes ou depois de a
+  // vencedora concluir o POST:
+  //   * antes  -> 409 OPERACAO_EM_PROCESSAMENTO (resultado remoto desconhecido);
+  //   * depois -> 200 apontando para o MESMO pedido.
+  // Nenhum dos dois inventa sucesso ou rejeição, e nenhum cria uma segunda
+  // operação — é isso que a corrida precisa provar. Fixar um dos desfechos
+  // seria assumir um timing, não uma invariante.
   const vencedoras = resultados.filter(r => r.status === 200);
-  const perdedoras = resultados.filter(r => r.status !== 200);
-  assert.equal(vencedoras.length, 1);
-  assert.equal(perdedoras.length, 1);
-  assert.equal(perdedoras[0].status, 409);
-  assert.equal(perdedoras[0].body.code, 'OPERACAO_EM_PROCESSAMENTO');
-  assert.equal(perdedoras[0].body.pedidoId, vencedoras[0].body.pedidoId,
-    'o perdedor aponta para o MESMO pedido');
+  assert.ok(vencedoras.length >= 1, 'ao menos uma conclui');
+  for (const r of resultados) {
+    if (r.status !== 200) {
+      assert.equal(r.status, 409);
+      assert.equal(r.body.code, 'OPERACAO_EM_PROCESSAMENTO');
+    }
+    assert.equal(r.body.pedidoId, vencedoras[0].body.pedidoId,
+      'sucesso ou "em processamento", sempre o MESMO pedido');
+  }
 
   assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === 'POST').length, 1);
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM pedidos').first()).n, 1);
@@ -658,13 +664,24 @@ test('pix ADMIN: mesma key concorrente => uma tentativa; keys distintas => Pix a
     gerarPix(db, session, {valorCentavos: 4000, operationKey: KEY}),
   );
   db.hook = null;
-  // Uma operação lógica vence; o perdedor recupera a vencedora e, como ela
-  // ainda não conhece o resultado remoto nesta corrida, recebe "em
-  // processamento" — nunca uma segunda tentativa Pix.
-  assert.equal(mesma.filter(r => r.status === 201).length, 1);
-  assert.equal(mesma.filter(r => r.body.code === 'OPERACAO_EM_PROCESSAMENTO').length, 1);
-  assert.equal((await state(db)).pagamentos.length, 1);
-  assert.equal((await state(db)).operacoes.length, 1);
+  // Uma operação lógica vence e o perdedor recupera a vencedora. O perdedor
+  // pode legitimamente ver DOIS desfechos, conforme ele releia antes ou
+  // depois de a vencedora concluir o POST:
+  //   * antes  -> 409 OPERACAO_EM_PROCESSAMENTO (resultado remoto desconhecido);
+  //   * depois -> 201 com `replay`, apontando para a MESMA tentativa.
+  // Os dois são corretos; fixar um deles seria assumir um timing. O que a
+  // corrida precisa provar é o invariante: nunca uma segunda tentativa Pix.
+  assert.ok(mesma.some(r => r.status === 201), 'ao menos uma conclui');
+  for (const r of mesma) {
+    if (r.status === 201) {
+      assert.equal(r.body.pagamentoId, mesma.find(x => x.status === 201).body.pagamentoId,
+        'todo sucesso aponta para a MESMA tentativa');
+    } else {
+      assert.equal(r.body.code, 'OPERACAO_EM_PROCESSAMENTO');
+    }
+  }
+  assert.equal((await state(db)).pagamentos.length, 1, 'uma única tentativa Pix');
+  assert.equal((await state(db)).operacoes.length, 1, 'uma única operação lógica');
 
   // Retry posterior da mesma key recupera a tentativa já concluída.
   const retry = await corpo(await gerarPix(db, session, {valorCentavos: 4000, operationKey: KEY}));
