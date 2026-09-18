@@ -1,13 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useAdminTheme } from "../theme/AdminThemeContext";
 import { useAdminAuth } from "../auth/AdminAuthContext";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
-import { useAdminModal } from "./useAdminModal";
 import "./AdminSidebar.css";
 
 /* ── SVG icons — exported directly from Figma ── */
-const IconDashboard = () => (
+export const IconDashboard = () => (
   <svg
     width="20"
     height="20"
@@ -84,7 +82,7 @@ const IconCakeLogo = () => (
   </svg>
 );
 
-const IconProdutosCake = () => (
+export const IconProdutosCake = () => (
   <svg
     width="20"
     height="20"
@@ -126,7 +124,7 @@ const IconProdutosCake = () => (
   </svg>
 );
 
-const IconBag = () => (
+export const IconBag = () => (
   <svg
     width="20"
     height="20"
@@ -144,7 +142,7 @@ const IconBag = () => (
   </svg>
 );
 
-const IconUsers = () => (
+export const IconUsers = () => (
   <svg
     width="20"
     height="20"
@@ -162,7 +160,7 @@ const IconUsers = () => (
   </svg>
 );
 
-const IconStore = () => (
+export const IconStore = () => (
   <svg
     width="20"
     height="20"
@@ -180,7 +178,7 @@ const IconStore = () => (
   </svg>
 );
 
-const IconBell = () => (
+export const IconBell = () => (
   <svg
     width="20"
     height="20"
@@ -198,7 +196,7 @@ const IconBell = () => (
   </svg>
 );
 
-const IconMoon = () => (
+export const IconMoon = () => (
   <svg
     width="20"
     height="20"
@@ -213,7 +211,7 @@ const IconMoon = () => (
   </svg>
 );
 
-const IconSun = () => (
+export const IconSun = () => (
   <svg
     width="20"
     height="20"
@@ -293,7 +291,6 @@ const PAPEL_LABEL: Record<string, string> = {
 };
 
 export default function AdminSidebar() {
-  const location = useLocation();
   const { user, logout } = useAdminAuth();
   const userName = user.nome;
   const userRole = PAPEL_LABEL[user.papel] ?? user.papel;
@@ -308,64 +305,6 @@ export default function AdminSidebar() {
   // HUMAN-14: contagem REAL de notificações não lidas deste operador,
   // derivada de fatos do domínio.
   const { naoLidas } = useNotificacoes();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const sidebarRef = useRef<HTMLElement>(null);
-  const menuWasOpen = useRef(false);
-
-  const closeMenu = () => setMenuOpen(false);
-  const backdropProps = useAdminModal(menuOpen, closeMenu);
-
-  useEffect(() => {
-    closeMenu();
-  }, [location.pathname, location.search]);
-
-  useEffect(() => {
-    if (!menuOpen) {
-      if (menuWasOpen.current) menuButtonRef.current?.focus();
-      menuWasOpen.current = false;
-      return;
-    }
-
-    menuWasOpen.current = true;
-    closeButtonRef.current?.focus();
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeMenu();
-        return;
-      }
-      if (event.key !== "Tab" || !sidebarRef.current) return;
-
-      const focusable = Array.from(
-        sidebarRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    const desktopQuery = window.matchMedia("(min-width: 901px)");
-    const onBreakpointChange = (event: MediaQueryListEvent) => {
-      if (event.matches) closeMenu();
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    desktopQuery.addEventListener("change", onBreakpointChange);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      desktopQuery.removeEventListener("change", onBreakpointChange);
-    };
-  }, [menuOpen]);
 
   const renderNavItem = (item: NavItem) => {
     const badge = item.to === "/admin/notificacoes" ? naoLidas : undefined;
@@ -374,7 +313,6 @@ export default function AdminSidebar() {
         key={item.to}
         to={item.to}
         end={item.to === "/admin"}
-        onClick={closeMenu}
         className={({ isActive }) =>
           `sidebar-nav-item ${item.animClass || ""}${isActive ? " sidebar-nav-item--active" : ""}`
         }
@@ -397,59 +335,13 @@ export default function AdminSidebar() {
           </div>
           <span className="sidebar-logo-text">R&amp;P Doces</span>
         </div>
-        <button
-          ref={menuButtonRef}
-          type="button"
-          className="admin-mobile-menu-btn"
-          aria-label={
-            menuOpen
-              ? "Fechar menu administrativo"
-              : "Abrir menu administrativo"
-          }
-          aria-expanded={menuOpen}
-          aria-controls="admin-navigation"
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
       </header>
 
-      <div
-        className={`admin-sidebar-backdrop${menuOpen ? " admin-sidebar-backdrop--open" : ""}`}
-        aria-hidden="true"
-        {...backdropProps}
-      />
-
       <aside
-        ref={sidebarRef}
         id="admin-navigation"
-        className={`admin-sidebar${menuOpen ? " admin-sidebar--open" : ""}`}
+        className="admin-sidebar"
         aria-label="Navegação administrativa"
       >
-        <button
-          ref={closeButtonRef}
-          type="button"
-          className="admin-sidebar-close"
-          aria-label="Fechar menu administrativo"
-          onClick={closeMenu}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M4 4L16 16M16 4L4 16"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
         <div className="sidebar-top">
           {/* Logo */}
           <div className="sidebar-logo">
@@ -470,10 +362,7 @@ export default function AdminSidebar() {
             <button
               type="button"
               className="sidebar-nav-item sidebar-anim-tema"
-              onClick={() => {
-                toggleTheme();
-                closeMenu();
-              }}
+              onClick={toggleTheme}
             >
               <span className="sidebar-nav-icon">
                 {theme === "light" ? <IconMoon /> : <IconSun />}
