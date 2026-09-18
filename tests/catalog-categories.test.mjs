@@ -19,10 +19,11 @@ const {catalogCategories} = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`
 );
 
-const product = (id, category) => ({
+const product = (id, categorySlug, category = categorySlug) => ({
   id,
   name: `Produto ${id}`,
   category,
+  categorySlug,
   price: 10,
   image: '',
 });
@@ -30,13 +31,31 @@ const product = (id, category) => ({
 test('cardápio deriva categorias dos produtos públicos sem lista fixa', () => {
   assert.deepEqual(
     catalogCategories([
-      product(1, 'Bolo no Pote'),
-      product(2, 'Brigadeiros'),
-      product(3, 'Bolo no Pote'),
-      product(4, '  Mini Pudim  '),
-      product(5, '   '),
+      product(1, 'BOLO_NO_POTE', 'Bolo no Pote'),
+      product(2, 'BRIGADEIROS', 'Brigadeiros'),
+      product(3, 'BOLO_NO_POTE', 'Bolo no Pote'),
+      product(4, '  MINI_PUDIM  ', '  Mini Pudim  '),
+      product(5, '   ', '   '),
     ]),
-    ['Bolo no Pote', 'Brigadeiros', 'Mini Pudim'],
+    [
+      {slug: 'BOLO_NO_POTE', nome: 'Bolo no Pote'},
+      {slug: 'BRIGADEIROS', nome: 'Brigadeiros'},
+      {slug: 'MINI_PUDIM', nome: 'Mini Pudim'},
+    ],
+  );
+});
+
+test('deduplicação é pelo slug canônico, não pelo texto de exibição', () => {
+  // Duas linhas com o MESMO slug (mesma categoria real) mas nome
+  // temporariamente divergente (ex.: leitura no meio de uma revalidação)
+  // devem contar como uma única categoria — a identidade nunca é o rótulo.
+  assert.deepEqual(
+    catalogCategories([
+      product(1, 'BOLO_NO_POTE', 'Bolo no Pote'),
+      product(2, 'BOLO_NO_POTE', 'Bolo no pote (novo nome)'),
+    ]),
+    [{slug: 'BOLO_NO_POTE', nome: 'Bolo no Pote'}],
+    'primeira ocorrência define o rótulo exibido; slug é a chave de identidade',
   );
 });
 
