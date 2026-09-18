@@ -595,12 +595,19 @@ test('correlação: retry após divergência continua seguro e sem tentativa nov
   await envelhecer(db);
   await recuperar(db);
 
-  assert.deepEqual(await state(db), aposPrimeira, 'repetir a divergência é inerte');
+  // `pedido_operacoes.atualizado_em` avança de propósito a cada observação —
+  // é o registro de que a recuperação rodou de novo, e o throttle depende
+  // dele. O invariante é que NADA de domínio muda: nem fato financeiro, nem
+  // tentativa, nem reserva, nem estoque, nem a fase/diagnóstico da operação.
+  const semCarimbo = s => ({...s, operacoes: s.operacoes.map(({atualizado_em, ...o}) => o)});
+  assert.deepEqual(semCarimbo(await state(db)), semCarimbo(aposPrimeira),
+    'repetir a divergência é inerte para o domínio');
   assert.equal(p.chamadas.post, 1, 'nenhuma tentativa nova em nenhum ciclo');
   assert.equal(p.chamadas.search, 2, 'observação repetível, decisão continua recusada');
   const op = (await db.prepare('SELECT * FROM pedido_operacoes WHERE operation_key = ?')
     .bind(operacao.operation_key).all()).results[0];
   assert.equal(op.erro, 'BUSCA:ASSOCIACAO_DIVERGENTE');
+  assert.equal(op.fase, 'ENVIO_INCONCLUSIVO', 'a fase não avança por observação repetida');
 });
 
 test('correlação: webhook legítimo posterior ainda converge normalmente', async t => {
