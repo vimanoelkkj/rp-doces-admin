@@ -504,3 +504,126 @@ test('recuperação não roda sem access token e nunca toca o banco nesse caso',
   await app.sync.recuperarOperacoesInconclusivas({DB: db});
   assert.deepEqual(await state(db), antes);
 });
+
+/* ───────── correlação: o recurso resolvido é da PRÓPRIA operação? ─────────
+ *
+ * `resolveWebhookPayment` responde "de quem é este recurso remoto?", que é a
+ * pergunta certa para o webhook. A recuperação precisa de uma pergunta mais
+ * estreita: "este recurso é da tentativa que ESTA operação registrou?".
+ * A divergência é forçada aqui pelo caminho realista: o provedor ecoa, para a
+ * referência da operação, um id que JÁ pertence a outra linha do banco
+ * (histórico não auditado, Pix substituído). */
+
+/** Insere uma segunda tentativa Pix do pedido já associada a `mpId`. */
+const tentativaAlheia = (db, origem, mpId) =>
+  db.prepare(`INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,
+    mp_payment_id,idempotency_key) VALUES(1,'PIX_MP',?,10000,'PENDENTE',?,?)`)
+    .bind(origem, mpId, `alheia-${mpId}`).run();
+
+for (const escopo of ['SITE', 'ADMIN']) {
+  test(`correlação ${escopo}: id que pertence a outra tentativa nunca é adotado`, async t => {
+    silenciar(t);
+    const remoto = new Map();
+    const bancada = escopo === 'SITE'
+      ? await siteInconclusivo(t, {remoto})
+      : await adminInconclusivo(t, {remoto});
+    const {db, provedor: p, operacao} = bancada;
+    const referencia = referenciaPersistida(operacao);
+    // O id devolvido para a NOSSA referência já é de outra linha do pedido.
+    await tentativaAlheia(db, escopo, '9900');
+    remoto.set(referencia, [{id: 9900, status: 'approved', external_reference: referencia}]);
+    const antes = await state(db);
+
+    await envelhecer(db);
+    await recuperar(db);
+
+    const depois = await state(db);
+    assert.deepEqual(
+      depois.pagamentos.map(x => [x.id, x.status, x.mp_payment_id]),
+      antes.pagamentos.map(x => [x.id, x.status, x.mp_payment_id]),
+      'nenhuma sincronização: nem na tentativa da operação, nem na alheia',
+    );
+    assert.equal(depois.pedido.status_pagamento, 'PENDENTE', 'nenhum estado financeiro promovido');
+    assert.deepEqual(depois.produtos, antes.produtos, 'estoque e reserva intactos');
+    assert.equal(depois.pedido.reserva_status, antes.pedido.reserva_status);
+    assert.equal(depois.refunds.length, 0);
+    assert.equal(p.chamadas.post, 1, 'nenhum POST, nenhuma tentativa nova');
+
+    const op = (await db.prepare('SELECT * FROM pedido_operacoes WHERE operation_key = ?')
+      .bind(operacao.operation_key).all()).results[0];
+    assert.equal(op.erro, 'BUSCA:ASSOCIACAO_DIVERGENTE', 'diagnóstico persistido');
+    assert.equal(op.fase, 'ENVIO_INCONCLUSIVO', 'não vira REMOTO_CONHECIDO com id alheio');
+    assert.equal(op.mp_payment_id, null, 'identidade da operação não é contaminada');
+    // Continua visível para intervenção.
+    const visiveis = await app.operacoes.listarOperacoesInconclusivasDoPedido(db, 1);
+    assert.equal(visiveis.length, 1);
+  });
+}
+
+test('correlação: convergente segue o fluxo normal (mesma bancada, id próprio)', async t => {
+  silenciar(t);
+  const remoto = new Map();
+  const {db, operacao} = await siteInconclusivo(t, {remoto});
+  const referencia = referenciaPersistida(operacao);
+  await tentativaAlheia(db, 'ADMIN', '9900'); // coexiste, mas não é a nossa
+  remoto.set(referencia, [{id: 9901, status: 'approved', external_reference: referencia}]);
+
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  const nossa = s.pagamentos.find(x => x.id === operacao.pagamento_id);
+  assert.equal(nossa.mp_payment_id, '9901', 'a tentativa da operação é a associada');
+  assert.equal(nossa.status, 'PAGO');
+  assert.equal(s.pagamentos.find(x => x.mp_payment_id === '9900').status, 'PENDENTE', 'alheia intocada');
+  const op = (await db.prepare('SELECT * FROM pedido_operacoes WHERE operation_key = ?')
+    .bind(operacao.operation_key).all()).results[0];
+  assert.equal(op.mp_payment_id, '9901');
+});
+
+test('correlação: retry após divergência continua seguro e sem tentativa nova', async t => {
+  silenciar(t);
+  const remoto = new Map();
+  const {db, provedor: p, operacao} = await siteInconclusivo(t, {remoto});
+  const referencia = referenciaPersistida(operacao);
+  await tentativaAlheia(db, 'SITE', '9902');
+  remoto.set(referencia, [{id: 9902, status: 'approved', external_reference: referencia}]);
+
+  await envelhecer(db);
+  await recuperar(db);
+  const aposPrimeira = await state(db);
+  await envelhecer(db);
+  await recuperar(db);
+
+  assert.deepEqual(await state(db), aposPrimeira, 'repetir a divergência é inerte');
+  assert.equal(p.chamadas.post, 1, 'nenhuma tentativa nova em nenhum ciclo');
+  assert.equal(p.chamadas.search, 2, 'observação repetível, decisão continua recusada');
+  const op = (await db.prepare('SELECT * FROM pedido_operacoes WHERE operation_key = ?')
+    .bind(operacao.operation_key).all()).results[0];
+  assert.equal(op.erro, 'BUSCA:ASSOCIACAO_DIVERGENTE');
+});
+
+test('correlação: webhook legítimo posterior ainda converge normalmente', async t => {
+  silenciar(t);
+  const remoto = new Map();
+  const {db, operacao} = await siteInconclusivo(t, {remoto});
+  const referencia = referenciaPersistida(operacao);
+  await tentativaAlheia(db, 'ADMIN', '9903');
+  remoto.set(referencia, [{id: 9903, status: 'approved', external_reference: referencia}]);
+  await envelhecer(db);
+  await recuperar(db);
+  assert.equal((await state(db)).pedido.status_pagamento, 'PENDENTE');
+
+  // O recurso REAL da nossa tentativa aparece pelo caminho autoritativo.
+  remoto.set(referencia, [{id: 9904, status: 'approved', external_reference: referencia}]);
+  const payment = await app.sync.fetchMpPayment('fake', '9904');
+  const resolvido = await app.sync.resolveWebhookPayment(db, payment);
+  assert.equal(resolvido.kind, 'found');
+  assert.equal(resolvido.pagamentoId, operacao.pagamento_id);
+  await app.sync.syncPaymentFromMp(db, resolvido.pagamentoId, payment);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos.find(x => x.id === operacao.pagamento_id).status, 'PAGO');
+  assert.equal(s.pedido.status_pagamento, 'PAGO');
+  assert.equal(s.produtos[0].estoque, 8, 'baixa física uma única vez');
+});

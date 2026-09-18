@@ -505,6 +505,36 @@ export async function recuperarOperacoesInconclusivas(
           return;
         }
 
+        // A resolução é boa o bastante para o webhook (que parte do recurso
+        // remoto e pergunta "de quem é isto?"), mas AQUI a pergunta é outra:
+        // "este recurso é da tentativa que ESTA operação registrou?". Uma
+        // recuperação só pode sincronizar o pagamento que o claim A1 já
+        // apontava. Se divergir, a busca descobriu uma identidade que não é
+        // nossa — nada é promovido, nada é associado, nada é liberado, e o
+        // caso fica visível (`operacoesInconclusivas`) para intervenção.
+        //
+        // Hoje nenhum caminho conhecido diverge (SITE resolve pelo
+        // token_publico do próprio pedido e ambiguidade vira `ambiguous`;
+        // ADMIN resolve pela idempotency_key derivada da operation key), mas
+        // produção ainda carrega histórico não auditado: esta asserção é o
+        // que impede que um dado antigo decida por nós. Fail-closed de
+        // propósito — `pagamento_id` ausente também diverge.
+        if (resolvido.pagamentoId !== operacao.pagamento_id) {
+          console.error("Recuperação de operação inconclusiva: pagamento resolvido diverge da operação", {
+            operationKey: operacao.operation_key,
+            pedidoId: operacao.pedido_id,
+            mpPaymentId: busca.mpPaymentId,
+            pagamentoDaOperacao: operacao.pagamento_id,
+            pagamentoResolvido: resolvido.pagamentoId,
+          });
+          await registrarObservacao(
+            env.DB,
+            operacao.operation_key,
+            "BUSCA:ASSOCIACAO_DIVERGENTE",
+          );
+          return;
+        }
+
         // Identidade remota agora é conhecida. A fase deixa de ser
         // inconclusiva e o replay da MESMA operationKey (A1) passa a
         // recuperar o resultado a partir das linhas persistidas.
