@@ -47,6 +47,9 @@ export const CANCELAMENTO_POR_ITEM = separarStatements(
 export const TROCA_POR_ITEM = separarStatements(
   await readFile('migrations/0019_comanda_viva_item_trocas.sql', 'utf8'),
 );
+export const REFUND_PIX_MP_RECUPERAVEL = separarStatements(
+  await readFile('migrations/0020_pedido_reembolso_pix_mp_intencoes.sql', 'utf8'),
+);
 
 function criarDb(mf) {
   const db = {
@@ -114,6 +117,10 @@ export async function aplicarCancelamentoPorItem(db) {
 
 export async function aplicarTrocaPorItem(db) {
   for (const sql of TROCA_POR_ITEM) await db.prepare(sql).run();
+}
+
+export async function aplicarRefundPixMpRecuperavel(db) {
+  for (const sql of REFUND_PIX_MP_RECUPERAVEL) await db.prepare(sql).run();
 }
 
 /** Roda a validação e devolve as linhas de verificacao/resultado. */

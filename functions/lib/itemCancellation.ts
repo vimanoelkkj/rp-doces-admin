@@ -21,6 +21,11 @@ import {
 } from "./operacoes";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 import { preparePedidoPhysicalProjection } from "./stock";
+import {
+  getPixMpRefundIntentForLeg,
+  reconcilePixMpRefundIntent,
+  type PixMpRefundIntentStatus,
+} from "./mpRefundIntent";
 
 export type CancellationStatus =
   | "SOLICITADO"
@@ -35,6 +40,7 @@ export interface CancellationLeg {
   metodo: string;
   valorCentavos: number;
   confirmacaoManualPermitida: boolean;
+  refundRemoto?: { status: PixMpRefundIntentStatus; tentativas: number; mpRefundId: string | null; ultimoErro: string | null };
 }
 
 export interface CancellationView {
@@ -56,12 +62,14 @@ type CancellationError =
   | "CANCELAMENTO_NAO_AGUARDANDO"
   | "PAGAMENTO_ALOCACAO_INVALIDA"
   | "PIX_MP_REFUND_REMOTO_PENDENTE"
+  | "MERCADO_PAGO_NAO_CONFIGURADO"
+  | "REFUND_REMOTO_EM_ANDAMENTO"
   | "VALOR_REFUND_DIVERGENTE"
   | "OPERACAO_INCOMPLETA"
   | ConflitoOperacao;
 
 export type CancellationResult =
-  | { ok: true; cancelamento: CancellationView; replay?: boolean; reembolsoId?: number }
+  | { ok: true; cancelamento: CancellationView; replay?: boolean; reembolsoId?: number; refundStatus?: PixMpRefundIntentStatus }
   | { ok: false; erro: CancellationError; preview?: ItemCancellationPreview };
 
 interface CancellationRow {
@@ -108,14 +116,22 @@ async function readCancellationView(
     db, Number(row.pedido_id), Number(row.pedido_item_id),
     { permitirCancelamentoExistente: true },
   );
-  const pernasPendentes = preview.pagamentos
+  const pernasPendentes = await Promise.all(preview.pagamentos
     .filter((p) => p.reembolsoPropostoCentavos > 0)
-    .map((p) => ({
-      pagamentoId: p.pagamentoId,
-      pagamentoAlocacaoId: p.pagamentoAlocacaoId,
-      metodo: p.metodo,
-      valorCentavos: p.reembolsoPropostoCentavos,
-      confirmacaoManualPermitida: METODOS_MANUAIS.has(p.metodo),
+    .map(async (p) => {
+      const remote = p.metodo === "PIX_MP"
+        ? await getPixMpRefundIntentForLeg(db, {
+          cancellationId: Number(row.id), pagamentoAlocacaoId: p.pagamentoAlocacaoId,
+        }) : null;
+      return {
+        pagamentoId: p.pagamentoId,
+        pagamentoAlocacaoId: p.pagamentoAlocacaoId,
+        metodo: p.metodo,
+        valorCentavos: p.reembolsoPropostoCentavos,
+        confirmacaoManualPermitida: METODOS_MANUAIS.has(p.metodo),
+        ...(remote ? { refundRemoto: { status: remote.status, tentativas: remote.tentativas,
+          mpRefundId: remote.mpRefundId, ultimoErro: remote.ultimoErro } } : {}),
+      };
     }));
   return {
     id: Number(row.id), pedidoId: Number(row.pedido_id), itemId: Number(row.pedido_item_id),
@@ -345,6 +361,7 @@ export async function confirmCancellationRefund(
   params: {
     pedidoId: number; cancellationId: number; usuarioId: number; operationKey: unknown;
     pagamentoId: number; pagamentoAlocacaoId: number; valorCentavos: number; confirmacao: boolean;
+    mpAccessToken?: string;
   },
 ): Promise<CancellationResult> {
   const parsed = parseOperationKey(params.operationKey);
@@ -362,10 +379,12 @@ export async function confirmCancellationRefund(
     const conflict = conflitoOperacao(existing, identity);
     if (conflict) return { ok: false, erro: conflict };
     const cancellation = await cancellationById(db, params.cancellationId);
-    if (!cancellation || !existing.reembolso_id) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
-    await tryFinalizeCancellation(db, cancellation);
-    return { ok: true, cancelamento: await readCancellationView(db, cancellation), replay: true,
-      reembolsoId: existing.reembolso_id };
+    if (!cancellation) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
+    if (existing.reembolso_id) {
+      await tryFinalizeCancellation(db, cancellation);
+      return { ok: true, cancelamento: await readCancellationView(db, cancellation), replay: true,
+        reembolsoId: existing.reembolso_id };
+    }
   }
   const cancellation = await cancellationById(db, params.cancellationId);
   if (!cancellation || Number(cancellation.pedido_id) !== params.pedidoId) {
@@ -379,10 +398,31 @@ export async function confirmCancellationRefund(
     p.pagamentoId === params.pagamentoId && p.pagamentoAlocacaoId === params.pagamentoAlocacaoId,
   );
   if (!leg) return { ok: false, erro: "PAGAMENTO_ALOCACAO_INVALIDA" };
-  if (!leg.confirmacaoManualPermitida) return { ok: false, erro: "PIX_MP_REFUND_REMOTO_PENDENTE" };
   if (!params.confirmacao || params.valorCentavos !== leg.valorCentavos) {
     return { ok: false, erro: "VALOR_REFUND_DIVERGENTE" };
   }
+  if (leg.metodo === "PIX_MP") {
+    if (!params.mpAccessToken) return { ok: false, erro: "MERCADO_PAGO_NAO_CONFIGURADO" };
+    const remote = await reconcilePixMpRefundIntent(db, {
+      pedidoId: params.pedidoId, pagamentoId: params.pagamentoId,
+      pagamentoAlocacaoId: params.pagamentoAlocacaoId, cancellationId: params.cancellationId,
+      usuarioId: params.usuarioId, operationKey: parsed.key, fingerprint: identity.fingerprint,
+      valorCentavos: params.valorCentavos, accessToken: params.mpAccessToken,
+    });
+    if (remote.ok === false) return { ok: false, erro: remote.erro };
+    if (remote.reembolsoId) {
+      try { await tryFinalizeCancellation(db, cancellation); }
+      catch (error) {
+        console.error("Refund MP persistido; finalizacao de cancelamento pendente", params.cancellationId, error);
+      }
+    }
+    const updated = await cancellationById(db, params.cancellationId);
+    if (!updated) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
+    return { ok: true, cancelamento: await readCancellationView(db, updated),
+      reembolsoId: remote.reembolsoId, refundStatus: remote.intencao.status,
+      replay: remote.replay };
+  }
+  if (!leg.confirmacaoManualPermitida) return { ok: false, erro: "PIX_MP_REFUND_REMOTO_PENDENTE" };
   const refundKey = chaveReembolso(parsed.key);
   const insertRefund = db.prepare(`INSERT INTO pedido_reembolsos(
       pedido_id,pagamento_id,origem,metodo,valor_centavos,status,idempotency_key,
@@ -435,4 +475,9 @@ async function tryFinalizeCancellation(db: D1Database, row: CancellationRow): Pr
   await db.batch(finalizationStatements(
     db, Number(row.pedido_id), Number(row.pedido_item_id), Number(row.id), null, row.estoque_acao,
   ));
+}
+
+export async function reconcileCancellationFinalization(db: D1Database, cancellationId: number): Promise<void> {
+  const row = await cancellationById(db, cancellationId);
+  if (row) await tryFinalizeCancellation(db, row);
 }

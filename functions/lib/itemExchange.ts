@@ -9,6 +9,8 @@ import {
 } from "./operacoes";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 import { preparePedidoPhysicalProjection } from "./stock";
+import { getPixMpRefundIntentForLeg, reconcilePixMpRefundIntent,
+  type PixMpRefundIntentStatus } from "./mpRefundIntent";
 
 export type ExchangeStockAction = "LIBERAR_RESERVA" | "NAO_REPOR" | "REPOR" | "NENHUMA";
 export type ExchangeStatus = "SOLICITADA" | "AGUARDANDO_COBRANCA" |
@@ -20,6 +22,7 @@ export interface ExchangeRefundLeg {
   metodo: string;
   valorCentavos: number;
   confirmacaoManualPermitida: boolean;
+  refundRemoto?: { status: PixMpRefundIntentStatus; tentativas: number; mpRefundId: string | null; ultimoErro: string | null };
 }
 
 export interface ItemExchangePreview {
@@ -203,8 +206,9 @@ type ExchangeError = "OPERATION_KEY_INVALIDA" | "PREVIEW_OBSOLETO" | "PRECO_ALTE
   "ESTOQUE_INSUFICIENTE" | "PIX_PENDENTE" | "TROCA_NAO_ENCONTRADA" |
   "TROCA_NAO_AGUARDANDO" | "PAGAMENTO_ALOCACAO_INVALIDA" |
   "PIX_MP_REFUND_REMOTO_PENDENTE" | "VALOR_REFUND_DIVERGENTE" |
+  "MERCADO_PAGO_NAO_CONFIGURADO" | "REFUND_REMOTO_EM_ANDAMENTO" |
   "OPERACAO_INCOMPLETA" | ConflitoOperacao;
-export type ExchangeResult = { ok: true; troca: ExchangeView; replay?: boolean; reembolsoId?: number }
+export type ExchangeResult = { ok: true; troca: ExchangeView; replay?: boolean; reembolsoId?: number; refundStatus?: PixMpRefundIntentStatus }
   | { ok: false; erro: ExchangeError; preview?: ItemExchangePreview; precoAtualCentavos?: number };
 
 async function exchangeById(db: D1Database, id: number): Promise<ExchangeRow | null> {
@@ -236,8 +240,11 @@ async function exchangeView(db: D1Database, row: ExchangeRow): Promise<ExchangeV
       GROUP BY a.id,pp.id,pp.metodo,a.valor_centavos ORDER BY a.id DESC`).bind(row.item_origem_id).all<AllocationRow>();
     pending=[];
     for(const allocation of allocations){if(required<=0)break;const effective=Math.max(0,Number(allocation.valorAlocadoCentavos)-Number(allocation.valorReembolsadoCentavos));
-      const amount=Math.min(required,effective);if(amount>0)pending.push({pagamentoId:Number(allocation.pagamentoId),pagamentoAlocacaoId:Number(allocation.pagamentoAlocacaoId),
-        metodo:allocation.metodo,valorCentavos:amount,confirmacaoManualPermitida:MANUAL_METHODS.has(allocation.metodo)});required-=amount;}
+      const amount=Math.min(required,effective);if(amount>0){const remote=allocation.metodo==="PIX_MP"
+        ?await getPixMpRefundIntentForLeg(db,{exchangeId:Number(row.id),pagamentoAlocacaoId:Number(allocation.pagamentoAlocacaoId)}):null;
+        pending.push({pagamentoId:Number(allocation.pagamentoId),pagamentoAlocacaoId:Number(allocation.pagamentoAlocacaoId),
+        metodo:allocation.metodo,valorCentavos:amount,confirmacaoManualPermitida:MANUAL_METHODS.has(allocation.metodo),
+        ...(remote?{refundRemoto:{status:remote.status,tentativas:remote.tentativas,mpRefundId:remote.mpRefundId,ultimoErro:remote.ultimoErro}}:{})});}required-=amount;}
   }
   return { id: Number(row.id), pedidoId: Number(row.pedido_id), itemOrigemId: Number(row.item_origem_id),
     itemDestinoId: row.item_destino_id == null ? null : Number(row.item_destino_id), status: row.status,
@@ -429,22 +436,34 @@ export async function createItemExchange(db: D1Database, params: {
 }
 
 export async function confirmExchangeRefund(db:D1Database,params:{pedidoId:number;exchangeId:number;usuarioId:number;
-  operationKey:unknown;pagamentoId:number;pagamentoAlocacaoId:number;valorCentavos:number;confirmacao:boolean}):Promise<ExchangeResult>{
+  operationKey:unknown;pagamentoId:number;pagamentoAlocacaoId:number;valorCentavos:number;confirmacao:boolean;
+  mpAccessToken?:string}):Promise<ExchangeResult>{
   const parsed=parseOperationKey(params.operationKey); if(parsed.ok===false)return{ok:false,erro:parsed.erro};
   const identity:IdentidadeEsperada={tipo:"REFUND_ADMIN",escopo:"ADMIN",atorUsuarioId:params.usuarioId,
     fingerprint:fingerprint({pedidoId:params.pedidoId,exchangeId:params.exchangeId,pagamentoId:params.pagamentoId,
       pagamentoAlocacaoId:params.pagamentoAlocacaoId,valorCentavos:params.valorCentavos,confirmacao:params.confirmacao})};
   const existing=await buscarOperacao(db,parsed.key);
   if(existing){const conflict=conflitoOperacao(existing,identity);if(conflict)return{ok:false,erro:conflict};
-    const row=await exchangeById(db,params.exchangeId);if(!row||!existing.reembolso_id)return{ok:false,erro:"OPERACAO_INCOMPLETA"};
-    await tryFinalizeExchange(db,row);return{ok:true,troca:await exchangeView(db,(await exchangeById(db,row.id))!),replay:true,reembolsoId:existing.reembolso_id};}
+    const row=await exchangeById(db,params.exchangeId);if(!row)return{ok:false,erro:"OPERACAO_INCOMPLETA"};
+    if(existing.reembolso_id){await tryFinalizeExchange(db,row);return{ok:true,troca:await exchangeView(db,(await exchangeById(db,row.id))!),replay:true,reembolsoId:existing.reembolso_id};}}
   const row=await exchangeById(db,params.exchangeId);
   if(!row||Number(row.pedido_id)!==params.pedidoId)return{ok:false,erro:"TROCA_NAO_ENCONTRADA"};
   if(!["AGUARDANDO_REEMBOLSO","INCONCLUSIVA"].includes(row.status))return{ok:false,erro:"TROCA_NAO_AGUARDANDO"};
   const view=await exchangeView(db,row);const leg=view.refundsPendentes.find(x=>x.pagamentoId===params.pagamentoId&&x.pagamentoAlocacaoId===params.pagamentoAlocacaoId);
   if(!leg)return{ok:false,erro:"PAGAMENTO_ALOCACAO_INVALIDA"};
-  if(!leg.confirmacaoManualPermitida)return{ok:false,erro:"PIX_MP_REFUND_REMOTO_PENDENTE"};
   if(!params.confirmacao||params.valorCentavos!==leg.valorCentavos)return{ok:false,erro:"VALOR_REFUND_DIVERGENTE"};
+  if(leg.metodo==="PIX_MP"){
+    if(!params.mpAccessToken)return{ok:false,erro:"MERCADO_PAGO_NAO_CONFIGURADO"};
+    const remote=await reconcilePixMpRefundIntent(db,{pedidoId:params.pedidoId,pagamentoId:params.pagamentoId,
+      pagamentoAlocacaoId:params.pagamentoAlocacaoId,exchangeId:params.exchangeId,usuarioId:params.usuarioId,
+      operationKey:parsed.key,fingerprint:identity.fingerprint,valorCentavos:params.valorCentavos,accessToken:params.mpAccessToken});
+    if(remote.ok===false)return{ok:false,erro:remote.erro};
+    if(remote.reembolsoId){try{await tryFinalizeExchange(db,row);}catch(error){console.error("Refund MP persistido; finalizacao de troca pendente",row.id,error);}}
+    const updated=(await exchangeById(db,row.id))!;
+    return{ok:true,troca:await exchangeView(db,updated),reembolsoId:remote.reembolsoId,
+      refundStatus:remote.intencao.status,replay:remote.replay};
+  }
+  if(!leg.confirmacaoManualPermitida)return{ok:false,erro:"PIX_MP_REFUND_REMOTO_PENDENTE"};
   const refundKey=chaveReembolso(parsed.key);
   const insert=db.prepare(`INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,status,idempotency_key,registrado_por_usuario_id,motivo,devolveu_estoque,concluido_em)
     SELECT ?,pp.id,'MANUAL',pp.metodo,?,'REEMBOLSADO',?,?,'Diferença de troca',0,CURRENT_TIMESTAMP
@@ -467,6 +486,10 @@ export async function confirmExchangeRefund(db:D1Database,params:{pedidoId:numbe
 async function tryFinalizeExchange(db:D1Database,row:ExchangeRow):Promise<void>{
   const view=await exchangeView(db,row);if(view.reembolsoPendenteCentavos>0)return;
   await db.batch(completeExchangeStatements(db,row));
+}
+
+export async function reconcileExchangeFinalization(db:D1Database,exchangeId:number):Promise<void>{
+  const row=await exchangeById(db,exchangeId);if(row)await tryFinalizeExchange(db,row);
 }
 
 export async function reconcileExchangeCharges(db:D1Database,pedidoId:number):Promise<void>{

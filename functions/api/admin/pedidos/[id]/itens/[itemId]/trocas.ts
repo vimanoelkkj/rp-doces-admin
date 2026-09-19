@@ -1,15 +1,19 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../../../../../lib/auth";
-import { createItemExchange, getExchangeView, ItemExchangePreviewError } from "../../../../../../lib/itemExchange";
+import { createItemExchange, getExchangeView, ItemExchangePreviewError, reconcileExchangeFinalization } from "../../../../../../lib/itemExchange";
+import { recoverPixMpRefundIntentsForParent } from "../../../../../../lib/mpRefundIntent";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
-interface Env{DB:D1Database}
+interface Env{DB:D1Database;MP_ACCESS_TOKEN?:string}
 const messages:Record<string,string>={PREVIEW_OBSOLETO:"A comanda mudou. Revise a troca novamente.",PRECO_ALTERADO:"O preço do produto mudou.",
   ESTOQUE_INSUFICIENTE:"Estoque insuficiente para o produto de destino.",PIX_PENDENTE:"Há um Pix pendente nesta comanda.",...OPERACAO_MENSAGENS};
 const fail=(message:string,status:number,code?:string,extra:object={})=>Response.json({error:message,...(code?{code}:{}),...extra},{status});
 export const onRequestGet:PagesFunction<Env>=async({request,env,params})=>{
   const auth=await requireUser(env.DB,request);if("error" in auth)return auth.error;
-  const troca=await getExchangeView(env.DB,Number(params.id),Number(params.itemId));
+  let troca=await getExchangeView(env.DB,Number(params.id),Number(params.itemId));
+  if(troca&&env.MP_ACCESS_TOKEN){try{await recoverPixMpRefundIntentsForParent(env.DB,env.MP_ACCESS_TOKEN,{exchangeId:troca.id});
+    await reconcileExchangeFinalization(env.DB,troca.id);troca=await getExchangeView(env.DB,Number(params.id),Number(params.itemId));}
+    catch(error){console.error("Recuperacao oportunista de refund MP pendente",error);}}
   return troca?Response.json({troca}):fail("Troca não encontrada",404,"TROCA_NAO_ENCONTRADA");
 };
 export const onRequestPost:PagesFunction<Env>=async({request,env,params})=>{
