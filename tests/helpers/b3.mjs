@@ -22,6 +22,8 @@ const bundle = await build({
       export * as pix from './functions/lib/comandaPix';
       export * as adminOrder from './functions/api/admin/pedidos/[id]';
       export * as adminItems from './functions/api/admin/pedidos/[id]/itens';
+      export * as itemCancellationPreview from './functions/lib/itemCancellationPreview';
+      export * as adminItemCancellationPreview from './functions/api/admin/pedidos/[id]/itens/[itemId]/cancelamento-preview';
       export * as operacoes from './functions/lib/operacoes';
       export * as mpPost from './functions/lib/mpPost';
       export * as adminCreate from './functions/api/admin/pedidos';

@@ -1,0 +1,176 @@
+.cancelpreview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(43, 29, 26, 0.42);
+}
+
+.cancelpreview-card {
+  width: min(560px, 100%);
+  max-height: 90dvh;
+  overflow-y: auto;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgba(43, 29, 26, 0.2);
+}
+
+.cancelpreview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #eadfd3;
+}
+
+.cancelpreview-header h3 {
+  margin: 3px 0 0;
+  color: #2b1d1a;
+  font-family: "Fraunces", serif;
+  font-size: 25px;
+}
+
+.cancelpreview-kicker,
+.cancelpreview-label {
+  color: #8c7a76;
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.cancelpreview-close {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #faf6f0;
+  color: #634738;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.cancelpreview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 24px;
+}
+
+.cancelpreview-state,
+.cancelpreview-error {
+  margin: 20px 24px 24px;
+  padding: 14px;
+  border-radius: 12px;
+  color: #634738;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+}
+
+.cancelpreview-error {
+  color: #a8352a;
+  background: #fbeceb;
+}
+
+.cancelpreview-product {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: "Manrope", sans-serif;
+}
+
+.cancelpreview-product strong { color: #2b1d1a; font-size: 16px; }
+.cancelpreview-product span { color: #8c7a76; font-size: 13px; }
+
+.cancelpreview-values {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 14px;
+  background: #faf6f0;
+}
+
+.cancelpreview-values > div,
+.cancelpreview-payments > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #8c7a76;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+}
+
+.cancelpreview-values strong,
+.cancelpreview-payments strong { color: #2b1d1a; text-align: right; }
+
+.cancelpreview-values-refund {
+  margin-top: 3px;
+  padding-top: 9px;
+  border-top: 1px solid #eadfd3;
+}
+
+.cancelpreview-section { display: flex; flex-direction: column; gap: 9px; }
+.cancelpreview-payments { display: flex; flex-direction: column; gap: 9px; }
+
+.cancelpreview-muted,
+.cancelpreview-stock p {
+  margin: 4px 0 0;
+  color: #634738;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cancelpreview-stock {
+  padding: 14px;
+  border-radius: 14px;
+  background: #f5efe8;
+}
+
+.cancelpreview-block {
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #8a5c23;
+  background: #fbf3eb;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cancelpreview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 4px;
+  color: #8c7a76;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+}
+
+.cancelpreview-footer button {
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: #634738;
+  cursor: pointer;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .cancelpreview-overlay { align-items: flex-end; padding: 0; }
+  .cancelpreview-card { width: 100%; max-height: 92dvh; border-radius: 22px 22px 0 0; }
+  .cancelpreview-header { position: sticky; top: 0; z-index: 1; background: #fff; }
+  .cancelpreview-footer { align-items: stretch; flex-direction: column; }
+  .cancelpreview-footer button { width: 100%; }
+}
