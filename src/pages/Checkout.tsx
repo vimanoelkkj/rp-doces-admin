@@ -51,7 +51,7 @@ export default function Checkout() {
   if (cartItems.length === 0) {
     return (
       <div className="checkout-page">
-        <Header />
+        <Header minimal />
         <main className="checkout-empty">
           <h1>Seu carrinho está vazio</h1>
           <p>Adicione produtos antes de finalizar o pedido.</p>
@@ -84,7 +84,7 @@ export default function Checkout() {
         </svg>
       </div>
 
-      <Header />
+      <Header minimal />
 
       <main className="checkout-content">
         <div className="checkout-card">
