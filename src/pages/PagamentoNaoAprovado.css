@@ -34,27 +34,59 @@
   text-align: center;
   margin-bottom: 32px;
 }
-.recusado-mascot {
-  width: 96px;
-  height: auto;
-  margin: 0 auto 20px;
-  display: block;
+.recusado-illustration {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 4px;
 }
 
-.recusado-mascot--shake {
-  animation: shake-no 1.5s ease-in-out infinite;
+.recusado-cupcake {
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: fall-in 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
-@keyframes shake-no {
-  0%,
+.recusado-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 0;
+  animation: badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both;
+}
+
+@keyframes fall-in {
+  0% {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(4px);
+    opacity: 1;
+  }
   100% {
-    transform: rotate(0deg);
+    transform: translateY(0);
+    opacity: 1;
   }
-  25% {
-    transform: rotate(-10deg);
+}
+
+@keyframes badge-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
   }
-  75% {
-    transform: rotate(10deg);
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recusado-cupcake,
+  .recusado-badge {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 .recusado-hero h1 {

@@ -1,0 +1,141 @@
+/* ── Layout ── */
+.processando-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  background: #FAF6F0;
+  padding: 40px 24px;
+  position: relative;
+}
+
+.processando-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ── Donut spinner ── */
+.processando-donut {
+  margin-bottom: 8px;
+}
+
+.donut-spinner {
+  animation: donut-spin 2.5s linear infinite;
+  transform-origin: 60px 56px; /* center of the donut, not the SVG */
+}
+
+/* ── Dots ── */
+.processando-dots {
+  display: flex;
+  gap: 10px;
+}
+
+.processando-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #634738;
+  opacity: 0.3;
+  animation: dot-pulse 1.4s ease-in-out infinite;
+}
+
+.processando-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.processando-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ── Typography ── */
+.processando-title {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #2B1D1A;
+  margin: 0;
+}
+
+.processando-subtitle {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8C7A76;
+  margin: 0;
+  margin-top: -10px;
+}
+
+.processando-footer {
+  position: absolute;
+  bottom: 40px;
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #8C7A76;
+  margin: 0;
+}
+
+/* ── Animations ── */
+
+/* Donut rotates like a spinner */
+@keyframes donut-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dot pulse */
+@keyframes dot-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* ── Dark mode ── */
+[data-theme="dark"] .processando-screen {
+  background: #1A1412;
+}
+
+[data-theme="dark"] .processando-title {
+  color: #FAF6F0;
+}
+
+[data-theme="dark"] .processando-subtitle {
+  color: #A89B92;
+}
+
+[data-theme="dark"] .processando-footer {
+  color: #A89B92;
+}
+
+[data-theme="dark"] .processando-dot {
+  background: #EADFD3;
+}
+
+/* Dark mode: donut hole matches dark bg */
+[data-theme="dark"] .donut-spinner circle:nth-child(3) {
+  fill: #1A1412;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .donut-spinner,
+  .processando-dot {
+    animation: none;
+  }
+
+  .processando-dot {
+    opacity: 0.6;
+  }
+}
