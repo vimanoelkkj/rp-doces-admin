@@ -379,7 +379,7 @@ export default function AguardandoPagamento() {
         </div>
       </main>
 
-      <Footer />
+      <Footer watermarkOnly />
     </div>
   );
 }
