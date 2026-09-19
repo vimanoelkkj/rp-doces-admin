@@ -1,6 +1,19 @@
 import "./Footer.css";
 
-export default function Footer() {
+interface FooterProps {
+  /** Só a marca d'água de fundo, sem links/contato/copyright — mesmo padrão de `Header minimal`. */
+  watermarkOnly?: boolean;
+}
+
+export default function Footer({ watermarkOnly = false }: FooterProps) {
+  if (watermarkOnly) {
+    return (
+      <footer className="footer footer--watermark-only" aria-hidden="true">
+        <div className="footer-branding">R&amp;P DOCES</div>
+      </footer>
+    );
+  }
+
   return (
     <footer className="footer" id="contato">
       <div className="footer-top">
