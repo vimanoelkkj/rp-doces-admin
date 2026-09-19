@@ -192,7 +192,7 @@ export default function Checkout() {
         </div>
       </main>
 
-      <Footer />
+      <Footer watermarkOnly />
     </div>
   );
 }
