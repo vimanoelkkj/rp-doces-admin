@@ -18,6 +18,9 @@ export interface PixMpRefundIntentView {
   mpStatus: string | null;
   ultimoErro: string | null;
   pedidoReembolsoId: number | null;
+  operationKey: string;
+  atualizadoEm: string;
+  podeVerificar: boolean;
 }
 
 interface IntentRow {
@@ -27,7 +30,7 @@ interface IntentRow {
   status: PixMpRefundIntentStatus; mp_payment_id: string; mp_idempotency_key: string;
   mp_request: string; mp_refund_id: string | null; mp_status: string | null;
   pedido_reembolso_id: number | null; tentativas: number; ultimo_erro: string | null;
-  operation_key: string; ator_usuario_id: number | null;
+  operation_key: string; ator_usuario_id: number | null; atualizado_em: string;
 }
 
 export type PixMpRefundIntentResult =
@@ -51,12 +54,25 @@ export interface PixMpRefundIntentParams {
 const columns = `i.id,i.operacao_id,i.pedido_id,i.pagamento_id,i.pagamento_alocacao_id,
   i.pedido_item_cancelamento_id,i.pedido_item_troca_id,i.valor_centavos,i.status,
   i.mp_payment_id,i.mp_idempotency_key,i.mp_request,i.mp_refund_id,i.mp_status,
-  i.pedido_reembolso_id,i.tentativas,i.ultimo_erro,o.operation_key,o.ator_usuario_id`;
+  i.pedido_reembolso_id,i.tentativas,i.ultimo_erro,i.atualizado_em,
+  o.operation_key,o.ator_usuario_id`;
+
+export const PIX_MP_REFUND_RECOVERY_AFTER_SECONDS = 60;
+
+function sqliteUtcMs(value: string): number {
+  const iso = value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
+  return Date.parse(iso);
+}
 
 function view(row: IntentRow): PixMpRefundIntentView {
   return { id: Number(row.id), status: row.status, tentativas: Number(row.tentativas),
     mpRefundId: row.mp_refund_id, mpStatus: row.mp_status, ultimoErro: row.ultimo_erro,
-    pedidoReembolsoId: row.pedido_reembolso_id == null ? null : Number(row.pedido_reembolso_id) };
+    pedidoReembolsoId: row.pedido_reembolso_id == null ? null : Number(row.pedido_reembolso_id),
+    operationKey: row.operation_key, atualizadoEm: row.atualizado_em,
+    podeVerificar: row.status === "INCONCLUSIVO" || row.status === "PENDENTE"
+      || (row.status === "PROCESSANDO"
+        && Date.now() - sqliteUtcMs(row.atualizado_em) >= PIX_MP_REFUND_RECOVERY_AFTER_SECONDS * 1000),
+  };
 }
 
 async function remoteKey(operationKey: string): Promise<string> {
@@ -293,15 +309,45 @@ export async function recoverPixMpRefundIntentsForParent(
   db: D1Database,
   accessToken: string,
   parent: { cancellationId?: number; exchangeId?: number },
-): Promise<void> {
+  options: { force?: boolean; limit?: number } = {},
+): Promise<Array<{ cancellationId: number | null; exchangeId: number | null }>> {
   const column = parent.cancellationId !== undefined
     ? "pedido_item_cancelamento_id" : "pedido_item_troca_id";
   const id = parent.cancellationId ?? parent.exchangeId;
+  const eligibility = options.force ? "1=1" : `(i.status IN ('PENDENTE','INCONCLUSIVO') OR (
+    i.status='PROCESSANDO'
+    AND datetime(i.atualizado_em)<=datetime('now', '-' || ? || ' seconds'))) `;
+  const args = options.force
+    ? [id, Math.max(1, Math.min(options.limit ?? 4, 10))]
+    : [id, PIX_MP_REFUND_RECOVERY_AFTER_SECONDS, Math.max(1, Math.min(options.limit ?? 4, 10))];
   const { results } = await db.prepare(`SELECT ${columns}
     FROM pedido_reembolso_pix_mp_intencoes i JOIN pedido_operacoes o ON o.id=i.operacao_id
     WHERE i.${column}=? AND i.status IN ('PENDENTE','PROCESSANDO','INCONCLUSIVO')
-    ORDER BY i.id LIMIT 4`).bind(id).all<IntentRow>();
+      AND ${eligibility}
+    ORDER BY i.atualizado_em,i.id LIMIT ?`).bind(...args).all<IntentRow>();
   for (const row of results) await processIntent(db, row, accessToken);
+  return results.map((row) => ({ cancellationId: row.pedido_item_cancelamento_id,
+    exchangeId: row.pedido_item_troca_id }));
+}
+
+export async function recoverPixMpRefundIntentsForPedido(
+  db: D1Database,
+  accessToken: string,
+  pedidoId: number,
+  limit = 4,
+): Promise<Array<{ cancellationId: number | null; exchangeId: number | null }>> {
+  const boundedLimit = Math.max(1, Math.min(limit, 10));
+  const { results } = await db.prepare(`SELECT ${columns}
+    FROM pedido_reembolso_pix_mp_intencoes i JOIN pedido_operacoes o ON o.id=i.operacao_id
+    WHERE i.pedido_id=? AND i.status IN ('PENDENTE','PROCESSANDO','INCONCLUSIVO')
+      AND (i.status IN ('PENDENTE','INCONCLUSIVO') OR (
+        i.status='PROCESSANDO'
+        AND datetime(i.atualizado_em)<=datetime('now', '-' || ? || ' seconds')))
+    ORDER BY i.atualizado_em,i.id LIMIT ?`)
+    .bind(pedidoId, PIX_MP_REFUND_RECOVERY_AFTER_SECONDS, boundedLimit).all<IntentRow>();
+  for (const row of results) await processIntent(db, row, accessToken);
+  return results.map((row) => ({ cancellationId: row.pedido_item_cancelamento_id,
+    exchangeId: row.pedido_item_troca_id }));
 }
 
 export async function getPixMpRefundIntentForLeg(

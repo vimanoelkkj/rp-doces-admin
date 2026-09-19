@@ -22,7 +22,10 @@ export interface ExchangeRefundLeg {
   metodo: string;
   valorCentavos: number;
   confirmacaoManualPermitida: boolean;
-  refundRemoto?: { status: PixMpRefundIntentStatus; tentativas: number; mpRefundId: string | null; ultimoErro: string | null };
+  refundRemoto?: {
+    status: PixMpRefundIntentStatus; tentativas: number; mpRefundId: string | null;
+    ultimoErro: string | null; operationKey: string; atualizadoEm: string; podeVerificar: boolean;
+  };
 }
 
 export interface ItemExchangePreview {
@@ -201,6 +204,9 @@ export async function getItemExchangePreview(
 export interface ExchangeView {
   id: number; pedidoId: number; itemOrigemId: number; itemDestinoId: number | null;
   status: ExchangeStatus; reembolsoPendenteCentavos: number; refundsPendentes: ExchangeRefundLeg[];
+  estoqueOrigemEstado: string; estoqueDestinoEstado: string | null;
+  reembolsosConfirmados: Array<{ id: number; metodo: string; valorCentavos: number; origem: string; mpRefundId: string | null }>;
+  financeiro: { status: string; totalCentavos: number; liquidoCentavos: number; saldoCentavos: number };
 }
 type ExchangeError = "OPERATION_KEY_INVALIDA" | "PREVIEW_OBSOLETO" | "PRECO_ALTERADO" |
   "ESTOQUE_INSUFICIENTE" | "PIX_PENDENTE" | "TROCA_NAO_ENCONTRADA" |
@@ -244,11 +250,29 @@ async function exchangeView(db: D1Database, row: ExchangeRow): Promise<ExchangeV
         ?await getPixMpRefundIntentForLeg(db,{exchangeId:Number(row.id),pagamentoAlocacaoId:Number(allocation.pagamentoAlocacaoId)}):null;
         pending.push({pagamentoId:Number(allocation.pagamentoId),pagamentoAlocacaoId:Number(allocation.pagamentoAlocacaoId),
         metodo:allocation.metodo,valorCentavos:amount,confirmacaoManualPermitida:MANUAL_METHODS.has(allocation.metodo),
-        ...(remote?{refundRemoto:{status:remote.status,tentativas:remote.tentativas,mpRefundId:remote.mpRefundId,ultimoErro:remote.ultimoErro}}:{})});}required-=amount;}
+        ...(remote?{refundRemoto:{status:remote.status,tentativas:remote.tentativas,mpRefundId:remote.mpRefundId,ultimoErro:remote.ultimoErro,
+          operationKey:remote.operationKey,atualizadoEm:remote.atualizadoEm,podeVerificar:remote.podeVerificar}}:{})});}required-=amount;}
   }
+  const [stocks, refunds, financeiro] = await Promise.all([
+    db.prepare(`SELECT id,estoque_estado FROM pedido_itens WHERE id IN (?,?)`)
+      .bind(row.item_origem_id, row.item_destino_id ?? -1).all<{ id: number; estoque_estado: string }>(),
+    db.prepare(`SELECT r.id,r.metodo,r.valor_centavos,r.origem,r.mp_refund_id
+      FROM pedido_item_troca_reembolso_alocacoes ra JOIN pedido_reembolsos r ON r.id=ra.reembolso_id
+      WHERE ra.pedido_item_troca_id=? AND r.status='REEMBOLSADO' ORDER BY r.id`)
+      .bind(row.id).all<{ id:number; metodo:string; valor_centavos:number; origem:string; mp_refund_id:string|null }>(),
+    getFinanceiroPedido(db, Number(row.pedido_id)),
+  ]);
+  const originStock = stocks.results.find((item) => Number(item.id) === Number(row.item_origem_id));
+  const destinationStock = stocks.results.find((item) => Number(item.id) === Number(row.item_destino_id));
   return { id: Number(row.id), pedidoId: Number(row.pedido_id), itemOrigemId: Number(row.item_origem_id),
     itemDestinoId: row.item_destino_id == null ? null : Number(row.item_destino_id), status: row.status,
-    reembolsoPendenteCentavos: pending.reduce((s, x) => s + x.valorCentavos, 0), refundsPendentes: pending };
+    reembolsoPendenteCentavos: pending.reduce((s, x) => s + x.valorCentavos, 0), refundsPendentes: pending,
+    estoqueOrigemEstado: originStock?.estoque_estado ?? "DESCONHECIDO",
+    estoqueDestinoEstado: destinationStock?.estoque_estado ?? null,
+    reembolsosConfirmados: refunds.results.map((refund)=>({id:Number(refund.id),metodo:refund.metodo,
+      valorCentavos:Number(refund.valor_centavos),origem:refund.origem,mpRefundId:refund.mp_refund_id})),
+    financeiro:{status:financeiro.status,totalCentavos:financeiro.totalCentavos,
+      liquidoCentavos:financeiro.liquidoCentavos,saldoCentavos:financeiro.saldoCentavos} };
 }
 
 async function replayExchange(db: D1Database, op: OperacaoRow, identity: IdentidadeEsperada): Promise<ExchangeResult> {
@@ -490,6 +514,13 @@ async function tryFinalizeExchange(db:D1Database,row:ExchangeRow):Promise<void>{
 
 export async function reconcileExchangeFinalization(db:D1Database,exchangeId:number):Promise<void>{
   const row=await exchangeById(db,exchangeId);if(row)await tryFinalizeExchange(db,row);
+}
+
+export async function reconcileExchangeFinalizationsForPedido(db:D1Database,pedidoId:number,limit=8):Promise<void>{
+  const {results}=await db.prepare(`SELECT id FROM pedido_item_trocas
+    WHERE pedido_id=? AND status IN ('SOLICITADA','AGUARDANDO_REEMBOLSO','INCONCLUSIVA')
+    ORDER BY id LIMIT ?`).bind(pedidoId,Math.max(1,Math.min(limit,20))).all<{id:number}>();
+  for(const row of results)await reconcileExchangeFinalization(db,Number(row.id));
 }
 
 export async function reconcileExchangeCharges(db:D1Database,pedidoId:number):Promise<void>{

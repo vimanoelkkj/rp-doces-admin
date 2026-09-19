@@ -499,3 +499,331 @@ test('drawer de preview permanece utilizável no mobile', async () => {
   assert.match(css, /max-height:\s*92dvh/);
   assert.match(css, /\.cancelpreview-footer button\s*\{[^}]*width:\s*100%/s);
 });
+
+
+test("reload do cancelamento inconclusivo verifica a mesma operationKey e bloqueia duplo clique", async t => {
+  const persistedKey = "refund-persisted-after-reload-01";
+  let posts = 0;
+  let release;
+  const pending = new Promise(resolve => {
+    release = resolve;
+  });
+  const cancellation = {
+    id: 14,
+    status: "INCONCLUSIVO",
+    estoqueAcao: "NAO_REPOR",
+    estoqueEstado: "BAIXADO",
+    reembolsoPendenteCentavos: 500,
+    financeiro: {
+      status: "PARCIAL",
+      totalCentavos: 3000,
+      liquidoCentavos: 2500,
+      saldoCentavos: 500
+    },
+    reembolsosConfirmados: [],
+    pernasPendentes: [
+      {
+        pagamentoId: 7,
+        pagamentoAlocacaoId: 11,
+        metodo: "PIX_MP",
+        valorCentavos: 500,
+        confirmacaoManualPermitida: false,
+        refundRemoto: {
+          status: "INCONCLUSIVO",
+          tentativas: 1,
+          mpRefundId: null,
+          ultimoErro: "transport",
+          operationKey: persistedKey,
+          atualizadoEm: "2026-01-01 12:00:00",
+          podeVerificar: true
+        }
+      }
+    ]
+  };
+  const current = detalhe({
+    itens: [
+      {
+        ...detalhe().itens[0],
+        cancelamento_id: 14,
+        cancelamento_status: "INCONCLUSIVO",
+        troca_id: null,
+        troca_status: null,
+        troca_item_origem_id: null
+      }
+    ]
+  });
+  let body;
+  const root = await mountWith(t, async (url, init = {}) => {
+    const href = String(url);
+    if (href.endsWith("/cancelamentos/14/reembolsos") && init.method === "POST") {
+      posts++;
+      body = JSON.parse(init.body);
+      await pending;
+      return Response.json({ ok: true, refundStatus: "INCONCLUSIVO", cancelamento: cancellation });
+    }
+    if (href.endsWith("/cancelamentos")) return Response.json({ cancelamento: cancellation });
+    return Response.json(current);
+  });
+  try {
+    const open = [...document.querySelectorAll(".pedmodal-btn-cancel-item")].find(button =>
+      /ver cancelamento/i.test(button.textContent)
+    );
+    await ui.act(async () => open.click());
+    await flush();
+    assert.match(
+      document.querySelector(".cancelpreview-card").textContent,
+      /Não foi possível confirmar o resultado do estorno/
+    );
+    const verify = [...document.querySelectorAll(".cancelpreview-card button")].find(button =>
+      /verificar novamente/i.test(button.textContent)
+    );
+    await ui.act(async () => verify.click());
+    await flush();
+    assert.equal(posts, 1);
+    assert.equal(body.operationKey, persistedKey);
+    assert.equal(verify.disabled, true);
+    await ui.act(async () => release());
+    await flush();
+    assert.equal(posts, 1);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("refund recusado é terminal na UI e não oferece retry automático", async t => {
+  const current = detalhe({
+    itens: [
+      {
+        ...detalhe().itens[0],
+        cancelamento_id: 15,
+        cancelamento_status: "AGUARDANDO_REEMBOLSO",
+        troca_id: null,
+        troca_status: null,
+        troca_item_origem_id: null
+      }
+    ]
+  });
+  const root = await mountWith(t, async url => {
+    if (String(url).endsWith("/cancelamentos"))
+      return Response.json({
+        cancelamento: {
+          id: 15,
+          status: "AGUARDANDO_REEMBOLSO",
+          estoqueAcao: "NAO_REPOR",
+          reembolsoPendenteCentavos: 500,
+          pernasPendentes: [
+            {
+              pagamentoId: 7,
+              pagamentoAlocacaoId: 11,
+              metodo: "PIX_MP",
+              valorCentavos: 500,
+              confirmacaoManualPermitida: false,
+              refundRemoto: {
+                status: "RECUSADO",
+                tentativas: 1,
+                mpRefundId: null,
+                ultimoErro: "provider detail",
+                operationKey: "refused-key-01",
+                atualizadoEm: "2026-01-01 12:00:00",
+                podeVerificar: false
+              }
+            }
+          ]
+        }
+      });
+    return Response.json(current);
+  });
+  try {
+    const open = [...document.querySelectorAll(".pedmodal-btn-cancel-item")].find(button =>
+      /ver cancelamento/i.test(button.textContent)
+    );
+    await ui.act(async () => open.click());
+    await flush();
+    const modal = document.querySelector(".cancelpreview-card");
+    assert.match(modal.textContent, /recusou esta tentativa/i);
+    assert.match(modal.textContent, /Recusado pelo provedor/);
+    assert.equal(
+      [...modal.querySelectorAll("button")].some(button =>
+        /verificar|tentar novamente/i.test(button.textContent)
+      ),
+      false
+    );
+    assert.doesNotMatch(modal.textContent, /provider detail/);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("reload da troca inconclusiva verifica a mesma intenção PIX_MP", async t => {
+  const persistedKey = "exchange-refund-persisted-01";
+  let posted;
+  const exchange = {
+    id: 21,
+    status: "INCONCLUSIVA",
+    reembolsoPendenteCentavos: 300,
+    refundsPendentes: [
+      {
+        pagamentoId: 7,
+        pagamentoAlocacaoId: 11,
+        metodo: "PIX_MP",
+        valorCentavos: 300,
+        confirmacaoManualPermitida: false,
+        refundRemoto: {
+          status: "INCONCLUSIVO",
+          tentativas: 2,
+          mpRefundId: "mp-refund-9",
+          ultimoErro: "timeout",
+          operationKey: persistedKey,
+          atualizadoEm: "2026-01-01 12:00:00",
+          podeVerificar: true
+        }
+      }
+    ]
+  };
+  const current = detalhe({
+    itens: [
+      {
+        ...detalhe().itens[0],
+        troca_id: 21,
+        troca_status: "INCONCLUSIVA",
+        troca_item_origem_id: 1,
+        cancelamento_id: null,
+        cancelamento_status: null
+      }
+    ]
+  });
+  const root = await mountWith(t, async (url, init = {}) => {
+    const href = String(url);
+    if (href.endsWith("/trocas/21/reembolsos")) {
+      posted = JSON.parse(init.body);
+      return Response.json({ ok: true, refundStatus: "INCONCLUSIVO", troca: exchange });
+    }
+    if (href.endsWith("/itens/1/trocas")) return Response.json({ troca: exchange });
+    return Response.json(current);
+  });
+  try {
+    const open = [...document.querySelectorAll(".pedmodal-btn-cancel-item")].find(button =>
+      /ver troca/i.test(button.textContent)
+    );
+    await ui.act(async () => open.click());
+    await flush();
+    const verify = [...document.querySelectorAll(".additem-card button")].find(button =>
+      /verificar novamente/i.test(button.textContent)
+    );
+    await ui.act(async () => verify.click());
+    await flush();
+    assert.equal(posted.operationKey, persistedKey);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("detalhe reconstrói estados físicos e orienta o Pix da diferença da troca", async t => {
+  const current = detalhe({
+    total: 2000,
+    pago: 1500,
+    status: "PARCIAL",
+    capacidade: 500,
+    itens: [
+      {
+        ...detalhe().itens[0],
+        status_item: "CANCELADO",
+        estoque_estado: "REPOSTO",
+        troca_id: 22,
+        troca_status: "AGUARDANDO_COBRANCA",
+        troca_item_origem_id: 1
+      },
+      {
+        ...detalhe().itens[0],
+        id: 2,
+        produto_nome: "Destino",
+        valor_total_centavos: 2000,
+        status_item: "ATIVO",
+        estoque_estado: "RESERVADO",
+        troca_id: 22,
+        troca_status: "AGUARDANDO_COBRANCA",
+        troca_item_origem_id: 1
+      }
+    ]
+  });
+  const root = await mountWith(t, async () => Response.json(current));
+  try {
+    await flush();
+    assert.match(document.body.textContent, /Cancelado · Estoque reposto/);
+    assert.match(document.body.textContent, /Ativo · Estoque reservado/);
+    assert.match(document.body.textContent, /Troca aguardando pagamento/);
+    assert.match(document.body.textContent, /Saldo: R\$ 5,00\./);
+    assert.ok(
+      [...document.querySelectorAll("button")].some(
+        button => button.textContent === "Gerar Pix R$ 5,00"
+      )
+    );
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("cancelamento concluído reabre em modo leitura sem ação financeira duplicada", async t => {
+  const current = detalhe({
+    total: 0,
+    pago: 500,
+    reembolsado: 500,
+    status: "PENDENTE",
+    capacidade: 0,
+    itens: [
+      {
+        ...detalhe().itens[0],
+        status_item: "CANCELADO",
+        estoque_estado: "REPOSTO",
+        cancelamento_id: 30,
+        cancelamento_status: "CONCLUIDO",
+        troca_id: null,
+        troca_status: null,
+        troca_item_origem_id: null
+      }
+    ]
+  });
+  const root = await mountWith(t, async url => {
+    if (String(url).endsWith("/cancelamentos"))
+      return Response.json({
+        cancelamento: {
+          id: 30,
+          status: "CONCLUIDO",
+          estoqueAcao: "REPOR",
+          estoqueEstado: "REPOSTO",
+          reembolsoPendenteCentavos: 0,
+          pernasPendentes: [],
+          reembolsosConfirmados: [
+            {
+              id: 40,
+              metodo: "PIX_MP",
+              valorCentavos: 500,
+              origem: "MERCADO_PAGO",
+              mpRefundId: "900"
+            }
+          ],
+          financeiro: { status: "PENDENTE", totalCentavos: 0, liquidoCentavos: 0, saldoCentavos: 0 }
+        }
+      });
+    return Response.json(current);
+  });
+  try {
+    assert.match(document.body.textContent, /Cancelamento concluído/);
+    const open = [...document.querySelectorAll(".pedmodal-btn-cancel-item")].find(button =>
+      /ver cancelamento/i.test(button.textContent)
+    );
+    await ui.act(async () => open.click());
+    await flush();
+    const modal = document.querySelector(".cancelpreview-card");
+    assert.match(modal.textContent, /Devoluções confirmadas/);
+    assert.match(modal.textContent, /R\$\s*5,00/);
+    assert.equal(
+      [...modal.querySelectorAll("button")].some(button =>
+        /confirmar devolução|verificar novamente|solicitar estorno/i.test(button.textContent)
+      ),
+      false
+    );
+  } finally {
+    await unmount(root);
+  }
+});

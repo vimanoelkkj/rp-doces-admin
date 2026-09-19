@@ -117,6 +117,20 @@ const STATUS_TYPE: Record<StatusPedido, "green" | "orange" | "blue" | "red"> = {
   CANCELADO: "red",
 };
 
+const ITEM_STATUS_LABEL: Record<string, string> = {
+  ATIVO: "Ativo", CANCELADO: "Cancelado",
+  TROCA_PENDENTE: "Destino da troca · aguardando conclusão",
+};
+const STOCK_STATUS_LABEL: Record<string, string> = {
+  RESERVADO: "Estoque reservado", BAIXADO: "Estoque baixado",
+  LIBERADO: "Reserva liberada", REPOSTO: "Estoque reposto",
+};
+const FLOW_STATUS_LABEL: Record<string, string> = {
+  AGUARDANDO_REEMBOLSO: "Aguardando devolução", INCONCLUSIVO: "Estorno inconclusivo",
+  INCONCLUSIVA: "Troca inconclusiva", AGUARDANDO_COBRANCA: "Troca aguardando pagamento",
+  CONCLUIDO: "Cancelamento concluído", CONCLUIDA: "Troca concluída",
+};
+
 /* ── Component ── */
 export default function PedidoDetalheModal({
   orderId,
@@ -323,6 +337,9 @@ export default function PedidoDetalheModal({
   };
 
   const financeiro = data ? formatarFinanceiro(data.financeiro) : null;
+  const trocaAguardandoCobranca = data?.itens.some(
+    (item) => item.troca_status === "AGUARDANDO_COBRANCA",
+  );
 
   return createPortal(
     <div className="pedmodal-overlay" {...modalProps}>
@@ -450,6 +467,13 @@ export default function PedidoDetalheModal({
                     <span className="pedmodal-item-name">
                       {item.produto_nome} {item.emoji ?? ""}
                     </span>
+                    <span className="pedmodal-item-state">
+                      {ITEM_STATUS_LABEL[item.status_item] ?? item.status_item} ·{" "}
+                      {STOCK_STATUS_LABEL[item.estoque_estado] ?? item.estoque_estado}
+                    </span>
+                    {item.status_item === "TROCA_PENDENTE" && (
+                      <span className="pedmodal-item-note">Fora do total até a troca ser concluída</span>
+                    )}
                     <span className="pedmodal-item-qty">
                       {item.quantidade}x{" "}
                       {formatarPreco(item.valor_unitario_centavos)}
@@ -459,11 +483,11 @@ export default function PedidoDetalheModal({
                     <span className="pedmodal-item-price">
                       {formatarPreco(item.valor_total_centavos)}
                     </span>
-                    {item.cancelamento_id && item.cancelamento_status !== "CONCLUIDO" && (
-                      <span className="pedmodal-item-qty">Cancelamento em andamento · {(item.cancelamento_status ?? "").replace(/_/g, " ")}</span>
+                    {item.cancelamento_id && (
+                      <span className="pedmodal-item-qty">{FLOW_STATUS_LABEL[item.cancelamento_status ?? ""] ?? "Cancelamento em andamento"}</span>
                     )}
-                    {item.troca_id && item.troca_status !== "CONCLUIDA" && (
-                      <span className="pedmodal-item-qty">Troca em andamento · {(item.troca_status ?? "").replace(/_/g, " ")}</span>
+                    {item.troca_id && (
+                      <span className="pedmodal-item-qty">{FLOW_STATUS_LABEL[item.troca_status ?? ""] ?? "Troca em andamento"}</span>
                     )}
                     {item.status_item === "ATIVO" &&
                       data.pedido.status_comanda === "ABERTA" &&
@@ -484,7 +508,10 @@ export default function PedidoDetalheModal({
                         )}
                         </>
                       )}
-                    {item.status_item === "ATIVO" && item.troca_id && item.troca_item_origem_id === item.id && (
+                    {item.cancelamento_id && item.status_item !== "ATIVO" && (
+                      <button type="button" className="pedmodal-btn-cancel-item" onClick={() => setItemCancelamentoPreviewId(item.id)}>Ver cancelamento</button>
+                    )}
+                    {item.troca_id && item.troca_item_origem_id === item.id && (
                       <button type="button" className="pedmodal-btn-cancel-item" onClick={() => setItemTroca(item)}>Ver troca</button>
                     )}
                   </div>
@@ -589,7 +616,12 @@ export default function PedidoDetalheModal({
 
               {data.pedido.status_comanda === "ABERTA" &&
                 data.capacidadeCobravelCentavos > 0 && (
-                  <button
+                  <div className="pedmodal-charge-action">
+                    {trocaAguardandoCobranca && (
+                      <div><strong>Troca aguardando pagamento</strong>
+                        <span>Saldo: {formatarPreco(data.capacidadeCobravelCentavos)}.</span></div>
+                    )}
+                    <button
                     type="button"
                     className="pedmodal-btn-advance"
                     onClick={() =>
@@ -600,7 +632,8 @@ export default function PedidoDetalheModal({
                     {gerando
                       ? "Gerando..."
                       : `Gerar Pix ${formatarPreco(data.capacidadeCobravelCentavos)}`}
-                  </button>
+                    </button>
+                  </div>
                 )}
 
               {data.pixAdminPendentes.map((pix) => {

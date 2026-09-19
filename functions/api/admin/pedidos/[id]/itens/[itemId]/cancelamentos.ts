@@ -4,9 +4,8 @@ import { requireUser } from "../../../../../../lib/auth";
 import {
   createItemCancellation,
   getCancellationView,
-  reconcileCancellationFinalization,
 } from "../../../../../../lib/itemCancellation";
-import { recoverPixMpRefundIntentsForParent } from "../../../../../../lib/mpRefundIntent";
+import { reconcileLiveTabParent } from "../../../../../../lib/liveTabRecovery";
 import { ItemCancellationPreviewError } from "../../../../../../lib/itemCancellationPreview";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
 
@@ -34,11 +33,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     return errorJson("Identificador inválido", 400, "ID_INVALIDO");
   }
   let cancelamento = await getCancellationView(env.DB, value.pedidoId, value.itemId);
-  if (cancelamento && env.MP_ACCESS_TOKEN) {
+  if (cancelamento) {
     try {
-      await recoverPixMpRefundIntentsForParent(env.DB, env.MP_ACCESS_TOKEN,
+      await reconcileLiveTabParent(env.DB, env.MP_ACCESS_TOKEN,
         { cancellationId: cancelamento.id });
-      await reconcileCancellationFinalization(env.DB, cancelamento.id);
       cancelamento = await getCancellationView(env.DB, value.pedidoId, value.itemId);
     } catch (error) { console.error("Recuperacao oportunista de refund MP pendente", error); }
   }
