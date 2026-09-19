@@ -41,6 +41,9 @@ export const ESTOQUE_POR_ITEM = separarStatements(
 export const OPERACAO_POR_ITEM = separarStatements(
   await readFile('migrations/0017_pedido_operacoes_item_adicao.sql', 'utf8'),
 );
+export const CANCELAMENTO_POR_ITEM = separarStatements(
+  await readFile('migrations/0018_item_cancelamento_preview.sql', 'utf8'),
+);
 
 function criarDb(mf) {
   const db = {
@@ -99,6 +102,11 @@ export async function aplicarEstoquePorItem(db) {
 /** Aplica a extensao A1 que vincula uma operacao ao item criado. */
 export async function aplicarOperacaoPorItem(db) {
   for (const sql of OPERACAO_POR_ITEM) await db.prepare(sql).run();
+}
+
+/** Aplica o modelo auditavel de cancelamento e atribuicao de refunds. */
+export async function aplicarCancelamentoPorItem(db) {
+  for (const sql of CANCELAMENTO_POR_ITEM) await db.prepare(sql).run();
 }
 
 /** Roda a validação e devolve as linhas de verificacao/resultado. */

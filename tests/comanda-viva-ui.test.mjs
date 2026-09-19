@@ -346,3 +346,107 @@ test('drawer de adicao preserva controles utilizaveis no mobile', async () => {
   assert.match(css, /\.additem-confirm[^}]*width:\s*100%/s);
   assert.match(css, /max-height:\s*92dvh/);
 });
+
+test('preview de cancelamento mostra cobertura por pagamento, estoque e nenhuma confirmação', async t => {
+  const root = await mountWith(t, async url => {
+    if (String(url).endsWith('/cancelamento-preview')) {
+      return Response.json({
+        pedidoId: 1,
+        item: {
+          id: 1, nome: 'Bolo', quantidade: 2, valorCentavos: 3000,
+          statusItem: 'ATIVO', estoqueEstado: 'BAIXADO',
+        },
+        financeiro: {
+          valorItemCentavos: 3000,
+          coberturaConfirmadaCentavos: 1500,
+          valorNaoPagoCentavos: 1500,
+          reembolsoNecessarioCentavos: 1500,
+        },
+        pagamentos: [
+          {
+            pagamentoId: 7, pagamentoAlocacaoId: 11, metodo: 'PIX_MP',
+            valorAlocadoCentavos: 500,
+            valorJaReembolsadoDaAlocacaoCentavos: 0,
+            coberturaEfetivaCentavos: 500,
+            reembolsoPropostoCentavos: 500,
+          },
+          {
+            pagamentoId: 8, pagamentoAlocacaoId: 12, metodo: 'DINHEIRO',
+            valorAlocadoCentavos: 1000,
+            valorJaReembolsadoDaAlocacaoCentavos: 0,
+            coberturaEfetivaCentavos: 1000,
+            reembolsoPropostoCentavos: 1000,
+          },
+        ],
+        estoque: {estadoAtual: 'BAIXADO', acaoPadrao: 'NAO_REPOR'},
+        bloqueios: [],
+        cancelamentoExecutavel: true,
+      });
+    }
+    return Response.json(detalhe());
+  });
+  try {
+    await ui.act(async () => document.querySelector('.pedmodal-btn-cancel-item').click());
+    await flush();
+    const modal = document.querySelector('.cancelpreview-card');
+    assert.ok(modal);
+    assert.match(modal.textContent, /Valor já pago associado/);
+    assert.match(modal.textContent, /Valor ainda não pago/);
+    assert.match(modal.textContent, /Pix Mercado Pago/);
+    assert.match(modal.textContent, /R\$\s*5,00 a estornar/);
+    assert.match(modal.textContent, /Dinheiro/);
+    assert.match(modal.textContent, /R\$\s*10,00 a devolver/);
+    assert.match(modal.textContent, /não irá repor estoque automaticamente/i);
+    assert.match(modal.textContent, /Cancelamento ainda não disponível nesta etapa/i);
+    assert.equal([...modal.querySelectorAll('button')].some(b => /confirmar cancelamento/i.test(b.textContent)), false);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test('preview exibe bloqueio de Pix e ação só aparece em item ativo de pedido aberto não terminal', async t => {
+  let atual = detalhe();
+  const root = await mountWith(t, async url => {
+    if (String(url).endsWith('/cancelamento-preview')) {
+      return Response.json({
+        pedidoId: 1,
+        item: {id: 1, nome: 'Bolo', quantidade: 2, valorCentavos: 3000, statusItem: 'ATIVO', estoqueEstado: 'RESERVADO'},
+        financeiro: {valorItemCentavos: 3000, coberturaConfirmadaCentavos: 0, valorNaoPagoCentavos: 3000, reembolsoNecessarioCentavos: 0},
+        pagamentos: [],
+        estoque: {estadoAtual: 'RESERVADO', acaoPadrao: 'LIBERAR_RESERVA'},
+        bloqueios: [{codigo: 'PIX_PENDENTE', mensagem: 'Há uma cobrança Pix pendente para esta comanda. O cancelamento só poderá ser executado após ela ser resolvida.'}],
+        cancelamentoExecutavel: false,
+      });
+    }
+    return Response.json(atual);
+  });
+  try {
+    await ui.act(async () => document.querySelector('.pedmodal-btn-cancel-item').click());
+    await flush();
+    assert.match(document.querySelector('.cancelpreview-block').textContent, /cobrança Pix pendente/i);
+    assert.match(document.querySelector('.cancelpreview-stock').textContent, /reserva de 2 unidades será liberada/i);
+    await ui.act(async () => document.querySelector('.cancelpreview-close').click());
+
+    atual = detalhe({statusComanda: 'ENCERRADA'});
+    await ui.act(async () => root.unmount());
+    container.innerHTML = '';
+    let second;
+    await ui.act(async () => { second = ui.mount(container); });
+    await flush();
+    assert.equal(document.querySelector('.pedmodal-btn-cancel-item'), null);
+    await unmount(second);
+    return;
+  } finally {
+    if (container.innerHTML) {
+      container.innerHTML = '';
+    }
+  }
+});
+
+test('drawer de preview permanece utilizável no mobile', async () => {
+  const css = await readFile('src/admin/Pedidos/CancelamentoItemPreviewModal.css', 'utf8');
+  assert.match(css, /@media \(max-width: 560px\)/);
+  assert.match(css, /\.cancelpreview-card\s*\{[^}]*width:\s*100%/s);
+  assert.match(css, /max-height:\s*92dvh/);
+  assert.match(css, /\.cancelpreview-footer button\s*\{[^}]*width:\s*100%/s);
+});
