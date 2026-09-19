@@ -35,7 +35,7 @@ html[data-admin-theme="dark"] .admin-sidebar {
   border-right: none;
 }
 html[data-admin-theme="dark"] .admin-mobile-header {
-  background: rgba(26, 20, 18, 0.96);
+  background: #1a1412;
   border-bottom-color: #3d3230;
 }
 html[data-admin-theme="dark"] .sidebar-logo-text {
