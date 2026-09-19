@@ -21,6 +21,7 @@ import {
 } from "./operacoes";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 import { preparePedidoPhysicalProjection } from "./stock";
+import { getFinanceiroPedido } from "./comandaLedger";
 import {
   getPixMpRefundIntentForLeg,
   reconcilePixMpRefundIntent,
@@ -40,7 +41,14 @@ export interface CancellationLeg {
   metodo: string;
   valorCentavos: number;
   confirmacaoManualPermitida: boolean;
-  refundRemoto?: { status: PixMpRefundIntentStatus; tentativas: number; mpRefundId: string | null; ultimoErro: string | null };
+  refundRemoto?: {
+    status: PixMpRefundIntentStatus; tentativas: number; mpRefundId: string | null;
+    ultimoErro: string | null; operationKey: string; atualizadoEm: string; podeVerificar: boolean;
+  };
+}
+
+export interface ConfirmedRefundView {
+  id: number; metodo: string; valorCentavos: number; origem: string; mpRefundId: string | null;
 }
 
 export interface CancellationView {
@@ -49,8 +57,11 @@ export interface CancellationView {
   itemId: number;
   status: CancellationStatus;
   estoqueAcao: AcaoEstoqueCancelamento | "REPOR";
+  estoqueEstado: string;
   reembolsoPendenteCentavos: number;
   pernasPendentes: CancellationLeg[];
+  reembolsosConfirmados: ConfirmedRefundView[];
+  financeiro: { status: string; totalCentavos: number; liquidoCentavos: number; saldoCentavos: number };
 }
 
 type CancellationError =
@@ -105,18 +116,24 @@ async function readCancellationView(
   db: D1Database,
   row: CancellationRow,
 ): Promise<CancellationView> {
-  if (row.status === "CONCLUIDO" || row.status === "FALHOU") {
-    return {
-      id: Number(row.id), pedidoId: Number(row.pedido_id), itemId: Number(row.pedido_item_id),
-      status: row.status, estoqueAcao: row.estoque_acao,
-      reembolsoPendenteCentavos: 0, pernasPendentes: [],
-    };
-  }
-  const preview = await getItemCancellationPreview(
-    db, Number(row.pedido_id), Number(row.pedido_item_id),
-    { permitirCancelamentoExistente: true },
-  );
-  const pernasPendentes = await Promise.all(preview.pagamentos
+  const [item, financeiroCompleto, refunds] = await Promise.all([
+    db.prepare(`SELECT estoque_estado FROM pedido_itens WHERE id=?`).bind(row.pedido_item_id)
+      .first<{ estoque_estado: string }>(),
+    getFinanceiroPedido(db, Number(row.pedido_id)),
+    db.prepare(`SELECT r.id,r.metodo,r.valor_centavos,r.origem,r.mp_refund_id
+      FROM pedido_reembolso_alocacoes ra JOIN pedido_reembolsos r ON r.id=ra.reembolso_id
+      WHERE ra.pedido_item_cancelamento_id=? AND r.status='REEMBOLSADO'
+      ORDER BY r.id`).bind(row.id).all<{
+        id: number; metodo: string; valor_centavos: number; origem: string; mp_refund_id: string | null;
+      }>(),
+  ]);
+  let pernasPendentes: CancellationLeg[] = [];
+  if (row.status !== "CONCLUIDO" && row.status !== "FALHOU") {
+    const preview = await getItemCancellationPreview(
+      db, Number(row.pedido_id), Number(row.pedido_item_id),
+      { permitirCancelamentoExistente: true },
+    );
+    pernasPendentes = await Promise.all(preview.pagamentos
     .filter((p) => p.reembolsoPropostoCentavos > 0)
     .map(async (p) => {
       const remote = p.metodo === "PIX_MP"
@@ -130,14 +147,25 @@ async function readCancellationView(
         valorCentavos: p.reembolsoPropostoCentavos,
         confirmacaoManualPermitida: METODOS_MANUAIS.has(p.metodo),
         ...(remote ? { refundRemoto: { status: remote.status, tentativas: remote.tentativas,
-          mpRefundId: remote.mpRefundId, ultimoErro: remote.ultimoErro } } : {}),
+          mpRefundId: remote.mpRefundId, ultimoErro: remote.ultimoErro,
+          operationKey: remote.operationKey, atualizadoEm: remote.atualizadoEm,
+          podeVerificar: remote.podeVerificar } } : {}),
       };
     }));
+  }
   return {
     id: Number(row.id), pedidoId: Number(row.pedido_id), itemId: Number(row.pedido_item_id),
     status: row.status, estoqueAcao: row.estoque_acao,
+    estoqueEstado: item?.estoque_estado ?? "DESCONHECIDO",
     reembolsoPendenteCentavos: pernasPendentes.reduce((s, p) => s + p.valorCentavos, 0),
     pernasPendentes,
+    reembolsosConfirmados: refunds.results.map((refund) => ({
+      id: Number(refund.id), metodo: refund.metodo, valorCentavos: Number(refund.valor_centavos),
+      origem: refund.origem, mpRefundId: refund.mp_refund_id,
+    })),
+    financeiro: { status: financeiroCompleto.status, totalCentavos: financeiroCompleto.totalCentavos,
+      liquidoCentavos: financeiroCompleto.liquidoCentavos,
+      saldoCentavos: financeiroCompleto.saldoCentavos },
   };
 }
 
@@ -480,4 +508,15 @@ async function tryFinalizeCancellation(db: D1Database, row: CancellationRow): Pr
 export async function reconcileCancellationFinalization(db: D1Database, cancellationId: number): Promise<void> {
   const row = await cancellationById(db, cancellationId);
   if (row) await tryFinalizeCancellation(db, row);
+}
+
+export async function reconcileCancellationFinalizationsForPedido(
+  db: D1Database,
+  pedidoId: number,
+  limit = 8,
+): Promise<void> {
+  const { results } = await db.prepare(`SELECT id FROM pedido_item_cancelamentos
+    WHERE pedido_id=? AND status IN ('SOLICITADO','AGUARDANDO_REEMBOLSO','INCONCLUSIVO')
+    ORDER BY id LIMIT ?`).bind(pedidoId, Math.max(1, Math.min(limit, 20))).all<{ id: number }>();
+  for (const row of results) await reconcileCancellationFinalization(db, Number(row.id));
 }

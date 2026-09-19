@@ -24,6 +24,9 @@ interface RefundLeg {
     tentativas: number;
     mpRefundId: string | null;
     ultimoErro: string | null;
+    operationKey: string;
+    atualizadoEm: string;
+    podeVerificar: boolean;
   };
 }
 interface Preview {
@@ -45,6 +48,12 @@ interface Exchange {
   status: string;
   reembolsoPendenteCentavos: number;
   refundsPendentes: RefundLeg[];
+  estoqueOrigemEstado?: string;
+  estoqueDestinoEstado?: string | null;
+  reembolsosConfirmados?: Array<{
+    id: number; metodo: string; valorCentavos: number; origem: string; mpRefundId: string | null;
+  }>;
+  financeiro?: { status: string; totalCentavos: number; liquidoCentavos: number; saldoCentavos: number };
 }
 interface Props {
   orderId: number;
@@ -187,7 +196,7 @@ export default function TrocarItemModal({
   };
   const refund = async (leg: RefundLeg) => {
     if (!exchange || saving) return;
-    let key = refundKeys.current.get(leg.pagamentoAlocacaoId);
+    let key = leg.refundRemoto?.operationKey ?? refundKeys.current.get(leg.pagamentoAlocacaoId);
     if (!key) {
       key = novaOperationKey();
       refundKeys.current.set(leg.pagamentoAlocacaoId, key);
@@ -211,7 +220,7 @@ export default function TrocarItemModal({
       );
       const b = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(b.error ?? "Falha ao registrar devolução");
-      if (["CONFIRMADO", "RECUSADO"].includes(b.refundStatus) || !b.refundStatus)
+      if (b.refundStatus === "CONFIRMADO" || !b.refundStatus)
         refundKeys.current.delete(leg.pagamentoAlocacaoId);
       setExchange(b.troca);
       await onChanged();
@@ -226,9 +235,15 @@ export default function TrocarItemModal({
     if (status === "PENDENTE") return "Aguardando envio";
     if (status === "PROCESSANDO") return "Processando";
     if (status === "CONFIRMADO") return "Confirmado";
-    if (status === "RECUSADO") return "Recusado — tentar novamente";
-    if (status === "INCONCLUSIVO") return "Inconclusivo — verificar novamente";
+    if (status === "RECUSADO") return "Recusado pelo provedor";
+    if (status === "INCONCLUSIVO") return "Verificar novamente";
     return "Solicitar estorno";
+  };
+  const remoteCanRun = (leg: RefundLeg) => {
+    const remote = leg.refundRemoto;
+    if (!remote) return true;
+    if (["RECUSADO", "CONFIRMADO"].includes(remote.status)) return false;
+    return remote.podeVerificar;
   };
   return createPortal(
     <div className="additem-overlay" {...modalProps}>
@@ -359,6 +374,25 @@ export default function TrocarItemModal({
                     : "Troca concluída."}
               </span>
             </div>
+            {exchange.financeiro && (
+              <div className="cancelpreview-values">
+                <div><span>Total atual</span><strong>{money(exchange.financeiro.totalCentavos)}</strong></div>
+                <div><span>Pago líquido</span><strong>{money(exchange.financeiro.liquidoCentavos)}</strong></div>
+                <div><span>Saldo</span><strong>{money(exchange.financeiro.saldoCentavos)}</strong></div>
+                <div><span>Estoque origem</span><strong>{exchange.estoqueOrigemEstado}</strong></div>
+              </div>
+            )}
+            {(exchange.reembolsosConfirmados?.length ?? 0) > 0 && (
+              <div className="cancelpreview-section">
+                <span className="cancelpreview-label">Devoluções confirmadas</span>
+                {exchange.reembolsosConfirmados?.map((refund) => (
+                  <div className="cancelpreview-refund-leg" key={refund.id}>
+                    <div><strong>{labels[refund.metodo] ?? refund.metodo}</strong><span>{money(refund.valorCentavos)}</span></div>
+                    <span>Confirmado</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {exchange.refundsPendentes.map((leg) => (
               <div
                 className="cancelpreview-refund-leg"
@@ -373,9 +407,19 @@ export default function TrocarItemModal({
                     Confirmar devolução
                   </button>
                 ) : (
-                  <button onClick={() => void refund(leg)} disabled={saving}>
-                    {remoteLabel(leg)}
-                  </button>
+                  <div>
+                    {leg.refundRemoto?.status === "INCONCLUSIVO" && (
+                      <span>Não foi possível confirmar o resultado do estorno.</span>
+                    )}
+                    {leg.refundRemoto?.status === "RECUSADO" && (
+                      <span>O Mercado Pago recusou esta tentativa. Revise antes de iniciar outra operação.</span>
+                    )}
+                    {remoteCanRun(leg) ? (
+                      <button onClick={() => void refund(leg)} disabled={saving}>{remoteLabel(leg)}</button>
+                    ) : (
+                      <span>{remoteLabel(leg)}</span>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

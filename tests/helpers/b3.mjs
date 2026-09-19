@@ -35,6 +35,7 @@ const bundle = await build({
       export * as mpPost from './functions/lib/mpPost';
       export * as mpRefund from './functions/lib/mpRefund';
       export * as mpRefundIntent from './functions/lib/mpRefundIntent';
+      export * as liveTabRecovery from './functions/lib/liveTabRecovery';
       export * as adminCreate from './functions/api/admin/pedidos';
       export * as promocao from './shared/promocao';
       export * as produtos from './functions/api/produtos';

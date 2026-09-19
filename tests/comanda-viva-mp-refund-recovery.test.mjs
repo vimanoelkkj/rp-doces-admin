@@ -183,6 +183,9 @@ test('in_process permanece sem efeito financeiro e GET oportunista conclui depoi
   assert.equal(first.refundStatus, 'PROCESSANDO');
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 0);
   await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(db, 'TEST_TOKEN', { cancellationId: cancellation.id });
+  assert.deepEqual(methods, ['POST'], 'PROCESSANDO recente não consulta o provedor novamente');
+  await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes SET atualizado_em='2000-01-01 00:00:00'`).run();
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(db, 'TEST_TOKEN', { cancellationId: cancellation.id });
   await app.itemCancellation.reconcileCancellationFinalization(db, cancellation.id);
   assert.deepEqual(methods, ['POST', 'GET']);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
@@ -330,4 +333,256 @@ test('migration 0020 preserva integralmente fatos e operações A1 anteriores', 
   }
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_pix_mp_intencoes`).first()).n, 0);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pragma_foreign_key_check`).first()).n, 0);
+});
+
+
+test("PROCESSANDO antigo com refund ainda in_process permanece recuperável", async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    return Response.json({ id: 7007, payment_id: 9001, amount: 5, status: "in_process" });
+  });
+  const first = await app.itemCancellation.confirmCancellationRefund(db,
+    refundInput(cancellation, leg, "refund-still-processing-01"));
+  assert.equal(first.refundStatus, "PROCESSANDO");
+  await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
+    SET atualizado_em='2000-01-01 00:00:00'`).run();
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(db, "TEST_TOKEN",
+    { cancellationId: cancellation.id });
+  assert.equal(calls, 2);
+  assert.equal((await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    "PROCESSANDO");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 0);
+});
+
+test("duas reconciliações concorrentes materializam um único efeito", async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  let approved = false;
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    id: 7008, payment_id: 9001, amount: 5, status: approved ? "approved" : "in_process",
+  }));
+  await app.itemCancellation.confirmCancellationRefund(db,
+    refundInput(cancellation, leg, "refund-concurrent-reconcile-01"));
+  approved = true;
+  await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
+    SET atualizado_em='2000-01-01 00:00:00'`).run();
+  await Promise.all([
+    app.liveTabRecovery.reconcileLiveTabParent(db, "TEST_TOKEN", { cancellationId: cancellation.id }),
+    app.liveTabRecovery.reconcileLiveTabParent(db, "TEST_TOKEN", { cancellationId: cancellation.id }),
+  ]);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_alocacoes`).first()).n, 1);
+});
+
+test("reconcile e clique manual simultâneos preservam um refund lógico", async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  let ambiguous = true;
+  t.mock.method(globalThis, "fetch", async () => {
+    if (ambiguous) throw new Error("timeout");
+    return Response.json({ id: 7012, payment_id: 9001, amount: 5, status: "approved" });
+  });
+  const input = refundInput(cancellation, leg, "refund-reconcile-click-01");
+  const first = await app.itemCancellation.confirmCancellationRefund(db, input);
+  assert.equal(first.refundStatus, "INCONCLUSIVO");
+  ambiguous = false;
+  await Promise.all([
+    app.liveTabRecovery.reconcileLiveTabParent(db, "TEST_TOKEN", { cancellationId: cancellation.id }),
+    app.itemCancellation.confirmCancellationRefund(db, input),
+  ]);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_pix_mp_intencoes`).first()).n, 1);
+});
+
+test("reload expõe a operationKey persistida e mantém a mesma intenção inconclusiva", async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("timeout depois do envio");
+  });
+  const operationKey = "refund-reload-same-intent-01";
+  const first = await app.itemCancellation.confirmCancellationRefund(
+    db,
+    refundInput(cancellation, leg, operationKey)
+  );
+  assert.equal(first.refundStatus, "INCONCLUSIVO");
+  const reloaded = await app.itemCancellation.getCancellationView(db, 1, 1);
+  assert.equal(reloaded.pernasPendentes[0].refundRemoto.operationKey, operationKey);
+  assert.equal(reloaded.pernasPendentes[0].refundRemoto.podeVerificar, true);
+  assert.equal(reloaded.pernasPendentes[0].refundRemoto.status, "INCONCLUSIVO");
+  assert.equal(
+    (await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_pix_mp_intencoes`).first()).n,
+    1
+  );
+});
+
+test("queda após persistir intenção PENDENTE e antes da rede é retomada no reload", async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  let remoteCalls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    remoteCalls++;
+    return Response.json({ id: 7009, payment_id: 9001, amount: 5, status: "approved" });
+  });
+  let crashBeforeNetwork = true;
+  db.hook = async statements => {
+    if (
+      crashBeforeNetwork &&
+      statements.some(statement => statement.sql.includes("SET status='PROCESSANDO'"))
+    ) {
+      crashBeforeNetwork = false;
+      throw new Error("processo caiu antes da chamada remota");
+    }
+    return statements;
+  };
+  await assert.rejects(() =>
+    app.itemCancellation.confirmCancellationRefund(
+      db,
+      refundInput(cancellation, leg, "refund-pending-before-network-01")
+    )
+  );
+  assert.equal(remoteCalls, 0);
+  assert.equal(
+    (await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    "PENDENTE"
+  );
+  db.hook = null;
+  await app.liveTabRecovery.reconcileLiveTabParent(db, "TEST_TOKEN", {
+    cancellationId: cancellation.id
+  });
+  assert.equal(remoteCalls, 1);
+  assert.equal(
+    (await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    "CONFIRMADO"
+  );
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+});
+
+test("ledger confirmado com finalização local interrompida converge no detalhe sem nova rede", async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  let remoteCalls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    remoteCalls++;
+    return Response.json({ id: 7010, payment_id: 9001, amount: 5, status: "approved" });
+  });
+  let failFinalization = true;
+  db.hook = async statements => {
+    if (
+      failFinalization &&
+      statements.some(statement =>
+        statement.sql.includes("UPDATE pedido_itens SET status_item='CANCELADO'")
+      )
+    ) {
+      failFinalization = false;
+      throw new Error("processo caiu depois do ledger");
+    }
+    return statements;
+  };
+  const confirmed = await app.itemCancellation.confirmCancellationRefund(
+    db,
+    refundInput(cancellation, leg, "refund-ledger-before-finalization-01")
+  );
+  assert.equal(confirmed.refundStatus, "CONFIRMADO");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.equal(
+    (await db.prepare(`SELECT status_item FROM pedido_itens WHERE id=1`).first()).status_item,
+    "ATIVO"
+  );
+  db.hook = null;
+  await app.liveTabRecovery.reconcileLiveTabPedido(db, undefined, 1);
+  assert.equal(remoteCalls, 1);
+  assert.equal(
+    (await db.prepare(`SELECT status_item FROM pedido_itens WHERE id=1`).first()).status_item,
+    "CANCELADO"
+  );
+  assert.equal(
+    (
+      await db
+        .prepare(`SELECT status FROM pedido_item_cancelamentos WHERE id=?`)
+        .bind(cancellation.id)
+        .first()
+    ).status,
+    "CONCLUIDO"
+  );
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  await app.liveTabRecovery.reconcileLiveTabPedido(db, undefined, 1);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+});
+
+test("troca com refund confirmado e finalização interrompida converge sem segundo refund", async t => {
+  const { db, exchange } = await exchangeScenario(t);
+  const leg = exchange.refundsPendentes[0];
+  let remoteCalls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    remoteCalls++;
+    return Response.json({ id: 7011, payment_id: 9002, amount: 3, status: "approved" });
+  });
+  let failFinalization = true;
+  db.hook = async statements => {
+    if (
+      failFinalization &&
+      statements.some(statement =>
+        statement.sql.includes("UPDATE pedido_itens SET status_item='CANCELADO'")
+      )
+    ) {
+      failFinalization = false;
+      throw new Error("processo caiu antes de concluir troca");
+    }
+    return statements;
+  };
+  const confirmed = await app.itemExchange.confirmExchangeRefund(db, {
+    pedidoId: 1,
+    exchangeId: exchange.id,
+    usuarioId: 1,
+    operationKey: "exchange-ledger-before-finalization-01",
+    pagamentoId: leg.pagamentoId,
+    pagamentoAlocacaoId: leg.pagamentoAlocacaoId,
+    valorCentavos: leg.valorCentavos,
+    confirmacao: true,
+    mpAccessToken: "TEST_TOKEN"
+  });
+  assert.equal(confirmed.refundStatus, "CONFIRMADO");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.equal(
+    (await db.prepare(`SELECT status_item FROM pedido_itens WHERE id=1`).first()).status_item,
+    "ATIVO"
+  );
+  db.hook = null;
+  await app.liveTabRecovery.reconcileLiveTabPedido(db, undefined, 1);
+  assert.equal(remoteCalls, 1);
+  assert.deepEqual(
+    (await db.prepare(`SELECT id,status_item FROM pedido_itens ORDER BY id`).all()).results,
+    [
+      { id: 1, status_item: "CANCELADO" },
+      { id: 2, status_item: "ATIVO" }
+    ]
+  );
+  assert.equal(
+    (await db.prepare(`SELECT status FROM pedido_item_trocas WHERE id=?`).bind(exchange.id).first())
+      .status,
+    "CONCLUIDA"
+  );
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+});
+
+test("RECUSADO é terminal para recuperação automática e não chama o provedor", async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    return Response.json({ message: "refund rejected" }, { status: 400 });
+  });
+  const refused = await app.itemCancellation.confirmCancellationRefund(
+    db,
+    refundInput(cancellation, leg, "refund-terminal-no-auto-retry")
+  );
+  assert.equal(refused.refundStatus, "RECUSADO");
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(
+    db,
+    "TEST_TOKEN",
+    { cancellationId: cancellation.id },
+    { force: true }
+  );
+  assert.equal(calls, 1);
+  const view = await app.itemCancellation.getCancellationView(db, 1, 1);
+  assert.equal(view.pernasPendentes[0].refundRemoto.status, "RECUSADO");
+  assert.equal(view.pernasPendentes[0].refundRemoto.podeVerificar, false);
 });
