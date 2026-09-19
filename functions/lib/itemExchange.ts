@@ -406,6 +406,13 @@ export async function createItemExchange(db: D1Database, params: {
   statements.push(exchangeInvariant(db,params.pedidoId,parsed.key,awaitingRefund));
   try {
     const baseResults=await db.batch(statements);
+    // M1 (auditoria Comanda Viva): por quando o batch chega aqui, o D1 já
+    // fez commit — este `throw` é diagnóstico (direciona pro catch e pra
+    // mensagem de erro certa), não um rollback. A garantia real de
+    // atomicidade contra estado parcial é `exchangeInvariant`, o último
+    // statement do batch: ele força violação do CHECK de
+    // `pedidos.valor_total_centavos >= 0` se o estado final não bater, e
+    // isso sim reverte o batch inteiro.
     if ([0,1,2,3,4].some((i)=>Number(baseResults[i]?.meta?.changes||0)!==1)) throw new Error("TROCA_GUARD_FALHOU");
   } catch (error) {
     const winner=await buscarOperacao(db,parsed.key); if(winner)return replayExchange(db,winner,identity);

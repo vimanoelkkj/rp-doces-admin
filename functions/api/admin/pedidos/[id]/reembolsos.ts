@@ -23,6 +23,8 @@ const MENSAGENS: Record<string, string> = {
   PEDIDO_NAO_ENCONTRADO: "Pedido não encontrado",
   STATUS_PEDIDO_NAO_REEMBOLSAVEL:
     "Pedidos entregues ou cancelados não podem ser reembolsados",
+  REFUND_REQUER_FLUXO_COMANDA:
+    "Reembolsos de uma comanda aberta devem ser feitos pelo cancelamento ou troca do item correspondente.",
   PAGAMENTO_NAO_ENCONTRADO: "Pagamento não encontrado ou não confirmado",
   METODO_NAO_REEMBOLSAVEL_MANUALMENTE:
     "O método deste pagamento não permite registrar estorno manual",
