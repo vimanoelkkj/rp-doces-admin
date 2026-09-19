@@ -1,6 +1,9 @@
 .checkout-page {
   position: relative;
   padding-top: 64px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ===== ONDA DECORATIVA ===== */
@@ -22,9 +25,12 @@
 .checkout-content {
   position: relative;
   z-index: 1;
+  flex: 1;
   max-width: 820px;
+  width: 100%;
   margin: 60px auto 80px;
   padding: 0 24px;
+  box-sizing: border-box;
 }
 
 .checkout-card {
