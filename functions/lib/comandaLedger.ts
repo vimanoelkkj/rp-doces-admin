@@ -1020,6 +1020,7 @@ export interface RegisterRefundResult {
   erro?:
     | "PEDIDO_NAO_ENCONTRADO"
     | "STATUS_PEDIDO_NAO_REEMBOLSAVEL"
+    | "REFUND_REQUER_FLUXO_COMANDA"
     | "PAGAMENTO_NAO_ENCONTRADO"
     | "METODO_NAO_REEMBOLSAVEL_MANUALMENTE"
     | "VALOR_INVALIDO"
@@ -1082,10 +1083,20 @@ export async function registerManualRefund(
   }
 
   const pedido = await db
-    .prepare(`SELECT status_pedido FROM pedidos WHERE id = ?`)
+    .prepare(`SELECT status_pedido, origem_pedido, status_comanda FROM pedidos WHERE id = ?`)
     .bind(params.pedidoId)
-    .first<{ status_pedido: string }>();
+    .first<{ status_pedido: string; origem_pedido: string; status_comanda: string }>();
   if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
+  // A1 (auditoria Comanda Viva) — o refund manual genérico não sabe a qual
+  // item atribuir o estorno: ele nunca grava em `pedido_reembolso_alocacoes`
+  // nem em `pedido_item_troca_reembolso_alocacoes`. Numa comanda MANUAL
+  // ainda ABERTA isso trava permanentemente `COBERTURA_INDETERMINADA` em
+  // qualquer cancelamento/troca futuro do pedido, sem caminho de reparo.
+  // Pedidos do site ou comandas já ENCERRADAS mantêm o comportamento
+  // anterior (não participam do fluxo por item).
+  if (pedido.origem_pedido === "MANUAL" && pedido.status_comanda === "ABERTA") {
+    return { ok: false, erro: "REFUND_REQUER_FLUXO_COMANDA" };
+  }
   if (!STATUS_PEDIDO_REEMBOLSAVEIS.has(pedido.status_pedido)) {
     return { ok: false, erro: "STATUS_PEDIDO_NAO_REEMBOLSAVEL" };
   }

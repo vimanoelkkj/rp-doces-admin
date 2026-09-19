@@ -3,6 +3,7 @@
 import { recalculatePedidoStatusPagamento, type StatusFinanceiroAgregado } from "./comandaLedger";
 import { baixarEstoquePedido, type BaixaResultado } from "./stock";
 import { STATUS_FINANCEIRO_SQL } from "./pedidoFinanceiroSql";
+import { reconcileExchangeCharges } from "./itemExchange";
 
 export type PedidoReconcileResult =
   | { ok: false; motivo: "PEDIDO_NAO_ENCONTRADO" | "LEGADO_SEM_LEDGER" }
@@ -24,6 +25,19 @@ export async function reconcilePedidoAfterFinancialChange(
     ? await baixarEstoquePedido(db, pedidoId)
     : { ok: true, baixado: false };
   if (!estoque.ok) console.error("Reconciliação financeira com pendência de estoque", pedidoId, estoque.erro);
+
+  // M2 (auditoria Comanda Viva) — mesmo gatilho de qualquer mudança
+  // financeira (pagamento admin, refund admin, sync de webhook MP, ou este
+  // próprio loop de divergentes). Sem isto, uma troca AGUARDANDO_COBRANCA só
+  // convergia para CONCLUIDA quando alguém abria o detalhe do pedido no
+  // admin. Idempotente (só atualiza linhas ainda em AGUARDANDO_COBRANCA) e
+  // não cria fato financeiro nenhum — só espelha o saldo já reconciliado
+  // acima. Falha aqui não pode mascarar o resultado financeiro já apurado.
+  try {
+    await reconcileExchangeCharges(db, pedidoId);
+  } catch (err) {
+    console.error("Reconciliação financeira com pendência de troca", pedidoId, err);
+  }
 
   // A baixa revalida no batch: um refund concorrente pode mudar a projeção.
   const atual = await db.prepare(`SELECT status_pagamento FROM pedidos WHERE id = ?`)
