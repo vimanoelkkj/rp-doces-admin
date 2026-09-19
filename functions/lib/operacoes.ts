@@ -27,7 +27,8 @@ export type OperacaoTipo =
   | "PAGAMENTO_ADMIN"
   | "REFUND_ADMIN"
   | "PIX_ADMIN"
-  | "PIX_ADMIN_REGENERACAO";
+  | "PIX_ADMIN_REGENERACAO"
+  | "ITEM_ADICAO_ADMIN";
 
 export type OperacaoEscopo = "SITE" | "ADMIN";
 
@@ -118,6 +119,7 @@ export interface OperacaoRow {
   pedido_id: number | null;
   pagamento_id: number | null;
   reembolso_id: number | null;
+  pedido_item_id: number | null;
   resultado: string | null;
   erro: string | null;
   mp_idempotency_key: string | null;
@@ -127,7 +129,7 @@ export interface OperacaoRow {
 
 const COLUNAS_OPERACAO = `id, operation_key, tipo, escopo, ator_usuario_id,
   fingerprint_versao, fingerprint, fase, pedido_id, pagamento_id, reembolso_id,
-  resultado, erro, mp_idempotency_key, mp_request, mp_payment_id`;
+  pedido_item_id, resultado, erro, mp_idempotency_key, mp_request, mp_payment_id`;
 
 // Este lookup roda ANTES dos guards dependentes do estado atual do domínio.
 // É o que permite recuperar um sucesso anterior cujo resultado HTTP se
@@ -188,7 +190,8 @@ export interface ClaimFonte {
 
 export function fontePagamento(chave: string): ClaimFonte {
   return {
-    sql: `SELECT pedido_id AS pedido_id, id AS pagamento_id, NULL AS reembolso_id
+    sql: `SELECT pedido_id AS pedido_id, id AS pagamento_id, NULL AS reembolso_id,
+                 NULL AS pedido_item_id
           FROM pedido_pagamentos WHERE idempotency_key = ?`,
     args: [chave],
   };
@@ -196,7 +199,8 @@ export function fontePagamento(chave: string): ClaimFonte {
 
 export function fonteReembolso(chave: string): ClaimFonte {
   return {
-    sql: `SELECT pedido_id AS pedido_id, pagamento_id AS pagamento_id, id AS reembolso_id
+    sql: `SELECT pedido_id AS pedido_id, pagamento_id AS pagamento_id, id AS reembolso_id,
+                 NULL AS pedido_item_id
           FROM pedido_reembolsos WHERE idempotency_key = ?`,
     args: [chave],
   };
@@ -207,11 +211,53 @@ export function fontePedidoComPagamento(
   chaveDoPagamento: string,
 ): ClaimFonte {
   return {
-    sql: `SELECT p.id AS pedido_id, pp.id AS pagamento_id, NULL AS reembolso_id
+    sql: `SELECT p.id AS pedido_id, pp.id AS pagamento_id, NULL AS reembolso_id,
+                 NULL AS pedido_item_id
           FROM pedidos p
           JOIN pedido_pagamentos pp ON pp.pedido_id = p.id AND pp.idempotency_key = ?
           WHERE p.idempotency_key = ?`,
     args: [chaveDoPagamento, chaveDoPedido],
+  };
+}
+
+// Deve ser usado imediatamente depois do INSERT de `pedido_itens` no mesmo
+// D1 batch. `changes() = 1` prova que aquele INSERT criou a linha nesta
+// transacao; os demais campos vinculam a identidade relacional aos dados
+// congelados da intencao, sem busca por produto/timestamp em retries.
+export function fonteItemAdicionado(params: {
+  pedidoId: number;
+  produtoId: number;
+  quantidade: number;
+  valorUnitarioCentavos: number;
+  atorUsuarioId: number;
+}): ClaimFonte {
+  return {
+    // A fonte sempre produz uma linha. Se o INSERT imediatamente anterior
+    // nao criou exatamente o item esperado, -1 viola a FK e faz o batch
+    // inteiro voltar; um SELECT vazio apenas deixaria o claim com changes=0
+    // e permitiria que o item ficasse sem identidade A1.
+    sql: `SELECT ? AS pedido_id, NULL AS pagamento_id,
+                 NULL AS reembolso_id,
+                 COALESCE((
+                   SELECT pi.id FROM pedido_itens pi
+                   WHERE changes() = 1
+                     AND pi.id = last_insert_rowid()
+                     AND pi.pedido_id = ?
+                     AND pi.produto_id = ?
+                     AND pi.quantidade = ?
+                     AND pi.valor_unitario_centavos = ?
+                     AND pi.adicionado_por_usuario_id = ?
+                     AND pi.status_item = 'ATIVO'
+                     AND pi.estoque_estado = 'RESERVADO'
+                 ), -1) AS pedido_item_id`,
+    args: [
+      params.pedidoId,
+      params.pedidoId,
+      params.produtoId,
+      params.quantidade,
+      params.valorUnitarioCentavos,
+      params.atorUsuarioId,
+    ],
   };
 }
 
@@ -236,9 +282,10 @@ export function prepareClaimOperacao(
       `INSERT INTO pedido_operacoes (
          operation_key, tipo, escopo, ator_usuario_id, fingerprint_versao, fingerprint,
          fase, mp_idempotency_key, mp_request, resultado,
-         pedido_id, pagamento_id, reembolso_id
+         pedido_id, pagamento_id, reembolso_id, pedido_item_id
        )
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, f.pedido_id, f.pagamento_id, f.reembolso_id
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+              f.pedido_id, f.pagamento_id, f.reembolso_id, f.pedido_item_id
        FROM (${params.fonte.sql}) f`,
     )
     .bind(

@@ -24,12 +24,15 @@ interface PedidoDetalheRow {
 }
 
 interface PedidoItemRow {
+  id: number;
   produto_id: number | null;
   produto_nome: string;
   emoji: string | null;
   quantidade: number;
   valor_unitario_centavos: number;
   valor_total_centavos: number;
+  status_item: string;
+  estoque_estado: string;
 }
 
 interface StatusInput {
@@ -77,8 +80,9 @@ export const onRequestGet: PagesFunction<Env> = async ({
     }
 
     const { results: itens } = await env.DB.prepare(
-      `SELECT pi.produto_id, pi.produto_nome, p.emoji, pi.quantidade,
-              pi.valor_unitario_centavos, pi.valor_total_centavos
+      `SELECT pi.id, pi.produto_id, pi.produto_nome, p.emoji, pi.quantidade,
+              pi.valor_unitario_centavos, pi.valor_total_centavos,
+              pi.status_item, pi.estoque_estado
        FROM pedido_itens pi
        LEFT JOIN produtos p ON p.id = pi.produto_id
        WHERE pi.pedido_id = ?`,
