@@ -347,7 +347,7 @@ test('drawer de adicao preserva controles utilizaveis no mobile', async () => {
   assert.match(css, /max-height:\s*92dvh/);
 });
 
-test('preview de cancelamento mostra cobertura por pagamento, estoque e nenhuma confirmação', async t => {
+test('preview de cancelamento mostra cobertura, estoque e confirmação executável', async t => {
   const root = await mountWith(t, async url => {
     if (String(url).endsWith('/cancelamento-preview')) {
       return Response.json({
@@ -396,9 +396,8 @@ test('preview de cancelamento mostra cobertura por pagamento, estoque e nenhuma 
     assert.match(modal.textContent, /R\$\s*5,00 a estornar/);
     assert.match(modal.textContent, /Dinheiro/);
     assert.match(modal.textContent, /R\$\s*10,00 a devolver/);
-    assert.match(modal.textContent, /não irá repor estoque automaticamente/i);
-    assert.match(modal.textContent, /Cancelamento ainda não disponível nesta etapa/i);
-    assert.equal([...modal.querySelectorAll('button')].some(b => /confirmar cancelamento/i.test(b.textContent)), false);
+    assert.match(modal.textContent, /reposição depende da confirmação física/i);
+    assert.equal([...modal.querySelectorAll('button')].some(b => /confirmar cancelamento/i.test(b.textContent)), true);
   } finally {
     await unmount(root);
   }
@@ -425,6 +424,7 @@ test('preview exibe bloqueio de Pix e ação só aparece em item ativo de pedido
     await flush();
     assert.match(document.querySelector('.cancelpreview-block').textContent, /cobrança Pix pendente/i);
     assert.match(document.querySelector('.cancelpreview-stock').textContent, /reserva de 2 unidades será liberada/i);
+    assert.equal(document.querySelector('.cancelpreview-confirm').disabled, true);
     await ui.act(async () => document.querySelector('.cancelpreview-close').click());
 
     atual = detalhe({statusComanda: 'ENCERRADA'});
@@ -440,6 +440,55 @@ test('preview exibe bloqueio de Pix e ação só aparece em item ativo de pedido
     if (container.innerHTML) {
       container.innerHTML = '';
     }
+  }
+});
+
+test('troca mostra diferença, confirma uma intenção e orienta cobrança do saldo', async t => {
+  let postBody;
+  const current = detalhe({total: 1500, pago: 1500, itens: [{
+    id: 1, produto_id: 1, produto_nome: 'Bolo', emoji: '🎂', quantidade: 1,
+    valor_unitario_centavos: 1500, valor_total_centavos: 1500,
+    status_item: 'ATIVO', estoque_estado: 'BAIXADO',
+  }]});
+  const root = await mountWith(t, async (url, init = {}) => {
+    const text = String(url);
+    if (text === 'https://local.test/api/admin/produtos' || text.endsWith('/api/admin/produtos')) {
+      return Response.json({produtos: [produto({preco_centavos: 2000})]});
+    }
+    if (text.includes('/troca-preview?')) {
+      return Response.json({
+        previewFingerprint: '1:preview-troca',
+        itemDestino: {produtoId: 2, nome: 'Produto C', quantidade: 1, precoUnitarioCentavos: 2000, valorCentavos: 2000, estoqueDisponivel: 10},
+        financeiro: {totalAtualCentavos: 1500, liquidoAtualCentavos: 1500, totalProjetadoCentavos: 2000,
+          diferencaCentavos: 500, tipoDiferenca: 'COBRAR', saldoProjetadoCentavos: 500, excessoProjetadoCentavos: 0},
+        refundsPropostos: [], estoque: {acaoOrigem: 'NAO_REPOR', acoesOrigemPermitidas: ['NAO_REPOR', 'REPOR'], estadoDestino: 'RESERVADO'},
+        bloqueios: [], trocaExecutavel: true,
+      });
+    }
+    if (text.endsWith('/itens/1/trocas') && init.method === 'POST') {
+      postBody = JSON.parse(init.body);
+      return Response.json({ok: true, troca: {id: 9, status: 'AGUARDANDO_COBRANCA', reembolsoPendenteCentavos: 0, refundsPendentes: []}}, {status: 201});
+    }
+    return Response.json(current);
+  });
+  try {
+    const button = [...document.querySelectorAll('.pedmodal-btn-cancel-item')].find(b => /trocar produto/i.test(b.textContent));
+    assert.ok(button);
+    await ui.act(async () => button.click());
+    await flush();
+    const select = document.querySelector('.additem-field select');
+    await ui.act(async () => changeValue(select, '2'));
+    await flush();
+    assert.match(document.querySelector('.additem-card').textContent, /Novo valorR\$ 20,00/);
+    const confirm = document.querySelector('.additem-confirm');
+    assert.equal(confirm.disabled, false);
+    await ui.act(async () => confirm.click());
+    await flush();
+    assert.match(postBody.operationKey, /^[A-Za-z0-9._:-]{8,128}$/);
+    assert.equal(postBody.previewFingerprint, '1:preview-troca');
+    assert.match(document.querySelector('.additem-card').textContent, /diferença pode ser cobrada pelo Pix/i);
+  } finally {
+    await unmount(root);
   }
 });
 

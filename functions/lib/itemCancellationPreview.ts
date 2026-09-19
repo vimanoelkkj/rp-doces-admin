@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { fingerprint } from "./operacoes";
+
 export type AcaoEstoqueCancelamento = "LIBERAR_RESERVA" | "NAO_REPOR" | "NENHUMA";
 
 export type BloqueioCancelamento = {
@@ -8,6 +10,7 @@ export type BloqueioCancelamento = {
 };
 
 export interface ItemCancellationPreview {
+  previewFingerprint: string;
   pedidoId: number;
   item: {
     id: number;
@@ -100,6 +103,7 @@ export async function getItemCancellationPreview(
   db: D1Database,
   pedidoId: number,
   itemId: number,
+  options: { permitirCancelamentoExistente?: boolean } = {},
 ): Promise<ItemCancellationPreview> {
   const pedido = await db.prepare(
     `SELECT id, status_pedido, status_comanda FROM pedidos WHERE id = ? LIMIT 1`,
@@ -159,7 +163,7 @@ export async function getItemCancellationPreview(
     `SELECT 1 FROM pedido_item_cancelamentos
      WHERE pedido_item_id = ? AND status <> 'FALHOU' LIMIT 1`,
   ).bind(itemId).first();
-  if (cancelamentoExistente) {
+  if (cancelamentoExistente && !options.permitirCancelamentoExistente) {
     throw new ItemCancellationPreviewError(
       "CANCELAMENTO_JA_EXISTENTE",
       "Já existe um cancelamento associado a este item",
@@ -172,7 +176,11 @@ export async function getItemCancellationPreview(
   const refundLegado = await db.prepare(
     `SELECT r.id
      FROM pedido_reembolsos r
-     LEFT JOIN pedido_reembolso_alocacoes ra ON ra.reembolso_id = r.id
+     LEFT JOIN (
+       SELECT reembolso_id, valor_centavos FROM pedido_reembolso_alocacoes
+       UNION ALL
+       SELECT reembolso_id, valor_centavos FROM pedido_item_troca_reembolso_alocacoes
+     ) ra ON ra.reembolso_id = r.id
      WHERE r.pedido_id = ? AND r.status = 'REEMBOLSADO'
      GROUP BY r.id, r.valor_centavos
      HAVING COALESCE(SUM(ra.valor_centavos), 0) <> r.valor_centavos
@@ -195,7 +203,13 @@ export async function getItemCancellationPreview(
          AS valorReembolsadoCentavos
      FROM pedido_pagamento_alocacoes a
      JOIN pedido_pagamentos pp ON pp.id = a.pagamento_id
-     LEFT JOIN pedido_reembolso_alocacoes ra ON ra.pagamento_alocacao_id = a.id
+     LEFT JOIN (
+       SELECT reembolso_id, pagamento_alocacao_id, valor_centavos
+       FROM pedido_reembolso_alocacoes
+       UNION ALL
+       SELECT reembolso_id, pagamento_alocacao_id, valor_centavos
+       FROM pedido_item_troca_reembolso_alocacoes
+     ) ra ON ra.pagamento_alocacao_id = a.id
      LEFT JOIN pedido_reembolsos r ON r.id = ra.reembolso_id
      WHERE a.pedido_item_id = ? AND pp.pedido_id = ? AND pp.status = 'PAGO'
      GROUP BY a.id, pp.id, pp.metodo, a.valor_centavos
@@ -240,7 +254,7 @@ export async function getItemCancellationPreview(
     });
   }
 
-  return {
+  const conteudo = {
     pedidoId,
     item: {
       id: Number(item.id),
@@ -263,5 +277,9 @@ export async function getItemCancellationPreview(
     },
     bloqueios,
     cancelamentoExecutavel: bloqueios.length === 0,
+  };
+  return {
+    previewFingerprint: fingerprint(conteudo),
+    ...conteudo,
   };
 }

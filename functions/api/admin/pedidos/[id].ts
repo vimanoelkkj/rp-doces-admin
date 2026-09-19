@@ -5,6 +5,7 @@ import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comand
 import { getCapacidadeCobravel, getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
 import { liberarReservaPedido, PIX_MP_PENDENTE_NO_PEDIDO_SQL } from "../../../lib/stock";
 import { listarOperacoesInconclusivasDoPedido } from "../../../lib/operacoes";
+import { reconcileExchangeCharges } from "../../../lib/itemExchange";
 
 interface Env {
   DB: D1Database;
@@ -34,6 +35,11 @@ interface PedidoItemRow {
   valor_total_centavos: number;
   status_item: string;
   estoque_estado: string;
+  cancelamento_id: number | null;
+  cancelamento_status: string | null;
+  troca_id: number | null;
+  troca_status: string | null;
+  troca_item_origem_id: number | null;
 }
 
 interface StatusInput {
@@ -68,6 +74,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
   }
 
   try {
+    await reconcileExchangeCharges(env.DB, id);
     const pedido = await env.DB.prepare(
       `SELECT id, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
               status_pagamento, status_pedido, status_comanda, origem_pedido,
@@ -84,7 +91,17 @@ export const onRequestGet: PagesFunction<Env> = async ({
     const { results: itens } = await env.DB.prepare(
       `SELECT pi.id, pi.produto_id, pi.produto_nome, p.emoji, pi.quantidade,
               pi.valor_unitario_centavos, pi.valor_total_centavos,
-              pi.status_item, pi.estoque_estado
+              pi.status_item, pi.estoque_estado,
+              (SELECT c.id FROM pedido_item_cancelamentos c
+               WHERE c.pedido_item_id=pi.id AND c.status<>'FALHOU' ORDER BY c.id DESC LIMIT 1) AS cancelamento_id,
+              (SELECT c.status FROM pedido_item_cancelamentos c
+               WHERE c.pedido_item_id=pi.id AND c.status<>'FALHOU' ORDER BY c.id DESC LIMIT 1) AS cancelamento_status,
+              (SELECT t.id FROM pedido_item_trocas t
+               WHERE (t.item_origem_id=pi.id OR t.item_destino_id=pi.id) AND t.status<>'FALHOU' ORDER BY t.id DESC LIMIT 1) AS troca_id,
+              (SELECT t.status FROM pedido_item_trocas t
+               WHERE (t.item_origem_id=pi.id OR t.item_destino_id=pi.id) AND t.status<>'FALHOU' ORDER BY t.id DESC LIMIT 1) AS troca_status
+              ,(SELECT t.item_origem_id FROM pedido_item_trocas t
+               WHERE (t.item_origem_id=pi.id OR t.item_destino_id=pi.id) AND t.status<>'FALHOU' ORDER BY t.id DESC LIMIT 1) AS troca_item_origem_id
        FROM pedido_itens pi
        LEFT JOIN produtos p ON p.id = pi.produto_id
        WHERE pi.pedido_id = ?`,

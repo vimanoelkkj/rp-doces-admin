@@ -42,7 +42,7 @@ export function preparePedidoPhysicalProjection(
   operationKey?: string,
 ): D1PreparedStatement {
   const ativoControlado = `pi.pedido_id = pedidos.id
-    AND pi.status_item = 'ATIVO' AND pi.produto_id IS NOT NULL`;
+    AND pi.status_item IN ('ATIVO', 'TROCA_PENDENTE') AND pi.produto_id IS NOT NULL`;
   const operationGuard = operationKey
     ? `AND EXISTS (SELECT 1 FROM pedido_operacoes o
                    WHERE o.operation_key = ? AND o.pedido_id = pedidos.id
