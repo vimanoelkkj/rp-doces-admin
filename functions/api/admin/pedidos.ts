@@ -196,6 +196,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       ...p,
       financeiro: financeiroPorPedido.get(p.id) ?? {
         status: p.status_pagamento as FinanceiroPedido["status"],
+        brutoPagoCentavos: 0,
+        reembolsadoCentavos: 0,
+        liquidoCentavos: 0,
+        saldoCentavos: p.valor_total_centavos,
         pagoCentavos: 0,
         totalCentavos: p.valor_total_centavos,
         metodosConfirmados: [],

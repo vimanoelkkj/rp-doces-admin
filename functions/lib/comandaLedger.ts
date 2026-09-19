@@ -424,6 +424,11 @@ export async function hasNetConfirmedPayment(db: D1Database, pedidoId: number): 
 // só que por linha em vez de agregada pro pedido inteiro.
 export type FinanceiroPedido = {
   status: StatusFinanceiroAgregado;
+  brutoPagoCentavos: number;
+  reembolsadoCentavos: number;
+  liquidoCentavos: number;
+  saldoCentavos: number;
+  /** Alias retrocompativel do liquido, mantido para leitores existentes. */
   pagoCentavos: number;
   totalCentavos: number;
   metodosConfirmados: LedgerMetodo[];
@@ -455,23 +460,30 @@ const METODOS_CONFIRMADOS_QUERY = `
 `;
 
 export async function getFinanceiroPedido(db: D1Database, pedidoId: number): Promise<FinanceiroPedido> {
-  const pedido = await db
-    .prepare(`SELECT valor_total_centavos, status_pagamento FROM pedidos WHERE id = ?`)
-    .bind(pedidoId)
-    .first<{ valor_total_centavos: number; status_pagamento: string }>();
-
-  const pagoCentavos = await getNetPaidCentavos(db, pedidoId);
-
-  const { results } = await db
-    .prepare(`${METODOS_CONFIRMADOS_QUERY} AND pp.pedido_id = ?`)
-    .bind(pedidoId)
-    .all<{ metodo: string }>();
+  const [pedido, brutoPagoCentavos, reembolsadoCentavos, metodos] = await Promise.all([
+    db
+      .prepare(`SELECT valor_total_centavos, status_pagamento FROM pedidos WHERE id = ?`)
+      .bind(pedidoId)
+      .first<{ valor_total_centavos: number; status_pagamento: string }>(),
+    getPaidCentavos(db, pedidoId),
+    getRefundedCentavos(db, pedidoId),
+    db
+      .prepare(`${METODOS_CONFIRMADOS_QUERY} AND pp.pedido_id = ?`)
+      .bind(pedidoId)
+      .all<{ metodo: string }>(),
+  ]);
+  const totalCentavos = Number(pedido?.valor_total_centavos || 0);
+  const liquidoCentavos = Math.max(0, brutoPagoCentavos - reembolsadoCentavos);
 
   return {
     status: (pedido?.status_pagamento as StatusFinanceiroAgregado) ?? "PENDENTE",
-    pagoCentavos,
-    totalCentavos: Number(pedido?.valor_total_centavos || 0),
-    metodosConfirmados: ordenarMetodos(results.map((r) => r.metodo)),
+    brutoPagoCentavos,
+    reembolsadoCentavos,
+    liquidoCentavos,
+    saldoCentavos: Math.max(0, totalCentavos - liquidoCentavos),
+    pagoCentavos: liquidoCentavos,
+    totalCentavos,
+    metodosConfirmados: ordenarMetodos(metodos.results.map((r) => r.metodo)),
   };
 }
 
@@ -523,9 +535,14 @@ export async function getFinanceirosPorPedidos(
   for (const p of pedidos) {
     const bruto = brutoPorPedido.get(p.id) ?? 0;
     const reembolsado = reembolsoPorPedido.get(p.id) ?? 0;
+    const liquido = Math.max(0, bruto - reembolsado);
     resultado.set(p.id, {
       status: p.statusPagamento as StatusFinanceiroAgregado,
-      pagoCentavos: Math.max(0, bruto - reembolsado),
+      brutoPagoCentavos: bruto,
+      reembolsadoCentavos: reembolsado,
+      liquidoCentavos: liquido,
+      saldoCentavos: Math.max(0, p.valorTotalCentavos - liquido),
+      pagoCentavos: liquido,
       totalCentavos: p.valorTotalCentavos,
       metodosConfirmados: ordenarMetodos(metodosPorPedido.get(p.id) ?? []),
     });

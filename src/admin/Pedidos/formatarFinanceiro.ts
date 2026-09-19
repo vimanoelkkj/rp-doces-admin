@@ -8,6 +8,10 @@ export type StatusFinanceiroAgregado = "PENDENTE" | "PARCIAL" | "PAGO";
 
 export interface FinanceiroPedido {
   status: StatusFinanceiroAgregado;
+  brutoPagoCentavos: number;
+  reembolsadoCentavos: number;
+  liquidoCentavos: number;
+  saldoCentavos: number;
   pagoCentavos: number;
   totalCentavos: number;
   metodosConfirmados: LedgerMetodo[];
