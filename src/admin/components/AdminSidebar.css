@@ -442,9 +442,11 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    background: rgba(250, 246, 240, 0.96);
+    /* Mesma cor sólida do fundo por trás do header desktop (.admin-layout),
+       sem transparência/blur — o alpha de 96% deixava o header com um tom
+       ligeiramente diferente do desktop. */
+    background: #faf6f0;
     border-bottom: 1px solid #eadfd3;
-    backdrop-filter: blur(12px);
   }
 
   .admin-sidebar {
