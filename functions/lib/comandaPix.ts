@@ -21,7 +21,7 @@ import {
   computeWaterfallAllocations,
   type LedgerMetodo,
 } from "./comandaLedger";
-import { liberarReservaPedido } from "./stock";
+import { liberarReservaPedido, preparePedidoPhysicalProjection } from "./stock";
 import { postPagamentoMp } from "./mpPost";
 import {
   buscarOperacao,
@@ -57,6 +57,8 @@ interface PedidoItemParaReserva {
   id: number;
   produto_id: number | null;
   quantidade: number;
+  status_item: string;
+  estoque_estado: string;
 }
 
 export interface GerarPixAdminParams {
@@ -367,16 +369,24 @@ export async function createAdminPixCharge(
   const waterfall = computeWaterfallAllocations(itens, valorCentavos);
   if (!waterfall.ok) return { ok: false, erro: "VALOR_INVALIDO" };
 
-  // Reserva ainda ATIVA na escrita não é recriada nem tem TTL renovado.
-  // A leitura inicial pode perder uma corrida para a liberação. Sempre
-  // preparamos a aquisição; somente os guards no batch decidem se ela ocorre.
+  // Itens BAIXADOS pertencem ao histórico físico e nunca voltam para a
+  // reserva. Em uma comanda viva, o pedido pode legitimamente misturar
+  // BAIXADO (compra anterior) e RESERVADO (item recém-adicionado).
   const { results: itensReserva } = await db
-    .prepare(`SELECT id, produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?`)
+    .prepare(`SELECT id, produto_id, quantidade, status_item, estoque_estado
+              FROM pedido_itens WHERE pedido_id = ?`)
     .bind(params.pedidoId)
     .all<PedidoItemParaReserva>();
-  const itensParaReserva = (itensReserva || []).filter((i) => i.produto_id !== null);
-  const podeAdquirirReserva = `reserva_status IN ('SEM_RESERVA', 'LIBERADA') AND estoque_baixado_em IS NULL
-    AND NOT EXISTS (SELECT 1 FROM pedido_itens pi WHERE pi.pedido_id = pedidos.id AND pi.estoque_baixado_em IS NOT NULL)`;
+  const itensControlados = (itensReserva || []).filter(
+    (i) => i.produto_id !== null && i.status_item === "ATIVO",
+  );
+  // Preparamos o CAS também para itens que a leitura viu RESERVADOS. Se uma
+  // expiração liberar a reserva entre esta leitura e o batch, a mesma
+  // transação da cobrança consegue readquiri-la. Se nada mudou, os UPDATEs
+  // ficam em changes=0 e a reserva preexistente permanece intocada.
+  const itensParaReserva = itensControlados.filter(
+    (i) => i.estoque_estado !== "BAIXADO",
+  );
 
   // A1: derivada da operation key quando existe — o UNIQUE parcial de
   // `pedido_pagamentos.idempotency_key` garante at-most-once da tentativa.
@@ -412,22 +422,43 @@ export async function createAdminPixCharge(
   // concorrentes no mesmo pedido órfão: a segunda a commitar já vê
   // `reserva_status='ATIVA'` (gravado pela primeira) e vira no-op, nunca
   // um segundo incremento de estoque_reservado.
-  const statements = [
-    ...itensParaReserva.map((item) =>
-      db
-        .prepare(
-          `UPDATE produtos SET estoque_reservado = estoque_reservado + ?, atualizado_em = CURRENT_TIMESTAMP
-           WHERE id = ? AND EXISTS (SELECT 1 FROM pedidos WHERE id = ? AND ${podeAdquirirReserva})`,
+  const reservaStatements = itensParaReserva.flatMap((item) => [
+    db.prepare(`
+      UPDATE produtos
+      SET estoque_reservado = estoque_reservado + ?, atualizado_em = CURRENT_TIMESTAMP
+      WHERE id = ?
+        AND EXISTS (
+          SELECT 1 FROM pedido_itens pi JOIN pedidos p ON p.id = pi.pedido_id
+          WHERE pi.id = ? AND pi.pedido_id = ? AND pi.produto_id = produtos.id
+            AND pi.status_item = 'ATIVO'
+            AND pi.estoque_estado IN ('SEM_RESERVA', 'LIBERADO', 'REPOSTO')
+            AND p.status_comanda = 'ABERTA'
+            AND p.reserva_status IN ('SEM_RESERVA', 'LIBERADA', 'ATIVA')
+            AND p.estoque_baixado_em IS NULL
+            AND pi.estoque_baixado_em IS NULL
         )
-        .bind(item.quantidade, item.produto_id, params.pedidoId),
-    ),
-    db
-      .prepare(
-        `UPDATE pedidos SET reserva_status = 'ATIVA', reserva_expira_em = datetime('now', '+31 minutes'),
-           atualizado_em = CURRENT_TIMESTAMP
-         WHERE id = ? AND ${podeAdquirirReserva}`,
-      )
-      .bind(params.pedidoId),
+    `).bind(item.quantidade, item.produto_id, item.id, params.pedidoId),
+    db.prepare(`
+      UPDATE pedido_itens
+      SET estoque_estado = 'RESERVADO',
+          estoque_reservado_em = CURRENT_TIMESTAMP,
+          estoque_liberado_em = NULL,
+          estoque_reposto_em = NULL
+      WHERE id = ? AND pedido_id = ? AND produto_id = ? AND quantidade = ?
+        AND status_item = 'ATIVO'
+        AND estoque_estado IN ('SEM_RESERVA', 'LIBERADO', 'REPOSTO')
+        AND estoque_baixado_em IS NULL
+        AND EXISTS (SELECT 1 FROM pedidos p
+                    WHERE p.id = pedido_itens.pedido_id
+                      AND p.status_comanda = 'ABERTA'
+                      AND p.reserva_status IN ('SEM_RESERVA', 'LIBERADA', 'ATIVA')
+                      AND p.estoque_baixado_em IS NULL)
+    `).bind(item.id, params.pedidoId, item.produto_id, item.quantidade),
+  ]);
+
+  const statements = [
+    ...reservaStatements,
+    preparePedidoPhysicalProjection(db, params.pedidoId),
     db
       .prepare(
         `INSERT INTO pedido_pagamentos (
@@ -436,8 +467,16 @@ export async function createAdminPixCharge(
          )
          SELECT ?, ?, 'ADMIN', ?, 'PENDENTE', ?, ?, ?
          WHERE ? <= ${CAPACIDADE_COBRAVEL_SQL}
-           AND EXISTS (SELECT 1 FROM pedidos WHERE id = ? AND reserva_status = 'ATIVA' AND estoque_baixado_em IS NULL
-             AND NOT EXISTS (SELECT 1 FROM pedido_itens pi WHERE pi.pedido_id = pedidos.id AND pi.estoque_baixado_em IS NOT NULL))
+           AND EXISTS (
+             SELECT 1 FROM pedidos
+             WHERE id = ? AND status_comanda = 'ABERTA'
+               AND NOT EXISTS (
+                 SELECT 1 FROM pedido_itens pi
+                 WHERE pi.pedido_id = pedidos.id
+                   AND pi.status_item = 'ATIVO' AND pi.produto_id IS NOT NULL
+                   AND pi.estoque_estado NOT IN ('RESERVADO', 'BAIXADO')
+               )
+           )
            AND (
              ? IS NULL
              OR (
@@ -510,8 +549,8 @@ export async function createAdminPixCharge(
     throw err;
   }
 
-  const reservaFlipIndex = itensParaReserva.length;
-  const pagamentoStmtIndex = itensParaReserva.length + 1;
+  const reservaProjectionIndex = reservaStatements.length;
+  const pagamentoStmtIndex = reservaProjectionIndex + 1;
   const pagamentoId = Number(batchResults[pagamentoStmtIndex]?.meta?.last_row_id || 0);
   if (!pagamentoId) {
     // CAS na escrita recusou: outra requisição consumiu a capacidade ou (numa
@@ -529,7 +568,10 @@ export async function createAdminPixCharge(
   // (changes=0), esta operação não pode compensar aquela reserva numa
   // falha do MP a seguir, porque não foi ela quem a adquiriu.
   const reservaCriadaPorEstaOperacao =
-    Number(batchResults[reservaFlipIndex]?.meta?.changes || 0) === 1;
+    itensParaReserva.length > 0
+    && reservaStatements.every(
+      (_, index) => Number(batchResults[index]?.meta?.changes || 0) === 1,
+    );
 
   const envio = await postPagamentoMp(env.MP_ACCESS_TOKEN, mpIdempotencyKey, mpRequest);
 

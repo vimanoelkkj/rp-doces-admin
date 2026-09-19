@@ -253,6 +253,30 @@
   gap: 8px;
 }
 
+.pedmodal-items-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pedmodal-btn-add-item {
+  padding: 7px 12px;
+  border: 1px solid #d8c8b8;
+  border-radius: 999px;
+  background: #faf6f0;
+  color: #634738;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pedmodal-btn-add-item:hover {
+  border-color: #634738;
+  background: #f5efe8;
+}
+
 .pedmodal-item-row {
   display: flex;
   align-items: center;
@@ -345,6 +369,36 @@
   font-weight: 400;
   font-size: 14px;
   color: #2b1d1a;
+}
+
+.pedmodal-financial-grid {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid #eadfd3;
+  border-radius: 14px;
+  background: #faf6f0;
+}
+
+.pedmodal-financial-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #8c7a76;
+}
+
+.pedmodal-financial-row strong {
+  color: #2b1d1a;
+}
+
+.pedmodal-financial-row--balance {
+  padding-top: 8px;
+  border-top: 1px solid #eadfd3;
+  color: #634738;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 /* ── Pix administrativo ── */
@@ -524,6 +578,15 @@
   .pedmodal-summary-row,
   .pedmodal-pix-copy-row {
     gap: 12px;
+  }
+
+  .pedmodal-items-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pedmodal-btn-add-item {
+    width: 100%;
   }
 
   /* O botão fica colado na borda esquerda quando o header empilha (coluna);
