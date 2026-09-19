@@ -24,6 +24,13 @@ const bundle = await build({
       export * as adminItems from './functions/api/admin/pedidos/[id]/itens';
       export * as itemCancellationPreview from './functions/lib/itemCancellationPreview';
       export * as adminItemCancellationPreview from './functions/api/admin/pedidos/[id]/itens/[itemId]/cancelamento-preview';
+      export * as itemCancellation from './functions/lib/itemCancellation';
+      export * as adminItemCancellation from './functions/api/admin/pedidos/[id]/itens/[itemId]/cancelamentos';
+      export * as adminItemCancellationRefund from './functions/api/admin/pedidos/[id]/cancelamentos/[cancelamentoId]/reembolsos';
+      export * as itemExchange from './functions/lib/itemExchange';
+      export * as adminItemExchangePreview from './functions/api/admin/pedidos/[id]/itens/[itemId]/troca-preview';
+      export * as adminItemExchange from './functions/api/admin/pedidos/[id]/itens/[itemId]/trocas';
+      export * as adminItemExchangeRefund from './functions/api/admin/pedidos/[id]/trocas/[trocaId]/reembolsos';
       export * as operacoes from './functions/lib/operacoes';
       export * as mpPost from './functions/lib/mpPost';
       export * as adminCreate from './functions/api/admin/pedidos';

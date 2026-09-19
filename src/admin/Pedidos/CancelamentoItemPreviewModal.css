@@ -129,6 +129,15 @@
   line-height: 1.5;
 }
 
+.cancelpreview-field { display:flex; flex-direction:column; gap:7px; color:#634738; font:600 12px "Manrope",sans-serif; }
+.cancelpreview-field select,.cancelpreview-field textarea { border:1px solid #d8c9ba; border-radius:10px; padding:10px; background:#fff; color:#2b1d1a; font:14px "Manrope",sans-serif; }
+.cancelpreview-confirm,.cancelpreview-refund-leg button { border:0; border-radius:10px; padding:10px 14px; background:#8b3f2f; color:#fff; cursor:pointer; font-weight:700; }
+.cancelpreview-confirm:disabled,.cancelpreview-refund-leg button:disabled { opacity:.55; cursor:not-allowed; }
+.cancelpreview-success { display:flex; flex-direction:column; gap:5px; padding:14px; border-radius:12px; background:#f1f7ef; color:#355c36; font-family:"Manrope",sans-serif; }
+.cancelpreview-refund-leg { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px; border:1px solid #eadfd3; border-radius:12px; font-family:"Manrope",sans-serif; }
+.cancelpreview-refund-leg>div { display:flex; flex-direction:column; gap:3px; }
+.cancelpreview-refund-leg>span,.cancelpreview-success span { font-size:12px; color:#8c7a76; }
+
 .cancelpreview-stock {
   padding: 14px;
   border-radius: 14px;

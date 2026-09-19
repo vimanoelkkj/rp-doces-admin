@@ -6,6 +6,7 @@ import "./PedidoDetalheModal.css";
 import { formatarFinanceiro, type FinanceiroPedido } from "./formatarFinanceiro";
 import AdicionarItemModal from "./AdicionarItemModal";
 import CancelamentoItemPreviewModal from "./CancelamentoItemPreviewModal";
+import TrocarItemModal from "./TrocarItemModal";
 
 /* ── Types (espelham o retorno de GET /api/admin/pedidos/:id) ── */
 interface PedidoItemRow {
@@ -18,6 +19,11 @@ interface PedidoItemRow {
   valor_total_centavos: number;
   status_item: string;
   estoque_estado: string;
+  cancelamento_id: number | null;
+  cancelamento_status: string | null;
+  troca_id: number | null;
+  troca_status: string | null;
+  troca_item_origem_id: number | null;
 }
 
 type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
@@ -140,6 +146,7 @@ export default function PedidoDetalheModal({
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [adicionandoItem, setAdicionandoItem] = useState(false);
   const [itemCancelamentoPreviewId, setItemCancelamentoPreviewId] = useState<number | null>(null);
+  const [itemTroca, setItemTroca] = useState<PedidoItemRow | null>(null);
   const dataRef = useRef<PedidoDetalheResponse | null>(null);
   const pixEmVooRef = useRef<Set<string>>(new Set());
   const onStatusChangedRef = useRef(onStatusChanged);
@@ -452,18 +459,34 @@ export default function PedidoDetalheModal({
                     <span className="pedmodal-item-price">
                       {formatarPreco(item.valor_total_centavos)}
                     </span>
+                    {item.cancelamento_id && item.cancelamento_status !== "CONCLUIDO" && (
+                      <span className="pedmodal-item-qty">Cancelamento em andamento · {(item.cancelamento_status ?? "").replace(/_/g, " ")}</span>
+                    )}
+                    {item.troca_id && item.troca_status !== "CONCLUIDA" && (
+                      <span className="pedmodal-item-qty">Troca em andamento · {(item.troca_status ?? "").replace(/_/g, " ")}</span>
+                    )}
                     {item.status_item === "ATIVO" &&
                       data.pedido.status_comanda === "ABERTA" &&
                       data.pedido.status_pedido !== "ENTREGUE" &&
-                      data.pedido.status_pedido !== "CANCELADO" && (
+                      data.pedido.status_pedido !== "CANCELADO" && !item.troca_id && (
+                        <>
                         <button
                           type="button"
                           className="pedmodal-btn-cancel-item"
                           onClick={() => setItemCancelamentoPreviewId(item.id)}
                         >
-                          Cancelar item
+                          {item.cancelamento_id ? "Ver cancelamento" : "Cancelar item"}
                         </button>
+                        {!item.cancelamento_id && (
+                          <button type="button" className="pedmodal-btn-cancel-item" onClick={() => setItemTroca(item)}>
+                            Trocar produto
+                          </button>
+                        )}
+                        </>
                       )}
+                    {item.status_item === "ATIVO" && item.troca_id && item.troca_item_origem_id === item.id && (
+                      <button type="button" className="pedmodal-btn-cancel-item" onClick={() => setItemTroca(item)}>Ver troca</button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -668,7 +691,13 @@ export default function PedidoDetalheModal({
           orderId={orderId}
           itemId={itemCancelamentoPreviewId}
           onClose={() => setItemCancelamentoPreviewId(null)}
+          existingCancellationId={data?.itens.find((item) => item.id === itemCancelamentoPreviewId)?.cancelamento_id}
+          onChanged={async () => { await carregarPedido(true); onStatusChanged?.(); }}
         />
+      )}
+      {itemTroca && (
+        <TrocarItemModal orderId={orderId} item={itemTroca} existingExchangeId={itemTroca.troca_id}
+          onClose={() => setItemTroca(null)} onChanged={async () => { await carregarPedido(true); onStatusChanged?.(); }} />
       )}
     </div>,
     document.body,
