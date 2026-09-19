@@ -1,0 +1,173 @@
+.gerando-page {
+  position: relative;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 40px 24px;
+  background: #faf6f0;
+  color: #2b1d1a;
+  font-family: "Manrope", sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.gerando-page h1 {
+  margin: 20px 0 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.gerando-page p {
+  margin: 0 0 20px;
+  color: #8c7a76;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.gerando-ilustracao {
+  position: relative;
+  width: 140px;
+  height: 140px;
+}
+
+.moeda {
+  position: absolute;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #c9b7a8;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #d38b80 0 18%, transparent 20%),
+    radial-gradient(circle, #f3e8dc 0 45%, #d38b80 47% 53%, #eadfd3 55%);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.5);
+  animation: moeda-caindo 1.5s ease-in infinite;
+}
+
+.moeda-1 {
+  left: 50px;
+  animation-delay: 0s;
+}
+
+.moeda-2 {
+  left: 78px;
+  width: 14px;
+  height: 14px;
+  animation-delay: 0.5s;
+}
+
+.moeda-3 {
+  left: 64px;
+  width: 12px;
+  height: 12px;
+  animation-delay: 1s;
+}
+
+.pote {
+  position: absolute;
+  z-index: 2;
+  left: 42px;
+  bottom: 26px;
+  width: 56px;
+  height: 38px;
+  border-radius: 8px 8px 18px 18px;
+  background: #d38b80;
+}
+
+.pote::before,
+.pote::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  width: 14px;
+  height: 18px;
+  border-radius: 8px;
+  background: #d38b80;
+}
+
+.pote::before {
+  left: -12px;
+}
+
+.pote::after {
+  right: -12px;
+}
+
+.pote-borda {
+  position: absolute;
+  top: -7px;
+  left: -4px;
+  width: 64px;
+  height: 14px;
+  border-radius: 50%;
+  background: #eadfd3;
+}
+
+.pote-borda::after {
+  content: "";
+  position: absolute;
+  inset: 3px 6px;
+  border-radius: 50%;
+  background: #c97b70;
+}
+
+.pote-brilho {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  width: 10px;
+  height: 20px;
+  border-radius: 5px;
+  background: rgba(234, 223, 211, 0.35);
+}
+
+.pote-sombra {
+  position: absolute;
+  left: 31px;
+  bottom: 12px;
+  width: 78px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(99, 71, 56, 0.08);
+}
+
+.gerando-marca {
+  position: absolute;
+  bottom: 40px;
+  left: 0;
+  right: 0;
+  color: #8c7a76;
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+@keyframes moeda-caindo {
+  0% {
+    top: 8px;
+    opacity: 0;
+    transform: rotateY(0deg);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 68px;
+    opacity: 0;
+    transform: rotateY(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moeda {
+    animation: none;
+  }
+}

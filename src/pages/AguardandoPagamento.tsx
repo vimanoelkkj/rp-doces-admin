@@ -9,7 +9,9 @@ import {
   novaOperationKey,
   SLOT_CHECKOUT,
 } from "../lib/operationKey";
-import cakeCartImage from "../assets/cake-cart-image.png";
+import PreparandoPedido from "./PreparandoPedido";
+import GerandoPagamento from "./GerandoPagamento";
+import ProcessandoPagamento from "./ProcessandoPagamento";
 import "./AguardandoPagamento.css";
 
 interface CheckoutState {
@@ -41,12 +43,16 @@ const POLL_INTERVAL_MS = 4000;
 
 // A criação do Pix é uma única chamada de rede — não existem "3 etapas"
 // reais de backend. Essa progressão de 2 passos (carrinho → gerando
-// pagamento) é puramente estética: tempos mínimos garantem que o cliente
+// pagamento) é puramente estética: durações mínimas garantem que o cliente
 // perceba as duas telas mesmo quando a rede responde quase instantaneamente,
 // sem inventar uma 3ª etapa fake no lugar do QR Code real (que precisa
-// aparecer assim que estiver pronto para o cliente pagar).
-const MIN_STEP_DURATION_MS = 1200;
-const MIN_TOTAL_LOADING_MS = 2400;
+// aparecer assim que estiver pronto para o cliente pagar). Cada visita sorteia
+// uma duração diferente dentro da faixa — não é uma barra de progresso com
+// passos previsíveis, é só a percepção de "algo está acontecendo".
+const LOADING_STEP_MIN_MS = 1500;
+const LOADING_STEP_MAX_MS = 2500;
+const duracaoAleatoria = () =>
+  LOADING_STEP_MIN_MS + Math.random() * (LOADING_STEP_MAX_MS - LOADING_STEP_MIN_MS);
 
 // Aparece só depois que a confirmação do pagamento chega de verdade (via
 // polling), como uma transição breve antes de navegar para o resultado —
@@ -54,7 +60,6 @@ const MIN_TOTAL_LOADING_MS = 2400;
 // cliente. Sem barra de progresso: não é uma etapa fake com passos
 // conhecidos, é só uma pausa perceptível pra não pular direto pro
 // resultado no instante em que detectamos a mudança de status.
-const PROCESSANDO_DELAY_MS = 1400;
 
 type Status = "criando" | "pronto" | "processando" | "erro";
 type LoadingStep = 1 | 2;
@@ -98,10 +103,14 @@ export default function AguardandoPagamento() {
     let cancelled = false;
     const controller = new AbortController();
     const startedAt = Date.now();
+    // Sorteados uma vez por visita: cada carregamento "varia" de verdade,
+    // não é sempre o mesmo tempo fixo.
+    const duracaoPasso1 = duracaoAleatoria();
+    const duracaoPasso2 = duracaoAleatoria();
 
     const stepTimer = setTimeout(() => {
       if (!cancelled) setLoadingStep(2);
-    }, MIN_STEP_DURATION_MS);
+    }, duracaoPasso1);
 
     fetch("/api/checkout", {
       method: "POST",
@@ -138,7 +147,7 @@ export default function AguardandoPagamento() {
       .then((data) => {
         if (cancelled || !data) return;
         const elapsed = Date.now() - startedAt;
-        const remaining = Math.max(0, MIN_TOTAL_LOADING_MS - elapsed);
+        const remaining = Math.max(0, duracaoPasso1 + duracaoPasso2 - elapsed);
         setTimeout(() => {
           if (cancelled) return;
           setPayment(data);
@@ -239,7 +248,7 @@ export default function AguardandoPagamento() {
           state: { items: state!.items, totalCentavos: payment.totalCentavos },
         });
       }
-    }, PROCESSANDO_DELAY_MS);
+    }, duracaoAleatoria());
 
     return () => clearTimeout(timer);
   }, [status, resultadoPendente, payment, navigate, clearCart, state]);
@@ -252,6 +261,12 @@ export default function AguardandoPagamento() {
   };
 
   if (!state) return null;
+
+  // Telas de loading tomam a tela inteira (mesmo tratamento visual do
+  // Figma) — sem Header/Footer/onda do storefront por trás.
+  if (status === "criando" && loadingStep === 1) return <PreparandoPedido />;
+  if (status === "criando" && loadingStep === 2) return <GerandoPagamento />;
+  if (status === "processando") return <ProcessandoPagamento />;
 
   const minutes =
     timeLeft != null ? Math.floor(timeLeft / 60).toString().padStart(2, "0") : "--";
@@ -278,66 +293,6 @@ export default function AguardandoPagamento() {
 
       <main className="aguardando-content">
         <div className="aguardando-card">
-          {status === "criando" && loadingStep === 1 && (
-            <div className="aguardando-step">
-              <img
-                src={cakeCartImage}
-                alt=""
-                aria-hidden="true"
-                className="aguardando-mascot aguardando-mascot--walk"
-              />
-              <h1 className="payment-title">Preparando seu pedido...</h1>
-              <p className="payment-subtitle">
-                Organizando os itens do seu carrinho de doçuras artesanais
-              </p>
-            </div>
-          )}
-
-          {status === "criando" && loadingStep === 2 && (
-            <div className="aguardando-step">
-              <div className="loading-pix-icon" aria-hidden="true">
-                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path className="pix-arm" d="M21 17 L7 3 L3 7 L17 21 Q19 19 21 17Z" />
-                  <path className="pix-arm" d="M27 17 L41 3 L45 7 L31 21 Q29 19 27 17Z" />
-                  <path className="pix-arm" d="M31 27 L45 41 L41 45 L27 31 Q29 29 31 27Z" />
-                  <path className="pix-arm" d="M17 27 L3 41 L7 45 L21 31 Q19 29 17 27Z" />
-                </svg>
-              </div>
-              <h1 className="payment-title">Gerando pagamento...</h1>
-              <p className="payment-subtitle">
-                Criando seu código Pix para garantir seus doces fresquinhos
-              </p>
-            </div>
-          )}
-
-          {status === "processando" && (
-            <div className="aguardando-step">
-              <div className="processando-clock-icon" aria-hidden="true">
-                <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="32" cy="32" r="28" stroke="#634738" strokeWidth="2" />
-                  <line
-                    x1="32" y1="32" x2="32" y2="16"
-                    stroke="#634738" strokeWidth="2" strokeLinecap="round"
-                    className="processando-clock-minute"
-                  />
-                  <line
-                    x1="32" y1="32" x2="42" y2="32"
-                    stroke="#634738" strokeWidth="2" strokeLinecap="round"
-                    className="processando-clock-hour"
-                  />
-                  <circle cx="32" cy="32" r="2" fill="#634738" />
-                </svg>
-              </div>
-              <h1 className="payment-title">Processando pagamento...</h1>
-              <p className="payment-subtitle">Confirmando o recebimento do seu Pix</p>
-              <div className="processando-dots">
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-          )}
-
           {status === "erro" && (
             <div className="aguardando-step">
               <div className="status-icon status-icon--error">

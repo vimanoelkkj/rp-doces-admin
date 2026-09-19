@@ -6,6 +6,9 @@ import AguardandoPagamento from "./pages/AguardandoPagamento";
 import PedidoConfirmado from "./pages/PedidoConfirmado";
 import PagamentoNaoAprovado from "./pages/PagamentoNaoAprovado";
 import AcompanharPedido from "./pages/AcompanharPedido";
+import PreparandoPedido from "./pages/PreparandoPedido";
+import GerandoPagamento from "./pages/GerandoPagamento";
+import ProcessandoPagamento from "./pages/ProcessandoPagamento";
 import PageTransition from "./components/PageTransition";
 import { CartProvider } from "./context/CartContext";
 import AdminLogin from "./admin/Login";
@@ -38,6 +41,11 @@ function StorefrontRoutes() {
           element={<PagamentoNaoAprovado />}
         />
         <Route path="/pedido/:token" element={<AcompanharPedido />} />
+        {/* Preview isolado das telas de loading — ficam paradas em loop,
+            sem passar pelo checkout real. Só para inspeção visual. */}
+        <Route path="/dev/preparando-pedido" element={<PreparandoPedido />} />
+        <Route path="/dev/gerando-pagamento" element={<GerandoPagamento />} />
+        <Route path="/dev/processando-pagamento" element={<ProcessandoPagamento />} />
       </Routes>
     </PageTransition>
   );
