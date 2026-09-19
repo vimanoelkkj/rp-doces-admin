@@ -1,0 +1,168 @@
+/* ===== PREPARANDO PEDIDO — Loading Screen ===== */
+
+.preparando-screen {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #faf6f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.preparando-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ---- Cupcake ---- */
+.preparando-cupcake {
+  width: 128px;
+  height: 128px;
+  margin-bottom: 8px;
+}
+
+/* Cupcake body: gentle float */
+.cupcake-body {
+  animation: cupcake-float 3s ease-in-out infinite;
+  transform-origin: center 90px; /* pivot at base of cup */
+}
+
+@keyframes cupcake-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Cherry: drop + bounce, repeating */
+.cherry-group {
+  animation: cherry-drop 2.4s ease-out infinite;
+  transform-origin: 79.5px 23.5px;
+}
+
+@keyframes cherry-drop {
+  0% {
+    transform: translateY(-35px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  40% {
+    transform: translateY(2px);
+  }
+  52% {
+    transform: translateY(-5px);
+  }
+  64% {
+    transform: translateY(1px);
+  }
+  74% {
+    transform: translateY(-2px);
+  }
+  84%, 100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ---- Pulsing dots ---- */
+.preparando-dots {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.preparando-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #634738;
+  animation: dot-pulse 1.4s ease-in-out infinite;
+}
+.preparando-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.preparando-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dot-pulse {
+  0%, 80%, 100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---- Text ---- */
+.preparando-title {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #2b1d1a;
+  margin: 0;
+  text-align: center;
+}
+
+.preparando-subtitle {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8c7a76;
+  margin: 0;
+  text-align: center;
+}
+
+/* ---- Footer ---- */
+.preparando-footer {
+  position: absolute;
+  bottom: 40px;
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #8c7a76;
+  margin: 0;
+  text-align: center;
+}
+
+/* ===== DARK MODE ===== */
+[data-theme="dark"] .preparando-screen {
+  background: #1a1412;
+}
+[data-theme="dark"] .preparando-title {
+  color: #faf6f0;
+}
+[data-theme="dark"] .preparando-subtitle {
+  color: #a89b92;
+}
+[data-theme="dark"] .preparando-dot {
+  background: #a89b92;
+}
+[data-theme="dark"] .preparando-footer {
+  color: #a89b92;
+}
+
+/* ===== Reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .cherry-group,
+  .cupcake-body,
+  .preparando-dot {
+    animation: none;
+  }
+  .cherry-group {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  .preparando-dot {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+}
