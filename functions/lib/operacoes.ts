@@ -28,7 +28,8 @@ export type OperacaoTipo =
   | "REFUND_ADMIN"
   | "PIX_ADMIN"
   | "PIX_ADMIN_REGENERACAO"
-  | "ITEM_ADICAO_ADMIN";
+  | "ITEM_ADICAO_ADMIN"
+  | "ITEM_CANCELAMENTO_ADMIN";
 
 export type OperacaoEscopo = "SITE" | "ADMIN";
 
@@ -120,6 +121,7 @@ export interface OperacaoRow {
   pagamento_id: number | null;
   reembolso_id: number | null;
   pedido_item_id: number | null;
+  pedido_item_cancelamento_id: number | null;
   resultado: string | null;
   erro: string | null;
   mp_idempotency_key: string | null;
@@ -129,7 +131,8 @@ export interface OperacaoRow {
 
 const COLUNAS_OPERACAO = `id, operation_key, tipo, escopo, ator_usuario_id,
   fingerprint_versao, fingerprint, fase, pedido_id, pagamento_id, reembolso_id,
-  pedido_item_id, resultado, erro, mp_idempotency_key, mp_request, mp_payment_id`;
+  pedido_item_id, pedido_item_cancelamento_id, resultado, erro,
+  mp_idempotency_key, mp_request, mp_payment_id`;
 
 // Este lookup roda ANTES dos guards dependentes do estado atual do domínio.
 // É o que permite recuperar um sucesso anterior cujo resultado HTTP se

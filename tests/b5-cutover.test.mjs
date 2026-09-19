@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { app } from './helpers/b3.mjs';
 import {
   bancoProducao, aplicarB5, aplicarEstoquePorItem, aplicarOperacaoPorItem,
+  aplicarCancelamentoPorItem,
   validarB5, snapshot, SCRIPT_B5,
 } from './helpers/b5.mjs';
 
@@ -203,6 +204,7 @@ test('SITE: checkout real cria pedido multi-item contra o schema de produção',
   await aplicarB5(db);
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
+  await aplicarCancelamentoPorItem(db);
   mpPixOk(t);
   const pedidosAntes = await contar(db, 'pedidos');
 
@@ -260,6 +262,7 @@ test('SITE: A1 continua idempotente contra o schema legado', async t => {
   await aplicarB5(db);
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
+  await aplicarCancelamentoPorItem(db);
   mpPixOk(t);
 
   const primeira = await (await checkoutSite(db, [{ id: 1, quantity: 1 }])).json();
@@ -275,6 +278,7 @@ test('ADMIN: pedido manual real é criado contra o schema de produção', async 
   await aplicarB5(db);
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
+  await aplicarCancelamentoPorItem(db);
   const pedidosAntes = await contar(db, 'pedidos');
 
   const resposta = await pedidoAdmin(db, [
@@ -318,6 +322,7 @@ test('ADMIN: replay da mesma key não cria segundo pedido de balcão', async t =
   await aplicarB5(db);
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
+  await aplicarCancelamentoPorItem(db);
   const a = await (await pedidoAdmin(db, [{ produtoId: 2, quantidade: 1 }])).json();
   const b = await (await pedidoAdmin(db, [{ produtoId: 2, quantidade: 1 }])).json();
   assert.equal(b.pedidoId, a.pedidoId);
@@ -332,6 +337,7 @@ test('reconciliador reconhece a baixa histórica por item sem repetir efeito', a
   await aplicarB5(db);
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
+  await aplicarCancelamentoPorItem(db);
   const antes = await snapshot(db);
 
   // O pedido 5 é o caso observado: PAGO, reserva ATIVA, pedidos

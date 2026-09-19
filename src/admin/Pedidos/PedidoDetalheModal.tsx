@@ -5,6 +5,7 @@ import { useAdminModal } from "../components/useAdminModal";
 import "./PedidoDetalheModal.css";
 import { formatarFinanceiro, type FinanceiroPedido } from "./formatarFinanceiro";
 import AdicionarItemModal from "./AdicionarItemModal";
+import CancelamentoItemPreviewModal from "./CancelamentoItemPreviewModal";
 
 /* ── Types (espelham o retorno de GET /api/admin/pedidos/:id) ── */
 interface PedidoItemRow {
@@ -138,6 +139,7 @@ export default function PedidoDetalheModal({
   const [agora, setAgora] = useState(() => Date.now());
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [adicionandoItem, setAdicionandoItem] = useState(false);
+  const [itemCancelamentoPreviewId, setItemCancelamentoPreviewId] = useState<number | null>(null);
   const dataRef = useRef<PedidoDetalheResponse | null>(null);
   const pixEmVooRef = useRef<Set<string>>(new Set());
   const onStatusChangedRef = useRef(onStatusChanged);
@@ -446,9 +448,23 @@ export default function PedidoDetalheModal({
                       {formatarPreco(item.valor_unitario_centavos)}
                     </span>
                   </div>
-                  <span className="pedmodal-item-price">
-                    {formatarPreco(item.valor_total_centavos)}
-                  </span>
+                  <div className="pedmodal-item-actions">
+                    <span className="pedmodal-item-price">
+                      {formatarPreco(item.valor_total_centavos)}
+                    </span>
+                    {item.status_item === "ATIVO" &&
+                      data.pedido.status_comanda === "ABERTA" &&
+                      data.pedido.status_pedido !== "ENTREGUE" &&
+                      data.pedido.status_pedido !== "CANCELADO" && (
+                        <button
+                          type="button"
+                          className="pedmodal-btn-cancel-item"
+                          onClick={() => setItemCancelamentoPreviewId(item.id)}
+                        >
+                          Cancelar item
+                        </button>
+                      )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -645,6 +661,13 @@ export default function PedidoDetalheModal({
           onAdded={async () => {
             await carregarPedido(true);
           }}
+        />
+      )}
+      {itemCancelamentoPreviewId !== null && (
+        <CancelamentoItemPreviewModal
+          orderId={orderId}
+          itemId={itemCancelamentoPreviewId}
+          onClose={() => setItemCancelamentoPreviewId(null)}
         />
       )}
     </div>,
