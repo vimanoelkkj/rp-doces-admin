@@ -265,8 +265,10 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       ...itensParaPersistir.map((item) =>
         env.DB.prepare(
           `INSERT INTO pedido_itens
-             (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos)
-           SELECT id, ?, ?, ?, ?, ? FROM pedidos WHERE token_publico = ?`,
+             (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos,
+              valor_total_centavos, status_item, estoque_estado, estoque_reservado_em)
+           SELECT id, ?, ?, ?, ?, ?, 'ATIVO', 'RESERVADO', CURRENT_TIMESTAMP
+           FROM pedidos WHERE token_publico = ?`,
         ).bind(
           item.produtoId,
           item.produtoNome,

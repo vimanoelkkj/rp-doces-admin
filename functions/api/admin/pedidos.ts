@@ -575,8 +575,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         env.DB.prepare(
           `INSERT INTO pedido_itens
              (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos,
-              valor_total_centavos, adicionado_por_usuario_id, adicionado_em)
-           SELECT id, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP FROM pedidos WHERE token_publico = ?`,
+              valor_total_centavos, adicionado_por_usuario_id, adicionado_em,
+              status_item, estoque_estado, estoque_reservado_em)
+           SELECT id, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
+                  'ATIVO', 'RESERVADO', CURRENT_TIMESTAMP
+           FROM pedidos WHERE token_publico = ?`,
         ).bind(
           item.produtoId,
           item.produtoNome,

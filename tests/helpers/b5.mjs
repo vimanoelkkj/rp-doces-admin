@@ -35,6 +35,9 @@ export const SCRIPT_B5 = separarStatements(
 export const VALIDACAO_B5 = separarStatements(
   await readFile('scripts/b5-production-validate.sql', 'utf8'),
 );
+export const ESTOQUE_POR_ITEM = separarStatements(
+  await readFile('migrations/0016_pedido_itens_estado_estoque.sql', 'utf8'),
+);
 
 function criarDb(mf) {
   const db = {
@@ -83,6 +86,11 @@ export async function bancoProducao(t, { popular = true } = {}) {
 /** Aplica o script de compatibilidade, statement a statement, como o cutover. */
 export async function aplicarB5(db) {
   for (const sql of SCRIPT_B5) await db.prepare(sql).run();
+}
+
+/** Aplica localmente a migration desta fase sobre a topologia historica. */
+export async function aplicarEstoquePorItem(db) {
+  for (const sql of ESTOQUE_POR_ITEM) await db.prepare(sql).run();
 }
 
 /** Roda a validação e devolve as linhas de verificacao/resultado. */

@@ -38,13 +38,30 @@ const RECONCILE_PEDIDOS_BATCH_SIZE = 4;
 export async function reconcilePedidosDivergentes(db: D1Database): Promise<void> {
   const { results } = await db.prepare(`
     SELECT id FROM (
-      SELECT p.id, p.status_pagamento, p.estoque_baixado_em, p.atualizado_em,
-             ${STATUS_FINANCEIRO_SQL} AS esperado
+      SELECT p.id, p.status_pagamento, p.reserva_status, p.estoque_baixado_em, p.atualizado_em,
+             ${STATUS_FINANCEIRO_SQL} AS esperado,
+             EXISTS (
+               SELECT 1
+               FROM pedido_itens pi
+               WHERE pi.pedido_id = p.id
+                 AND pi.status_item = 'ATIVO'
+                 AND pi.produto_id IS NOT NULL
+                 AND pi.estoque_estado IN ('RESERVADO', 'SEM_RESERVA', 'LIBERADO')
+             ) AS estoque_pendente
       FROM pedidos p
       WHERE EXISTS (SELECT 1 FROM pedido_pagamentos pp WHERE pp.pedido_id = p.id)
-    )
+    ) divergente
     WHERE status_pagamento IS NOT esperado
-       OR (esperado = 'PAGO' AND estoque_baixado_em IS NULL)
+       OR (esperado = 'PAGO' AND estoque_pendente)
+       OR (esperado = 'PAGO'
+           AND EXISTS (
+             SELECT 1 FROM pedido_itens pi
+             WHERE pi.pedido_id = divergente.id
+               AND pi.status_item = 'ATIVO'
+               AND pi.produto_id IS NOT NULL
+           )
+           AND NOT estoque_pendente
+           AND (reserva_status <> 'CONVERTIDA' OR estoque_baixado_em IS NULL))
     ORDER BY (status_pagamento IS NOT esperado) DESC, atualizado_em ASC, id ASC
     LIMIT ?
   `).bind(RECONCILE_PEDIDOS_BATCH_SIZE).all<{ id: number }>();

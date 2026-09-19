@@ -214,7 +214,7 @@ const concurrent = [
   {
     name: 'reservation release',
     setup: db => db.prepare("UPDATE pedido_pagamentos SET status='EXPIRADO' WHERE id=1").run(),
-    atWrite: s => s.some(x => x.sql.includes("reserva_status = 'LIBERADA'")),
+    atWrite: s => s.some(x => x.sql.includes("estoque_estado = 'LIBERADO'")),
     run: db => app.stock.liberarReservaPedido(db, 1),
     check(s) {
       assert.equal(s.pedido.reserva_status, 'LIBERADA');

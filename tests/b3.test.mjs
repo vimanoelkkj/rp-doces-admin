@@ -168,6 +168,7 @@ function converted(s) {
   assert.equal(s.pedido.reserva_status, 'CONVERTIDA');
   assert.ok(s.pedido.estoque_baixado_em);
   assert.ok(s.itens[0].estoque_baixado_em);
+  assert.equal(s.itens[0].estoque_estado, 'BAIXADO');
   assert.equal(s.produtos[0].estoque, 8);
   assert.equal(s.produtos[0].estoque_reservado, 0);
   assert.equal(s.pagamentos.length, 1);
@@ -373,16 +374,21 @@ test('legacy without ledger and missing order are explicit non-mutating results'
   assert.deepEqual(await app.reconcile.reconcilePedidoAfterFinancialChange(db,999),{ok:false,motivo:'PEDIDO_NAO_ENCONTRADO'});
 });
 
-test('contradictory physical marks are not silently debited again', async t => {
+test('item BAIXADO is authoritative even if the global projection is stale', async t => {
   const db = await fixture(t, { paid:true, reserve:'CONVERTIDA' });
-  assert.equal((await reconcile(db)).estoque.erro,'ESTADO_ESTOQUE_INCONSISTENTE');
-  assert.equal((await state(db)).produtos[0].estoque,10);
+  await db.prepare("UPDATE pedidos SET reserva_status='ATIVA',estoque_baixado_em=NULL WHERE id=1").run();
+  assert.deepEqual((await reconcile(db)).estoque,{ok:true,baixado:false});
+  const s = await state(db);
+  assert.equal(s.produtos[0].estoque,10);
+  assert.equal(s.pedido.reserva_status,'CONVERTIDA');
+  assert.ok(s.pedido.estoque_baixado_em);
 });
 
 test('another conversion completed between reads is a successful no-op', async t => {
   const db=await fixture(t,{paid:true});
   db.hook=async (s,op)=>{
-    if (op==='all' && s[0].sql.includes('SELECT id, produto_id, quantidade FROM pedido_itens')) {
+    if (op==='all' && s[0].sql.includes('SELECT id, produto_id, quantidade') &&
+        s[0].sql.includes('FROM pedido_itens')) {
       db.hook=null;
       await reconcile(db);
     }

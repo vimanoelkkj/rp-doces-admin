@@ -101,16 +101,26 @@ export async function fixture(t, { paid = false, reserve = 'ATIVA', ledger = tru
   };
   // Fresh schema only; no access to .wrangler, .dev.vars or remote bindings.
   for (const sql of migrations) await db.prepare(sql).run();
+  const estoqueEstado = reserve === 'ATIVA' ? 'RESERVADO'
+    : reserve === 'LIBERADA' ? 'LIBERADO'
+      : reserve === 'CONVERTIDA' ? 'BAIXADO'
+        : 'SEM_RESERVA';
+  const baixadoEm = estoqueEstado === 'BAIXADO' ? '2026-01-01 00:00:00' : null;
   await db.batch([
     db.prepare(`INSERT INTO usuarios_admin(id,nome,username,email,senha_hash,papel)
       VALUES(1,'Teste','teste','teste@example.invalid','unused','OWNER')`),
     db.prepare(`INSERT INTO produtos(id,nome,categoria,preco_centavos,estoque,estoque_reservado)
       VALUES(1,'Bolo','BOLO',5000,10,?)`).bind(reserve === 'ATIVA' ? 2 : 0),
     db.prepare(`INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,
-      idempotency_key,reserva_status,mp_payment_id,pix_expira_em)
-      VALUES(1,'token','Teste','000',10000,'pedido-1',?,'101','2099-01-01T00:00:00Z')`).bind(reserve),
+      idempotency_key,reserva_status,estoque_baixado_em,mp_payment_id,pix_expira_em)
+      VALUES(1,'token','Teste','000',10000,'pedido-1',?,?,'101','2099-01-01T00:00:00Z')`).bind(reserve, baixadoEm),
     db.prepare(`INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,
-      valor_unitario_centavos,valor_total_centavos) VALUES(1,1,1,'Bolo',2,5000,10000)`),
+      valor_unitario_centavos,valor_total_centavos,estoque_baixado_em,status_item,
+      estoque_estado,estoque_reservado_em,estoque_liberado_em)
+      VALUES(1,1,1,'Bolo',2,5000,10000,?,'ATIVO',?,
+        CASE WHEN ?='RESERVADO' THEN CURRENT_TIMESTAMP ELSE NULL END,
+        CASE WHEN ?='LIBERADO' THEN CURRENT_TIMESTAMP ELSE NULL END)`)
+      .bind(baixadoEm, estoqueEstado, estoqueEstado, estoqueEstado),
   ]);
   if (ledger) await db.batch([
     db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
