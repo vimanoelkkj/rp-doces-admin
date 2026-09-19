@@ -5,6 +5,11 @@
   min-height: 100vh;
 }
 
+/* Mesmo fundo da página, sem a caixa mais clara do Footer padrão. */
+.confirmado-page .footer {
+  background: #faf6f0;
+}
+
 /* Onda */
 .confirmado-wave {
   position: absolute;
