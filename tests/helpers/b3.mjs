@@ -33,6 +33,8 @@ const bundle = await build({
       export * as adminItemExchangeRefund from './functions/api/admin/pedidos/[id]/trocas/[trocaId]/reembolsos';
       export * as operacoes from './functions/lib/operacoes';
       export * as mpPost from './functions/lib/mpPost';
+      export * as mpRefund from './functions/lib/mpRefund';
+      export * as mpRefundIntent from './functions/lib/mpRefundIntent';
       export * as adminCreate from './functions/api/admin/pedidos';
       export * as promocao from './shared/promocao';
       export * as produtos from './functions/api/produtos';

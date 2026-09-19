@@ -19,6 +19,12 @@ interface RefundLeg {
   metodo: string;
   valorCentavos: number;
   confirmacaoManualPermitida: boolean;
+  refundRemoto?: {
+    status: "PENDENTE" | "PROCESSANDO" | "CONFIRMADO" | "RECUSADO" | "INCONCLUSIVO";
+    tentativas: number;
+    mpRefundId: string | null;
+    ultimoErro: string | null;
+  };
 }
 interface Preview {
   previewFingerprint: string;
@@ -205,7 +211,8 @@ export default function TrocarItemModal({
       );
       const b = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(b.error ?? "Falha ao registrar devolução");
-      refundKeys.current.delete(leg.pagamentoAlocacaoId);
+      if (["CONFIRMADO", "RECUSADO"].includes(b.refundStatus) || !b.refundStatus)
+        refundKeys.current.delete(leg.pagamentoAlocacaoId);
       setExchange(b.troca);
       await onChanged();
     } catch (e) {
@@ -213,6 +220,15 @@ export default function TrocarItemModal({
     } finally {
       setSaving(false);
     }
+  };
+  const remoteLabel = (leg: RefundLeg) => {
+    const status = leg.refundRemoto?.status;
+    if (status === "PENDENTE") return "Aguardando envio";
+    if (status === "PROCESSANDO") return "Processando";
+    if (status === "CONFIRMADO") return "Confirmado";
+    if (status === "RECUSADO") return "Recusado — tentar novamente";
+    if (status === "INCONCLUSIVO") return "Inconclusivo — verificar novamente";
+    return "Solicitar estorno";
   };
   return createPortal(
     <div className="additem-overlay" {...modalProps}>
@@ -357,7 +373,9 @@ export default function TrocarItemModal({
                     Confirmar devolução
                   </button>
                 ) : (
-                  <span>Aguardando estorno pelo sistema</span>
+                  <button onClick={() => void refund(leg)} disabled={saving}>
+                    {remoteLabel(leg)}
+                  </button>
                 )}
               </div>
             ))}

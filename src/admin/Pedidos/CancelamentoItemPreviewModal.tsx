@@ -41,6 +41,12 @@ interface Perna {
   metodo: string;
   valorCentavos: number;
   confirmacaoManualPermitida: boolean;
+  refundRemoto?: {
+    status: "PENDENTE" | "PROCESSANDO" | "CONFIRMADO" | "RECUSADO" | "INCONCLUSIVO";
+    tentativas: number;
+    mpRefundId: string | null;
+    ultimoErro: string | null;
+  };
 }
 interface Cancelamento {
   id: number;
@@ -174,7 +180,8 @@ export default function CancelamentoItemPreviewModal({
       const body = await response.json().catch(() => ({}));
       if (!response.ok)
         throw new Error(body.error ?? "Falha ao registrar devolução");
-      refundKeys.current.delete(leg.pagamentoAlocacaoId);
+      if (["CONFIRMADO", "RECUSADO"].includes(body.refundStatus) || !body.refundStatus)
+        refundKeys.current.delete(leg.pagamentoAlocacaoId);
       setCancelamento(body.cancelamento);
       await onChanged();
     } catch (e) {
@@ -191,6 +198,15 @@ export default function CancelamentoItemPreviewModal({
       INCONCLUSIVO: "Reconciliação pendente",
       FALHOU: "Falhou",
     })[s] ?? s;
+  const remoteLabel = (leg: Perna) => {
+    const status = leg.refundRemoto?.status;
+    if (status === "PENDENTE") return "Aguardando envio";
+    if (status === "PROCESSANDO") return "Processando";
+    if (status === "CONFIRMADO") return "Confirmado";
+    if (status === "RECUSADO") return "Recusado — tentar novamente";
+    if (status === "INCONCLUSIVO") return "Inconclusivo — verificar novamente";
+    return "Solicitar estorno";
+  };
   return createPortal(
     <div className="cancelpreview-overlay" {...modalProps}>
       <section className="cancelpreview-card" role="dialog" aria-modal="true">
@@ -352,7 +368,9 @@ export default function CancelamentoItemPreviewModal({
                     Confirmar devolução
                   </button>
                 ) : (
-                  <span>Aguardando estorno pelo sistema</span>
+                  <button type="button" onClick={() => void refund(leg)} disabled={saving}>
+                    {remoteLabel(leg)}
+                  </button>
                 )}
               </div>
             ))}

@@ -1023,6 +1023,7 @@ export interface RegisterRefundResult {
     | "REFUND_REQUER_FLUXO_COMANDA"
     | "PAGAMENTO_NAO_ENCONTRADO"
     | "METODO_NAO_REEMBOLSAVEL_MANUALMENTE"
+    | "REFUND_PIX_MP_REMOTO_EM_ANDAMENTO"
     | "VALOR_INVALIDO"
     | "SALDO_REEMBOLSAVEL_INSUFICIENTE"
     | "OPERATION_KEY_INVALIDA"
@@ -1117,6 +1118,12 @@ export async function registerManualRefund(
     // não os estorna. `PIX_MP` passou a ser registrável no B-2 — ver a nota
     // em METODOS_MANUAIS_REEMBOLSAVEIS.
     return { ok: false, erro: "METODO_NAO_REEMBOLSAVEL_MANUALMENTE" };
+  }
+  if (pagamento.metodo === "PIX_MP") {
+    const intencaoAtiva = await db.prepare(`SELECT 1 FROM pedido_reembolso_pix_mp_intencoes
+      WHERE pagamento_id=? AND status IN ('PENDENTE','PROCESSANDO','INCONCLUSIVO') LIMIT 1`)
+      .bind(params.pagamentoId).first();
+    if (intencaoAtiva) return { ok: false, erro: "REFUND_PIX_MP_REMOTO_EM_ANDAMENTO" };
   }
   // O estorno só pode ser registrado sobre um pagamento efetivamente
   // confirmado (`status = 'PAGO'`, validado acima) — e o registro NUNCA muta

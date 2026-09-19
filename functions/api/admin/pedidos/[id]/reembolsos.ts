@@ -31,6 +31,8 @@ const MENSAGENS: Record<string, string> = {
   VALOR_INVALIDO: "Valor inválido",
   SALDO_REEMBOLSAVEL_INSUFICIENTE:
     "O saldo reembolsável mudou antes da confirmação. Atualize e tente novamente.",
+  REFUND_PIX_MP_REMOTO_EM_ANDAMENTO:
+    "Existe um estorno Mercado Pago em andamento para este pagamento.",
   ...OPERACAO_MENSAGENS,
 };
 
