@@ -525,4 +525,11 @@
   .pedmodal-pix-copy-row {
     gap: 12px;
   }
+
+  /* O botão fica colado na borda esquerda quando o header empilha (coluna);
+     alinhar o menu pela direita (padrão desktop) o jogava pra fora da tela. */
+  .pedmodal-status-menu {
+    left: 0;
+    right: auto;
+  }
 }
