@@ -573,6 +573,12 @@ export interface ItemComSaldo {
 // consumido (é exatamente o que separa este helper de
 // allocateFullValueAcrossItems).
 export async function getItensComSaldo(db: D1Database, pedidoId: number): Promise<ItemComSaldo[]> {
+  // Durante o cutover B5 o mesmo código ainda precisa ler a topologia
+  // histórica, anterior à 0016. Depois da migration, somente ATIVO entra no
+  // waterfall; TROCA_PENDENTE jamais recebe cobertura financeira.
+  const temStatusItem = await db.prepare(
+    `SELECT 1 FROM pragma_table_info('pedido_itens') WHERE name='status_item' LIMIT 1`,
+  ).first();
   const { results } = await db
     .prepare(
       `SELECT pi.id AS itemId, pi.valor_total_centavos AS valorTotalCentavos,
@@ -580,7 +586,7 @@ export async function getItensComSaldo(db: D1Database, pedidoId: number): Promis
        FROM pedido_itens pi
        LEFT JOIN pedido_pagamento_alocacoes a ON a.pedido_item_id = pi.id
        LEFT JOIN pedido_pagamentos pp ON pp.id = a.pagamento_id
-       WHERE pi.pedido_id = ?
+       WHERE pi.pedido_id = ? ${temStatusItem ? "AND pi.status_item = 'ATIVO'" : ""}
        GROUP BY pi.id, pi.valor_total_centavos
        ORDER BY pi.id ASC`,
     )

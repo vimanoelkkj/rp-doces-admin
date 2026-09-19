@@ -29,7 +29,8 @@ export type OperacaoTipo =
   | "PIX_ADMIN"
   | "PIX_ADMIN_REGENERACAO"
   | "ITEM_ADICAO_ADMIN"
-  | "ITEM_CANCELAMENTO_ADMIN";
+  | "ITEM_CANCELAMENTO_ADMIN"
+  | "ITEM_TROCA_ADMIN";
 
 export type OperacaoEscopo = "SITE" | "ADMIN";
 
@@ -122,6 +123,7 @@ export interface OperacaoRow {
   reembolso_id: number | null;
   pedido_item_id: number | null;
   pedido_item_cancelamento_id: number | null;
+  pedido_item_troca_id: number | null;
   resultado: string | null;
   erro: string | null;
   mp_idempotency_key: string | null;
@@ -131,7 +133,7 @@ export interface OperacaoRow {
 
 const COLUNAS_OPERACAO = `id, operation_key, tipo, escopo, ator_usuario_id,
   fingerprint_versao, fingerprint, fase, pedido_id, pagamento_id, reembolso_id,
-  pedido_item_id, pedido_item_cancelamento_id, resultado, erro,
+  pedido_item_id, pedido_item_cancelamento_id, pedido_item_troca_id, resultado, erro,
   mp_idempotency_key, mp_request, mp_payment_id`;
 
 // Este lookup roda ANTES dos guards dependentes do estado atual do domínio.
@@ -142,10 +144,28 @@ export async function buscarOperacao(
   db: D1Database,
   key: string,
 ): Promise<OperacaoRow | null> {
-  return await db
-    .prepare(`SELECT ${COLUNAS_OPERACAO} FROM pedido_operacoes WHERE operation_key = ? LIMIT 1`)
-    .bind(key)
-    .first<OperacaoRow>();
+  try {
+    return await db
+      .prepare(`SELECT ${COLUNAS_OPERACAO} FROM pedido_operacoes WHERE operation_key = ? LIMIT 1`)
+      .bind(key)
+      .first<OperacaoRow>();
+  } catch (error) {
+    // Durante o cutover local entre 0018 e 0019, as operacoes anteriores
+    // continuam plenamente utilizaveis. A coluna de troca so passa a
+    // existir com a migration que habilita ITEM_TROCA_ADMIN.
+    if (!/no such column:\s*pedido_item_troca_id/i.test(String(error))) throw error;
+    return await db
+      .prepare(
+        `SELECT id, operation_key, tipo, escopo, ator_usuario_id,
+                fingerprint_versao, fingerprint, fase, pedido_id, pagamento_id,
+                reembolso_id, pedido_item_id, pedido_item_cancelamento_id,
+                NULL AS pedido_item_troca_id, resultado, erro,
+                mp_idempotency_key, mp_request, mp_payment_id
+         FROM pedido_operacoes WHERE operation_key = ? LIMIT 1`,
+      )
+      .bind(key)
+      .first<OperacaoRow>();
+  }
 }
 
 export type ConflitoOperacao =
@@ -194,7 +214,8 @@ export interface ClaimFonte {
 export function fontePagamento(chave: string): ClaimFonte {
   return {
     sql: `SELECT pedido_id AS pedido_id, id AS pagamento_id, NULL AS reembolso_id,
-                 NULL AS pedido_item_id
+                 NULL AS pedido_item_id, NULL AS pedido_item_cancelamento_id,
+                 NULL AS pedido_item_troca_id
           FROM pedido_pagamentos WHERE idempotency_key = ?`,
     args: [chave],
   };
@@ -203,7 +224,8 @@ export function fontePagamento(chave: string): ClaimFonte {
 export function fonteReembolso(chave: string): ClaimFonte {
   return {
     sql: `SELECT pedido_id AS pedido_id, pagamento_id AS pagamento_id, id AS reembolso_id,
-                 NULL AS pedido_item_id
+                 NULL AS pedido_item_id, NULL AS pedido_item_cancelamento_id,
+                 NULL AS pedido_item_troca_id
           FROM pedido_reembolsos WHERE idempotency_key = ?`,
     args: [chave],
   };
@@ -215,7 +237,8 @@ export function fontePedidoComPagamento(
 ): ClaimFonte {
   return {
     sql: `SELECT p.id AS pedido_id, pp.id AS pagamento_id, NULL AS reembolso_id,
-                 NULL AS pedido_item_id
+                 NULL AS pedido_item_id, NULL AS pedido_item_cancelamento_id,
+                 NULL AS pedido_item_troca_id
           FROM pedidos p
           JOIN pedido_pagamentos pp ON pp.pedido_id = p.id AND pp.idempotency_key = ?
           WHERE p.idempotency_key = ?`,
@@ -252,7 +275,9 @@ export function fonteItemAdicionado(params: {
                      AND pi.adicionado_por_usuario_id = ?
                      AND pi.status_item = 'ATIVO'
                      AND pi.estoque_estado = 'RESERVADO'
-                 ), -1) AS pedido_item_id`,
+                 ), -1) AS pedido_item_id,
+                 NULL AS pedido_item_cancelamento_id,
+                 NULL AS pedido_item_troca_id`,
     args: [
       params.pedidoId,
       params.pedidoId,
@@ -261,6 +286,34 @@ export function fonteItemAdicionado(params: {
       params.valorUnitarioCentavos,
       params.atorUsuarioId,
     ],
+  };
+}
+
+// Deve seguir imediatamente o INSERT guardado de cada entidade. A FK -1
+// funciona como sentinela transacional: se o fato anterior nao nasceu, o
+// batch inteiro e revertido em vez de deixar uma operacao A1 orfa.
+export function fonteCancelamentoCriado(pedidoId: number, itemId: number): ClaimFonte {
+  return {
+    sql: `SELECT ? AS pedido_id, NULL AS pagamento_id, NULL AS reembolso_id,
+                 ? AS pedido_item_id,
+                 COALESCE((SELECT c.id FROM pedido_item_cancelamentos c
+                           WHERE changes() = 1 AND c.id = last_insert_rowid()
+                             AND c.pedido_id = ? AND c.pedido_item_id = ?), -1)
+                   AS pedido_item_cancelamento_id,
+                 NULL AS pedido_item_troca_id`,
+    args: [pedidoId, itemId, pedidoId, itemId],
+  };
+}
+
+export function fonteTrocaCriada(pedidoId: number, itemId: number): ClaimFonte {
+  return {
+    sql: `SELECT ? AS pedido_id, NULL AS pagamento_id, NULL AS reembolso_id,
+                 ? AS pedido_item_id, NULL AS pedido_item_cancelamento_id,
+                 COALESCE((SELECT t.id FROM pedido_item_trocas t
+                           WHERE changes() = 1 AND t.id = last_insert_rowid()
+                             AND t.pedido_id = ? AND t.item_origem_id = ?), -1)
+                   AS pedido_item_troca_id`,
+    args: [pedidoId, itemId, pedidoId, itemId],
   };
 }
 
@@ -280,15 +333,46 @@ export function prepareClaimOperacao(
   db: D1Database,
   params: ClaimParams,
 ): D1PreparedStatement {
+  if (params.tipo !== "ITEM_TROCA_ADMIN") {
+    return db
+      .prepare(
+        `INSERT INTO pedido_operacoes (
+           operation_key, tipo, escopo, ator_usuario_id, fingerprint_versao, fingerprint,
+           fase, mp_idempotency_key, mp_request, resultado,
+           pedido_id, pagamento_id, reembolso_id, pedido_item_id,
+           pedido_item_cancelamento_id
+         )
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                f.pedido_id, f.pagamento_id, f.reembolso_id, f.pedido_item_id,
+                f.pedido_item_cancelamento_id
+         FROM (${params.fonte.sql}) f`,
+      )
+      .bind(
+        params.key,
+        params.tipo,
+        params.escopo,
+        params.atorUsuarioId,
+        FINGERPRINT_VERSAO,
+        params.fingerprint,
+        params.fase,
+        params.mpIdempotencyKey ?? null,
+        params.mpRequest ?? null,
+        params.resultado ?? null,
+        ...params.fonte.args,
+      );
+  }
+
   return db
     .prepare(
       `INSERT INTO pedido_operacoes (
          operation_key, tipo, escopo, ator_usuario_id, fingerprint_versao, fingerprint,
          fase, mp_idempotency_key, mp_request, resultado,
-         pedido_id, pagamento_id, reembolso_id, pedido_item_id
+         pedido_id, pagamento_id, reembolso_id, pedido_item_id,
+         pedido_item_cancelamento_id, pedido_item_troca_id
        )
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-              f.pedido_id, f.pagamento_id, f.reembolso_id, f.pedido_item_id
+              f.pedido_id, f.pagamento_id, f.reembolso_id, f.pedido_item_id,
+              f.pedido_item_cancelamento_id, f.pedido_item_troca_id
        FROM (${params.fonte.sql}) f`,
     )
     .bind(
