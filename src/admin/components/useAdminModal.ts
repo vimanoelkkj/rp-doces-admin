@@ -41,7 +41,11 @@ function unlockPageScroll() {
   const { cssText, scrollX, scrollY } = savedBodyState;
   savedBodyState = null;
   document.body.style.cssText = cssText;
-  window.scrollTo(scrollX, scrollY);
+  // `html { scroll-behavior: smooth }` é global (âncoras do site) — sem
+  // `behavior: "instant"` explícito, essa restauração técnica herdava o
+  // smooth e a tela visivelmente "pulava pro topo e deslizava de volta"
+  // ao fechar qualquer modal.
+  window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
 }
 
 export function useAdminModal(active: boolean, onClose: () => void) {
