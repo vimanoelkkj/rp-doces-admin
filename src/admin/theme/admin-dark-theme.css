@@ -653,6 +653,18 @@ html[data-admin-theme="dark"] .loj-image-thumb {
   background: #1a1412;
   border-color: #3d3230;
 }
+html[data-admin-theme="dark"] .loj-image-label {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .loj-image-empty {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .loj-image-link {
+  color: #e8a99e;
+}
+html[data-admin-theme="dark"] .loj-image-link:hover {
+  color: #f0c7bd;
+}
 
 /* ═══════════════════════════════════════════
    Novo Produto Modal
