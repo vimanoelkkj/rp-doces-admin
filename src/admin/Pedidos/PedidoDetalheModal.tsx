@@ -1,17 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { novaOperationKey } from "../../lib/operationKey";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import "./PedidoDetalheModal.css";
 import { formatarFinanceiro, type FinanceiroPedido } from "./formatarFinanceiro";
+import AdicionarItemModal from "./AdicionarItemModal";
 
 /* ── Types (espelham o retorno de GET /api/admin/pedidos/:id) ── */
 interface PedidoItemRow {
+  id: number;
+  produto_id: number | null;
   produto_nome: string;
   emoji: string | null;
   quantidade: number;
   valor_unitario_centavos: number;
   valor_total_centavos: number;
+  status_item: string;
+  estoque_estado: string;
 }
 
 type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
@@ -27,6 +32,7 @@ interface PedidoRow {
   status_comanda: string;
   criado_em: string;
   pago_em: string | null;
+  origem_pedido: "SITE" | "MANUAL";
 }
 
 interface PixAdminPendente {
@@ -43,6 +49,7 @@ interface PedidoDetalheResponse {
   itens: PedidoItemRow[];
   financeiro: FinanceiroPedido;
   pixAdminPendentes: PixAdminPendente[];
+  capacidadeCobravelCentavos: number;
   /** B-3: cobranças sem confirmação do Mercado Pago (leitura, nunca decisão). */
   operacoesInconclusivas: {
     tipo: string;
@@ -130,6 +137,14 @@ export default function PedidoDetalheModal({
   const [pixAviso, setPixAviso] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [adicionandoItem, setAdicionandoItem] = useState(false);
+  const dataRef = useRef<PedidoDetalheResponse | null>(null);
+  const pixEmVooRef = useRef<Set<string>>(new Set());
+  const onStatusChangedRef = useRef(onStatusChanged);
+
+  useEffect(() => {
+    onStatusChangedRef.current = onStatusChanged;
+  }, [onStatusChanged]);
 
   // A1: uma key por INTENÇÃO de cobrança. A identidade da ação já distingue
   // "gerar Pix novo" de "regenerar o Pix X", então o mapa é indexado por
@@ -140,25 +155,39 @@ export default function PedidoDetalheModal({
   // pode nascer como uma segunda cobrança com outra identidade no MP.
   const pixKeysRef = useRef<Map<string, string>>(new Map());
 
-  const carregarPedido = () => {
-    setLoading(true);
+  const carregarPedido = useCallback((silencioso = false) => {
+    if (!silencioso) setLoading(true);
     return fetch(`/api/admin/pedidos/${orderId}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Falha ao carregar pedido");
         return response.json() as Promise<PedidoDetalheResponse>;
       })
       .then((result) => {
+        const anterior = dataRef.current;
+        const financeiroMudou = Boolean(
+          anterior &&
+            (anterior.financeiro.status !== result.financeiro.status ||
+              anterior.financeiro.pagoCentavos !== result.financeiro.pagoCentavos ||
+              anterior.financeiro.totalCentavos !== result.financeiro.totalCentavos),
+        );
+        dataRef.current = result;
         setData(result);
         setError(null);
+        if (silencioso && financeiroMudou) onStatusChangedRef.current?.();
       })
       .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  };
+      .finally(() => {
+        if (!silencioso) setLoading(false);
+      });
+  }, [orderId]);
 
   useEffect(() => {
-    carregarPedido();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId]);
+    dataRef.current = null;
+    setData(null);
+    setAdicionandoItem(false);
+    pixKeysRef.current.clear();
+    void carregarPedido();
+  }, [carregarPedido]);
 
   // Contador de expiração dos Pix pendentes — só liga o relógio quando há
   // algo pra contar. Nunca decide sozinho que um Pix expirou: só o
@@ -171,13 +200,24 @@ export default function PedidoDetalheModal({
     return () => clearInterval(interval);
   }, [data]);
 
-  const gerarPix = (substituiId?: number) => {
+  // O webhook segue sendo a autoridade da confirmação. Enquanto existir
+  // uma cobrança pendente, uma releitura espaçada traz a convergência para a
+  // tela sem exigir refresh manual nem manter polling quando não há trabalho.
+  useEffect(() => {
+    if (!data || data.pixAdminPendentes.length === 0) return;
+    const interval = setInterval(() => void carregarPedido(true), 5000);
+    return () => clearInterval(interval);
+  }, [carregarPedido, data]);
+
+  const gerarPix = (substituiId?: number, valorCentavos?: number) => {
     setPixError(null);
     setPixAviso(null);
     if (substituiId) setRegenerandoId(substituiId);
     else setGerando(true);
 
     const acao = substituiId ? `regen:${substituiId}` : "novo";
+    if (pixEmVooRef.current.has(acao)) return;
+    pixEmVooRef.current.add(acao);
     let operationKey = pixKeysRef.current.get(acao);
     if (!operationKey) {
       operationKey = novaOperationKey();
@@ -188,7 +228,9 @@ export default function PedidoDetalheModal({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
-        substituiId ? { substituiId, operationKey } : { operationKey },
+        substituiId
+          ? { substituiId, operationKey }
+          : { operationKey, valorCentavos },
       ),
     })
       .then(async (response) => {
@@ -214,10 +256,11 @@ export default function PedidoDetalheModal({
           throw new Error(body.error ?? "Falha ao gerar Pix");
         }
         pixKeysRef.current.delete(acao);
-        return carregarPedido();
+        return carregarPedido(true);
       })
       .catch((err) => setPixError(err.message))
       .finally(() => {
+        pixEmVooRef.current.delete(acao);
         setGerando(false);
         setRegenerandoId(null);
       });
@@ -377,9 +420,23 @@ export default function PedidoDetalheModal({
 
             {/* Items */}
             <div className="pedmodal-items">
-              <span className="pedmodal-section-label">Itens do pedido</span>
-              {data.itens.map((item, i) => (
-                <div className="pedmodal-item-row" key={i}>
+              <div className="pedmodal-items-header">
+                <span className="pedmodal-section-label">Itens do pedido</span>
+                {data.pedido.origem_pedido === "MANUAL" &&
+                  data.pedido.status_comanda === "ABERTA" &&
+                  (data.pedido.status_pedido === "NOVO" ||
+                    data.pedido.status_pedido === "PREPARANDO") && (
+                    <button
+                      type="button"
+                      className="pedmodal-btn-add-item"
+                      onClick={() => setAdicionandoItem(true)}
+                    >
+                      + Adicionar produto
+                    </button>
+                  )}
+              </div>
+              {data.itens.map((item) => (
+                <div className="pedmodal-item-row" key={item.id}>
                   <div className="pedmodal-item-info">
                     <span className="pedmodal-item-name">
                       {item.produto_nome} {item.emoji ?? ""}
@@ -426,6 +483,31 @@ export default function PedidoDetalheModal({
                 )}
               </div>
 
+              <div className="pedmodal-financial-grid">
+                <div className="pedmodal-financial-row">
+                  <span>Total</span>
+                  <strong>{formatarPreco(data.financeiro.totalCentavos)}</strong>
+                </div>
+                <div className="pedmodal-financial-row">
+                  <span>Pago</span>
+                  <strong>{formatarPreco(data.financeiro.brutoPagoCentavos)}</strong>
+                </div>
+                {data.financeiro.reembolsadoCentavos > 0 && (
+                  <div className="pedmodal-financial-row">
+                    <span>Reembolsado</span>
+                    <strong>- {formatarPreco(data.financeiro.reembolsadoCentavos)}</strong>
+                  </div>
+                )}
+                <div className="pedmodal-financial-row">
+                  <span>Líquido</span>
+                  <strong>{formatarPreco(data.financeiro.liquidoCentavos)}</strong>
+                </div>
+                <div className="pedmodal-financial-row pedmodal-financial-row--balance">
+                  <span>Saldo</span>
+                  <strong>{formatarPreco(data.financeiro.saldoCentavos)}</strong>
+                </div>
+              </div>
+
               {/* B-3: cobrança cujo envio ao Mercado Pago ficou inconclusivo.
                   Reusa o mesmo bloco de aviso do caminho ambíguo, porque a
                   ação correta é idêntica: nunca tentar de novo às cegas, só
@@ -439,7 +521,11 @@ export default function PedidoDetalheModal({
                     pedido não teve confirmação do Mercado Pago. Verificamos automaticamente; não
                     gere outra sem conferir.
                   </span>
-                  <button type="button" className="pedmodal-btn-edit" onClick={carregarPedido}>
+                  <button
+                    type="button"
+                    className="pedmodal-btn-edit"
+                    onClick={() => void carregarPedido(true)}
+                  >
                     Atualizar pedido
                   </button>
                 </div>
@@ -454,7 +540,7 @@ export default function PedidoDetalheModal({
                     className="pedmodal-btn-edit"
                     onClick={() => {
                       setPixAviso(null);
-                      carregarPedido();
+                      void carregarPedido(true);
                     }}
                   >
                     Atualizar pedido
@@ -462,20 +548,19 @@ export default function PedidoDetalheModal({
                 </div>
               )}
 
-              {/* "Gerar Pix" só aparece sem nenhum Pix administrativo vivo —
-                  com Pix parciais aditivos já existentes, esta primeira
-                  versão só oferece regenerar cada um, não criar mais um em
-                  cima (o backend suporta; a UI não oferece isso ainda). */}
-              {data.pixAdminPendentes.length === 0 &&
-                data.pedido.status_comanda === "ABERTA" &&
-                data.financeiro.totalCentavos > data.financeiro.pagoCentavos && (
+              {data.pedido.status_comanda === "ABERTA" &&
+                data.capacidadeCobravelCentavos > 0 && (
                   <button
                     type="button"
                     className="pedmodal-btn-advance"
-                    onClick={() => gerarPix()}
+                    onClick={() =>
+                      gerarPix(undefined, data.capacidadeCobravelCentavos)
+                    }
                     disabled={gerando}
                   >
-                    {gerando ? "Gerando..." : "Gerar Pix"}
+                    {gerando
+                      ? "Gerando..."
+                      : `Gerar Pix ${formatarPreco(data.capacidadeCobravelCentavos)}`}
                   </button>
                 )}
 
@@ -525,7 +610,7 @@ export default function PedidoDetalheModal({
                         <button
                           type="button"
                           className="pedmodal-btn-edit"
-                          onClick={() => carregarPedido()}
+                          onClick={() => void carregarPedido(true)}
                         >
                           Atualizar pedido
                         </button>
@@ -553,6 +638,15 @@ export default function PedidoDetalheModal({
           </div>
         )}
       </div>
+      {data && adicionandoItem && (
+        <AdicionarItemModal
+          orderId={orderId}
+          onClose={() => setAdicionandoItem(false)}
+          onAdded={async () => {
+            await carregarPedido(true);
+          }}
+        />
+      )}
     </div>,
     document.body,
   );

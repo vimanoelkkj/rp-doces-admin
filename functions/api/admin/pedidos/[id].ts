@@ -2,7 +2,7 @@
 
 import { requireUser } from "../../../lib/auth";
 import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
-import { getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
+import { getCapacidadeCobravel, getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
 import { liberarReservaPedido, PIX_MP_PENDENTE_NO_PEDIDO_SQL } from "../../../lib/stock";
 import { listarOperacoesInconclusivasDoPedido } from "../../../lib/operacoes";
 
@@ -19,6 +19,7 @@ interface PedidoDetalheRow {
   status_pagamento: string;
   status_pedido: string;
   status_comanda: string;
+  origem_pedido: string;
   criado_em: string;
   pago_em: string | null;
 }
@@ -69,7 +70,8 @@ export const onRequestGet: PagesFunction<Env> = async ({
   try {
     const pedido = await env.DB.prepare(
       `SELECT id, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
-              status_pagamento, status_pedido, status_comanda, criado_em, pago_em
+              status_pagamento, status_pedido, status_comanda, origem_pedido,
+              criado_em, pago_em
        FROM pedidos WHERE id = ?`,
     )
       .bind(id)
@@ -90,8 +92,11 @@ export const onRequestGet: PagesFunction<Env> = async ({
       .bind(id)
       .all<PedidoItemRow>();
 
-    const financeiro = await getFinanceiroPedido(env.DB, id);
-    const pixAdminPendentes = await getPixAdminPendentesAtivos(env.DB, id);
+    const [financeiro, pixAdminPendentes, capacidadeCobravelCentavos] = await Promise.all([
+      getFinanceiroPedido(env.DB, id),
+      getPixAdminPendentesAtivos(env.DB, id),
+      getCapacidadeCobravel(env.DB, id),
+    ]);
 
     // B-3: cobranças cujo envio ao Mercado Pago ficou inconclusivo. Leitura
     // pura — não inventa estado nem decide nada. Existe para que o caso pare
@@ -111,6 +116,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
       itens,
       financeiro,
       pixAdminPendentes,
+      capacidadeCobravelCentavos,
       operacoesInconclusivas,
     });
   } catch (err) {

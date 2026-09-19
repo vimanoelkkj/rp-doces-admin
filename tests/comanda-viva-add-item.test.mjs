@@ -65,6 +65,24 @@ async function adicionar(db, session, {
   });
 }
 
+async function gerarPix(db, session, {
+  key = 'live-tab-pix-00000001',
+  valorCentavos,
+} = {}) {
+  return app.adminPix.onRequestPost({
+    env: env(db),
+    params: {id: '1'},
+    request: new Request('https://local.test/api/admin/pedidos/1/pix', {
+      method: 'POST',
+      headers: {
+        Cookie: session.cookie.split(';')[0],
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({operationKey: key, ...(valorCentavos ? {valorCentavos} : {})}),
+    }),
+  });
+}
+
 const itensNovos = async db => (await db.prepare(
   'SELECT * FROM pedido_itens WHERE pedido_id=1 AND id<>1 ORDER BY id',
 ).all()).results;
@@ -353,6 +371,136 @@ test('Pix ADMIN pendente conserva valor e capacidade futura absorve somente o no
   assert.equal(response.status, 201);
   assert.deepEqual(await db.prepare('SELECT * FROM pedido_pagamentos WHERE id=1').first(), pixAntes);
   assert.equal(await app.pix.getCapacidadeCobravel(db, 1), 1200);
+});
+
+test('adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa somente o item novo', async t => {
+  const {db, session} = await prepararComanda(t);
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
+    if (options.method === 'POST') {
+      posts += 1;
+      assert.equal(JSON.parse(options.body).transaction_amount, 12);
+      return Response.json({
+        id: 777,
+        status: 'pending',
+        date_of_expiration: '2099-01-01T00:00:00Z',
+        point_of_interaction: {transaction_data: {
+          qr_code: 'pix-copia-e-cola-777',
+          qr_code_base64: 'cXItNzc3',
+          ticket_url: 'https://mp.test/777',
+        }},
+      });
+    }
+    const id = Number(String(url).split('/').at(-1));
+    return Response.json({id, status: id === 777 ? 'approved' : 'pending'});
+  });
+
+  const addResponse = await adicionar(db, session, {key: 'live-tab-add-00000001'});
+  assert.equal(addResponse.status, 201);
+  const novoItem = (await addResponse.json()).item;
+  assert.equal(await app.pix.getCapacidadeCobravel(db, 1), 1200);
+
+  const detalhe = await app.adminOrder.onRequestGet({
+    env: env(db), params: {id: '1'},
+    request: new Request('https://local.test/api/admin/pedidos/1', {
+      headers: {Cookie: session.cookie.split(';')[0]},
+    }),
+  });
+  assert.equal(detalhe.status, 200);
+  const detalheBody = await detalhe.json();
+  assert.equal(detalheBody.pedido.origem_pedido, 'MANUAL');
+  assert.equal(detalheBody.capacidadeCobravelCentavos, 1200);
+  assert.deepEqual(detalheBody.financeiro, {
+    status: 'PARCIAL',
+    brutoPagoCentavos: 3000,
+    reembolsadoCentavos: 0,
+    liquidoCentavos: 3000,
+    saldoCentavos: 1200,
+    pagoCentavos: 3000,
+    totalCentavos: 4200,
+    metodosConfirmados: ['PIX_MP'],
+  });
+
+  const oldItemBefore = await db.prepare('SELECT * FROM pedido_itens WHERE id=1').first();
+  const oldProductBefore = await db.prepare('SELECT * FROM produtos WHERE id=1').first();
+  const primeira = await gerarPix(db, session, {
+    key: 'live-tab-pix-00000001', valorCentavos: 1200,
+  });
+  assert.equal(primeira.status, 201);
+  const pixBody = await primeira.json();
+  assert.equal(pixBody.valorCentavos, 1200);
+  assert.equal(pixBody.qrCode, 'pix-copia-e-cola-777');
+
+  const retry = await gerarPix(db, session, {
+    key: 'live-tab-pix-00000001', valorCentavos: 1200,
+  });
+  assert.equal(retry.status, 201);
+  assert.equal((await retry.json()).pagamentoId, pixBody.pagamentoId);
+  assert.equal(posts, 1, 'retry A1 nao envia nem persiste segunda cobranca');
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM pedido_pagamentos WHERE origem='ADMIN'").first()).n, 1);
+
+  const secret = 'live-tab-webhook-secret';
+  const ts = '1';
+  const requestId = 'live-tab-payment';
+  const signature = createHmac('sha256', secret)
+    .update(`id:777;request-id:${requestId};ts:${ts};`)
+    .digest('hex');
+  const webhook = await app.webhook.onRequestPost({
+    env: {...env(db), MP_WEBHOOK_SECRET: secret},
+    request: new Request('https://local.test/api/webhooks/mercadopago?data.id=777&type=payment', {
+      method: 'POST',
+      headers: {'x-signature': `ts=${ts},v1=${signature}`, 'x-request-id': requestId},
+    }),
+  });
+  assert.equal(webhook.status, 200);
+
+  const final = await state(db);
+  assert.equal(final.pedido.status_pagamento, 'PAGO');
+  assert.equal(final.itens.find(item => item.id === novoItem.id).estoque_estado, 'BAIXADO');
+  assert.deepEqual(await db.prepare('SELECT * FROM pedido_itens WHERE id=1').first(), oldItemBefore);
+  assert.deepEqual(await db.prepare('SELECT * FROM produtos WHERE id=1').first(), oldProductBefore);
+  assert.equal(final.produtos.find(produto => produto.id === 2).estoque, 9);
+  assert.equal(final.produtos.find(produto => produto.id === 2).estoque_reservado, 0);
+  assert.equal(await app.pix.getCapacidadeCobravel(db, 1), 0);
+});
+
+test('Pix pendente parcial reduz capacidade e capacidade zero impede nova cobranca', async t => {
+  const {db, session} = await prepararComanda(t);
+  await adicionar(db, session, {key: 'live-tab-add-pending-01'});
+  await db.batch([
+    db.prepare(`INSERT INTO pedido_pagamentos(
+      id,pedido_id,metodo,origem,valor_centavos,status,mp_payment_id,idempotency_key
+    ) VALUES(2,1,'PIX_MP','ADMIN',500,'PENDENTE','501','pending-partial-500')`),
+    db.prepare(`INSERT INTO pedido_pagamento_alocacoes(
+      pagamento_id,pedido_item_id,valor_centavos
+    ) VALUES(2,2,500)`),
+  ]);
+  assert.equal(await app.pix.getCapacidadeCobravel(db, 1), 700);
+
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, options = {}) => {
+    assert.equal(options.method, 'POST');
+    posts += 1;
+    assert.equal(JSON.parse(options.body).transaction_amount, 7);
+    return Response.json({
+      id: 778, status: 'pending', date_of_expiration: '2099-01-01T00:00:00Z',
+      point_of_interaction: {transaction_data: {qr_code: 'pix-778'}},
+    });
+  });
+  const nova = await gerarPix(db, session, {
+    key: 'live-tab-pix-partial-01', valorCentavos: 700,
+  });
+  assert.equal(nova.status, 201);
+  assert.equal(await app.pix.getCapacidadeCobravel(db, 1), 0);
+
+  const bloqueada = await gerarPix(db, session, {key: 'live-tab-pix-zero-0001'});
+  assert.equal(bloqueada.status, 400);
+  assert.equal((await bloqueada.json()).code, 'VALOR_INVALIDO');
+  assert.equal(posts, 1);
+  assert.deepEqual(
+    (await db.prepare("SELECT valor_centavos FROM pedido_pagamentos WHERE origem='ADMIN' ORDER BY id").all()).results,
+    [{valor_centavos: 500}, {valor_centavos: 700}],
+  );
 });
 
 test('refund legado nao atribuido nao bloqueia a adicao', async t => {
