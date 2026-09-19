@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { app } from './helpers/b3.mjs';
-import { bancoProducao, aplicarB5, validarB5, snapshot, SCRIPT_B5 } from './helpers/b5.mjs';
+import {
+  bancoProducao, aplicarB5, aplicarEstoquePorItem, validarB5, snapshot, SCRIPT_B5,
+} from './helpers/b5.mjs';
 
 // B5 — simulação do cutover contra a TOPOLOGIA real do D1 de produção.
 //
@@ -198,6 +200,7 @@ test('SITE: checkout real cria pedido multi-item contra o schema de produção',
   silenciar(t);
   const db = await bancoProducao(t);
   await aplicarB5(db);
+  await aplicarEstoquePorItem(db);
   mpPixOk(t);
   const pedidosAntes = await contar(db, 'pedidos');
 
@@ -229,6 +232,7 @@ test('SITE: checkout real cria pedido multi-item contra o schema de produção',
   assert.equal(itens.length, 2);
   assert.deepEqual(itens.map(i => [i.produto_id, i.quantidade, i.valor_total_centavos]),
     [[1, 2, 10000], [2, 3, 900]]);
+  assert.ok(itens.every(i => i.status_item === 'ATIVO' && i.estoque_estado === 'RESERVADO'));
   assert.equal(itens.reduce((s, i) => s + i.valor_total_centavos, 0), novo.valor_total_centavos);
 
   // Reserva física aplicada nos produtos.
@@ -252,6 +256,7 @@ test('SITE: A1 continua idempotente contra o schema legado', async t => {
   silenciar(t);
   const db = await bancoProducao(t);
   await aplicarB5(db);
+  await aplicarEstoquePorItem(db);
   mpPixOk(t);
 
   const primeira = await (await checkoutSite(db, [{ id: 1, quantity: 1 }])).json();
@@ -265,6 +270,7 @@ test('ADMIN: pedido manual real é criado contra o schema de produção', async 
   silenciar(t);
   const db = await bancoProducao(t);
   await aplicarB5(db);
+  await aplicarEstoquePorItem(db);
   const pedidosAntes = await contar(db, 'pedidos');
 
   const resposta = await pedidoAdmin(db, [
@@ -291,6 +297,7 @@ test('ADMIN: pedido manual real é criado contra o schema de produção', async 
     'SELECT * FROM pedido_itens WHERE pedido_id = ? ORDER BY id').bind(corpo.pedidoId).all()).results;
   assert.equal(itens.length, 2);
   assert.equal(itens.reduce((s, i) => s + i.valor_total_centavos, 0), novo.valor_total_centavos);
+  assert.ok(itens.every(i => i.status_item === 'ATIVO' && i.estoque_estado === 'RESERVADO'));
 
   const p3 = await db.prepare('SELECT * FROM produtos WHERE id=3').first();
   assert.equal(p3.estoque_reservado, 1, 'reserva do balcão aplicada');
@@ -305,6 +312,7 @@ test('ADMIN: replay da mesma key não cria segundo pedido de balcão', async t =
   silenciar(t);
   const db = await bancoProducao(t);
   await aplicarB5(db);
+  await aplicarEstoquePorItem(db);
   const a = await (await pedidoAdmin(db, [{ produtoId: 2, quantidade: 1 }])).json();
   const b = await (await pedidoAdmin(db, [{ produtoId: 2, quantidade: 1 }])).json();
   assert.equal(b.pedidoId, a.pedidoId);
@@ -313,10 +321,11 @@ test('ADMIN: replay da mesma key não cria segundo pedido de balcão', async t =
 
 /* ═══════════════ PARTE 9 — pedido histórico inconsistente ═══════════════ */
 
-test('reconciliador não muta o pedido histórico inconsistente', async t => {
-  const logs = silenciar(t);
+test('reconciliador reconhece a baixa histórica por item sem repetir efeito', async t => {
+  silenciar(t);
   const db = await bancoProducao(t);
   await aplicarB5(db);
+  await aplicarEstoquePorItem(db);
   const antes = await snapshot(db);
 
   // O pedido 5 é o caso observado: PAGO, reserva ATIVA, pedidos
@@ -324,8 +333,7 @@ test('reconciliador não muta o pedido histórico inconsistente', async t => {
   const resultado = await app.reconcile.reconcilePedidoAfterFinancialChange(db, 5);
   assert.equal(resultado.ok, true);
   assert.equal(resultado.statusFinanceiro, 'PAGO');
-  assert.equal(resultado.estoque.ok, false, 'estado físico é reportado como inconsistente');
-  assert.equal(resultado.estoque.erro, 'ESTADO_ESTOQUE_INCONSISTENTE');
+  assert.deepEqual(resultado.estoque, {ok: true, baixado: false});
 
   // E a varredura oportunista do painel admin também não muta nada.
   await app.reconcile.reconcilePedidosDivergentes(db);
@@ -335,11 +343,10 @@ test('reconciliador não muta o pedido histórico inconsistente', async t => {
   assert.deepEqual(depois.pedido_itens, antes.pedido_itens, 'itens intactos');
   assert.deepEqual(depois.pedido_pagamentos, antes.pedido_pagamentos, 'financeiro intacto');
   assert.deepEqual(depois.pedido_pagamento_alocacoes, antes.pedido_pagamento_alocacoes);
-  const pedido5antes = antes.pedidos.find(p => p.id === 5);
   const pedido5depois = depois.pedidos.find(p => p.id === 5);
-  assert.equal(pedido5depois.reserva_status, pedido5antes.reserva_status);
-  assert.equal(pedido5depois.estoque_baixado_em, null, 'nenhuma baixa foi inventada');
-  assert.ok(logs.mock.calls.length > 0, 'a inconsistência é logada, não silenciada');
+  assert.equal(pedido5depois.reserva_status, 'CONVERTIDA');
+  assert.ok(pedido5depois.estoque_baixado_em, 'projecao global e reparada a partir do item');
+  assert.equal(depois.pedido_itens.find(i => i.id === 7).estoque_estado, 'BAIXADO');
 });
 
 /* ═══════════════ PARTE 8 — compatibilidade com o código antigo ═══════════════ */

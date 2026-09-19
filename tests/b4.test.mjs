@@ -5,7 +5,7 @@ import {app, fixture, state, barrier, isProjection, refund} from './helpers/b3.m
 const env = db => ({DB:db, MP_ACCESS_TOKEN:'fake'});
 const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db,1);
 const release = db => app.stock.liberarReservaPedido(db,1);
-const isRelease = s => s.some(x=>x.sql.includes("reserva_status = 'LIBERADA'"));
+const isRelease = s => s.some(x=>x.sql.includes("estoque_estado = 'LIBERADO'"));
 const isCreation = s => s.some(x=>x.sql.includes('INSERT INTO pedido_pagamentos')) &&
   s.some(x=>x.sql.includes('substitui_pagamento_id'));
 const create = (db, extra={}) => app.pix.createAdminPixCharge(env(db),{pedidoId:1,usuarioId:1,valorCentavos:5000,...extra});
@@ -30,12 +30,14 @@ function reserved(s) {
   assert.equal(s.produtos[0].estoque_reservado,2);
   assert.equal(s.produtos[0].estoque,10);
   assert.equal(s.pedido.estoque_baixado_em,null);
+  assert.ok(s.itens.every(i => i.estoque_estado === 'RESERVADO'));
 }
 function released(s) {
   assert.equal(s.pedido.reserva_status,'LIBERADA');
   assert.equal(s.produtos[0].estoque_reservado,0);
   assert.equal(s.produtos[0].estoque,10);
   assert.equal(s.pedido.estoque_baixado_em,null);
+  assert.ok(s.itens.every(i => i.estoque_estado === 'LIBERADO'));
 }
 
 for(const status of ['cancelled','expired']) for(const origin of ['ADMIN','SITE']) {
@@ -345,8 +347,8 @@ test('multiple products and repeated product items release atomically, including
   const db=await fixture(t); t.mock.method(console,'error',()=>{});
   await db.batch([
     db.prepare("INSERT INTO produtos(id,nome,categoria,preco_centavos,estoque,estoque_reservado) VALUES(2,'Doce','BOLO',100,5,1)"),
-    db.prepare("INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,valor_unitario_centavos,valor_total_centavos) VALUES(2,1,2,'Doce',1,100,100)"),
-    db.prepare("INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,valor_unitario_centavos,valor_total_centavos) VALUES(3,1,1,'Bolo',1,100,100)"),
+    db.prepare("INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,valor_unitario_centavos,valor_total_centavos,status_item,estoque_estado,estoque_reservado_em) VALUES(2,1,2,'Doce',1,100,100,'ATIVO','RESERVADO',CURRENT_TIMESTAMP)"),
+    db.prepare("INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,valor_unitario_centavos,valor_total_centavos,status_item,estoque_estado,estoque_reservado_em) VALUES(3,1,1,'Bolo',1,100,100,'ATIVO','RESERVADO',CURRENT_TIMESTAMP)"),
     db.prepare('UPDATE produtos SET estoque_reservado=3 WHERE id=1'),
   ]);
   const before=await state(db);
@@ -365,10 +367,10 @@ test('multiple products and repeated product items release atomically, including
   assert.equal(after.pedido.reserva_status,'LIBERADA');
 });
 
-for(const mark of ['order','item']) test(`inconsistent ATIVA with physical ${mark} mark never releases`,async t=>{
+test('BAIXADO item never releases even with a stale ATIVA projection',async t=>{
   const db=await fixture(t);
   await db.prepare("UPDATE pedido_pagamentos SET status='CANCELADO' WHERE id=1").run();
-  await db.prepare(`UPDATE ${mark==='order'?'pedidos':'pedido_itens'} SET estoque_baixado_em='2026-01-01' WHERE id=1`).run();
+  await db.prepare("UPDATE pedido_itens SET estoque_estado='BAIXADO',estoque_baixado_em='2026-01-01' WHERE id=1").run();
   assert.equal((await release(db)).liberado,false);
   assert.equal((await state(db)).produtos[0].estoque_reservado,2);
   assert.equal((await state(db)).pedido.reserva_status,'ATIVA');
