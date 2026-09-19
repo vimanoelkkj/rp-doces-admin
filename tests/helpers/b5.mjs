@@ -38,6 +38,9 @@ export const VALIDACAO_B5 = separarStatements(
 export const ESTOQUE_POR_ITEM = separarStatements(
   await readFile('migrations/0016_pedido_itens_estado_estoque.sql', 'utf8'),
 );
+export const OPERACAO_POR_ITEM = separarStatements(
+  await readFile('migrations/0017_pedido_operacoes_item_adicao.sql', 'utf8'),
+);
 
 function criarDb(mf) {
   const db = {
@@ -91,6 +94,11 @@ export async function aplicarB5(db) {
 /** Aplica localmente a migration desta fase sobre a topologia historica. */
 export async function aplicarEstoquePorItem(db) {
   for (const sql of ESTOQUE_POR_ITEM) await db.prepare(sql).run();
+}
+
+/** Aplica a extensao A1 que vincula uma operacao ao item criado. */
+export async function aplicarOperacaoPorItem(db) {
+  for (const sql of OPERACAO_POR_ITEM) await db.prepare(sql).run();
 }
 
 /** Roda a validação e devolve as linhas de verificacao/resultado. */
