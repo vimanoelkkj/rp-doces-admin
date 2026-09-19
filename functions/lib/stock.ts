@@ -36,9 +36,18 @@ const ESTADOS_BAIXAVEIS_SQL = "('RESERVADO', 'SEM_RESERVA', 'LIBERADO')";
 // alguma reserva viva -> ATIVA; alguma reserva ja liberada/reposta ->
 // LIBERADA; algum item ainda sem reserva -> SEM_RESERVA; todos os itens
 // controlados baixados -> CONVERTIDA. Estado misto nao exige um novo enum.
-function preparePedidoPhysicalProjection(db: D1Database, pedidoId: number): D1PreparedStatement {
+export function preparePedidoPhysicalProjection(
+  db: D1Database,
+  pedidoId: number,
+  operationKey?: string,
+): D1PreparedStatement {
   const ativoControlado = `pi.pedido_id = pedidos.id
     AND pi.status_item = 'ATIVO' AND pi.produto_id IS NOT NULL`;
+  const operationGuard = operationKey
+    ? `AND EXISTS (SELECT 1 FROM pedido_operacoes o
+                   WHERE o.operation_key = ? AND o.pedido_id = pedidos.id
+                     AND o.pedido_item_id IS NOT NULL)`
+    : "";
   return db.prepare(`
     UPDATE pedidos
     SET reserva_status = CASE
@@ -75,7 +84,8 @@ function preparePedidoPhysicalProjection(db: D1Database, pedidoId: number): D1Pr
         END,
         atualizado_em = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).bind(pedidoId);
+      ${operationGuard}
+  `).bind(pedidoId, ...(operationKey ? [operationKey] : []));
 }
 
 // Converte somente itens ATIVOS que ainda precisam de baixa. A decisao sobre
