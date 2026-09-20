@@ -4,12 +4,12 @@ import {app, fixture} from './helpers/b3.mjs';
 
 const cookieDe = session => session.cookie.split(';')[0];
 
-async function prepararPedidoPronto(t) {
+async function prepararPedido(t, statusPedido = 'PRONTO') {
   const db = await fixture(t, {ledger: false, reserve: 'ATIVA'});
   await db.prepare(`UPDATE pedidos
-    SET origem_pedido='MANUAL', status_comanda='ABERTA', status_pedido='PRONTO',
+    SET origem_pedido='MANUAL', status_comanda='ABERTA', status_pedido=?,
         status_pagamento='PENDENTE'
-    WHERE id=1`).run();
+    WHERE id=1`).bind(statusPedido).run();
   return {db, session: await app.auth.createSession(db, 1)};
 }
 
@@ -29,7 +29,7 @@ const registrar = (db, session, {metodo = 'DINHEIRO', valorCentavos, operationKe
   });
 
 test('pedido PRONTO com comanda aberta recebe pagamento integral e baixa estoque', async t => {
-  const {db, session} = await prepararPedidoPronto(t);
+  const {db, session} = await prepararPedido(t);
   const response = await registrar(db, session, {
     valorCentavos: 10000,
     operationKey: 'ready-full-payment-01',
@@ -61,8 +61,71 @@ test('pedido PRONTO com comanda aberta recebe pagamento integral e baixa estoque
   );
 });
 
+test('pedido ENTREGUE com comanda encerrada recebe pagamento sem alterar o status operacional', async t => {
+  const {db, session} = await prepararPedido(t, 'ENTREGUE');
+  assert.deepEqual(
+    await db.prepare(
+      'SELECT status_pedido, status_comanda FROM pedidos WHERE id=1',
+    ).first(),
+    {status_pedido: 'ENTREGUE', status_comanda: 'ENCERRADA'},
+    'o trigger terminal encerra a comanda antes do recebimento',
+  );
+  const payload = {
+    metodo: 'CARTAO',
+    valorCentavos: 10000,
+    operationKey: 'delivered-full-payment-01',
+  };
+
+  const response = await registrar(db, session, payload);
+  assert.equal(response.status, 201);
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    pagamentoId: 1,
+    statusFinanceiro: 'PAGO',
+    saldoCentavos: 0,
+  });
+  assert.deepEqual(
+    await db.prepare(
+      'SELECT status_pedido, status_comanda, status_pagamento FROM pedidos WHERE id=1',
+    ).first(),
+    {status_pedido: 'ENTREGUE', status_comanda: 'ENCERRADA', status_pagamento: 'PAGO'},
+  );
+  assert.equal(
+    (await db.prepare(`SELECT COUNT(*) AS n FROM pedido_pagamentos
+      WHERE pedido_id=1 AND status='PAGO'`).first()).n,
+    1,
+  );
+  assert.equal(
+    (await db.prepare('SELECT estoque_estado FROM pedido_itens WHERE id=1').first()).estoque_estado,
+    'BAIXADO',
+  );
+
+  const retry = await registrar(db, session, payload);
+  assert.equal(retry.status, 201);
+  assert.equal((await retry.json()).replay, true);
+  assert.equal(
+    (await db.prepare('SELECT COUNT(*) AS n FROM pedido_pagamentos WHERE pedido_id=1').first()).n,
+    1,
+    'retry do recebimento apos entrega nao duplica o fato financeiro',
+  );
+});
+
+test('pedido CANCELADO com comanda encerrada continua recusando pagamento', async t => {
+  const {db, session} = await prepararPedido(t, 'CANCELADO');
+  const response = await registrar(db, session, {
+    valorCentavos: 10000,
+    operationKey: 'cancelled-payment-blocked-01',
+  });
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, 'COMANDA_ENCERRADA');
+  assert.equal(
+    (await db.prepare('SELECT COUNT(*) AS n FROM pedido_pagamentos WHERE pedido_id=1').first()).n,
+    0,
+  );
+});
+
 test('pagamento parcial seguido do restante converge sem duplicar baixa', async t => {
-  const {db, session} = await prepararPedidoPronto(t);
+  const {db, session} = await prepararPedido(t);
   const parcial = await registrar(db, session, {
     metodo: 'PIX_EXTERNO',
     valorCentavos: 4000,
