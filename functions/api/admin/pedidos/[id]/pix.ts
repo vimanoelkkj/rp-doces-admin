@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../../../lib/auth";
+import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { createAdminPixCharge } from "../../../../lib/comandaPix";
 import {
   OPERACAO_HTTP_STATUS,
@@ -53,6 +53,7 @@ const STATUS_HTTP: Record<string, number> = {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 

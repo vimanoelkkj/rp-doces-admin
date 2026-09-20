@@ -192,6 +192,41 @@ test('duas abas criam um único cancelamento ou uma única troca efetiva',async 
   assert.equal((await exchangeDb.prepare(`SELECT COUNT(*) n FROM pedido_itens WHERE produto_id=2`).first()).n,1);
 });
 
+test('duas abas trocando a mesma origem por destinos diferentes admitem uma única verdade',async t=>{
+  const db=await setup(t,{paid:1500});await addB(db,2000);
+  await db.prepare(`INSERT INTO produtos(id,nome,categoria,preco_centavos,estoque,estoque_reservado,ativo,disponivel)
+    VALUES(3,'C','BOLO',1800,10,0,1,1)`).run();
+  const first={pedidoId:1,itemId:1,produtoDestinoId:2,quantidadeDestino:1,precoEsperadoCentavos:2000,estoqueAcaoOrigem:'LIBERAR_RESERVA'};
+  const second={...first,produtoDestinoId:3,precoEsperadoCentavos:1800};
+  const [firstPreview,secondPreview]=await Promise.all([
+    app.itemExchange.getItemExchangePreview(db,first),
+    app.itemExchange.getItemExchangePreview(db,second),
+  ]);
+  const results=await Promise.all([
+    app.itemExchange.createItemExchange(db,{...first,usuarioId:1,motivo:'aba B',previewFingerprint:firstPreview.previewFingerprint,operationKey:'exchange-destination-b'}),
+    app.itemExchange.createItemExchange(db,{...second,usuarioId:1,motivo:'aba C',previewFingerprint:secondPreview.previewFingerprint,operationKey:'exchange-destination-c'}),
+  ]);
+  assert.equal(results.filter(result=>result.ok).length,1);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_item_trocas`).first()).n,1);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_itens WHERE status_item IN ('ATIVO','TROCA_PENDENTE') AND id<>1`).first()).n,1);
+  assert.equal((await db.prepare(`SELECT SUM(estoque_reservado) n FROM produtos WHERE id IN (2,3)`).first()).n,1);
+});
+
+test('cancelamento e troca concorrentes da mesma origem admitem uma única operação efetiva',async t=>{
+  const db=await setup(t,{paid:1500});await addB(db,1200);
+  const cancellationPreview=await app.itemCancellationPreview.getItemCancellationPreview(db,1,1);
+  const exchangeInput={pedidoId:1,itemId:1,produtoDestinoId:2,quantidadeDestino:1,precoEsperadoCentavos:1200,estoqueAcaoOrigem:'LIBERAR_RESERVA'};
+  const exchangePreview=await app.itemExchange.getItemExchangePreview(db,exchangeInput);
+  const results=await Promise.all([
+    app.itemCancellation.createItemCancellation(db,{pedidoId:1,itemId:1,usuarioId:1,motivo:'cancelar',estoqueAcao:'LIBERAR_RESERVA',previewFingerprint:cancellationPreview.previewFingerprint,operationKey:'cancel-versus-exchange'}),
+    app.itemExchange.createItemExchange(db,{...exchangeInput,usuarioId:1,motivo:'trocar',previewFingerprint:exchangePreview.previewFingerprint,operationKey:'exchange-versus-cancel'}),
+  ]);
+  assert.equal(results.filter(result=>result.ok).length,1);
+  const cancellations=(await db.prepare(`SELECT COUNT(*) n FROM pedido_item_cancelamentos WHERE status<>'FALHOU'`).first()).n;
+  const exchanges=(await db.prepare(`SELECT COUNT(*) n FROM pedido_item_trocas WHERE status<>'FALHOU'`).first()).n;
+  assert.equal(cancellations+exchanges,1);
+});
+
 test('refund manual concorrente registra um único fato',async t=>{
   const db=await setup(t,{paid:1500});const {result:created}=await cancel(db);const leg=created.cancelamento.pernasPendentes[0];
   const base={pedidoId:1,cancellationId:created.cancelamento.id,usuarioId:1,pagamentoId:leg.pagamentoId,

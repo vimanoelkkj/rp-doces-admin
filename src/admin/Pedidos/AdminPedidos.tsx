@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PedidoDetalheModal from "./PedidoDetalheModal";
-import EditarPedidoModal from "./EditarPedidoModal";
 import "./AdminPedidos.css";
 import NovoPedidoModal from "./NovoPedidoModal";
 import { formatarFinanceiroTexto, type FinanceiroPedido } from "./formatarFinanceiro";
@@ -106,7 +105,6 @@ export default function AdminPedidos() {
       setSearchParams(proximos, { replace: true });
     }
   };
-  const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [novoPedidoOpen, setNovoPedidoOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -391,19 +389,6 @@ export default function AdminPedidos() {
             orderId={selectedOrderId}
             onClose={fecharDetalhe}
             onStatusChanged={() => setRefreshKey((k) => k + 1)}
-            onEdit={() => {
-              setEditingOrderId(selectedOrderId);
-              fecharDetalhe();
-            }}
-          />
-        )}
-        {editingOrderId !== null && (
-          <EditarPedidoModal
-            orderId={editingOrderId}
-            onClose={() => {
-              setSelectedOrderId(editingOrderId);
-              setEditingOrderId(null);
-            }}
           />
         )}
         <NovoPedidoModal

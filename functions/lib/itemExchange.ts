@@ -448,6 +448,10 @@ export async function createItemExchange(db: D1Database, params: {
   } catch (error) {
     const winner=await buscarOperacao(db,parsed.key); if(winner)return replayExchange(db,winner,identity);
     if(await getExchangeView(db,params.pedidoId,params.itemId))return{ok:false,erro:"PREVIEW_OBSOLETO"};
+    const competingCancellation=await db.prepare(`SELECT 1 FROM pedido_item_cancelamentos
+      WHERE pedido_id=? AND pedido_item_id=? AND status<>'FALHOU' LIMIT 1`)
+      .bind(params.pedidoId,params.itemId).first();
+    if(competingCancellation)return{ok:false,erro:"PREVIEW_OBSOLETO"};
     const currentPrice=await db.prepare(`SELECT id,nome,preco_centavos,preco_promocional_centavos,promocao_ativa,promocao_inicio,promocao_fim,
       estoque,estoque_reservado,ativo,disponivel FROM produtos WHERE id=?`).bind(params.produtoDestinoId).first<ProductRow>();
     if(currentPrice && precoVigenteCentavos(currentPrice)!==params.precoEsperadoCentavos)

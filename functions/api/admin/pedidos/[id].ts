@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../../lib/auth";
+import { requireUser, sameOrigin } from "../../../lib/auth";
 import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
 import { getCapacidadeCobravel, getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
 import { liberarReservaPedido, PIX_MP_PENDENTE_NO_PEDIDO_SQL } from "../../../lib/stock";
@@ -155,6 +155,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({
   env,
   params,
 }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 

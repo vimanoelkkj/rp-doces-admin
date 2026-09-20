@@ -26,7 +26,7 @@ function endpoint(modulo, db, {id = '1', body, session, env: extra = {}} = {}) {
     params: {id},
     request: new Request('https://local.test/api/x', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', ...(session ? {Cookie: cookieDe(session)} : {})},
+      headers: {'Content-Type': 'application/json', Origin: 'https://local.test', ...(session ? {Cookie: cookieDe(session)} : {})},
       body: JSON.stringify(body),
     }),
   });
@@ -282,7 +282,7 @@ const criarPedido = (db, session, body) =>
     env: {DB: db},
     request: new Request('https://local.test/api/admin/pedidos', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({
         itens: [{produtoId: 1, quantidade: 2}],
         clienteNome: 'Balcao',
@@ -833,7 +833,7 @@ test('B1 continua bloqueado: A1 não reabriu a edição destrutiva de itens', as
     env: {DB: db}, params: {id: '1'},
     request: new Request('https://local.test/api/admin/pedidos/1/itens', {
       method: 'PUT',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({itens: [{produtoId: 1, quantidade: 5}], operationKey: KEY}),
     }),
   });

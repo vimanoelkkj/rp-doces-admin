@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../../../lib/auth";
+import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { registerManualRefund } from "../../../../lib/comandaLedger";
 import {
   OPERACAO_HTTP_STATUS,
@@ -41,6 +41,7 @@ function jsonError(message: string, status: number, code?: string) {
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 

@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../lib/auth";
+import { requireUser, sameOrigin } from "../../lib/auth";
 import {
   reconcilePendingPixPayments,
   liberarReservasVencidasLocalmente,
@@ -401,6 +401,7 @@ async function replayPedidoManual(
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 

@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../../../../../lib/auth";
+import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import { confirmCancellationRefund } from "../../../../../../lib/itemCancellation";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
 
@@ -21,6 +21,7 @@ const fail = (message: string, status: number, code?: string) =>
   Response.json({ error: message, ...(code ? { code } : {}) }, { status });
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
+  if (!sameOrigin(request)) return fail("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
   const pedidoId = Number(params.id);

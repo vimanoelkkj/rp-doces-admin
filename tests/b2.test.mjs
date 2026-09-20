@@ -183,7 +183,7 @@ for(const both of [false,true]) test(`I/J: real admin regeneration keeps A recon
   const create=async substituiId=>{
     const operationKey=`b2-pix-${++opSeq}`;
     const r=await app.adminPix.onRequestPost({env:env(db),params:{id:'1'},request:new Request('https://local.test/api/admin/pedidos/1/pix',{
-      method:'POST',headers:{Cookie:session.cookie.split(';')[0]},
+      method:'POST',headers:{Cookie:session.cookie.split(';')[0],Origin:'https://local.test'},
       body:JSON.stringify(substituiId?{substituiId,operationKey}:{operationKey}),
     })});
     assert.equal(r.status,201); return r.json();

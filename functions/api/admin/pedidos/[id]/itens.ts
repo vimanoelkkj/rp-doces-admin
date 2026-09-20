@@ -506,6 +506,7 @@ export const onRequestPut: PagesFunction<Env> = async ({
   env,
   params,
 }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 

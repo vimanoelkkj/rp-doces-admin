@@ -69,7 +69,6 @@ interface PedidoDetalheModalProps {
   orderId: number;
   onClose: () => void;
   onStatusChanged?: () => void;
-  onEdit?: () => void;
 }
 
 /* ── Helpers ── */
@@ -136,7 +135,6 @@ export default function PedidoDetalheModal({
   orderId,
   onClose,
   onStatusChanged,
-  onEdit,
 }: PedidoDetalheModalProps) {
   const modalProps = useAdminModal(true, onClose);
   const [data, setData] = useState<PedidoDetalheResponse | null>(null);
@@ -381,11 +379,6 @@ export default function PedidoDetalheModal({
                   </ul>
                 )}
               </div>
-            )}
-            {data && data.pedido.status_pedido !== "ENTREGUE" && (
-              <button className="pedmodal-btn-edit" onClick={onEdit}>
-                Editar pedido
-              </button>
             )}
             <button className="pedmodal-btn-close" onClick={onClose}>
               <svg

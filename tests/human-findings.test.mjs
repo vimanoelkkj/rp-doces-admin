@@ -27,7 +27,7 @@ const utilities = await import(
 const cookieDe = session => session.cookie.split(';')[0];
 const adminRequest = (session, body) => new Request('https://local.test/api/admin/pedidos', {
   method: 'POST',
-  headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+  headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
   body: JSON.stringify({
     itens: [{produtoId: 1, quantidade: 1}],
     clienteNome: 'Cliente Humano',
@@ -81,7 +81,7 @@ test('HUMAN-02/05: NOVO é canônico e só ação explícita inicia produção',
     env: {DB: db}, params: {id: String(created.pedidoId)},
     request: new Request('https://local.test/api/admin/pedidos/1', {
       method: 'PATCH',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({statusPedido: 'PREPARANDO'}),
     }),
   });
@@ -96,7 +96,7 @@ test('HUMAN-02/05: NOVO é canônico e só ação explícita inicia produção',
     env: {DB: db}, params: {id: String(created.pedidoId)},
     request: new Request('https://local.test/api/admin/pedidos/1', {
       method: 'PATCH',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({statusPedido: 'CANCELADO'}),
     }),
   });

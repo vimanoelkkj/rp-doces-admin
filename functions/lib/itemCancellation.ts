@@ -377,6 +377,10 @@ export async function createItemCancellation(
     if (await getCancellationView(db, params.pedidoId, params.itemId)) {
       return { ok: false, erro: "PREVIEW_OBSOLETO" };
     }
+    const competingExchange = await db.prepare(`SELECT 1 FROM pedido_item_trocas
+      WHERE pedido_id=? AND item_origem_id=? AND status<>'FALHOU' LIMIT 1`)
+      .bind(params.pedidoId, params.itemId).first();
+    if (competingExchange) return { ok: false, erro: "PREVIEW_OBSOLETO" };
     throw error;
   }
   const op = await buscarOperacao(db, parsed.key);

@@ -62,7 +62,7 @@ const salvar = (db, session, body, id) =>
     env: {DB: db}, params: {id: String(id ?? '')},
     request: new Request('https://local.test/api/admin/produtos', {
       method: id ? 'PUT' : 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({
         nome: 'Bolo', categoria: 'BOLO', descricao: '', precoCentavos: 5000, estoque: 50, ...body,
       }),
@@ -220,7 +220,7 @@ test('pedido manual do admin usa a mesma regra de preço', async t => {
     env: {DB: db},
     request: new Request('https://local.test/api/admin/pedidos', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({
         itens: [{produtoId: 1, quantidade: 2}], clienteNome: 'Balcao',
         clienteWhatsapp: '11999999999', metodoPagamento: 'DINHEIRO', statusPagamento: 'PENDENTE',

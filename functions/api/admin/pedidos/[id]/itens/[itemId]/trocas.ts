@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../../../../../lib/auth";
+import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import { createItemExchange, getExchangeView, ItemExchangePreviewError } from "../../../../../../lib/itemExchange";
 import { reconcileLiveTabParent } from "../../../../../../lib/liveTabRecovery";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
@@ -17,6 +17,7 @@ export const onRequestGet:PagesFunction<Env>=async({request,env,params})=>{
   return troca?Response.json({troca}):fail("Troca não encontrada",404,"TROCA_NAO_ENCONTRADA");
 };
 export const onRequestPost:PagesFunction<Env>=async({request,env,params})=>{
+  if(!sameOrigin(request))return fail("Origem inválida",403);
   const auth=await requireUser(env.DB,request);if("error" in auth)return auth.error;
   const pedidoId=Number(params.id),itemId=Number(params.itemId);let body:Record<string,unknown>;
   try{body=await request.json();}catch{return fail("JSON inválido",400);}

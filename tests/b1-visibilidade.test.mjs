@@ -33,7 +33,7 @@ function criarManual(db, session, body) {
     env: {DB: db},
     request: new Request('https://local.test/api/admin/pedidos', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({
         itens: [{produtoId: 1, quantidade: 2}],
         clienteNome: 'Balcao',
@@ -213,7 +213,7 @@ test('cancelar o pedido MANUAL libera a reserva — não fica presa', async t =>
     env: {DB: db}, params: {id: String(criado.pedidoId)},
     request: new Request('https://local.test/api/admin/pedidos/1', {
       method: 'PATCH',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({statusPedido: 'CANCELADO'}),
     }),
   });
@@ -238,7 +238,7 @@ test('pagamento posterior converte a reserva do pedido MANUAL em baixa física',
     env: {DB: db}, params: {id: String(criado.pedidoId)},
     request: new Request('https://local.test/api/admin/pedidos/1/pagamentos', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({metodo: 'DINHEIRO', valorCentavos: 10000, operationKey: uuid(7)}),
     }),
   });
@@ -271,7 +271,7 @@ test('Pix ADMIN sobre pedido MANUAL preserva B4: reserva única e retida enquant
     env: {DB: db, MP_ACCESS_TOKEN: 'fake'}, params: {id: String(criado.pedidoId)},
     request: new Request('https://local.test/api/admin/pedidos/1/pix', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({operationKey: uuid(9)}),
     }),
   });
