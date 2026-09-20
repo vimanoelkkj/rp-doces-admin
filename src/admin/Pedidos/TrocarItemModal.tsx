@@ -59,6 +59,7 @@ interface Props {
   orderId: number;
   item: Item;
   existingExchangeId?: number | null;
+  existingExchangeStatus?: string | null;
   onClose: () => void;
   onChanged: () => void | Promise<void>;
 }
@@ -75,6 +76,7 @@ export default function TrocarItemModal({
   orderId,
   item,
   existingExchangeId,
+  existingExchangeStatus,
   onClose,
   onChanged,
 }: Props) {
@@ -100,6 +102,7 @@ export default function TrocarItemModal({
   const signatureRef = useRef("");
   const refundKeys = useRef(new Map<number, string>());
   useEffect(() => {
+    let active = true;
     if (existingExchangeId) {
       fetch(`/api/admin/pedidos/${orderId}/itens/${item.id}/trocas`)
         .then(async (r) => {
@@ -107,21 +110,41 @@ export default function TrocarItemModal({
           if (!r.ok) throw new Error(b.error);
           return b;
         })
-        .then((b) => setExchange(b.troca))
-        .catch((e) => setError(e.message))
-        .finally(() => setLoading(false));
-      return;
+        .then((b) => {
+          if (active) {
+            setExchange(b.troca);
+            setError(null);
+          }
+        })
+        .catch((e) => {
+          if (active) setError(e.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+      return () => {
+        active = false;
+      };
     }
     fetch("/api/admin/produtos")
       .then((r) => r.json())
-      .then((b: { produtos: ProdutoAdmin[] }) =>
-        setProducts(
-          b.produtos.filter((p) => p.ativo === 1 && p.disponivel === 1),
-        ),
-      )
-      .catch(() => setError("Falha ao carregar produtos"))
-      .finally(() => setLoading(false));
-  }, [existingExchangeId, item.id, orderId]);
+      .then((b: { produtos: ProdutoAdmin[] }) => {
+        if (active) {
+          setProducts(
+            b.produtos.filter((p) => p.ativo === 1 && p.disponivel === 1),
+          );
+        }
+      })
+      .catch(() => {
+        if (active) setError("Falha ao carregar produtos");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [existingExchangeId, existingExchangeStatus, item.id, orderId]);
   const product = products.find((p) => p.id === productId) ?? null;
   const price = product ? precoVigenteCentavos(product) : 0;
   useEffect(() => {

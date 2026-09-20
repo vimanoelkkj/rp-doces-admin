@@ -43,9 +43,12 @@ interface PedidoItemRow {
   troca_item_origem_id: number | null;
 }
 
-interface StatusInput {
+interface PedidoUpdateInput {
   statusPedido?: string;
+  clienteNome?: unknown;
 }
+
+const MAX_CLIENTE_NOME_LENGTH = 200;
 
 // Mesmo enum de produção (order.model.ts / OrderStatusSelect.tsx). Sem
 // CHECK no banco de propósito — produção também valida só em código.
@@ -164,11 +167,48 @@ export const onRequestPatch: PagesFunction<Env> = async ({
     return jsonError("Id inválido", 400);
   }
 
-  let body: StatusInput;
+  let body: PedidoUpdateInput;
   try {
-    body = await request.json();
+    const parsed: unknown = await request.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return jsonError("JSON inválido", 400);
+    }
+    body = parsed as PedidoUpdateInput;
   } catch {
     return jsonError("JSON inválido", 400);
+  }
+
+  const alteraStatus = body.statusPedido !== undefined;
+  const alteraClienteNome = body.clienteNome !== undefined;
+  if (alteraStatus === alteraClienteNome) {
+    return jsonError("Informe exatamente um campo para alterar", 400);
+  }
+
+  if (alteraClienteNome) {
+    if (typeof body.clienteNome !== "string") {
+      return jsonError("Nome do cliente inválido", 400);
+    }
+    const clienteNome = body.clienteNome.trim();
+    if (!clienteNome || clienteNome.length > MAX_CLIENTE_NOME_LENGTH) {
+      return jsonError("Nome do cliente deve ter entre 1 e 200 caracteres", 400);
+    }
+
+    try {
+      const alteracao = await env.DB.prepare(
+        `UPDATE pedidos
+         SET cliente_nome = ?, atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      )
+        .bind(clienteNome, id)
+        .run();
+      if (Number(alteracao?.meta?.changes || 0) === 0) {
+        return jsonError("Pedido não encontrado", 404);
+      }
+      return Response.json({ ok: true, clienteNome });
+    } catch (err) {
+      console.error("Erro ao alterar nome do cliente (admin)", err);
+      return jsonError("Erro interno ao alterar nome do cliente", 500);
+    }
   }
 
   const novoStatus = body.statusPedido;
