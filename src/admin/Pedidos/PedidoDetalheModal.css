@@ -77,34 +77,82 @@
   gap: 6px;
 }
 
-.pedmodal-name-form > label {
-  color: #8c7a76;
-  font-family: "Manrope", sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .pedmodal-name-controls {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.pedmodal-name-prefix {
+  flex-shrink: 0;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: #2b1d1a;
+  white-space: nowrap;
 }
 
 .pedmodal-name-controls input {
   min-width: 0;
   flex: 1;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border: 1px solid #d8c8b8;
   border-radius: 10px;
   background: #ffffff;
   color: #2b1d1a;
   font-family: "Manrope", sans-serif;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .pedmodal-name-controls input:focus {
   border-color: #634738;
   outline: 2px solid rgba(99, 71, 56, 0.12);
+}
+
+.pedmodal-btn-name-save {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 100px;
+  background: #634738;
+  color: #ffffff;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pedmodal-btn-name-save:hover {
+  background: #4a332b;
+}
+
+.pedmodal-btn-name-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pedmodal-btn-name-cancel {
+  flex-shrink: 0;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: #8c7a76;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pedmodal-btn-name-cancel:hover {
+  color: #634738;
+  text-decoration: underline;
+}
+
+.pedmodal-btn-name-cancel:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .pedmodal-name-error {
@@ -768,7 +816,7 @@
 .pedmodal-manual-payment-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
