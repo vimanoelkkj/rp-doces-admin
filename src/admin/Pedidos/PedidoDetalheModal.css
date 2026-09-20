@@ -401,22 +401,23 @@
 }
 
 .pedmodal-btn-cancel-item {
-  padding: 5px 12px;
+  padding: 7px 12px;
   border: 1px solid #f0c4c0;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #a8352a;
+  border-radius: 999px;
+  background: #fbeceb;
+  color: #c0392b;
   cursor: pointer;
   font-family: "Manrope", sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   transition: all 0.15s;
 }
 
-.pedmodal-btn-cancel-item:hover { background: #fbeceb; border-color: #a8352a; }
+.pedmodal-btn-cancel-item:hover { background: #f5dcda; border-color: #c0392b; }
 
 .pedmodal-btn-cancel-item--neutral {
-  border-color: #eadfd3;
+  border-color: #d8c8b8;
+  background: #faf6f0;
   color: #634738;
 }
 
