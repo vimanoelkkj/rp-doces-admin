@@ -798,9 +798,8 @@ html[data-admin-theme="dark"] .loj-btn-save {
   background: #d38b80;
   color: #ffffff;
 }
-html[data-admin-theme="dark"] .loj-image-slot,
 html[data-admin-theme="dark"] .loj-image-thumb {
-  background: #1a1412;
+  background: transparent;
   border-color: #3d3230;
 }
 html[data-admin-theme="dark"] .loj-image-label {
