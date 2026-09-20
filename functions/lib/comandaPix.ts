@@ -23,6 +23,7 @@ import {
 } from "./comandaLedger";
 import { liberarReservaPedido, preparePedidoPhysicalProjection } from "./stock";
 import { postPagamentoMp } from "./mpPost";
+import { chargeableCapacitySql, financialChargeSlotKey, liveAdminPixPredicate } from "./financialCoverage";
 import {
   buscarOperacao,
   chaveMp,
@@ -93,7 +94,6 @@ export interface GerarPixAdminFalha {
   erro:
     | "PEDIDO_NAO_ENCONTRADO"
     | "COMANDA_ENCERRADA"
-    | "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO"
     | "VALOR_INVALIDO"
     | "CAPACIDADE_INSUFICIENTE"
     | "PIX_PARA_SUBSTITUIR_INVALIDO"
@@ -133,23 +133,7 @@ const MAX_TEXT_LENGTH = 200;
 // ficaria excluído da capacidade e "já substituído" indefinidamente, mesmo
 // o substituto nunca tendo virado dinheiro nem QR válido — o pedido
 // ficaria sem nenhum Pix administrativo utilizável.
-const SUCESSOR_VIVO = `NOT EXISTS (
-  SELECT 1 FROM pedido_pagamentos sub
-  WHERE sub.substitui_pagamento_id = %ALVO%
-    AND sub.status IN ('PENDENTE', 'PAGO')
-)`;
-
-const CAPACIDADE_COBRAVEL_SQL = `(
-  SELECT p.valor_total_centavos
-    - COALESCE((SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id = p.id AND status = 'PAGO'), 0)
-    - COALESCE((
-        SELECT SUM(pp.valor_centavos) FROM pedido_pagamentos pp
-        WHERE pp.pedido_id = p.id AND pp.metodo = 'PIX_MP' AND pp.origem = 'ADMIN' AND pp.status = 'PENDENTE'
-          AND pp.id != COALESCE(?, -1)
-          AND ${SUCESSOR_VIVO.replace("%ALVO%", "pp.id")}
-      ), 0)
-  FROM pedidos p WHERE p.id = ?
-)`;
+const CAPACIDADE_COBRAVEL_SQL = chargeableCapacitySql("?");
 
 export async function getCapacidadeCobravel(
   db: D1Database,
@@ -182,7 +166,7 @@ interface PixAdminPendenteRow {
 }
 
 // Leitura pura — nenhuma escrita, nenhuma decisão financeira nova. Reaproveita
-// a MESMA definição de "ainda vivo" usada pela regeneração (SUCESSOR_VIVO):
+// a MESMA definição de "ainda vivo" usada pela regeneração:
 // um pedido pode legitimamente ter vários PIX_MP/ADMIN/PENDENTE simultâneos
 // (Pix parciais aditivos, não uma cadeia de substituição entre si) — por
 // isso é uma LISTA, nunca "o mais recente". `expiresAt` vencido não é
@@ -198,7 +182,7 @@ export async function getPixAdminPendentesAtivos(
       `SELECT id, valor_centavos, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
        FROM pedido_pagamentos pp
        WHERE pp.pedido_id = ? AND pp.metodo = 'PIX_MP' AND pp.origem = 'ADMIN' AND pp.status = 'PENDENTE'
-         AND ${SUCESSOR_VIVO.replace("%ALVO%", "pp.id")}
+         AND ${liveAdminPixPredicate("pp")}
        ORDER BY id ASC`,
     )
     .bind(pedidoId)
@@ -318,21 +302,6 @@ export async function createAdminPixCharge(
   if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
   if (pedido.status_comanda !== "ABERTA") return { ok: false, erro: "COMANDA_ENCERRADA" };
 
-  // Mesma limitação explícita e temporária do Passo 5 usada em
-  // registerAdminPayment: com reembolso confirmado, a leitura de saldo por
-  // item (getItensComSaldo) ainda não sabe reabrir a alocação parcialmente
-  // devolvida — preferível recusar a criar uma alocação sutilmente errada.
-  const temReembolso = await db
-    .prepare(`SELECT 1 FROM pedido_reembolsos WHERE pedido_id = ? AND status = 'REEMBOLSADO' LIMIT 1`)
-    .bind(params.pedidoId)
-    .first();
-  if (temReembolso) {
-    const saldoAtual = await getComandaSaldo(db, params.pedidoId);
-    if (saldoAtual.pago < saldoAtual.total) {
-      return { ok: false, erro: "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO" };
-    }
-  }
-
   const substituiId = params.substituiId ?? null;
 
   // Pré-checagem só pra UX (mensagem de erro cedo, antes de montar o
@@ -347,7 +316,7 @@ export async function createAdminPixCharge(
       .prepare(
         `SELECT 1 FROM pedido_pagamentos a
          WHERE a.id = ? AND a.pedido_id = ? AND a.metodo = 'PIX_MP' AND a.origem = 'ADMIN' AND a.status = 'PENDENTE'
-           AND ${SUCESSOR_VIVO.replace("%ALVO%", "a.id")}`,
+           AND ${liveAdminPixPredicate("a")}`,
       )
       .bind(substituiId, params.pedidoId)
       .first();
@@ -390,7 +359,14 @@ export async function createAdminPixCharge(
 
   // A1: derivada da operation key quando existe — o UNIQUE parcial de
   // `pedido_pagamentos.idempotency_key` garante at-most-once da tentativa.
-  const idempotencyKey = operationKey ? chavePagamento(operationKey) : crypto.randomUUID();
+  // Quando duas cobrancas deste mesmo valor nao cabem juntas, ambas disputam
+  // um slot derivado da mesma revisao do ledger. O UNIQUE existente torna a
+  // decisao atomica mesmo se as duas lerem a capacidade anterior ao mesmo tempo.
+  // Valores que cabem de forma aditiva preservam tentativas independentes.
+  const disputaCapacidade = valorCentavos * 2 > capacidadePrevia;
+  const idempotencyKey = disputaCapacidade
+    ? await financialChargeSlotKey(db, params.pedidoId, "pix")
+    : operationKey ? chavePagamento(operationKey) : crypto.randomUUID();
   const externalReference = idempotencyKey; // trava 2: identidade inequívoca por tentativa, nunca token_publico
   // Key MP estável por operação lógica: timeout, 5xx ou resposta local
   // perdida NUNCA geram uma key nova (era a causa de um segundo POST lógico
@@ -542,6 +518,11 @@ export async function createAdminPixCharge(
     if (operationKey && identidade) {
       const vencedora = await buscarOperacao(db, operationKey);
       if (vencedora) return await replayPixAdmin(db, vencedora, identidade);
+    }
+    if (disputaCapacidade) {
+      const slotVencedor = await db.prepare(`SELECT 1 FROM pedido_pagamentos
+        WHERE idempotency_key=? LIMIT 1`).bind(idempotencyKey).first();
+      if (slotVencedor) return { ok: false, erro: "CAPACIDADE_INSUFICIENTE" };
     }
     if (String((err as Error)?.message || "").includes("CHECK")) {
       return { ok: false, erro: "ESTOQUE_INSUFICIENTE" };

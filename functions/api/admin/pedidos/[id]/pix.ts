@@ -26,8 +26,6 @@ function jsonError(message: string, status: number, code?: string) {
 const MENSAGENS: Record<string, string> = {
   PEDIDO_NAO_ENCONTRADO: "Pedido não encontrado",
   COMANDA_ENCERRADA: "Esta comanda já foi encerrada",
-  PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO:
-    "Este pedido possui reembolso e ainda não suporta nova cobrança Pix após devolução parcial.",
   VALOR_INVALIDO: "Valor inválido",
   CAPACIDADE_INSUFICIENTE: "Valor acima da capacidade disponível para novas cobranças Pix",
   PIX_PARA_SUBSTITUIR_INVALIDO:
@@ -42,7 +40,6 @@ const MENSAGENS: Record<string, string> = {
 const STATUS_HTTP: Record<string, number> = {
   PEDIDO_NAO_ENCONTRADO: 404,
   COMANDA_ENCERRADA: 409,
-  PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO: 409,
   VALOR_INVALIDO: 400,
   CAPACIDADE_INSUFICIENTE: 409,
   PIX_PARA_SUBSTITUIR_INVALIDO: 409,

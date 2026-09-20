@@ -11,6 +11,12 @@ import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 import { preparePedidoPhysicalProjection } from "./stock";
 import { getPixMpRefundIntentForLeg, reconcilePixMpRefundIntent,
   type PixMpRefundIntentStatus } from "./mpRefundIntent";
+import {
+  CONFIRMED_REFUNDS_BY_ALLOCATION_CTE,
+  financialLineageCte,
+  financialLineageMembership,
+  REFUND_ALLOCATIONS_UNION_SQL,
+} from "./financialCoverage";
 
 export type ExchangeStockAction = "LIBERAR_RESERVA" | "NAO_REPOR" | "REPOR" | "NENHUMA";
 export type ExchangeStatus = "SOLICITADA" | "AGUARDANDO_COBRANCA" |
@@ -69,8 +75,7 @@ interface ExchangeRow {
 }
 
 const MANUAL_METHODS = new Set(["DINHEIRO", "CARTAO", "PIX_EXTERNO"]);
-const refundsUnion = `(SELECT reembolso_id,pagamento_alocacao_id,valor_centavos FROM pedido_reembolso_alocacoes
-  UNION ALL SELECT reembolso_id,pagamento_alocacao_id,valor_centavos FROM pedido_item_troca_reembolso_alocacoes)`;
+const refundsUnion = REFUND_ALLOCATIONS_UNION_SQL;
 
 function stockActions(state: string): ExchangeStockAction[] {
   if (state === "RESERVADO") return ["LIBERAR_RESERVA"];
@@ -125,14 +130,15 @@ export async function getItemExchangePreview(
   if(legacyRefund)throw new ItemExchangePreviewError("COBERTURA_INDETERMINADA",
     "Há um reembolso histórico sem atribuição completa. A origem financeira da troca não pode ser determinada.");
 
-  const { results: allocations } = await db.prepare(`SELECT pp.id AS pagamentoId,
+  const { results: allocations } = await db.prepare(`WITH RECURSIVE ${financialLineageCte("?")},
+      ${CONFIRMED_REFUNDS_BY_ALLOCATION_CTE}
+    SELECT pp.id AS pagamentoId,
       a.id AS pagamentoAlocacaoId,pp.metodo AS metodo,a.valor_centavos AS valorAlocadoCentavos,
-      COALESCE(SUM(CASE WHEN r.status='REEMBOLSADO' THEN ra.valor_centavos ELSE 0 END),0) AS valorReembolsadoCentavos
+      COALESCE(rf.valor_centavos,0) AS valorReembolsadoCentavos
     FROM pedido_pagamento_alocacoes a JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
-    LEFT JOIN ${refundsUnion} ra ON ra.pagamento_alocacao_id=a.id
-    LEFT JOIN pedido_reembolsos r ON r.id=ra.reembolso_id
-    WHERE a.pedido_item_id=? AND pp.status='PAGO'
-    GROUP BY a.id,pp.id,pp.metodo,a.valor_centavos ORDER BY a.id DESC`)
+    LEFT JOIN refunds_confirmados rf ON rf.pagamento_alocacao_id=a.id
+    WHERE a.pedido_item_id IN (SELECT item_id FROM linhagem_financeira) AND pp.status='PAGO'
+    ORDER BY a.id DESC`)
     .bind(params.itemId).all<AllocationRow>();
   const effective = allocations.map((a) => ({ ...a,
     efetivo: Math.max(0, Number(a.valorAlocadoCentavos) - Number(a.valorReembolsadoCentavos)),
@@ -236,14 +242,15 @@ async function exchangeView(db: D1Database, row: ExchangeRow): Promise<ExchangeV
   if(!["CONCLUIDA","AGUARDANDO_COBRANCA","FALHOU"].includes(row.status)){
     const financial=await getFinanceiroPedido(db,row.pedido_id);
     let required=Math.max(0,financial.liquidoCentavos-projectedTotal);
-    const {results:allocations}=await db.prepare(`SELECT pp.id AS pagamentoId,a.id AS pagamentoAlocacaoId,
+    const {results:allocations}=await db.prepare(`WITH RECURSIVE ${financialLineageCte("?")},
+        ${CONFIRMED_REFUNDS_BY_ALLOCATION_CTE}
+      SELECT pp.id AS pagamentoId,a.id AS pagamentoAlocacaoId,
         pp.metodo AS metodo,a.valor_centavos AS valorAlocadoCentavos,
-        COALESCE(SUM(CASE WHEN r.status='REEMBOLSADO' THEN ra.valor_centavos ELSE 0 END),0) AS valorReembolsadoCentavos
+        COALESCE(rf.valor_centavos,0) AS valorReembolsadoCentavos
       FROM pedido_pagamento_alocacoes a JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
-      LEFT JOIN ${refundsUnion} ra ON ra.pagamento_alocacao_id=a.id
-      LEFT JOIN pedido_reembolsos r ON r.id=ra.reembolso_id
-      WHERE a.pedido_item_id=? AND pp.status='PAGO'
-      GROUP BY a.id,pp.id,pp.metodo,a.valor_centavos ORDER BY a.id DESC`).bind(row.item_origem_id).all<AllocationRow>();
+      LEFT JOIN refunds_confirmados rf ON rf.pagamento_alocacao_id=a.id
+      WHERE a.pedido_item_id IN (SELECT item_id FROM linhagem_financeira) AND pp.status='PAGO'
+      ORDER BY a.id DESC`).bind(row.item_origem_id).all<AllocationRow>();
     pending=[];
     for(const allocation of allocations){if(required<=0)break;const effective=Math.max(0,Number(allocation.valorAlocadoCentavos)-Number(allocation.valorReembolsadoCentavos));
       const amount=Math.min(required,effective);if(amount>0){const remote=allocation.metodo==="PIX_MP"
@@ -554,8 +561,10 @@ export async function confirmExchangeRefund(db:D1Database,params:{pedidoId:numbe
   const insert=db.prepare(`INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,status,idempotency_key,registrado_por_usuario_id,motivo,devolveu_estoque,concluido_em)
     SELECT ?,pp.id,'MANUAL',pp.metodo,?,'REEMBOLSADO',?,?,'Diferença de troca',0,CURRENT_TIMESTAMP
     FROM pedido_pagamentos pp JOIN pedido_pagamento_alocacoes a ON a.pagamento_id=pp.id
-    WHERE pp.id=? AND a.id=? AND a.pedido_item_id=? AND pp.status='PAGO' AND pp.metodo IN ('DINHEIRO','CARTAO','PIX_EXTERNO')`)
-    .bind(params.pedidoId,params.valorCentavos,refundKey,params.usuarioId,params.pagamentoId,params.pagamentoAlocacaoId,row.item_origem_id);
+    WHERE pp.id=? AND a.id=?
+      AND ${financialLineageMembership("a.pedido_item_id", String(Number(row.item_origem_id)), "refund_linhagem")}
+      AND pp.status='PAGO' AND pp.metodo IN ('DINHEIRO','CARTAO','PIX_EXTERNO')`)
+    .bind(params.pedidoId,params.valorCentavos,refundKey,params.usuarioId,params.pagamentoId,params.pagamentoAlocacaoId);
   const claim=prepareClaimOperacao(db,{key:parsed.key,...identity,fase:"CONCLUIDA",fonte:fonteReembolso(refundKey)});
   const allocation=db.prepare(`INSERT INTO pedido_item_troca_reembolso_alocacoes(reembolso_id,pagamento_alocacao_id,pedido_item_troca_id,valor_centavos)
     SELECT id,?,?,? FROM pedido_reembolsos WHERE idempotency_key=?`).bind(params.pagamentoAlocacaoId,row.id,params.valorCentavos,refundKey);

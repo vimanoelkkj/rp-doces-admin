@@ -1,6 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { fingerprint } from "./operacoes";
+import {
+  CONFIRMED_REFUNDS_BY_ALLOCATION_CTE,
+  financialLineageCte,
+} from "./financialCoverage";
 
 export type AcaoEstoqueCancelamento = "LIBERAR_RESERVA" | "NAO_REPOR" | "NENHUMA";
 
@@ -194,25 +198,19 @@ export async function getItemCancellationPreview(
   }
 
   const { results: alocacoes } = await db.prepare(
-    `SELECT
+    `WITH RECURSIVE ${financialLineageCte("?")},
+     ${CONFIRMED_REFUNDS_BY_ALLOCATION_CTE}
+     SELECT
        pp.id AS pagamentoId,
        a.id AS pagamentoAlocacaoId,
        pp.metodo AS metodo,
        a.valor_centavos AS valorAlocadoCentavos,
-       COALESCE(SUM(CASE WHEN r.status = 'REEMBOLSADO' THEN ra.valor_centavos ELSE 0 END), 0)
-         AS valorReembolsadoCentavos
+       COALESCE(rf.valor_centavos,0) AS valorReembolsadoCentavos
      FROM pedido_pagamento_alocacoes a
      JOIN pedido_pagamentos pp ON pp.id = a.pagamento_id
-     LEFT JOIN (
-       SELECT reembolso_id, pagamento_alocacao_id, valor_centavos
-       FROM pedido_reembolso_alocacoes
-       UNION ALL
-       SELECT reembolso_id, pagamento_alocacao_id, valor_centavos
-       FROM pedido_item_troca_reembolso_alocacoes
-     ) ra ON ra.pagamento_alocacao_id = a.id
-     LEFT JOIN pedido_reembolsos r ON r.id = ra.reembolso_id
-     WHERE a.pedido_item_id = ? AND pp.pedido_id = ? AND pp.status = 'PAGO'
-     GROUP BY a.id, pp.id, pp.metodo, a.valor_centavos
+     LEFT JOIN refunds_confirmados rf ON rf.pagamento_alocacao_id=a.id
+     WHERE a.pedido_item_id IN (SELECT item_id FROM linhagem_financeira)
+       AND pp.pedido_id = ? AND pp.status = 'PAGO'
      ORDER BY a.id ASC, pp.id ASC`,
   ).bind(itemId, pedidoId).all<AllocationRow>();
 

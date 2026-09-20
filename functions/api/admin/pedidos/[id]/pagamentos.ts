@@ -27,8 +27,6 @@ const MENSAGENS: Record<string, string> = {
   VALOR_ACIMA_DO_SALDO: "Valor acima do saldo em aberto",
   SALDO_INSUFICIENTE_CONCORRENCIA:
     "O saldo mudou antes da confirmação. Atualize e tente novamente.",
-  PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO:
-    "Este pedido possui reembolso e ainda não suporta novo pagamento após devolução parcial.",
   ...OPERACAO_MENSAGENS,
 };
 

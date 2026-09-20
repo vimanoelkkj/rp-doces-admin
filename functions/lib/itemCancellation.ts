@@ -20,6 +20,7 @@ import {
   type OperacaoRow,
 } from "./operacoes";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
+import { financialLineageMembership } from "./financialCoverage";
 import { preparePedidoPhysicalProjection } from "./stock";
 import { getFinanceiroPedido } from "./comandaLedger";
 import {
@@ -211,13 +212,15 @@ function snapshotGuard(preview: ItemCancellationPreview): { sql: string; args: u
       SELECT 1 FROM pedido_pagamento_alocacoes a
       JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
       WHERE a.id=? AND pp.id=? AND pp.metodo=? AND pp.status='PAGO'
+        AND ${financialLineageMembership("a.pedido_item_id", "pi.id", "guard_linhagem")}
         AND a.valor_centavos=? AND ${refundSomadoSql("a")}=?
     )`;
   });
   return {
     sql: `(SELECT COUNT(*) FROM pedido_pagamento_alocacoes a
            JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
-           WHERE a.pedido_item_id=pi.id AND pp.pedido_id=p.id AND pp.status='PAGO')=?
+           WHERE ${financialLineageMembership("a.pedido_item_id", "pi.id", "count_linhagem")}
+             AND pp.pedido_id=p.id AND pp.status='PAGO')=?
           ${checks.map((c) => `AND ${c}`).join(" ")}`,
     args,
   };
@@ -239,7 +242,8 @@ function finalizationStatements(
   const noCoverage = `NOT EXISTS (
     SELECT 1 FROM pedido_pagamento_alocacoes a
     JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
-    WHERE a.pedido_item_id=pi.id AND pp.status='PAGO'
+    WHERE ${financialLineageMembership("a.pedido_item_id", "pi.id", "final_linhagem")}
+      AND pp.status='PAGO'
       AND a.valor_centavos > ${refundSomadoSql("a")}
   )`;
   const eligible = `EXISTS (
@@ -461,12 +465,13 @@ export async function confirmCancellationRefund(
       registrado_por_usuario_id,motivo,devolveu_estoque,concluido_em)
     SELECT ?,pp.id,'MANUAL',pp.metodo,?,'REEMBOLSADO',?,?,'Cancelamento de item',0,CURRENT_TIMESTAMP
     FROM pedido_pagamentos pp JOIN pedido_pagamento_alocacoes a ON a.pagamento_id=pp.id
-    WHERE pp.id=? AND a.id=? AND a.pedido_item_id=? AND pp.status='PAGO'
+    WHERE pp.id=? AND a.id=?
+      AND ${financialLineageMembership("a.pedido_item_id", String(Number(cancellation.pedido_item_id)), "refund_linhagem")}
+      AND pp.status='PAGO'
       AND pp.metodo IN ('DINHEIRO','CARTAO','PIX_EXTERNO')
       AND a.valor_centavos-${refundSomadoSql("a") }=?`)
     .bind(params.pedidoId, params.valorCentavos, refundKey, params.usuarioId,
-      params.pagamentoId, params.pagamentoAlocacaoId, cancellation.pedido_item_id,
-      params.valorCentavos);
+      params.pagamentoId, params.pagamentoAlocacaoId, params.valorCentavos);
   const claim = prepareClaimOperacao(db, {
     key: parsed.key, ...identity, fase: "CONCLUIDA", fonte: fonteReembolso(refundKey),
   });

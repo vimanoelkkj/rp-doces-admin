@@ -141,8 +141,7 @@ test('destino ATIVO de troca concluída pode ser cancelado sem alterar o histór
   const first=(await exchange(db,{price:1,action:'NAO_REPOR',key:'exchange-before-destination-cancel'})).result;
   assert.equal(first.ok,true);assert.equal(first.troca.status,'CONCLUIDA');
   const firstBefore=await db.prepare(`SELECT * FROM pedido_item_trocas WHERE id=?`).bind(first.troca.id).first();
-  await db.prepare(`UPDATE pedido_pagamento_alocacoes SET pedido_item_id=? WHERE id=1`)
-    .bind(first.troca.itemDestinoId).run();
+  const allocationBefore=await db.prepare(`SELECT * FROM pedido_pagamento_alocacoes WHERE id=1`).first();
   const preview=await app.itemCancellationPreview.getItemCancellationPreview(db,1,first.troca.itemDestinoId);
   const cancelled=await app.itemCancellation.createItemCancellation(db,{pedidoId:1,itemId:first.troca.itemDestinoId,
     usuarioId:1,operationKey:'cancel-exchange-destination',motivo:'cancelar destino',estoqueAcao:'NAO_REPOR',
@@ -155,6 +154,7 @@ test('destino ATIVO de troca concluída pode ser cancelado sem alterar o histór
     valorCentavos:leg.valorCentavos,confirmacao:true});
   assert.equal(refunded.ok,true);assert.equal(refunded.cancelamento.status,'CONCLUIDO');
   assert.deepEqual(await db.prepare(`SELECT * FROM pedido_item_trocas WHERE id=?`).bind(first.troca.id).first(),firstBefore);
+  assert.deepEqual(await db.prepare(`SELECT * FROM pedido_pagamento_alocacoes WHERE id=1`).first(),allocationBefore);
   assert.deepEqual(await db.prepare(`SELECT status_item,estoque_estado FROM pedido_itens WHERE id=?`)
     .bind(first.troca.itemDestinoId).first(),{status_item:'CANCELADO',estoque_estado:'BAIXADO'});
 });
@@ -231,6 +231,39 @@ test('estoque insuficiente e preço alterado não produzem efeito',async t=>{
   const result=await app.itemExchange.createItemExchange(db,{...input,usuarioId:1,operationKey:'stale-exchange-01',previewFingerprint:fresh.previewFingerprint});
   assert.equal(result.ok,false);assert.equal(result.erro,'PRECO_ALTERADO');
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_item_trocas`).first()).n,0);
+});
+
+test('A to B expensive then C cheaper refunds direct and ancestral allocations without moving them',async t=>{
+  const db=await setup(t,{state:'BAIXADO',paid:1500});await addB(db,2000);
+  const first=(await exchange(db,{price:2000,action:'NAO_REPOR',key:'lineage-expensive-first'})).result;
+  assert.equal(first.troca.status,'AGUARDANDO_COBRANCA');
+  const payment=await app.ledger.registerAdminPayment(db,{pedidoId:1,metodo:'DINHEIRO',valorCentavos:500,
+    usuarioId:1,operationKey:'lineage-difference-payment'});
+  assert.equal(payment.ok,true);
+  assert.equal((await db.prepare(`SELECT status FROM pedido_item_trocas WHERE id=?`).bind(first.troca.id).first()).status,'CONCLUIDA');
+  await db.prepare(`INSERT INTO produtos(id,nome,categoria,preco_centavos,estoque,estoque_reservado,ativo,disponivel)
+    VALUES(3,'C','BOLO',1200,10,0,1,1)`).run();
+  const input={pedidoId:1,itemId:first.troca.itemDestinoId,produtoDestinoId:3,quantidadeDestino:1,
+    precoEsperadoCentavos:1200,estoqueAcaoOrigem:'NAO_REPOR'};
+  const preview=await app.itemExchange.getItemExchangePreview(db,input);
+  assert.deepEqual(preview.refundsPropostos.map(x=>[x.pagamentoAlocacaoId,x.valorCentavos]),[[2,500],[1,300]]);
+  const second=await app.itemExchange.createItemExchange(db,{...input,usuarioId:1,motivo:'cheaper',
+    operationKey:'lineage-cheaper-second',previewFingerprint:preview.previewFingerprint});
+  assert.equal(second.ok,true);let current=second.troca;
+  for(let index=0;current.refundsPendentes.length>0;index++){
+    const leg=current.refundsPendentes[0];
+    const result=await app.itemExchange.confirmExchangeRefund(db,{pedidoId:1,exchangeId:current.id,usuarioId:1,
+      operationKey:`lineage-cheaper-refund-${index}`,pagamentoId:leg.pagamentoId,
+      pagamentoAlocacaoId:leg.pagamentoAlocacaoId,valorCentavos:leg.valorCentavos,confirmacao:true});
+    assert.equal(result.ok,true);current=result.troca;
+  }
+  assert.equal(current.status,'CONCLUIDA');
+  assert.deepEqual((await db.prepare(`SELECT id,pedido_item_id,valor_centavos FROM pedido_pagamento_alocacoes ORDER BY id`).all()).results,
+    [{id:1,pedido_item_id:1,valor_centavos:1500},{id:2,pedido_item_id:first.troca.itemDestinoId,valor_centavos:500}]);
+  assert.deepEqual((await db.prepare(`SELECT item_origem_id,item_destino_id,status FROM pedido_item_trocas ORDER BY id`).all()).results,
+    [{item_origem_id:1,item_destino_id:first.troca.itemDestinoId,status:'CONCLUIDA'},
+     {item_origem_id:first.troca.itemDestinoId,item_destino_id:current.itemDestinoId,status:'CONCLUIDA'}]);
+  assert.equal((await db.prepare(`SELECT SUM(valor_centavos) total FROM pedido_reembolsos WHERE status='REEMBOLSADO'`).first()).total,800);
 });
 
 test('TROCA_PENDENTE fica fora do waterfall e nunca é baixado pela reconciliação',async t=>{
