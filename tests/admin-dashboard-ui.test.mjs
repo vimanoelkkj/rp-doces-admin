@@ -59,7 +59,17 @@ test('dashboard renderiza caixa total e ranking geral entregues pelo backend', a
     return Response.json({
       data: '2026-09-20',
       recebidoHoje: {count: 1, total: 100000},
-      aReceber: {count: 0, total: 0},
+      aReceber: {count: 1, total: 500, anteriores: 1},
+      pagamentosPendentes: [
+        {
+          id: 49,
+          cliente_nome: 'Vitória',
+          status_pedido: 'ENTREGUE',
+          criado_em: '2026-09-19 15:54:00',
+          saldo_centavos: 500,
+          dias_em_aberto: 1,
+        },
+      ],
       comandasAbertas: 0,
       aguardandoPreparo: 0,
       catalogo: {total: 2, estoqueBaixo: 0},
@@ -90,6 +100,19 @@ test('dashboard renderiza caixa total e ranking geral entregues pelo backend', a
     [...document.querySelectorAll('.dash-rank-row')].map(row => row.textContent.replace(/\s+/g, ' ').trim()),
     ['1Ninho com Nutella84 un.', '2Sabor historico12 un.'],
   );
+
+  const aReceber = document.querySelector('.dash-kpi-card--interactive');
+  assert.match(aReceber.textContent, /A receber/);
+  assert.match(aReceber.textContent, /Atual/);
+  assert.match(aReceber.textContent, /1 pendência\(s\) em aberto/);
+  assert.match(aReceber.textContent, /1 anterior\(es\)/);
+
+  const pendingRow = document.querySelector('.dash-pending-row');
+  assert.match(pendingRow.textContent, /RP-49/);
+  assert.match(pendingRow.textContent, /Vitória/);
+  assert.match(pendingRow.textContent, /R\$ 5,00/);
+  assert.match(pendingRow.textContent, /Desde ontem/);
+  assert.equal(pendingRow.getAttribute('href'), '/admin/pedidos?pedido=49');
 
   await ui.act(async () => root.unmount());
   container.innerHTML = '';

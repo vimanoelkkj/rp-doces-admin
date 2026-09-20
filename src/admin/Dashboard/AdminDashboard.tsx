@@ -43,6 +43,19 @@ interface ValorContagem {
   total: number;
 }
 
+interface AReceberResumo extends ValorContagem {
+  anteriores: number;
+}
+
+interface PendenciaPagamentoRow {
+  id: number;
+  cliente_nome: string;
+  status_pedido: StatusPedido;
+  criado_em: string;
+  saldo_centavos: number;
+  dias_em_aberto: number;
+}
+
 interface MaisVendidoRow {
   produtoId: number | null;
   nome: string;
@@ -60,7 +73,8 @@ interface PedidoRecenteRow {
 interface DashboardResponse {
   data: string;
   recebidoHoje: ValorContagem;
-  aReceber: ValorContagem;
+  aReceber: AReceberResumo;
+  pagamentosPendentes: PendenciaPagamentoRow[];
   comandasAbertas: number;
   aguardandoPreparo: number;
   catalogo: { total: number; estoqueBaixo: number };
@@ -106,6 +120,9 @@ function isToday(d: Date): boolean {
   return formatDateISO(d) === formatDateISO(now);
 }
 
+const idadePendencia = (dias: number) =>
+  dias <= 0 ? "Hoje" : dias === 1 ? "Desde ontem" : `Há ${dias} dias`;
+
 /* ── Component ── */
 export default function AdminDashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -115,7 +132,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/admin/dashboard?date=${formatDateISO(selectedDate)}`)
+    fetch(
+      `/api/admin/dashboard?date=${formatDateISO(selectedDate)}&today=${formatDateISO(new Date())}`,
+    )
       .then(async (response) => {
         if (!response.ok) throw new Error("Falha ao carregar dashboard");
         return response.json() as Promise<DashboardResponse>;
@@ -180,17 +199,31 @@ export default function AdminDashboard() {
               </span>
             </div>
           </div>
-          <div className="dash-kpi-card">
-            <span className="dash-kpi-label">A receber</span>
+          <button
+            type="button"
+            className="dash-kpi-card dash-kpi-card--interactive"
+            onClick={() =>
+              document
+                .getElementById("pagamentos-pendentes")
+                ?.scrollIntoView({ behavior: "smooth", block: "center" })
+            }
+            disabled={!data || data.aReceber.count === 0}
+          >
+            <span className="dash-kpi-label-row">
+              <span className="dash-kpi-label">A receber</span>
+              <span className="dash-kpi-live">Atual</span>
+            </span>
             <div className="dash-kpi-value-group">
               <span className="dash-kpi-value">
                 {formatarPreco(data?.aReceber.total ?? 0)}
               </span>
               <span className="dash-kpi-desc">
-                {data?.aReceber.count ?? 0} faturamento(s) agendado(s)
+                {!data || data.aReceber.count === 0
+                  ? "Nenhuma pendência em aberto"
+                  : `${data.aReceber.count} pendência(s) em aberto${data.aReceber.anteriores > 0 ? ` • ${data.aReceber.anteriores} anterior(es)` : ""}`}
               </span>
             </div>
-          </div>
+          </button>
           <div className="dash-kpi-card">
             <span className="dash-kpi-label">Comandas abertas</span>
             <div className="dash-kpi-value-group">
@@ -302,9 +335,17 @@ export default function AdminDashboard() {
             </div>
 
             {/* Pending payments */}
-            <div className="dash-panel dash-pending-payments">
+            <div
+              className="dash-panel dash-pending-payments"
+              id="pagamentos-pendentes"
+            >
               <div className="dash-panel-header-row">
-                <h2 className="dash-panel-title">Pagamentos pendentes</h2>
+                <div className="dash-panel-title-group">
+                  <h2 className="dash-panel-title">Pagamentos pendentes</h2>
+                  <p className="dash-panel-subtitle">
+                    Saldo em aberto até ser totalmente resolvido
+                  </p>
+                </div>
                 <span className="dash-pending-value">
                   {formatarPreco(data?.aReceber.total ?? 0)}
                 </span>
@@ -316,20 +357,47 @@ export default function AdminDashboard() {
                     Nenhum valor pendente
                   </span>
                   <span className="dash-empty-desc">
-                    Excelente! Todas as comandas abertas já foram resolvidas.
+                    Todos os saldos financeiros estão resolvidos.
                   </span>
                 </div>
               ) : (
-                <div className="dash-alert-box">
-                  <IconAlert />
-                  <div className="dash-alert-text">
-                    <span className="dash-alert-bold">
-                      {data.aReceber.count} pagamento(s) pendente(s)
-                    </span>
-                    <span className="dash-alert-desc">
-                      Aguardando confirmação do Pix.
-                    </span>
-                  </div>
+                <div className="dash-pending-list">
+                  {data.pagamentosPendentes.map((pedido) => (
+                    <a
+                      className="dash-pending-row"
+                      href={`/admin/pedidos?pedido=${pedido.id}`}
+                      key={pedido.id}
+                    >
+                      <div className="dash-pending-main">
+                        <div className="dash-pending-order">
+                          <span className="dash-pending-id">RP-{pedido.id}</span>
+                          <span className="dash-pending-client">
+                            {pedido.cliente_nome}
+                          </span>
+                        </div>
+                        <strong className="dash-pending-amount">
+                          {formatarPreco(pedido.saldo_centavos)}
+                        </strong>
+                      </div>
+                      <div className="dash-pending-meta">
+                        <span
+                          className={`dash-badge ${statusClass(pedido.status_pedido)}`}
+                        >
+                          {statusLabel(pedido.status_pedido)}
+                        </span>
+                        <span
+                          className={`dash-pending-age${pedido.dias_em_aberto > 0 ? " dash-pending-age--late" : ""}`}
+                        >
+                          {idadePendencia(pedido.dias_em_aberto)}
+                        </span>
+                      </div>
+                    </a>
+                  ))}
+                  {data.aReceber.count > data.pagamentosPendentes.length && (
+                    <a className="dash-pending-more" href="/admin/pedidos">
+                      +{data.aReceber.count - data.pagamentosPendentes.length} outra(s) pendência(s)
+                    </a>
+                  )}
                 </div>
               )}
             </div>

@@ -295,6 +295,41 @@
   min-height: 138px;
 }
 
+.dash-kpi-card--interactive {
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.dash-kpi-card--interactive:hover:not(:disabled) {
+  border-color: #cdb9ab;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(99, 71, 56, 0.08);
+}
+
+.dash-kpi-card--interactive:disabled {
+  cursor: default;
+}
+
+.dash-kpi-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dash-kpi-live {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #ebf5f0;
+  color: #4e8c6f;
+  font-family: "Manrope", sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
 .dash-kpi-label {
   font-family: "Manrope", sans-serif;
   font-weight: 700;
@@ -512,6 +547,97 @@
   font-weight: 700;
   font-size: 14px;
   color: #634738;
+}
+
+.dash-pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-pending-row {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dash-pending-row:hover {
+  background: #faf6f0;
+  border-color: #d9c7ba;
+}
+
+.dash-pending-main,
+.dash-pending-meta,
+.dash-pending-order {
+  display: flex;
+  align-items: center;
+}
+
+.dash-pending-main,
+.dash-pending-meta {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dash-pending-order {
+  gap: 8px;
+  min-width: 0;
+}
+
+.dash-pending-id {
+  flex-shrink: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #634738;
+}
+
+.dash-pending-client {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2b1d1a;
+}
+
+.dash-pending-amount {
+  flex-shrink: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #2b1d1a;
+}
+
+.dash-pending-age {
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8c7a76;
+}
+
+.dash-pending-age--late {
+  color: #c28343;
+}
+
+.dash-pending-more {
+  align-self: flex-start;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #634738;
+  text-decoration: none;
+}
+
+.dash-pending-more:hover {
+  text-decoration: underline;
 }
 
 .dash-empty-state {

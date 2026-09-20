@@ -12,6 +12,19 @@ interface ValorContagem {
   total: number;
 }
 
+interface AReceberResumo extends ValorContagem {
+  anteriores: number;
+}
+
+interface PendenciaPagamentoRow {
+  id: number;
+  cliente_nome: string;
+  status_pedido: string;
+  criado_em: string;
+  saldo_centavos: number;
+  dias_em_aberto: number;
+}
+
 interface CatalogoRow {
   total: number;
   baixo: number;
@@ -31,6 +44,61 @@ function jsonError(message: string, status: number) {
 
 const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+// "A receber" é estado atual da loja, não resultado do dia selecionado.
+// O CTE usa o mesmo princípio do ledger: bruto PAGO menos refunds
+// REEMBOLSADO, e carrega a obrigação enquanto houver saldo líquido aberto.
+// Pedido manual é compromisso operacional mesmo sem Pix vivo; pedido SITE
+// PENDENTE só entra se ainda houver uma tentativa de pagamento viva.
+const PENDENCIAS_FINANCEIRAS_CTE = `
+WITH candidatos AS (
+  SELECT
+    p.id,
+    p.cliente_nome,
+    p.status_pedido,
+    p.criado_em,
+    p.valor_total_centavos,
+    COALESCE((
+      SELECT SUM(pp.valor_centavos)
+      FROM pedido_pagamentos pp
+      WHERE pp.pedido_id = p.id AND pp.status = 'PAGO'
+    ), 0) AS bruto_pago_centavos,
+    COALESCE((
+      SELECT SUM(r.valor_centavos)
+      FROM pedido_reembolsos r
+      WHERE r.pedido_id = p.id AND r.status = 'REEMBOLSADO'
+    ), 0) AS reembolsado_centavos
+  FROM pedidos p
+  WHERE p.status_pedido <> 'CANCELADO'
+    AND (
+      p.origem_pedido = 'MANUAL'
+      OR EXISTS (
+        SELECT 1
+        FROM pedido_pagamentos pp
+        WHERE pp.pedido_id = p.id
+          AND (
+            pp.status = 'PAGO'
+            OR (
+              pp.status = 'PENDENTE'
+              AND (pp.pix_expira_em IS NULL OR datetime(pp.pix_expira_em) > CURRENT_TIMESTAMP)
+            )
+          )
+      )
+    )
+),
+pendencias AS (
+  SELECT
+    id,
+    cliente_nome,
+    status_pedido,
+    criado_em,
+    MAX(
+      0,
+      valor_total_centavos - MAX(0, bruto_pago_centavos - reembolsado_centavos)
+    ) AS saldo_centavos
+  FROM candidatos
+)
+`;
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
@@ -38,13 +106,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     const url = new URL(request.url);
     const data = url.searchParams.get("date") ?? "";
-    if (!DATA_REGEX.test(data)) {
-      return jsonError("Parâmetro date inválido (esperado YYYY-MM-DD)", 400);
+    const hoje = url.searchParams.get("today") ?? data;
+    if (!DATA_REGEX.test(data) || !DATA_REGEX.test(hoje)) {
+      return jsonError("Parâmetro date/today inválido (esperado YYYY-MM-DD)", 400);
     }
 
     const [
       recebidoHoje,
       aReceber,
+      pagamentosPendentes,
       comandasAbertas,
       aguardandoPreparo,
       catalogo,
@@ -61,20 +131,44 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       )
         .bind(data)
         .first<ValorContagem>(),
-      // "Ainda pode virar receita": PENDENTE agregado (zero confirmado) E
-      // existe uma tentativa genuinamente viva no ledger — sem o EXISTS, um
-      // Pix expirado (pago=0, mas tentativa morta) voltaria a contar aqui.
+      // Estado financeiro ATUAL: atravessa a virada do dia e independe do
+      // filtro de data do dashboard. "anteriores" usa a data local enviada
+      // pelo browser, então selecionar outro dia no calendário não apaga a
+      // fila operacional de cobrança.
       env.DB.prepare(
-        `SELECT COUNT(*) AS count, COALESCE(SUM(valor_total_centavos), 0) AS total
-         FROM pedidos p
-         WHERE p.status_pagamento = 'PENDENTE' AND date(p.criado_em) = ?
-           AND EXISTS (
-             SELECT 1 FROM pedido_pagamentos pp
-             WHERE pp.pedido_id = p.id AND pp.status = 'PENDENTE'
-           )`,
+        `${PENDENCIAS_FINANCEIRAS_CTE}
+         SELECT
+           COUNT(*) AS count,
+           COALESCE(SUM(saldo_centavos), 0) AS total,
+           COALESCE(SUM(CASE WHEN date(criado_em) < ? THEN 1 ELSE 0 END), 0) AS anteriores
+         FROM pendencias
+         WHERE saldo_centavos > 0`,
       )
-        .bind(data)
-        .first<ValorContagem>(),
+        .bind(hoje)
+        .first<AReceberResumo>(),
+      env.DB.prepare(
+        `${PENDENCIAS_FINANCEIRAS_CTE}
+         SELECT
+           id,
+           cliente_nome,
+           status_pedido,
+           criado_em,
+           saldo_centavos,
+           CASE
+             WHEN date(criado_em) < ?
+             THEN MAX(1, CAST(julianday(?) - julianday(date(criado_em)) AS INTEGER))
+             ELSE 0
+           END AS dias_em_aberto
+         FROM pendencias
+         WHERE saldo_centavos > 0
+         ORDER BY
+           CASE WHEN date(criado_em) < ? THEN 0 ELSE 1 END,
+           criado_em ASC,
+           id ASC
+         LIMIT 4`,
+      )
+        .bind(hoje, hoje, hoje)
+        .all<PendenciaPagamentoRow>(),
       // "Tem dinheiro confirmado (total ou parcial) e ainda está em
       // atendimento" — pergunta financeira+operacional combinada, PARCIAL
       // participa por definição.
@@ -114,7 +208,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({
       data,
       recebidoHoje: recebidoHoje ?? { count: 0, total: 0 },
-      aReceber: aReceber ?? { count: 0, total: 0 },
+      aReceber: aReceber ?? { count: 0, total: 0, anteriores: 0 },
+      pagamentosPendentes: pagamentosPendentes.results,
       comandasAbertas: comandasAbertas?.count ?? 0,
       aguardandoPreparo: aguardandoPreparo?.count ?? 0,
       catalogo: {
