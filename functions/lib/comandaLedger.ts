@@ -823,11 +823,20 @@ export async function registerAdminPayment(
   }
 
   const pedido = await db
-    .prepare(`SELECT status_comanda FROM pedidos WHERE id = ?`)
+    .prepare(`SELECT status_comanda, status_pedido FROM pedidos WHERE id = ?`)
     .bind(params.pedidoId)
-    .first<{ status_comanda: string }>();
+    .first<{ status_comanda: string; status_pedido: string }>();
   if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
-  if (pedido.status_comanda !== "ABERTA") return { ok: false, erro: "COMANDA_ENCERRADA" };
+  // ENTREGUE encerra a comanda automaticamente por trigger, mas isso é um
+  // estado operacional: o recebimento ainda pode acontecer depois da
+  // entrega. A exceção é deliberadamente estreita; CANCELADO e qualquer
+  // outro pedido com comanda encerrada continuam bloqueados.
+  if (
+    pedido.status_comanda !== "ABERTA" &&
+    pedido.status_pedido !== "ENTREGUE"
+  ) {
+    return { ok: false, erro: "COMANDA_ENCERRADA" };
+  }
 
   const itens = await getItensComSaldo(db, params.pedidoId);
   const waterfall = computeWaterfallAllocations(itens, params.valorCentavos);

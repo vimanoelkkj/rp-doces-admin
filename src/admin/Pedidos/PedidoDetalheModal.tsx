@@ -482,6 +482,17 @@ export default function PedidoDetalheModal({
   };
 
   const financeiro = data ? formatarFinanceiro(data.financeiro) : null;
+  const podeRegistrarPagamento = Boolean(
+    data &&
+      data.capacidadeCobravelCentavos > 0 &&
+      (data.pedido.status_comanda === "ABERTA" ||
+        data.pedido.status_pedido === "ENTREGUE"),
+  );
+  const podeGerarPix = Boolean(
+    data &&
+      data.capacidadeCobravelCentavos > 0 &&
+      data.pedido.status_comanda === "ABERTA",
+  );
   const trocaAguardandoCobranca = data?.itens.some(
     (item) => item.troca_status === "AGUARDANDO_COBRANCA",
   );
@@ -832,8 +843,7 @@ export default function PedidoDetalheModal({
                 </div>
               )}
 
-              {data.pedido.status_comanda === "ABERTA" &&
-                data.capacidadeCobravelCentavos > 0 && (
+              {(podeRegistrarPagamento || podeGerarPix) && (
                   <div className="pedmodal-charge-block">
                     <div className="pedmodal-charge-action">
                       <div>
@@ -847,25 +857,29 @@ export default function PedidoDetalheModal({
                         </span>
                       </div>
                       <div className="pedmodal-charge-buttons">
-                        <button
-                          type="button"
-                          className="pedmodal-btn-edit"
-                          onClick={abrirRegistroPagamento}
-                        >
-                          Registrar pagamento
-                        </button>
-                        <button
-                          type="button"
-                          className="pedmodal-btn-advance"
-                          onClick={() =>
-                            gerarPix(undefined, data.capacidadeCobravelCentavos)
-                          }
-                          disabled={gerando}
-                        >
-                          {gerando
-                            ? "Gerando..."
-                            : `Gerar Pix ${formatarPreco(data.capacidadeCobravelCentavos)}`}
-                        </button>
+                        {podeRegistrarPagamento && (
+                          <button
+                            type="button"
+                            className="pedmodal-btn-edit"
+                            onClick={abrirRegistroPagamento}
+                          >
+                            Registrar pagamento
+                          </button>
+                        )}
+                        {podeGerarPix && (
+                          <button
+                            type="button"
+                            className="pedmodal-btn-advance"
+                            onClick={() =>
+                              gerarPix(undefined, data.capacidadeCobravelCentavos)
+                            }
+                            disabled={gerando}
+                          >
+                            {gerando
+                              ? "Gerando..."
+                              : `Gerar Pix ${formatarPreco(data.capacidadeCobravelCentavos)}`}
+                          </button>
+                        )}
                       </div>
                     </div>
 

@@ -566,6 +566,55 @@ test('pedido PRONTO registra o saldo integral uma vez e atualiza detalhe e lista
   }
 });
 
+test('saldo em aberto permite registrar pagamento em NOVO, PREPARANDO, PRONTO e ENTREGUE', async t => {
+  const casos = [
+    ['NOVO', 'ABERTA', true],
+    ['PREPARANDO', 'ABERTA', true],
+    ['PRONTO', 'ABERTA', true],
+    ['ENTREGUE', 'ENCERRADA', true],
+    ['CANCELADO', 'ENCERRADA', false],
+  ];
+  let atual = detalhe({total: 4000, pago: 0, capacidade: 4000});
+  t.mock.method(globalThis, 'fetch', async () => Response.json(atual));
+
+  for (const [statusPedido, statusComanda, visivel] of casos) {
+    atual = detalhe({
+      total: 4000,
+      pago: 0,
+      capacidade: 4000,
+      statusPedido,
+      statusComanda,
+    });
+    let root;
+    await ui.act(async () => { root = ui.mount(container); });
+    await flush();
+    const registrar = [...document.querySelectorAll('button')]
+      .some(button => button.textContent === 'Registrar pagamento');
+    assert.equal(registrar, visivel, statusPedido);
+    if (statusPedido === 'ENTREGUE') {
+      assert.equal(
+        [...document.querySelectorAll('button')]
+          .some(button => button.textContent.startsWith('Gerar Pix')),
+        false,
+        'pedido entregue aceita recebimento externo sem abrir nova cobranca MP',
+      );
+    }
+    await unmount(root);
+  }
+
+  atual = detalhe({total: 4000, pago: 4000, status: 'PAGO', capacidade: 0});
+  let root;
+  await ui.act(async () => { root = ui.mount(container); });
+  await flush();
+  assert.equal(
+    [...document.querySelectorAll('button')]
+      .some(button => /Registrar pagamento|não pago/i.test(button.textContent)),
+    false,
+    'pedido pago nao oferece nova cobranca nem reversao destrutiva',
+  );
+  await unmount(root);
+});
+
 test('pagamento parcial preenche e registra somente o saldo restante', async t => {
   let postBody;
   let atual = detalhe({total: 4000, pago: 1500, status: 'PARCIAL', capacidade: 2500});
