@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { recusarPedidoAnulado } from "../../../../../../lib/pedidoValido";
+
 import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import {
   createItemCancellation,
@@ -49,6 +51,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (!sameOrigin(request)) return errorJson("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
+  const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
+  if (anulado) return anulado;
+
   const value = ids(params);
   if (!Number.isInteger(value.pedidoId) || value.pedidoId <= 0
       || !Number.isInteger(value.itemId) || value.itemId <= 0) {

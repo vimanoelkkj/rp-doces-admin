@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { pedidoValidoSql } from "../../lib/pedidoValido";
+
 import { requireUser } from "../../lib/auth";
 import { getStoreAnalytics } from "../../lib/dashboardAnalytics";
 
@@ -68,7 +70,7 @@ WITH candidatos AS (
       WHERE r.pedido_id = p.id AND r.status = 'REEMBOLSADO'
     ), 0) AS reembolsado_centavos
   FROM pedidos p
-  WHERE p.status_pedido <> 'CANCELADO'
+  WHERE ${pedidoValidoSql('p.id')} AND p.status_pedido <> 'CANCELADO'
     AND (
       p.origem_pedido = 'MANUAL'
       OR EXISTS (
@@ -127,7 +129,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // UI, "pagamento(s) confirmado(s)"), não pedidos.
       env.DB.prepare(
         `SELECT COUNT(*) AS count, COALESCE(SUM(valor_centavos), 0) AS total
-         FROM pedido_pagamentos WHERE status = 'PAGO' AND date(pago_em) = ?`,
+         FROM pedido_pagamentos WHERE ${pedidoValidoSql('pedido_pagamentos.pedido_id')} AND status = 'PAGO' AND date(pago_em) = ?`,
       )
         .bind(data)
         .first<ValorContagem>(),
@@ -174,7 +176,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // participa por definição.
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE status_pagamento IN ('PARCIAL', 'PAGO') AND status_comanda = 'ABERTA' AND date(criado_em) = ?`,
+         WHERE ${pedidoValidoSql('pedidos.id')} AND status_pagamento IN ('PARCIAL', 'PAGO') AND status_comanda = 'ABERTA' AND date(criado_em) = ?`,
       )
         .bind(data)
         .first<{ count: number }>(),
@@ -183,7 +185,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // até virar decisão de negócio explícita incluir parcial aqui.
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE status_pagamento = 'PAGO' AND status_pedido = 'NOVO' AND date(criado_em) = ?`,
+         WHERE ${pedidoValidoSql('pedidos.id')} AND status_pagamento = 'PAGO' AND status_pedido = 'NOVO' AND date(criado_em) = ?`,
       )
         .bind(data)
         .first<{ count: number }>(),
@@ -197,7 +199,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         `SELECT p.id, p.cliente_nome, p.valor_total_centavos, p.status_pedido,
                 (SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = p.id) AS itens_count
          FROM pedidos p
-         WHERE p.status_pagamento IN ('PARCIAL', 'PAGO') AND date(p.criado_em) = ?
+         WHERE ${pedidoValidoSql('p.id')} AND p.status_pagamento IN ('PARCIAL', 'PAGO') AND date(p.criado_em) = ?
          ORDER BY p.criado_em DESC
          LIMIT 8`,
       )

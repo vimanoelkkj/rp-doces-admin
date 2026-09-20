@@ -1,12 +1,14 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { pedidoValidoSql, getPedidoAnulacao } from "./pedidoValido";
+
 import { recalculatePedidoStatusPagamento, type StatusFinanceiroAgregado } from "./comandaLedger";
 import { baixarEstoquePedido, type BaixaResultado } from "./stock";
 import { STATUS_FINANCEIRO_SQL } from "./pedidoFinanceiroSql";
 import { reconcileExchangeCharges } from "./itemExchange";
 
 export type PedidoReconcileResult =
-  | { ok: false; motivo: "PEDIDO_NAO_ENCONTRADO" | "LEGADO_SEM_LEDGER" }
+  | { ok: false; motivo: "PEDIDO_NAO_ENCONTRADO" | "LEGADO_SEM_LEDGER" | "PEDIDO_ANULADO" }
   | { ok: true; statusFinanceiro: StatusFinanceiroAgregado; estoque: BaixaResultado };
 
 // Convergência por pedido: não cria fatos financeiros, não materializa legado,
@@ -15,6 +17,7 @@ export async function reconcilePedidoAfterFinancialChange(
   db: D1Database,
   pedidoId: number,
 ): Promise<PedidoReconcileResult> {
+  if (await getPedidoAnulacao(db, pedidoId)) return { ok: false, motivo: "PEDIDO_ANULADO" };
   const agregado = await recalculatePedidoStatusPagamento(db, pedidoId);
   if (agregado === null) {
     const pedido = await db.prepare(`SELECT id FROM pedidos WHERE id = ?`).bind(pedidoId).first();
@@ -63,7 +66,7 @@ export async function reconcilePedidosDivergentes(db: D1Database): Promise<void>
                  AND pi.estoque_estado IN ('RESERVADO', 'SEM_RESERVA', 'LIBERADO')
              ) AS estoque_pendente
       FROM pedidos p
-      WHERE EXISTS (SELECT 1 FROM pedido_pagamentos pp WHERE pp.pedido_id = p.id)
+      WHERE ${pedidoValidoSql('p.id')} AND EXISTS (SELECT 1 FROM pedido_pagamentos pp WHERE pp.pedido_id = p.id)
     ) divergente
     WHERE status_pagamento IS NOT esperado
        OR (esperado = 'PAGO' AND estoque_pendente)

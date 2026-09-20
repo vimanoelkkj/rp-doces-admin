@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
+
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { precoAtualCentavos, type ProdutoRow } from "../../../../lib/pricing";
 import {
@@ -229,6 +231,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
 
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
+  const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
+  if (anulado) return anulado;
+
 
   const pedidoId = Number(params.id);
   if (!Number.isInteger(pedidoId) || pedidoId <= 0) return jsonError("Id inválido", 400);
@@ -509,6 +514,9 @@ export const onRequestPut: PagesFunction<Env> = async ({
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
+  const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
+  if (anulado) return anulado;
+
 
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {

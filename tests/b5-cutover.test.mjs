@@ -4,6 +4,7 @@ import { app } from './helpers/b3.mjs';
 import {
   bancoProducao, aplicarB5, aplicarEstoquePorItem, aplicarOperacaoPorItem,
   aplicarCancelamentoPorItem,
+  aplicarTrocaPorItem, aplicarRefundPixMpRecuperavel, aplicarCoberturaFinanceiraLinhagem, aplicarPedidoAnulacoes,
   validarB5, snapshot, SCRIPT_B5,
 } from './helpers/b5.mjs';
 
@@ -338,6 +339,10 @@ test('reconciliador reconhece a baixa histórica por item sem repetir efeito', a
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
   await aplicarCancelamentoPorItem(db);
+  await aplicarTrocaPorItem(db);
+  await aplicarRefundPixMpRecuperavel(db);
+  await aplicarCoberturaFinanceiraLinhagem(db);
+  await aplicarPedidoAnulacoes(db);
   const antes = await snapshot(db);
 
   // O pedido 5 é o caso observado: PAGO, reserva ATIVA, pedidos

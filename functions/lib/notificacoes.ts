@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { pedidoValidoSql } from "./pedidoValido";
+
 // HUMAN-14 — notificações internas do admin.
 //
 // ARQUITETURA MÍNIMA, deliberada: nenhuma notificação é materializada. Cada
@@ -60,7 +62,7 @@ async function pedidosNovos(db: D1Database): Promise<NotificacaoDerivada[]> {
     .prepare(
       `SELECT id, cliente_nome, valor_total_centavos, criado_em
        FROM pedidos
-       WHERE status_pedido = 'NOVO'
+       WHERE ${pedidoValidoSql('pedidos.id')} AND status_pedido = 'NOVO'
          AND (status_pagamento IN ('PARCIAL', 'PAGO') OR origem_pedido = 'MANUAL')
        ORDER BY criado_em DESC, id DESC
        LIMIT ?`,
@@ -84,7 +86,7 @@ async function pagamentosConfirmados(db: D1Database): Promise<NotificacaoDerivad
     .prepare(
       `SELECT pp.id, pp.pedido_id, pp.metodo, pp.valor_centavos, pp.pago_em
        FROM pedido_pagamentos pp
-       WHERE pp.status = 'PAGO' AND pp.pago_em IS NOT NULL
+       WHERE ${pedidoValidoSql('pp.pedido_id')} AND pp.status = 'PAGO' AND pp.pago_em IS NOT NULL
        ORDER BY pp.pago_em DESC, pp.id DESC
        LIMIT ?`,
     )

@@ -90,16 +90,19 @@ export function NotificacoesProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     ativo.current = true;
     const aoFocar = () => carregar();
+    const aoAnular = () => carregar(true);
     const aoFicarVisivel = () => {
       if (document.visibilityState === "visible") carregar();
     };
 
     carregar(true);
     window.addEventListener("focus", aoFocar);
+    window.addEventListener("pedido-anulado", aoAnular);
     document.addEventListener("visibilitychange", aoFicarVisivel);
     return () => {
       ativo.current = false;
       window.removeEventListener("focus", aoFocar);
+      window.removeEventListener("pedido-anulado", aoAnular);
       document.removeEventListener("visibilitychange", aoFicarVisivel);
     };
   }, [carregar]);

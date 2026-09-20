@@ -83,6 +83,7 @@ const detalhe = (overrides = {}) => {
   const pago = overrides.pago ?? 3000;
   const status = overrides.status ?? (pago >= total ? 'PAGO' : pago > 0 ? 'PARCIAL' : 'PENDENTE');
   return {
+    anulacao: overrides.anulacao ?? null,
     pedido: {
       id: 1,
       cliente_nome: overrides.clienteNome ?? 'Balcao',
@@ -131,6 +132,90 @@ async function unmount(root) {
   await ui.act(async () => root.unmount());
   container.innerHTML = '';
 }
+
+test('excluir pedido exige escolha de estoque, confirma uma vez e atualiza a listagem', async t => {
+  let calls = 0, refreshed = 0, closed = 0, notified = 0, resolvePost;
+  const gate = new Promise(resolve => { resolvePost = resolve; });
+  const bodies = [];
+  const listener = () => { notified++; };
+  window.addEventListener('pedido-anulado', listener);
+  const root = await mountWith(t, async (url, options = {}) => {
+    if (String(url).endsWith('/anulacao')) {
+      calls++;
+      bodies.push(JSON.parse(options.body));
+      await gate;
+      return Response.json({ok:true});
+    }
+    return Response.json(detalhe({total:4000,pago:4000}));
+  }, {onStatusChanged: () => refreshed++, onClose: () => closed++});
+  try {
+    assert.ok(document.querySelector('.pedmodal-more summary'));
+    await ui.act(async () => document.querySelector('.pedmodal-more button').click());
+    const modal = document.querySelector('.excluir-pedido-overlay');
+    assert.match(modal.textContent, /40,00/);
+    assert.match(modal.textContent, /histórico financeiro continuará registrado/);
+    const submit = modal.querySelector('button[type="submit"]');
+    assert.equal(submit.disabled, true);
+    assert.equal(modal.querySelectorAll('input:checked').length, 0);
+    await ui.act(async () => modal.querySelectorAll('input[type="radio"]')[1].click());
+    assert.equal(submit.disabled, false);
+    await ui.act(async () => { submit.click(); submit.click(); });
+    assert.equal(calls, 1);
+    assert.deepEqual(bodies, [{devolverEstoque:false,motivo:''}]);
+    assert.equal(submit.disabled, true);
+    await ui.act(async () => { resolvePost(); await gate; });
+    await flush();
+    assert.equal(refreshed, 1);
+    assert.equal(closed, 1);
+    assert.equal(notified, 1);
+    assert.equal(document.querySelector('.excluir-pedido-overlay'), null);
+  } finally {
+    window.removeEventListener('pedido-anulado', listener);
+    await unmount(root);
+  }
+});
+
+test('bloqueio MP permanece visivel na confirmacao e nao fecha o pedido', async t => {
+  let closed = 0;
+  const root = await mountWith(t, async (url) => String(url).endsWith('/anulacao')
+    ? Response.json({error:'Trate o pagamento pelo fluxo de estorno existente.'}, {status:409})
+    : Response.json(detalhe()), {onClose: () => closed++});
+  try {
+    await ui.act(async () => document.querySelector('.pedmodal-more button').click());
+    await ui.act(async () => document.querySelector('.excluir-pedido-overlay input').click());
+    await ui.act(async () => document.querySelector('.excluir-pedido-danger').click());
+    await flush();
+    assert.match(document.querySelector('[role="alert"]').textContent, /fluxo de estorno/);
+    assert.equal(closed, 0);
+    assert.equal(document.querySelector('.excluir-pedido-danger').disabled, false);
+  } finally { await unmount(root); }
+});
+
+test('pedido anulado preserva valores, mostra auditoria e oculta todas as acoes mutantes', async t => {
+  const root = await mountWith(t, async () => Response.json(detalhe({
+    total:4000,pago:4000,capacidade:4000,
+    anulacao: {id:1,pedido_id:1,motivo:'Duplicado',estoque_acao:'MANTER',usuario_nome:'Operadora',
+      criado_em:'2026-09-20 12:00:00',liquido_original_centavos:4000},
+    itens: [
+      {id:1,produto_id:1,produto_nome:'Original',quantidade:1,valor_unitario_centavos:4000,
+        valor_total_centavos:4000,status_item:'CANCELADO',estoque_estado:'BAIXADO',troca_id:1,troca_item_origem_id:1},
+      {id:2,produto_id:1,produto_nome:'Atual',quantidade:1,valor_unitario_centavos:4000,
+        valor_total_centavos:4000,status_item:'ATIVO',estoque_estado:'BAIXADO'},
+    ],
+  })));
+  try {
+    assert.match(document.body.textContent, /Anulado/);
+    assert.match(document.querySelector('.pedmodal-anulacao').textContent, /Duplicado/);
+    assert.match(document.querySelector('.pedmodal-anulacao').textContent, /Operadora/);
+    assert.match(document.querySelector('.pedmodal-payment').textContent, /40,00/);
+    assert.equal(document.querySelectorAll('.pedmodal-item-row').length, 2);
+    for (const selector of ['.pedmodal-more','.pedmodal-btn-advance','.pedmodal-btn-archive',
+      '.pedmodal-btn-name-edit','.pedmodal-btn-add-item','.pedmodal-btn-cancel-item','.pedmodal-charge-buttons']) {
+      assert.equal(document.querySelector(selector), null, selector);
+    }
+    assert.ok(document.querySelector('.pedmodal-btn-historico'));
+  } finally { await unmount(root); }
+});
 
 function changeValue(element, value) {
   const prototype = element.tagName === 'SELECT'

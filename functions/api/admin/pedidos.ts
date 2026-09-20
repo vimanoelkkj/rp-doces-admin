@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { pedidoValidoSql } from "../../lib/pedidoValido";
+
 import { requireUser, sameOrigin } from "../../lib/auth";
 import {
   reconcilePendingPixPayments,
@@ -157,14 +159,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const [countRow, pedidosResult, counts] = await Promise.all([
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE ${listScope} ${tabFilter} ${searchFilter}`,
+         WHERE ${pedidoValidoSql('pedidos.id')} AND ${listScope} ${tabFilter} ${searchFilter}`,
       )
         .bind(...searchParams)
         .first<{ count: number }>(),
       env.DB.prepare(
         `SELECT id, cliente_nome, valor_total_centavos, status_pagamento, status_pedido, criado_em
          FROM pedidos
-         WHERE ${listScope} ${tabFilter} ${searchFilter}
+         WHERE ${pedidoValidoSql('pedidos.id')} AND ${listScope} ${tabFilter} ${searchFilter}
          ORDER BY criado_em DESC
          LIMIT ? OFFSET ?`,
       )
@@ -184,7 +186,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
            COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
                      AND status_pedido='ENTREGUE' THEN 1 ELSE 0 END),0) AS entregues,
            COALESCE(SUM(CASE WHEN arquivado=1 THEN 1 ELSE 0 END),0) AS arquivados
-         FROM pedidos`,
+         FROM pedidos WHERE ${pedidoValidoSql('pedidos.id')}`,
       ).first<CountsRow>(),
     ]);
 

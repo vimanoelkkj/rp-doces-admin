@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { pedidoValidoSql } from "./pedidoValido";
+
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 
 // Estado fisico autoritativo por item. Os marcadores de `pedidos` continuam
@@ -95,7 +97,7 @@ export function preparePedidoPhysicalProjection(
 export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Promise<BaixaResultado> {
   const pedido = await db
     .prepare(`SELECT status_pagamento, reserva_status, estoque_baixado_em
-              FROM pedidos WHERE id = ? LIMIT 1`)
+              FROM pedidos WHERE ${pedidoValidoSql('pedidos.id')} AND id = ? LIMIT 1`)
     .bind(pedidoId)
     .first<{ status_pagamento: string; reserva_status: string; estoque_baixado_em: string | null }>();
 
@@ -115,7 +117,7 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
     .prepare(
       `SELECT id, produto_id, quantidade
        FROM pedido_itens
-       WHERE pedido_id = ?
+       WHERE pedido_id = ? AND ${pedidoValidoSql('pedido_itens.pedido_id')}
          AND status_item = 'ATIVO'
          AND produto_id IS NOT NULL
          AND estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
@@ -178,7 +180,7 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
               AND pi.quantidade = ?
               AND pi.status_item = 'ATIVO'
               AND pi.estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
-              AND p.status_pagamento = 'PAGO'
+              AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql('p.id')}
           )
       `).bind(
         item.quantidade,
@@ -205,7 +207,7 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
           AND status_item = 'ATIVO'
           AND estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
           AND EXISTS (SELECT 1 FROM pedidos p
-                      WHERE p.id = pedido_itens.pedido_id AND p.status_pagamento = 'PAGO')
+                      WHERE p.id = pedido_itens.pedido_id AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql('p.id')})
           AND EXISTS (SELECT 1 FROM produtos pr WHERE pr.id = pedido_itens.produto_id)
       `).bind(item.id, pedidoId, item.produto_id, item.quantidade),
     );
@@ -232,7 +234,7 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
 export const PIX_MP_PENDENTE_NO_PEDIDO_SQL = `EXISTS (SELECT 1 FROM pedido_pagamentos pp
                   WHERE pp.pedido_id = pedidos.id AND pp.metodo = 'PIX_MP' AND pp.status = 'PENDENTE')`;
 
-const RESERVA_LIBERAVEL_SQL = `status_pagamento = 'PENDENTE'
+const RESERVA_LIBERAVEL_SQL = `${pedidoValidoSql('pedidos.id')} AND status_pagamento = 'PENDENTE'
   AND NOT ${PIX_MP_PENDENTE_NO_PEDIDO_SQL}`;
 
 // Libera somente itens que ainda estao RESERVADOS. As guards B4 continuam
@@ -242,7 +244,7 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
     .prepare(
       `SELECT id, produto_id, quantidade
        FROM pedido_itens
-       WHERE pedido_id = ?
+       WHERE pedido_id = ? AND ${pedidoValidoSql('pedido_itens.pedido_id')}
          AND status_item = 'ATIVO'
          AND produto_id IS NOT NULL
          AND estoque_estado = 'RESERVADO'

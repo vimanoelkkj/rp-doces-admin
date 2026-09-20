@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
+
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { createAdminPixCharge } from "../../../../lib/comandaPix";
 import {
@@ -53,6 +55,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
+  const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
+  if (anulado) return anulado;
+
 
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
