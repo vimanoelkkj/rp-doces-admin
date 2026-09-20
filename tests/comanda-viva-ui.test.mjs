@@ -302,6 +302,7 @@ test('Pix usa capacidade do backend, mostra QR e polling espaçado converge para
       pixBody = JSON.parse(options.body);
       atual = detalhe({
         total: 4200, pago: 3000, status: 'PARCIAL', capacidade: 0,
+        itens: [{...detalhe().itens[0], estoque_estado: 'RESERVADO'}],
         pix: [{
           id: 2, valorCentavos: 1200, qrCode: 'pix-copia-e-cola',
           qrCodeBase64: 'cXI=', ticketUrl: null, expiresAt: '2099-01-01T00:00:00Z',
@@ -326,13 +327,18 @@ test('Pix usa capacidade do backend, mostra QR e polling espaçado converge para
     );
     assert.equal(document.querySelector('.pedmodal-pix-code-box').textContent, 'pix-copia-e-cola');
     assert.equal(document.querySelector('.pedmodal-pix-qr img').getAttribute('src'), 'data:image/png;base64,cXI=');
+    assert.match(document.querySelector('.pedmodal-item-row').textContent, /Estoque reservado/);
     assert.equal(typeof pollCallback, 'function');
 
-    atual = detalhe({total: 4200, pago: 4200, status: 'PAGO', capacidade: 0});
+    atual = detalhe({
+      total: 4200, pago: 4200, status: 'PAGO', capacidade: 0,
+      itens: [{...detalhe().itens[0], estoque_estado: 'BAIXADO'}],
+    });
     await ui.act(async () => { await pollCallback(); });
     await flush();
     assert.match(document.querySelector('.pedmodal-payment-row').textContent, /Pago/);
     assert.match(document.querySelector('.pedmodal-financial-row--balance').textContent, /0,00/);
+    assert.match(document.querySelector('.pedmodal-item-row').textContent, /Estoque baixado/);
     assert.equal(document.querySelector('.pedmodal-pix-card'), null);
   } finally {
     await unmount(root);

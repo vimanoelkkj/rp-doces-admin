@@ -294,10 +294,56 @@ function originPhysicalStatements(db: D1Database, itemId: number, action: Exchan
   return [];
 }
 
+function destinationPhysicalStatements(db:D1Database,selector:{exchangeId:number}|{operationKey:string},extraGuard=""):D1PreparedStatement[]{
+  const byOperation="operationKey" in selector;
+  const exchangePredicate=byOperation
+    ?`t.id=(SELECT pedido_item_troca_id FROM pedido_operacoes WHERE operation_key=?)`
+    :`t.id=?`;
+  const value=byOperation?selector.operationKey:selector.exchangeId;
+  return [
+    db.prepare(`WITH destino AS (
+      SELECT pi.produto_id,pi.quantidade FROM pedido_item_trocas t
+      JOIN pedido_itens pi ON pi.id=t.item_destino_id
+      WHERE ${exchangePredicate} AND pi.status_item IN ('TROCA_PENDENTE','ATIVO')
+        AND pi.estoque_estado='RESERVADO' ${extraGuard}
+    )
+    UPDATE produtos SET estoque=estoque-(SELECT quantidade FROM destino),
+      estoque_reservado=estoque_reservado-(SELECT quantidade FROM destino),
+      disponivel=CASE WHEN ativo=1
+        AND (estoque-(SELECT quantidade FROM destino))-(estoque_reservado-(SELECT quantidade FROM destino))>0
+        THEN disponivel ELSE 0 END,
+      atualizado_em=CURRENT_TIMESTAMP
+    WHERE id=(SELECT produto_id FROM destino)
+      AND estoque>=(SELECT quantidade FROM destino)
+      AND estoque_reservado>=(SELECT quantidade FROM destino)`).bind(value),
+    db.prepare(`UPDATE pedido_itens SET status_item='ATIVO',pedido_item_troca_id=NULL,
+      estoque_estado='BAIXADO',estoque_baixado_em=COALESCE(estoque_baixado_em,CURRENT_TIMESTAMP)
+    WHERE id=(SELECT t.item_destino_id FROM pedido_item_trocas t WHERE ${exchangePredicate})
+      AND status_item IN ('TROCA_PENDENTE','ATIVO') AND estoque_estado='RESERVADO' ${extraGuard}`).bind(value),
+  ];
+}
+
+function completedExchangeInvariant(db:D1Database,row:ExchangeRow):D1PreparedStatement{
+  return db.prepare(`UPDATE pedidos SET valor_total_centavos=-1 WHERE id=?
+    AND EXISTS(SELECT 1 FROM pedido_item_trocas WHERE id=? AND status='CONCLUIDA')
+    AND NOT EXISTS(
+      SELECT 1 FROM pedido_item_trocas t
+      JOIN pedido_itens destino ON destino.id=t.item_destino_id
+      WHERE t.id=? AND destino.status_item='ATIVO' AND destino.estoque_estado='BAIXADO'
+        AND NOT EXISTS(
+          SELECT 1 FROM produtos pr WHERE pr.id=destino.produto_id
+            AND pr.estoque_reservado<>(SELECT COALESCE(SUM(pi.quantidade),0) FROM pedido_itens pi
+              WHERE pi.produto_id=pr.id AND pi.status_item IN ('ATIVO','TROCA_PENDENTE')
+                AND pi.estoque_estado='RESERVADO')
+        )
+    )`).bind(row.pedido_id,row.id,row.id);
+}
+
 function completeExchangeStatements(db: D1Database, row: ExchangeRow): D1PreparedStatement[] {
   let projectedTotal=0;try{projectedTotal=(JSON.parse(row.snapshot_financeiro) as ItemExchangePreview).financeiro.totalProjetadoCentavos;}catch{projectedTotal=-1;}
-  const safe=`AND (COALESCE((SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id=${Number(row.pedido_id)} AND status='PAGO'),0)
-    -COALESCE((SELECT SUM(valor_centavos) FROM pedido_reembolsos WHERE pedido_id=${Number(row.pedido_id)} AND status='REEMBOLSADO'),0))<=${Number(projectedTotal)}`;
+  const net=`(COALESCE((SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id=${Number(row.pedido_id)} AND status='PAGO'),0)
+    -COALESCE((SELECT SUM(valor_centavos) FROM pedido_reembolsos WHERE pedido_id=${Number(row.pedido_id)} AND status='REEMBOLSADO'),0))`;
+  const safe=`AND ${net}<=${Number(projectedTotal)}`;
   const statements = originPhysicalStatements(db, row.item_origem_id, row.estoque_acao_origem,safe);
   statements.push(db.prepare(`UPDATE pedido_itens SET status_item='CANCELADO',
       estoque_estado=CASE WHEN ?='LIBERAR_RESERVA' THEN 'LIBERADO' WHEN ?='REPOR' THEN 'REPOSTO' ELSE estoque_estado END,
@@ -306,6 +352,9 @@ function completeExchangeStatements(db: D1Database, row: ExchangeRow): D1Prepare
     WHERE id=? AND status_item='ATIVO' ${safe}`).bind(row.estoque_acao_origem,row.estoque_acao_origem,row.estoque_acao_origem,row.estoque_acao_origem,row.item_origem_id));
   statements.push(db.prepare(`UPDATE pedido_itens SET status_item='ATIVO',pedido_item_troca_id=NULL
     WHERE id=? AND pedido_item_troca_id=? AND status_item='TROCA_PENDENTE' ${safe}`).bind(row.item_destino_id,row.id));
+  const financiallyResolved=`${safe} AND ${net}>=(SELECT COALESCE(SUM(valor_total_centavos),0)
+    FROM pedido_itens WHERE pedido_id=${Number(row.pedido_id)} AND status_item='ATIVO')`;
+  statements.push(...destinationPhysicalStatements(db,{exchangeId:row.id},financiallyResolved));
   statements.push(db.prepare(`UPDATE pedidos SET valor_total_centavos=(SELECT COALESCE(SUM(valor_total_centavos),0)
     FROM pedido_itens WHERE pedido_id=? AND status_item='ATIVO'),atualizado_em=CURRENT_TIMESTAMP WHERE id=?`)
     .bind(row.pedido_id,row.pedido_id));
@@ -316,7 +365,10 @@ function completeExchangeStatements(db: D1Database, row: ExchangeRow): D1Prepare
       THEN 'AGUARDANDO_COBRANCA' ELSE 'CONCLUIDA' END,
       concluido_em=CASE WHEN (SELECT status_pagamento FROM pedidos WHERE id=pedido_id)='PAGO' THEN COALESCE(concluido_em,CURRENT_TIMESTAMP) ELSE concluido_em END
     WHERE id=? AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_origem_id AND status_item='CANCELADO')
-      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_destino_id AND status_item='ATIVO')`).bind(row.id));
+      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_destino_id AND status_item='ATIVO'
+        AND estoque_estado=CASE WHEN (SELECT MAX(0,p.valor_total_centavos-${net}) FROM pedidos p WHERE p.id=pedido_id)>0
+          THEN 'RESERVADO' ELSE 'BAIXADO' END)`).bind(row.id));
+  statements.push(completedExchangeInvariant(db,row));
   return statements;
 }
 
@@ -328,9 +380,10 @@ function completeInitialExchangeStatements(db:D1Database,params:{pedidoId:number
     estoque_liberado_em=CASE WHEN ?='LIBERAR_RESERVA' THEN COALESCE(estoque_liberado_em,CURRENT_TIMESTAMP) ELSE estoque_liberado_em END,
     estoque_reposto_em=CASE WHEN ?='REPOR' THEN COALESCE(estoque_reposto_em,CURRENT_TIMESTAMP) ELSE estoque_reposto_em END
     WHERE id=? AND status_item='ATIVO'`).bind(params.action,params.action,params.action,params.action,params.itemId));
-  statements.push(db.prepare(`UPDATE pedido_itens SET status_item='ATIVO',pedido_item_troca_id=NULL
+  if(params.projectedBalance>0)statements.push(db.prepare(`UPDATE pedido_itens SET status_item='ATIVO',pedido_item_troca_id=NULL
     WHERE pedido_item_troca_id=(SELECT pedido_item_troca_id FROM pedido_operacoes WHERE operation_key=?)
       AND status_item='TROCA_PENDENTE'`).bind(params.operationKey));
+  else statements.push(...destinationPhysicalStatements(db,{operationKey:params.operationKey}));
   statements.push(db.prepare(`UPDATE pedidos SET valor_total_centavos=(SELECT COALESCE(SUM(valor_total_centavos),0)
     FROM pedido_itens WHERE pedido_id=? AND status_item='ATIVO'),atualizado_em=CURRENT_TIMESTAMP WHERE id=?`)
     .bind(params.pedidoId,params.pedidoId));
@@ -342,14 +395,15 @@ function completeInitialExchangeStatements(db:D1Database,params:{pedidoId:number
   return statements;
 }
 
-function exchangeInvariant(db:D1Database,pedidoId:number,operationKey:string,pending:boolean):D1PreparedStatement{
+function exchangeInvariant(db:D1Database,pedidoId:number,operationKey:string,
+  expected:{originStatus:"ATIVO"|"CANCELADO";destinationStatus:"TROCA_PENDENTE"|"ATIVO";destinationStock:"RESERVADO"|"BAIXADO"}):D1PreparedStatement{
   return db.prepare(`UPDATE pedidos AS p SET valor_total_centavos=-1 WHERE p.id=? AND NOT EXISTS(
     SELECT 1 FROM pedido_operacoes o JOIN pedido_item_trocas t ON t.id=o.pedido_item_troca_id
     JOIN pedido_itens origem ON origem.id=t.item_origem_id
     JOIN pedido_itens destino ON destino.id=t.item_destino_id
     WHERE o.operation_key=? AND t.pedido_id=p.id
       AND origem.status_item=? AND destino.status_item=?
-      AND destino.estoque_estado='RESERVADO'
+      AND destino.estoque_estado=?
       AND p.valor_total_centavos=(SELECT COALESCE(SUM(valor_total_centavos),0) FROM pedido_itens
                                   WHERE pedido_id=p.id AND status_item='ATIVO')
       AND NOT EXISTS(
@@ -357,7 +411,7 @@ function exchangeInvariant(db:D1Database,pedidoId:number,operationKey:string,pen
           AND pr.estoque_reservado<>(SELECT COALESCE(SUM(pi.quantidade),0) FROM pedido_itens pi
             WHERE pi.produto_id=pr.id AND pi.status_item IN ('ATIVO','TROCA_PENDENTE') AND pi.estoque_estado='RESERVADO')
       )
-  )`).bind(pedidoId,operationKey,pending?"ATIVO":"CANCELADO",pending?"TROCA_PENDENTE":"ATIVO");
+  )`).bind(pedidoId,operationKey,expected.originStatus,expected.destinationStatus,expected.destinationStock);
 }
 
 export async function createItemExchange(db: D1Database, params: {
@@ -434,7 +488,11 @@ export async function createItemExchange(db: D1Database, params: {
     action:params.estoqueAcaoOrigem as ExchangeStockAction,
     projectedBalance:preview.financeiro.saldoProjetadoCentavos,
   }));
-  statements.push(exchangeInvariant(db,params.pedidoId,parsed.key,awaitingRefund));
+  statements.push(exchangeInvariant(db,params.pedidoId,parsed.key,awaitingRefund
+    ?{originStatus:"ATIVO",destinationStatus:"TROCA_PENDENTE",destinationStock:"RESERVADO"}
+    :preview.financeiro.saldoProjetadoCentavos>0
+      ?{originStatus:"CANCELADO",destinationStatus:"ATIVO",destinationStock:"RESERVADO"}
+      :{originStatus:"CANCELADO",destinationStatus:"ATIVO",destinationStock:"BAIXADO"}));
   try {
     const baseResults=await db.batch(statements);
     // M1 (auditoria Comanda Viva): por quando o batch chega aqui, o D1 já
@@ -528,7 +586,27 @@ export async function reconcileExchangeFinalizationsForPedido(db:D1Database,pedi
 }
 
 export async function reconcileExchangeCharges(db:D1Database,pedidoId:number):Promise<void>{
-  const financeiro=await getFinanceiroPedido(db,pedidoId);if(financeiro.saldoCentavos>0)return;
-  await db.prepare(`UPDATE pedido_item_trocas SET status='CONCLUIDA',concluido_em=COALESCE(concluido_em,CURRENT_TIMESTAMP)
-    WHERE pedido_id=? AND status='AGUARDANDO_COBRANCA'`).bind(pedidoId).run();
+  const financeiro=await getFinanceiroPedido(db,pedidoId);
+  const {results}=await db.prepare(`SELECT id,pedido_id,item_origem_id,item_destino_id,status,estoque_acao_origem,snapshot_financeiro
+    FROM pedido_item_trocas t WHERE pedido_id=?
+      AND (status='CONCLUIDA' OR (status='AGUARDANDO_COBRANCA' AND ?<=0))
+      AND EXISTS(SELECT 1 FROM pedido_itens pi WHERE pi.id=t.item_destino_id
+        AND pi.status_item='ATIVO' AND pi.estoque_estado='RESERVADO')
+    ORDER BY id`).bind(pedidoId,financeiro.saldoCentavos).all<ExchangeRow>();
+  for(const row of results){
+    const statements=destinationPhysicalStatements(db,{exchangeId:Number(row.id)});
+    statements.push(preparePedidoPhysicalProjection(db,pedidoId));
+    statements.push(db.prepare(`UPDATE pedido_item_trocas
+      SET status='CONCLUIDA',concluido_em=COALESCE(concluido_em,CURRENT_TIMESTAMP)
+      WHERE id=? AND status IN ('AGUARDANDO_COBRANCA','CONCLUIDA')
+        AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_destino_id
+          AND status_item='ATIVO' AND estoque_estado='BAIXADO')`).bind(row.id));
+    statements.push(completedExchangeInvariant(db,row));
+    await db.batch(statements);
+  }
+  if(financeiro.saldoCentavos<=0)await db.prepare(`UPDATE pedido_item_trocas
+    SET status='CONCLUIDA',concluido_em=COALESCE(concluido_em,CURRENT_TIMESTAMP)
+    WHERE pedido_id=? AND status='AGUARDANDO_COBRANCA'
+      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_destino_id
+        AND status_item='ATIVO' AND estoque_estado='BAIXADO')`).bind(pedidoId).run();
 }
