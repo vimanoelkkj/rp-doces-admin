@@ -129,6 +129,13 @@ html[data-admin-theme="dark"] .dash-pending-client,
 html[data-admin-theme="dark"] .dash-pending-amount {
   color: #faf6f0;
 }
+html[data-admin-theme="dark"] .dash-pending-row {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .dash-pending-row:hover {
+  background: #3d2e2b;
+  border-color: #3d3230;
+}
 html[data-admin-theme="dark"] .dash-date-picker {
   background: #2b2220;
   border-color: #3d3230;
