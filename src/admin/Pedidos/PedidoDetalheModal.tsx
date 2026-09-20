@@ -491,7 +491,8 @@ export default function PedidoDetalheModal({
   const podeGerarPix = Boolean(
     data &&
       data.capacidadeCobravelCentavos > 0 &&
-      data.pedido.status_comanda === "ABERTA",
+      (data.pedido.status_comanda === "ABERTA" ||
+        data.pedido.status_pedido === "ENTREGUE"),
   );
   const trocaAguardandoCobranca = data?.itens.some(
     (item) => item.troca_status === "AGUARDANDO_COBRANCA",

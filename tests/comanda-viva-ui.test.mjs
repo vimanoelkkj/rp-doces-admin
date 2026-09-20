@@ -592,11 +592,17 @@ test('saldo em aberto permite registrar pagamento em NOVO, PREPARANDO, PRONTO e 
       .some(button => button.textContent === 'Registrar pagamento');
     assert.equal(registrar, visivel, statusPedido);
     if (statusPedido === 'ENTREGUE') {
+      assert.ok(
+        [...document.querySelectorAll('button')]
+          .some(button => button.textContent === 'Gerar Pix R$ 40,00'),
+        'pedido entregue permite liquidar o saldo por Pix sem reabrir a comanda',
+      );
+      assert.equal(document.querySelector('.pedmodal-btn-add-item'), null);
       assert.equal(
         [...document.querySelectorAll('button')]
-          .some(button => button.textContent.startsWith('Gerar Pix')),
+          .some(button => /Cancelar item|Trocar produto/.test(button.textContent)),
         false,
-        'pedido entregue aceita recebimento externo sem abrir nova cobranca MP',
+        'liquidacao financeira nao reabre operacoes de itens',
       );
     }
     await unmount(root);
@@ -613,6 +619,126 @@ test('saldo em aberto permite registrar pagamento em NOVO, PREPARANDO, PRONTO e 
     'pedido pago nao oferece nova cobranca nem reversao destrutiva',
   );
   await unmount(root);
+});
+
+test('ENTREGUE parcial oferece Pix do saldo e polling converge sem F5', async t => {
+  let atual = detalhe({
+    total: 4000,
+    pago: 0,
+    status: 'PENDENTE',
+    capacidade: 4000,
+    statusPedido: 'ENTREGUE',
+    statusComanda: 'ENCERRADA',
+    itens: [{...detalhe().itens[0], estoque_estado: 'RESERVADO'}],
+  });
+  let manualPosts = 0;
+  let pixPosts = 0;
+  let manualBody;
+  let pixBody;
+  let pollCallback;
+  let listRefreshes = 0;
+  t.mock.method(globalThis, 'setInterval', (callback, delay) => {
+    if (delay === 5000) pollCallback = callback;
+    return delay;
+  });
+  t.mock.method(globalThis, 'clearInterval', () => {});
+
+  const root = await mountWith(t, async (url, options = {}) => {
+    const href = String(url);
+    if (options.method === 'POST' && href.endsWith('/pagamentos')) {
+      manualPosts += 1;
+      manualBody = JSON.parse(options.body);
+      atual = detalhe({
+        total: 4000,
+        pago: 3500,
+        status: 'PARCIAL',
+        capacidade: 500,
+        statusPedido: 'ENTREGUE',
+        statusComanda: 'ENCERRADA',
+        itens: [{...detalhe().itens[0], estoque_estado: 'RESERVADO'}],
+      });
+      return Response.json({ok: true, statusFinanceiro: 'PARCIAL', saldoCentavos: 500}, {status: 201});
+    }
+    if (options.method === 'POST' && href.endsWith('/pix')) {
+      pixPosts += 1;
+      pixBody = JSON.parse(options.body);
+      atual = detalhe({
+        total: 4000,
+        pago: 3500,
+        status: 'PARCIAL',
+        capacidade: 0,
+        statusPedido: 'ENTREGUE',
+        statusComanda: 'ENCERRADA',
+        itens: [{...detalhe().itens[0], estoque_estado: 'RESERVADO'}],
+        pix: [{
+          id: 9,
+          valorCentavos: 500,
+          qrCode: 'pix-saldo-entregue',
+          qrCodeBase64: null,
+          ticketUrl: null,
+          expiresAt: '2099-01-01T00:00:00Z',
+        }],
+      });
+      return Response.json({ok: true}, {status: 201});
+    }
+    return Response.json(atual);
+  }, {onStatusChanged: () => { listRefreshes += 1; }});
+
+  try {
+    const registrar = [...document.querySelectorAll('button')]
+      .find(button => button.textContent === 'Registrar pagamento');
+    await ui.act(async () => registrar.click());
+    await flush();
+    await ui.act(async () =>
+      changeValue(document.querySelector('input[aria-label="Valor recebido"]'), '35,00'));
+    const confirmar = [...document.querySelectorAll('.pedmodal-manual-payment button')]
+      .find(button => button.textContent === 'Confirmar pagamento');
+    await ui.act(async () => confirmar.click());
+    await flush();
+
+    assert.equal(manualPosts, 1);
+    assert.equal(manualBody.valorCentavos, 3500);
+    assert.equal(pixPosts, 0, 'pagamento manual nunca gera Pix automaticamente');
+    assert.match(document.querySelector('.pedmodal-payment-row').textContent, /Parcial/);
+    assert.match(document.querySelector('.pedmodal-financial-row--balance').textContent, /5,00/);
+    const gerarPix = [...document.querySelectorAll('button')]
+      .find(button => button.textContent === 'Gerar Pix R$ 5,00');
+    assert.ok(gerarPix);
+
+    await ui.act(async () => { gerarPix.click(); gerarPix.click(); });
+    await flush();
+    assert.equal(pixPosts, 1, 'duplo clique cria uma unica intencao Pix');
+    assert.equal(pixBody.valorCentavos, 500);
+    assert.match(pixBody.operationKey, /^[A-Za-z0-9._:-]{8,128}$/);
+    assert.match(document.querySelector('.pedmodal-pix-code-box').textContent, /pix-saldo-entregue/);
+    assert.equal(typeof pollCallback, 'function');
+
+    atual = detalhe({
+      total: 4000,
+      pago: 4000,
+      status: 'PAGO',
+      capacidade: 0,
+      statusPedido: 'ENTREGUE',
+      statusComanda: 'ENCERRADA',
+      itens: [{...detalhe().itens[0], estoque_estado: 'BAIXADO'}],
+      pix: [],
+    });
+    await ui.act(async () => { await pollCallback(); });
+    await flush();
+
+    assert.equal(document.querySelector('.pedmodal-pix-card'), null);
+    assert.match(document.querySelector('.pedmodal-payment-row').textContent, /Pago/);
+    assert.match(document.querySelector('.pedmodal-financial-row--balance').textContent, /0,00/);
+    assert.match(document.querySelector('.pedmodal-item-row').textContent, /Estoque baixado/);
+    assert.ok(
+      [...document.querySelectorAll('.pedmodal-badge')]
+        .some(badge => /Entregue/.test(badge.textContent)),
+      'status operacional continua ENTREGUE',
+    );
+    assert.ok(listRefreshes >= 2, 'listagem pai acompanha pagamento manual e confirmacao do Pix');
+  } finally {
+    await unmount(root);
+  }
 });
 
 test('pagamento parcial preenche e registra somente o saldo restante', async t => {
