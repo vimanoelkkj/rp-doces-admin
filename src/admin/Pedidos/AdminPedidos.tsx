@@ -90,6 +90,7 @@ export default function AdminPedidos() {
   const [error, setError] = useState<string | null>(null);
   const pageCacheRef = useRef<Map<number, PedidosResponse>>(new Map());
   const inFlightRef = useRef<Map<number, Promise<PedidosResponse>>>(new Map());
+  const requestVersionRef = useRef(0);
 
   // HUMAN-14: as notificações levam ao pedido exato via `?pedido=<id>`, que é
   // o destino real da ação contextual. Sem isso a notificação só conseguiria
@@ -117,6 +118,19 @@ export default function AdminPedidos() {
   const [novoPedidoOpen, setNovoPedidoOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  useEffect(() => {
+    const aoAnular = (event: Event) => {
+      const id = (event as CustomEvent<{ pedidoId: number }>).detail.pedidoId;
+      requestVersionRef.current++;
+      pageCacheRef.current.clear();
+      inFlightRef.current.clear();
+      setData(atual => atual ? { ...atual, pedidos: atual.pedidos.filter(pedido => pedido.id !== id) } : atual);
+      setRefreshKey(key => key + 1);
+    };
+    window.addEventListener("pedido-anulado", aoAnular);
+    return () => window.removeEventListener("pedido-anulado", aoAnular);
+  }, []);
+
   // Debounce da busca
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(search), 300);
@@ -138,6 +152,8 @@ export default function AdminPedidos() {
 
   useEffect(() => {
     let cancelled = false;
+    const requestVersion = requestVersionRef.current;
+    const obsoleto = () => cancelled || requestVersion !== requestVersionRef.current;
 
     const carregarPagina = (page: number): Promise<PedidosResponse> => {
       const cached = pageCacheRef.current.get(page);
@@ -158,11 +174,11 @@ export default function AdminPedidos() {
           return response.json() as Promise<PedidosResponse>;
         })
         .then((result) => {
-          pageCacheRef.current.set(page, result);
+          if (!obsoleto()) pageCacheRef.current.set(page, result);
           return result;
         })
         .finally(() => {
-          inFlightRef.current.delete(page);
+          if (!obsoleto()) inFlightRef.current.delete(page);
         });
 
       inFlightRef.current.set(page, requisicao);
@@ -180,7 +196,8 @@ export default function AdminPedidos() {
 
     carregarPagina(currentPage)
       .then((result) => {
-        if (cancelled) return;
+        if (obsoleto()) return;
+        if (currentPage > result.totalPages) setCurrentPage(result.totalPages);
         setData(result);
         setError(null);
         setLoading(false);
@@ -197,7 +214,7 @@ export default function AdminPedidos() {
         }
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (obsoleto()) return;
         setError(err.message);
         setLoading(false);
       });

@@ -125,10 +125,17 @@ const idadePendencia = (dias: number) =>
 
 /* ── Component ── */
 export default function AdminDashboard() {
+  const [refreshKey, setRefreshKey] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const atualizar = () => setRefreshKey(key => key + 1);
+    window.addEventListener("pedido-anulado", atualizar);
+    return () => window.removeEventListener("pedido-anulado", atualizar);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -145,7 +152,7 @@ export default function AdminDashboard() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [selectedDate]);
+  }, [selectedDate, refreshKey]);
 
   const maiorVendido = data?.maisVendidos.reduce(
     (max, item) => Math.max(max, item.quantidade),

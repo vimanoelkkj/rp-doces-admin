@@ -4,6 +4,7 @@ import { useAdminModal } from "../components/useAdminModal";
 import "./HistoricoComandaModal.css";
 
 type EventoTipo =
+  | "PEDIDO_ANULADO"
   | "ITEM_ADICIONADO"
   | "TROCA_SOLICITADA"
   | "TROCA_CONCLUIDA"
@@ -42,6 +43,7 @@ interface HistoricoEvento {
 }
 
 interface Props {
+  readOnly?: boolean;
   orderId: number;
   onClose: () => void;
   onVerCancelamento: (itemId: number) => void;
@@ -117,8 +119,10 @@ function EventoCard({
   evento,
   onVerCancelamento,
   onVerTroca,
+  readOnly,
 }: {
   evento: HistoricoEvento;
+  readOnly?: boolean;
   onVerCancelamento: (itemId: number) => void;
   onVerTroca: (itemId: number) => void;
 }) {
@@ -155,7 +159,7 @@ function EventoCard({
             {evento.itemDestino?.estoqueEstado &&
               ` · Estado destino: ${ESTOQUE_ESTADO_LABEL[evento.itemDestino.estoqueEstado] ?? evento.itemDestino.estoqueEstado}`}
           </div>
-          {evento.referenciaId != null && (
+          {!readOnly && evento.referenciaId != null && (
             <VerDetalhesButton onClick={() => onVerTroca(evento.referenciaId!)} />
           )}
         </>
@@ -177,12 +181,20 @@ function EventoCard({
             {evento.item.estoqueEstado &&
               ` · Estado final: ${ESTOQUE_ESTADO_LABEL[evento.item.estoqueEstado] ?? evento.item.estoqueEstado}`}
           </div>
-          {evento.referenciaId != null && (
+          {!readOnly && evento.referenciaId != null && (
             <VerDetalhesButton onClick={() => onVerCancelamento(evento.referenciaId!)} />
           )}
         </>
       )}
 
+      {evento.tipo === "PEDIDO_ANULADO" && (
+        <div className="histmodal-evento-linha">
+          <div>Impacto nos totais: {formatarPreco(evento.valorCentavos ?? 0)}</div>
+          <div>{evento.estoqueAcao === "DEVOLVER" ? "Devolução dos itens elegíveis ao estoque" : "Estoque mantido"}</div>
+          <div>{evento.usuario}</div>
+          <div>{evento.motivo || "Motivo não informado"}</div>
+        </div>
+      )}
       {evento.tipo === "PAGAMENTO" && (
         <div className="histmodal-evento-linha">
           {metodoLabel(evento.metodo ?? "")} · {formatarPreco(evento.valorCentavos ?? 0)}
@@ -201,6 +213,7 @@ function EventoCard({
 
 export default function HistoricoComandaModal({
   orderId,
+  readOnly,
   onClose,
   onVerCancelamento,
   onVerTroca,
@@ -256,7 +269,7 @@ export default function HistoricoComandaModal({
               {eventos.map((evento) => (
                 <EventoCard
                   key={evento.id}
-                  evento={evento}
+                  evento={evento} readOnly={readOnly}
                   onVerCancelamento={onVerCancelamento}
                   onVerTroca={onVerTroca}
                 />

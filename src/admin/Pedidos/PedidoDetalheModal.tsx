@@ -9,6 +9,8 @@ import AdicionarItemModal from "./AdicionarItemModal";
 import CancelamentoItemPreviewModal from "./CancelamentoItemPreviewModal";
 import TrocarItemModal from "./TrocarItemModal";
 import HistoricoComandaModal from "./HistoricoComandaModal";
+import ExcluirPedidoModal from "./ExcluirPedidoModal";
+import type { PedidoAnulacao } from "../../../shared/pedidoAnulacao";
 
 /* ── Types (espelham o retorno de GET /api/admin/pedidos/:id) ── */
 interface PedidoItemRow {
@@ -57,6 +59,7 @@ interface PixAdminPendente {
 }
 
 interface PedidoDetalheResponse {
+  anulacao?: PedidoAnulacao | null;
   pedido: PedidoRow;
   itens: PedidoItemRow[];
   financeiro: FinanceiroPedido;
@@ -163,6 +166,7 @@ export default function PedidoDetalheModal({
   const [arquivando, setArquivando] = useState(false);
   const [arquivamentoError, setArquivamentoError] = useState<string | null>(null);
   const [confirmarArquivamento, setConfirmarArquivamento] = useState(false);
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const [editandoNome, setEditandoNome] = useState(false);
@@ -227,6 +231,16 @@ export default function PedidoDetalheModal({
         );
         dataRef.current = result;
         setData(result);
+        if (result.anulacao) {
+          setEditandoNome(false);
+          setRegistrandoPagamento(false);
+          setAdicionandoItem(false);
+          setItemCancelamentoPreviewId(null);
+          setItemTroca(null);
+          setConfirmarArquivamento(false);
+          setConfirmarExclusao(false);
+          if (anterior && !anterior.anulacao) onStatusChangedRef.current?.();
+        }
         // O modal de troca pode permanecer aberto durante a confirmação do
         // Pix. Mantém o item aberto ligado à fotografia mais recente do GET
         // para que a mudança AGUARDANDO_COBRANCA -> CONCLUIDA também atualize
@@ -405,7 +419,7 @@ export default function PedidoDetalheModal({
 
   const clicarArquivar = () => {
     if (!data || arquivando) return;
-    if (data.pedido.arquivado === 0) {
+    if (!anulado && data.pedido.arquivado === 0) {
       setConfirmarArquivamento(true);
       return;
     }
@@ -519,16 +533,17 @@ export default function PedidoDetalheModal({
   };
 
   const financeiro = data ? formatarFinanceiro(data.financeiro) : null;
+  const anulado = Boolean(data?.anulacao);
   const podeRegistrarPagamento = Boolean(
     data &&
-      data.pedido.arquivado === 0 &&
+      !anulado && data.pedido.arquivado === 0 &&
       data.capacidadeCobravelCentavos > 0 &&
       (data.pedido.status_comanda === "ABERTA" ||
         data.pedido.status_pedido === "ENTREGUE"),
   );
   const podeGerarPix = Boolean(
     data &&
-      data.pedido.arquivado === 0 &&
+      !anulado && data.pedido.arquivado === 0 &&
       data.capacidadeCobravelCentavos > 0 &&
       (data.pedido.status_comanda === "ABERTA" ||
         data.pedido.status_pedido === "ENTREGUE"),
@@ -537,17 +552,19 @@ export default function PedidoDetalheModal({
     (item) => item.troca_status === "AGUARDANDO_COBRANCA",
   );
   const itensAtuais = data?.itens.filter(
-    (item) => item.status_item === "ATIVO" || item.status_item === "TROCA_PENDENTE",
+    (item) => anulado || item.status_item === "ATIVO" || item.status_item === "TROCA_PENDENTE",
   ) ?? [];
 
   // "Ver detalhes" no histórico fecha o histórico e abre o modal específico
   // por cima do principal — mesmo comportamento de quem abre a partir da
   // lista de itens atual, sem empilhar um terceiro nível.
   const verCancelamentoDoHistorico = (itemId: number) => {
+    if (anulado) return;
     setHistoricoAberto(false);
     setItemCancelamentoPreviewId(itemId);
   };
   const verTrocaDoHistorico = (itemId: number) => {
+    if (anulado) return;
     const item = data?.itens.find((i) => i.id === itemId);
     setHistoricoAberto(false);
     if (item) setItemTroca(item);
@@ -559,7 +576,7 @@ export default function PedidoDetalheModal({
         {/* Header */}
         <div className="pedmodal-header">
           <div className="pedmodal-title-area">
-            {editandoNome && data ? (
+            {editandoNome && data && !anulado ? (
               <form
                 className="pedmodal-name-form"
                 onSubmit={(event) => {
@@ -601,7 +618,7 @@ export default function PedidoDetalheModal({
                   Pedido #{orderId}
                   {data ? ` - ${data.pedido.cliente_nome}` : ""}
                 </h2>
-                {data && data.pedido.arquivado === 0 && (
+                {data && !anulado && data.pedido.arquivado === 0 && (
                   <button
                     type="button"
                     className="pedmodal-btn-name-edit"
@@ -615,7 +632,7 @@ export default function PedidoDetalheModal({
             )}
           </div>
           <div className="pedmodal-header-actions">
-            {data && data.pedido.arquivado === 0 && (
+            {data && !anulado && data.pedido.arquivado === 0 && (
               <div className="pedmodal-status-dropdown" ref={statusMenuRef}>
                 <button
                   type="button"
@@ -646,7 +663,7 @@ export default function PedidoDetalheModal({
                 )}
               </div>
             )}
-            {data &&
+            {data && !anulado &&
               (data.pedido.arquivado === 1 ||
                 data.pedido.status_pedido === "ENTREGUE" ||
                 data.pedido.status_pedido === "CANCELADO") && (
@@ -667,6 +684,15 @@ export default function PedidoDetalheModal({
                       : "Arquivar pedido"}
                 </button>
               )}
+            {data && !anulado && (
+              <details className="pedmodal-more">
+                <summary aria-label="Mais ações do pedido">⋮</summary>
+                <button type="button" onClick={event => {
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                  setConfirmarExclusao(true);
+                }}>Excluir pedido</button>
+              </details>
+            )}
             <button className="pedmodal-btn-close" onClick={onClose}>
               <svg
                 width="16"
@@ -707,6 +733,7 @@ export default function PedidoDetalheModal({
               >
                 {STATUS_LABEL[data.pedido.status_pedido]}
               </span>
+              {anulado && <span className="pedmodal-badge pedmodal-badge--red">Anulado</span>}
               {data.pedido.arquivado === 1 && (
                 <span className="pedmodal-badge pedmodal-badge--archived">
                   Arquivado
@@ -732,6 +759,18 @@ export default function PedidoDetalheModal({
               </span>
             </div>
 
+            {data.anulacao && (
+              <section className="pedmodal-anulacao" aria-label="Anulação">
+                <h3>Anulação</h3>
+                <p>{formatarData(data.anulacao.criado_em)} · {data.anulacao.usuario_nome}</p>
+                <p>Motivo: {data.anulacao.motivo || "Não informado"}</p>
+                <p>{data.anulacao.estoque_acao === "DEVOLVER"
+                  ? "Produtos baixados repostos e reservas liberadas, quando aplicável."
+                  : "Estoque mantido como estava."}</p>
+                <p>Impacto nos totais: -{formatarPreco(data.anulacao.liquido_original_centavos)}</p>
+                <p>Os valores abaixo preservam o histórico original.</p>
+              </section>
+            )}
             {/* Items */}
             <div className="pedmodal-items">
               <div className="pedmodal-items-header">
@@ -744,7 +783,7 @@ export default function PedidoDetalheModal({
                   >
                     Histórico
                   </button>
-                  {data.pedido.arquivado === 0 &&
+                  {!anulado && data.pedido.arquivado === 0 &&
                     data.pedido.origem_pedido === "MANUAL" &&
                     data.pedido.status_comanda === "ABERTA" &&
                     (data.pedido.status_pedido === "NOVO" ||
@@ -787,7 +826,7 @@ export default function PedidoDetalheModal({
                     {item.troca_id && (
                       <span className="pedmodal-item-qty">{FLOW_STATUS_LABEL[item.troca_status ?? ""] ?? "Troca em andamento"}</span>
                     )}
-                    {item.status_item === "ATIVO" &&
+                    {!anulado && item.status_item === "ATIVO" &&
                       data.pedido.status_comanda === "ABERTA" &&
                       data.pedido.status_pedido !== "ENTREGUE" &&
                       data.pedido.status_pedido !== "CANCELADO" &&
@@ -807,10 +846,10 @@ export default function PedidoDetalheModal({
                         )}
                         </>
                       )}
-                    {item.cancelamento_id && item.status_item !== "ATIVO" && (
+                    {!anulado && item.cancelamento_id && item.status_item !== "ATIVO" && (
                       <button type="button" className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral" onClick={() => setItemCancelamentoPreviewId(item.id)}>Ver cancelamento</button>
                     )}
-                    {item.troca_id && item.troca_item_origem_id === item.id && (
+                    {!anulado && item.troca_id && item.troca_item_origem_id === item.id && (
                       <button type="button" className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral" onClick={() => setItemTroca(item)}>Ver troca</button>
                     )}
                   </div>
@@ -1084,7 +1123,7 @@ export default function PedidoDetalheModal({
                       )
                     )}
 
-                    {data.pedido.arquivado === 0 && (
+                    {!anulado && data.pedido.arquivado === 0 && (
                       <button
                         type="button"
                         className="pedmodal-btn-edit"
@@ -1101,6 +1140,14 @@ export default function PedidoDetalheModal({
           </div>
         )}
       </div>
+      {confirmarExclusao && data && !anulado && (
+        <ExcluirPedidoModal orderId={orderId} liquidoCentavos={data.financeiro.liquidoCentavos}
+          onClose={() => setConfirmarExclusao(false)} onDeleted={() => {
+            setConfirmarExclusao(false);
+            onStatusChangedRef.current?.();
+            onClose();
+          }} />
+      )}
       {confirmarArquivamento && (
         <ConfirmDialog
           title="Arquivar pedido"
@@ -1118,11 +1165,12 @@ export default function PedidoDetalheModal({
         <HistoricoComandaModal
           orderId={orderId}
           onClose={() => setHistoricoAberto(false)}
+          readOnly={anulado}
           onVerCancelamento={verCancelamentoDoHistorico}
           onVerTroca={verTrocaDoHistorico}
         />
       )}
-      {data && adicionandoItem && (
+      {data && !anulado && adicionandoItem && (
         <AdicionarItemModal
           orderId={orderId}
           onClose={() => setAdicionandoItem(false)}
@@ -1131,7 +1179,7 @@ export default function PedidoDetalheModal({
           }}
         />
       )}
-      {itemCancelamentoPreviewId !== null && (
+      {!anulado && itemCancelamentoPreviewId !== null && (
         <CancelamentoItemPreviewModal
           orderId={orderId}
           itemId={itemCancelamentoPreviewId}
@@ -1140,7 +1188,7 @@ export default function PedidoDetalheModal({
           onChanged={async () => { await carregarPedido(true); onStatusChanged?.(); }}
         />
       )}
-      {itemTroca && (
+      {!anulado && itemTroca && (
         <TrocarItemModal
           orderId={orderId}
           item={itemTroca}

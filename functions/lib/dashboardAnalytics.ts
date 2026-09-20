@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { pedidoValidoSql } from "./pedidoValido";
+
 import {
   CONFIRMED_REFUNDS_BY_ALLOCATION_CTE,
   EXCHANGE_COVERAGE_STATUSES,
@@ -33,17 +35,17 @@ interface BestSellerRow {
 const STORE_FINANCIAL_SQL = `SELECT
   COALESCE((SELECT SUM(valor_centavos)
             FROM pedido_pagamentos
-            WHERE status='PAGO'),0) AS bruto_centavos,
+            WHERE status='PAGO' AND ${pedidoValidoSql('pedido_pagamentos.pedido_id')}),0) AS bruto_centavos,
   COALESCE((SELECT SUM(valor_centavos)
             FROM pedido_reembolsos
-            WHERE status='REEMBOLSADO'),0) AS reembolsado_centavos,
+            WHERE status='REEMBOLSADO' AND ${pedidoValidoSql('pedido_reembolsos.pedido_id')}),0) AS reembolsado_centavos,
   MAX(0,
     COALESCE((SELECT SUM(valor_centavos)
               FROM pedido_pagamentos
-              WHERE status='PAGO'),0)
+              WHERE status='PAGO' AND ${pedidoValidoSql('pedido_pagamentos.pedido_id')}),0)
     - COALESCE((SELECT SUM(valor_centavos)
                 FROM pedido_reembolsos
-                WHERE status='REEMBOLSADO'),0)
+                WHERE status='REEMBOLSADO' AND ${pedidoValidoSql('pedido_reembolsos.pedido_id')}),0)
   ) AS liquido_centavos`;
 
 // Cada item ATIVO e uma venda candidata. A recursao leva junto a identidade
@@ -58,7 +60,7 @@ const BEST_SELLERS_SQL = `WITH RECURSIVE
       CASE WHEN pi.produto_id IS NOT NULL THEN 'produto:' || pi.produto_id
            ELSE 'historico:' || lower(trim(pi.produto_nome)) END AS identidade
     FROM pedido_itens pi
-    WHERE pi.status_item='ATIVO' AND pi.valor_total_centavos>0
+    WHERE ${pedidoValidoSql('pi.pedido_id')} AND pi.status_item='ATIVO' AND pi.valor_total_centavos>0
   ),
   linhagem_financeira(item_vendido_id,item_id) AS (
     SELECT id,id FROM itens_ativos

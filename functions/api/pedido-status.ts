@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { pedidoValidoSql } from "../lib/pedidoValido";
+
 import { refreshPedidoStatus, PedidoStatusRow } from "../lib/pedidoStatus";
 
 interface Env {
@@ -28,7 +30,7 @@ async function handleStatus(request: Request, env: Env): Promise<Response> {
 
   const pedido = await env.DB.prepare(
     `SELECT id, token_publico, status_pagamento, status_pedido, mp_payment_id, pix_expira_em
-     FROM pedidos WHERE token_publico = ?`,
+     FROM pedidos WHERE ${pedidoValidoSql('pedidos.id')} AND token_publico = ?`,
   )
     .bind(token)
     .first<PedidoStatusRow>();

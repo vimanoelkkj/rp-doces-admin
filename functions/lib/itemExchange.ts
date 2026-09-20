@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { getPedidoAnulacao } from "./pedidoValido";
+
 import { precoVigenteCentavos } from "../../shared/promocao";
 import { getFinanceiroPedido } from "./comandaLedger";
 import {
@@ -595,6 +597,7 @@ export async function reconcileExchangeFinalizationsForPedido(db:D1Database,pedi
 }
 
 export async function reconcileExchangeCharges(db:D1Database,pedidoId:number):Promise<void>{
+  if (await getPedidoAnulacao(db, pedidoId)) return;
   const financeiro=await getFinanceiroPedido(db,pedidoId);
   const {results}=await db.prepare(`SELECT id,pedido_id,item_origem_id,item_destino_id,status,estoque_acao_origem,snapshot_financeiro
     FROM pedido_item_trocas t WHERE pedido_id=?

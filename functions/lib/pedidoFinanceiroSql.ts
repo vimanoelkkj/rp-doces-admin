@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { pedidoValidoSql } from "./pedidoValido";
+
 // Compartilhada por projeção, seleção de divergências e revalidação física.
 // Subqueries independentes evitam multiplicar pagamentos por refunds/alocações.
 // O alias p sempre representa pedidos.
@@ -39,7 +41,7 @@ function preparePedidoFinancialProjectionBase(
     SET status_pagamento = ${STATUS_FINANCEIRO_SQL},
         atualizado_em = CASE WHEN p.status_pagamento IS NOT (${STATUS_FINANCEIRO_SQL})
                              THEN CURRENT_TIMESTAMP ELSE p.atualizado_em END
-    WHERE p.id = ?
+    WHERE p.id = ? AND ${pedidoValidoSql('p.id')}
       ${ledgerGuard}
       ${operationGuard}
     RETURNING status_pagamento

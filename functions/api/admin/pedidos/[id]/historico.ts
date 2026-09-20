@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { getPedidoAnulacao } from "../../../../lib/pedidoValido";
 import { requireUser } from "../../../../lib/auth";
 
 interface Env {
@@ -18,6 +19,7 @@ function jsonError(message: string, status: number) {
 // recalculada aqui — os valores exibidos são os que já estão gravados.
 
 type EventoTipo =
+  | "PEDIDO_ANULADO"
   | "ITEM_ADICIONADO"
   | "TROCA_SOLICITADA"
   | "TROCA_CONCLUIDA"
@@ -233,6 +235,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     const refundsPorTroca = agruparRefunds(refundsTroca.results);
 
     const eventos: HistoricoEvento[] = [];
+    const anulacao = await getPedidoAnulacao(env.DB, id);
+    if (anulacao) eventos.push({
+      id: `anulacao-${anulacao.id}`, tipo: "PEDIDO_ANULADO", data: anulacao.criado_em,
+      titulo: "Pedido anulado", status: "ANULADO", motivo: anulacao.motivo,
+      usuario: anulacao.usuario_nome, estoqueAcao: anulacao.estoque_acao,
+      valorCentavos: -anulacao.liquido_original_centavos,
+    });
 
     for (const row of itensAdicionados.results) {
       eventos.push({

@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { recusarPedidoAnulado, getPedidoAnulacao } from "../../../lib/pedidoValido";
+
 import { requireUser, sameOrigin } from "../../../lib/auth";
 import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
 import { getCapacidadeCobravel, getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
@@ -145,6 +147,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
 
     return Response.json({
       pedido,
+      anulacao: await getPedidoAnulacao(env.DB, id),
       itens,
       financeiro,
       pixAdminPendentes,
@@ -165,6 +168,9 @@ export const onRequestPatch: PagesFunction<Env> = async ({
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
+  const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
+  if (anulado) return anulado;
+
 
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
