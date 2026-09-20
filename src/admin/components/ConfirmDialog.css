@@ -1,0 +1,134 @@
+.confirmdlg-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 29, 26, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1300;
+  padding: 20px;
+}
+
+.confirmdlg-card {
+  width: min(400px, 100%);
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 24px 64px rgba(43, 29, 26, 0.2);
+}
+
+.confirmdlg-title {
+  margin: 0 0 8px;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: #2b1d1a;
+}
+
+.confirmdlg-message {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #63524e;
+}
+
+.confirmdlg-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.confirmdlg-btn-cancel,
+.confirmdlg-btn-confirm,
+.confirmdlg-btn-danger {
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.confirmdlg-btn-cancel {
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  color: #634738;
+}
+
+.confirmdlg-btn-cancel:hover {
+  background: #f5efe8;
+  border-color: #634738;
+}
+
+.confirmdlg-btn-confirm {
+  border: none;
+  background: #634738;
+  color: #ffffff;
+  transition: background 0.15s;
+}
+
+.confirmdlg-btn-confirm:hover {
+  background: #4a332b;
+}
+
+.confirmdlg-btn-danger {
+  border: none;
+  background: #c0392b;
+  color: #ffffff;
+  transition: background 0.15s;
+}
+
+.confirmdlg-btn-danger:hover {
+  background: #a52d20;
+}
+
+@media (max-width: 480px) {
+  .confirmdlg-actions {
+    flex-direction: column-reverse;
+  }
+
+  .confirmdlg-btn-cancel,
+  .confirmdlg-btn-confirm,
+  .confirmdlg-btn-danger {
+    width: 100%;
+  }
+}
+
+html[data-admin-theme="dark"] .confirmdlg-overlay {
+  background: rgba(0, 0, 0, 0.58);
+}
+
+html[data-admin-theme="dark"] .confirmdlg-card {
+  background: #2b2220;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+html[data-admin-theme="dark"] .confirmdlg-title {
+  color: #faf6f0;
+}
+
+html[data-admin-theme="dark"] .confirmdlg-message {
+  color: #a89b92;
+}
+
+html[data-admin-theme="dark"] .confirmdlg-btn-cancel {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+
+html[data-admin-theme="dark"] .confirmdlg-btn-cancel:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+
+html[data-admin-theme="dark"] .confirmdlg-btn-confirm {
+  background: #d38b80;
+  color: #ffffff;
+}
+
+html[data-admin-theme="dark"] .confirmdlg-btn-confirm:hover {
+  background: #c17a6f;
+}
