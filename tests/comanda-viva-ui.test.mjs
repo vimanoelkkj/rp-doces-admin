@@ -138,6 +138,17 @@ function changeValue(element, value) {
   element.dispatchEvent(new Event(element.tagName === 'SELECT' ? 'change' : 'input', {bubbles: true}));
 }
 
+// O seletor de produto virou um dropdown customizado (não um <select>
+// nativo) — abre o gatilho e clica na opção pelo texto visível.
+async function escolherDropdown(gatilhoSeletor, textoOpcao) {
+  await ui.act(async () => document.querySelector(gatilhoSeletor).click());
+  await flush();
+  const opcao = [...document.querySelectorAll('.additem-dropdown-option')]
+    .find(button => button.textContent.includes(textoOpcao));
+  await ui.act(async () => opcao.click());
+  await flush();
+}
+
 test('botao de adicionar aparece somente para MANUAL, ABERTA e NOVO/PREPARANDO', async t => {
   const casos = [
     [{}, true],
@@ -189,9 +200,12 @@ test('modal lista produtos, calcula subtotal e sucesso atualiza item, total, sal
   try {
     await ui.act(async () => document.querySelector('.pedmodal-btn-add-item').click());
     await flush();
-    const select = document.querySelector('.additem-field select');
-    assert.match(select.textContent, /Produto C/);
-    await ui.act(async () => changeValue(select, '2'));
+    await ui.act(async () => document.querySelector('.additem-dropdown-trigger').click());
+    await flush();
+    assert.match(document.querySelector('.additem-dropdown-list').textContent, /Produto C/);
+    await ui.act(async () => [...document.querySelectorAll('.additem-dropdown-option')]
+      .find(button => button.textContent.includes('Produto C')).click());
+    await flush();
     const quantity = document.querySelector('.additem-field input');
     await ui.act(async () => changeValue(quantity, '2'));
     assert.match(document.querySelector('.additem-subtotal').textContent, /24,00/);
@@ -242,7 +256,7 @@ test('retry conserva key; PRECO_ALTERADO exige confirmacao e cria key nova', asy
   try {
     await ui.act(async () => document.querySelector('.pedmodal-btn-add-item').click());
     await flush();
-    await ui.act(async () => changeValue(document.querySelector('.additem-field select'), '2'));
+    await escolherDropdown('.additem-dropdown-trigger', 'Produto C');
     const submit = document.querySelector('.additem-confirm');
     await ui.act(async () => submit.click());
     await flush();
@@ -277,7 +291,7 @@ test('estoque insuficiente permanece no modal sem aparentar sucesso', async t =>
   try {
     await ui.act(async () => document.querySelector('.pedmodal-btn-add-item').click());
     await flush();
-    await ui.act(async () => changeValue(document.querySelector('.additem-field select'), '2'));
+    await escolherDropdown('.additem-dropdown-trigger', 'Produto C');
     await ui.act(async () => document.querySelector('.additem-confirm').click());
     await flush();
     assert.ok(document.querySelector('.additem-card'));
@@ -482,9 +496,7 @@ test('troca mostra diferença, confirma uma intenção e orienta cobrança do sa
     assert.ok(button);
     await ui.act(async () => button.click());
     await flush();
-    const select = document.querySelector('.additem-field select');
-    await ui.act(async () => changeValue(select, '2'));
-    await flush();
+    await escolherDropdown('.additem-dropdown-trigger', 'Produto C');
     assert.match(document.querySelector('.additem-card').textContent, /Novo valorR\$ 20,00/);
     const confirm = document.querySelector('.additem-confirm');
     assert.equal(confirm.disabled, false);

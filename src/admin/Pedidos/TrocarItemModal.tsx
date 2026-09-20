@@ -94,6 +94,8 @@ export default function TrocarItemModal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
+  const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
   const keyRef = useRef(novaOperationKey());
   const signatureRef = useRef("");
   const refundKeys = useRef(new Map<number, string>());
@@ -266,21 +268,45 @@ export default function TrocarItemModal({
           <div className="additem-form">
             <label className="additem-field">
               <span>Novo produto</span>
-              <select
-                value={productId ?? ""}
-                onChange={(e) => {
-                  setProductId(e.target.value ? Number(e.target.value) : null);
-                  setQuantity(1);
-                }}
-              >
-                <option value="">Selecione</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome} · {money(precoVigenteCentavos(p))} · {free(p)}{" "}
-                    disponíveis
-                  </option>
-                ))}
-              </select>
+              <div className={`additem-dropdown${productDropdownOpen ? " additem-dropdown--open" : ""}`}>
+                <button
+                  type="button"
+                  className="additem-dropdown-trigger"
+                  onClick={() => setProductDropdownOpen((open) => !open)}
+                  onBlur={() => setTimeout(() => setProductDropdownOpen(false), 150)}
+                >
+                  <span>
+                    {(() => {
+                      const selected = products.find((p) => p.id === productId);
+                      return selected
+                        ? `${selected.nome} · ${money(precoVigenteCentavos(selected))} · ${free(selected)} disponíveis`
+                        : "Selecione";
+                    })()}
+                  </span>
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                    <path d="M1 1.5L6 6.5L11 1.5" stroke="#634738" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {productDropdownOpen && (
+                  <ul className="additem-dropdown-list">
+                    {products.map((p) => (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          className={`additem-dropdown-option${productId === p.id ? " additem-dropdown-option--active" : ""}`}
+                          onClick={() => {
+                            setProductId(p.id);
+                            setQuantity(1);
+                            setProductDropdownOpen(false);
+                          }}
+                        >
+                          {p.nome} · {money(precoVigenteCentavos(p))} · {free(p)} disponíveis
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </label>
             <label className="additem-field">
               <span>Quantidade</span>
@@ -295,13 +321,40 @@ export default function TrocarItemModal({
             {item.estoque_estado === "BAIXADO" && (
               <label className="additem-field">
                 <span>Produto atual</span>
-                <select
-                  value={action}
-                  onChange={(e) => setAction(e.target.value)}
-                >
-                  <option value="NAO_REPOR">Não voltou ao estoque</option>
-                  <option value="REPOR">Voltou fisicamente ao estoque</option>
-                </select>
+                <div className={`additem-dropdown${actionDropdownOpen ? " additem-dropdown--open" : ""}`}>
+                  <button
+                    type="button"
+                    className="additem-dropdown-trigger"
+                    onClick={() => setActionDropdownOpen((open) => !open)}
+                    onBlur={() => setTimeout(() => setActionDropdownOpen(false), 150)}
+                  >
+                    <span>{action === "REPOR" ? "Voltou fisicamente ao estoque" : "Não voltou ao estoque"}</span>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                      <path d="M1 1.5L6 6.5L11 1.5" stroke="#634738" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {actionDropdownOpen && (
+                    <ul className="additem-dropdown-list">
+                      {[
+                        { value: "NAO_REPOR", label: "Não voltou ao estoque" },
+                        { value: "REPOR", label: "Voltou fisicamente ao estoque" },
+                      ].map((option) => (
+                        <li key={option.value}>
+                          <button
+                            type="button"
+                            className={`additem-dropdown-option${action === option.value ? " additem-dropdown-option--active" : ""}`}
+                            onClick={() => {
+                              setAction(option.value);
+                              setActionDropdownOpen(false);
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </label>
             )}
             {preview && (

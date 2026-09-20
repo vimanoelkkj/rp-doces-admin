@@ -96,6 +96,7 @@ export default function CancelamentoItemPreviewModal({
   const [error, setError] = useState<string | null>(null);
   const [motivo, setMotivo] = useState("");
   const [acao, setAcao] = useState<string>("");
+  const [acaoDropdownOpen, setAcaoDropdownOpen] = useState(false);
   const operationKey = useRef(novaOperationKey());
   const refundKeys = useRef(new Map<number, string>());
   useEffect(() => {
@@ -313,16 +314,41 @@ export default function CancelamentoItemPreviewModal({
             {preview.item.estoqueEstado === "BAIXADO" && (
               <label className="cancelpreview-field">
                 <span>Ação física confirmada</span>
-                <select
-                  value={acao}
-                  onChange={(e) => setAcao(e.target.value)}
-                  disabled={saving}
-                >
-                  <option value="NAO_REPOR">Não repor no estoque</option>
-                  <option value="REPOR">
-                    Produto devolvido: repor no estoque
-                  </option>
-                </select>
+                <div className={`cancelpreview-dropdown${acaoDropdownOpen ? " cancelpreview-dropdown--open" : ""}`}>
+                  <button
+                    type="button"
+                    className="cancelpreview-dropdown-trigger"
+                    onClick={() => setAcaoDropdownOpen((open) => !open)}
+                    onBlur={() => setTimeout(() => setAcaoDropdownOpen(false), 150)}
+                    disabled={saving}
+                  >
+                    <span>{acao === "REPOR" ? "Produto devolvido: repor no estoque" : "Não repor no estoque"}</span>
+                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                      <path d="M1 1.5L6 6.5L11 1.5" stroke="#634738" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {acaoDropdownOpen && (
+                    <ul className="cancelpreview-dropdown-list">
+                      {[
+                        { value: "NAO_REPOR", label: "Não repor no estoque" },
+                        { value: "REPOR", label: "Produto devolvido: repor no estoque" },
+                      ].map((option) => (
+                        <li key={option.value}>
+                          <button
+                            type="button"
+                            className={`cancelpreview-dropdown-option${acao === option.value ? " cancelpreview-dropdown-option--active" : ""}`}
+                            onClick={() => {
+                              setAcao(option.value);
+                              setAcaoDropdownOpen(false);
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </label>
             )}
             <label className="cancelpreview-field">
