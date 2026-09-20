@@ -764,7 +764,9 @@ test("detalhe reconstrói estados físicos e orienta o Pix da diferença da troc
   const root = await mountWith(t, async () => Response.json(current));
   try {
     await flush();
-    assert.match(document.body.textContent, /Cancelado · Estoque reposto/);
+    // Item CANCELADO (origem da troca) saiu da lista principal — só o
+    // destino ATIVO aparece; o histórico da origem vive no modal próprio.
+    assert.doesNotMatch(document.body.textContent, /Cancelado · Estoque reposto/);
     assert.match(document.body.textContent, /Ativo · Estoque reservado/);
     assert.match(document.body.textContent, /Troca aguardando pagamento/);
     assert.match(document.body.textContent, /Saldo: R\$ 5,00\./);
@@ -809,20 +811,78 @@ test("troca concluída preserva histórico na origem e libera ações normais no
   });
   const calls = [];
   const root = await mountWith(t, async url => {
-    calls.push(String(url));
-    if (String(url) === "/api/admin/produtos") return Response.json({produtos: []});
+    const href = String(url);
+    calls.push(href);
+    if (href === "/api/admin/produtos") return Response.json({produtos: []});
     return Response.json(current);
   });
   try {
-    const [origin, destination] = [...document.querySelectorAll(".pedmodal-item-row")];
-    const labels = row => [...row.querySelectorAll("button")].map(button => button.textContent.trim());
-    assert.deepEqual(labels(origin), ["Ver troca"]);
-    assert.deepEqual(labels(destination), ["Cancelar item", "Trocar produto"]);
+    // A origem CANCELADA não ocupa mais a lista principal — só o destino
+    // ativo aparece, com as ações normais de item.
+    const rows = [...document.querySelectorAll(".pedmodal-item-row")];
+    assert.equal(rows.length, 1);
+    const destination = rows[0];
+    const labels = [...destination.querySelectorAll("button")].map(button => button.textContent.trim());
+    assert.deepEqual(labels, ["Cancelar item", "Trocar produto"]);
     assert.match(destination.textContent, /Troca concluída/);
     await ui.act(async () => destination.querySelectorAll("button")[1].click());
     await flush();
     assert.ok(calls.includes("/api/admin/produtos"));
     assert.equal(calls.some(url => url.endsWith("/itens/2/trocas")), false);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("histórico mostra a troca concluída da origem e 'Ver detalhes' abre a troca por ela", async t => {
+  const current = detalhe({
+    itens: [
+      {
+        ...detalhe().itens[0], id: 1, produto_nome: "Origem",
+        status_item: "CANCELADO", estoque_estado: "REPOSTO",
+        troca_id: 40, troca_status: "CONCLUIDA", troca_item_origem_id: 1,
+      },
+      {
+        ...detalhe().itens[0], id: 2, produto_nome: "Destino",
+        status_item: "ATIVO", estoque_estado: "BAIXADO",
+        troca_id: 40, troca_status: "CONCLUIDA", troca_item_origem_id: 1,
+      },
+    ],
+  });
+  const calls = [];
+  const root = await mountWith(t, async url => {
+    const href = String(url);
+    calls.push(href);
+    if (href.endsWith("/historico")) return Response.json({
+      eventos: [{
+        id: "troca-concluida-40", tipo: "TROCA_CONCLUIDA", data: "2026-01-02 10:00:00",
+        titulo: "Troca concluída", status: "CONCLUIDA",
+        itemOrigem: {id: 1, nome: "Origem", valorCentavos: 3000, estoqueEstado: "REPOSTO"},
+        itemDestino: {id: 2, nome: "Destino", quantidade: 2, valorCentavos: 3000, estoqueEstado: "BAIXADO"},
+        diferencaCentavos: 0, tipoDiferenca: "ZERO", estoqueAcao: "REPOR", referenciaId: 1,
+      }],
+    });
+    if (href.endsWith("/itens/1/trocas")) return Response.json({troca: {
+      id: 40, status: "CONCLUIDA", reembolsoPendenteCentavos: 0, refundsPendentes: [],
+      reembolsosConfirmados: [], financeiro: {status: "PAGO", totalCentavos: 3000, liquidoCentavos: 3000, saldoCentavos: 0},
+    }});
+    return Response.json(current);
+  });
+  try {
+    assert.equal(document.querySelectorAll(".pedmodal-item-row").length, 1, "origem não aparece na lista atual");
+
+    await ui.act(async () => document.querySelector(".pedmodal-btn-historico").click());
+    await flush();
+    const historico = document.querySelector(".histmodal-card");
+    assert.match(historico.textContent, /Origem/);
+    assert.match(historico.textContent, /Destino/);
+    assert.match(historico.textContent, /Concluído/);
+
+    await ui.act(async () => [...historico.querySelectorAll("button")]
+      .find(button => /ver detalhes/i.test(button.textContent)).click());
+    await flush();
+    assert.equal(document.querySelector(".histmodal-card"), null, "histórico fecha ao abrir o detalhe");
+    assert.ok(calls.some(url => url.endsWith("/itens/1/trocas")), "abre a troca pela origem, não pelo destino");
   } finally {
     await unmount(root);
   }
@@ -849,7 +909,8 @@ test("cancelamento concluído reabre em modo leitura sem ação financeira dupli
     ]
   });
   const root = await mountWith(t, async url => {
-    if (String(url).endsWith("/cancelamentos"))
+    const href = String(url);
+    if (href.endsWith("/cancelamentos"))
       return Response.json({
         cancelamento: {
           id: 30,
@@ -870,15 +931,29 @@ test("cancelamento concluído reabre em modo leitura sem ação financeira dupli
           financeiro: { status: "PENDENTE", totalCentavos: 0, liquidoCentavos: 0, saldoCentavos: 0 }
         }
       });
+    if (href.endsWith("/historico")) return Response.json({
+      eventos: [{
+        id: "cancelamento-concluido-30", tipo: "CANCELAMENTO_CONCLUIDO", data: "2026-01-01 12:05:00",
+        titulo: "Cancelamento concluído", status: "CONCLUIDO",
+        item: {id: 1, nome: "Bolo", valorCentavos: 3000, estoqueEstado: "REPOSTO"},
+        estoqueAcao: "REPOR", valorReembolsoCentavos: 500, metodosReembolso: ["PIX_MP"], referenciaId: 1,
+      }],
+    });
     return Response.json(current);
   });
   try {
-    assert.match(document.body.textContent, /Cancelamento concluído/);
-    const open = [...document.querySelectorAll(".pedmodal-btn-cancel-item")].find(button =>
-      /ver cancelamento/i.test(button.textContent)
-    );
-    await ui.act(async () => open.click());
+    // Item CANCELADO some da lista principal — sem ele não sobra nenhuma
+    // linha, e o cancelamento só é revisitável pelo histórico.
+    assert.equal(document.querySelectorAll(".pedmodal-item-row").length, 0);
+
+    await ui.act(async () => document.querySelector(".pedmodal-btn-historico").click());
     await flush();
+    const historico = document.querySelector(".histmodal-card");
+    assert.match(historico.textContent, /Cancelamento concluído/);
+    await ui.act(async () => [...historico.querySelectorAll("button")]
+      .find(button => /ver detalhes/i.test(button.textContent)).click());
+    await flush();
+    assert.equal(document.querySelector(".histmodal-card"), null, "histórico fecha ao abrir o detalhe");
     const modal = document.querySelector(".cancelpreview-card");
     assert.match(modal.textContent, /Devoluções confirmadas/);
     assert.match(modal.textContent, /R\$\s*5,00/);
