@@ -445,6 +445,156 @@ html[data-admin-theme="dark"] .pedmodal-payment-method {
     border-bottom-color: #3d3230;
   }
 }
+html[data-admin-theme="dark"] .pedmodal-btn-add-item {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-add-item:hover {
+  background: #3d2e2b;
+  border-color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-historico {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-historico:hover {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-cancel-item {
+  background: #3b1a17;
+  border-color: #5c2a2a;
+  color: #e08276;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-cancel-item:hover {
+  background: #4d221e;
+  border-color: #e08276;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-cancel-item--neutral {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-cancel-item--neutral:hover {
+  background: #3d2e2b;
+  border-color: #a89b92;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-item-state {
+  background: #3d3230;
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .pedmodal-item-note {
+  background: #3b2214;
+  color: #e5955c;
+}
+html[data-admin-theme="dark"] .pedmodal-charge-action > div {
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .pedmodal-financial-grid {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .pedmodal-financial-row {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-financial-row strong {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-financial-row--balance {
+  color: #d38b80;
+  border-top-color: #3d3230;
+}
+html[data-admin-theme="dark"] .pedmodal-pix-aviso {
+  background: #3b2214;
+  color: #e5955c;
+}
+html[data-admin-theme="dark"] .pedmodal-pix-card {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .pedmodal-pix-valor {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-pix-copy-label,
+html[data-admin-theme="dark"] .pedmodal-pix-timer {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-pix-copy-btn {
+  color: #d38b80;
+}
+html[data-admin-theme="dark"] .pedmodal-pix-code-box {
+  background: #2b2220;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-pix-vencido {
+  background: #3b1a17;
+  color: #e08276;
+}
+
+/* ── Histórico da Comanda Modal ── */
+html[data-admin-theme="dark"] .histmodal-overlay {
+  background: rgba(0, 0, 0, 0.88);
+}
+html[data-admin-theme="dark"] .histmodal-card {
+  background: #2b2220;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.5);
+}
+html[data-admin-theme="dark"] .histmodal-header {
+  background: #2b2220;
+  border-bottom-color: #3d3230;
+}
+html[data-admin-theme="dark"] .histmodal-title {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .histmodal-btn-close {
+  background: #1a1412;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .histmodal-btn-close:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .histmodal-status {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .histmodal-status--error {
+  color: #e5807a;
+}
+html[data-admin-theme="dark"] .histmodal-evento {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .histmodal-evento-titulo {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .histmodal-evento-data,
+html[data-admin-theme="dark"] .histmodal-evento-linha {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .histmodal-evento-linha:first-of-type {
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .histmodal-troca-linha {
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .histmodal-seta {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .histmodal-badge--green {
+  background: #182c22;
+  color: #62c584;
+}
+html[data-admin-theme="dark"] .histmodal-badge--orange {
+  background: #3b2214;
+  color: #e5955c;
+}
+html[data-admin-theme="dark"] .histmodal-badge--red {
+  background: #3b1a17;
+  color: #e08276;
+}
+html[data-admin-theme="dark"] .histmodal-btn-detalhes {
+  color: #d38b80;
+}
 
 /* ═══════════════════════════════════════════
    Administradores
