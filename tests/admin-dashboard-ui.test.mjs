@@ -55,7 +55,10 @@ const ui = await import(
 
 test('dashboard renderiza caixa total e ranking geral entregues pelo backend', async t => {
   t.mock.method(globalThis, 'fetch', async url => {
-    assert.match(String(url), /^\/api\/admin\/dashboard\?date=\d{4}-\d{2}-\d{2}$/);
+    assert.match(
+      String(url),
+      /^\/api\/admin\/dashboard\?date=\d{4}-\d{2}-\d{2}&today=\d{4}-\d{2}-\d{2}$/,
+    );
     return Response.json({
       data: '2026-09-20',
       recebidoHoje: {count: 1, total: 100000},
