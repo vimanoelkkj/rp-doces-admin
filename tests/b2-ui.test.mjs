@@ -50,10 +50,16 @@ const ui=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFi
 const container=document.getElementById('root');
 const flush=()=>ui.act(async()=>{await new Promise(setImmediate);});
 const initial={items:[{id:1,name:'Bolo',price:50,image:'',quantity:2}],cliente:{nome:'Teste',whatsapp:'11999999999'}};
+const LOADING_TOTAL_MIN_MS=3000;
+const RESULT_TRANSITION_MIN_MS=1500;
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 async function mount(t,respond){
   // Usa o relógio do contexto do teste; cada teste restaura mocks/timers.
   t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:Date.parse('2026-09-17T12:00:00Z')});
+  // A UI sorteia a duração das duas etapas de loading e da transição
+  // final. Fixa o menor valor para testar as fronteiras dos timers sem
+  // depender de aleatoriedade.
+  t.mock.method(Math,'random',()=>0);
   const advance=async ms=>{await ui.act(async()=>{t.mock.timers.tick(ms);});await flush();};
   const calls=[];
   t.mock.method(globalThis,'fetch',async(url,options)=>{
@@ -64,7 +70,7 @@ async function mount(t,respond){
   let root;
   await ui.act(async()=>{root=ui.mount(container,initial);});
   t.after(async()=>{await ui.act(async()=>root.unmount());container.innerHTML='';});
-  await flush(); await advance(2400);
+  await flush(); await advance(LOADING_TOTAL_MIN_MS);
   return {calls,advance};
 }
 
@@ -80,7 +86,7 @@ test('M: timer zero with approval in flight never navigates to failure; normal s
   assert.equal(calls.length,1,'polls must not overlap a hanging request');
   pending.resolve(Response.json({statusPagamento:'PAGO'})); await flush();
   assert.match(container.textContent,/Processando pagamento/);
-  await advance(1399);
+  await advance(RESULT_TRANSITION_MIN_MS-1);
   assert.equal(ui.currentPath,'/aguardando-pagamento');
   await advance(1);
   assert.equal(ui.currentPath,'/pedido-confirmado');
@@ -93,7 +99,7 @@ test('expired response remains inconclusive and polls again; 500 also cannot nav
   assert.match(container.textContent,/Ainda não confirmamos/);
   await advance(4000);
   assert.equal(calls.length,3);
-  await advance(1400);
+  await advance(RESULT_TRANSITION_MIN_MS);
   assert.equal(ui.currentPath,'/pedido-confirmado');
 });
 
@@ -113,13 +119,13 @@ test('timer zero during success transition cannot replace approval with failure'
   const {advance}=await mount(t,()=>pending.promise);
   await advance(3000);
   pending.resolve(Response.json({statusPagamento:'PAGO'})); await flush();
-  await advance(1400);
+  await advance(RESULT_TRANSITION_MIN_MS);
   assert.equal(ui.currentPath,'/pedido-confirmado');
 });
 
 test('known rejection keeps the existing result transition without claiming no money was charged',async t=>{
   const {advance}=await mount(t,()=>Promise.resolve(Response.json({statusPagamento:'CANCELADO'})));
-  await advance(1400);
+  await advance(RESULT_TRANSITION_MIN_MS);
   assert.equal(ui.currentPath,'/pagamento-nao-aprovado');
   assert.match(container.textContent,/Valor do pedido/);
   assert.doesNotMatch(container.textContent,/Nenhum valor foi cobrado|Valor não cobrado/);

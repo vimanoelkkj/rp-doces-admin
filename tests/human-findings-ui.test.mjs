@@ -20,7 +20,7 @@ Object.defineProperty(window, 'scrollY', {configurable: true, value: 321});
 Object.defineProperty(window, 'innerWidth', {configurable: true, value: 1200});
 Object.defineProperty(document.documentElement, 'clientWidth', {configurable: true, value: 1180});
 const restoredScroll = [];
-window.scrollTo = (x, y) => restoredScroll.push([x, y]);
+window.scrollTo = (...args) => restoredScroll.push(args);
 
 test.after(() => {
   dom.window.close();
@@ -138,7 +138,9 @@ test('HUMAN-06/08: modal trava scroll e só fecha em clique genuíno no backdrop
   await unmount(root);
   assert.equal(document.body.style.position, '');
   assert.equal(document.body.style.paddingRight, '4px');
-  assert.deepEqual(restoredScroll.at(-1), [7, 321]);
+  assert.deepEqual(restoredScroll.at(-1), [
+    {left: 7, top: 321, behavior: 'instant'},
+  ]);
 });
 
 test('HUMAN-01: dropdown compartilhado é portal fixo fora do fluxo do modal', async () => {
