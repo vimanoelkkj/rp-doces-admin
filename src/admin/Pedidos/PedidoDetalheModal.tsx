@@ -7,6 +7,7 @@ import { formatarFinanceiro, type FinanceiroPedido } from "./formatarFinanceiro"
 import AdicionarItemModal from "./AdicionarItemModal";
 import CancelamentoItemPreviewModal from "./CancelamentoItemPreviewModal";
 import TrocarItemModal from "./TrocarItemModal";
+import HistoricoComandaModal from "./HistoricoComandaModal";
 
 /* ── Types (espelham o retorno de GET /api/admin/pedidos/:id) ── */
 interface PedidoItemRow {
@@ -159,6 +160,7 @@ export default function PedidoDetalheModal({
   const [adicionandoItem, setAdicionandoItem] = useState(false);
   const [itemCancelamentoPreviewId, setItemCancelamentoPreviewId] = useState<number | null>(null);
   const [itemTroca, setItemTroca] = useState<PedidoItemRow | null>(null);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
   const dataRef = useRef<PedidoDetalheResponse | null>(null);
   const pixEmVooRef = useRef<Set<string>>(new Set());
   const onStatusChangedRef = useRef(onStatusChanged);
@@ -338,6 +340,22 @@ export default function PedidoDetalheModal({
   const trocaAguardandoCobranca = data?.itens.some(
     (item) => item.troca_status === "AGUARDANDO_COBRANCA",
   );
+  const itensAtuais = data?.itens.filter(
+    (item) => item.status_item === "ATIVO" || item.status_item === "TROCA_PENDENTE",
+  ) ?? [];
+
+  // "Ver detalhes" no histórico fecha o histórico e abre o modal específico
+  // por cima do principal — mesmo comportamento de quem abre a partir da
+  // lista de itens atual, sem empilhar um terceiro nível.
+  const verCancelamentoDoHistorico = (itemId: number) => {
+    setHistoricoAberto(false);
+    setItemCancelamentoPreviewId(itemId);
+  };
+  const verTrocaDoHistorico = (itemId: number) => {
+    const item = data?.itens.find((i) => i.id === itemId);
+    setHistoricoAberto(false);
+    if (item) setItemTroca(item);
+  };
 
   return createPortal(
     <div className="pedmodal-overlay" {...modalProps}>
@@ -441,20 +459,29 @@ export default function PedidoDetalheModal({
             <div className="pedmodal-items">
               <div className="pedmodal-items-header">
                 <span className="pedmodal-section-label">Itens do pedido</span>
-                {data.pedido.origem_pedido === "MANUAL" &&
-                  data.pedido.status_comanda === "ABERTA" &&
-                  (data.pedido.status_pedido === "NOVO" ||
-                    data.pedido.status_pedido === "PREPARANDO") && (
-                    <button
-                      type="button"
-                      className="pedmodal-btn-add-item"
-                      onClick={() => setAdicionandoItem(true)}
-                    >
-                      + Adicionar produto
-                    </button>
-                  )}
+                <div className="pedmodal-items-header-actions">
+                  <button
+                    type="button"
+                    className="pedmodal-btn-historico"
+                    onClick={() => setHistoricoAberto(true)}
+                  >
+                    Histórico
+                  </button>
+                  {data.pedido.origem_pedido === "MANUAL" &&
+                    data.pedido.status_comanda === "ABERTA" &&
+                    (data.pedido.status_pedido === "NOVO" ||
+                      data.pedido.status_pedido === "PREPARANDO") && (
+                      <button
+                        type="button"
+                        className="pedmodal-btn-add-item"
+                        onClick={() => setAdicionandoItem(true)}
+                      >
+                        + Adicionar produto
+                      </button>
+                    )}
+                </div>
               </div>
-              {data.itens.map((item) => (
+              {itensAtuais.map((item) => (
                 <div className="pedmodal-item-row" key={item.id}>
                   <div className="pedmodal-item-info">
                     <span className="pedmodal-item-name">
@@ -704,6 +731,14 @@ export default function PedidoDetalheModal({
           </div>
         )}
       </div>
+      {data && historicoAberto && (
+        <HistoricoComandaModal
+          orderId={orderId}
+          onClose={() => setHistoricoAberto(false)}
+          onVerCancelamento={verCancelamentoDoHistorico}
+          onVerTroca={verTrocaDoHistorico}
+        />
+      )}
       {data && adicionandoItem && (
         <AdicionarItemModal
           orderId={orderId}

@@ -260,6 +260,28 @@
   gap: 12px;
 }
 
+.pedmodal-items-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pedmodal-btn-historico {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #8c7a76;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pedmodal-btn-historico:hover {
+  color: #634738;
+  text-decoration: underline;
+}
+
 .pedmodal-btn-add-item {
   padding: 7px 12px;
   border: 1px solid #d8c8b8;
@@ -614,6 +636,13 @@
   .pedmodal-items-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .pedmodal-items-header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 
   .pedmodal-btn-add-item {
