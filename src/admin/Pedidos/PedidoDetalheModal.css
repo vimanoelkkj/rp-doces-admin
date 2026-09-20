@@ -375,21 +375,30 @@
   display: flex;
   align-items: flex-end;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .pedmodal-btn-cancel-item {
-  padding: 3px 0;
-  border: 0;
-  background: transparent;
+  padding: 5px 12px;
+  border: 1px solid #f0c4c0;
+  border-radius: 8px;
+  background: #ffffff;
   color: #a8352a;
   cursor: pointer;
   font-family: "Manrope", sans-serif;
   font-size: 11px;
   font-weight: 700;
+  transition: all 0.15s;
 }
 
-.pedmodal-btn-cancel-item:hover { text-decoration: underline; }
+.pedmodal-btn-cancel-item:hover { background: #fbeceb; border-color: #a8352a; }
+
+.pedmodal-btn-cancel-item--neutral {
+  border-color: #eadfd3;
+  color: #634738;
+}
+
+.pedmodal-btn-cancel-item--neutral:hover { background: #f5efe8; border-color: #634738; }
 
 .pedmodal-financial-grid {
   display: grid;
