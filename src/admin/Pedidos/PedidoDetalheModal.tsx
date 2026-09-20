@@ -489,23 +489,23 @@ export default function PedidoDetalheModal({
                         <>
                         <button
                           type="button"
-                          className="pedmodal-btn-cancel-item"
+                          className={`pedmodal-btn-cancel-item${item.cancelamento_id ? " pedmodal-btn-cancel-item--neutral" : ""}`}
                           onClick={() => setItemCancelamentoPreviewId(item.id)}
                         >
                           {item.cancelamento_id ? "Ver cancelamento" : "Cancelar item"}
                         </button>
                         {!item.cancelamento_id && (
-                          <button type="button" className="pedmodal-btn-cancel-item" onClick={() => setItemTroca(item)}>
+                          <button type="button" className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral" onClick={() => setItemTroca(item)}>
                             Trocar produto
                           </button>
                         )}
                         </>
                       )}
                     {item.cancelamento_id && item.status_item !== "ATIVO" && (
-                      <button type="button" className="pedmodal-btn-cancel-item" onClick={() => setItemCancelamentoPreviewId(item.id)}>Ver cancelamento</button>
+                      <button type="button" className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral" onClick={() => setItemCancelamentoPreviewId(item.id)}>Ver cancelamento</button>
                     )}
                     {item.troca_id && item.troca_item_origem_id === item.id && (
-                      <button type="button" className="pedmodal-btn-cancel-item" onClick={() => setItemTroca(item)}>Ver troca</button>
+                      <button type="button" className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral" onClick={() => setItemTroca(item)}>Ver troca</button>
                     )}
                   </div>
                 </div>
