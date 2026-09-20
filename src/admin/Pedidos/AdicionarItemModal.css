@@ -369,6 +369,21 @@ html[data-admin-theme="dark"] .additem-dropdown-option--active {
   color: #f8eee8;
 }
 
+html[data-admin-theme="dark"] .additem-error {
+  color: #e08276;
+  background: #3b1a17;
+}
+
+html[data-admin-theme="dark"] .additem-price-change {
+  color: #e5955c;
+  background: #3b2214;
+}
+
+html[data-admin-theme="dark"] .additem-price-change button {
+  background: #d38b80;
+  color: #ffffff;
+}
+
 @media (max-width: 560px) {
   .additem-overlay {
     align-items: flex-end;
