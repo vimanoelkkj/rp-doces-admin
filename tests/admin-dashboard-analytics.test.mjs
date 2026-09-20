@@ -4,12 +4,14 @@ import {app, fixture} from './helpers/b3.mjs';
 
 const cookieDe = session => session.cookie.split(';')[0];
 
-const dashboardRequest = (db, cookie = '') => app.dashboard.onRequestGet({
-  env: {DB: db},
-  request: new Request('https://local.test/api/admin/dashboard?date=2099-01-01', {
-    headers: cookie ? {Cookie: cookie} : {},
-  }),
-});
+const dashboardRequest = (db, cookie = '', date = '2099-01-01', today = date) =>
+  app.dashboard.onRequestGet({
+    env: {DB: db},
+    request: new Request(
+      `https://local.test/api/admin/dashboard?date=${date}&today=${today}`,
+      {headers: cookie ? {Cookie: cookie} : {}},
+    ),
+  });
 
 test('caixa total usa somente fatos confirmados e alocacoes nao duplicam valores', async t => {
   const db = await fixture(t, {paid: true, reserve: 'CONVERTIDA'});
@@ -177,4 +179,38 @@ test('dashboard exige autenticacao, agrega no backend e nao modifica o dominio',
     assert.deepEqual((await db.prepare(`SELECT * FROM ${table} ORDER BY id`).all()).results,
       before[table], `${table} permaneceu somente leitura`);
   }
+});
+
+
+test('a receber atravessa a virada do dia e some somente quando o saldo zera', async t => {
+  const db = await fixture(t, {ledger: false, reserve: 'ATIVA'});
+  await db.prepare(`UPDATE pedidos
+    SET origem_pedido='MANUAL',
+        status_pedido='ENTREGUE',
+        status_comanda='ENCERRADA',
+        status_pagamento='PENDENTE',
+        valor_total_centavos=4000,
+        criado_em='2098-12-31 10:00:00'
+    WHERE id=1`).run();
+
+  const session = await app.auth.createSession(db, 1);
+  let response = await dashboardRequest(db, cookieDe(session), '2099-01-01', '2099-01-01');
+  assert.equal(response.status, 200);
+  let body = await response.json();
+
+  assert.deepEqual(body.aReceber, {count: 1, total: 4000, anteriores: 1});
+  assert.equal(body.pagamentosPendentes.length, 1);
+  assert.equal(body.pagamentosPendentes[0].id, 1);
+  assert.equal(body.pagamentosPendentes[0].saldo_centavos, 4000);
+  assert.equal(body.pagamentosPendentes[0].dias_em_aberto, 1);
+
+  await db.prepare(`INSERT INTO pedido_pagamentos(
+    pedido_id,metodo,origem,valor_centavos,status,idempotency_key,pago_em)
+    VALUES(1,'DINHEIRO','ADMIN',4000,'PAGO','quit-next-day',CURRENT_TIMESTAMP)`).run();
+  await db.prepare(`UPDATE pedidos SET status_pagamento='PAGO' WHERE id=1`).run();
+
+  response = await dashboardRequest(db, cookieDe(session), '2099-01-01', '2099-01-01');
+  body = await response.json();
+  assert.deepEqual(body.aReceber, {count: 0, total: 0, anteriores: 0});
+  assert.deepEqual(body.pagamentosPendentes, []);
 });
