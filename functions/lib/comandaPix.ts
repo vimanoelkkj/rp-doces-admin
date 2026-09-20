@@ -49,6 +49,7 @@ interface PedidoParaPix {
   id: number;
   valor_total_centavos: number;
   status_comanda: string;
+  status_pedido: string;
   reserva_status: string;
   cliente_nome: string;
   cliente_whatsapp: string;
@@ -294,13 +295,19 @@ export async function createAdminPixCharge(
 
   const pedido = await db
     .prepare(
-      `SELECT id, valor_total_centavos, status_comanda, reserva_status, cliente_nome, cliente_whatsapp
+      `SELECT id, valor_total_centavos, status_comanda, status_pedido, reserva_status, cliente_nome, cliente_whatsapp
        FROM pedidos WHERE id = ?`,
     )
     .bind(params.pedidoId)
     .first<PedidoParaPix>();
   if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
-  if (pedido.status_comanda !== "ABERTA") return { ok: false, erro: "COMANDA_ENCERRADA" };
+  const liquidacaoAposEntrega = pedido.status_pedido === "ENTREGUE";
+  if (
+    pedido.status_pedido === "CANCELADO" ||
+    (pedido.status_comanda !== "ABERTA" && !liquidacaoAposEntrega)
+  ) {
+    return { ok: false, erro: "COMANDA_ENCERRADA" };
+  }
 
   const substituiId = params.substituiId ?? null;
 
@@ -353,9 +360,13 @@ export async function createAdminPixCharge(
   // expiração liberar a reserva entre esta leitura e o batch, a mesma
   // transação da cobrança consegue readquiri-la. Se nada mudou, os UPDATEs
   // ficam em changes=0 e a reserva preexistente permanece intocada.
-  const itensParaReserva = itensControlados.filter(
-    (i) => i.estoque_estado !== "BAIXADO",
-  );
+  // ENTREGUE fecha a comanda pelo trigger operacional. A liquidação do
+  // saldo pode gerar um Pix, mas nunca reabre ou readquire reserva: a
+  // reconciliação financeira continua sendo a única responsável pela
+  // baixa física quando o provedor confirmar o pagamento.
+  const itensParaReserva = liquidacaoAposEntrega
+    ? []
+    : itensControlados.filter((i) => i.estoque_estado !== "BAIXADO");
 
   // A1: derivada da operation key quando existe — o UNIQUE parcial de
   // `pedido_pagamentos.idempotency_key` garante at-most-once da tentativa.
@@ -445,12 +456,17 @@ export async function createAdminPixCharge(
          WHERE ? <= ${CAPACIDADE_COBRAVEL_SQL}
            AND EXISTS (
              SELECT 1 FROM pedidos
-             WHERE id = ? AND status_comanda = 'ABERTA'
-               AND NOT EXISTS (
-                 SELECT 1 FROM pedido_itens pi
-                 WHERE pi.pedido_id = pedidos.id
-                   AND pi.status_item = 'ATIVO' AND pi.produto_id IS NOT NULL
-                   AND pi.estoque_estado NOT IN ('RESERVADO', 'BAIXADO')
+             WHERE id = ?
+               AND status_pedido <> 'CANCELADO'
+               AND (status_comanda = 'ABERTA' OR status_pedido = 'ENTREGUE')
+               AND (
+                 status_pedido = 'ENTREGUE'
+                 OR NOT EXISTS (
+                   SELECT 1 FROM pedido_itens pi
+                   WHERE pi.pedido_id = pedidos.id
+                     AND pi.status_item = 'ATIVO' AND pi.produto_id IS NOT NULL
+                     AND pi.estoque_estado NOT IN ('RESERVADO', 'BAIXADO')
+                 )
                )
            )
            AND (
