@@ -38,7 +38,7 @@ const bundle = await build({
       export {act} from 'react';
       export function mount(container, callbacks = {}) {
         const root = createRoot(container);
-        root.render(<PedidoDetalheModal orderId={1} onClose={() => {}}
+        root.render(<PedidoDetalheModal orderId={1} onClose={callbacks.onClose ?? (() => {})}
           onStatusChanged={callbacks.onStatusChanged} />);
         return root;
       }
@@ -93,6 +93,8 @@ const detalhe = (overrides = {}) => {
       status_pedido: overrides.statusPedido ?? 'NOVO',
       status_comanda: overrides.statusComanda ?? 'ABERTA',
       origem_pedido: overrides.origem ?? 'MANUAL',
+      arquivado: overrides.arquivado ?? 0,
+      arquivado_em: overrides.arquivado ? '2026-01-02 10:00:00' : null,
       criado_em: '2026-01-01 12:00:00',
       pago_em: pago ? '2026-01-01 12:01:00' : null,
     },
@@ -1059,6 +1061,12 @@ test('detalhe aposenta a entrada visual do editor integral legado', async () => 
   assert.doesNotMatch(adminSource, /EditarPedidoModal/);
 });
 
+test('listagem oferece a aba de pedidos arquivados', async () => {
+  const adminSource = await readFile('src/admin/Pedidos/AdminPedidos.tsx', 'utf8');
+  assert.match(adminSource, /key:\s*"arquivados",\s*label:\s*"Arquivados"/);
+  assert.match(adminSource, /counts\s*\?\s*counts\[tab\.key\]/);
+});
+
 test("refund recusado é terminal na UI e não oferece retry automático", async t => {
   const current = detalhe({
     itens: [
@@ -1417,6 +1425,114 @@ test("cancelamento concluído reabre em modo leitura sem ação financeira dupli
       ),
       false
     );
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("pedido ENTREGUE oferece arquivamento com modal de confirmacao proprio e atualiza a lista sem recarregar", async t => {
+  const current = detalhe({statusPedido: "ENTREGUE", statusComanda: "ENCERRADA"});
+  let payload;
+  let atualizacoes = 0;
+  let fechamentos = 0;
+  const confirmMock = t.mock.method(window, "confirm", () => true);
+  const root = await mountWith(t, async (_url, options) => {
+    if (options?.method === "PATCH") {
+      payload = JSON.parse(options.body);
+      return Response.json({ok: true, arquivado: true, arquivadoEm: "2026-01-02 10:00:00"});
+    }
+    return Response.json(current);
+  }, {
+    onStatusChanged: () => { atualizacoes += 1; },
+    onClose: () => { fechamentos += 1; },
+  });
+  try {
+    const botao = [...document.querySelectorAll("button")]
+      .find(button => button.textContent.trim() === "Arquivar pedido");
+    assert.ok(botao);
+    await ui.act(async () => botao.click());
+    await flush();
+    assert.equal(confirmMock.mock.callCount(), 0, "nao usa mais o window.confirm nativo");
+    assert.equal(payload, undefined, "ainda nao confirmou no modal proprio");
+
+    const dialog = document.querySelector(".confirmdlg-card");
+    assert.ok(dialog, "abre o modal de confirmacao proprio");
+    assert.match(dialog.textContent, /Arquivar pedido/);
+    await ui.act(async () => dialog.querySelector(".confirmdlg-btn-confirm").click());
+    await flush();
+    assert.deepEqual(payload, {arquivado: true});
+    assert.equal(atualizacoes, 1);
+    assert.equal(fechamentos, 1);
+    assert.equal(document.querySelector(".confirmdlg-card"), null, "modal de confirmacao fecha depois");
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("cancelar o modal de arquivamento nao envia PATCH", async t => {
+  const current = detalhe({statusPedido: "ENTREGUE", statusComanda: "ENCERRADA"});
+  let patchCalls = 0;
+  const root = await mountWith(t, async (_url, options) => {
+    if (options?.method === "PATCH") { patchCalls += 1; return Response.json({ok: true}); }
+    return Response.json(current);
+  });
+  try {
+    const botao = [...document.querySelectorAll("button")]
+      .find(button => button.textContent.trim() === "Arquivar pedido");
+    await ui.act(async () => botao.click());
+    await flush();
+    const dialog = document.querySelector(".confirmdlg-card");
+    await ui.act(async () => dialog.querySelector(".confirmdlg-btn-cancel").click());
+    await flush();
+    assert.equal(document.querySelector(".confirmdlg-card"), null);
+    assert.equal(patchCalls, 0);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("pedido arquivado fica em modo historico e pode ser restaurado", async t => {
+  const current = detalhe({
+    statusPedido: "ENTREGUE",
+    statusComanda: "ENCERRADA",
+    arquivado: 1,
+    capacidade: 500,
+    pix: [{
+      id: 50,
+      valorCentavos: 500,
+      qrCode: "pix-arquivado",
+      qrCodeBase64: null,
+      ticketUrl: null,
+      expiresAt: "2099-01-01T00:00:00Z",
+    }],
+  });
+  let payload;
+  let confirmacoes = 0;
+  t.mock.method(window, "confirm", () => { confirmacoes += 1; return true; });
+  const root = await mountWith(t, async (_url, options) => {
+    if (options?.method === "PATCH") {
+      payload = JSON.parse(options.body);
+      return Response.json({ok: true, arquivado: false, arquivadoEm: null});
+    }
+    return Response.json(current);
+  });
+  try {
+    assert.match(document.querySelector(".pedmodal-meta").textContent, /Arquivado/);
+    assert.equal(document.querySelector(".pedmodal-status-dropdown"), null);
+    assert.equal(document.querySelector(".pedmodal-btn-name-edit"), null);
+    assert.equal(
+      [...document.querySelectorAll("button")].some(button =>
+        /registrar pagamento|gerar pix|regenerar pix/i.test(button.textContent)),
+      false,
+    );
+
+    const restaurar = [...document.querySelectorAll("button")]
+      .find(button => button.textContent.trim() === "Restaurar");
+    assert.ok(restaurar);
+    await ui.act(async () => restaurar.click());
+    await flush();
+    assert.deepEqual(payload, {arquivado: false});
+    assert.equal(confirmacoes, 0, "restaurar nao exige confirmacao destrutiva");
   } finally {
     await unmount(root);
   }

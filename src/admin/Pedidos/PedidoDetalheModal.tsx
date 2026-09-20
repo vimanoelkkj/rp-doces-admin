@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { novaOperationKey } from "../../lib/operationKey";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
+import ConfirmDialog from "../components/ConfirmDialog";
 import "./PedidoDetalheModal.css";
 import { formatarFinanceiro, type FinanceiroPedido } from "./formatarFinanceiro";
 import AdicionarItemModal from "./AdicionarItemModal";
@@ -42,6 +43,8 @@ interface PedidoRow {
   criado_em: string;
   pago_em: string | null;
   origem_pedido: "SITE" | "MANUAL";
+  arquivado: number;
+  arquivado_em: string | null;
 }
 
 interface PixAdminPendente {
@@ -157,6 +160,9 @@ export default function PedidoDetalheModal({
   const [error, setError] = useState<string | null>(null);
   const [alterando, setAlterando] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [arquivando, setArquivando] = useState(false);
+  const [arquivamentoError, setArquivamentoError] = useState<string | null>(null);
+  const [confirmarArquivamento, setConfirmarArquivamento] = useState(false);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const [editandoNome, setEditandoNome] = useState(false);
@@ -375,6 +381,37 @@ export default function PedidoDetalheModal({
       .finally(() => setAlterando(false));
   };
 
+  const executarArquivamento = (arquivar: boolean) => {
+    if (!data || arquivando) return;
+
+    setArquivando(true);
+    setArquivamentoError(null);
+    fetch(`/api/admin/pedidos/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ arquivado: arquivar }),
+    })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error ?? "Falha ao alterar arquivamento");
+        }
+        onStatusChangedRef.current?.();
+        onClose();
+      })
+      .catch((err) => setArquivamentoError(err.message))
+      .finally(() => setArquivando(false));
+  };
+
+  const clicarArquivar = () => {
+    if (!data || arquivando) return;
+    if (data.pedido.arquivado === 0) {
+      setConfirmarArquivamento(true);
+      return;
+    }
+    executarArquivamento(false);
+  };
+
   const iniciarEdicaoNome = () => {
     if (!data) return;
     setClienteNome(data.pedido.cliente_nome);
@@ -484,12 +521,14 @@ export default function PedidoDetalheModal({
   const financeiro = data ? formatarFinanceiro(data.financeiro) : null;
   const podeRegistrarPagamento = Boolean(
     data &&
+      data.pedido.arquivado === 0 &&
       data.capacidadeCobravelCentavos > 0 &&
       (data.pedido.status_comanda === "ABERTA" ||
         data.pedido.status_pedido === "ENTREGUE"),
   );
   const podeGerarPix = Boolean(
     data &&
+      data.pedido.arquivado === 0 &&
       data.capacidadeCobravelCentavos > 0 &&
       (data.pedido.status_comanda === "ABERTA" ||
         data.pedido.status_pedido === "ENTREGUE"),
@@ -562,7 +601,7 @@ export default function PedidoDetalheModal({
                   Pedido #{orderId}
                   {data ? ` - ${data.pedido.cliente_nome}` : ""}
                 </h2>
-                {data && (
+                {data && data.pedido.arquivado === 0 && (
                   <button
                     type="button"
                     className="pedmodal-btn-name-edit"
@@ -576,7 +615,7 @@ export default function PedidoDetalheModal({
             )}
           </div>
           <div className="pedmodal-header-actions">
-            {data && (
+            {data && data.pedido.arquivado === 0 && (
               <div className="pedmodal-status-dropdown" ref={statusMenuRef}>
                 <button
                   type="button"
@@ -607,6 +646,27 @@ export default function PedidoDetalheModal({
                 )}
               </div>
             )}
+            {data &&
+              (data.pedido.arquivado === 1 ||
+                data.pedido.status_pedido === "ENTREGUE" ||
+                data.pedido.status_pedido === "CANCELADO") && (
+                <button
+                  type="button"
+                  className={
+                    data.pedido.arquivado === 1
+                      ? "pedmodal-btn-edit"
+                      : "pedmodal-btn-archive"
+                  }
+                  onClick={clicarArquivar}
+                  disabled={arquivando}
+                >
+                  {arquivando
+                    ? "Salvando..."
+                    : data.pedido.arquivado === 1
+                      ? "Restaurar"
+                      : "Arquivar pedido"}
+                </button>
+              )}
             <button className="pedmodal-btn-close" onClick={onClose}>
               <svg
                 width="16"
@@ -634,6 +694,9 @@ export default function PedidoDetalheModal({
             {statusError && (
               <p className="pedmodal-status-error">{statusError}</p>
             )}
+            {arquivamentoError && (
+              <p className="pedmodal-status-error">{arquivamentoError}</p>
+            )}
             {/* Meta badges */}
             <div className="pedmodal-meta">
               <span className="pedmodal-badge pedmodal-badge--comanda">
@@ -644,6 +707,11 @@ export default function PedidoDetalheModal({
               >
                 {STATUS_LABEL[data.pedido.status_pedido]}
               </span>
+              {data.pedido.arquivado === 1 && (
+                <span className="pedmodal-badge pedmodal-badge--archived">
+                  Arquivado
+                </span>
+              )}
               <span className="pedmodal-meta-date">
                 <svg
                   width="16"
@@ -676,7 +744,8 @@ export default function PedidoDetalheModal({
                   >
                     Histórico
                   </button>
-                  {data.pedido.origem_pedido === "MANUAL" &&
+                  {data.pedido.arquivado === 0 &&
+                    data.pedido.origem_pedido === "MANUAL" &&
                     data.pedido.status_comanda === "ABERTA" &&
                     (data.pedido.status_pedido === "NOVO" ||
                       data.pedido.status_pedido === "PREPARANDO") && (
@@ -1015,14 +1084,16 @@ export default function PedidoDetalheModal({
                       )
                     )}
 
-                    <button
-                      type="button"
-                      className="pedmodal-btn-edit"
-                      onClick={() => gerarPix(pix.id)}
-                      disabled={regenerandoId === pix.id}
-                    >
-                      {regenerandoId === pix.id ? "Regenerando..." : "Regenerar Pix"}
-                    </button>
+                    {data.pedido.arquivado === 0 && (
+                      <button
+                        type="button"
+                        className="pedmodal-btn-edit"
+                        onClick={() => gerarPix(pix.id)}
+                        disabled={regenerandoId === pix.id}
+                      >
+                        {regenerandoId === pix.id ? "Regenerando..." : "Regenerar Pix"}
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -1030,6 +1101,19 @@ export default function PedidoDetalheModal({
           </div>
         )}
       </div>
+      {confirmarArquivamento && (
+        <ConfirmDialog
+          title="Arquivar pedido"
+          message="O pedido sairá da lista principal, mas todo o histórico financeiro e operacional será preservado."
+          confirmLabel="Arquivar"
+          cancelLabel="Cancelar"
+          onConfirm={() => {
+            setConfirmarArquivamento(false);
+            executarArquivamento(true);
+          }}
+          onCancel={() => setConfirmarArquivamento(false)}
+        />
+      )}
       {data && historicoAberto && (
         <HistoricoComandaModal
           orderId={orderId}

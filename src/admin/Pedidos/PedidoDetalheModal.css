@@ -207,6 +207,29 @@
   cursor: default;
 }
 
+.pedmodal-btn-archive {
+  padding: 8px 16px;
+  border: 1px solid #f0c4c0;
+  border-radius: 100px;
+  background: #fbeceb;
+  color: #c0392b;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pedmodal-btn-archive:hover {
+  border-color: #c0392b;
+  background: #f5dcda;
+}
+
+.pedmodal-btn-archive:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ── Status dropdown ── */
 .pedmodal-status-dropdown {
   position: relative;
@@ -338,6 +361,11 @@
 .pedmodal-badge--red {
   background: #fbeceb;
   color: #c0392b;
+}
+
+.pedmodal-badge--archived {
+  background: #eee8e4;
+  color: #63524e;
 }
 
 .pedmodal-meta-date {
