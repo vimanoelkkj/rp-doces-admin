@@ -175,6 +175,8 @@ test('estilos estruturais cobrem páginas, barra inferior, overlays e dark mode'
   assert.match(dashboard, /\.dash-cash-total/);
   assert.match(dashboard, /@media \(max-width: 768px\)[\s\S]*\.dash-cash-breakdown[\s\S]*flex-wrap: wrap/);
   assert.match(orders, /\.ped-table-panel[\s\S]*overflow-x: auto/);
+  assert.match(detailModal, /\.pedmodal-btn-archive/);
+  assert.match(dark, /\.pedmodal-btn-archive/);
   for (const css of [dashboard, products, orders, admins, store, notifications]) {
     assert.match(css, /@media \(max-width:/);
   }

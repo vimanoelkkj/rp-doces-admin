@@ -8,7 +8,14 @@ import { formatarFinanceiroTexto, type FinanceiroPedido } from "./formatarFinanc
 /* ── Types (espelham o retorno de GET /api/admin/pedidos) ── */
 type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
 
-type TabFilter = "todos" | "hoje" | "novos" | "em_producao" | "prontos" | "entregues";
+type TabFilter =
+  | "todos"
+  | "hoje"
+  | "novos"
+  | "em_producao"
+  | "prontos"
+  | "entregues"
+  | "arquivados";
 
 interface PedidoListItem {
   id: number;
@@ -26,6 +33,7 @@ interface Counts {
   em_producao: number;
   prontos: number;
   entregues: number;
+  arquivados: number;
 }
 
 interface PedidosResponse {
@@ -43,6 +51,7 @@ const TABS: { key: TabFilter; label: string }[] = [
   { key: "em_producao", label: "Em produção" },
   { key: "prontos", label: "Prontos" },
   { key: "entregues", label: "Entregues" },
+  { key: "arquivados", label: "Arquivados" },
 ];
 
 /* ── Helpers ── */

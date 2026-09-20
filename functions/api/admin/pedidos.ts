@@ -52,6 +52,7 @@ interface CountsRow {
   em_producao: number;
   prontos: number;
   entregues: number;
+  arquivados: number;
 }
 
 const ITEMS_PER_PAGE = 8;
@@ -134,6 +135,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     }
 
     const tabFilter = TAB_FILTERS[tab] ?? "";
+    const listScope = tab === "arquivados"
+      ? "arquivado = 1"
+      : `arquivado = 0 AND ${PEDIDOS_OPERACIONAIS_SQL}`;
 
     let searchFilter = "";
     const searchParams: string[] = [];
@@ -153,14 +157,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const [countRow, pedidosResult, counts] = await Promise.all([
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE ${PEDIDOS_OPERACIONAIS_SQL} ${tabFilter} ${searchFilter}`,
+         WHERE ${listScope} ${tabFilter} ${searchFilter}`,
       )
         .bind(...searchParams)
         .first<{ count: number }>(),
       env.DB.prepare(
         `SELECT id, cliente_nome, valor_total_centavos, status_pagamento, status_pedido, criado_em
          FROM pedidos
-         WHERE ${PEDIDOS_OPERACIONAIS_SQL} ${tabFilter} ${searchFilter}
+         WHERE ${listScope} ${tabFilter} ${searchFilter}
          ORDER BY criado_em DESC
          LIMIT ? OFFSET ?`,
       )
@@ -168,13 +172,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         .all<PedidoListRow>(),
       env.DB.prepare(
         `SELECT
-           COUNT(*) AS todos,
-           SUM(CASE WHEN date(criado_em) = date('now') THEN 1 ELSE 0 END) AS hoje,
-           SUM(CASE WHEN status_pedido = 'NOVO' THEN 1 ELSE 0 END) AS novos,
-           SUM(CASE WHEN status_pedido = 'PREPARANDO' THEN 1 ELSE 0 END) AS em_producao,
-           SUM(CASE WHEN status_pedido = 'PRONTO' THEN 1 ELSE 0 END) AS prontos,
-           SUM(CASE WHEN status_pedido = 'ENTREGUE' THEN 1 ELSE 0 END) AS entregues
-         FROM pedidos WHERE ${PEDIDOS_OPERACIONAIS_SQL}`,
+           COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL} THEN 1 ELSE 0 END),0) AS todos,
+           COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
+                     AND date(criado_em)=date('now') THEN 1 ELSE 0 END),0) AS hoje,
+           COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
+                     AND status_pedido='NOVO' THEN 1 ELSE 0 END),0) AS novos,
+           COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
+                     AND status_pedido='PREPARANDO' THEN 1 ELSE 0 END),0) AS em_producao,
+           COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
+                     AND status_pedido='PRONTO' THEN 1 ELSE 0 END),0) AS prontos,
+           COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
+                     AND status_pedido='ENTREGUE' THEN 1 ELSE 0 END),0) AS entregues,
+           COALESCE(SUM(CASE WHEN arquivado=1 THEN 1 ELSE 0 END),0) AS arquivados
+         FROM pedidos`,
       ).first<CountsRow>(),
     ]);
 
@@ -218,6 +228,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         em_producao: 0,
         prontos: 0,
         entregues: 0,
+        arquivados: 0,
       },
     });
   } catch (err) {

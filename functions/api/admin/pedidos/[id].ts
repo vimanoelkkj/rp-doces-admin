@@ -22,6 +22,8 @@ interface PedidoDetalheRow {
   status_pedido: string;
   status_comanda: string;
   origem_pedido: string;
+  arquivado: number;
+  arquivado_em: string | null;
   criado_em: string;
   pago_em: string | null;
 }
@@ -46,6 +48,7 @@ interface PedidoItemRow {
 interface PedidoUpdateInput {
   statusPedido?: string;
   clienteNome?: unknown;
+  arquivado?: unknown;
 }
 
 const MAX_CLIENTE_NOME_LENGTH = 200;
@@ -89,6 +92,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
     const pedido = await env.DB.prepare(
       `SELECT id, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
               status_pagamento, status_pedido, status_comanda, origem_pedido,
+              arquivado, arquivado_em,
               criado_em, pago_em
        FROM pedidos WHERE id = ?`,
     )
@@ -180,8 +184,81 @@ export const onRequestPatch: PagesFunction<Env> = async ({
 
   const alteraStatus = body.statusPedido !== undefined;
   const alteraClienteNome = body.clienteNome !== undefined;
-  if (alteraStatus === alteraClienteNome) {
+  const alteraArquivamento = body.arquivado !== undefined;
+  if (Number(alteraStatus) + Number(alteraClienteNome) + Number(alteraArquivamento) !== 1) {
     return jsonError("Informe exatamente um campo para alterar", 400);
+  }
+
+  if (alteraArquivamento) {
+    if (typeof body.arquivado !== "boolean") {
+      return jsonError("Estado de arquivamento inválido", 400);
+    }
+
+    try {
+      const pedido = await env.DB.prepare(
+        `SELECT id,status_pedido,arquivado,arquivado_em FROM pedidos WHERE id=?`,
+      ).bind(id).first<{
+        id: number;
+        status_pedido: string;
+        arquivado: number;
+        arquivado_em: string | null;
+      }>();
+      if (!pedido) return jsonError("Pedido não encontrado", 404);
+
+      const arquivar = body.arquivado;
+      if (arquivar && !["ENTREGUE", "CANCELADO"].includes(pedido.status_pedido)) {
+        return jsonError(
+          "Somente pedidos entregues ou cancelados podem ser arquivados.",
+          409,
+          "PEDIDO_NAO_TERMINAL",
+        );
+      }
+
+      if (Boolean(pedido.arquivado) === arquivar) {
+        return Response.json({
+          ok: true,
+          arquivado: arquivar,
+          arquivadoEm: pedido.arquivado_em,
+          replay: true,
+        });
+      }
+
+      const alteracao = arquivar
+        ? await env.DB.prepare(
+          `UPDATE pedidos SET arquivado=1,arquivado_em=CURRENT_TIMESTAMP,
+             atualizado_em=CURRENT_TIMESTAMP
+           WHERE id=? AND arquivado=0 AND status_pedido IN ('ENTREGUE','CANCELADO')`,
+        ).bind(id).run()
+        : await env.DB.prepare(
+          `UPDATE pedidos SET arquivado=0,arquivado_em=NULL,
+             atualizado_em=CURRENT_TIMESTAMP
+           WHERE id=? AND arquivado=1`,
+        ).bind(id).run();
+
+      if (Number(alteracao?.meta?.changes || 0) === 0) {
+        return jsonError("O pedido mudou durante a operação. Atualize e tente novamente.", 409);
+      }
+
+      const atualizado = await env.DB.prepare(
+        `SELECT arquivado,arquivado_em FROM pedidos WHERE id=?`,
+      ).bind(id).first<{ arquivado: number; arquivado_em: string | null }>();
+      return Response.json({
+        ok: true,
+        arquivado: Boolean(atualizado?.arquivado),
+        arquivadoEm: atualizado?.arquivado_em ?? null,
+      });
+    } catch (err) {
+      console.error("Erro ao arquivar pedido (admin)", err);
+      return jsonError("Erro interno ao arquivar pedido", 500);
+    }
+  }
+
+  const estadoAtual = await env.DB.prepare(
+    `SELECT arquivado FROM pedidos WHERE id=?`,
+  ).bind(id).first<{ arquivado: number }>();
+  if (!estadoAtual) return jsonError("Pedido não encontrado", 404);
+  if (estadoAtual.arquivado) {
+    return jsonError("Restaure o pedido antes de alterá-lo.", 409, "PEDIDO_ARQUIVADO");
   }
 
   if (alteraClienteNome) {
