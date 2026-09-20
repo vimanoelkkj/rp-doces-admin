@@ -9,6 +9,11 @@
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 import {
+  chargeableCapacitySql,
+  CONFIRMED_REFUNDS_BY_ALLOCATION_CTE,
+  EXCHANGE_COVERAGE_STATUSES,
+} from "./financialCoverage";
+import {
   buscarOperacao,
   chavePagamento,
   chaveReembolso,
@@ -579,18 +584,41 @@ export async function getItensComSaldo(db: D1Database, pedidoId: number): Promis
   const temStatusItem = await db.prepare(
     `SELECT 1 FROM pragma_table_info('pedido_itens') WHERE name='status_item' LIMIT 1`,
   ).first();
+  if (!temStatusItem) {
+    const { results } = await db.prepare(
+      `SELECT pi.id AS itemId,pi.valor_total_centavos AS valorTotalCentavos,
+              COALESCE(SUM(CASE WHEN pp.status='PAGO' THEN a.valor_centavos ELSE 0 END),0) AS pagoPorOutrosCentavos
+       FROM pedido_itens pi
+       LEFT JOIN pedido_pagamento_alocacoes a ON a.pedido_item_id=pi.id
+       LEFT JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
+       WHERE pi.pedido_id=? GROUP BY pi.id,pi.valor_total_centavos ORDER BY pi.id`,
+    ).bind(pedidoId).all<ItemComSaldo>();
+    return results;
+  }
   const { results } = await db
     .prepare(
-      `SELECT pi.id AS itemId, pi.valor_total_centavos AS valorTotalCentavos,
-              COALESCE(SUM(CASE WHEN pp.status = 'PAGO' THEN a.valor_centavos ELSE 0 END), 0) AS pagoPorOutrosCentavos
+      `WITH RECURSIVE linhagem(item_atual_id,item_id) AS (
+         SELECT pi.id,pi.id FROM pedido_itens pi
+         WHERE pi.pedido_id=? AND pi.status_item='ATIVO'
+         UNION
+         SELECT l.item_atual_id,t.item_origem_id FROM linhagem l
+         JOIN pedido_item_trocas t ON t.item_destino_id=l.item_id
+         WHERE t.status IN (${EXCHANGE_COVERAGE_STATUSES})
+       ), ${CONFIRMED_REFUNDS_BY_ALLOCATION_CTE}
+       SELECT pi.id AS itemId, pi.valor_total_centavos AS valorTotalCentavos,
+              COALESCE(SUM(CASE WHEN pp.status='PAGO'
+                THEN MAX(0,a.valor_centavos-COALESCE(rf.valor_centavos,0)) ELSE 0 END),0)
+                AS pagoPorOutrosCentavos
        FROM pedido_itens pi
-       LEFT JOIN pedido_pagamento_alocacoes a ON a.pedido_item_id = pi.id
+       LEFT JOIN linhagem l ON l.item_atual_id=pi.id
+       LEFT JOIN pedido_pagamento_alocacoes a ON a.pedido_item_id=l.item_id
        LEFT JOIN pedido_pagamentos pp ON pp.id = a.pagamento_id
-       WHERE pi.pedido_id = ? ${temStatusItem ? "AND pi.status_item = 'ATIVO'" : ""}
+       LEFT JOIN refunds_confirmados rf ON rf.pagamento_alocacao_id=a.id
+       WHERE pi.pedido_id=? AND pi.status_item='ATIVO'
        GROUP BY pi.id, pi.valor_total_centavos
        ORDER BY pi.id ASC`,
     )
-    .bind(pedidoId)
+    .bind(pedidoId, pedidoId)
     .all<ItemComSaldo>();
   return results;
 }
@@ -653,7 +681,6 @@ export interface RegisterAdminPaymentResult {
     | "COMANDA_ENCERRADA"
     | "VALOR_ACIMA_DO_SALDO"
     | "SALDO_INSUFICIENTE_CONCORRENCIA"
-    | "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO"
     | "OPERATION_KEY_INVALIDA"
     | "OPERACAO_INCOMPLETA"
     | ConflitoOperacao;
@@ -802,26 +829,6 @@ export async function registerAdminPayment(
   if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO" };
   if (pedido.status_comanda !== "ABERTA") return { ok: false, erro: "COMANDA_ENCERRADA" };
 
-  // Passo 5, limitação explícita e temporária: se este pedido já tem algum
-  // reembolso confirmado, o waterfall (getItensComSaldo) ainda não sabe
-  // reabrir a alocação do item que foi parcialmente devolvido — as
-  // alocações do pagamento original continuam intactas, "cobrindo" os
-  // itens mesmo que o dinheiro tenha voltado em parte. Aceitar um novo
-  // pagamento aqui distribuiria dinheiro de verdade sobre uma leitura de
-  // saldo por item que já sabemos estar desatualizada. Preferível recusar
-  // explicitamente a criar uma alocação sutilmente errada — ver relatório
-  // do Passo 5 (reembolso ↔ alocações fica pra investigação futura).
-  const temReembolso = await db
-    .prepare(`SELECT 1 FROM pedido_reembolsos WHERE pedido_id = ? AND status = 'REEMBOLSADO' LIMIT 1`)
-    .bind(params.pedidoId)
-    .first();
-  if (temReembolso) {
-    const saldoAtual = await getComandaSaldo(db, params.pedidoId);
-    if (saldoAtual.pago < saldoAtual.total) {
-      return { ok: false, erro: "PEDIDO_COM_REEMBOLSO_NAO_SUPORTADO" };
-    }
-  }
-
   const itens = await getItensComSaldo(db, params.pedidoId);
   const waterfall = computeWaterfallAllocations(itens, params.valorCentavos);
   if (!waterfall.ok) return { ok: false, erro: waterfall.erro };
@@ -858,10 +865,6 @@ export async function registerAdminPayment(
   // key (caminho interno), continua sendo um UUID por chamada.
   const idempotencyKey = operationKey ? chavePagamento(operationKey) : crypto.randomUUID();
 
-  // A condição abaixo continua em cima do BRUTO (soma de pedido_pagamentos
-  // PAGO), não do líquido — e isso é seguro porque, se este pedido já
-  // tivesse algum reembolso, já teríamos recusado acima. Sem reembolso,
-  // bruto e líquido são idênticos por definição.
   const statements = [
     db
       .prepare(
@@ -871,11 +874,7 @@ export async function registerAdminPayment(
            substitui_pagamento_id
          )
          SELECT ?, ?, 'ADMIN', ?, 'PAGO', ?, ?, ?, CURRENT_TIMESTAMP, ?
-         WHERE ? <= (
-           SELECT p.valor_total_centavos - COALESCE(
-             (SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id = p.id AND status = 'PAGO'), 0)
-           FROM pedidos p WHERE p.id = ?
-         )`,
+         WHERE ? <= ${chargeableCapacitySql()}`,
       )
       .bind(
         params.pedidoId,
