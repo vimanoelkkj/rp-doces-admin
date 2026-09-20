@@ -778,6 +778,56 @@ test("detalhe reconstrói estados físicos e orienta o Pix da diferença da troc
   }
 });
 
+test("troca concluída preserva histórico na origem e libera ações normais no destino ativo", async t => {
+  const current = detalhe({
+    itens: [
+      {
+        ...detalhe().itens[0],
+        id: 1,
+        produto_nome: "Origem",
+        status_item: "CANCELADO",
+        estoque_estado: "REPOSTO",
+        cancelamento_id: null,
+        cancelamento_status: null,
+        troca_id: 40,
+        troca_status: "CONCLUIDA",
+        troca_item_origem_id: 1,
+      },
+      {
+        ...detalhe().itens[0],
+        id: 2,
+        produto_nome: "Destino",
+        status_item: "ATIVO",
+        estoque_estado: "BAIXADO",
+        cancelamento_id: null,
+        cancelamento_status: null,
+        troca_id: 40,
+        troca_status: "CONCLUIDA",
+        troca_item_origem_id: 1,
+      },
+    ],
+  });
+  const calls = [];
+  const root = await mountWith(t, async url => {
+    calls.push(String(url));
+    if (String(url) === "/api/admin/produtos") return Response.json({produtos: []});
+    return Response.json(current);
+  });
+  try {
+    const [origin, destination] = [...document.querySelectorAll(".pedmodal-item-row")];
+    const labels = row => [...row.querySelectorAll("button")].map(button => button.textContent.trim());
+    assert.deepEqual(labels(origin), ["Ver troca"]);
+    assert.deepEqual(labels(destination), ["Cancelar item", "Trocar produto"]);
+    assert.match(destination.textContent, /Troca concluída/);
+    await ui.act(async () => destination.querySelectorAll("button")[1].click());
+    await flush();
+    assert.ok(calls.includes("/api/admin/produtos"));
+    assert.equal(calls.some(url => url.endsWith("/itens/2/trocas")), false);
+  } finally {
+    await unmount(root);
+  }
+});
+
 test("cancelamento concluído reabre em modo leitura sem ação financeira duplicada", async t => {
   const current = detalhe({
     total: 0,

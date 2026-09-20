@@ -117,6 +117,48 @@ test('troca ZERO de origem BAIXADO com REPOR mantém PAGO e baixa o destino',asy
   assert.deepEqual(await db.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=2`).first(),{estoque:9,estoque_reservado:0});
 });
 
+test('destino ATIVO de troca concluída pode originar nova troca sem alterar o histórico anterior',async t=>{
+  const db=await setup(t,{state:'BAIXADO',paid:1500});await addB(db,1500);
+  const first=(await exchange(db,{price:1500,action:'NAO_REPOR',key:'exchange-sequential-first'})).result;
+  assert.equal(first.ok,true);assert.equal(first.troca.status,'CONCLUIDA');
+  const firstBefore=await db.prepare(`SELECT * FROM pedido_item_trocas WHERE id=?`).bind(first.troca.id).first();
+  await db.prepare(`INSERT INTO produtos(id,nome,categoria,preco_centavos,estoque,estoque_reservado,ativo,disponivel)
+    VALUES(3,'C','BOLO',1500,10,0,1,1)`).run();
+  const input={pedidoId:1,itemId:first.troca.itemDestinoId,produtoDestinoId:3,quantidadeDestino:1,
+    precoEsperadoCentavos:1500,estoqueAcaoOrigem:'NAO_REPOR'};
+  const preview=await app.itemExchange.getItemExchangePreview(db,input);
+  assert.equal(preview.trocaExecutavel,true);
+  const second=await app.itemExchange.createItemExchange(db,{...input,usuarioId:1,motivo:'segunda troca',
+    operationKey:'exchange-sequential-second',previewFingerprint:preview.previewFingerprint});
+  assert.equal(second.ok,true);assert.equal(second.troca.status,'CONCLUIDA');
+  assert.equal(second.troca.itemOrigemId,first.troca.itemDestinoId);
+  assert.deepEqual(await db.prepare(`SELECT * FROM pedido_item_trocas WHERE id=?`).bind(first.troca.id).first(),firstBefore);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_item_trocas`).first()).n,2);
+});
+
+test('destino ATIVO de troca concluída pode ser cancelado sem alterar o histórico anterior',async t=>{
+  const db=await setup(t,{state:'BAIXADO',paid:1,value:1});await addB(db,1);
+  const first=(await exchange(db,{price:1,action:'NAO_REPOR',key:'exchange-before-destination-cancel'})).result;
+  assert.equal(first.ok,true);assert.equal(first.troca.status,'CONCLUIDA');
+  const firstBefore=await db.prepare(`SELECT * FROM pedido_item_trocas WHERE id=?`).bind(first.troca.id).first();
+  await db.prepare(`UPDATE pedido_pagamento_alocacoes SET pedido_item_id=? WHERE id=1`)
+    .bind(first.troca.itemDestinoId).run();
+  const preview=await app.itemCancellationPreview.getItemCancellationPreview(db,1,first.troca.itemDestinoId);
+  const cancelled=await app.itemCancellation.createItemCancellation(db,{pedidoId:1,itemId:first.troca.itemDestinoId,
+    usuarioId:1,operationKey:'cancel-exchange-destination',motivo:'cancelar destino',estoqueAcao:'NAO_REPOR',
+    previewFingerprint:preview.previewFingerprint});
+  assert.equal(cancelled.ok,true);assert.equal(cancelled.cancelamento.status,'AGUARDANDO_REEMBOLSO');
+  const leg=cancelled.cancelamento.pernasPendentes[0];
+  const refunded=await app.itemCancellation.confirmCancellationRefund(db,{pedidoId:1,
+    cancellationId:cancelled.cancelamento.id,usuarioId:1,operationKey:'refund-exchange-destination',
+    pagamentoId:leg.pagamentoId,pagamentoAlocacaoId:leg.pagamentoAlocacaoId,
+    valorCentavos:leg.valorCentavos,confirmacao:true});
+  assert.equal(refunded.ok,true);assert.equal(refunded.cancelamento.status,'CONCLUIDO');
+  assert.deepEqual(await db.prepare(`SELECT * FROM pedido_item_trocas WHERE id=?`).bind(first.troca.id).first(),firstBefore);
+  assert.deepEqual(await db.prepare(`SELECT status_item,estoque_estado FROM pedido_itens WHERE id=?`)
+    .bind(first.troca.itemDestinoId).first(),{status_item:'CANCELADO',estoque_estado:'BAIXADO'});
+});
+
 test('recovery repara troca CONCLUIDA antiga ainda RESERVADA e retry não repete a baixa',async t=>{
   const db=await setup(t,{paid:1500});await addB(db,1500);const {result}=await exchange(db,{price:1500});
   await db.batch([

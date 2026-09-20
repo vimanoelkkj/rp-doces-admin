@@ -485,7 +485,8 @@ export default function PedidoDetalheModal({
                     {item.status_item === "ATIVO" &&
                       data.pedido.status_comanda === "ABERTA" &&
                       data.pedido.status_pedido !== "ENTREGUE" &&
-                      data.pedido.status_pedido !== "CANCELADO" && !item.troca_id && (
+                      data.pedido.status_pedido !== "CANCELADO" &&
+                      (!item.troca_id || (item.troca_status === "CONCLUIDA" && item.troca_item_origem_id !== item.id)) && (
                         <>
                         <button
                           type="button"
@@ -722,7 +723,7 @@ export default function PedidoDetalheModal({
         />
       )}
       {itemTroca && (
-        <TrocarItemModal orderId={orderId} item={itemTroca} existingExchangeId={itemTroca.troca_id}
+        <TrocarItemModal orderId={orderId} item={itemTroca} existingExchangeId={itemTroca.troca_item_origem_id === itemTroca.id ? itemTroca.troca_id : null}
           onClose={() => setItemTroca(null)} onChanged={async () => { await carregarPedido(true); onStatusChanged?.(); }} />
       )}
     </div>,
