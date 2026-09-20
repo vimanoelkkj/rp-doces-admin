@@ -105,10 +105,31 @@ test('troca 1500→2000 conclui estrutura, total 2000, líquido 1500 e saldo 500
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_pagamentos`).first()).n,1);
 });
 
-test('troca 1500→1500 mantém PAGO e saldo zero',async t=>{
-  const db=await setup(t,{paid:1500});await addB(db,1500);const {result}=await exchange(db,{price:1500});
+test('troca ZERO de origem BAIXADO com REPOR mantém PAGO e baixa o destino',async t=>{
+  const db=await setup(t,{state:'BAIXADO',paid:1,value:1});await addB(db,1);const {result}=await exchange(db,{price:1,action:'REPOR'});
   assert.equal(result.ok,true);assert.equal(result.troca.status,'CONCLUIDA');
   const financeiro=await app.ledger.getFinanceiroPedido(db,1);assert.equal(financeiro.status,'PAGO');assert.equal(financeiro.saldoCentavos,0);
+  const destination=await db.prepare(`SELECT status_item,estoque_estado FROM pedido_itens WHERE id=?`).bind(result.troca.itemDestinoId).first();
+  assert.deepEqual(destination,{status_item:'ATIVO',estoque_estado:'BAIXADO'});
+  assert.deepEqual(await db.prepare(`SELECT status_item,estoque_estado FROM pedido_itens WHERE id=1`).first(),
+    {status_item:'CANCELADO',estoque_estado:'REPOSTO'});
+  assert.equal((await db.prepare(`SELECT estoque FROM produtos WHERE id=1`).first()).estoque,11);
+  assert.deepEqual(await db.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=2`).first(),{estoque:9,estoque_reservado:0});
+});
+
+test('recovery repara troca CONCLUIDA antiga ainda RESERVADA e retry não repete a baixa',async t=>{
+  const db=await setup(t,{paid:1500});await addB(db,1500);const {result}=await exchange(db,{price:1500});
+  await db.batch([
+    db.prepare(`UPDATE pedido_itens SET estoque_estado='RESERVADO',estoque_baixado_em=NULL WHERE id=?`).bind(result.troca.itemDestinoId),
+    db.prepare(`UPDATE produtos SET estoque=estoque+1,estoque_reservado=estoque_reservado+1 WHERE id=2`),
+  ]);
+  await app.itemExchange.reconcileExchangeCharges(db,1);
+  const recovered=await db.prepare(`SELECT status_item,estoque_estado FROM pedido_itens WHERE id=?`).bind(result.troca.itemDestinoId).first();
+  assert.deepEqual(recovered,{status_item:'ATIVO',estoque_estado:'BAIXADO'});
+  const first=await db.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=2`).first();
+  assert.deepEqual(first,{estoque:9,estoque_reservado:0});
+  await app.itemExchange.reconcileExchangeCharges(db,1);
+  assert.deepEqual(await db.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=2`).first(),first);
 });
 
 test('troca 1500→1200 propõe e registra somente 300, concluindo atomicamente',async t=>{
@@ -124,7 +145,9 @@ test('troca 1500→1200 propõe e registra somente 300, concluindo atomicamente'
     usuarioId:1,operationKey:'exchange-refund-01',pagamentoId:leg.pagamentoId,pagamentoAlocacaoId:leg.pagamentoAlocacaoId,
     valorCentavos:leg.valorCentavos,confirmacao:true});
   assert.equal(refunded.ok,true);assert.equal(refunded.troca.status,'CONCLUIDA');
-  assert.deepEqual((await db.prepare(`SELECT status_item FROM pedido_itens ORDER BY id`).all()).results.map(x=>x.status_item),['CANCELADO','ATIVO']);
+  assert.deepEqual((await db.prepare(`SELECT status_item,estoque_estado FROM pedido_itens ORDER BY id`).all()).results,
+    [{status_item:'CANCELADO',estoque_estado:'LIBERADO'},{status_item:'ATIVO',estoque_estado:'BAIXADO'}]);
+  assert.deepEqual(await db.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=2`).first(),{estoque:9,estoque_reservado:0});
   assert.deepEqual(await db.prepare(`SELECT valor_total_centavos,status_pagamento FROM pedidos WHERE id=1`).first(),{valor_total_centavos:1200,status_pagamento:'PAGO'});
   assert.deepEqual(await db.prepare(`SELECT * FROM pedido_pagamentos WHERE id=1`).first(),originalPayment);
   assert.deepEqual(await db.prepare(`SELECT * FROM pedido_pagamento_alocacoes WHERE id=1`).first(),originalAllocation);

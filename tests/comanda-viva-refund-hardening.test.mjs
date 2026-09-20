@@ -170,6 +170,11 @@ test('M2 (7): troca mais cara fica AGUARDANDO_COBRANCA', async t => {
   const { result } = await exchange(db);
   assert.equal(result.ok, true);
   assert.equal(result.troca.status, 'AGUARDANDO_COBRANCA');
+  const destination = await db.prepare(`SELECT status_item,estoque_estado FROM pedido_itens WHERE id=?`)
+    .bind(result.troca.itemDestinoId).first();
+  assert.deepEqual(destination, {status_item:'ATIVO', estoque_estado:'RESERVADO'});
+  assert.deepEqual(await db.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=2`).first(),
+    {estoque:10, estoque_reservado:1});
 });
 
 test('M2 (8,9): pagamento da diferença conclui a troca sem abrir o GET do detalhe', async t => {
@@ -186,6 +191,11 @@ test('M2 (8,9): pagamento da diferença conclui a troca sem abrir o GET do detal
 
   const troca = await db.prepare('SELECT status FROM pedido_item_trocas WHERE id=?').bind(result.troca.id).first();
   assert.equal(troca.status, 'CONCLUIDA', 'reconciliação disparada pelo próprio pagamento, não pelo GET');
+  const destination = await db.prepare(`SELECT status_item,estoque_estado FROM pedido_itens WHERE id=?`)
+    .bind(result.troca.itemDestinoId).first();
+  assert.deepEqual(destination, {status_item:'ATIVO', estoque_estado:'BAIXADO'});
+  assert.deepEqual(await db.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=2`).first(),
+    {estoque:9, estoque_reservado:0});
 });
 
 test('M2 (10,11,12): reconciliação repetida é no-op — financeiro e estoque estáveis', async t => {
