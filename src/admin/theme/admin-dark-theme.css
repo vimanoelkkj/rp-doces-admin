@@ -122,6 +122,13 @@ html[data-admin-theme="dark"] .dash-th {
 html[data-admin-theme="dark"] .dash-cash-breakdown {
   border-color: #3d3230;
 }
+html[data-admin-theme="dark"] .dash-pending-payments .dash-panel-subtitle {
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .dash-pending-client,
+html[data-admin-theme="dark"] .dash-pending-amount {
+  color: #faf6f0;
+}
 html[data-admin-theme="dark"] .dash-date-picker {
   background: #2b2220;
   border-color: #3d3230;
