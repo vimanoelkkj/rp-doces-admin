@@ -246,7 +246,7 @@ test('expired without remote ID remains retained after interrupted finalization 
 test('operational cancellation is refused and never terminalizes the live Pix',async t=>{
   const db=await fixture(t); const session=await app.auth.createSession(db,1);
   const r=await app.adminOrder.onRequestPatch({env:env(db),params:{id:'1'},request:new Request('https://local.test/api/admin/pedidos/1',{
-    method:'PATCH',headers:{Cookie:session.cookie.split(';')[0]},body:JSON.stringify({statusPedido:'CANCELADO'}),
+    method:'PATCH',headers:{Cookie:session.cookie.split(';')[0],Origin:'https://local.test'},body:JSON.stringify({statusPedido:'CANCELADO'}),
   })});
   assert.equal(r.status,409);
   assert.equal((await r.json()).code,'PEDIDO_COM_PIX_PENDENTE');

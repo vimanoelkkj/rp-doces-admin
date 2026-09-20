@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../../../../../lib/auth";
+import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import {
   createItemCancellation,
   getCancellationView,
@@ -46,6 +46,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
+  if (!sameOrigin(request)) return errorJson("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
   const value = ids(params);

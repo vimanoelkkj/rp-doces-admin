@@ -101,7 +101,7 @@ async function adminInconclusivo(t, {postar, remoto} = {}) {
     env: {DB: db, MP_ACCESS_TOKEN: 'fake'}, params: {id: '1'},
     request: new Request('https://local.test/api/admin/pedidos/1/pix', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({valorCentavos: 10000, operationKey: uuid('admin')}),
     }),
   });
@@ -339,7 +339,7 @@ test('9. Pix ADMIN substituído: recuperação do sucessor não mexe no original
     env: {DB: db, MP_ACCESS_TOKEN: 'fake'}, params: {id: '1'},
     request: new Request('https://local.test/api/admin/pedidos/1/pix', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify(body),
     }),
   });

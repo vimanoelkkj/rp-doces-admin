@@ -47,7 +47,7 @@ async function editor(db, {afterOrderRead} = {}) {
         env: {DB: observed}, params: {id},
         request: new Request('https://local.test/api/admin/pedidos/' + id + '/itens', {
           method: 'PUT',
-          headers: {'Content-Type': 'application/json', Cookie: cookie},
+          headers: {'Content-Type': 'application/json', Cookie: cookie, Origin: 'https://local.test'},
           body: raw ?? JSON.stringify(body),
         }),
       });

@@ -590,6 +590,15 @@ test("reload do cancelamento inconclusivo verifica a mesma operationKey e bloque
   }
 });
 
+test('detalhe aposenta a entrada visual do editor integral legado', async () => {
+  const [detailSource, adminSource] = await Promise.all([
+    readFile('src/admin/Pedidos/PedidoDetalheModal.tsx', 'utf8'),
+    readFile('src/admin/Pedidos/AdminPedidos.tsx', 'utf8'),
+  ]);
+  assert.doesNotMatch(detailSource, /Editar pedido/);
+  assert.doesNotMatch(adminSource, /EditarPedidoModal/);
+});
+
 test("refund recusado é terminal na UI e não oferece retry automático", async t => {
   const current = detalhe({
     itens: [

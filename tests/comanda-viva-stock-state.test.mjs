@@ -9,6 +9,21 @@ const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db, 1)
 const release = db => app.stock.liberarReservaPedido(db, 1);
 const isRelease = statements => statements.some(s => s.sql.includes("estoque_estado = 'LIBERADO'"));
 
+async function assertPhysicalInvariants(db) {
+  const products = (await db.prepare(`SELECT id,estoque,estoque_reservado FROM produtos`).all()).results;
+  for (const product of products) {
+    assert.ok(product.estoque >= 0, `estoque negativo no produto ${product.id}`);
+    assert.ok(product.estoque_reservado >= 0, `reserva negativa no produto ${product.id}`);
+    assert.ok(product.estoque_reservado <= product.estoque,
+      `reserva impossível no produto ${product.id}`);
+    const expected = await db.prepare(`SELECT COALESCE(SUM(quantidade),0) total FROM pedido_itens
+      WHERE produto_id=? AND status_item='ATIVO' AND estoque_estado='RESERVADO'`)
+      .bind(product.id).first('total');
+    assert.equal(product.estoque_reservado, expected,
+      `projeção agregada divergente no produto ${product.id}`);
+  }
+}
+
 async function seedMigrationCases(db, { ambiguousConverted = false, reservedAggregate = 2 } = {}) {
   await db.batch([
     db.prepare("INSERT INTO categorias(id,nome,sistema) VALUES('BOLO','Bolos',1)"),
@@ -196,4 +211,41 @@ test('payment deduction racing reservation release converges to BAIXADO once', a
   assert.equal(s.itens[0].estoque_estado, 'BAIXADO');
   assert.equal(s.produtos[0].estoque, 8);
   assert.equal(s.produtos[0].estoque_reservado, 0);
+});
+
+test('invariantes físicas valem após cada prefixo e retry das transições válidas', async t => {
+  const lowered = await fixture(t, {paid: true});
+  for (let retry = 0; retry < 3; retry++) {
+    await reconcile(lowered);
+    await assertPhysicalInvariants(lowered);
+  }
+  assert.deepEqual(await lowered.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=1`).first(),
+    {estoque:8,estoque_reservado:0});
+
+  const released = await fixture(t);
+  await released.prepare("UPDATE pedido_pagamentos SET status='CANCELADO' WHERE id=1").run();
+  for (let retry = 0; retry < 3; retry++) {
+    await release(released);
+    await assertPhysicalInvariants(released);
+  }
+  assert.deepEqual(await released.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=1`).first(),
+    {estoque:10,estoque_reservado:0});
+
+  const restocked = await fixture(t, {ledger:false,reserve:'CONVERTIDA'});
+  await restocked.batch([
+    restocked.prepare(`UPDATE pedidos SET origem_pedido='MANUAL',status_comanda='ABERTA',status_pedido='NOVO' WHERE id=1`),
+    restocked.prepare(`UPDATE produtos SET estoque=8,estoque_reservado=0 WHERE id=1`),
+  ]);
+  const preview = await app.itemCancellationPreview.getItemCancellationPreview(restocked,1,1);
+  const input = {pedidoId:1,itemId:1,usuarioId:1,operationKey:'stock-property-restock',
+    motivo:'propriedade',estoqueAcao:'REPOR',previewFingerprint:preview.previewFingerprint};
+  for (let retry = 0; retry < 3; retry++) {
+    const result = await app.itemCancellation.createItemCancellation(restocked,input);
+    assert.equal(result.ok,true);
+    await assertPhysicalInvariants(restocked);
+  }
+  assert.deepEqual(await restocked.prepare(`SELECT estoque,estoque_reservado FROM produtos WHERE id=1`).first(),
+    {estoque:10,estoque_reservado:0});
+  assert.equal((await restocked.prepare(`SELECT estoque_estado FROM pedido_itens WHERE id=1`).first()).estoque_estado,
+    'REPOSTO');
 });

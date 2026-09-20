@@ -79,7 +79,7 @@ const estornar = (db, session, body) =>
     env: { DB: db }, params: { id: '1' },
     request: new Request('https://local.test/api/admin/pedidos/1/reembolsos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: cookieDe(session) },
+      headers: { 'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test' },
       body: JSON.stringify(body),
     }),
   });

@@ -76,6 +76,7 @@ async function gerarPix(db, session, {
       method: 'POST',
       headers: {
         Cookie: session.cookie.split(';')[0],
+        Origin: 'https://local.test',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({operationKey: key, ...(valorCentavos ? {valorCentavos} : {})}),
@@ -569,7 +570,7 @@ test('detalhe admin expoe ids e estados estaveis; PUT integral continua bloquead
   const put = await app.adminItems.onRequestPut({
     env: env(db), params: {id: '1'},
     request: new Request('https://local.test/api/admin/pedidos/1/itens', {
-      method: 'PUT', headers: {Cookie: cookie, 'Content-Type': 'application/json'},
+      method: 'PUT', headers: {Cookie: cookie, Origin: 'https://local.test', 'Content-Type': 'application/json'},
       body: JSON.stringify({itens: [{produtoId: 2, quantidade: 2}]}),
     }),
   });

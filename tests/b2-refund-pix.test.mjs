@@ -43,7 +43,7 @@ const estornar = (db, session, body) =>
     env: {DB: db}, params: {id: '1'},
     request: new Request('https://local.test/api/admin/pedidos/1/reembolsos', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({pagamentoId: 1, valorCentavos: 3000, ...body}),
     }),
   });
@@ -53,7 +53,7 @@ const cancelar = (db, session) =>
     env: {DB: db}, params: {id: '1'},
     request: new Request('https://local.test/api/admin/pedidos/1', {
       method: 'PATCH',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
       body: JSON.stringify({statusPedido: 'CANCELADO'}),
     }),
   });

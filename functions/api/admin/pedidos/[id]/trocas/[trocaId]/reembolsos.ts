@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../../../../../lib/auth";
+import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import { confirmExchangeRefund } from "../../../../../../lib/itemExchange";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
 interface Env{DB:D1Database;MP_ACCESS_TOKEN?:string}
@@ -11,6 +11,7 @@ const messages:Record<string,string>={TROCA_NAO_ENCONTRADA:"Troca não encontrad
   REFUND_REMOTO_EM_ANDAMENTO:"Já existe um estorno remoto em andamento para esta perna.",...OPERACAO_MENSAGENS};
 const fail=(message:string,status:number,code?:string)=>Response.json({error:message,...(code?{code}:{})},{status});
 export const onRequestPost:PagesFunction<Env>=async({request,env,params})=>{
+  if(!sameOrigin(request))return fail("Origem inválida",403);
   const auth=await requireUser(env.DB,request);if("error" in auth)return auth.error;
   let body:Record<string,unknown>;try{body=await request.json();}catch{return fail("JSON inválido",400);}
   try{const result=await confirmExchangeRefund(env.DB,{pedidoId:Number(params.id),exchangeId:Number(params.trocaId),usuarioId:auth.user.id,

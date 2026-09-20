@@ -19,7 +19,7 @@ async function patchStatus(db, statusPedido = 'CANCELADO') {
     env: env(db), params: {id: '1'},
     request: new Request('https://local.test/api/admin/pedidos/1', {
       method: 'PATCH',
-      headers: {Cookie: session.cookie.split(';')[0], 'Content-Type': 'application/json'},
+      headers: {Cookie: session.cookie.split(';')[0], Origin: 'https://local.test', 'Content-Type': 'application/json'},
       body: JSON.stringify({statusPedido}),
     }),
   });
@@ -147,7 +147,7 @@ test('11. corrida: criação de Pix ADMIN entre a decisão e a escrita do cancel
         env: env(db), params: {id: '1'},
         request: new Request('https://local.test/api/admin/pedidos/1/pix', {
           method: 'POST',
-          headers: {Cookie: session.cookie.split(';')[0], 'Content-Type': 'application/json'},
+          headers: {Cookie: session.cookie.split(';')[0], Origin: 'https://local.test', 'Content-Type': 'application/json'},
           body: JSON.stringify({valorCentavos: 10000, operationKey: 'corrida-pix-0000-0000-00000000'}),
         }),
       });

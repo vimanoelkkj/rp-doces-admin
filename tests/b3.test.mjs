@@ -11,7 +11,7 @@ async function adminOperation(db, kind, amount, operationKey = `b3-${kind}-${amo
   const session = await app.auth.createSession(db, 1);
   return () => app[kind === 'PAGAMENTO' ? 'adminPayment' : 'adminRefund'].onRequestPost({
     request: new Request('https://local.test/api/admin/pedidos/1', {
-      method: 'POST', headers: {Cookie: session.cookie.split(';')[0], 'Content-Type': 'application/json'},
+      method: 'POST', headers: {Cookie: session.cookie.split(';')[0], Origin: 'https://local.test', 'Content-Type': 'application/json'},
       body: JSON.stringify(kind === 'PAGAMENTO'
         ? {metodo: 'DINHEIRO', valorCentavos: amount, operationKey}
         : {pagamentoId: 1, valorCentavos: amount, operationKey}),
