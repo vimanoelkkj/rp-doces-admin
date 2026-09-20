@@ -42,6 +42,7 @@ export default function AdicionarItemModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [precoAlterado, setPrecoAlterado] = useState<PrecoAlterado | null>(null);
+  const [produtoDropdownAberto, setProdutoDropdownAberto] = useState(false);
   const savingRef = useRef(false);
   const operationKeyRef = useRef<string | null>(null);
   const assinaturaRef = useRef<string | null>(null);
@@ -172,18 +173,42 @@ export default function AdicionarItemModal({
 
             <label className="additem-field">
               <span>Produto</span>
-              <select
-                value={produtoId ?? ""}
-                onChange={(event) => selecionarProduto(event.target.value ? Number(event.target.value) : null)}
-                disabled={saving}
-              >
-                <option value="">Selecione um produto</option>
-                {produtos.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.emoji ? `${item.emoji} ` : ""}{item.nome} · {formatarPreco(precoVigenteCentavos(item))}
-                  </option>
-                ))}
-              </select>
+              <div className={`additem-dropdown${produtoDropdownAberto ? " additem-dropdown--open" : ""}`}>
+                <button
+                  type="button"
+                  className="additem-dropdown-trigger"
+                  onClick={() => setProdutoDropdownAberto((open) => !open)}
+                  onBlur={() => setTimeout(() => setProdutoDropdownAberto(false), 150)}
+                  disabled={saving}
+                >
+                  <span>
+                    {produto
+                      ? `${produto.emoji ? `${produto.emoji} ` : ""}${produto.nome} · ${formatarPreco(precoVigenteCentavos(produto))}`
+                      : "Selecione um produto"}
+                  </span>
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                    <path d="M1 1.5L6 6.5L11 1.5" stroke="#634738" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {produtoDropdownAberto && (
+                  <ul className="additem-dropdown-list">
+                    {produtos.map((item) => (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          className={`additem-dropdown-option${produtoId === item.id ? " additem-dropdown-option--active" : ""}`}
+                          onClick={() => {
+                            selecionarProduto(item.id);
+                            setProdutoDropdownAberto(false);
+                          }}
+                        >
+                          {item.emoji ? `${item.emoji} ` : ""}{item.nome} · {formatarPreco(precoVigenteCentavos(item))}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </label>
 
             {produto && (

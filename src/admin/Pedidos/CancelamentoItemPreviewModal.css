@@ -131,6 +131,85 @@
 
 .cancelpreview-field { display:flex; flex-direction:column; gap:7px; color:#634738; font:600 12px "Manrope",sans-serif; }
 .cancelpreview-field select,.cancelpreview-field textarea { border:1px solid #d8c9ba; border-radius:10px; padding:10px; background:#fff; color:#2b1d1a; font:14px "Manrope",sans-serif; }
+
+.cancelpreview-dropdown { position: relative; }
+
+.cancelpreview-dropdown-trigger {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #d8c9ba;
+  border-radius: 10px;
+  background: #fff;
+  font: 14px "Manrope", sans-serif;
+  color: #2b1d1a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.cancelpreview-dropdown-trigger:hover,
+.cancelpreview-dropdown--open .cancelpreview-dropdown-trigger {
+  border-color: #634738;
+}
+
+.cancelpreview-dropdown-trigger:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+.cancelpreview-dropdown-trigger svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.cancelpreview-dropdown--open .cancelpreview-dropdown-trigger svg {
+  transform: rotate(180deg);
+}
+
+.cancelpreview-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #d8c9ba;
+  border-radius: 10px;
+  padding: 6px;
+  list-style: none;
+  margin: 0;
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(43, 29, 26, 0.1);
+}
+
+.cancelpreview-dropdown-option {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: 14px "Manrope", sans-serif;
+  color: #2b1d1a;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+
+.cancelpreview-dropdown-option:hover {
+  background: #f5efe8;
+  color: #634738;
+}
+
+.cancelpreview-dropdown-option--active {
+  background: #f5efe8;
+  font-weight: 700;
+  color: #634738;
+}
 .cancelpreview-confirm,.cancelpreview-refund-leg button { border:0; border-radius:10px; padding:10px 14px; background:#8b3f2f; color:#fff; cursor:pointer; font-weight:700; }
 .cancelpreview-confirm:disabled,.cancelpreview-refund-leg button:disabled { opacity:.55; cursor:not-allowed; }
 .cancelpreview-success { display:flex; flex-direction:column; gap:5px; padding:14px; border-radius:12px; background:#f1f7ef; color:#355c36; font-family:"Manrope",sans-serif; }
