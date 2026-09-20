@@ -528,10 +528,10 @@ export default function PedidoDetalheModal({
                   salvarNome();
                 }}
               >
-                <label htmlFor={`pedmodal-cliente-${orderId}`}>Nome da cliente</label>
                 <div className="pedmodal-name-controls">
+                  <span className="pedmodal-name-prefix">Pedido #{orderId} -</span>
                   <input
-                    id={`pedmodal-cliente-${orderId}`}
+                    aria-label="Nome da cliente"
                     value={clienteNome}
                     onChange={(event) => setClienteNome(event.target.value)}
                     maxLength={200}
@@ -540,14 +540,14 @@ export default function PedidoDetalheModal({
                   />
                   <button
                     type="submit"
-                    className="pedmodal-btn-advance"
+                    className="pedmodal-btn-name-save"
                     disabled={salvandoNome}
                   >
                     {salvandoNome ? "Salvando..." : "Salvar"}
                   </button>
                   <button
                     type="button"
-                    className="pedmodal-btn-edit"
+                    className="pedmodal-btn-name-cancel"
                     onClick={() => setEditandoNome(false)}
                     disabled={salvandoNome}
                   >

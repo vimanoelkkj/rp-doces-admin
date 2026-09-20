@@ -387,16 +387,31 @@ html[data-admin-theme="dark"] .pedmodal-summary-value,
 html[data-admin-theme="dark"] .pedmodal-total-label {
   color: #faf6f0;
 }
-html[data-admin-theme="dark"] .pedmodal-btn-name-edit,
-html[data-admin-theme="dark"] .pedmodal-name-form > label {
+html[data-admin-theme="dark"] .pedmodal-btn-name-edit {
   color: #a89b92;
 }
 html[data-admin-theme="dark"] .pedmodal-btn-name-edit:hover {
   color: #faf6f0;
 }
+html[data-admin-theme="dark"] .pedmodal-name-prefix {
+  color: #faf6f0;
+}
 html[data-admin-theme="dark"] .pedmodal-name-controls input {
   background: #1a1412;
   border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-name-save {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-name-save:hover {
+  background: #c17a6f;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-name-cancel {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-name-cancel:hover {
   color: #faf6f0;
 }
 html[data-admin-theme="dark"] .pedmodal-name-error {
