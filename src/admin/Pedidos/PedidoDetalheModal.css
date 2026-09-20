@@ -42,6 +42,77 @@
   line-height: 1.25;
 }
 
+.pedmodal-title-area {
+  min-width: 0;
+  flex: 1;
+}
+
+.pedmodal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pedmodal-btn-name-edit {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: #8c7a76;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pedmodal-btn-name-edit:hover {
+  color: #634738;
+  text-decoration: underline;
+}
+
+.pedmodal-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pedmodal-name-form > label {
+  color: #8c7a76;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pedmodal-name-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pedmodal-name-controls input {
+  min-width: 0;
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid #d8c8b8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #2b1d1a;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+}
+
+.pedmodal-name-controls input:focus {
+  border-color: #634738;
+  outline: 2px solid rgba(99, 71, 56, 0.12);
+}
+
+.pedmodal-name-error {
+  color: #c0392b;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+}
+
 .pedmodal-header-actions {
   display: flex;
   align-items: center;
@@ -679,10 +750,111 @@
   flex-wrap: wrap;
 }
 
+.pedmodal-charge-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .pedmodal-charge-action > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
   color: #634738;
   font-size: 13px;
+}
+
+.pedmodal-charge-buttons,
+.pedmodal-manual-payment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pedmodal-manual-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d8c8b8;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #634738;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+}
+
+.pedmodal-manual-payment > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pedmodal-manual-payment label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pedmodal-manual-payment select,
+.pedmodal-money-input {
+  width: 100%;
+  border: 1px solid #d8c8b8;
+  border-radius: 10px;
+  background: #faf6f0;
+  color: #2b1d1a;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+}
+
+.pedmodal-manual-payment select {
+  padding: 9px 12px;
+}
+
+.pedmodal-money-input {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.pedmodal-money-input span {
+  padding-left: 12px;
+  color: #8c7a76;
+}
+
+.pedmodal-money-input input {
+  min-width: 0;
+  flex: 1;
+  padding: 9px 12px 9px 6px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #2b1d1a;
+  font: inherit;
+}
+
+.pedmodal-manual-payment select:focus,
+.pedmodal-money-input:focus-within {
+  border-color: #634738;
+  outline: 2px solid rgba(99, 71, 56, 0.12);
+}
+
+@media (max-width: 520px) {
+  .pedmodal-title-row,
+  .pedmodal-name-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pedmodal-name-controls,
+  .pedmodal-name-controls input,
+  .pedmodal-charge-buttons,
+  .pedmodal-charge-buttons button,
+  .pedmodal-manual-payment-actions,
+  .pedmodal-manual-payment-actions button {
+    width: 100%;
+  }
 }

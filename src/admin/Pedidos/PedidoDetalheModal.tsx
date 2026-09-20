@@ -28,6 +28,7 @@ interface PedidoItemRow {
 }
 
 type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
+type MetodoPagamentoManual = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO";
 
 interface PedidoRow {
   id: number;
@@ -75,6 +76,19 @@ interface PedidoDetalheModalProps {
 /* ── Helpers ── */
 const formatarPreco = (centavos: number) =>
   `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+
+const valorPagamentoInicial = (centavos: number) =>
+  (centavos / 100).toFixed(2).replace(".", ",");
+
+const parseValorPagamento = (valor: string) => {
+  const limpo = valor.trim().replace(/\s/g, "");
+  const normalizado = limpo.includes(",")
+    ? limpo.replace(/\./g, "").replace(",", ".")
+    : limpo;
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalizado)) return null;
+  const centavos = Math.round(Number(normalizado) * 100);
+  return Number.isSafeInteger(centavos) && centavos > 0 ? centavos : null;
+};
 
 const formatarData = (isoLike: string) => {
   // SQLite CURRENT_TIMESTAMP é UTC e chega como "YYYY-MM-DD HH:mm:ss".
@@ -145,6 +159,18 @@ export default function PedidoDetalheModal({
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [clienteNome, setClienteNome] = useState("");
+  const [salvandoNome, setSalvandoNome] = useState(false);
+  const [nomeError, setNomeError] = useState<string | null>(null);
+  const [registrandoPagamento, setRegistrandoPagamento] = useState(false);
+  const [metodoPagamento, setMetodoPagamento] =
+    useState<MetodoPagamentoManual>("DINHEIRO");
+  const [valorPagamento, setValorPagamento] = useState("");
+  const [pagamentoEmVoo, setPagamentoEmVoo] = useState(false);
+  const [pagamentoError, setPagamentoError] = useState<string | null>(null);
+  const pagamentoEmVooRef = useRef(false);
+  const pagamentoKeyRef = useRef<string | null>(null);
 
   // Pix administrativo: `gerando` cobre a ação sem substituto; `regenerandoId`
   // guarda qual bloco específico está em voo (desabilita só aquele botão).
@@ -195,6 +221,14 @@ export default function PedidoDetalheModal({
         );
         dataRef.current = result;
         setData(result);
+        // O modal de troca pode permanecer aberto durante a confirmação do
+        // Pix. Mantém o item aberto ligado à fotografia mais recente do GET
+        // para que a mudança AGUARDANDO_COBRANCA -> CONCLUIDA também atualize
+        // o detalhe da troca, sem criar um segundo polling.
+        setItemTroca((aberto) => {
+          if (!aberto) return aberto;
+          return result.itens.find((item) => item.id === aberto.id) ?? aberto;
+        });
         setError(null);
         if (silencioso && financeiroMudou) onStatusChangedRef.current?.();
       })
@@ -208,6 +242,11 @@ export default function PedidoDetalheModal({
     dataRef.current = null;
     setData(null);
     setAdicionandoItem(false);
+    setEditandoNome(false);
+    setRegistrandoPagamento(false);
+    setPagamentoError(null);
+    pagamentoEmVooRef.current = false;
+    pagamentoKeyRef.current = null;
     pixKeysRef.current.clear();
     void carregarPedido();
   }, [carregarPedido]);
@@ -336,6 +375,112 @@ export default function PedidoDetalheModal({
       .finally(() => setAlterando(false));
   };
 
+  const iniciarEdicaoNome = () => {
+    if (!data) return;
+    setClienteNome(data.pedido.cliente_nome);
+    setNomeError(null);
+    setEditandoNome(true);
+  };
+
+  const salvarNome = () => {
+    if (!data || salvandoNome) return;
+    const nomeNormalizado = clienteNome.trim();
+    if (!nomeNormalizado) {
+      setNomeError("Informe o nome da cliente.");
+      return;
+    }
+    if (nomeNormalizado.length > 200) {
+      setNomeError("O nome deve ter no máximo 200 caracteres.");
+      return;
+    }
+    if (nomeNormalizado === data.pedido.cliente_nome) {
+      setEditandoNome(false);
+      return;
+    }
+
+    setSalvandoNome(true);
+    setNomeError(null);
+    fetch(`/api/admin/pedidos/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clienteNome: nomeNormalizado }),
+    })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error ?? "Falha ao alterar nome da cliente");
+        }
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                pedido: {
+                  ...prev.pedido,
+                  cliente_nome: body.clienteNome ?? nomeNormalizado,
+                },
+              }
+            : prev,
+        );
+        setEditandoNome(false);
+        onStatusChangedRef.current?.();
+      })
+      .catch((err) => setNomeError(err.message))
+      .finally(() => setSalvandoNome(false));
+  };
+
+  const selecionarMetodoPagamento = (metodo: MetodoPagamentoManual) => {
+    setMetodoPagamento(metodo);
+    setPagamentoError(null);
+    pagamentoKeyRef.current = null;
+  };
+
+  const abrirRegistroPagamento = () => {
+    if (!data) return;
+    setValorPagamento(valorPagamentoInicial(data.capacidadeCobravelCentavos));
+    setPagamentoError(null);
+    pagamentoKeyRef.current = null;
+    setRegistrandoPagamento(true);
+  };
+
+  const registrarPagamento = () => {
+    if (!data || pagamentoEmVooRef.current) return;
+    const valorCentavos = parseValorPagamento(valorPagamento);
+    if (!valorCentavos) {
+      setPagamentoError("Informe um valor válido.");
+      return;
+    }
+    if (valorCentavos > data.capacidadeCobravelCentavos) {
+      setPagamentoError("O valor não pode ultrapassar o saldo em aberto.");
+      return;
+    }
+
+    pagamentoEmVooRef.current = true;
+    setPagamentoEmVoo(true);
+    setPagamentoError(null);
+    const operationKey = pagamentoKeyRef.current ?? novaOperationKey();
+    pagamentoKeyRef.current = operationKey;
+
+    fetch(`/api/admin/pedidos/${orderId}/pagamentos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metodo: metodoPagamento, valorCentavos, operationKey }),
+    })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error ?? "Falha ao registrar pagamento");
+        }
+        pagamentoKeyRef.current = null;
+        setRegistrandoPagamento(false);
+        return carregarPedido(true);
+      })
+      .catch((err) => setPagamentoError(err.message))
+      .finally(() => {
+        pagamentoEmVooRef.current = false;
+        setPagamentoEmVoo(false);
+      });
+  };
+
   const financeiro = data ? formatarFinanceiro(data.financeiro) : null;
   const trocaAguardandoCobranca = data?.itens.some(
     (item) => item.troca_status === "AGUARDANDO_COBRANCA",
@@ -362,10 +507,62 @@ export default function PedidoDetalheModal({
       <div className="pedmodal-card">
         {/* Header */}
         <div className="pedmodal-header">
-          <h2 className="pedmodal-title">
-            Pedido #{orderId}
-            {data ? ` - ${data.pedido.cliente_nome}` : ""}
-          </h2>
+          <div className="pedmodal-title-area">
+            {editandoNome && data ? (
+              <form
+                className="pedmodal-name-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  salvarNome();
+                }}
+              >
+                <label htmlFor={`pedmodal-cliente-${orderId}`}>Nome da cliente</label>
+                <div className="pedmodal-name-controls">
+                  <input
+                    id={`pedmodal-cliente-${orderId}`}
+                    value={clienteNome}
+                    onChange={(event) => setClienteNome(event.target.value)}
+                    maxLength={200}
+                    autoFocus
+                    disabled={salvandoNome}
+                  />
+                  <button
+                    type="submit"
+                    className="pedmodal-btn-advance"
+                    disabled={salvandoNome}
+                  >
+                    {salvandoNome ? "Salvando..." : "Salvar"}
+                  </button>
+                  <button
+                    type="button"
+                    className="pedmodal-btn-edit"
+                    onClick={() => setEditandoNome(false)}
+                    disabled={salvandoNome}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+                {nomeError && <span className="pedmodal-name-error">{nomeError}</span>}
+              </form>
+            ) : (
+              <div className="pedmodal-title-row">
+                <h2 className="pedmodal-title">
+                  Pedido #{orderId}
+                  {data ? ` - ${data.pedido.cliente_nome}` : ""}
+                </h2>
+                {data && (
+                  <button
+                    type="button"
+                    className="pedmodal-btn-name-edit"
+                    onClick={iniciarEdicaoNome}
+                    aria-label="Editar nome da cliente"
+                  >
+                    Editar nome
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="pedmodal-header-actions">
             {data && (
               <div className="pedmodal-status-dropdown" ref={statusMenuRef}>
@@ -637,23 +834,110 @@ export default function PedidoDetalheModal({
 
               {data.pedido.status_comanda === "ABERTA" &&
                 data.capacidadeCobravelCentavos > 0 && (
-                  <div className="pedmodal-charge-action">
-                    {trocaAguardandoCobranca && (
-                      <div><strong>Troca aguardando pagamento</strong>
-                        <span>Saldo: {formatarPreco(data.capacidadeCobravelCentavos)}.</span></div>
+                  <div className="pedmodal-charge-block">
+                    <div className="pedmodal-charge-action">
+                      <div>
+                        <strong>
+                          {trocaAguardandoCobranca
+                            ? "Troca aguardando pagamento"
+                            : "Saldo aguardando pagamento"}
+                        </strong>
+                        <span>
+                          Saldo: {formatarPreco(data.capacidadeCobravelCentavos)}.
+                        </span>
+                      </div>
+                      <div className="pedmodal-charge-buttons">
+                        <button
+                          type="button"
+                          className="pedmodal-btn-edit"
+                          onClick={abrirRegistroPagamento}
+                        >
+                          Registrar pagamento
+                        </button>
+                        <button
+                          type="button"
+                          className="pedmodal-btn-advance"
+                          onClick={() =>
+                            gerarPix(undefined, data.capacidadeCobravelCentavos)
+                          }
+                          disabled={gerando}
+                        >
+                          {gerando
+                            ? "Gerando..."
+                            : `Gerar Pix ${formatarPreco(data.capacidadeCobravelCentavos)}`}
+                        </button>
+                      </div>
+                    </div>
+
+                    {registrandoPagamento && (
+                      <div className="pedmodal-manual-payment">
+                        <div>
+                          <strong>Registrar pagamento recebido</strong>
+                          <span>O saldo em aberto já está preenchido.</span>
+                        </div>
+                        <label>
+                          Valor recebido
+                          <div className="pedmodal-money-input">
+                            <span>R$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={valorPagamento}
+                              onChange={(event) => {
+                                setValorPagamento(event.target.value);
+                                setPagamentoError(null);
+                                pagamentoKeyRef.current = null;
+                              }}
+                              disabled={pagamentoEmVoo}
+                              aria-label="Valor recebido"
+                            />
+                          </div>
+                        </label>
+                        <label>
+                          Forma de pagamento
+                          <select
+                            value={metodoPagamento}
+                            onChange={(event) =>
+                              selecionarMetodoPagamento(
+                                event.target.value as MetodoPagamentoManual,
+                              )
+                            }
+                            disabled={pagamentoEmVoo}
+                          >
+                            <option value="DINHEIRO">Dinheiro</option>
+                            <option value="CARTAO">Cartão</option>
+                            <option value="PIX_EXTERNO">
+                              Pix recebido fora do sistema
+                            </option>
+                          </select>
+                        </label>
+                        {pagamentoError && (
+                          <p className="pedmodal-status-error">{pagamentoError}</p>
+                        )}
+                        <div className="pedmodal-manual-payment-actions">
+                          <button
+                            type="button"
+                            className="pedmodal-btn-advance"
+                            onClick={registrarPagamento}
+                            disabled={pagamentoEmVoo}
+                          >
+                            {pagamentoEmVoo ? "Registrando..." : "Confirmar pagamento"}
+                          </button>
+                          <button
+                            type="button"
+                            className="pedmodal-btn-edit"
+                            onClick={() => {
+                              setRegistrandoPagamento(false);
+                              setPagamentoError(null);
+                              pagamentoKeyRef.current = null;
+                            }}
+                            disabled={pagamentoEmVoo}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
                     )}
-                    <button
-                    type="button"
-                    className="pedmodal-btn-advance"
-                    onClick={() =>
-                      gerarPix(undefined, data.capacidadeCobravelCentavos)
-                    }
-                    disabled={gerando}
-                  >
-                    {gerando
-                      ? "Gerando..."
-                      : `Gerar Pix ${formatarPreco(data.capacidadeCobravelCentavos)}`}
-                    </button>
                   </div>
                 )}
 
@@ -758,8 +1042,21 @@ export default function PedidoDetalheModal({
         />
       )}
       {itemTroca && (
-        <TrocarItemModal orderId={orderId} item={itemTroca} existingExchangeId={itemTroca.troca_item_origem_id === itemTroca.id ? itemTroca.troca_id : null}
-          onClose={() => setItemTroca(null)} onChanged={async () => { await carregarPedido(true); onStatusChanged?.(); }} />
+        <TrocarItemModal
+          orderId={orderId}
+          item={itemTroca}
+          existingExchangeId={
+            itemTroca.troca_item_origem_id === itemTroca.id
+              ? itemTroca.troca_id
+              : null
+          }
+          existingExchangeStatus={itemTroca.troca_status}
+          onClose={() => setItemTroca(null)}
+          onChanged={async () => {
+            await carregarPedido(true);
+            onStatusChanged?.();
+          }}
+        />
       )}
     </div>,
     document.body,

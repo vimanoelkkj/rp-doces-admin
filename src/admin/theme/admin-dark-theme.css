@@ -387,6 +387,21 @@ html[data-admin-theme="dark"] .pedmodal-summary-value,
 html[data-admin-theme="dark"] .pedmodal-total-label {
   color: #faf6f0;
 }
+html[data-admin-theme="dark"] .pedmodal-btn-name-edit,
+html[data-admin-theme="dark"] .pedmodal-name-form > label {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-btn-name-edit:hover {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-name-controls input {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-name-error {
+  color: #e08276;
+}
 html[data-admin-theme="dark"] .pedmodal-btn-advance {
   background: #d38b80;
   color: #ffffff;
@@ -489,6 +504,23 @@ html[data-admin-theme="dark"] .pedmodal-item-note {
 }
 html[data-admin-theme="dark"] .pedmodal-charge-action > div {
   color: #d9c9be;
+}
+html[data-admin-theme="dark"] .pedmodal-manual-payment {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #d9c9be;
+}
+html[data-admin-theme="dark"] .pedmodal-manual-payment select,
+html[data-admin-theme="dark"] .pedmodal-money-input {
+  background: #2b2220;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .pedmodal-money-input span {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .pedmodal-money-input input {
+  color: #faf6f0;
 }
 html[data-admin-theme="dark"] .pedmodal-financial-grid {
   background: #1a1412;

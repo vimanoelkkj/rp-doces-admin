@@ -85,7 +85,7 @@ const detalhe = (overrides = {}) => {
   return {
     pedido: {
       id: 1,
-      cliente_nome: 'Balcao',
+      cliente_nome: overrides.clienteNome ?? 'Balcao',
       cliente_whatsapp: '11999999999',
       observacao: '',
       valor_total_centavos: total,
@@ -354,6 +354,273 @@ test('Pix usa capacidade do backend, mostra QR e polling espaçado converge para
     assert.match(document.querySelector('.pedmodal-financial-row--balance').textContent, /0,00/);
     assert.match(document.querySelector('.pedmodal-item-row').textContent, /Estoque baixado/);
     assert.equal(document.querySelector('.pedmodal-pix-card'), null);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test('Pix da troca mais cara conclui troca, estoque e modal aberto no proximo polling', async t => {
+  const itensTroca = (statusTroca, estoqueDestino) => [
+    {
+      ...detalhe().itens[0],
+      id: 1,
+      produto_nome: 'Origem',
+      quantidade: 1,
+      valor_unitario_centavos: 1000,
+      valor_total_centavos: 1000,
+      status_item: 'CANCELADO',
+      estoque_estado: 'REPOSTO',
+      cancelamento_id: null,
+      cancelamento_status: null,
+      troca_id: 22,
+      troca_status: statusTroca,
+      troca_item_origem_id: 1,
+    },
+    {
+      ...detalhe().itens[0],
+      id: 2,
+      produto_nome: 'Destino',
+      quantidade: 1,
+      valor_unitario_centavos: 1500,
+      valor_total_centavos: 1500,
+      status_item: 'ATIVO',
+      estoque_estado: estoqueDestino,
+      cancelamento_id: null,
+      cancelamento_status: null,
+      troca_id: 22,
+      troca_status: statusTroca,
+      troca_item_origem_id: 1,
+    },
+  ];
+  const troca = (status, estoqueDestino, pago) => ({
+    id: 22,
+    status,
+    reembolsoPendenteCentavos: 0,
+    refundsPendentes: [],
+    estoqueOrigemEstado: 'REPOSTO',
+    estoqueDestinoEstado: estoqueDestino,
+    reembolsosConfirmados: [],
+    financeiro: {
+      status: pago === 1500 ? 'PARCIAL' : 'PAGO',
+      totalCentavos: 2000,
+      liquidoCentavos: pago,
+      saldoCentavos: 2000 - pago,
+    },
+  });
+
+  let atual = detalhe({
+    total: 2000,
+    pago: 1500,
+    status: 'PARCIAL',
+    capacidade: 500,
+    itens: itensTroca('AGUARDANDO_COBRANCA', 'RESERVADO'),
+  });
+  let trocaAtual = troca('AGUARDANDO_COBRANCA', 'RESERVADO', 1500);
+  let pollCallback;
+  const clearedIntervals = [];
+  let listRefreshes = 0;
+  t.mock.method(globalThis, 'setInterval', (callback, delay) => {
+    if (delay === 5000) pollCallback = callback;
+    return delay;
+  });
+  t.mock.method(globalThis, 'clearInterval', id => clearedIntervals.push(id));
+
+  const root = await mountWith(t, async (url, options = {}) => {
+    const href = String(url);
+    if (options.method === 'POST' && href.endsWith('/pix')) {
+      atual = detalhe({
+        total: 2000,
+        pago: 1500,
+        status: 'PARCIAL',
+        capacidade: 0,
+        itens: itensTroca('AGUARDANDO_COBRANCA', 'RESERVADO'),
+        pix: [{
+          id: 8,
+          valorCentavos: 500,
+          qrCode: 'pix-diferenca',
+          qrCodeBase64: null,
+          ticketUrl: null,
+          expiresAt: '2099-01-01T00:00:00Z',
+        }],
+      });
+      return Response.json({ok: true}, {status: 201});
+    }
+    if (href.endsWith('/historico')) {
+      return Response.json({eventos: [{
+        id: 'troca-22',
+        tipo: 'TROCA_SOLICITADA',
+        data: '2026-01-01 12:00:00',
+        titulo: 'Troca solicitada',
+        status: trocaAtual.status,
+        itemOrigem: {id: 1, nome: 'Origem', valorCentavos: 1000},
+        itemDestino: {id: 2, nome: 'Destino', valorCentavos: 1500, estoqueEstado: trocaAtual.estoqueDestinoEstado},
+        diferencaCentavos: 500,
+        tipoDiferenca: 'COBRAR',
+        estoqueAcao: 'REPOR',
+        referenciaId: 1,
+      }]});
+    }
+    if (href.endsWith('/itens/1/trocas')) {
+      return Response.json({troca: trocaAtual});
+    }
+    return Response.json(atual);
+  }, {onStatusChanged: () => { listRefreshes += 1; }});
+
+  try {
+    const gerarPix = [...document.querySelectorAll('button')]
+      .find(button => button.textContent === 'Gerar Pix R$ 5,00');
+    await ui.act(async () => gerarPix.click());
+    await flush();
+    assert.ok(document.querySelector('.pedmodal-pix-card'));
+    assert.match(document.body.textContent, /Troca aguardando pagamento/);
+    assert.match(document.body.textContent, /Ativo · Estoque reservado/);
+    assert.equal(typeof pollCallback, 'function');
+
+    await ui.act(async () => document.querySelector('.pedmodal-btn-historico').click());
+    await flush();
+    await ui.act(async () => document.querySelector('.histmodal-btn-detalhes').click());
+    await flush();
+    assert.match(document.querySelector('.additem-card').textContent, /AGUARDANDO COBRANCA/);
+
+    atual = detalhe({
+      total: 2000,
+      pago: 2000,
+      status: 'PAGO',
+      capacidade: 0,
+      itens: itensTroca('CONCLUIDA', 'BAIXADO'),
+      pix: [],
+    });
+    trocaAtual = troca('CONCLUIDA', 'BAIXADO', 2000);
+    await ui.act(async () => { await pollCallback(); });
+    await flush();
+    await flush();
+
+    assert.equal(document.querySelector('.pedmodal-pix-card'), null);
+    assert.match(document.querySelector('.pedmodal-payment-row').textContent, /Pago/);
+    assert.match(document.querySelector('.pedmodal-financial-grid').textContent, /PagoR\$ 20,00/);
+    assert.match(document.querySelector('.pedmodal-financial-grid').textContent, /LíquidoR\$ 20,00/);
+    assert.match(document.querySelector('.pedmodal-financial-row--balance').textContent, /0,00/);
+    assert.match(document.querySelector('.pedmodal-item-row').textContent, /Ativo · Estoque baixado/);
+    assert.doesNotMatch(document.querySelector('.pedmodal-payment').textContent, /Troca aguardando pagamento/);
+    assert.match(document.querySelector('.additem-card').textContent, /CONCLUIDA/);
+    assert.match(document.querySelector('.additem-card').textContent, /Troca concluída/);
+    assert.match(document.querySelector('.additem-card').textContent, /Estoque origemREPOSTO/);
+    assert.equal(listRefreshes, 1, 'a listagem pai recebe a convergencia financeira');
+    assert.ok(clearedIntervals.includes(5000), 'polling para quando o Pix desaparece');
+  } finally {
+    await unmount(root);
+  }
+});
+
+test('pedido PRONTO registra o saldo integral uma vez e atualiza detalhe e listagem', async t => {
+  let atual = detalhe({total: 4000, pago: 0, statusPedido: 'PRONTO', capacidade: 4000});
+  let posts = 0;
+  let postBody;
+  let liberarPost;
+  const postPendente = new Promise(resolve => { liberarPost = resolve; });
+  let listRefreshes = 0;
+  const root = await mountWith(t, async (url, options = {}) => {
+    if (options.method === 'POST' && String(url).endsWith('/pagamentos')) {
+      posts += 1;
+      postBody = JSON.parse(options.body);
+      await postPendente;
+      atual = detalhe({total: 4000, pago: 4000, statusPedido: 'PRONTO', capacidade: 0});
+      return Response.json({ok: true, statusFinanceiro: 'PAGO', saldoCentavos: 0}, {status: 201});
+    }
+    return Response.json(atual);
+  }, {onStatusChanged: () => { listRefreshes += 1; }});
+  try {
+    const open = [...document.querySelectorAll('button')]
+      .find(button => button.textContent === 'Registrar pagamento');
+    assert.ok(open, 'PRONTO com comanda aberta permite registrar pagamento');
+    await ui.act(async () => open.click());
+    await flush();
+
+    const amount = document.querySelector('input[aria-label="Valor recebido"]');
+    assert.equal(amount.value, '40,00');
+    const method = document.querySelector('.pedmodal-manual-payment select');
+    await ui.act(async () => changeValue(method, 'CARTAO'));
+
+    const confirm = [...document.querySelectorAll('.pedmodal-manual-payment button')]
+      .find(button => button.textContent === 'Confirmar pagamento');
+    await ui.act(async () => { confirm.click(); confirm.click(); });
+    assert.equal(posts, 1, 'duplo clique envia uma unica intencao');
+    assert.equal(confirm.disabled, true);
+    await ui.act(async () => { liberarPost(); await postPendente; });
+    await flush();
+
+    assert.equal(postBody.metodo, 'CARTAO');
+    assert.equal(postBody.valorCentavos, 4000);
+    assert.match(postBody.operationKey, /^[A-Za-z0-9._:-]{8,128}$/);
+    assert.match(document.querySelector('.pedmodal-payment-row').textContent, /Pago/);
+    assert.match(document.querySelector('.pedmodal-financial-row--balance').textContent, /0,00/);
+    assert.equal(
+      [...document.querySelectorAll('button')]
+        .some(button => /Registrar pagamento|não pago/i.test(button.textContent)),
+      false,
+      'pedido pago nao oferece reversao destrutiva',
+    );
+    assert.equal(listRefreshes, 1);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test('pagamento parcial preenche e registra somente o saldo restante', async t => {
+  let postBody;
+  let atual = detalhe({total: 4000, pago: 1500, status: 'PARCIAL', capacidade: 2500});
+  const root = await mountWith(t, async (url, options = {}) => {
+    if (options.method === 'POST' && String(url).endsWith('/pagamentos')) {
+      postBody = JSON.parse(options.body);
+      atual = detalhe({total: 4000, pago: 4000, status: 'PAGO', capacidade: 0});
+      return Response.json({ok: true, statusFinanceiro: 'PAGO', saldoCentavos: 0}, {status: 201});
+    }
+    return Response.json(atual);
+  });
+  try {
+    const open = [...document.querySelectorAll('button')]
+      .find(button => button.textContent === 'Registrar pagamento');
+    await ui.act(async () => open.click());
+    await flush();
+    assert.equal(document.querySelector('input[aria-label="Valor recebido"]').value, '25,00');
+    const confirm = [...document.querySelectorAll('.pedmodal-manual-payment button')]
+      .find(button => button.textContent === 'Confirmar pagamento');
+    await ui.act(async () => confirm.click());
+    await flush();
+    assert.equal(postBody.valorCentavos, 2500);
+    assert.match(document.querySelector('.pedmodal-payment-row').textContent, /Pago/);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test('edicao do nome atualiza o titulo e a listagem pai sem recarregar', async t => {
+  let patchBody;
+  let listRefreshes = 0;
+  const root = await mountWith(t, async (url, options = {}) => {
+    if (options.method === 'PATCH') {
+      patchBody = JSON.parse(options.body);
+      return Response.json({ok: true, clienteNome: patchBody.clienteNome});
+    }
+    return Response.json(detalhe({clienteNome: 'Vitoria'}));
+  }, {onStatusChanged: () => { listRefreshes += 1; }});
+  try {
+    await ui.act(async () =>
+      document.querySelector('button[aria-label="Editar nome da cliente"]').click());
+    await flush();
+    const input = document.querySelector('.pedmodal-name-controls input');
+    await ui.act(async () => changeValue(input, '   '));
+    await ui.act(async () => document.querySelector('.pedmodal-name-form').requestSubmit());
+    await flush();
+    assert.match(document.querySelector('.pedmodal-name-error').textContent, /Informe o nome/);
+    assert.equal(patchBody, undefined, 'nome vazio nao chega ao backend');
+
+    await ui.act(async () => changeValue(input, '  Vitória  '));
+    await ui.act(async () => document.querySelector('.pedmodal-name-form').requestSubmit());
+    await flush();
+    assert.deepEqual(patchBody, {clienteNome: 'Vitória'});
+    assert.match(document.querySelector('.pedmodal-title').textContent, /Pedido #1 - Vitória/);
+    assert.equal(listRefreshes, 1);
   } finally {
     await unmount(root);
   }
