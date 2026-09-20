@@ -75,7 +75,7 @@ function stockBadge(p: ProdutoAdmin): { text: string; type: "critical" | "availa
 
 /* ── Component ── */
 export default function AdminProdutos() {
-  const [activeTab, setActiveTab] = useState<FilterTab>("todos");
+  const [activeTab, setActiveTab] = useState<FilterTab>("ativos");
   const [searchQuery, setSearchQuery] = useState("");
   const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
   const [categorias, setCategorias] = useState<CategoriaResumo[]>([]);
