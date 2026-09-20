@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser } from "../../lib/auth";
+import { getStoreAnalytics } from "../../lib/dashboardAnalytics";
 
 interface Env {
   DB: D1Database;
@@ -14,12 +15,6 @@ interface ValorContagem {
 interface CatalogoRow {
   total: number;
   baixo: number;
-}
-
-interface MaisVendidoRow {
-  nome: string;
-  emoji: string | null;
-  unidades: number;
 }
 
 interface PedidoRecenteRow {
@@ -53,7 +48,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       comandasAbertas,
       aguardandoPreparo,
       catalogo,
-      maisVendidos,
+      analytics,
       pedidosRecentes,
     ] = await Promise.all([
       // "Quanto dinheiro confirmado entrou hoje" é pergunta do livro-caixa,
@@ -103,20 +98,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
                 SUM(CASE WHEN (estoque - estoque_reservado) <= 2 THEN 1 ELSE 0 END) AS baixo
          FROM produtos WHERE ativo = 1`,
       ).first<CatalogoRow>(),
-      // Visibilidade de vendas confirmadas (total ou parcial) — mesma
-      // classificação de comandasAbertas/pedidosRecentes.
-      env.DB.prepare(
-        `SELECT pi.produto_nome AS nome, p.emoji AS emoji, SUM(pi.quantidade) AS unidades
-         FROM pedido_itens pi
-         JOIN pedidos ped ON ped.id = pi.pedido_id
-         LEFT JOIN produtos p ON p.id = pi.produto_id
-         WHERE ped.status_pagamento IN ('PARCIAL', 'PAGO') AND date(ped.criado_em) = ?
-         GROUP BY pi.produto_nome, p.emoji
-         ORDER BY unidades DESC
-         LIMIT 4`,
-      )
-        .bind(data)
-        .all<MaisVendidoRow>(),
+      getStoreAnalytics(env.DB),
       env.DB.prepare(
         `SELECT p.id, p.cliente_nome, p.valor_total_centavos, p.status_pedido,
                 (SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = p.id) AS itens_count
@@ -139,7 +121,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         total: catalogo?.total ?? 0,
         estoqueBaixo: catalogo?.baixo ?? 0,
       },
-      maisVendidos: maisVendidos.results,
+      financeiro: analytics.financeiro,
+      maisVendidos: analytics.maisVendidos,
       pedidosRecentes: pedidosRecentes.results,
     });
   } catch (err) {

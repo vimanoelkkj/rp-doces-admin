@@ -44,9 +44,9 @@ interface ValorContagem {
 }
 
 interface MaisVendidoRow {
+  produtoId: number | null;
   nome: string;
-  emoji: string | null;
-  unidades: number;
+  quantidade: number;
 }
 
 interface PedidoRecenteRow {
@@ -64,13 +64,21 @@ interface DashboardResponse {
   comandasAbertas: number;
   aguardandoPreparo: number;
   catalogo: { total: number; estoqueBaixo: number };
+  financeiro: {
+    brutoCentavos: number;
+    reembolsadoCentavos: number;
+    liquidoCentavos: number;
+  };
   maisVendidos: MaisVendidoRow[];
   pedidosRecentes: PedidoRecenteRow[];
 }
 
 /* ── Helpers ── */
 const formatarPreco = (centavos: number) =>
-  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+  `R$ ${(centavos / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 function formatDateISO(d: Date): string {
   const yyyy = d.getFullYear();
@@ -121,7 +129,7 @@ export default function AdminDashboard() {
   }, [selectedDate]);
 
   const maiorVendido = data?.maisVendidos.reduce(
-    (max, item) => Math.max(max, item.unidades),
+    (max, item) => Math.max(max, item.quantidade),
     0,
   );
 
@@ -233,35 +241,36 @@ export default function AdminDashboard() {
           {/* Best sellers */}
           <div className="dash-panel dash-best-sellers">
             <div className="dash-panel-title-group">
-              <h2 className="dash-panel-title">
-                Sabores de bolo mais vendidos
-              </h2>
+              <h2 className="dash-panel-title">Produtos mais vendidos</h2>
               <p className="dash-panel-subtitle">
-                Métricas de vendas acumuladas no período selecionado
+                Vendas com cobertura financeira em todo o histórico
               </p>
             </div>
             {!loading && data && data.maisVendidos.length === 0 && (
               <p className="dash-empty-inline">
-                Nenhuma venda registrada nesse dia.
+                Nenhuma venda confirmada até agora.
               </p>
             )}
             <div className="dash-ranked-list">
               {data?.maisVendidos.map((item, i) => (
-                <div className="dash-rank-row" key={item.nome}>
+                <div
+                  className="dash-rank-row"
+                  key={item.produtoId === null ? `historico:${item.nome}` : item.produtoId}
+                >
                   <div className="dash-rank-meta">
                     <div className="dash-rank-label">
                       <span className="dash-rank-number">{i + 1}</span>
-                      <span className="dash-rank-name">
-                        {item.nome} {item.emoji}
-                      </span>
+                      <span className="dash-rank-name">{item.nome}</span>
                     </div>
-                    <span className="dash-rank-units">{item.unidades} un.</span>
+                    <span className="dash-rank-units">
+                      {item.quantidade} un.
+                    </span>
                   </div>
                   <div className="dash-progress-track">
                     <div
                       className="dash-progress-fill"
                       style={{
-                        width: `${maiorVendido ? (item.unidades / maiorVendido) * 100 : 0}%`,
+                        width: `${maiorVendido ? (item.quantidade / maiorVendido) * 100 : 0}%`,
                       }}
                     />
                   </div>
@@ -272,6 +281,26 @@ export default function AdminDashboard() {
 
           {/* Right column */}
           <div className="dash-right-col">
+            <div className="dash-panel dash-cash-total">
+              <div className="dash-panel-title-group">
+                <h2 className="dash-panel-title">Caixa total</h2>
+                <p className="dash-panel-subtitle">
+                  Movimento financeiro confirmado da loja
+                </p>
+              </div>
+              <strong className="dash-cash-value" data-testid="caixa-total">
+                {formatarPreco(data?.financeiro.liquidoCentavos ?? 0)}
+              </strong>
+              <div className="dash-cash-breakdown">
+                <span>
+                  Recebido: {formatarPreco(data?.financeiro.brutoCentavos ?? 0)}
+                </span>
+                <span>
+                  Reembolsado: -{formatarPreco(data?.financeiro.reembolsadoCentavos ?? 0)}
+                </span>
+              </div>
+            </div>
+
             {/* Pending payments */}
             <div className="dash-panel dash-pending-payments">
               <div className="dash-panel-header-row">

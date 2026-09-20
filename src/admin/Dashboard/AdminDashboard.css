@@ -467,6 +467,33 @@
   gap: 24px;
 }
 
+/* ── Store cash ── */
+.dash-cash-total {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dash-cash-value {
+  font-family: "Fraunces", serif;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #2b1d1a;
+}
+
+.dash-cash-breakdown {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #eadfd3;
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #63524e;
+}
+
 /* ── Pending payments ── */
 .dash-pending-payments {
   display: flex;
@@ -772,7 +799,8 @@
 
   .dash-results-banner,
   .dash-panel-header-row,
-  .dash-rank-meta {
+  .dash-rank-meta,
+  .dash-cash-breakdown {
     flex-wrap: wrap;
   }
 

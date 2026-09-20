@@ -48,6 +48,8 @@ const bundle = await build({
       export * as diagnosticoPedidoTeste from './functions/api/admin/diagnosticos/pedido-teste';
       export * as diagnosticoPixStatus from './functions/api/admin/diagnosticos/pix-status';
       export * as diagnosticoPixReembolso from './functions/api/admin/diagnosticos/pix-reembolso';
+      export * as dashboard from './functions/api/admin/dashboard';
+      export * as dashboardAnalytics from './functions/lib/dashboardAnalytics';
       export * as paymentSync from './functions/lib/paymentSync';
     `,
     resolveDir: process.cwd(), loader: 'ts',

@@ -95,6 +95,7 @@ html[data-admin-theme="dark"] .dash-title,
 html[data-admin-theme="dark"] .dash-panel-title,
 html[data-admin-theme="dark"] .dash-orders-title,
 html[data-admin-theme="dark"] .dash-kpi-value,
+html[data-admin-theme="dark"] .dash-cash-value,
 html[data-admin-theme="dark"] .dash-rank-name,
 html[data-admin-theme="dark"] .dash-pending-value,
 html[data-admin-theme="dark"] .dash-empty-title,
@@ -108,6 +109,7 @@ html[data-admin-theme="dark"] .dash-panel-subtitle,
 html[data-admin-theme="dark"] .dash-orders-subtitle,
 html[data-admin-theme="dark"] .dash-kpi-label,
 html[data-admin-theme="dark"] .dash-kpi-desc,
+html[data-admin-theme="dark"] .dash-cash-breakdown,
 html[data-admin-theme="dark"] .dash-rank-meta,
 html[data-admin-theme="dark"] .dash-rank-units,
 html[data-admin-theme="dark"] .dash-empty-desc,
@@ -116,6 +118,9 @@ html[data-admin-theme="dark"] .dash-alert-text,
 html[data-admin-theme="dark"] .dash-results-light,
 html[data-admin-theme="dark"] .dash-th {
   color: #a89b92;
+}
+html[data-admin-theme="dark"] .dash-cash-breakdown {
+  border-color: #3d3230;
 }
 html[data-admin-theme="dark"] .dash-date-picker {
   background: #2b2220;
