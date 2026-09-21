@@ -3,11 +3,14 @@ import { useState, useEffect } from "react";
 import Footer from "../components/Footer";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "../hooks/useScrollReveal";
+import { useCatalogProducts } from "../hooks/useCatalogProducts";
 import { createPortal } from "react-dom";
 import "./Homepage.css";
 
 export default function Homepage() {
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const { products } = useCatalogProducts();
+  const galleryProducts = products.filter((product) => product.image).slice(0, 5);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -517,11 +520,14 @@ export default function Homepage() {
         </div>
 
         <div className="instagram-gallery">
-          <img src="/images/insta-1.png" alt="R&P Doces Instagram" />
-          <img src="/images/insta-2.png" alt="R&P Doces Instagram" />
-          <img src="/images/insta-3.png" alt="R&P Doces Instagram" />
-          <img src="/images/insta-4.png" alt="R&P Doces Instagram" />
-          <img src="/images/insta-5.png" alt="R&P Doces Instagram" />
+          {galleryProducts.map((product) => (
+            <img
+              key={product.id}
+              src={product.image}
+              alt={product.name}
+              loading="lazy"
+            />
+          ))}
         </div>
       </section>
 
