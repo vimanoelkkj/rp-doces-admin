@@ -227,7 +227,7 @@ test('11: o valor enviado pelo cliente no corpo do POST e ignorado; o servidor s
 });
 
 // 12) nenhuma regressao em cancelamento/troca/refund existente + trava operacional
-test('12a: mutua exclusao entre intencao por item e intencao de anulacao sobre o mesmo pagamento', async t => {
+test('12a: intencao por item CONFIRMADA (historica) nao bloqueia intencao de anulacao (migration 0024)', async t => {
   const {db, session} = await pedidoComMp(t);
   await db.batch([
     db.prepare(`UPDATE pedidos SET valor_total_centavos=5000 WHERE id=1`),
@@ -255,13 +255,17 @@ test('12a: mutua exclusao entre intencao por item e intencao de anulacao sobre o
   });
   assert.equal(confirmado.ok, true);
   assert.equal(confirmado.refundStatus, 'CONFIRMADO');
-  // A intencao por item esta CONFIRMADA (nao RECUSADA, logo ainda "ativa" para
-  // o indice/trigger); a tentativa de abrir uma intencao "sem item" para o
-  // MESMO pagamento tem que ser recusada pelo trigger de exclusao mutua.
-  await assert.rejects(app.mpRefundIntent.reconcilePixMpRefundIntent(db, {
+  // Migration 0024: a exclusao mutua e assimetrica. Uma intencao por item
+  // CONFIRMADA e historica -- seu valor ja foi descontado por
+  // listarPagamentosMpReembolsaveis -- e NAO bloqueia mais uma intencao de
+  // anulacao para o restante do mesmo pagamento (bug real de producao
+  // corrigido pela 0024; a 0023 sozinha recusava esta chamada).
+  mockRefundAprovado(t, {refundId: 9002});
+  const anulacao = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, {
     pedidoId: 1, pagamentoId: leg.pagamentoId, usuarioId: 1, operationKey: 'anul-mutex-01',
-    fingerprint: 'fp-anul-mutex-01', valorCentavos: leg.valorCentavos, accessToken: 'TEST_TOKEN',
-  }), /pix_mp_refund_intencao_conflito_item_anulacao/);
+    fingerprint: 'fp-anul-mutex-01', valorCentavos: 1, accessToken: 'TEST_TOKEN',
+  });
+  assert.equal(anulacao.ok, true);
 });
 
 test('12b: trava operacional bloqueia pagamento, pix, cancelamento, troca e adicao de item enquanto o refund de anulacao esta ativo', async t => {
