@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
+import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../lib/pedidoAnulacao";
 
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { registerAdminPayment, MetodoManual } from "../../../../lib/comandaLedger";
@@ -29,6 +30,7 @@ const MENSAGENS: Record<string, string> = {
   VALOR_ACIMA_DO_SALDO: "Valor acima do saldo em aberto",
   SALDO_INSUFICIENTE_CONCORRENCIA:
     "O saldo mudou antes da confirmação. Atualize e tente novamente.",
+  ESTORNO_ANULACAO_ATIVO: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
   ...OPERACAO_MENSAGENS,
 };
 

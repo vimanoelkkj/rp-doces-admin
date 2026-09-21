@@ -39,6 +39,7 @@ import {
   type IdentidadeEsperada,
   type OperacaoRow,
 } from "./operacoes";
+import { temEstornoAnulacaoAtivo } from "./pedidoAnulacao";
 
 interface Env {
   DB: D1Database;
@@ -104,6 +105,7 @@ export interface GerarPixAdminFalha {
     | "OPERATION_KEY_INVALIDA"
     | "OPERACAO_INCOMPLETA"
     | "OPERACAO_EM_PROCESSAMENTO"
+    | "ESTORNO_ANULACAO_ATIVO"
     | ConflitoOperacao;
 }
 
@@ -307,6 +309,9 @@ export async function createAdminPixCharge(
     (pedido.status_comanda !== "ABERTA" && !liquidacaoAposEntrega)
   ) {
     return { ok: false, erro: "COMANDA_ENCERRADA" };
+  }
+  if (await temEstornoAnulacaoAtivo(db, params.pedidoId)) {
+    return { ok: false, erro: "ESTORNO_ANULACAO_ATIVO" };
   }
 
   const substituiId = params.substituiId ?? null;

@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { recusarPedidoAnulado } from "../../../../../../lib/pedidoValido";
+import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../../../lib/pedidoAnulacao";
 
 import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import { createItemExchange, getExchangeView, ItemExchangePreviewError } from "../../../../../../lib/itemExchange";
@@ -8,7 +9,8 @@ import { reconcileLiveTabParent } from "../../../../../../lib/liveTabRecovery";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
 interface Env{DB:D1Database;MP_ACCESS_TOKEN?:string}
 const messages:Record<string,string>={PREVIEW_OBSOLETO:"A comanda mudou. Revise a troca novamente.",PRECO_ALTERADO:"O preço do produto mudou.",
-  ESTOQUE_INSUFICIENTE:"Estoque insuficiente para o produto de destino.",PIX_PENDENTE:"Há um Pix pendente nesta comanda.",...OPERACAO_MENSAGENS};
+  ESTOQUE_INSUFICIENTE:"Estoque insuficiente para o produto de destino.",PIX_PENDENTE:"Há um Pix pendente nesta comanda.",
+  ESTORNO_ANULACAO_ATIVO:ESTORNO_ANULACAO_ATIVO_MENSAGEM,...OPERACAO_MENSAGENS};
 const fail=(message:string,status:number,code?:string,extra:object={})=>Response.json({error:message,...(code?{code}:{}),...extra},{status});
 export const onRequestGet:PagesFunction<Env>=async({request,env,params})=>{
   const auth=await requireUser(env.DB,request);if("error" in auth)return auth.error;

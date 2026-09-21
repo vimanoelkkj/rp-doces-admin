@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
+import { ESTORNO_ANULACAO_ATIVO_MENSAGEM, temEstornoAnulacaoAtivo } from "../../../../lib/pedidoAnulacao";
 
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { precoAtualCentavos, type ProdutoRow } from "../../../../lib/pricing";
@@ -279,6 +280,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     // se pedido, produto, preco ou estoque mudaram desde a primeira resposta.
     const existente = await buscarOperacao(env.DB, operationKey);
     if (existente) return await replayAdicionarItem(env.DB, existente, identidade);
+    if (await temEstornoAnulacaoAtivo(env.DB, pedidoId)) {
+      return jsonError(ESTORNO_ANULACAO_ATIVO_MENSAGEM, 409, "ESTORNO_ANULACAO_ATIVO");
+    }
 
     const [pedido, produto] = await Promise.all([
       carregarPedido(env.DB, pedidoId),

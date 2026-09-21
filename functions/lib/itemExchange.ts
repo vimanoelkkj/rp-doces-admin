@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { getPedidoAnulacao } from "./pedidoValido";
+import { temEstornoAnulacaoAtivo } from "./pedidoAnulacao";
 
 import { precoVigenteCentavos } from "../../shared/promocao";
 import { getFinanceiroPedido } from "./comandaLedger";
@@ -221,7 +222,7 @@ type ExchangeError = "OPERATION_KEY_INVALIDA" | "PREVIEW_OBSOLETO" | "PRECO_ALTE
   "TROCA_NAO_AGUARDANDO" | "PAGAMENTO_ALOCACAO_INVALIDA" |
   "PIX_MP_REFUND_REMOTO_PENDENTE" | "VALOR_REFUND_DIVERGENTE" |
   "MERCADO_PAGO_NAO_CONFIGURADO" | "REFUND_REMOTO_EM_ANDAMENTO" |
-  "OPERACAO_INCOMPLETA" | ConflitoOperacao;
+  "OPERACAO_INCOMPLETA" | "ESTORNO_ANULACAO_ATIVO" | ConflitoOperacao;
 export type ExchangeResult = { ok: true; troca: ExchangeView; replay?: boolean; reembolsoId?: number; refundStatus?: PixMpRefundIntentStatus }
   | { ok: false; erro: ExchangeError; preview?: ItemExchangePreview; precoAtualCentavos?: number };
 
@@ -438,6 +439,9 @@ export async function createItemExchange(db: D1Database, params: {
       motivo,previewFingerprint:params.previewFingerprint}) };
   const existing = await buscarOperacao(db, parsed.key);
   if (existing) return replayExchange(db, existing, identity);
+  if (await temEstornoAnulacaoAtivo(db, params.pedidoId)) {
+    return { ok: false, erro: "ESTORNO_ANULACAO_ATIVO" };
+  }
   let preview: ItemExchangePreview;
   try { preview = await getItemExchangePreview(db, params); }
   catch (error) {

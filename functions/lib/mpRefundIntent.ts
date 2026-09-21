@@ -25,7 +25,7 @@ export interface PixMpRefundIntentView {
 
 interface IntentRow {
   id: number; operacao_id: number; pedido_id: number; pagamento_id: number;
-  pagamento_alocacao_id: number; pedido_item_cancelamento_id: number | null;
+  pagamento_alocacao_id: number | null; pedido_item_cancelamento_id: number | null;
   pedido_item_troca_id: number | null; valor_centavos: number;
   status: PixMpRefundIntentStatus; mp_payment_id: string; mp_idempotency_key: string;
   mp_request: string; mp_refund_id: string | null; mp_status: string | null;
@@ -38,10 +38,13 @@ export type PixMpRefundIntentResult =
   | { ok: false; erro: "OPERACAO_CONFLITO_TIPO" | "OPERACAO_CONFLITO_ESCOPO" |
       "OPERACAO_CONFLITO_PAYLOAD" | "REFUND_REMOTO_EM_ANDAMENTO" };
 
+// `pagamentoAlocacaoId`, `cancellationId` e `exchangeId` ausentes ao mesmo
+// tempo identificam o terceiro caso (0023): reembolso do saldo restante de
+// um PAGAMENTO inteiro para a anulação do pedido, sem item pai nenhum.
 export interface PixMpRefundIntentParams {
   pedidoId: number;
   pagamentoId: number;
-  pagamentoAlocacaoId: number;
+  pagamentoAlocacaoId?: number;
   cancellationId?: number;
   exchangeId?: number;
   usuarioId: number;
@@ -87,7 +90,19 @@ async function byOperation(db: D1Database, operationKey: string): Promise<Intent
     .bind(operationKey).first<IntentRow>();
 }
 
+// Nem cancelamento nem troca: reembolso do pagamento inteiro (anulação).
+function semItemPai(params: Pick<PixMpRefundIntentParams, "cancellationId" | "exchangeId">): boolean {
+  return params.cancellationId === undefined && params.exchangeId === undefined;
+}
+
 async function activeByLeg(db: D1Database, params: PixMpRefundIntentParams): Promise<IntentRow | null> {
+  if (semItemPai(params)) {
+    return db.prepare(`SELECT ${columns} FROM pedido_reembolso_pix_mp_intencoes i
+      JOIN pedido_operacoes o ON o.id=i.operacao_id
+      WHERE i.pagamento_id=? AND i.pedido_item_cancelamento_id IS NULL
+        AND i.pedido_item_troca_id IS NULL AND i.status<>'RECUSADO'
+      ORDER BY i.id DESC LIMIT 1`).bind(params.pagamentoId).first<IntentRow>();
+  }
   const parentColumn = params.cancellationId !== undefined
     ? "pedido_item_cancelamento_id" : "pedido_item_troca_id";
   const parentId = params.cancellationId ?? params.exchangeId;
@@ -134,7 +149,7 @@ async function ensureIntent(
           mp_payment_id,mp_idempotency_key,mp_request)
         SELECT o.id,?,?,?, ?,?,?,o.mp_payment_id,o.mp_idempotency_key,o.mp_request
         FROM pedido_operacoes o WHERE o.operation_key=?`)
-        .bind(params.pedidoId, params.pagamentoId, params.pagamentoAlocacaoId,
+        .bind(params.pedidoId, params.pagamentoId, params.pagamentoAlocacaoId ?? null,
           cancellationId, exchangeId, params.valorCentavos, params.operationKey),
     ]);
   } catch (error) {
@@ -174,6 +189,8 @@ async function materialize(
 ): Promise<IntentRow> {
   const localKey = chaveReembolso(row.operation_key);
   const refundId = String(refund.id);
+  const semItemPai = row.pedido_item_cancelamento_id === null && row.pedido_item_troca_id === null;
+  const motivo = semItemPai ? "Anulação de pedido" : "Refund parcial Mercado Pago";
   const allocation = row.pedido_item_cancelamento_id !== null
     ? db.prepare(`INSERT INTO pedido_reembolso_alocacoes(
         reembolso_id,pagamento_alocacao_id,pedido_item_cancelamento_id,valor_centavos)
@@ -182,23 +199,27 @@ async function materialize(
           WHERE x.reembolso_id=r.id AND x.pagamento_alocacao_id=?)`)
       .bind(row.pagamento_alocacao_id, row.pedido_item_cancelamento_id,
         row.valor_centavos, localKey, row.pagamento_alocacao_id)
-    : db.prepare(`INSERT INTO pedido_item_troca_reembolso_alocacoes(
+    : row.pedido_item_troca_id !== null
+    ? db.prepare(`INSERT INTO pedido_item_troca_reembolso_alocacoes(
         reembolso_id,pagamento_alocacao_id,pedido_item_troca_id,valor_centavos)
       SELECT r.id,?,?,? FROM pedido_reembolsos r WHERE r.idempotency_key=?
         AND NOT EXISTS(SELECT 1 FROM pedido_item_troca_reembolso_alocacoes x
           WHERE x.reembolso_id=r.id AND x.pagamento_alocacao_id=?)`)
       .bind(row.pagamento_alocacao_id, row.pedido_item_troca_id,
-        row.valor_centavos, localKey, row.pagamento_alocacao_id);
-  await db.batch([
+        row.valor_centavos, localKey, row.pagamento_alocacao_id)
+    : null;
+  const statements: D1PreparedStatement[] = [
     db.prepare(`INSERT OR IGNORE INTO pedido_reembolsos(
         pedido_id,pagamento_id,origem,metodo,valor_centavos,status,mp_refund_id,mp_status,
         idempotency_key,registrado_por_usuario_id,motivo,devolveu_estoque,concluido_em)
-      SELECT ?,?,'MERCADO_PAGO','PIX_MP',?,'REEMBOLSADO',?,?,?,?,'Refund parcial Mercado Pago',0,CURRENT_TIMESTAMP
+      SELECT ?,?,'MERCADO_PAGO','PIX_MP',?,'REEMBOLSADO',?,?,?,?,?,0,CURRENT_TIMESTAMP
       WHERE EXISTS(SELECT 1 FROM pedido_reembolso_pix_mp_intencoes
                    WHERE id=? AND status<>'RECUSADO')`)
       .bind(row.pedido_id, row.pagamento_id, row.valor_centavos, refundId,
-        refund.status, localKey, usuarioId, row.id),
-    allocation,
+        refund.status, localKey, usuarioId, motivo, row.id),
+  ];
+  if (allocation) statements.push(allocation);
+  statements.push(
     db.prepare(`UPDATE pedido_operacoes SET fase='CONCLUIDA',reembolso_id=(
         SELECT id FROM pedido_reembolsos WHERE idempotency_key=?),resultado=?,erro=NULL,
         atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND fase<>'RECUSADA'`)
@@ -209,7 +230,8 @@ async function materialize(
         confirmado_em=COALESCE(confirmado_em,CURRENT_TIMESTAMP),atualizado_em=CURRENT_TIMESTAMP
       WHERE id=? AND status<>'RECUSADO'`).bind(refundId, refund.status, localKey, row.id),
     preparePedidoFinancialProjection(db, row.pedido_id),
-  ]);
+  );
+  await db.batch(statements);
   return (await byOperation(db, row.operation_key)) ?? row;
 }
 
@@ -361,5 +383,22 @@ export async function getPixMpRefundIntentForLeg(
     JOIN pedido_operacoes o ON o.id=i.operacao_id
     WHERE i.${column}=? AND i.pagamento_alocacao_id=?
     ORDER BY i.id DESC LIMIT 1`).bind(id, parent.pagamentoAlocacaoId).first<IntentRow>();
+  return row ? view(row) : null;
+}
+
+// Intenção sem item pai (0023): reembolso do saldo restante de um pagamento
+// inteiro, usado pela exclusão/anulação de pedido.
+export async function getPixMpRefundIntentForPagamento(
+  db: D1Database,
+  params: { pedidoId: number; pagamentoId: number },
+): Promise<PixMpRefundIntentView | null> {
+  // Sem filtro de status: para exibicao (modal de exclusao) um RECUSADO
+  // recente importa tanto quanto um PROCESSANDO -- e a UNICA forma do admin
+  // ver que a tentativa anterior falhou e precisa de uma nova key.
+  const row = await db.prepare(`SELECT i.*,o.operation_key FROM pedido_reembolso_pix_mp_intencoes i
+    JOIN pedido_operacoes o ON o.id=i.operacao_id
+    WHERE i.pedido_id=? AND i.pagamento_id=? AND i.pedido_item_cancelamento_id IS NULL
+      AND i.pedido_item_troca_id IS NULL
+    ORDER BY i.id DESC LIMIT 1`).bind(params.pedidoId, params.pagamentoId).first<IntentRow>();
   return row ? view(row) : null;
 }
