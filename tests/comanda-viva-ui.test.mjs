@@ -191,6 +191,119 @@ test('bloqueio MP permanece visivel na confirmacao e nao fecha o pedido', async 
   } finally { await unmount(root); }
 });
 
+// Estados do estorno de anulacao dentro do ExcluirPedidoModal: `intencao ===
+// null` significa saldo reembolsavel cujo estorno ainda NAO foi disparado
+// (botao "Estornar"), nunca um estorno em andamento (isso e exclusividade de
+// PENDENTE/PROCESSANDO).
+function estorno(pernas, overrides = {}) {
+  const restanteTotalCentavos = overrides.restanteTotalCentavos
+    ?? pernas.reduce((soma, p) => soma + p.restanteCentavos, 0);
+  return Response.json({pedidoId: 1, restanteTotalCentavos, pernas});
+}
+
+async function abrirExcluirComEstorno(t, handlerEstorno) {
+  const root = await mountWith(t, async (url, options = {}) => {
+    if (String(url).endsWith('/anulacao/estorno')) return handlerEstorno(url, options);
+    return Response.json(detalhe({total: 4000, pago: 4000}));
+  });
+  await ui.act(async () => document.querySelector('.pedmodal-more button').click());
+  await flush();
+  return root;
+}
+
+test('1: saldo reembolsavel sem estorno iniciado mostra o botao Estornar', async t => {
+  const root = await abrirExcluirComEstorno(t, () => estorno(
+    [{pagamentoId: 1, valorCentavos: 3000, restanteCentavos: 3000, intencao: null}]));
+  try {
+    const modal = document.querySelector('.excluir-pedido-overlay');
+    const botao = modal.querySelector('.excluir-pedido-estorno-botao');
+    assert.ok(botao, 'botao Estornar deveria aparecer para intencao null');
+    assert.match(botao.textContent, /Estornar/);
+    assert.match(botao.textContent, /30,00/);
+    assert.doesNotMatch(botao.textContent, /Tentar novamente/);
+    assert.equal(modal.querySelector('.excluir-pedido-estorno-status'), null, 'nao deveria mostrar "Estornando"');
+  } finally { await unmount(root); }
+});
+
+for (const status of ['PENDENTE', 'PROCESSANDO']) {
+  test(`2/3: intencao ${status} mostra "Estornando...", nao o botao`, async t => {
+    const root = await abrirExcluirComEstorno(t, () => estorno(
+      [{pagamentoId: 1, valorCentavos: 3000, restanteCentavos: 3000,
+        intencao: {status, ultimoErro: null, podeVerificar: true}}]));
+    try {
+      const modal = document.querySelector('.excluir-pedido-overlay');
+      const emAndamento = modal.querySelector('.excluir-pedido-estorno-status');
+      assert.ok(emAndamento, `deveria mostrar "Estornando" para ${status}`);
+      assert.match(emAndamento.textContent, /Estornando/);
+      assert.match(emAndamento.textContent, /30,00/);
+      assert.equal(modal.querySelector('.excluir-pedido-estorno-botao'), null);
+    } finally { await unmount(root); }
+  });
+}
+
+for (const [status, mensagem] of [['INCONCLUSIVO', /confirmar/], ['RECUSADO', /recusou/]]) {
+  test(`4/5: intencao ${status} mostra "Tentar novamente" e mantem exclusao bloqueada`, async t => {
+    const root = await abrirExcluirComEstorno(t, () => estorno(
+      [{pagamentoId: 1, valorCentavos: 3000, restanteCentavos: 3000,
+        intencao: {status, ultimoErro: 'x', podeVerificar: true}}]));
+    try {
+      const modal = document.querySelector('.excluir-pedido-overlay');
+      const botao = modal.querySelector('.excluir-pedido-estorno-botao');
+      assert.ok(botao, `deveria oferecer retentativa para ${status}`);
+      assert.match(botao.textContent, /Tentar novamente/);
+      assert.match(botao.textContent, /30,00/);
+      assert.equal(modal.querySelector('.excluir-pedido-estorno-status'), null);
+      const erro = modal.querySelector('.excluir-pedido-estorno-erro[role="alert"]');
+      assert.ok(erro);
+      assert.match(erro.textContent, mensagem);
+      await ui.act(async () => modal.querySelectorAll('input[type="radio"]')[1].click());
+      assert.equal(modal.querySelector('button[type="submit"]').disabled, true, 'exclusao continua bloqueada');
+    } finally { await unmount(root); }
+  });
+}
+
+test('6: uma perna CONFIRMADA ao lado de outra sem intencao mostra o botao para a perna restante', async t => {
+  const root = await abrirExcluirComEstorno(t, () => estorno([
+    {pagamentoId: 1, valorCentavos: 5000, restanteCentavos: 0,
+      intencao: {status: 'CONFIRMADO', ultimoErro: null, podeVerificar: false}},
+    {pagamentoId: 2, valorCentavos: 4000, restanteCentavos: 4000, intencao: null},
+  ], {restanteTotalCentavos: 4000}));
+  try {
+    const modal = document.querySelector('.excluir-pedido-overlay');
+    const botao = modal.querySelector('.excluir-pedido-estorno-botao');
+    assert.ok(botao, 'deveria mostrar o botao para a perna ainda sem intencao');
+    assert.match(botao.textContent, /Estornar/);
+    assert.match(botao.textContent, /40,00/);
+    assert.doesNotMatch(botao.textContent, /Tentar novamente/);
+    assert.equal(modal.querySelector('.excluir-pedido-estorno-status'), null);
+  } finally { await unmount(root); }
+});
+
+test('7: restante zerado apos estornar mostra sucesso e libera a exclusao', async t => {
+  const root = await mountWith(t, async (url, options = {}) => {
+    if (String(url).endsWith('/anulacao/estorno')) {
+      return options.method === 'POST'
+        ? estorno([])
+        : estorno([{pagamentoId: 1, valorCentavos: 3000, restanteCentavos: 3000, intencao: null}]);
+    }
+    return Response.json(detalhe({total: 4000, pago: 4000}));
+  });
+  try {
+    await ui.act(async () => document.querySelector('.pedmodal-more button').click());
+    await flush();
+    const modal = document.querySelector('.excluir-pedido-overlay');
+    await ui.act(async () => modal.querySelector('.excluir-pedido-estorno-botao').click());
+    await flush();
+    assert.equal(modal.querySelector('.excluir-pedido-estorno'), null, 'aviso de bloqueio some');
+    const sucesso = modal.querySelector('.excluir-pedido-estorno-sucesso');
+    assert.ok(sucesso);
+    assert.match(sucesso.textContent, /30,00/);
+    assert.match(sucesso.textContent, /estornados com sucesso/);
+    await ui.act(async () => modal.querySelectorAll('input[type="radio"]')[1].click());
+    assert.equal(modal.querySelector('button[type="submit"]').disabled, false, 'exclusao liberada');
+  } finally { await unmount(root); }
+});
+
 test('pedido anulado preserva valores, mostra auditoria e oculta todas as acoes mutantes', async t => {
   const root = await mountWith(t, async () => Response.json(detalhe({
     total:4000,pago:4000,capacidade:4000,

@@ -32,8 +32,11 @@ function lerEstorno(body: unknown): EstadoEstorno | null {
 }
 
 function algumaPernaEmAndamento(estado: EstadoEstorno | null): boolean {
-  return !!estado && estado.pernas.some(p => p.intencao === null
-    || p.intencao.status === "PENDENTE" || p.intencao.status === "PROCESSANDO");
+  // `intencao === null` significa saldo reembolsável cujo estorno ainda NÃO
+  // foi disparado (mostra o botão "Estornar"), não um estorno em andamento —
+  // só PENDENTE/PROCESSANDO justificam "Estornando...".
+  return !!estado && estado.pernas.some(p =>
+    p.intencao?.status === "PENDENTE" || p.intencao?.status === "PROCESSANDO");
 }
 
 function algumaPernaRecusada(estado: EstadoEstorno | null): boolean {
