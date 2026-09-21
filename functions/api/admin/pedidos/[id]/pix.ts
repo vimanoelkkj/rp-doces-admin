@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
+import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../lib/pedidoAnulacao";
 
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { createAdminPixCharge } from "../../../../lib/comandaPix";
@@ -36,6 +37,7 @@ const MENSAGENS: Record<string, string> = {
   MERCADO_PAGO_RECUSOU: "O Mercado Pago recusou o pagamento Pix",
   MERCADO_PAGO_INDISPONIVEL:
     "Não foi possível confirmar com o Mercado Pago se o Pix foi criado. Verifique novamente em instantes.",
+  ESTORNO_ANULACAO_ATIVO: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
   ...OPERACAO_MENSAGENS,
 };
 
@@ -48,6 +50,7 @@ const STATUS_HTTP: Record<string, number> = {
   ESTOQUE_INSUFICIENTE: 409,
   MERCADO_PAGO_RECUSOU: 502,
   MERCADO_PAGO_INDISPONIVEL: 502,
+  ESTORNO_ANULACAO_ATIVO: 409,
   ...OPERACAO_HTTP_STATUS,
 };
 

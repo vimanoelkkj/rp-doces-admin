@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { recusarPedidoAnulado } from "../../../../../../lib/pedidoValido";
+import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../../../lib/pedidoAnulacao";
 
 import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import {
@@ -17,6 +18,7 @@ const MESSAGES: Record<string, string> = {
   PREVIEW_OBSOLETO: "O pedido mudou. Revise o impacto atualizado antes de confirmar novamente.",
   ESTOQUE_ACAO_INVALIDA: "A ação de estoque não corresponde ao estado atual do item.",
   PIX_PENDENTE: "Há um Pix pendente. Aguarde sua resolução antes de cancelar o item.",
+  ESTORNO_ANULACAO_ATIVO: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
   ...OPERACAO_MENSAGENS,
 };
 

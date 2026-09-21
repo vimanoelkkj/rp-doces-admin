@@ -23,6 +23,7 @@ import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 import { financialLineageMembership } from "./financialCoverage";
 import { preparePedidoPhysicalProjection } from "./stock";
 import { getFinanceiroPedido } from "./comandaLedger";
+import { temEstornoAnulacaoAtivo } from "./pedidoAnulacao";
 import {
   getPixMpRefundIntentForLeg,
   reconcilePixMpRefundIntent,
@@ -78,6 +79,7 @@ type CancellationError =
   | "REFUND_REMOTO_EM_ANDAMENTO"
   | "VALOR_REFUND_DIVERGENTE"
   | "OPERACAO_INCOMPLETA"
+  | "ESTORNO_ANULACAO_ATIVO"
   | ConflitoOperacao;
 
 export type CancellationResult =
@@ -309,6 +311,9 @@ export async function createItemCancellation(
   };
   const existing = await buscarOperacao(db, parsed.key);
   if (existing) return replayCancellation(db, existing, identity);
+  if (await temEstornoAnulacaoAtivo(db, params.pedidoId)) {
+    return { ok: false, erro: "ESTORNO_ANULACAO_ATIVO" };
+  }
 
   let preview: ItemCancellationPreview;
   try {

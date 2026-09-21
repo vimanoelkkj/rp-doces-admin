@@ -86,6 +86,15 @@ export const chaveReembolso = (key: string) => `a1:${key}:ref`;
 // seguido de falha local NUNCA produzem uma key MP nova.
 export const chaveMp = (key: string) => `a1:${key}:mp`;
 
+// Uma anulação de pedido pode precisar estornar mais de um pagamento PIX_MP
+// (ex.: pedido pago em duas cobranças). `pedido_operacoes.operation_key` é
+// UNIQUE por linha, então um único clique do admin — uma única key recebida
+// do cliente — deriva uma sub-key ESTÁVEL por pagamento, permitindo duas
+// (ou mais) intenções de refund nascerem do mesmo clique sem colidir e sem
+// que um retry do mesmo pagamento produza uma segunda intenção.
+export const chaveAnulacaoRefund = (key: string, pagamentoId: number) =>
+  `a1:${key}:anul:${pagamentoId}`;
+
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {

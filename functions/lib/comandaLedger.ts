@@ -27,6 +27,7 @@ import {
   type IdentidadeEsperada,
   type OperacaoRow,
 } from "./operacoes";
+import { temEstornoAnulacaoAtivo } from "./pedidoAnulacao";
 
 // Passo 4b: materialização lazy de pagamentos legados em `pedido_pagamentos`
 // + leitura (real ou virtual) sem nunca escrever no caminho de leitura.
@@ -683,6 +684,7 @@ export interface RegisterAdminPaymentResult {
     | "SALDO_INSUFICIENTE_CONCORRENCIA"
     | "OPERATION_KEY_INVALIDA"
     | "OPERACAO_INCOMPLETA"
+    | "ESTORNO_ANULACAO_ATIVO"
     | ConflitoOperacao;
 }
 
@@ -836,6 +838,9 @@ export async function registerAdminPayment(
     pedido.status_pedido !== "ENTREGUE"
   ) {
     return { ok: false, erro: "COMANDA_ENCERRADA" };
+  }
+  if (await temEstornoAnulacaoAtivo(db, params.pedidoId)) {
+    return { ok: false, erro: "ESTORNO_ANULACAO_ATIVO" };
   }
 
   const itens = await getItensComSaldo(db, params.pedidoId);

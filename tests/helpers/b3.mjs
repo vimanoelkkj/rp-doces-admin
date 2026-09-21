@@ -21,6 +21,7 @@ const bundle = await build({
       export * as adminPix from './functions/api/admin/pedidos/[id]/pix';
       export * as pix from './functions/lib/comandaPix';
       export * as adminVoid from './functions/api/admin/pedidos/[id]/anulacao';
+      export * as adminVoidEstorno from './functions/api/admin/pedidos/[id]/anulacao/estorno';
       export * as orderVoid from './functions/lib/pedidoAnulacao';
       export * as adminOrder from './functions/api/admin/pedidos/[id]';
       export * as adminHistorico from './functions/api/admin/pedidos/[id]/historico';

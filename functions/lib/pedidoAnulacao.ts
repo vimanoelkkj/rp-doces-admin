@@ -5,12 +5,67 @@ import { preparePedidoPhysicalProjection } from "./stock";
 
 import { getPedidoAnulacao, type PedidoAnulacao } from "./pedidoValido";
 
+export const ESTORNO_ANULACAO_ATIVO_MENSAGEM =
+  "Este pedido tem um estorno de exclusão em andamento no Mercado Pago. Nenhuma ação financeira é permitida até a exclusão ser concluída ou o estorno ser recusado.";
+
 export const ANULACAO_ERROS: Record<string, string> = {
   ANULACAO_MP_RECEBIDO: "Há recebimento Mercado Pago ainda não estornado. Trate o pagamento pelo fluxo de estorno existente antes de excluir.",
   ANULACAO_MP_PENDENTE: "Há cobrança Mercado Pago pendente, expirada sem confirmação definitiva ou inconclusiva. Resolva a cobrança antes de excluir.",
   ANULACAO_REFUND_PENDENTE: "Há um estorno em processamento ou inconclusivo. Aguarde sua resolução antes de excluir.",
   ANULACAO_LEGADO_AMBIGUO: "O pagamento histórico ainda não possui ledger auditável. Regularize o pagamento antes de excluir.",
 };
+
+export interface PagamentoMpReembolsavel {
+  pagamentoId: number;
+  valorCentavos: number;
+  restanteCentavos: number;
+}
+
+// Espelha exatamente a condição ANULACAO_MP_RECEBIDO da trigger
+// `pedido_anulacoes_validar_mp` (migration 0022): o saldo restante de cada
+// pagamento PIX_MP confirmado, descontados os estornos MP já confirmados
+// daquele mesmo pagamento_id. Não percorre a linhagem de trocas (migration
+// 0021) de propósito — aqui o pedido inteiro está sendo anulado, não a
+// cobertura de um item específico, e cada pagamento é a unidade de refund.
+export async function listarPagamentosMpReembolsaveis(
+  db: D1Database,
+  pedidoId: number,
+): Promise<PagamentoMpReembolsavel[]> {
+  const { results } = await db.prepare(`
+    SELECT pagamento_id, valor_centavos, restante_centavos FROM (
+      SELECT pp.id AS pagamento_id, pp.valor_centavos AS valor_centavos,
+        pp.valor_centavos - COALESCE((
+          SELECT SUM(r.valor_centavos) FROM pedido_reembolsos r
+          WHERE r.pagamento_id=pp.id AND r.status='REEMBOLSADO'
+            AND r.origem='MERCADO_PAGO' AND r.metodo='PIX_MP' AND r.mp_refund_id IS NOT NULL
+        ),0) AS restante_centavos
+      FROM pedido_pagamentos pp
+      WHERE pp.pedido_id=? AND pp.metodo='PIX_MP' AND pp.status='PAGO'
+    ) WHERE restante_centavos > 0
+    ORDER BY pagamento_id`)
+    .bind(pedidoId)
+    .all<{ pagamento_id: number; valor_centavos: number; restante_centavos: number }>();
+  return (results || []).map((row) => ({
+    pagamentoId: Number(row.pagamento_id),
+    valorCentavos: Number(row.valor_centavos),
+    restanteCentavos: Number(row.restante_centavos),
+  }));
+}
+
+// Ponto 4 da revisão de arquitetura (migration 0023): existe uma janela real
+// entre o estorno de um pagamento confirmado (ou ainda em voo) e a anulação
+// do pedido se efetivar. Nessa janela o dinheiro já pode ter voltado ao
+// cliente, então nenhuma outra ação financeira pode acontecer — só
+// reconciliar esse mesmo estorno e concluir a exclusão. `status<>'RECUSADO'`
+// inclui de propósito PENDENTE/PROCESSANDO/INCONCLUSIVO/CONFIRMADO: só uma
+// recusa definitiva do provedor devolve a escrita ao pedido.
+export async function temEstornoAnulacaoAtivo(db: D1Database, pedidoId: number): Promise<boolean> {
+  const row = await db.prepare(`SELECT 1 FROM pedido_reembolso_pix_mp_intencoes
+      WHERE pedido_id=? AND pedido_item_cancelamento_id IS NULL
+        AND pedido_item_troca_id IS NULL AND status<>'RECUSADO' LIMIT 1`)
+    .bind(pedidoId).first();
+  return !!row;
+}
 
 export async function anularPedido(db: D1Database, params: {
   pedidoId: number; devolverEstoque: boolean; motivo: string; usuarioId: number; usuarioNome: string;
