@@ -1,40 +1,306 @@
 .excluir-pedido-overlay {
-  position: fixed; inset: 0; z-index: 1300; display: flex; align-items: center;
-  justify-content: center; padding: 16px; background: rgba(25, 15, 15, .5);
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(43, 29, 26, 0.42);
 }
+
 .excluir-pedido-card {
-  width: 100%; max-width: 470px; max-height: 90dvh; overflow-y: auto;
-  padding: 24px; border-radius: 18px; background: var(--admin-surface, #fff);
-  color: var(--admin-text, #342522); box-shadow: 0 12px 45px #0003;
+  width: min(440px, 100%);
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding: 24px;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 24px 64px rgba(43, 29, 26, 0.2);
 }
-.excluir-pedido-card h2 { margin: 0 0 16px; font-size: 21px; }
-.excluir-pedido-card p { line-height: 1.5; }
-.excluir-pedido-card fieldset { border: 0; padding: 0; margin: 20px 0; }
-.excluir-pedido-card legend { font-weight: 600; margin-bottom: 10px; }
-.excluir-pedido-card fieldset label { display: flex; gap: 8px; padding: 8px 0; align-items: center; }
-.excluir-pedido-motivo { display: grid; gap: 8px; }
-.excluir-pedido-motivo textarea {
-  min-height: 75px; resize: vertical; border: 1px solid #b7aaa6; border-radius: 8px;
-  padding: 10px; font: inherit; color: inherit; background: transparent;
+
+.excluir-pedido-title {
+  margin: 0 0 10px;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 21px;
+  color: #2b1d1a;
 }
-.excluir-pedido-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
-.excluir-pedido-actions button { padding: 11px 16px; border-radius: 9px; border: 1px solid #b7aaa6; cursor: pointer; font: inherit; }
-.excluir-pedido-actions .excluir-pedido-danger { background: #b42318; border-color: #b42318; color: #fff; }
-.excluir-pedido-actions button:disabled { opacity: .55; cursor: not-allowed; }
-.excluir-pedido-error { color: #b42318; }
+
+.excluir-pedido-text {
+  margin: 0 0 16px;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #63524e;
+}
+
+.excluir-pedido-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #faf6f0;
+  margin-bottom: 20px;
+}
+
+.excluir-pedido-stat-label {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #8c7a76;
+}
+
+.excluir-pedido-stat-value {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #2b1d1a;
+  white-space: nowrap;
+}
+
+.excluir-pedido-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+.excluir-pedido-legend {
+  padding: 0 0 10px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b1d1a;
+}
+
+.excluir-pedido-radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  color: #2b1d1a;
+  cursor: pointer;
+}
+
+.excluir-pedido-radio input {
+  width: 17px;
+  height: 17px;
+  accent-color: #634738;
+  cursor: pointer;
+}
+
+.excluir-pedido-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #2b1d1a;
+}
+
+.excluir-pedido-textarea {
+  min-height: 76px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #d8c8b8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #2b1d1a;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.excluir-pedido-textarea:focus {
+  outline: none;
+  border-color: #634738;
+  box-shadow: 0 0 0 3px rgba(99, 71, 56, 0.1);
+}
+
+.excluir-pedido-error {
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fbeceb;
+  color: #c0392b;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+}
+
+.excluir-pedido-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.excluir-pedido-cancel,
+.excluir-pedido-danger {
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.excluir-pedido-cancel {
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  color: #634738;
+}
+
+.excluir-pedido-cancel:hover {
+  background: #f5efe8;
+  border-color: #634738;
+}
+
+.excluir-pedido-danger {
+  border: none;
+  background: #c0392b;
+  color: #ffffff;
+}
+
+.excluir-pedido-danger:hover {
+  background: #a52d20;
+}
+
+.excluir-pedido-cancel:disabled,
+.excluir-pedido-danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .excluir-pedido-actions {
+    flex-direction: column-reverse;
+  }
+
+  .excluir-pedido-cancel,
+  .excluir-pedido-danger {
+    width: 100%;
+  }
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-overlay {
+  background: rgba(0, 0, 0, 0.58);
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-card {
+  background: #2b2220;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-title {
+  color: #faf6f0;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-text {
+  color: #a89b92;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-stat {
+  background: #1a1412;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-stat-label {
+  color: #a89b92;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-stat-value {
+  color: #faf6f0;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-legend,
+html[data-admin-theme="dark"] .excluir-pedido-radio,
+html[data-admin-theme="dark"] .excluir-pedido-field {
+  color: #faf6f0;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-radio input {
+  accent-color: #d38b80;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-textarea {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-error {
+  background: #3b1a17;
+  color: #e08276;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-cancel {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-cancel:hover {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-danger {
+  background: #d1554a;
+}
+
+html[data-admin-theme="dark"] .excluir-pedido-danger:hover {
+  background: #b8483e;
+}
+
+/* ── "Mais ações" (⋮) ── */
 .pedmodal-more { position: relative; }
 .pedmodal-more summary { cursor: pointer; padding: 7px 12px; font-size: 24px; list-style: none; }
 .pedmodal-more summary::-webkit-details-marker { display: none; }
 .pedmodal-more button {
   position: absolute; right: 0; z-index: 2; min-width: 150px; padding: 12px;
-  background: var(--admin-surface, #fff); color: #b42318; border: 1px solid #d8c6c2;
-  border-radius: 9px; cursor: pointer; font: inherit; box-shadow: 0 5px 15px #0002;
+  background: #ffffff; color: #c0392b; border: 1px solid #eadfd3;
+  border-radius: 9px; cursor: pointer; font: inherit; box-shadow: 0 5px 15px rgba(43, 29, 26, 0.13);
 }
-.pedmodal-anulacao { border: 1px solid #d8a6a0; border-radius: 12px; padding: 16px; margin: 16px 0; }
-.pedmodal-anulacao h3 { margin-top: 0; }
-.pedmodal-anulacao p { margin: 8px 0; overflow-wrap: anywhere; }
-html[data-admin-theme="dark"] .excluir-pedido-card,
-html[data-admin-theme="dark"] .pedmodal-more button { background: #2e2420; color: #faf6f0; }
-html[data-admin-theme="dark"] .pedmodal-more button,
-html[data-admin-theme="dark"] .excluir-pedido-error { color: #ffb4ab; }
-html[data-admin-theme="dark"] .excluir-pedido-actions button:not(.excluir-pedido-danger) { background: #3d3230; color: #faf6f0; }
+
+html[data-admin-theme="dark"] .pedmodal-more button {
+  background: #2b2220;
+  color: #e08276;
+  border-color: #3d3230;
+}
+
+/* ── Registro de anulação ── */
+.pedmodal-anulacao {
+  border: 1px solid #eadfd3;
+  border-radius: 14px;
+  padding: 16px;
+  margin: 16px 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  color: #63524e;
+}
+
+.pedmodal-anulacao h3 {
+  margin: 0 0 8px;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #2b1d1a;
+}
+
+.pedmodal-anulacao p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+
+html[data-admin-theme="dark"] .pedmodal-anulacao {
+  border-color: #3d3230;
+  color: #a89b92;
+}
+
+html[data-admin-theme="dark"] .pedmodal-anulacao h3 {
+  color: #faf6f0;
+}
