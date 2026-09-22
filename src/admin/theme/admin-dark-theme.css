@@ -1495,11 +1495,29 @@ html[data-admin-theme="dark"] .desp-ranking li b {
 html[data-admin-theme="dark"] .desp-ranking li span {
   color: #faf6f0;
 }
-html[data-admin-theme="dark"] .desp-toolbar > select,
+html[data-admin-theme="dark"] .desp-status-dropdown-trigger,
 html[data-admin-theme="dark"] .desp-search,
 html[data-admin-theme="dark"] .desp-custom-range input {
   background: #1a1412;
   border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .desp-status-dropdown-trigger {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .desp-status-dropdown-list {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .desp-status-dropdown-option {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .desp-status-dropdown-option:hover,
+html[data-admin-theme="dark"] .desp-status-dropdown-option--active {
+  background: #3d2e2b;
+  color: #d38b80;
+}
+html[data-admin-theme="dark"] .desp-status-dropdown-chevron {
+  color: #d38b80;
 }
 /* Mesmo pill sólido de .loj-delivery-pill (Loja › Entregas) no escuro. */
 html[data-admin-theme="dark"] .desp-periods button {
@@ -1530,6 +1548,10 @@ html[data-admin-theme="dark"] .desp-table tr {
   border-color: #3d3230;
 }
 html[data-admin-theme="dark"] .desp-table-row:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .desp-card-mobile:hover,
+html[data-admin-theme="dark"] .desp-card-mobile:active {
   background: #3d2e2b;
 }
 html[data-admin-theme="dark"] .desp-status--ativa {
@@ -1578,17 +1600,51 @@ html[data-admin-theme="dark"] .gasto-btn-save:hover:not(:disabled) {
 }
 html[data-admin-theme="dark"] .gasto-form-grid input,
 html[data-admin-theme="dark"] .gasto-form-grid textarea,
-html[data-admin-theme="dark"] .gasto-form-grid select,
 html[data-admin-theme="dark"] .gasto-item-grid input,
-html[data-admin-theme="dark"] .gasto-item-grid select,
+html[data-admin-theme="dark"] .gasto-dropdown-trigger,
 html[data-admin-theme="dark"] .gasto-money-input {
   background: #1a1412;
   border-color: #3d3230;
   color: #faf6f0;
 }
+/* Mesmo padrão de .nped-dropdown-list/.nped-dropdown-option (Pedidos ›
+   Novo pedido) no dark mode. */
+html[data-admin-theme="dark"] .gasto-dropdown-list {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .gasto-dropdown-option {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .gasto-dropdown-option:hover,
+html[data-admin-theme="dark"] .gasto-dropdown-option--active {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .gasto-dropdown-chevron {
+  color: #d38b80;
+}
 html[data-admin-theme="dark"] .gasto-item-card {
   background: #241c1a;
   border-color: #3d3230;
+}
+/* Botão de remover item (ícone de lixeira): sem override ficava com o
+   fundo branco do claro (#fff) sobre o card escuro — mesma classe de bug
+   já corrigida no "X" de remover item do NovoPedidoModal (HUMAN-16). */
+html[data-admin-theme="dark"] .gasto-item-card > header button {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .gasto-item-card > header button:hover:not(:disabled) {
+  background: #3b1a17;
+  border-color: #e08276;
+  color: #e08276;
+}
+/* Ícone do seletor nativo de data (Data da compra): o SVG do navegador é
+   preto fixo — sem inverter, fica invisível sobre o input escuro. */
+html[data-admin-theme="dark"] .gasto-form-grid input[type="date"]::-webkit-calendar-picker-indicator,
+html[data-admin-theme="dark"] .desp-custom-range input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }
 html[data-admin-theme="dark"] .gasto-item-subtotal {
   background: #3b2a2c;

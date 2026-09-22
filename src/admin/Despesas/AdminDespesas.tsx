@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DESPESA_CATEGORIA_LABEL, type DespesaCategoria } from "../../../shared/despesas";
 import GastoModal from "./GastoModal";
 import {
@@ -43,6 +43,68 @@ interface DespesasResponse {
   despesas: DespesaListItem[];
   resumo: { totalCentavos: number; porCategoria: CategoriaResumo[]; rankingItens: ItemRankingResumo[] };
   resultadoFinanceiro: ResultadoFinanceiro;
+}
+
+const STATUS_OPCOES: { valor: "TODOS" | "ATIVA" | "CANCELADA"; label: string }[] = [
+  { valor: "TODOS", label: "Todos" },
+  { valor: "ATIVA", label: "Ativa" },
+  { valor: "CANCELADA", label: "Cancelada" },
+];
+
+function IconChevron({ open }: { open: boolean }) {
+  return (
+    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="desp-status-dropdown-chevron"
+      style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>
+      <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function useDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+  return { open, setOpen, ref, menuRef };
+}
+
+function StatusDropdown({ value, onChange }: {
+  value: "TODOS" | "ATIVA" | "CANCELADA";
+  onChange: (valor: "TODOS" | "ATIVA" | "CANCELADA") => void;
+}) {
+  const dd = useDropdown();
+  const atual = STATUS_OPCOES.find((o) => o.valor === value)!;
+  return (
+    <div className={`desp-status-dropdown ${dd.open ? "desp-status-dropdown--open" : ""}`} ref={dd.ref}>
+      <button type="button" className="desp-status-dropdown-trigger" aria-label="Filtrar por status"
+        onClick={() => dd.setOpen(!dd.open)}>
+        <span>{atual.label}</span>
+        <IconChevron open={dd.open} />
+      </button>
+      {dd.open && (
+        <ul className="desp-status-dropdown-list" ref={dd.menuRef}>
+          {STATUS_OPCOES.map((opcao) => (
+            <li key={opcao.valor}>
+              <button type="button"
+                className={`desp-status-dropdown-option ${value === opcao.valor ? "desp-status-dropdown-option--active" : ""}`}
+                onClick={() => { onChange(opcao.valor); dd.setOpen(false); }}>
+                {opcao.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 const PERIODOS: { valor: Periodo; label: string }[] = [
@@ -220,12 +282,7 @@ export default function AdminDespesas() {
               placeholder="Buscar por fornecedor ou item..." aria-label="Buscar despesas" />
           </label>
 
-          <select value={statusFiltro} onChange={(e) => setStatusFiltro(e.target.value as typeof statusFiltro)}
-            aria-label="Filtrar por status">
-            <option value="TODOS">Todos</option>
-            <option value="ATIVA">Ativa</option>
-            <option value="CANCELADA">Cancelada</option>
-          </select>
+          <StatusDropdown value={statusFiltro} onChange={setStatusFiltro} />
         </div>
 
         {erro && <p role="alert" className="desp-error">{erro}</p>}

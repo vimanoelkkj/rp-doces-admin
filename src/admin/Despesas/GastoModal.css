@@ -107,9 +107,7 @@
 
 .gasto-form-grid input,
 .gasto-form-grid textarea,
-.gasto-form-grid select,
-.gasto-item-grid input,
-.gasto-item-grid select {
+.gasto-item-grid input {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #eadfd3;
@@ -121,15 +119,6 @@
   outline: none;
 }
 
-/* A caixa fechada do select pode abreviar (reticências) quando o nome não
-   cabe — ex.: "Entrega / Transp…" — mas a lista aberta (nativa do
-   navegador) sempre mostra o nome completo de cada opção, sem cortar. */
-.gasto-item-grid select {
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
 .gasto-form-grid textarea {
   min-height: 60px;
   resize: vertical;
@@ -137,10 +126,96 @@
 
 .gasto-form-grid input:focus,
 .gasto-form-grid textarea:focus,
-.gasto-form-grid select:focus,
-.gasto-item-grid input:focus,
-.gasto-item-grid select:focus {
+.gasto-item-grid input:focus {
   border-color: #634738;
+}
+
+/* Mesmo padrão de .nped-dropdown (Pedidos › Novo pedido): seta animada e
+   lista com opções custom-estilizadas, no lugar do <select> nativo — que
+   não permite indicador animado nem hover custom na lista aberta. */
+.gasto-dropdown {
+  position: relative;
+}
+
+.gasto-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #eadfd3;
+  border-radius: 10px;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.gasto-dropdown-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gasto-dropdown-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.gasto-dropdown--open .gasto-dropdown-trigger {
+  border-color: #634738;
+}
+
+.gasto-dropdown-chevron {
+  flex-shrink: 0;
+  color: #634738;
+}
+
+.gasto-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  padding: 4px;
+  list-style: none;
+  margin: 0;
+  z-index: 600;
+  box-shadow: 0 8px 24px rgba(43, 29, 26, 0.1);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.gasto-dropdown-option {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #2b1d1a;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.gasto-dropdown-option:hover {
+  background: #f5efe8;
+}
+
+.gasto-dropdown-option--active {
+  background: #f5efe8;
+  color: #634738;
+  font-weight: 700;
 }
 
 .gasto-itens-heading {
@@ -215,9 +290,12 @@
    valor/total dividem a linha de baixo em 5 colunas iguais — 6 campos
    numa linha só (design anterior) espremia demais cada um, cortando
    texto de select e input mesmo em telas normais. */
+/* Larguras desiguais: "CATEGORIA" é o rótulo mais longo (maiúsculo, sem
+   espaço para quebrar linha) — em colunas de 1fr iguais ele não cabia e
+   vazava visualmente por cima do campo Quantidade ao lado. */
 .gasto-item-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: minmax(128px, 1.3fr) minmax(90px, 1fr) minmax(78px, 0.85fr) minmax(88px, 0.95fr) minmax(92px, 0.9fr);
   gap: 10px 12px;
   align-items: end;
 }
@@ -465,7 +543,7 @@
 
 @media (max-width: 720px) {
   .gasto-item-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(128px, 1.3fr) minmax(92px, 1fr);
   }
 
   .gasto-item-descricao {
