@@ -683,7 +683,14 @@ export default function Homepage() {
                 </div>
               </div>
 
-              <div className="contact-info-item">
+              <a
+                href="https://www.instagram.com/rp.doces"
+                className="contact-info-item"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Abrir Instagram da R&P Doces"
+                style={{ color: "inherit", textDecoration: "none" }}
+              >
                 <div className="contact-icon-bg">
                   <svg
                     width="14"
@@ -704,7 +711,7 @@ export default function Homepage() {
                   <h4>Instagram</h4>
                   <p>@rp.doces</p>
                 </div>
-              </div>
+              </a>
             </div>
 
             <a
