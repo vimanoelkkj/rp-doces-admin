@@ -1,5 +1,5 @@
 import Header from "../components/Header";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
 import Footer from "../components/Footer";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "../hooks/useScrollReveal";
@@ -14,6 +14,11 @@ import {
 } from "../api/storeConfig";
 import { createPortal } from "react-dom";
 import "./Homepage.css";
+
+const INSTAGRAM_WEB_URL = "https://www.instagram.com/rp.doces/";
+const INSTAGRAM_IOS_URL = "instagram://user?username=rp.doces";
+const INSTAGRAM_ANDROID_URL =
+  "intent://instagram.com/_u/rp.doces/#Intent;package=com.instagram.android;scheme=https;S.browser_fallback_url=https%3A%2F%2Fwww.instagram.com%2Frp.doces%2F;end";
 
 export default function Homepage() {
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -58,6 +63,33 @@ export default function Homepage() {
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openInstagram = (event: MouseEvent<HTMLAnchorElement>) => {
+    const userAgent = navigator.userAgent;
+
+    if (/Android/i.test(userAgent)) {
+      event.preventDefault();
+      window.location.href = INSTAGRAM_ANDROID_URL;
+      return;
+    }
+
+    if (/iPhone|iPad|iPod/i.test(userAgent)) {
+      event.preventDefault();
+
+      const fallbackTimer = window.setTimeout(() => {
+        window.location.href = INSTAGRAM_WEB_URL;
+      }, 1200);
+
+      const stopFallback = () => {
+        if (!document.hidden) return;
+        window.clearTimeout(fallbackTimer);
+        document.removeEventListener("visibilitychange", stopFallback);
+      };
+
+      document.addEventListener("visibilitychange", stopFallback);
+      window.location.href = INSTAGRAM_IOS_URL;
+    }
   };
   const storyRef = useScrollReveal<HTMLElement>();
   const processRef = useScrollReveal<HTMLElement>();
@@ -546,10 +578,11 @@ export default function Homepage() {
             <h2>Suspiros diários no @rpdoces</h2>
           </div>
           <a
-            href="https://instagram.com/rp.doces"
+            href={INSTAGRAM_WEB_URL}
             className="btn-instagram"
             target="_blank"
             rel="noopener noreferrer"
+            onClick={openInstagram}
           >
             Seguir no Instagram
           </a>
@@ -684,11 +717,12 @@ export default function Homepage() {
               </div>
 
               <a
-                href="https://www.instagram.com/rp.doces"
+                href={INSTAGRAM_WEB_URL}
                 className="contact-info-item"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Abrir Instagram da R&P Doces"
+                onClick={openInstagram}
                 style={{ color: "inherit", textDecoration: "none" }}
               >
                 <div className="contact-icon-bg">
