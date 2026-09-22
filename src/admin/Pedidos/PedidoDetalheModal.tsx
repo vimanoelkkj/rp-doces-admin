@@ -169,6 +169,7 @@ export default function PedidoDetalheModal({
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const [editandoNome, setEditandoNome] = useState(false);
   const [clienteNome, setClienteNome] = useState("");
   const [salvandoNome, setSalvandoNome] = useState(false);
@@ -367,6 +368,21 @@ export default function PedidoDetalheModal({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [statusMenuOpen]);
+
+  // O menu de mais ações usa <details>, então o navegador só o fecha
+  // automaticamente ao clicar novamente no <summary>. Fechamos também ao
+  // clicar em qualquer ponto fora dele, inclusive dentro do próprio modal.
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const menu = moreMenuRef.current;
+      if (menu?.open && !menu.contains(event.target as Node)) {
+        menu.removeAttribute("open");
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
 
   const alterarStatus = (novoStatus: StatusPedido) => {
     setStatusMenuOpen(false);
@@ -685,7 +701,7 @@ export default function PedidoDetalheModal({
                 </button>
               )}
             {data && !anulado && (
-              <details className="pedmodal-more">
+              <details ref={moreMenuRef} className="pedmodal-more">
                 <summary aria-label="Mais ações do pedido">⋮</summary>
                 <button type="button" onClick={event => {
                   event.currentTarget.closest("details")?.removeAttribute("open");
