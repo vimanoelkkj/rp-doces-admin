@@ -40,7 +40,7 @@ interface ConfigInput {
 }
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"] as const;
-const TIME_RE = /^(?:[01]\\d|2[0-3]):[0-5]\\d$/;
+const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const DELIVERY = new Set<DeliveryStatus>(["soon", "available", "unavailable"]);
 
 function rowToConfig(row: ConfigRow) {
