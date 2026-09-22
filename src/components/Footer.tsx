@@ -1,3 +1,9 @@
+import { useEffect, useState } from "react";
+import {
+  DEFAULT_STORE_CONFIG,
+  fetchStoreConfig,
+  formatStoreWhatsapp,
+} from "../api/storeConfig";
 import "./Footer.css";
 
 interface FooterProps {
@@ -6,6 +12,23 @@ interface FooterProps {
 }
 
 export default function Footer({ watermarkOnly = false }: FooterProps) {
+  const [storeConfig, setStoreConfig] = useState(DEFAULT_STORE_CONFIG);
+
+  useEffect(() => {
+    let active = true;
+    void fetchStoreConfig()
+      .then((config) => {
+        if (active) setStoreConfig(config);
+      })
+      .catch(() => {
+        // Mantém os dados padrão no rodapé em caso de indisponibilidade.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   if (watermarkOnly) {
     return (
       <footer className="footer footer--watermark-only" aria-hidden="true">
@@ -35,11 +58,13 @@ export default function Footer({ watermarkOnly = false }: FooterProps) {
         <div className="footer-col">
           <h4>Localização &amp; Contato</h4>
           <p>
-            Temponi Concept - Cambuí, Campinas
+            {storeConfig.localName}
             <br />
-            Rua Luís Barrozi Pereira, 582 - Sala 07
+            {storeConfig.address}
           </p>
-          <p className="footer-phone">(19) 99876-5432</p>
+          <p className="footer-phone">
+            {formatStoreWhatsapp(storeConfig.whatsapp)}
+          </p>
         </div>
       </div>
 
