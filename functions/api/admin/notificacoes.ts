@@ -8,7 +8,7 @@
 // Não existe endpoint de criação: notificação não é um fato que se cria, é um
 // fato do domínio observado de outro ângulo.
 
-import { requireUser } from "../../lib/auth";
+import { requireUser, sameOrigin } from "../../lib/auth";
 import {
   listarNotificacoes,
   marcarComoLidas,
@@ -43,6 +43,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
+
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 

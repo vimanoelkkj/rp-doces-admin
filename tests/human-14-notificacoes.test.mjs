@@ -24,7 +24,7 @@ const marcar = (db, session, corpo) =>
     env: {DB: db},
     request: new Request('https://local.test/api/admin/notificacoes', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session)},
+      headers: {'Content-Type': 'application/json', Origin: 'https://local.test', Cookie: cookieDe(session)},
       body: JSON.stringify(corpo),
     }),
   });
@@ -264,7 +264,7 @@ test('endpoint exige autenticação e valida a entrada', async t => {
   const postSemSessao = await app.adminNotificacoes.onRequestPost({
     env: {DB: db},
     request: new Request('https://local.test/api/admin/notificacoes', {
-      method: 'POST', body: JSON.stringify({todas: true}),
+      method: 'POST', headers: {Origin: 'https://local.test'}, body: JSON.stringify({todas: true}),
     }),
   });
   assert.equal(postSemSessao.status, 401);
@@ -277,7 +277,7 @@ test('endpoint exige autenticação e valida a entrada', async t => {
   const jsonInvalido = await app.adminNotificacoes.onRequestPost({
     env: {DB: db},
     request: new Request('https://local.test/api/admin/notificacoes', {
-      method: 'POST', headers: {Cookie: cookieDe(session)}, body: '{',
+      method: 'POST', headers: {Origin: 'https://local.test', Cookie: cookieDe(session)}, body: '{',
     }),
   });
   assert.equal(jsonInvalido.status, 400);

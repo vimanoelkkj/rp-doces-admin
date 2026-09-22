@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser, hashPassword, validatePassword } from "../../../lib/auth";
+import { requireUser, hashPassword, validatePassword, sameOrigin } from "../../../lib/auth";
 
 interface Env {
   DB: D1Database;
@@ -42,6 +42,8 @@ async function handlePut({
   env: Env;
   params: Record<string, string | string[]>;
 }): Promise<Response> {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
+
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 

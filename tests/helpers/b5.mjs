@@ -56,6 +56,9 @@ export const COBERTURA_FINANCEIRA_LINHAGEM = separarStatements(
 export const PEDIDO_ANULACOES = separarStatements(
   await readFile('migrations/0022_pedido_anulacoes.sql', 'utf8'),
 );
+export const CHECKOUT_RATE_LIMIT = separarStatements(
+  await readFile('migrations/0027_checkout_rate_limits.sql', 'utf8'),
+);
 
 function criarDb(mf) {
   const db = {
@@ -135,6 +138,11 @@ export async function aplicarCoberturaFinanceiraLinhagem(db) {
 
 export async function aplicarPedidoAnulacoes(db) {
   for (const sql of PEDIDO_ANULACOES) await db.prepare(sql).run();
+}
+
+/** Aplica a infraestrutura exigida pelo checkout atual sem reescrever o cutover B5 histórico. */
+export async function aplicarCheckoutRateLimit(db) {
+  for (const sql of CHECKOUT_RATE_LIMIT) await db.prepare(sql).run();
 }
 
 /** Roda a validação e devolve as linhas de verificacao/resultado. */

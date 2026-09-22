@@ -79,7 +79,16 @@ function produto(id, categorySlug, nomeCategoria, nome) {
 }
 
 async function montar(t, produtos) {
-  t.mock.method(globalThis, 'fetch', async () => Response.json({produtos}));
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url === '/api/config') {
+      return Response.json({config: {
+        days: [], openTime: '09:00', closeTime: '20:00',
+        localName: 'R&P Doces', address: '', mapsLink: '',
+        deliveryStatus: 'unavailable', whatsapp: '11999999999', defaultMessage: '',
+      }});
+    }
+    return Response.json({produtos});
+  });
   let root;
   await ui.act(async () => { root = ui.mount(container); });
   await flush();
