@@ -527,6 +527,23 @@
     min-width: 100%;
   }
 
+  /* No celular, o menu deve crescer para a direita a partir do gatilho.
+     Ancorá-lo pela direita fazia a lista ultrapassar a borda esquerda da
+     viewport quando o filtro ficava no início da linha. */
+  .desp-status-dropdown-list {
+    right: auto;
+    left: 0;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+  }
+
+  .desp-status-dropdown-option {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   /* Tabela vira cards: nenhuma tentativa de encolher colunas. */
   .desp-table-panel {
     overflow-x: visible;
