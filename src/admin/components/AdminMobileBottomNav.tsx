@@ -44,7 +44,7 @@ const primaryItems: PrimaryItem[] = [
   },
 ];
 
-const secondaryPaths = ["/admin/administradores", "/admin/notificacoes"];
+const secondaryPaths = ["/admin/administradores", "/admin/despesas", "/admin/notificacoes"];
 
 function IconMore() {
   return (

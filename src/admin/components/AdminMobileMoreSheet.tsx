@@ -9,7 +9,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useAdminAuth } from "../auth/AdminAuthContext";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
 import { useAdminTheme } from "../theme/AdminThemeContext";
-import { IconBell, IconMoon, IconSun, IconUsers } from "./AdminSidebar";
+import { IconBell, IconMoon, IconReceipt, IconSun, IconUsers } from "./AdminSidebar";
 import { useAdminModal } from "./useAdminModal";
 
 interface RenderProps {
@@ -141,6 +141,16 @@ export default function AdminMobileMoreSheet({ children }: Props) {
             >
               <span className="admin-mobile-sheet-icon"><IconUsers /></span>
               <span>Administradores</span>
+            </NavLink>
+            <NavLink
+              to="/admin/despesas"
+              className={({ isActive }) =>
+                `admin-mobile-sheet-item admin-mobile-sheet-item--despesas${isActive ? " admin-mobile-sheet-item--active" : ""}`
+              }
+              onClick={close}
+            >
+              <span className="admin-mobile-sheet-icon"><IconReceipt /></span>
+              <span>Despesas</span>
             </NavLink>
             <NavLink
               to="/admin/notificacoes"
