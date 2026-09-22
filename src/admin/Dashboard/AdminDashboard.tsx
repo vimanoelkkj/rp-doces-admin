@@ -360,7 +360,7 @@ export default function AdminDashboard() {
               <div className="dash-panel-title-group">
                 <h2 className="dash-panel-title">Resultado financeiro</h2>
                 <p className="dash-panel-subtitle">
-                  Faturamento líquido menos despesas do dia
+                  Faturamento líquido total menos despesas
                 </p>
               </div>
               <div className="dash-result-grid">

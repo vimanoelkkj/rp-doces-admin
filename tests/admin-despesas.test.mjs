@@ -506,11 +506,14 @@ test('42: endpoints exigem sessão autenticada', async t => {
 });
 
 // 48) dashboard financeiro correto
-test('48: dashboard expõe resultadoFinanceiro do dia selecionado', async t => {
+test('48: dashboard expõe resultadoFinanceiro acumulado (não só do dia selecionado)', async t => {
   const {db, session} = await setup(t);
-  await configurarFaturamento(db, {valorCentavos: 10000, data: '2026-09-22'});
+  // Faturamento e despesa de um dia BEM diferente de "hoje" — o card do
+  // dashboard é acumulado geral (bate com "Caixa total"), então precisa
+  // continuar contando isso mesmo consultando outra data.
+  await configurarFaturamento(db, {valorCentavos: 10000, data: '2026-09-01'});
   await criar(db, session, despesaBasica({
-    dataCompetencia: '2026-09-22', itens: [itemBasico({valorUnitarioCentavos: 100, quantidade: 40})],
+    dataCompetencia: '2026-09-01', itens: [itemBasico({valorUnitarioCentavos: 100, quantidade: 40})],
   }));
   const response = await app.dashboard.onRequestGet({
     env: {DB: db}, waitUntil() {},
