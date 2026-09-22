@@ -86,6 +86,12 @@ test('dashboard renderiza caixa total e ranking geral entregues pelo backend', a
         {produtoId: null, nome: 'Sabor historico', quantidade: 12},
       ],
       pedidosRecentes: [],
+      resultadoFinanceiro: {
+        faturamentoLiquidoCentavos: 90000,
+        despesasCentavos: 0,
+        lucroEstimadoCentavos: 90000,
+        margemEstimada: 100,
+      },
     });
   });
 

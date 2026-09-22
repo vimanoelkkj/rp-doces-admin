@@ -121,6 +121,15 @@
   outline: none;
 }
 
+/* A caixa fechada do select pode abreviar (reticências) quando o nome não
+   cabe — ex.: "Entrega / Transp…" — mas a lista aberta (nativa do
+   navegador) sempre mostra o nome completo de cada opção, sem cortar. */
+.gasto-item-grid select {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .gasto-form-grid textarea {
   min-height: 60px;
   resize: vertical;
@@ -202,15 +211,19 @@
   background: #fdebea;
 }
 
+/* Descrição ocupa a própria linha inteira; categoria/quantidade/unidade/
+   valor/total dividem a linha de baixo em 5 colunas iguais — 6 campos
+   numa linha só (design anterior) espremia demais cada um, cortando
+   texto de select e input mesmo em telas normais. */
 .gasto-item-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 0.7fr 0.8fr 1fr auto;
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px 12px;
   align-items: end;
 }
 
 .gasto-item-descricao {
-  grid-column: span 1;
+  grid-column: 1 / -1;
 }
 
 .gasto-money-input {
