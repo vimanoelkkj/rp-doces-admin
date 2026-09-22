@@ -104,7 +104,7 @@ test('navegação mobile troca o drawer pela barra inferior acessível', async t
   const labels = [...document.querySelectorAll('.sidebar-main-nav a, .sidebar-system-nav a')]
     .map(link => link.textContent.trim().replace(/(?:\d+|9\+)$/, ''));
   assert.deepEqual(labels, [
-    'Dashboard', 'Produtos', 'Pedidos', 'Administradores', 'Loja', 'Notificações',
+    'Dashboard', 'Produtos', 'Pedidos', 'Administradores', 'Despesas', 'Loja', 'Notificações',
   ]);
   assert.equal(document.querySelectorAll('.sidebar-nav-badge').length, 1);
   assert.equal(document.querySelector('.sidebar-nav-badge').textContent, '3');

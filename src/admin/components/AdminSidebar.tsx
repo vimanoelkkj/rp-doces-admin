@@ -160,6 +160,38 @@ export const IconUsers = () => (
   </svg>
 );
 
+export const IconReceipt = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M5.2 2H14.8C15.1314 2 15.4 2.26863 15.4 2.6V17.4C15.4 17.9376 14.7896 18.2453 14.36 17.928L12.8 16.775L11.24 17.928C10.9946 18.1097 10.6587 18.1097 10.4133 17.928L8.85333 16.775L7.29333 17.928C7.04794 18.1097 6.71206 18.1097 6.46667 17.928L4.90667 16.775L3.64 17.712C3.21038 18.0293 2.6 17.7216 2.6 17.184V4.6"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M2.6 4.6C2.6 3.16406 3.76406 2 5.2 2"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M6.2 6.8H11.8M6.2 9.6H11.8M6.2 12.4H9.4"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 export const IconStore = () => (
   <svg
     width="20"
@@ -266,6 +298,12 @@ const mainNav: NavItem[] = [
     label: "Administradores",
     icon: <IconUsers />,
     animClass: "sidebar-anim-admins",
+  },
+  {
+    to: "/admin/despesas",
+    label: "Despesas",
+    icon: <IconReceipt />,
+    animClass: "sidebar-anim-despesas",
   },
   {
     to: "/admin/loja",

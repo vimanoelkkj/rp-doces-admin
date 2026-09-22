@@ -4,6 +4,7 @@ import { pedidoValidoSql } from "../../lib/pedidoValido";
 
 import { requireUser } from "../../lib/auth";
 import { getStoreAnalytics } from "../../lib/dashboardAnalytics";
+import { getResultadoFinanceiro } from "../../lib/resultadoFinanceiro";
 
 interface Env {
   DB: D1Database;
@@ -122,6 +123,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       catalogo,
       analytics,
       pedidosRecentes,
+      resultadoFinanceiro,
     ] = await Promise.all([
       // "Quanto dinheiro confirmado entrou hoje" é pergunta do livro-caixa,
       // não do agregado do pedido — um pedido PARCIAL contribui só a fração
@@ -205,6 +207,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       )
         .bind(data)
         .all<PedidoRecenteRow>(),
+      // Resultado financeiro (despesas itemizadas): mesmo dia selecionado
+      // pelo filtro do dashboard, para "lucro estimado" bater com
+      // "recebido hoje" acima — não redefine faturamento, só compõe com
+      // getResultadoFinanceiro (que reusa a mesma definição de líquido).
+      getResultadoFinanceiro(env.DB, { desde: data, ate: data }),
     ]);
 
     return Response.json({
@@ -221,6 +228,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       financeiro: analytics.financeiro,
       maisVendidos: analytics.maisVendidos,
       pedidosRecentes: pedidosRecentes.results,
+      resultadoFinanceiro,
     });
   } catch (err) {
     console.error("Erro ao carregar dashboard (admin)", err);

@@ -17,6 +17,7 @@ import AdminProdutos from "./admin/Produtos";
 import AdminPedidos from "./admin/Pedidos";
 import AdminAdministradores from "./admin/Administradores";
 import AdminLoja from "./admin/Loja";
+import AdminDespesas from "./admin/Despesas";
 import AdminNotificacoes from "./admin/notificacoes/AdminNotificacoes";
 import AdminLayout from "./admin/components/AdminLayout";
 import { AdminThemeProvider } from "./admin/theme/AdminThemeContext";
@@ -73,6 +74,7 @@ function AdminRoutes() {
           element={<AdminAdministradores />}
         />
         <Route path="/admin/loja" element={<AdminLoja />} />
+        <Route path="/admin/despesas" element={<AdminDespesas />} />
         {/* HUMAN-14: a rota já existia no menu lateral e não tinha destino —
             clicar caía numa área vazia. Agora é a superfície das
             notificações, dentro do layout administrativo atual. */}

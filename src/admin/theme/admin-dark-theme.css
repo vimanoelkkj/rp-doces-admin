@@ -1432,3 +1432,178 @@ html[data-admin-theme="dark"] .admin-login-forgot:hover {
 html[data-admin-theme="dark"] .admin-login-footer-text {
   color: #a89b92;
 }
+
+/* ═══════════════════════════════════════════
+   Despesas
+   ═══════════════════════════════════════════ */
+html[data-admin-theme="dark"] .desp-title,
+html[data-admin-theme="dark"] .desp-kpi-value,
+html[data-admin-theme="dark"] .desp-card-heading h2,
+html[data-admin-theme="dark"] .desp-table td strong,
+html[data-admin-theme="dark"] .desp-card-mobile > strong {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .desp-subtitle,
+html[data-admin-theme="dark"] .desp-kpi-label,
+html[data-admin-theme="dark"] .desp-categoria-row > span,
+html[data-admin-theme="dark"] .desp-categoria-row > em,
+html[data-admin-theme="dark"] .desp-ranking li strong,
+html[data-admin-theme="dark"] .desp-empty,
+html[data-admin-theme="dark"] .desp-table th,
+html[data-admin-theme="dark"] .desp-table td,
+html[data-admin-theme="dark"] .desp-search,
+html[data-admin-theme="dark"] .desp-custom-range,
+html[data-admin-theme="dark"] .desp-card-mobile-row {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .desp-kpi-value--negativo {
+  color: #e08276;
+}
+html[data-admin-theme="dark"] .desp-btn-primary {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .desp-btn-primary:hover {
+  background: #b8746a;
+}
+html[data-admin-theme="dark"] .desp-kpi-card,
+html[data-admin-theme="dark"] .desp-card,
+html[data-admin-theme="dark"] .desp-table-panel,
+html[data-admin-theme="dark"] .desp-card-mobile {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .desp-progress {
+  background: #1a1412;
+}
+html[data-admin-theme="dark"] .desp-ranking li b {
+  background: #3b2a2c;
+  color: #e2a79c;
+}
+html[data-admin-theme="dark"] .desp-ranking li span {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .desp-periods button,
+html[data-admin-theme="dark"] .desp-toolbar > select,
+html[data-admin-theme="dark"] .desp-search,
+html[data-admin-theme="dark"] .desp-custom-range input {
+  background: #1a1412;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .desp-periods button.is-active {
+  border-color: #d38b80;
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .desp-custom-range input {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .desp-search input {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .desp-error {
+  background: #3b1a17;
+  color: #e08276;
+}
+html[data-admin-theme="dark"] .desp-table th {
+  background: #1a1412;
+}
+html[data-admin-theme="dark"] .desp-table td,
+html[data-admin-theme="dark"] .desp-table tr {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .desp-table-row:hover {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .desp-status--ativa {
+  background: #182c22;
+  color: #62c584;
+}
+html[data-admin-theme="dark"] .desp-status--cancelada {
+  background: #3b1a17;
+  color: #e08276;
+}
+
+/* ── Registrar/editar gasto (GastoModal) ── */
+html[data-admin-theme="dark"] .gasto-overlay {
+  background: rgba(0, 0, 0, 0.72);
+}
+html[data-admin-theme="dark"] .gasto-modal {
+  background: #2b2220;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .gasto-title,
+html[data-admin-theme="dark"] .gasto-itens-heading h3,
+html[data-admin-theme="dark"] .gasto-detalhe-itens h3,
+html[data-admin-theme="dark"] .gasto-total-row span,
+html[data-admin-theme="dark"] .gasto-total-row strong,
+html[data-admin-theme="dark"] .gasto-detalhe-grid strong,
+html[data-admin-theme="dark"] .gasto-detalhe-item strong {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .gasto-close,
+html[data-admin-theme="dark"] .gasto-btn-cancel {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .gasto-close:hover,
+html[data-admin-theme="dark"] .gasto-btn-cancel:hover:not(:disabled) {
+  background: #3d2e2b;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .gasto-btn-save {
+  background: #d38b80;
+  color: #ffffff;
+}
+html[data-admin-theme="dark"] .gasto-btn-save:hover:not(:disabled) {
+  background: #b8746a;
+}
+html[data-admin-theme="dark"] .gasto-form-grid input,
+html[data-admin-theme="dark"] .gasto-form-grid textarea,
+html[data-admin-theme="dark"] .gasto-form-grid select,
+html[data-admin-theme="dark"] .gasto-item-grid input,
+html[data-admin-theme="dark"] .gasto-item-grid select,
+html[data-admin-theme="dark"] .gasto-money-input {
+  background: #1a1412;
+  border-color: #3d3230;
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .gasto-item-card {
+  background: #241c1a;
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .gasto-item-subtotal {
+  background: #3b2a2c;
+}
+html[data-admin-theme="dark"] .gasto-item-subtotal strong {
+  color: #e2a79c;
+}
+html[data-admin-theme="dark"] .gasto-btn-add-item {
+  border-color: #d38b80;
+  color: #e2a79c;
+}
+html[data-admin-theme="dark"] .gasto-btn-add-item:hover:not(:disabled) {
+  background: #3d2e2b;
+}
+html[data-admin-theme="dark"] .gasto-error {
+  background: #3b1a17;
+  color: #e08276;
+}
+html[data-admin-theme="dark"] .gasto-footer {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .gasto-detalhe-item {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .gasto-status-pill--ativa {
+  background: #182c22;
+  color: #62c584;
+}
+html[data-admin-theme="dark"] .gasto-status-pill--cancelada {
+  background: #3b1a17;
+  color: #e08276;
+}
+html[data-admin-theme="dark"] .gasto-loading {
+  color: #a89b92;
+}

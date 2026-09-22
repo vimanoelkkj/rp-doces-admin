@@ -1,0 +1,481 @@
+.gasto-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(43, 29, 26, 0.45);
+}
+
+.gasto-modal {
+  width: 620px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(43, 29, 26, 0.12);
+}
+
+.gasto-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 28px 32px 20px;
+}
+
+.gasto-kicker {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #634738;
+}
+
+.gasto-title {
+  margin: 4px 0 0;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: #2b1d1a;
+}
+
+.gasto-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #eadfd3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #634738;
+  cursor: pointer;
+}
+
+.gasto-close:hover {
+  background: #f5efe8;
+}
+
+.gasto-body {
+  padding: 0 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.gasto-loading {
+  padding: 40px 32px;
+  margin: 0;
+  text-align: center;
+  color: #8c7a76;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+}
+
+.gasto-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.gasto-span-2 {
+  grid-column: 1 / -1;
+}
+
+.gasto-form-grid label,
+.gasto-item-grid label {
+  display: grid;
+  gap: 6px;
+  font-family: "Manrope", sans-serif;
+}
+
+.gasto-form-grid label > span:first-child,
+.gasto-item-grid label > span:first-child,
+.gasto-item-subtotal > span {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  color: #8c7a76;
+  text-transform: uppercase;
+}
+
+.gasto-form-grid input,
+.gasto-form-grid textarea,
+.gasto-form-grid select,
+.gasto-item-grid input,
+.gasto-item-grid select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #eadfd3;
+  border-radius: 10px;
+  background: #faf6f0;
+  color: #2b1d1a;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  outline: none;
+}
+
+.gasto-form-grid textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.gasto-form-grid input:focus,
+.gasto-form-grid textarea:focus,
+.gasto-form-grid select:focus,
+.gasto-item-grid input:focus,
+.gasto-item-grid select:focus {
+  border-color: #634738;
+}
+
+.gasto-itens-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gasto-itens-heading h3 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: #2b1d1a;
+}
+
+.gasto-itens-heading span {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  color: #8c7a76;
+}
+
+.gasto-itens-list {
+  display: grid;
+  gap: 12px;
+}
+
+.gasto-item-card {
+  padding: 16px;
+  border: 1px solid #eadfd3;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.gasto-item-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.gasto-item-card > header strong {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #8c7a76;
+}
+
+.gasto-item-card > header button {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #eadfd3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #8c7a76;
+  cursor: pointer;
+}
+
+.gasto-item-card > header button:hover:not(:disabled) {
+  color: #b85c59;
+  border-color: #b85c59;
+  background: #fdebea;
+}
+
+.gasto-item-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.7fr 0.8fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.gasto-item-descricao {
+  grid-column: span 1;
+}
+
+.gasto-money-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #eadfd3;
+  border-radius: 10px;
+  background: #faf6f0;
+}
+
+.gasto-money-input span {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #8c7a76;
+}
+
+.gasto-money-input input {
+  border: none !important;
+  background: transparent !important;
+  padding: 10px 0 !important;
+}
+
+.gasto-money-input:focus-within {
+  border-color: #634738;
+}
+
+.gasto-item-subtotal {
+  min-width: 92px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f7ecee;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gasto-item-subtotal strong {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #d38b80;
+}
+
+.gasto-btn-add-item {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: 1px dashed #d38b80;
+  border-radius: 100px;
+  background: transparent;
+  color: #634738;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gasto-btn-add-item:hover:not(:disabled) {
+  background: #f5efe8;
+}
+
+.gasto-error {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fbeceb;
+  color: #b85c59;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+}
+
+.gasto-footer {
+  padding-top: 16px;
+  border-top: 1px solid #eadfd3;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gasto-footer--detalhe {
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.gasto-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gasto-total-row span {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #2b1d1a;
+}
+
+.gasto-total-row strong {
+  font-family: "Fraunces", serif;
+  font-weight: 700;
+  font-size: 22px;
+  color: #2b1d1a;
+}
+
+.gasto-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.gasto-btn-cancel,
+.gasto-btn-save {
+  padding: 11px 22px;
+  border-radius: 100px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.gasto-btn-cancel {
+  border: 1px solid #eadfd3;
+  background: #ffffff;
+  color: #634738;
+}
+
+.gasto-btn-cancel:hover:not(:disabled) {
+  background: #f5efe8;
+}
+
+.gasto-btn-save {
+  border: none;
+  background: #634738;
+  color: #ffffff;
+}
+
+.gasto-btn-save:hover:not(:disabled) {
+  background: #4a332b;
+}
+
+.gasto-btn-cancel:disabled,
+.gasto-btn-save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Detalhe (somente leitura) ── */
+.gasto-detalhe-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.gasto-detalhe-span2 {
+  grid-column: 1 / -1;
+}
+
+.gasto-detalhe-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gasto-detalhe-grid span {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: #8c7a76;
+}
+
+.gasto-detalhe-grid strong {
+  font-family: "Manrope", sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #2b1d1a;
+}
+
+.gasto-status-pill {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 12px !important;
+}
+
+.gasto-status-pill--ativa {
+  background: #ebf5f0;
+  color: #4e8c6f;
+}
+
+.gasto-status-pill--cancelada {
+  background: #fdebea;
+  color: #a7372e;
+}
+
+.gasto-detalhe-itens h3 {
+  margin: 0 0 10px;
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: #2b1d1a;
+}
+
+.gasto-detalhe-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #eadfd3;
+  font-family: "Manrope", sans-serif;
+}
+
+.gasto-detalhe-item:last-child {
+  border-bottom: none;
+}
+
+.gasto-detalhe-item > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gasto-detalhe-item strong {
+  font-size: 14px;
+  color: #2b1d1a;
+}
+
+.gasto-detalhe-item span {
+  font-size: 12px;
+  color: #8c7a76;
+}
+
+@media (max-width: 720px) {
+  .gasto-item-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .gasto-item-descricao {
+    grid-column: 1 / -1;
+  }
+
+  .gasto-item-subtotal {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .gasto-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gasto-detalhe-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gasto-modal {
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+}
