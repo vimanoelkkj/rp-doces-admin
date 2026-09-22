@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import "./Header.css";
@@ -13,6 +14,23 @@ export default function Header({ minimal }: HeaderProps) {
   const location = useLocation();
   const isCardapio = location.pathname === "/cardapio";
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const menuRef = useRef<HTMLElement>(null);
+  const dragStartYRef = useRef(0);
+  const dragOffsetRef = useRef(0);
+  const dragPointerIdRef = useRef<number | null>(null);
+  const dragMovedRef = useRef(false);
+  const suppressHandleClickRef = useRef(false);
+
+  const closeMenu = () => {
+    dragOffsetRef.current = 0;
+    dragPointerIdRef.current = null;
+    dragMovedRef.current = false;
+    setDragOffset(0);
+    setIsDragging(false);
+    setMenuOpen(false);
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -33,13 +51,77 @@ export default function Header({ minimal }: HeaderProps) {
   }, [menuOpen]);
 
   const handleMenuLink = (hash: string) => {
-    setMenuOpen(false);
+    closeMenu();
     if (location.pathname !== "/") {
       window.location.href = "/" + hash;
     } else {
       const el = document.querySelector(hash);
       el?.scrollIntoView({ behavior: "smooth" });
     }
+  };
+
+  const handleDragStart = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!menuOpen || (event.pointerType === "mouse" && event.button !== 0)) {
+      return;
+    }
+
+    dragStartYRef.current = event.clientY;
+    dragOffsetRef.current = 0;
+    dragPointerIdRef.current = event.pointerId;
+    dragMovedRef.current = false;
+    suppressHandleClickRef.current = false;
+    setDragOffset(0);
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleDragMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (dragPointerIdRef.current !== event.pointerId) return;
+
+    const offset = Math.max(0, event.clientY - dragStartYRef.current);
+    if (offset > 4) dragMovedRef.current = true;
+
+    dragOffsetRef.current = offset;
+    setDragOffset(offset);
+  };
+
+  const finishDrag = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    cancelled = false,
+  ) => {
+    if (dragPointerIdRef.current !== event.pointerId) return;
+
+    const moved = dragMovedRef.current;
+    const menuHeight = menuRef.current?.getBoundingClientRect().height ?? 320;
+    const closeThreshold = Math.max(72, Math.min(120, menuHeight * 0.25));
+    const shouldClose =
+      !cancelled && moved && dragOffsetRef.current >= closeThreshold;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    suppressHandleClickRef.current = moved;
+    dragPointerIdRef.current = null;
+    dragMovedRef.current = false;
+    setIsDragging(false);
+
+    if (shouldClose) {
+      closeMenu();
+      return;
+    }
+
+    dragOffsetRef.current = 0;
+    setDragOffset(0);
+  };
+
+  const handleDragHandleClick = () => {
+    if (suppressHandleClickRef.current) {
+      suppressHandleClickRef.current = false;
+      return;
+    }
+
+    closeMenu();
   };
 
   return (
@@ -100,7 +182,7 @@ export default function Header({ minimal }: HeaderProps) {
             <button
               className={`mobile-menu-btn ${menuOpen ? "mobile-menu-btn--open" : ""}`}
               aria-label="Menu"
-              onClick={() => setMenuOpen(!menuOpen)}
+              onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
             >
               <span />
               <span />
@@ -114,13 +196,27 @@ export default function Header({ minimal }: HeaderProps) {
         <>
           <div
             className={`mobile-menu-overlay ${menuOpen ? "mobile-menu-overlay--open" : ""}`}
-            onClick={() => setMenuOpen(false)}
+            onClick={closeMenu}
           />
-          <nav className={`mobile-menu ${menuOpen ? "mobile-menu--open" : ""}`}>
+          <nav
+            ref={menuRef}
+            className={`mobile-menu ${menuOpen ? "mobile-menu--open" : ""} ${isDragging ? "mobile-menu--dragging" : ""}`}
+            style={
+              menuOpen && dragOffset > 0
+                ? { transform: `translateY(${dragOffset}px)` }
+                : undefined
+            }
+          >
             <button
+              type="button"
               className="mobile-menu-close"
-              onClick={() => setMenuOpen(false)}
+              onPointerDown={handleDragStart}
+              onPointerMove={handleDragMove}
+              onPointerUp={(event) => finishDrag(event)}
+              onPointerCancel={(event) => finishDrag(event, true)}
+              onClick={handleDragHandleClick}
               aria-label="Fechar menu"
+              title="Arraste para baixo para fechar"
             />
             <div className="mobile-menu-links">
               <button onClick={() => handleMenuLink("#cardapio")}>

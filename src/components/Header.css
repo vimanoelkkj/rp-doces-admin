@@ -260,16 +260,45 @@
   overscroll-behavior: contain;
 }
 
+.mobile-menu--dragging {
+  transition: none;
+}
+
 .mobile-menu-close {
   align-self: center;
-  background: #d1c4b9;
-  border: none;
-  cursor: pointer;
+  position: relative;
+  width: 72px;
+  height: 32px;
+  margin: -4px 0 4px;
   padding: 0;
-  margin-bottom: 16px;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-menu-close::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
   width: 40px;
-  height: 2px;
-  border-radius: 2px;
+  height: 3px;
+  border-radius: 999px;
+  background: #d1c4b9;
+  transform: translate(-50%, -50%);
+}
+
+.mobile-menu-close:active {
+  cursor: grabbing;
+}
+
+.mobile-menu-close:focus-visible {
+  outline: 2px solid #634738;
+  outline-offset: 2px;
 }
 
 .mobile-menu-links {
