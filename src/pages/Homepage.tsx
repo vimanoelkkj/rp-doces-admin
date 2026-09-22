@@ -15,10 +15,10 @@ import {
 import { createPortal } from "react-dom";
 import "./Homepage.css";
 
-const INSTAGRAM_WEB_URL = "https://www.instagram.com/rp.doces/";
-const INSTAGRAM_IOS_URL = "instagram://user?username=rp.doces";
+const INSTAGRAM_WEB_URL = "https://www.instagram.com/rp.doces_/";
+const INSTAGRAM_IOS_URL = "instagram://user?username=rp.doces_";
 const INSTAGRAM_ANDROID_URL =
-  "intent://instagram.com/_u/rp.doces/#Intent;package=com.instagram.android;scheme=https;S.browser_fallback_url=https%3A%2F%2Fwww.instagram.com%2Frp.doces%2F;end";
+  "intent://instagram.com/_u/rp.doces_/#Intent;package=com.instagram.android;scheme=https;S.browser_fallback_url=https%3A%2F%2Fwww.instagram.com%2Frp.doces_%2F;end";
 
 export default function Homepage() {
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -575,7 +575,7 @@ export default function Homepage() {
         <div className="instagram-header">
           <div className="instagram-title-group">
             <span className="section-tag">Acompanhe-nos</span>
-            <h2>Suspiros diários no @rpdoces</h2>
+            <h2>Suspiros diários no @rp.doces_</h2>
           </div>
           <a
             href={INSTAGRAM_WEB_URL}
@@ -743,7 +743,7 @@ export default function Homepage() {
                 </div>
                 <div>
                   <h4>Instagram</h4>
-                  <p>@rp.doces</p>
+                  <p>@rp.doces_</p>
                 </div>
               </a>
             </div>
