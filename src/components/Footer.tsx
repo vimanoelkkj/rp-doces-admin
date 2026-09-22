@@ -15,6 +15,10 @@ export default function Footer({ watermarkOnly = false }: FooterProps) {
   const [storeConfig, setStoreConfig] = useState(DEFAULT_STORE_CONFIG);
 
   useEffect(() => {
+    // A versão watermark-only não exibe nenhum dado da loja e não precisa
+    // disparar uma chamada de configuração (inclusive durante o checkout).
+    if (watermarkOnly) return;
+
     let active = true;
     void fetchStoreConfig()
       .then((config) => {
@@ -27,7 +31,7 @@ export default function Footer({ watermarkOnly = false }: FooterProps) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [watermarkOnly]);
 
   if (watermarkOnly) {
     return (

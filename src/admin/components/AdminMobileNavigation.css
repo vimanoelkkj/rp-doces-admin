@@ -275,6 +275,11 @@
     transform-origin: top center;
   }
 
+  .admin-mobile-sheet-item--despesas:active .admin-mobile-sheet-icon {
+    animation: iconPrint 0.45s ease;
+    transform-origin: top center;
+  }
+
   .admin-mobile-sheet-item--theme:active .admin-mobile-sheet-icon {
     animation: iconPulse 0.5s ease;
   }

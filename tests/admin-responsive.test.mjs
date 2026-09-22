@@ -128,7 +128,8 @@ test('navegação mobile troca o drawer pela barra inferior acessível', async t
   assert.equal(document.activeElement.textContent.trim(), 'Administradores');
   assert.deepEqual(
     [...document.querySelectorAll('.admin-mobile-sheet-links a')].map(link => link.textContent.trim().replace(/3$/, '')),
-    ['Administradores', 'Notificações'],
+    ['Administradores', 'Despesas', 'Notificações'],
+    'Despesas está no menu de "Mais" do mobile — sem isso não há como abrir a tela no celular',
   );
   assert.equal(document.querySelector('.admin-mobile-sheet-badge').textContent, '3');
 

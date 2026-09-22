@@ -81,6 +81,9 @@ export async function fetchStoreConfig(): Promise<StoreConfig> {
   if (!response.ok) {
     throw new Error(body.error ?? "Não foi possível carregar as configurações da loja");
   }
+  if (!body || typeof body.config !== "object" || body.config === null) {
+    return DEFAULT_STORE_CONFIG;
+  }
   return body.config as StoreConfig;
 }
 
