@@ -350,6 +350,24 @@
   }
 }
 
+/* Despesas — leve "impressão" de recibo */
+.sidebar-anim-despesas:hover .sidebar-nav-icon {
+  animation: iconPrint 0.45s ease;
+  transform-origin: top center;
+}
+
+@keyframes iconPrint {
+  0% {
+    transform: scaleY(0.85);
+  }
+  50% {
+    transform: scaleY(1.05);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
 /* Loja — balanço de plaquinha */
 .sidebar-anim-loja:hover .sidebar-nav-icon {
   animation: iconSwing 0.5s ease;

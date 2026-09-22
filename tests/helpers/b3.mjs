@@ -54,6 +54,11 @@ const bundle = await build({
       export * as dashboard from './functions/api/admin/dashboard';
       export * as dashboardAnalytics from './functions/lib/dashboardAnalytics';
       export * as paymentSync from './functions/lib/paymentSync';
+      export * as despesas from './functions/lib/despesas';
+      export * as resultadoFinanceiro from './functions/lib/resultadoFinanceiro';
+      export * as adminDespesas from './functions/api/admin/despesas';
+      export * as adminDespesaId from './functions/api/admin/despesas/[id]';
+      export * as adminDespesaCancelar from './functions/api/admin/despesas/[id]/cancelar';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
