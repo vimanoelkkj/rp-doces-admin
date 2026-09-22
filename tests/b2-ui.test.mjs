@@ -64,6 +64,10 @@ async function mount(t,respond){
   const calls=[];
   t.mock.method(globalThis,'fetch',async(url,options)=>{
     if(url==='/api/checkout') return Response.json({pedidoId:1,tokenPublico:'token',totalCentavos:10000,qrCode:'qr',qrCodeBase64:'fake',expiresAt:new Date(Date.now()+6000).toISOString()});
+    if(url==='/api/config') return Response.json({config:{
+      days:[],openTime:'09:00',closeTime:'20:00',localName:'R&P Doces',
+      address:'',mapsLink:'',deliveryStatus:'unavailable',whatsapp:'11999999999',defaultMessage:''
+    }});
     calls.push({url,options});
     return respond(calls.length);
   });

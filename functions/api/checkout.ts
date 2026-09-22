@@ -3,6 +3,7 @@
 import { precoAtualCentavos, ProdutoRow } from "../lib/pricing";
 import { liberarReservaPedido } from "../lib/stock";
 import { postPagamentoMp } from "../lib/mpPost";
+import { checkCheckoutRateLimit } from "../lib/checkoutRateLimit";
 import {
   buscarOperacao,
   chaveMp,
@@ -141,6 +142,22 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const existente = await buscarOperacao(env.DB, operationKey);
   if (existente) {
     return await replayCheckout(env, existente, identidade);
+  }
+
+  // Replays idempotentes saem antes daqui. O limite conta apenas novas
+  // tentativas de checkout, reduzindo abuso sem penalizar retry legítimo.
+  const rateLimit = await checkCheckoutRateLimit(env.DB, request);
+  if (!rateLimit.allowed) {
+    return Response.json(
+      {
+        error: "Muitas tentativas de pedido em pouco tempo. Aguarde alguns instantes.",
+        code: "CHECKOUT_RATE_LIMIT",
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateLimit.retryAfter) },
+      },
+    );
   }
 
   const ids = [...new Set(body.items.map((i) => i.id))];

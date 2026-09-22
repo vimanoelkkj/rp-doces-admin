@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser } from "../../../../lib/auth";
+import { requireUser, sameOrigin } from "../../../../lib/auth";
 
 interface Env {
   DB: D1Database;
@@ -13,6 +13,49 @@ const ALLOWED_TYPES = new Map([
   ["image/png", "png"],
   ["image/webp", "webp"],
 ]);
+
+function detectImageType(bytes: ArrayBuffer): string | null {
+  const data = new Uint8Array(bytes);
+
+  if (
+    data.length >= 3 &&
+    data[0] === 0xff &&
+    data[1] === 0xd8 &&
+    data[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+
+  if (
+    data.length >= 8 &&
+    data[0] === 0x89 &&
+    data[1] === 0x50 &&
+    data[2] === 0x4e &&
+    data[3] === 0x47 &&
+    data[4] === 0x0d &&
+    data[5] === 0x0a &&
+    data[6] === 0x1a &&
+    data[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+
+  if (
+    data.length >= 12 &&
+    data[0] === 0x52 &&
+    data[1] === 0x49 &&
+    data[2] === 0x46 &&
+    data[3] === 0x46 &&
+    data[8] === 0x57 &&
+    data[9] === 0x45 &&
+    data[10] === 0x42 &&
+    data[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+
+  return null;
+}
 
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -27,6 +70,8 @@ export const onRequestPost: PagesFunction<Env> = async ({
   env,
   params,
 }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
+
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 
@@ -67,13 +112,21 @@ export const onRequestPost: PagesFunction<Env> = async ({
       return jsonError("A imagem deve ter no máximo 5 MB", 413);
     }
 
-    const extension = ALLOWED_TYPES.get(file.type)!;
-    const key = imageKey(id, extension);
     const bytes = await file.arrayBuffer();
+    const detectedType = detectImageType(bytes);
+    if (!detectedType || detectedType !== file.type) {
+      return jsonError(
+        "O conteúdo do arquivo não corresponde ao tipo de imagem informado",
+        415,
+      );
+    }
+
+    const extension = ALLOWED_TYPES.get(detectedType)!;
+    const key = imageKey(id, extension);
 
     await env.PRODUCT_IMAGES.put(key, bytes, {
       httpMetadata: {
-        contentType: file.type,
+        contentType: detectedType,
         cacheControl: "public, max-age=31536000, immutable",
       },
       customMetadata: { productId: String(id) },
@@ -110,6 +163,8 @@ export const onRequestDelete: PagesFunction<Env> = async ({
   env,
   params,
 }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
+
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 

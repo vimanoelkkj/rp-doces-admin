@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { app } from './helpers/b3.mjs';
 import {
   bancoProducao, aplicarB5, aplicarEstoquePorItem, aplicarOperacaoPorItem,
-  aplicarCancelamentoPorItem,
+  aplicarCancelamentoPorItem, aplicarCheckoutRateLimit,
   aplicarTrocaPorItem, aplicarRefundPixMpRecuperavel, aplicarCoberturaFinanceiraLinhagem, aplicarPedidoAnulacoes,
   validarB5, snapshot, SCRIPT_B5,
 } from './helpers/b5.mjs';
@@ -206,6 +206,7 @@ test('SITE: checkout real cria pedido multi-item contra o schema de produção',
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
   await aplicarCancelamentoPorItem(db);
+  await aplicarCheckoutRateLimit(db);
   mpPixOk(t);
   const pedidosAntes = await contar(db, 'pedidos');
 
@@ -264,6 +265,7 @@ test('SITE: A1 continua idempotente contra o schema legado', async t => {
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
   await aplicarCancelamentoPorItem(db);
+  await aplicarCheckoutRateLimit(db);
   mpPixOk(t);
 
   const primeira = await (await checkoutSite(db, [{ id: 1, quantity: 1 }])).json();

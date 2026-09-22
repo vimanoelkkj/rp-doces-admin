@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser, hashPassword, validatePassword } from "../../lib/auth";
+import { requireUser, hashPassword, validatePassword, sameOrigin } from "../../lib/auth";
 
 interface Env {
   DB: D1Database;
@@ -63,6 +63,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
+
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
   if (!isOwner(auth.user.papel)) {

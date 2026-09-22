@@ -121,8 +121,8 @@ function validate(body: ConfigInput) {
   if (body.mapsLink) {
     try {
       const url = new URL(body.mapsLink);
-      if (url.protocol !== "https:" && url.protocol !== "http:") {
-        return "Link do Google Maps inválido";
+      if (url.protocol !== "https:") {
+        return "Link do Google Maps precisa usar HTTPS";
       }
     } catch {
       return "Link do Google Maps inválido";
