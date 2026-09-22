@@ -235,8 +235,17 @@
   gap: 6px;
 }
 
-.desp-toolbar > select {
+/* Mesmo padrão de .nped-dropdown (Pedidos › Novo pedido): seta animada e
+   lista com opções custom-estilizadas, no lugar do <select> nativo. */
+.desp-status-dropdown {
+  position: relative;
+}
+
+.desp-status-dropdown-trigger {
   height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 0 14px;
   border: 1px solid #eadfd3;
   border-radius: 100px;
@@ -247,6 +256,60 @@
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  transition: border-color 0.15s;
+}
+
+.desp-status-dropdown--open .desp-status-dropdown-trigger {
+  border-color: #634738;
+}
+
+.desp-status-dropdown-chevron {
+  flex-shrink: 0;
+  color: #634738;
+}
+
+/* Só ancorada pela direita (sem left:0): a lista é mais larga que o
+   gatilho (min-width) e o filtro fica coladinho à borda direita da
+   página — ancorar dos dois lados fazia a lista crescer para além da
+   viewport. Crescendo para a esquerda, sempre sobra espaço na toolbar. */
+.desp-status-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  padding: 4px;
+  list-style: none;
+  margin: 0;
+  z-index: 600;
+  box-shadow: 0 8px 24px rgba(43, 29, 26, 0.1);
+  min-width: 130px;
+}
+
+.desp-status-dropdown-option {
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: #63524e;
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+
+.desp-status-dropdown-option:hover {
+  background: #faf6f0;
+}
+
+.desp-status-dropdown-option--active {
+  background: #faf6f0;
+  color: #634738;
 }
 
 /* Mesmo pill sólido de .loj-delivery-pill (Loja › Entregas): preenchido,
@@ -307,6 +370,12 @@
   border-radius: 100px;
   background: #ffffff;
   color: #8c7a76;
+  transition: border-color 0.15s;
+}
+
+/* Mesmo padrão de .ped-search:focus-within (Pedidos). */
+.desp-search:focus-within {
+  border-color: #634738;
 }
 
 .desp-search input {
@@ -485,6 +554,14 @@
     text-align: left;
     font-family: "Manrope", sans-serif;
     cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  /* Mesmo feedback de toque de .desp-table-row:hover (a versão desktop
+     do mesmo clique). */
+  .desp-card-mobile:hover,
+  .desp-card-mobile:active {
+    background: #faf6f0;
   }
 
   .desp-card-mobile-row {

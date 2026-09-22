@@ -48,6 +48,65 @@ interface ItemForm {
   valorUnitario: string;
 }
 
+function IconChevron({ open }: { open: boolean }) {
+  return (
+    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="gasto-dropdown-chevron"
+      style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>
+      <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function useDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+  return { open, setOpen, ref, menuRef };
+}
+
+function GastoDropdown<T extends string>({ value, options, labels, disabled, onChange, ariaLabel }: {
+  value: T;
+  options: readonly T[];
+  labels: Record<T, string>;
+  disabled?: boolean;
+  onChange: (valor: T) => void;
+  ariaLabel: string;
+}) {
+  const dd = useDropdown();
+  return (
+    <div className={`gasto-dropdown ${dd.open ? "gasto-dropdown--open" : ""}`} ref={dd.ref}>
+      <button type="button" className="gasto-dropdown-trigger" disabled={disabled} aria-label={ariaLabel}
+        onClick={() => dd.setOpen(!dd.open)}>
+        <span>{labels[value]}</span>
+        <IconChevron open={dd.open} />
+      </button>
+      {dd.open && (
+        <ul className="gasto-dropdown-list" ref={dd.menuRef}>
+          {options.map((opt) => (
+            <li key={opt}>
+              <button type="button"
+                className={`gasto-dropdown-option ${value === opt ? "gasto-dropdown-option--active" : ""}`}
+                onClick={() => { onChange(opt); dd.setOpen(false); }}>
+                {labels[opt]}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 let proximaKey = 0;
 function novoItemVazio(): ItemForm {
   proximaKey += 1;
@@ -345,10 +404,9 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                       </label>
                       <label>
                         <span>Categoria</span>
-                        <select value={item.categoria} disabled={salvando}
-                          onChange={(e) => atualizarItem(item.key, "categoria", e.target.value)}>
-                          {DESPESA_CATEGORIAS.map((c) => <option value={c} key={c}>{DESPESA_CATEGORIA_LABEL[c]}</option>)}
-                        </select>
+                        <GastoDropdown value={item.categoria} options={DESPESA_CATEGORIAS} labels={DESPESA_CATEGORIA_LABEL}
+                          disabled={salvando} ariaLabel="Categoria"
+                          onChange={(valor) => atualizarItem(item.key, "categoria", valor)} />
                       </label>
                       <label>
                         <span>Quantidade</span>
@@ -357,10 +415,9 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                       </label>
                       <label>
                         <span>Unidade</span>
-                        <select value={item.unidade} disabled={salvando}
-                          onChange={(e) => atualizarItem(item.key, "unidade", e.target.value)}>
-                          {DESPESA_UNIDADES.map((u) => <option value={u} key={u}>{DESPESA_UNIDADE_LABEL[u]}</option>)}
-                        </select>
+                        <GastoDropdown value={item.unidade} options={DESPESA_UNIDADES} labels={DESPESA_UNIDADE_LABEL}
+                          disabled={salvando} ariaLabel="Unidade"
+                          onChange={(valor) => atualizarItem(item.key, "unidade", valor)} />
                       </label>
                       <label>
                         <span>Valor unitário</span>
