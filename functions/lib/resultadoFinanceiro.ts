@@ -26,23 +26,29 @@ interface ResultadoRow {
 
 export async function getResultadoFinanceiro(
   db: D1Database,
-  params: { desde: string; ate: string },
+  params?: { desde: string; ate: string },
 ): Promise<ResultadoFinanceiro> {
+  // Sem params: acumulado geral, na mesma definição de "Caixa total"
+  // (getStoreAnalytics) — bate com o que o dono vê como saldo da loja,
+  // em vez de recortar só o dia e destoar do card de cima.
+  const filtroPagamentos = params ? "AND date(pago_em) BETWEEN ? AND ?" : "";
+  const filtroReembolsos = params ? "AND date(concluido_em) BETWEEN ? AND ?" : "";
+  const filtroDespesas = params ? "AND d.data_competencia BETWEEN ? AND ?" : "";
   const row = await db.prepare(`SELECT
       MAX(0,
         COALESCE((SELECT SUM(valor_centavos) FROM pedido_pagamentos
-                  WHERE status='PAGO' AND date(pago_em) BETWEEN ? AND ?
+                  WHERE status='PAGO' ${filtroPagamentos}
                     AND ${pedidoValidoSql("pedido_pagamentos.pedido_id")}), 0)
         - COALESCE((SELECT SUM(valor_centavos) FROM pedido_reembolsos
-                    WHERE status='REEMBOLSADO' AND date(concluido_em) BETWEEN ? AND ?
+                    WHERE status='REEMBOLSADO' ${filtroReembolsos}
                       AND ${pedidoValidoSql("pedido_reembolsos.pedido_id")}), 0)
       ) AS faturamento_liquido_centavos,
       COALESCE((SELECT SUM(di.valor_total_centavos)
                 FROM despesa_itens di
                 JOIN despesas d ON d.id = di.despesa_id
-                WHERE d.status = 'ATIVA' AND d.data_competencia BETWEEN ? AND ?), 0) AS despesas_centavos
+                WHERE d.status = 'ATIVA' ${filtroDespesas}), 0) AS despesas_centavos
     `)
-    .bind(params.desde, params.ate, params.desde, params.ate, params.desde, params.ate)
+    .bind(...(params ? [params.desde, params.ate, params.desde, params.ate, params.desde, params.ate] : []))
     .first<ResultadoRow>();
 
   const faturamentoLiquidoCentavos = Number(row?.faturamento_liquido_centavos ?? 0);

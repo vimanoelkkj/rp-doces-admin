@@ -207,11 +207,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       )
         .bind(data)
         .all<PedidoRecenteRow>(),
-      // Resultado financeiro (despesas itemizadas): mesmo dia selecionado
-      // pelo filtro do dashboard, para "lucro estimado" bater com
-      // "recebido hoje" acima — não redefine faturamento, só compõe com
-      // getResultadoFinanceiro (que reusa a mesma definição de líquido).
-      getResultadoFinanceiro(env.DB, { desde: data, ate: data }),
+      // Resultado financeiro (despesas itemizadas): acumulado geral, na
+      // mesma definição de "Caixa total" (getStoreAnalytics) — despesas
+      // ATIVAS descontadas do faturamento líquido de TODOS os tempos, não
+      // só do dia, senão destoa do card de caixa logo acima.
+      getResultadoFinanceiro(env.DB),
     ]);
 
     return Response.json({
