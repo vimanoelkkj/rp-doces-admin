@@ -85,6 +85,12 @@ interface DashboardResponse {
   };
   maisVendidos: MaisVendidoRow[];
   pedidosRecentes: PedidoRecenteRow[];
+  resultadoFinanceiro: {
+    faturamentoLiquidoCentavos: number;
+    despesasCentavos: number;
+    lucroEstimadoCentavos: number;
+    margemEstimada: number | null;
+  };
 }
 
 /* ── Helpers ── */
@@ -93,6 +99,14 @@ const formatarPreco = (centavos: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+
+const formatarPrecoComSinal = (centavos: number) =>
+  `${centavos < 0 ? "-" : ""}${formatarPreco(Math.abs(centavos))}`;
+
+// Nunca "0%"/NaN%/Infinity%: sem faturamento no período, a margem é
+// indefinida, não zero.
+const formatarMargem = (margem: number | null) =>
+  margem === null ? "—" : `${margem.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 
 function formatDateISO(d: Date): string {
   const yyyy = d.getFullYear();
@@ -338,6 +352,38 @@ export default function AdminDashboard() {
                 <span>
                   Reembolsado: -{formatarPreco(data?.financeiro.reembolsadoCentavos ?? 0)}
                 </span>
+              </div>
+            </div>
+
+            {/* Resultado financeiro (despesas itemizadas) */}
+            <div className="dash-panel dash-result-panel">
+              <div className="dash-panel-title-group">
+                <h2 className="dash-panel-title">Resultado financeiro</h2>
+                <p className="dash-panel-subtitle">
+                  Faturamento líquido menos despesas do dia
+                </p>
+              </div>
+              <div className="dash-result-grid">
+                <div>
+                  <span>Faturamento líquido</span>
+                  <strong>{formatarPreco(data?.resultadoFinanceiro?.faturamentoLiquidoCentavos ?? 0)}</strong>
+                </div>
+                <div>
+                  <span>Gastos</span>
+                  <strong>{formatarPreco(data?.resultadoFinanceiro?.despesasCentavos ?? 0)}</strong>
+                </div>
+                <div>
+                  <span>Lucro estimado</span>
+                  <strong className={(data?.resultadoFinanceiro?.lucroEstimadoCentavos ?? 0) < 0 ? "dash-result-negativo" : ""}>
+                    {formatarPrecoComSinal(data?.resultadoFinanceiro?.lucroEstimadoCentavos ?? 0)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Margem estimada</span>
+                  <strong className={(data?.resultadoFinanceiro?.margemEstimada ?? 0) < 0 ? "dash-result-negativo" : ""}>
+                    {formatarMargem(data?.resultadoFinanceiro?.margemEstimada ?? null)}
+                  </strong>
+                </div>
               </div>
             </div>
 

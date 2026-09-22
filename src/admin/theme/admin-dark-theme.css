@@ -122,6 +122,18 @@ html[data-admin-theme="dark"] .dash-th {
 html[data-admin-theme="dark"] .dash-cash-breakdown {
   border-color: #3d3230;
 }
+html[data-admin-theme="dark"] .dash-result-grid {
+  border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .dash-result-grid span {
+  color: #a89b92;
+}
+html[data-admin-theme="dark"] .dash-result-grid strong {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .dash-result-negativo {
+  color: #e08276 !important;
+}
 html[data-admin-theme="dark"] .dash-pending-payments .dash-panel-subtitle {
   color: #d9c9be;
 }
@@ -1483,17 +1495,22 @@ html[data-admin-theme="dark"] .desp-ranking li b {
 html[data-admin-theme="dark"] .desp-ranking li span {
   color: #faf6f0;
 }
-html[data-admin-theme="dark"] .desp-periods button,
 html[data-admin-theme="dark"] .desp-toolbar > select,
 html[data-admin-theme="dark"] .desp-search,
 html[data-admin-theme="dark"] .desp-custom-range input {
   background: #1a1412;
   border-color: #3d3230;
 }
+/* Mesmo pill sólido de .loj-delivery-pill (Loja › Entregas) no escuro. */
+html[data-admin-theme="dark"] .desp-periods button {
+  background: #3d3230;
+  border-color: #3d3230;
+  color: #a89b92;
+}
 html[data-admin-theme="dark"] .desp-periods button.is-active {
+  background: #d38b80;
   border-color: #d38b80;
-  background: #3d2e2b;
-  color: #faf6f0;
+  color: #ffffff;
 }
 html[data-admin-theme="dark"] .desp-custom-range input {
   color: #faf6f0;

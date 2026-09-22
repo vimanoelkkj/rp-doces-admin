@@ -235,7 +235,6 @@
   gap: 6px;
 }
 
-.desp-periods button,
 .desp-toolbar > select {
   height: 36px;
   padding: 0 14px;
@@ -250,10 +249,30 @@
   white-space: nowrap;
 }
 
+/* Mesmo pill sólido de .loj-delivery-pill (Loja › Entregas): preenchido,
+   não contornado — nunca um tom claro/translúcido no estado ativo. */
+.desp-periods button {
+  padding: 10px 20px;
+  border-radius: 100px;
+  border: 1px solid #eadfd3;
+  background: #faf6f0;
+  font-family: "Manrope", sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  color: #63524e;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.desp-periods button:hover {
+  border-color: #634738;
+}
+
 .desp-periods button.is-active {
-  border-color: #d38b80;
-  background: #f7ecee;
-  color: #634738;
+  background: #634738;
+  border-color: #634738;
+  color: #ffffff;
 }
 
 .desp-custom-range {
