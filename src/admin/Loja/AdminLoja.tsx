@@ -1,8 +1,13 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./AdminLoja.css";
 import { formatScheduleText } from "./scheduleText";
 import { novaOperationKey } from "../../lib/operationKey";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
+import {
+  fetchStoreConfig,
+  saveStoreConfig,
+  type StoreConfig,
+} from "../../api/storeConfig";
 
 /* ── Types ── */
 interface DayToggle {
@@ -75,6 +80,83 @@ export default function AdminLoja() {
   /* Imagens */
   const [heroImg, setHeroImg] = useState<string | null>("/images/hero.jpg");
   const [storyImg, setStoryImg] = useState<string | null>("/images/story.jpg");
+
+  /* Configuração pública persistida */
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [configSaved, setConfigSaved] = useState(false);
+
+  const aplicarConfiguracao = (config: StoreConfig) => {
+    setDays(config.days.map((day) => ({ ...day })));
+    setOpenTime(config.openTime);
+    setCloseTime(config.closeTime);
+    setLocalName(config.localName);
+    setAddress(config.address);
+    setMapsLink(config.mapsLink);
+    setDeliveryStatus(config.deliveryStatus);
+    setWhatsapp(config.whatsapp);
+    setDefaultMessage(config.defaultMessage);
+  };
+
+  useEffect(() => {
+    let active = true;
+    setConfigLoading(true);
+    void fetchStoreConfig()
+      .then((config) => {
+        if (!active) return;
+        aplicarConfiguracao(config);
+        setConfigError(null);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setConfigError(
+          err instanceof Error
+            ? err.message
+            : "Falha ao carregar configurações da loja",
+        );
+      })
+      .finally(() => {
+        if (active) setConfigLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const salvarConfiguracoes = async () => {
+    if (configSaving || configLoading) return;
+
+    setConfigSaving(true);
+    setConfigError(null);
+    setConfigSaved(false);
+
+    try {
+      const config = await saveStoreConfig({
+        days: days.map((day) => ({ ...day })),
+        openTime,
+        closeTime,
+        localName,
+        address,
+        mapsLink,
+        deliveryStatus,
+        whatsapp,
+        defaultMessage,
+      });
+      aplicarConfiguracao(config);
+      setConfigSaved(true);
+      window.setTimeout(() => setConfigSaved(false), 3000);
+    } catch (err) {
+      setConfigError(
+        err instanceof Error
+          ? err.message
+          : "Falha ao salvar configurações da loja",
+      );
+    } finally {
+      setConfigSaving(false);
+    }
+  };
 
   /* Diagnósticos permanentes */
   const { revalidar: revalidarNotificacoes } = useNotificacoes();
@@ -516,7 +598,21 @@ export default function AdminLoja() {
 
         {/* ── Save bar ── */}
         <div className="loj-save-bar">
-          <button className="loj-btn-save">Salvar alterações</button>
+          {configError && <p className="loj-diag-error">{configError}</p>}
+          {configSaved && (
+            <p className="loj-diag-success">Alterações salvas e publicadas.</p>
+          )}
+          <button
+            className="loj-btn-save"
+            onClick={salvarConfiguracoes}
+            disabled={configSaving || configLoading}
+          >
+            {configLoading
+              ? "Carregando..."
+              : configSaving
+                ? "Salvando..."
+                : "Salvar alterações"}
+          </button>
         </div>
 
         {/* ── Diagnósticos permanentes ── */}

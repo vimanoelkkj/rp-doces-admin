@@ -4,13 +4,49 @@ import Footer from "../components/Footer";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "../hooks/useScrollReveal";
 import { useCatalogProducts } from "../hooks/useCatalogProducts";
+import {
+  DEFAULT_STORE_CONFIG,
+  deliveryStatusLabel,
+  fetchStoreConfig,
+  formatStoreSchedule,
+  formatStoreWhatsapp,
+  storeWhatsappHref,
+} from "../api/storeConfig";
 import { createPortal } from "react-dom";
 import "./Homepage.css";
 
 export default function Homepage() {
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [storeConfig, setStoreConfig] = useState(DEFAULT_STORE_CONFIG);
   const { products } = useCatalogProducts();
   const galleryProducts = products.filter((product) => product.image).slice(0, 5);
+  const storeSchedule = formatStoreSchedule(
+    storeConfig.days,
+    storeConfig.openTime,
+    storeConfig.closeTime,
+  );
+  const storeDelivery = deliveryStatusLabel(storeConfig.deliveryStatus);
+  const storeWhatsapp = formatStoreWhatsapp(storeConfig.whatsapp);
+  const storeWhatsappUrl = storeWhatsappHref(
+    storeConfig.whatsapp,
+    storeConfig.defaultMessage,
+  );
+
+  useEffect(() => {
+    let active = true;
+    void fetchStoreConfig()
+      .then((config) => {
+        if (active) setStoreConfig(config);
+      })
+      .catch(() => {
+        // A home continua utilizável com os valores padrão se a configuração
+        // pública estiver temporariamente indisponível.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -60,8 +96,8 @@ export default function Homepage() {
           <p className="hero-description">
             Unimos o aconchego da alta confeitaria artesanal com o seu momento
             de autocuidado. Saboreie nossos famosos bolos no pote bem recheados
-            e mini pudins cremosos diretamente no aconchegante salão Temponi
-            Concept, no Cambuí.
+            e mini pudins cremosos diretamente no aconchegante salão{" "}
+            {storeConfig.localName}, no Cambuí.
           </p>
 
           <a href="#sobre" className="btn-primary hero-cta">
@@ -237,7 +273,7 @@ export default function Homepage() {
           />
           <div className="floating-badge">
             <span className="floating-label">Onde Estamos</span>
-            <span className="floating-place">Temponi Concept</span>
+            <span className="floating-place">{storeConfig.localName}</span>
             <span className="floating-city">Cambuí, Campinas</span>
           </div>
         </div>
@@ -563,7 +599,7 @@ export default function Homepage() {
               </div>
               <div>
                 <span className="contact-label">Localização</span>
-                <h3>Temponi Concept</h3>
+                <h3>{storeConfig.localName}</h3>
               </div>
             </div>
 
@@ -588,8 +624,18 @@ export default function Homepage() {
                 </div>
                 <div>
                   <h4>Endereço</h4>
-                  <p>Rua Luís Barrozi Pereira, 582 - Sala 07</p>
-                  <p>Cambuí, Campinas - SP</p>
+                  {storeConfig.mapsLink ? (
+                    <a
+                      href={storeConfig.mapsLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "inherit", textDecoration: "none" }}
+                    >
+                      <p>{storeConfig.address}</p>
+                    </a>
+                  ) : (
+                    <p>{storeConfig.address}</p>
+                  )}
                 </div>
               </div>
 
@@ -610,8 +656,9 @@ export default function Homepage() {
                   </svg>
                 </div>
                 <div>
-                  <h4>Horário de Funcionamento</h4>
-                  <p>Seg a Sáb: 9h às 18h</p>
+                  <h4>Atendimento</h4>
+                  <p>{storeSchedule}</p>
+                  <p>{storeDelivery}</p>
                 </div>
               </div>
 
@@ -632,7 +679,7 @@ export default function Homepage() {
                 </div>
                 <div>
                   <h4>WhatsApp para Encomendas</h4>
-                  <p>(19) 99128-5807</p>
+                  <p>{storeWhatsapp}</p>
                 </div>
               </div>
 
@@ -661,7 +708,7 @@ export default function Homepage() {
             </div>
 
             <a
-              href="https://wa.me/5519991285807"
+              href={storeWhatsappUrl}
               className="btn-whatsapp"
               target="_blank"
               rel="noopener noreferrer"
