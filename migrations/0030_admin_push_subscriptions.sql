@@ -33,7 +33,10 @@ CREATE TABLE IF NOT EXISTS push_eventos__v2 (
   ultimo_erro TEXT,
   criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (pedido_id, evento)
+  PRIMARY KEY (pedido_id, evento),
+  FOREIGN KEY (pedido_id)
+    REFERENCES pedidos(id)
+    ON DELETE CASCADE
 );
 
 INSERT OR IGNORE INTO push_eventos__v2 (pedido_id, evento, status, criado_em)
