@@ -240,6 +240,16 @@
 }
 
 @media (max-width: 480px) {
+  .excluir-pedido-overlay {
+    padding: 12px;
+  }
+
+  .excluir-pedido-card {
+    padding: 20px 18px;
+    border-radius: 16px;
+    max-height: calc(100dvh - 24px);
+  }
+
   .excluir-pedido-actions {
     flex-direction: column-reverse;
   }
@@ -351,6 +361,13 @@ html[data-admin-theme="dark"] .pedmodal-more button {
   background: #2b2220;
   color: #e08276;
   border-color: #3d3230;
+}
+
+@media (max-width: 520px) {
+  .pedmodal-more button {
+    left: 0;
+    right: auto;
+  }
 }
 
 /* ── Registro de anulação ── */

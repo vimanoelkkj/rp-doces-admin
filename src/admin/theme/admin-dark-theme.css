@@ -519,6 +519,11 @@ html[data-admin-theme="dark"] .pedmodal-payment-method {
     border-bottom-color: #3d3230;
   }
 }
+@media (max-width: 480px) {
+  html[data-admin-theme="dark"] .pedmodal-item-row {
+    border-bottom-color: #3d3230;
+  }
+}
 html[data-admin-theme="dark"] .pedmodal-btn-add-item {
   background: #1a1412;
   border-color: #3d3230;
@@ -1570,6 +1575,10 @@ html[data-admin-theme="dark"] .gasto-overlay {
 html[data-admin-theme="dark"] .gasto-modal {
   background: #2b2220;
   border-color: #3d3230;
+}
+html[data-admin-theme="dark"] .gasto-header {
+  background: #2b2220;
+  border-bottom-color: #3d3230;
 }
 html[data-admin-theme="dark"] .gasto-title,
 html[data-admin-theme="dark"] .gasto-itens-heading h3,

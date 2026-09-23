@@ -11,7 +11,8 @@ interface PortalDropdownProps {
 
 interface MenuPosition {
   left: number;
-  top: number;
+  top?: number;
+  bottom?: number;
   width: number;
   maxHeight: number;
 }
@@ -30,13 +31,44 @@ export default function PortalDropdown({
     const update = () => {
       const rect = anchorRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const top = rect.bottom + 4;
-      setPosition({
-        left: rect.left,
-        top,
-        width: rect.width,
-        maxHeight: Math.max(80, Math.min(220, window.innerHeight - top - 16)),
-      });
+
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const minMargin = 8;
+
+      // Clamping horizontal: garante que não ultrapasse as margens da viewport
+      const width = Math.min(rect.width, Math.max(120, viewportWidth - minMargin * 2));
+      let left = rect.left;
+      if (left + width > viewportWidth - minMargin) {
+        left = Math.max(minMargin, viewportWidth - minMargin - width);
+      }
+      if (left < minMargin) {
+        left = minMargin;
+      }
+
+      // Flip vertical: se o espaço abaixo for insuficiente e houver mais espaço acima
+      const spaceBelow = viewportHeight - rect.bottom - 16;
+      const spaceAbove = rect.top - 16;
+      const openUpwards = spaceBelow < 160 && spaceAbove > spaceBelow;
+
+      if (openUpwards) {
+        const maxHeight = Math.max(80, Math.min(220, spaceAbove));
+        setPosition({
+          left,
+          bottom: Math.max(8, viewportHeight - rect.top + 4),
+          width,
+          maxHeight,
+        });
+      } else {
+        const top = rect.bottom + 4;
+        const maxHeight = Math.max(80, Math.min(220, spaceBelow));
+        setPosition({
+          left,
+          top,
+          width,
+          maxHeight,
+        });
+      }
     };
     update();
     window.addEventListener("resize", update);
@@ -55,7 +87,8 @@ export default function PortalDropdown({
       style={{
         position: "fixed",
         left: position.left,
-        top: position.top,
+        top: position.top !== undefined ? position.top : undefined,
+        bottom: position.bottom !== undefined ? position.bottom : undefined,
         width: position.width,
         maxHeight: position.maxHeight,
       }}
