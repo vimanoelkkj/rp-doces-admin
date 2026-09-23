@@ -21,6 +21,17 @@ const silenciar = t => t.mock.method(console, 'error', () => {});
 const envelhecer = db =>
   db.prepare("UPDATE pedido_operacoes SET atualizado_em = datetime('now','-10 minutes')").run();
 
+// R2 — reescreve o TTL persistido no mp_request para que ele tenha vencido há
+// `horasAtras` horas. O prazo terminal é TTL + 24h: com 25h a operação está
+// além do prazo; com 2h (TTL vencido, margem não) continua inconclusiva.
+async function expirarOperacao(db, horasAtras = 25) {
+  const operacao = (await db.prepare('SELECT * FROM pedido_operacoes').all()).results[0];
+  const request = JSON.parse(operacao.mp_request);
+  request.date_of_expiration = new Date(Date.now() - horasAtras * 60 * 60 * 1000).toISOString();
+  await db.prepare('UPDATE pedido_operacoes SET mp_request = ? WHERE id = ?')
+    .bind(JSON.stringify(request), operacao.id).run();
+}
+
 /**
  * Provedor simulado. `postar` decide o resultado do POST de criação;
  * `remoto` é o "banco" do Mercado Pago (external_reference -> [pagamentos]).
@@ -750,4 +761,167 @@ test('R1 ADMIN: falha no batch de persistência fica LOCAL_CRIADA e é resgatada
   assert.equal(s.pagamentos[0].status, 'PAGO');
   assert.equal(s.operacoes[0].fase, 'REMOTO_CONHECIDO');
   assert.equal(p.chamadas.post, 1, 'nenhum segundo POST lógico');
+});
+
+/* ─────────────── R2: prazo terminal de operações inconclusivas ──────────────
+ *
+ * Antes do R2, uma operação cujo envio ficou ENVIO_INCONCLUSIVO e cuja busca
+ * por external_reference retorna NENHUM ficava presa PARA SEMPRE: sem
+ * mp_payment_id, sem TTL, sem contador, sem estado terminal. A cobrança local
+ * (pedido_pagamentos PENDENTE), a reserva de estoque e a operação nunca eram
+ * fechadas. O prazo terminal é TTL persistido (mp_request.date_of_expiration)
+ * + 24h de margem — só então a ausência observada deixa de ser ambígua. */
+
+test('R2: busca NENHUM dentro do prazo (TTL vencido, margem não) permanece inconclusiva', async t => {
+  silenciar(t);
+  const {db, provedor: p, operacao} = await siteInconclusivo(t);
+  const antes = await state(db);
+
+  await expirarOperacao(db, 2); // TTL venceu há 2h, mas a margem de 24h não.
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos[0].status, 'PENDENTE', 'TTL vencido sozinho não prova rejeição');
+  assert.equal(s.pagamentos[0].mp_payment_id, null);
+  assert.equal(s.pedido.reserva_status, 'ATIVA', 'reserva intacta');
+  assert.equal(s.produtos[0].estoque_reservado, antes.produtos[0].estoque_reservado);
+  assert.equal(s.operacoes[0].fase, 'ENVIO_INCONCLUSIVO');
+  assert.equal(s.operacoes[0].expirado_em, null, 'operação ainda não fechada');
+  assert.equal(s.operacoes[0].erro, 'BUSCA:NENHUM');
+  assert.equal(p.chamadas.post, 1, 'nenhum reenvio');
+});
+
+test('R2: busca NENHUM após o prazo fecha a operação como EXPIRADA e libera a reserva', async t => {
+  silenciar(t);
+  const {db, provedor: p, operacao} = await adminInconclusivo(t);
+  const antes = await state(db);
+  assert.equal(antes.pedido.reserva_status, 'ATIVA');
+  assert.equal(antes.produtos[0].estoque_reservado, 2);
+
+  await expirarOperacao(db);
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos.length, 1, 'nenhuma tentativa nova');
+  assert.equal(s.pagamentos[0].status, 'EXPIRADO', 'terminal local é EXPIRADO, nunca FALHOU/RECUSADA');
+  assert.equal(s.pagamentos[0].mp_payment_id, null);
+  assert.equal(s.pedido.reserva_status, 'LIBERADA', 'reserva liberada pelo fluxo existente');
+  assert.equal(s.produtos[0].estoque_reservado, 0);
+  assert.equal(s.produtos[0].estoque, 10, 'sem baixa física (nenhum pagamento confirmado)');
+  assert.equal(s.operacoes.length, 1, 'nenhuma operação nova');
+  assert.equal(s.operacoes[0].fase, 'ENVIO_INCONCLUSIVO', 'fase preservada para o replay A1');
+  assert.ok(s.operacoes[0].expirado_em, 'operação marcada como expirada');
+  assert.equal(p.chamadas.post, 1, 'nenhum reenvio');
+
+  const visiveis = await app.operacoes.listarOperacoesInconclusivasDoPedido(db, 1);
+  assert.equal(visiveis.length, 0, 'operação fechada sai da seleção de inconclusivas');
+});
+
+test('R2: busca INDISPONÍVEL após o prazo não finaliza (não é confirmação negativa)', async t => {
+  silenciar(t);
+  const {db, provedor: p, operacao} = await siteInconclusivo(t);
+  await expirarOperacao(db);
+  p.mock.mock.restore();
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (options?.method === 'POST') throw new Error('nenhum POST deve ocorrer');
+    throw new Error('search transport failure');
+  });
+
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos[0].status, 'PENDENTE', 'indisponibilidade não é expiração');
+  assert.equal(s.pedido.reserva_status, 'ATIVA');
+  assert.equal(s.operacoes[0].fase, 'ENVIO_INCONCLUSIVO');
+  assert.match(s.operacoes[0].erro, /^BUSCA:INDISPONIVEL:/);
+  assert.equal(s.operacoes[0].expirado_em, null, 'INDISPONÍVEL não fecha a operação');
+});
+
+test('R2: cobrança encontrada após o prazo segue o fluxo normal de sincronização', async t => {
+  silenciar(t);
+  const remoto = new Map();
+  const {db, provedor: p, operacao} = await siteInconclusivo(t, {remoto});
+  const referencia = referenciaPersistida(operacao);
+  remoto.set(referencia, [{id: 9550, status: 'approved', external_reference: referencia}]);
+
+  await expirarOperacao(db);
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos[0].status, 'PAGO', 'a cobrança existe: sincroniza, não expira');
+  assert.equal(s.pagamentos[0].mp_payment_id, '9550');
+  assert.equal(s.pedido.status_pagamento, 'PAGO');
+  assert.equal(s.operacoes[0].fase, 'REMOTO_CONHECIDO');
+  assert.equal(s.operacoes[0].expirado_em, null, 'não expira quando a cobrança existe');
+  assert.equal(p.chamadas.post, 1);
+});
+
+test('R2: EXPIRADO -> PAGO tardio continua funcionando após o fechamento', async t => {
+  silenciar(t);
+  const remoto = new Map();
+  const {db, provedor: p, operacao} = await siteInconclusivo(t, {remoto});
+  const referencia = referenciaPersistida(operacao);
+
+  await expirarOperacao(db);
+  await envelhecer(db);
+  await recuperar(db);
+  let s = await state(db);
+  assert.equal(s.pagamentos[0].status, 'EXPIRADO');
+  assert.ok(s.operacoes[0].expirado_em, 'operação fechada');
+
+  // Webhook/GET tardio: autoridade verificada ainda promove EXPIRADO -> PAGO.
+  remoto.set(referencia, [{id: 9560, status: 'approved', external_reference: referencia}]);
+  const payment = await app.sync.fetchMpPayment('fake', '9560');
+  const resolvido = await app.sync.resolveWebhookPayment(db, payment);
+  assert.equal(resolvido.kind, 'found');
+  await app.sync.syncPaymentFromMp(db, resolvido.pagamentoId, payment);
+
+  s = await state(db);
+  assert.equal(s.pagamentos[0].status, 'PAGO', 'recuperado por autoridade verificada');
+  assert.equal(s.pedido.status_pagamento, 'PAGO');
+  assert.equal(s.produtos[0].estoque, 8, 'baixa física única após reclamação');
+  assert.equal(p.chamadas.post, 1);
+});
+
+test('R2: guard B4 segura a reserva com outro Pix pendente, mesmo com prazo decorrido', async t => {
+  silenciar(t);
+  const {db, provedor: p, operacao} = await adminInconclusivo(t);
+  // Outro Pix PENDENTE no mesmo pedido: o guard B4 impede liberar a reserva.
+  await db.prepare(`INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,idempotency_key)
+    VALUES(1,'PIX_MP','ADMIN',5000,'PENDENTE','outro-pix-vivo')`).run();
+
+  await expirarOperacao(db);
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos.find(x => x.id === operacao.pagamento_id).status, 'EXPIRADO');
+  assert.equal(s.pedido.reserva_status, 'ATIVA', 'B4: reserva não liberada com outro Pix pendente');
+  assert.equal(s.produtos[0].estoque_reservado, 2);
+  const op = (await db.prepare('SELECT expirado_em FROM pedido_operacoes WHERE operation_key = ?')
+    .bind(operacao.operation_key).first());
+  assert.ok(op.expirado_em, 'operação fechada mesmo com reserva segurada pelo B4');
+  assert.equal(p.chamadas.post, 1);
+});
+
+test('R2: operação fechada não gera notificação nem aparece no detalhe', async t => {
+  silenciar(t);
+  const {db, operacao} = await adminInconclusivo(t);
+
+  const antes = await app.notificacoes.derivarNotificacoes(db);
+  assert.ok(antes.some(n => n.tipo === 'OPERACAO' && n.chave === `operacao:${operacao.operation_key}`),
+    'operação aberta gera notificação');
+
+  await expirarOperacao(db);
+  await envelhecer(db);
+  await recuperar(db);
+
+  const depois = await app.notificacoes.derivarNotificacoes(db);
+  assert.equal(depois.some(n => n.tipo === 'OPERACAO'), false, 'operação fechada fora das notificações');
+  const visiveis = await app.operacoes.listarOperacoesInconclusivasDoPedido(db, 1);
+  assert.equal(visiveis.length, 0);
 });
