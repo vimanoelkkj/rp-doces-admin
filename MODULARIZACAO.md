@@ -23,6 +23,10 @@ Este documento orienta a refatoração e modularização dos centros de densidad
      * `npm run build`
      * `git diff --check`
 
+4. **Fase 0 Obrigatória — Mapeamento Sem Edições:**
+   * Antes de tocar em qualquer código de um alvo, realizar um mapeamento estrito: dependências, exports públicos, consumidores externos, potenciais ciclos e o agrupamento natural das funções existentes.
+   * A árvore definitiva só é aprovada e fatiada após essa inspeção e validação explícita. Não transformar hipóteses de estrutura em profecias autocumpridas.
+
 ---
 
 ## 2. Ordem de Ataque
@@ -39,19 +43,22 @@ Este documento orienta a refatoração e modularização dos centros de densidad
 ## 3. Desenho de Arquitetura por Alvo
 
 ### Alvo 1: `functions/lib/comandaLedger.ts` (1.247 linhas)
-**Diagnóstico:** É o centro de gravidade financeiro/contábil dos pedidos (cálculo de projeções de saldo, alocações de itens, pagamentos manuais no balcão e estornos administrativos).
+**Diagnóstico:** É o centro de gravidade financeiro/contábil dos pedidos (cálculo de projeções de saldo, alocações de itens, materialização legada, pagamentos manuais no balcão e estornos administrativos).
 
-**Estrutura pretendida:**
+**Estrutura pretendida (Hipótese de Trabalho):**
 ```text
 functions/lib/
   comandaLedger.ts               # Fachada que reexporta todos os submódulos para manter compatibilidade
   ledger/
     types.ts                     # Interfaces contábeis, enums e tipos compartilhados
+    legacy.ts                    # Compatibilidade e materialização legada (ledgerPaymentStatus, ensureLegacyPaymentMaterialized, resolveLedgerPaymentId, getVirtualOrRealPayment)
     projection.ts                # Projeções contábeis e consolidação de saldos
     allocations.ts               # Alocação de pagamentos a itens e consumo de reservas
     adminPayments.ts             # Registro e processamento de pagamentos manuais
     adminRefunds.ts              # Regras e lançamentos contábeis de estornos/reembolsos
 ```
+
+> **Nota sobre operações administrativas:** Helpers como `reconcilePersistedAdminFact` e `replayOperacaoLocal` devem ser mantidos junto dos pagamentos/refunds administrativos se forem estritamente auxiliares a eles, evitando criar arquivos extras para poucos helpers a menos que haja necessidade comprovada na Fase 0.
 
 ---
 
@@ -73,25 +80,28 @@ src/admin/Pedidos/PedidoDetalheModal/
 ---
 
 ### Alvo 3: `functions/lib/comandaPix.ts` (1.069 linhas)
-**Diagnóstico:** Concentra geração de QRCode/Copia-e-Cola, consulta de status remoto, substituição de cobranças Pix expiradas e lógica de estorno Pix Mercado Pago.
+**Diagnóstico:** Concentra consultas de capacidade cobrável, geração/substituição de cobranças Pix administrativas e reprojeção local.
 
-**Estrutura pretendida:**
+**Estrutura pretendida (Hipótese de Trabalho):**
 ```text
 functions/lib/
   comandaPix.ts                  # Fachada reexportando submódulos
   pix/
     types.ts                     # Tipos e contratos de resposta Pix
-    generation.ts                # Criação e regeneração de cobranças Pix Mercado Pago
-    statusCheck.ts               # Verificação ativa e resolução de estados remotos
-    refunds.ts                   # Execução e validação de devoluções Pix
+    queries.ts                   # Consultas de capacidade cobrável e Pix pendentes (ex: getCapacidadeCobravel, getPixAdminPendentesAtivos)
+    replay.ts                    # Reprojeção e reconciliação local (ex: replayPixAdmin)
+    adminCharge.ts               # Criação e substituição de cobranças administrativas (ex: createAdminPixCharge)
 ```
+
+> **Atenção:** A estrutura acima é uma hipótese inicial. Antes de criar cada módulo, confirmar que a responsabilidade existe de fato no arquivo atual. O projeto já possui módulos dedicados como `paymentSync.ts`, `mpRefund.ts` e `mpRefundIntent.ts`; portanto, **não mover lógica pertencente a esses módulos só para preencher a estrutura planejada.** A arquitetura deve emergir das responsabilidades reais, não de uma árvore imaginada previamente.
 
 ---
 
 ## 4. Estado Atual do Repositório (Baseline)
 
 * **Branch:** `main`
-* **Último Commit:** `165a216` (`rp-doces: add web push notification test`)
+* **Baseline Funcional:** `165a216` (`rp-doces: add web push notification test`)
+* **Commit do Roadmap:** `b50bcf6` (`docs: add modularization strategy roadmap`)
 * **Status:** Working tree 100% limpo e sincronizado com `origin/main`.
 * **Funcionalidade recente:** PWA V2 Web Push implementado com badge monocromático Android e endpoint de teste (`POST /api/admin/push/test`) com 24/24 testes aprovados.
 
@@ -100,4 +110,4 @@ functions/lib/
 ## 5. Como Iniciar a Próxima Sessão
 
 Ao abrir o projeto no Antigravity no computador de casa:
-> *"Li o `MODULARIZACAO.md`. Vamos iniciar a execução do Alvo 1 (`comandaLedger.ts`)."*
+> *"Li o `MODULARIZACAO.md`. Vamos iniciar a Fase 0 de mapeamento do Alvo 1 (`comandaLedger.ts`)."*
