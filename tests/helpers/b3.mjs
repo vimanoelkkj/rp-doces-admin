@@ -59,6 +59,11 @@ const bundle = await build({
       export * as adminDespesas from './functions/api/admin/despesas';
       export * as adminDespesaId from './functions/api/admin/despesas/[id]';
       export * as adminDespesaCancelar from './functions/api/admin/despesas/[id]/cancelar';
+      export * as pushNotifier from './functions/lib/pushNotifier';
+      export * as adminPushVapidKey from './functions/api/admin/push/vapid-key';
+      export * as adminPushSubscribe from './functions/api/admin/push/subscribe';
+      export * as adminPushUnsubscribe from './functions/api/admin/push/unsubscribe';
+      export * as adminPushRetry from './functions/api/admin/push/retry';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },

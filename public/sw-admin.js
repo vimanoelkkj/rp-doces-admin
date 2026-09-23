@@ -67,3 +67,54 @@ self.addEventListener("fetch", (event) => {
   // Quaisquer outros assets (scripts, styles, imagens):
   // O Service Worker NÃO intercepta; o navegador cuida via HTTP cache padrão.
 });
+
+// ─────────────────────────────────────────────────────────────
+// Web Push Notifications (PWA Admin V2)
+// ─────────────────────────────────────────────────────────────
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch {
+      data = { title: "Novo pedido 🍰", body: event.data.text() };
+    }
+  }
+
+  const title = data.title || "Novo pedido 🍰";
+  const options = {
+    body: data.body || "Novo pedido confirmado na loja.",
+    icon: "/icons/admin-icon-192.png",
+    badge: "/icons/admin-icon-192.png",
+    tag: data.tag || (data.pedidoId ? `pedido-${data.pedidoId}` : "novo-pedido"),
+    renotify: true,
+    data: {
+      url: data.url || (data.pedidoId ? `/admin/pedidos?pedido=${data.pedidoId}` : "/admin/pedidos"),
+      pedidoId: data.pedidoId,
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || "/admin/pedidos";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Se houver uma janela/aba aberta no escopo /admin, foca e navega nela
+      for (const client of windowClients) {
+        if ("focus" in client && client.url.includes("/admin")) {
+          return client.navigate(targetUrl).then(() => client.focus());
+        }
+      }
+      // Se não houver janela aberta, abre uma nova
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    }),
+  );
+});
