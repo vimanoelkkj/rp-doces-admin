@@ -14,7 +14,9 @@ import { liberarReservaPedido } from "./stock";
 import { buscarPagamentosPorReferenciaExterna } from "./mpSearch";
 import {
   claimRecuperacao,
+  expiracaoDecorrida,
   externalReferenceDaOperacao,
+  fecharOperacaoExpirada,
   listarOperacoesInconclusivas,
   registrarFase,
   registrarObservacao,
@@ -464,7 +466,19 @@ export async function recuperarOperacoesInconclusivas(
 
         if (busca.resultado === "NENHUM") {
           // Zero compatíveis NÃO prova que o provedor não criou o recurso.
-          // Nada de FALHOU, nada de CANCELADO, nada de liberar reserva.
+          // Nada de FALHOU, nada de CANCELADO, nada de liberar reserva — a
+          // menos que o prazo terminal do Pix (TTL persistido + 24h) já tenha
+          // decorrido. Nesse caso a ausência observada deixa de ser ambígua o
+          // bastante para fechar a operação como EXPIRADA, reutilizando o
+          // fluxo existente (expireLocalPayment -> finalizePayment -> B4). A
+          // operação só é fechada se a expiração do ledger SUCCEDER; se o
+          // guard B4 segurar a reserva (outro Pix pendente), `expireLocalPayment`
+          // lança e a operação permanece na fila.
+          if (operacao.pagamento_id != null && expiracaoDecorrida(operacao)) {
+            await expireLocalPayment(env.DB, operacao.pagamento_id);
+            await fecharOperacaoExpirada(env.DB, operacao.operation_key);
+            return;
+          }
           await registrarObservacao(env.DB, operacao.operation_key, "BUSCA:NENHUM");
           return;
         }

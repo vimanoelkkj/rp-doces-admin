@@ -511,6 +511,7 @@ const OPERACAO_INCONCLUSIVA_SQL = `
     AND pp.mp_payment_id IS NULL
     AND pp.metodo = 'PIX_MP'
     AND pp.status IN ('PENDENTE', 'EXPIRADO')
+    AND o.expirado_em IS NULL
 `;
 
 // Candidatas à recuperação read-only, em lote pequeno e mais antigas
@@ -612,6 +613,54 @@ export function externalReferenceDaOperacao(operacao: OperacaoInconclusiva): str
   } catch {
     return null;
   }
+}
+
+// R2 — prazo terminal de uma operação PIX cuja criação remota ficou
+// inconclusiva. `mp_request.date_of_expiration` é o TTL real do Pix que o A1
+// persistiu ANTES do envio (SITE em checkout.ts, ADMIN em comandaPix.ts). A
+// margem de 24h existe porque "nenhum pagamento encontrado por
+// external_reference" NUNCA prova que o provedor não criou a cobrança —
+// eventual consistency, cliente que paga no fim do TTL, webhook atrasado.
+// Só depois de TTL + 24h a ausência observada deixa de ser ambígua o bastante
+// para fechar a operação como EXPIRADA.
+export const RECUPERACAO_EXPIRACAO_MARGEM_MS = 24 * 60 * 60 * 1000;
+
+export function dateOfExpirationDaOperacao(operacao: OperacaoInconclusiva): number | null {
+  if (!operacao.mp_request) return null;
+  try {
+    const request = JSON.parse(operacao.mp_request) as { date_of_expiration?: unknown };
+    const valor = String(request?.date_of_expiration ?? "").trim();
+    if (!valor) return null;
+    const ts = Date.parse(valor);
+    return Number.isNaN(ts) ? null : ts;
+  } catch {
+    return null;
+  }
+}
+
+// O prazo só decorre quando a operação TINHA uma expiração persistida e ela
+// já passou (TTL + margem). Sem expiração persistida, nada decorre: a
+// operação permanece inconclusiva e visível para intervenção.
+export function expiracaoDecorrida(operacao: OperacaoInconclusiva, agora = Date.now()): boolean {
+  const expira = dateOfExpirationDaOperacao(operacao);
+  return expira !== null && expira + RECUPERACAO_EXPIRACAO_MARGEM_MS <= agora;
+}
+
+// Fecha uma operação inconclusiva como EXPIRADA. `expirado_em` é o marco que
+// a remove de OPERACAO_INCONCLUSIVA_SQL (recuperação, detalhe administrativo e
+// notificações) SEM tocar na fase: o replay A1 continua relatando "operação em
+// processamento" em vez de uma rejeição inventada. O guard por fase impede que
+// um evento tardio do provedor reabra algo já fechado.
+export async function fecharOperacaoExpirada(db: D1Database, key: string): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE pedido_operacoes
+       SET expirado_em = COALESCE(expirado_em, CURRENT_TIMESTAMP),
+           atualizado_em = CURRENT_TIMESTAMP
+       WHERE operation_key = ? AND fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')`,
+    )
+    .bind(key)
+    .run();
 }
 
 export function parseResultado<T>(operacao: OperacaoRow): T | null {
