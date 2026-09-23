@@ -569,11 +569,15 @@ test('checkout: recusa comprovada libera reserva e o retry devolve a MESMA recus
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM pedidos').first()).n, 1);
 });
 
-test('checkout: recurso MP conhecido + falha local posterior é recuperado pela mesma key', async t => {
+test('checkout: recurso MP conhecido + falha no batch de persistência permanece LOCAL_CRIADA e recupera pelo B3', async t => {
   const db = await siteLimpo(t);
   silenciarLogs(t);
   const mp = mpPost(t);
-  // Falha na gravação dos detalhes locais, DEPOIS do sucesso remoto.
+  // Falha na gravação dos detalhes locais, DEPOIS do sucesso remoto. O batch
+  // agora inclui a transição para REMOTO_CONHECIDO, então a falha reverte
+  // TUDO junto: pedido_pagamentos.mp_payment_id continua NULL e a operação
+  // permanece LOCAL_CRIADA — a janela que antes deixava a operação
+  // REMOTO_CONHECIDO com a tentativa órfã de identidade remota não existe mais.
   db.hook = (s, op) => {
     if (op === 'batch' && s.some(x => x.sql.includes('SET mp_payment_id = ?'))) {
       db.hook = null;
@@ -586,15 +590,40 @@ test('checkout: recurso MP conhecido + falha local posterior é recuperado pela 
   assert.equal(falha.status, 500);
 
   const operacao = (await db.prepare('SELECT * FROM pedido_operacoes').all()).results[0];
-  assert.equal(operacao.fase, 'REMOTO_CONHECIDO');
-  assert.ok(operacao.mp_payment_id, 'identidade remota registrada antes da gravação local');
+  assert.equal(operacao.fase, 'LOCAL_CRIADA', 'fase não avança para REMOTO_CONHECIDO sem a persistência');
+  assert.equal(operacao.mp_payment_id, null, 'identidade remota só nasce junto com a tentativa');
+  const tentativa = (await db.prepare('SELECT * FROM pedido_pagamentos').all()).results[0];
+  assert.equal(tentativa.mp_payment_id, null, 'tentativa sem identidade remota após o rollback');
 
+  // O retry com a MESMA key NÃO faz novo POST nem inventa sucesso: devolve a
+  // operação ainda inconclusiva e recuperável pelo B3 (mp_payment_id NULL +
+  // LOCAL_CRIADA entram na seleção de operações inconclusivas).
   const posts = mp.mock.calls.filter(c => c.arguments[1]?.method === 'POST').length;
   const retry = await corpo(await checkout(db, {operationKey: KEY}));
-  assert.equal(retry.status, 200);
-  assert.equal(String(retry.body.paymentId), operacao.mp_payment_id, 'mesma cobrança, não outra');
-  assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === 'POST').length, posts);
+  assert.equal(retry.status, 409);
+  assert.equal(retry.body.code, 'OPERACAO_EM_PROCESSAMENTO');
+  assert.ok(retry.body.tokenPublico, 'devolve o pedido que já existe para acompanhamento');
+  assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === 'POST').length, posts,
+    'nenhum reenvio automático');
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM pedidos').first()).n, 1);
+  assert.equal((await db.prepare('SELECT reserva_status FROM pedidos').first()).reserva_status, 'ATIVA');
+});
+
+test('checkout: fluxo feliz grava identidade remota e fase CONCLUIDA no mesmo batch', async t => {
+  const db = await siteLimpo(t);
+  mpPost(t);
+  const r = await corpo(await checkout(db, {operationKey: KEY}));
+  assert.equal(r.status, 200);
+
+  const pedido = await db.prepare('SELECT mp_payment_id FROM pedidos').first();
+  const pagamento = await db.prepare('SELECT mp_payment_id FROM pedido_pagamentos').first();
+  const operacao = await db.prepare('SELECT fase, mp_payment_id, resultado FROM pedido_operacoes').first();
+  assert.ok(pedido.mp_payment_id, 'pedidos.mp_payment_id gravado');
+  assert.ok(pagamento.mp_payment_id, 'pedido_pagamentos.mp_payment_id gravado');
+  assert.equal(pedido.mp_payment_id, pagamento.mp_payment_id, 'mesma identidade remota nos dois alvos');
+  assert.equal(operacao.fase, 'CONCLUIDA');
+  assert.equal(operacao.mp_payment_id, pagamento.mp_payment_id, 'identidade remota também na operação');
+  assert.ok(operacao.resultado, 'snapshot persistido junto');
 });
 
 test('checkout: última unidade em disputa entre keys distintas faz rollback completo do perdedor', async t => {
@@ -759,6 +788,78 @@ test('pix ADMIN: 5xx do POST não inventa FALHOU nem libera a reserva; retry rec
   assert.equal(retry.body.code, 'OPERACAO_EM_PROCESSAMENTO');
   assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === 'POST').length, posts);
   assert.equal((await state(db)).pagamentos.length, 1);
+});
+
+test('pix ADMIN: recurso MP conhecido + falha no batch de persistência permanece LOCAL_CRIADA', async t => {
+  const db = await fixture(t, {ledger: false});
+  const session = await app.auth.createSession(db, 1);
+  silenciarLogs(t);
+  const mp = mpPost(t);
+  // Falha injetada no batch que persiste mp_payment_id/QR — agora também a
+  // transição REMOTO_CONHECIDO. O rollback reverte tudo junto: a tentativa
+  // fica sem identidade remota E a operação permanece LOCAL_CRIADA (estado
+  // recuperável pelo B3, nunca o órfão REMOTO_CONHECIDO+NULL de antes).
+  db.hook = (s, op) => {
+    if (op === 'batch' && s.some(x => x.sql.includes('SET mp_payment_id = ?'))) {
+      db.hook = null;
+      throw new Error('injected local persistence failure');
+    }
+  };
+  const falha = await gerarPix(db, session, {valorCentavos: 5000, operationKey: KEY});
+  assert.equal(falha.status, 500);
+
+  const operacao = (await db.prepare('SELECT * FROM pedido_operacoes').all()).results[0];
+  assert.equal(operacao.fase, 'LOCAL_CRIADA');
+  assert.equal(operacao.mp_payment_id, null);
+  const tentativa = (await db.prepare('SELECT * FROM pedido_pagamentos').all()).results[0];
+  assert.equal(tentativa.mp_payment_id, null);
+
+  const posts = mp.mock.calls.filter(c => c.arguments[1]?.method === 'POST').length;
+  const retry = await corpo(await gerarPix(db, session, {valorCentavos: 5000, operationKey: KEY}));
+  assert.equal(retry.status, 409);
+  assert.equal(retry.body.code, 'OPERACAO_EM_PROCESSAMENTO');
+  assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === 'POST').length, posts,
+    'nenhum reenvio automático');
+  assert.equal((await state(db)).pagamentos.length, 1);
+});
+
+test('pix ADMIN: fluxo feliz grava identidade remota e fase CONCLUIDA no mesmo batch', async t => {
+  const db = await fixture(t, {ledger: false});
+  const session = await app.auth.createSession(db, 1);
+  mpPost(t);
+  const r = await corpo(await gerarPix(db, session, {valorCentavos: 5000, operationKey: KEY}));
+  assert.equal(r.status, 201);
+
+  const pagamento = await db.prepare('SELECT mp_payment_id FROM pedido_pagamentos WHERE id = ?')
+    .bind(r.body.pagamentoId).first();
+  const operacao = await db.prepare('SELECT fase, mp_payment_id, resultado FROM pedido_operacoes').first();
+  assert.ok(pagamento.mp_payment_id, 'pedido_pagamentos.mp_payment_id gravado');
+  assert.equal(operacao.fase, 'CONCLUIDA');
+  assert.equal(operacao.mp_payment_id, pagamento.mp_payment_id, 'identidade remota também na operação');
+  assert.ok(operacao.resultado, 'snapshot persistido junto');
+});
+
+test('fase terminal é guarda: write tardio de REMOTO_CONHECIDO não reabre CONCLUIDA', async t => {
+  const db = await siteLimpo(t);
+  mpPost(t);
+  await corpo(await checkout(db, {operationKey: KEY}));
+  const antes = await db.prepare('SELECT fase, mp_payment_id FROM pedido_operacoes').first();
+  assert.equal(antes.fase, 'CONCLUIDA');
+
+  // Resposta tardia do provedor não pode reabrir a operação terminal nem
+  // sobrescrever a identidade já gravada — a guarda é preservada pela
+  // primitiva batchable e pelo invólucro standalone.
+  await app.operacoes.registrarFase(db, KEY, {fase: 'REMOTO_CONHECIDO', mpPaymentId: '9999'});
+  const depois = await db.prepare('SELECT fase, mp_payment_id FROM pedido_operacoes').first();
+  assert.equal(depois.fase, 'CONCLUIDA', 'guarda terminal preservada');
+  assert.equal(depois.mp_payment_id, antes.mp_payment_id, 'identidade não é sobrescrita');
+
+  await db.batch([
+    app.operacoes.prepareRegistrarFase(db, KEY, {fase: 'REMOTO_CONHECIDO', mpPaymentId: '9999'}),
+  ]);
+  const final = await db.prepare('SELECT fase, mp_payment_id FROM pedido_operacoes').first();
+  assert.equal(final.fase, 'CONCLUIDA');
+  assert.equal(final.mp_payment_id, antes.mp_payment_id);
 });
 
 /* ──────────────── UNIDADE: CONTRATO DA OPERATION KEY ───────────────── */

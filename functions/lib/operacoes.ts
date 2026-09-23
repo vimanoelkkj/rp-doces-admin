@@ -402,7 +402,13 @@ export function prepareClaimOperacao(
 // `CONCLUIDA` e `RECUSADA` são terminais: uma resposta tardia do provedor
 // nunca reabre uma operação já resolvida. Campos omitidos são preservados
 // (COALESCE), nunca apagados.
-export async function registrarFase(
+//
+// `prepareRegistrarFase` é a primitiva batchable: devolve o statement pronto
+// para entrar num `db.batch` atômico junto com a persistência local, de modo
+// que a transição de fase e a gravação de mp_payment_id/QR aconteçam juntas
+// ou não aconteçam. `registrarFase` é só o invólucro standalone que executa
+// essa mesma primitiva imediatamente.
+export function prepareRegistrarFase(
   db: D1Database,
   key: string,
   patch: {
@@ -411,8 +417,8 @@ export async function registrarFase(
     resultado?: string | null;
     erro?: string | null;
   },
-): Promise<void> {
-  await db
+): D1PreparedStatement {
+  return db
     .prepare(
       `UPDATE pedido_operacoes
        SET fase = ?,
@@ -428,8 +434,20 @@ export async function registrarFase(
       patch.resultado ?? null,
       patch.erro ?? null,
       key,
-    )
-    .run();
+    );
+}
+
+export async function registrarFase(
+  db: D1Database,
+  key: string,
+  patch: {
+    fase: OperacaoFase;
+    mpPaymentId?: string | null;
+    resultado?: string | null;
+    erro?: string | null;
+  },
+): Promise<void> {
+  await prepareRegistrarFase(db, key, patch).run();
 }
 
 // Contrato HTTP compartilhado pelos endpoints A1. `code` estruturado, nunca
