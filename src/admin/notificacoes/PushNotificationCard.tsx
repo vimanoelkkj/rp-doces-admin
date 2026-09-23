@@ -16,6 +16,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export default function PushNotificationCard() {
   const [status, setStatus] = useState<PushState>("CHECKING");
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,6 +147,56 @@ export default function PushNotificationCard() {
     }
   };
 
+  const handleTestNotification = async () => {
+    setTesting(true);
+    setBusy(true);
+    setFeedback(null);
+    try {
+      if (
+        typeof window === "undefined" ||
+        !("serviceWorker" in navigator) ||
+        !("PushManager" in window)
+      ) {
+        setStatus("UNSUPPORTED");
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+
+      if (!sub) {
+        setStatus("PROMPT");
+        setFeedback("Nenhuma inscrição encontrada neste dispositivo. Ative as notificações primeiro.");
+        return;
+      }
+
+      const res = await fetch("/api/admin/push/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: sub.endpoint }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (res.status === 410 || data.stale) {
+          setStatus("PROMPT");
+          setFeedback("A inscrição deste dispositivo expirou. Ative as notificações novamente.");
+          return;
+        }
+        throw new Error(data.error || "Falha ao enviar notificação de teste.");
+      }
+
+      setFeedback("Notificação de teste enviada para este dispositivo.");
+    } catch (err: unknown) {
+      console.error("Erro ao enviar teste de notificação:", err);
+      setFeedback(err instanceof Error ? err.message : "Erro ao enviar notificação de teste.");
+    } finally {
+      setTesting(false);
+      setBusy(false);
+    }
+  };
+
   if (status === "CHECKING") {
     return null;
   }
@@ -206,14 +257,24 @@ export default function PushNotificationCard() {
         )}
 
         {status === "SUBSCRIBED" && (
-          <button
-            type="button"
-            className="push-btn outline"
-            onClick={handleUnsubscribe}
-            disabled={busy}
-          >
-            {busy ? "Desativando…" : "Desativar"}
-          </button>
+          <div className="push-card-buttons">
+            <button
+              type="button"
+              className="push-btn primary"
+              onClick={handleTestNotification}
+              disabled={busy}
+            >
+              {testing ? "Enviando…" : "Enviar notificação de teste"}
+            </button>
+            <button
+              type="button"
+              className="push-btn outline"
+              onClick={handleUnsubscribe}
+              disabled={busy}
+            >
+              {busy && !testing ? "Desativando…" : "Desativar"}
+            </button>
+          </div>
         )}
       </div>
     </div>

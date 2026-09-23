@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import { app, fixture } from "./helpers/b3.mjs";
 import { generateVapidKeys } from "@mmmike/web-push/vapid";
 
@@ -7,6 +8,14 @@ import { generateVapidKeys } from "@mmmike/web-push/vapid";
 
 const TEST_VAPID = await generateVapidKeys();
 const VAPID_SUBJECT = "mailto:admin@example.invalid";
+
+function gerarChavesClient() {
+  const { publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const rawPub = publicKey.export({ type: "spki", format: "der" });
+  const p256dh = rawPub.slice(-65).toString("base64url");
+  const auth = crypto.randomBytes(16).toString("base64url");
+  return { p256dh, auth };
+}
 
 const cookieDe = (session) => session.cookie.split(";")[0];
 
@@ -661,4 +670,252 @@ test("migration 0030: converge banco com schema legado sem perder registros e cr
   assert.equal(registroLegado.criado_em, "2026-01-01 10:00:00");
 });
 
+/* ──────────────────── 8. Teste de Notificação Web Push (POST /api/admin/push/test) ──────────────────── */
 
+test("POST /api/admin/push/test: exige sessão de admin", async (t) => {
+  const { db } = await bancada(t);
+  const res = await app.adminPushTest.onRequestPost({
+    env: { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey, VAPID_PRIVATE_KEY: TEST_VAPID.privateKey },
+    request: new Request("https://local.test/api/admin/push/test", {
+      method: "POST",
+      headers: { Origin: "https://local.test" },
+      body: JSON.stringify({ endpoint: "https://push.example/1" }),
+    }),
+  });
+  assert.equal(res.status, 401);
+});
+
+test("POST /api/admin/push/test: bloqueia same-origin/CSRF inválido", async (t) => {
+  const { db, session } = await bancada(t);
+  const res = await app.adminPushTest.onRequestPost({
+    env: { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey, VAPID_PRIVATE_KEY: TEST_VAPID.privateKey },
+    request: new Request("https://local.test/api/admin/push/test", {
+      method: "POST",
+      headers: { Origin: "https://attacker.invalid", Cookie: cookieDe(session) },
+      body: JSON.stringify({ endpoint: "https://push.example/1" }),
+    }),
+  });
+  assert.equal(res.status, 403);
+});
+
+test("POST /api/admin/push/test: rejeita payload inválido ou endpoint malformado", async (t) => {
+  const { db, session } = await bancada(t);
+  const env = { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey, VAPID_PRIVATE_KEY: TEST_VAPID.privateKey };
+
+  const testEndpoint = async (body, expectedStatus = 400) => {
+    const res = await app.adminPushTest.onRequestPost({
+      env,
+      request: new Request("https://local.test/api/admin/push/test", {
+        method: "POST",
+        headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
+        body: typeof body === "string" ? body : JSON.stringify(body),
+      }),
+    });
+    assert.equal(res.status, expectedStatus);
+  };
+
+  await testEndpoint("not-a-json", 400);
+  await testEndpoint({}, 400);
+  await testEndpoint({ endpoint: "" }, 400);
+  await testEndpoint({ endpoint: "http://insecure.test/1" }, 400);
+  await testEndpoint({ endpoint: "https://" + "a".repeat(1050) }, 400);
+  await testEndpoint({ endpoint: 12345 }, 400);
+});
+
+test("POST /api/admin/push/test: não permite usar subscription pertencente a outro usuario_id", async (t) => {
+  const { db, session } = await bancada(t);
+  const keys = gerarChavesClient();
+
+  // Insere um segundo admin no banco
+  await db
+    .prepare("INSERT INTO usuarios_admin (id, nome, username, email, senha_hash) VALUES (2, 'Outro Admin', 'outro_admin', 'outro@example.com', 'hash_teste')")
+    .run();
+
+  // Insere subscription associada ao usuario_id 2 (outro usuário)
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(2, "https://push.example/sub-user-2", keys.p256dh, keys.auth)
+    .run();
+
+  const res = await app.adminPushTest.onRequestPost({
+    env: { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey, VAPID_PRIVATE_KEY: TEST_VAPID.privateKey },
+    request: new Request("https://local.test/api/admin/push/test", {
+      method: "POST",
+      headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: "https://push.example/sub-user-2" }),
+    }),
+  });
+
+  assert.equal(res.status, 404);
+  const data = await res.json();
+  assert.match(data.error, /não encontrada/i);
+});
+
+test("POST /api/admin/push/test: busca p256dh/auth no banco, envia para somente uma subscription, não cria push_eventos nem altera pedidos", async (t) => {
+  const { db, session } = await bancada(t);
+  const keys1 = gerarChavesClient();
+  const keys2 = gerarChavesClient();
+
+  // Insere duas inscrições do mesmo usuário
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/sub-1", keys1.p256dh, keys1.auth)
+    .run();
+
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/sub-2", keys2.p256dh, keys2.auth)
+    .run();
+
+  // Cria um pedido existente para certificar que nenhum pedido é tocado
+  await db
+    .prepare(
+      `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
+       VALUES (900, 'tok-900', 'Cliente Intacto', '11999999999', 5000, 'idemp-900', 'SITE', 'PENDENTE', 'NOVO')`,
+    )
+    .run();
+
+  const dispatchedUrls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://push.mock.test/")) {
+      dispatchedUrls.push(String(url));
+      return new Response(null, { status: 201 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    // Cliente envia APENAS o endpoint no body (sem chaves)
+    const res = await app.adminPushTest.onRequestPost({
+      env: {
+        DB: db,
+        VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+        VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+        VAPID_SUBJECT,
+      },
+      request: new Request("https://local.test/api/admin/push/test", {
+        method: "POST",
+        headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: "https://push.mock.test/sub-1" }),
+      }),
+    });
+
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.ok, true);
+
+    // Envio direcionado a EXATAMENTE a subscription solicitada
+    assert.deepEqual(dispatchedUrls, ["https://push.mock.test/sub-1"]);
+
+    // Zero registros em push_eventos
+    const totalEventos = await db.prepare("SELECT COUNT(*) as total FROM push_eventos").first();
+    assert.equal(totalEventos.total, 0, "Notificação de teste NÃO deve inserir em push_eventos");
+
+    // Pedido não foi alterado
+    const pedido = await db.prepare("SELECT status_pagamento, status_pedido FROM pedidos WHERE id = 900").first();
+    assert.equal(pedido.status_pagamento, "PENDENTE");
+    assert.equal(pedido.status_pedido, "NOVO");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("POST /api/admin/push/test: subscription stale (410) remove somente ela e retorna aviso", async (t) => {
+  const { db, session } = await bancada(t);
+  const keys1 = gerarChavesClient();
+  const keys2 = gerarChavesClient();
+
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/stale-sub", keys1.p256dh, keys1.auth)
+    .run();
+
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/active-sub", keys2.p256dh, keys2.auth)
+    .run();
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === "https://push.mock.test/stale-sub") {
+      // Simula 410 Gone do push service (FCM / Mozilla)
+      return new Response(null, { status: 410 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const res = await app.adminPushTest.onRequestPost({
+      env: {
+        DB: db,
+        VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+        VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+        VAPID_SUBJECT,
+      },
+      request: new Request("https://local.test/api/admin/push/test", {
+        method: "POST",
+        headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: "https://push.mock.test/stale-sub" }),
+      }),
+    });
+
+    assert.equal(res.status, 410);
+    const data = await res.json();
+    assert.equal(data.ok, false);
+    assert.equal(data.stale, true);
+
+    // Confirma que SOMENTE a inscrição stale foi removida
+    const subStale = await db.prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/stale-sub'").first();
+    assert.equal(subStale, null);
+
+    const subActive = await db.prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/active-sub'").first();
+    assert.ok(subActive, "Inscrição ativa do usuário deve ser preservada");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("POST /api/admin/push/test: erro no push service retorna 502 e não quebra o sistema", async (t) => {
+  const { db, session } = await bancada(t);
+  const keys = gerarChavesClient();
+
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/error-sub", keys.p256dh, keys.auth)
+    .run();
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === "https://push.mock.test/error-sub") {
+      return new Response("Internal Push Service Error", { status: 500 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const res = await app.adminPushTest.onRequestPost({
+      env: {
+        DB: db,
+        VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+        VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+        VAPID_SUBJECT,
+      },
+      request: new Request("https://local.test/api/admin/push/test", {
+        method: "POST",
+        headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: "https://push.mock.test/error-sub" }),
+      }),
+    });
+
+    assert.equal(res.status, 502);
+    const data = await res.json();
+    assert.match(data.error, /Falha ao despachar/i);
+
+    // Subscription permanece intacta para retry futuro
+    const sub = await db.prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/error-sub'").first();
+    assert.ok(sub);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

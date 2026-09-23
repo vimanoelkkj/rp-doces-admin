@@ -64,6 +64,7 @@ const bundle = await build({
       export * as adminPushSubscribe from './functions/api/admin/push/subscribe';
       export * as adminPushUnsubscribe from './functions/api/admin/push/unsubscribe';
       export * as adminPushRetry from './functions/api/admin/push/retry';
+      export * as adminPushTest from './functions/api/admin/push/test';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
