@@ -634,3 +634,120 @@ test('correlação: webhook legítimo posterior ainda converge normalmente', asy
   assert.equal(s.pedido.status_pagamento, 'PAGO');
   assert.equal(s.produtos[0].estoque, 8, 'baixa física uma única vez');
 });
+
+/* ─────────── R1: falha no batch de persistência pós-sucesso remoto ──────────
+ *
+ * Antes da correção atômica, a transição para REMOTO_CONHECIDO era gravada em
+ * write SEPARADO da persistência de mp_payment_id/QR. Um crash entre os dois
+ * deixava a operação REMOTO_CONHECIDO com a tentativa órfã de identidade
+ * remota — estado que NENHUM sweep recuperava (a seleção de inconclusivas
+ * exclui REMOTO_CONHECIDO e exige mp_payment_id IS NULL).
+ *
+ * Agora a fase só avança JUNTO com a persistência: a falha reverte tudo e a
+ * operação permanece LOCAL_CRIADA — que a recuperação B3 SABE resgatar pela
+ * referência persistida no claim. Estes testes provam o resgate de ponta a
+ * ponta, em SITE e ADMIN. */
+
+test('R1 SITE: falha no batch de persistência fica LOCAL_CRIADA e é resgatada pelo B3', async t => {
+  silenciar(t);
+  const remoto = new Map();
+  const db = await fixture(t, {ledger: false, reserve: 'SEM_RESERVA'});
+  await db.prepare('DELETE FROM pedidos WHERE id=1').run();
+  await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('pedidos','pedido_itens','pedido_pagamentos')").run();
+  await db.prepare('UPDATE produtos SET estoque=10, estoque_reservado=0 WHERE id=1').run();
+  const p = provedor(t, {
+    postar: () => Response.json({
+      id: 9810, status: 'pending', date_of_expiration: '2099-01-01T00:00:00Z',
+      point_of_interaction: {transaction_data: {qr_code: 'qr-9810'}},
+    }),
+    remoto,
+  });
+  const key = uuid('r1-site');
+  db.hook = (s, op) => {
+    if (op === 'batch' && s.some(x => x.sql.includes('SET mp_payment_id = ?'))) {
+      db.hook = null;
+      throw new Error('injected local persistence failure');
+    }
+  };
+  const resposta = await app.checkout.onRequestPost({
+    env: {DB: db, MP_ACCESS_TOKEN: 'fake'},
+    request: new Request('https://local.test/api/checkout', {
+      method: 'POST',
+      body: JSON.stringify({
+        items: [{id: 1, quantity: 2}],
+        cliente: {nome: 'Teste', whatsapp: '11999999999'},
+        operationKey: key,
+      }),
+    }),
+  });
+  assert.equal(resposta.status, 500);
+
+  const operacao = (await db.prepare('SELECT * FROM pedido_operacoes').all()).results[0];
+  assert.equal(operacao.fase, 'LOCAL_CRIADA', 'rollback atômico: fase não avançou sem a persistência');
+  assert.equal(operacao.mp_payment_id, null);
+  const tentativa = (await db.prepare('SELECT * FROM pedido_pagamentos').all()).results[0];
+  assert.equal(tentativa.mp_payment_id, null, 'tentativa órfã de identidade remota');
+
+  const referencia = referenciaPersistida(operacao);
+  remoto.set(referencia, [{id: 9810, status: 'approved', external_reference: referencia}]);
+
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos.length, 1, 'nenhuma tentativa nova');
+  assert.equal(s.pagamentos[0].mp_payment_id, '9810', 'identidade remota resgatada pelo B3');
+  assert.equal(s.pagamentos[0].status, 'PAGO');
+  assert.equal(s.operacoes[0].fase, 'REMOTO_CONHECIDO');
+  assert.equal(p.chamadas.post, 1, 'nenhum segundo POST lógico');
+});
+
+test('R1 ADMIN: falha no batch de persistência fica LOCAL_CRIADA e é resgatada pelo B3', async t => {
+  silenciar(t);
+  const remoto = new Map();
+  const db = await fixture(t, {ledger: false});
+  const session = await app.auth.createSession(db, 1);
+  const p = provedor(t, {
+    postar: () => Response.json({
+      id: 9820, status: 'pending', date_of_expiration: '2099-01-01T00:00:00Z',
+      point_of_interaction: {transaction_data: {qr_code: 'qr-9820'}},
+    }),
+    remoto,
+  });
+  const key = uuid('r1-admin');
+  db.hook = (s, op) => {
+    if (op === 'batch' && s.some(x => x.sql.includes('SET mp_payment_id = ?'))) {
+      db.hook = null;
+      throw new Error('injected local persistence failure');
+    }
+  };
+  const resposta = await app.adminPix.onRequestPost({
+    env: {DB: db, MP_ACCESS_TOKEN: 'fake'}, params: {id: '1'},
+    request: new Request('https://local.test/api/admin/pedidos/1/pix', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', Cookie: cookieDe(session), Origin: 'https://local.test'},
+      body: JSON.stringify({valorCentavos: 10000, operationKey: key}),
+    }),
+  });
+  assert.equal(resposta.status, 500);
+
+  const operacao = (await db.prepare('SELECT * FROM pedido_operacoes').all()).results[0];
+  assert.equal(operacao.fase, 'LOCAL_CRIADA');
+  assert.equal(operacao.mp_payment_id, null);
+  const tentativa = (await db.prepare('SELECT * FROM pedido_pagamentos').all()).results[0];
+  assert.equal(tentativa.mp_payment_id, null);
+
+  const referencia = referenciaPersistida(operacao);
+  assert.equal(referencia, tentativa.idempotency_key, 'ADMIN usa a key da tentativa como referência');
+  remoto.set(referencia, [{id: 9820, status: 'approved', external_reference: referencia}]);
+
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos.length, 1, 'nenhuma tentativa nova');
+  assert.equal(s.pagamentos[0].mp_payment_id, '9820', 'identidade remota resgatada pelo B3');
+  assert.equal(s.pagamentos[0].status, 'PAGO');
+  assert.equal(s.operacoes[0].fase, 'REMOTO_CONHECIDO');
+  assert.equal(p.chamadas.post, 1, 'nenhum segundo POST lógico');
+});

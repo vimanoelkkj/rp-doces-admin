@@ -34,6 +34,7 @@ import {
   parseOperationKey,
   parseResultado,
   prepareClaimOperacao,
+  prepareRegistrarFase,
   registrarFase,
   type ConflitoOperacao,
   type IdentidadeEsperada,
@@ -645,17 +646,13 @@ export async function createAdminPixCharge(
     expiresAt: payment.date_of_expiration,
   };
 
-  // Identidade remota e resultado registrados ANTES da gravação local: se
-  // ela falhar, um retry com a mesma key recupera este resultado em vez de
-  // fazer outro POST com outra identidade.
-  if (operationKey) {
-    await registrarFase(db, operationKey, {
-      fase: "REMOTO_CONHECIDO",
-      mpPaymentId: String(payment.id),
-      resultado: JSON.stringify(sucesso),
-    });
-  }
-
+  // Identidade remota e resultado gravados no MESMO batch da persistência
+  // local: ou `pedido_pagamentos.mp_payment_id`/QR e a fase
+  // `REMOTO_CONHECIDO` nascem juntos, ou nada nasce. Antes, a fase era
+  // gravada em write separado e um crash entre os dois deixava a operação
+  // `REMOTO_CONHECIDO` com `pedido_pagamentos.mp_payment_id` NULL — estado
+  // que nenhum sweep recuperava (a busca read-only exige
+  // `mp_payment_id IS NULL` e exclui `REMOTO_CONHECIDO`).
   const statementsPosSucesso = [
     db
       .prepare(
@@ -673,6 +670,15 @@ export async function createAdminPixCharge(
         payment.date_of_expiration,
         pagamentoId,
       ),
+    ...(operationKey
+      ? [
+          prepareRegistrarFase(db, operationKey, {
+            fase: "REMOTO_CONHECIDO",
+            mpPaymentId: String(payment.id),
+            resultado: JSON.stringify(sucesso),
+          }),
+        ]
+      : []),
   ];
   // pedidos.mp_payment_id/mp_qr_code/etc NUNCA são gravados aqui de
   // propósito: esses campos são do modelo legado de 1-Pix-por-pedido do

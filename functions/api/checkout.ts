@@ -17,6 +17,7 @@ import {
   parseOperationKey,
   parseResultado,
   prepareClaimOperacao,
+  prepareRegistrarFase,
   registrarFase,
   type IdentidadeEsperada,
   type OperacaoRow,
@@ -414,16 +415,12 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     totalCentavos,
   };
 
-  // Registra a identidade remota e o resultado ANTES de gravar os detalhes
-  // locais. Se a gravação local a seguir falhar, o retry com a MESMA key
-  // recupera este resultado em vez de criar outro pedido e outro POST: o
-  // recurso remoto já existe e já tem nome.
-  await registrarFase(env.DB, operationKey, {
-    fase: "REMOTO_CONHECIDO",
-    mpPaymentId: String(payment.id),
-    resultado: JSON.stringify(sucesso),
-  });
-
+  // Identidade remota e resultado gravados no MESMO batch dos detalhes
+  // locais: ou pedidos/pedido_pagamentos (mp_payment_id, QR, expiração) e a
+  // fase `REMOTO_CONHECIDO` nascem juntos, ou nada nasce. Antes, a fase era
+  // gravada em write separado e um crash entre os dois deixava a operação
+  // `REMOTO_CONHECIDO` com `pedido_pagamentos.mp_payment_id` NULL — estado
+  // que nenhum sweep nem o polling do site recuperavam.
   await env.DB.batch([
     env.DB.prepare(
       `UPDATE pedidos
@@ -456,6 +453,11 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       payment.date_of_expiration,
       pagamentoId,
     ),
+    prepareRegistrarFase(env.DB, operationKey, {
+      fase: "REMOTO_CONHECIDO",
+      mpPaymentId: String(payment.id),
+      resultado: JSON.stringify(sucesso),
+    }),
   ]);
 
   await registrarFase(env.DB, operationKey, { fase: "CONCLUIDA" });
