@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Header.css";
 
 interface HeaderProps {
@@ -12,6 +12,7 @@ interface HeaderProps {
 
 export default function Header({ minimal }: HeaderProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const isCardapio = location.pathname === "/cardapio";
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -22,6 +23,7 @@ export default function Header({ minimal }: HeaderProps) {
   const dragPointerIdRef = useRef<number | null>(null);
   const dragMovedRef = useRef(false);
   const suppressHandleClickRef = useRef(false);
+  const pendingHashRef = useRef<string | null>(null);
 
   const closeMenu = () => {
     dragOffsetRef.current = 0;
@@ -50,14 +52,60 @@ export default function Header({ minimal }: HeaderProps) {
     };
   }, [menuOpen]);
 
-  const handleMenuLink = (hash: string) => {
-    closeMenu();
+  useEffect(() => {
+    if (menuOpen) return;
+    const targetHash = pendingHashRef.current;
+    if (!targetHash) return;
+    pendingHashRef.current = null;
+
     if (location.pathname !== "/") {
-      window.location.href = "/" + hash;
-    } else {
-      const el = document.querySelector(hash);
-      el?.scrollIntoView({ behavior: "smooth" });
+      navigate("/" + targetHash);
+      return;
     }
+
+    let innerFrameId: number;
+    const frameId = requestAnimationFrame(() => {
+      innerFrameId = requestAnimationFrame(() => {
+        const id = targetHash.replace(/^#/, "");
+        const el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+          window.history.replaceState(null, "", targetHash);
+        }
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      cancelAnimationFrame(innerFrameId);
+    };
+  }, [menuOpen, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (location.pathname === "/" && location.hash) {
+      const targetHash = location.hash;
+      let innerFrameId: number;
+      const frameId = requestAnimationFrame(() => {
+        innerFrameId = requestAnimationFrame(() => {
+          const id = targetHash.replace(/^#/, "");
+          const el = document.getElementById(id);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth" });
+          }
+        });
+      });
+
+      return () => {
+        cancelAnimationFrame(frameId);
+        cancelAnimationFrame(innerFrameId);
+      };
+    }
+  }, [location.pathname, location.hash]);
+
+  const handleMenuLink = (hash: string) => {
+    if (!menuOpen) return;
+    pendingHashRef.current = hash;
+    closeMenu();
   };
 
   const handleDragStart = (event: ReactPointerEvent<HTMLButtonElement>) => {
