@@ -1,7 +1,7 @@
-const CACHE_NAME = "rp-admin-offline-v1";
+const CACHE_NAME = "rp-admin-offline-v2";
 const OFFLINE_URL = "/admin-offline";
 
-// Precacheia SOMENTE a página estática de offline fallback.
+// Precacheia a página estática de offline fallback e assets essenciais de notificação.
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
@@ -13,6 +13,10 @@ self.addEventListener("install", (event) => {
         await cache.put(OFFLINE_URL, response.clone());
         await cache.put("/admin-offline.html", response);
       }
+      await cache.addAll([
+        "/icons/admin-badge-72.png",
+        "/icons/admin-icon-192.png",
+      ]).catch(() => {});
     }),
   );
   self.skipWaiting();
