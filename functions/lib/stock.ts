@@ -234,8 +234,17 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
 export const PIX_MP_PENDENTE_NO_PEDIDO_SQL = `EXISTS (SELECT 1 FROM pedido_pagamentos pp
                   WHERE pp.pedido_id = pedidos.id AND pp.metodo = 'PIX_MP' AND pp.status = 'PENDENTE')`;
 
+export const REGENERACAO_PIX_ATIVA_SQL = `EXISTS (
+  SELECT 1 FROM pedido_operacoes o
+  WHERE o.pedido_id = pedidos.id
+    AND o.tipo = 'PIX_ADMIN_REGENERACAO'
+    AND o.fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO', 'REMOTO_CONHECIDO')
+    AND o.expirado_em IS NULL
+)`;
+
 const RESERVA_LIBERAVEL_SQL = `${pedidoValidoSql('pedidos.id')} AND status_pagamento = 'PENDENTE'
-  AND NOT ${PIX_MP_PENDENTE_NO_PEDIDO_SQL}`;
+  AND NOT ${PIX_MP_PENDENTE_NO_PEDIDO_SQL}
+  AND NOT ${REGENERACAO_PIX_ATIVA_SQL}`;
 
 // Libera somente itens que ainda estao RESERVADOS. As guards B4 continuam
 // dentro da mesma transacao: liquido zero projetado e nenhum PIX_MP pendente.

@@ -928,6 +928,14 @@ export default function PedidoDetalheModal({
                 </div>
               </div>
 
+              {data.financeiro.temExcesso && (
+                <div className="pedmodal-pix-aviso" role="alert">
+                  <span>
+                    ⚠ <strong>Sobrepagamento identificado:</strong> Recebido {formatarPreco(data.financeiro.liquidoCentavos)} de um total de {formatarPreco(data.financeiro.totalCentavos)} (excesso de {formatarPreco(data.financeiro.excessoCentavos)}).
+                  </span>
+                </div>
+              )}
+
               {/* B-3: cobrança cujo envio ao Mercado Pago ficou inconclusivo.
                   Reusa o mesmo bloco de aviso do caminho ambíguo, porque a
                   ação correta é idêntica: nunca tentar de novo às cegas, só

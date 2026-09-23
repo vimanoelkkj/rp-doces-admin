@@ -14,6 +14,8 @@ export interface FinanceiroPedido {
   saldoCentavos: number;
   pagoCentavos: number;
   totalCentavos: number;
+  excessoCentavos: number;
+  temExcesso: boolean;
   metodosConfirmados: LedgerMetodo[];
 }
 
