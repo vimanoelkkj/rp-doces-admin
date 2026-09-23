@@ -1,9 +1,16 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser, sameOrigin } from "../../../../lib/auth";
-import { anularPedido, ANULACAO_ERROS } from "../../../../lib/pedidoAnulacao";
+import {
+  anularPedido,
+  ANULACAO_ERROS,
+  resolverPixNaoPagosParaAnulacao,
+} from "../../../../lib/pedidoAnulacao";
 
-interface Env { DB: D1Database }
+interface Env {
+  DB: D1Database;
+  MP_ACCESS_TOKEN?: string;
+}
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
   if (!sameOrigin(request)) return Response.json({ error: "Origem inválida" }, { status: 403 });
@@ -27,6 +34,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     return Response.json({ error: "Informe a opção de estoque e um motivo de até 300 caracteres." }, { status: 400 });
   }
   try {
+    const resolucao = await resolverPixNaoPagosParaAnulacao(env.DB, {
+      pedidoId,
+      accessToken: env.MP_ACCESS_TOKEN,
+      usuarioId: auth.user.id,
+    });
+    if (!resolucao.ok) {
+      return Response.json({ error: resolucao.mensagem, code: resolucao.erro }, { status: 409 });
+    }
+
     const result = await anularPedido(env.DB, {
       pedidoId, devolverEstoque: body.devolverEstoque as boolean,
       motivo: typeof body.motivo === "string" ? body.motivo.trim() : "",
