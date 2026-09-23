@@ -6,6 +6,7 @@ import AdminWave from "./AdminWave";
 import { AdminThemeProvider } from "../theme/AdminThemeContext";
 import { AdminAuthProvider, type AdminUser } from "../auth/AdminAuthContext";
 import { NotificacoesProvider } from "../notificacoes/NotificacoesContext";
+import { useAdminPwa } from "../pwa/useAdminPwa";
 
 type AuthState =
   | { status: "loading" }
@@ -13,6 +14,7 @@ type AuthState =
   | { status: "unauthenticated" };
 
 export default function AdminLayout() {
+  useAdminPwa();
   const navigate = useNavigate();
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
 
