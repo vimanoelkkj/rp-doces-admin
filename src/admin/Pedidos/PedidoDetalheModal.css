@@ -762,15 +762,25 @@
 @media (max-width: 520px) {
   .pedmodal-header {
     flex-direction: column;
+    position: sticky;
+  }
+
+  .pedmodal-title-area {
+    padding-right: 48px;
+    width: 100%;
   }
 
   .pedmodal-header-actions {
     width: 100%;
     justify-content: flex-start;
+    gap: 8px;
   }
 
   .pedmodal-btn-close {
-    margin-left: auto;
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    margin-left: 0;
   }
 
   .pedmodal-item-row,
@@ -802,6 +812,27 @@
   .pedmodal-status-menu {
     left: 0;
     right: auto;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .pedmodal-item-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0e9e0;
+  }
+
+  .pedmodal-item-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
   }
 }
 .pedmodal-item-state,

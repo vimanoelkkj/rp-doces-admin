@@ -365,6 +365,15 @@
   cursor: pointer;
   transition: border-color 0.15s;
   text-align: left;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nped-dropdown-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nped-dropdown--open .nped-dropdown-trigger {
@@ -552,6 +561,15 @@
   .nped-items-header {
     flex-wrap: wrap;
     gap: 12px;
+  }
+
+  .nped-item-row-fields {
+    gap: 8px;
+  }
+
+  .nped-item-row-fields .nped-dropdown {
+    flex: 1;
+    min-width: 0;
   }
 
   .nped-item-row-fields > * {
