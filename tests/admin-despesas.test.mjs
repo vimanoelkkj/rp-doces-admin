@@ -155,13 +155,25 @@ test('8: quantidade negativa é rejeitada', async t => {
 });
 
 // 9) valor unitário inválido rejeitado
-for (const valorUnitarioCentavos of [0, -100, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+for (const valorUnitarioCentavos of [0, -100, 116.3051, Number.MAX_SAFE_INTEGER + 1]) {
   test(`9: valor unitário inválido (${valorUnitarioCentavos}) é rejeitado`, async t => {
     const {db, session} = await setup(t);
     const {status} = await corpo(await criar(db, session, despesaBasica({itens: [itemBasico({valorUnitarioCentavos})]})));
     assert.equal(status, 400);
   });
 }
+
+// 9b) fração de centavo no valor unitário preserva o total real da compra
+test('9b: 200 unidades a R$ 1,16305 fecham em R$ 232,61', async t => {
+  const {db, session} = await setup(t);
+  const {status, body} = await corpo(await criar(db, session, despesaBasica({
+    itens: [itemBasico({quantidade: 200, valorUnitarioCentavos: 116.305})],
+  })));
+  assert.equal(status, 201);
+  assert.equal(body.despesa.totalCentavos, 23261);
+  assert.equal(body.despesa.itens[0].valorTotalCentavos, 23261);
+  assert.equal(body.despesa.itens[0].valorUnitarioCentavos, 116.305);
+});
 
 // 10) categoria inválida
 test('10: categoria inválida é rejeitada', async t => {

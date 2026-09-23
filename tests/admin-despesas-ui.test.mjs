@@ -134,6 +134,14 @@ test('43: registrar gasto atualiza a lista e o resumo sem reload', async t => {
     const valorUnitario = modal.querySelector('.gasto-money-input input');
     await ui.act(async () => {
       changeValue(descricao, 'Ovos');
+      changeValue(quantidade, '200');
+      changeValue(valorUnitario, '1,16305');
+    });
+    await flush();
+    assert.match(modal.querySelector('.gasto-item-subtotal strong').textContent, /232,61/,
+      'subtotal preserva frações de centavo do valor unitário');
+
+    await ui.act(async () => {
       changeValue(quantidade, '30');
       changeValue(valorUnitario, '0,80');
     });
