@@ -1,15 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
+import { CartItem } from "../context/CartContext";
 import "./CartWidget.css";
-
-interface CartItem {
-  id: number;
-  name: string;
-  price: number;
-  quantity: number;
-  image: string;
-}
 
 interface CartWidgetProps {
   items: CartItem[];
@@ -173,6 +166,7 @@ export default function CartWidget({
                         onClick={() =>
                           onUpdateQuantity(item.id, item.quantity - 1)
                         }
+                        aria-label={`Diminuir quantidade de ${item.name}`}
                       >
                         −
                       </button>
@@ -180,6 +174,23 @@ export default function CartWidget({
                       <button
                         onClick={() =>
                           onUpdateQuantity(item.id, item.quantity + 1)
+                        }
+                        disabled={
+                          item.disponibilidade !== undefined &&
+                          item.quantity >= item.disponibilidade
+                        }
+                        aria-disabled={
+                          item.disponibilidade !== undefined &&
+                          item.quantity >= item.disponibilidade
+                            ? "true"
+                            : undefined
+                        }
+                        aria-label={`Aumentar quantidade de ${item.name}`}
+                        title={
+                          item.disponibilidade !== undefined &&
+                          item.quantity >= item.disponibilidade
+                            ? "Limite de estoque atingido"
+                            : undefined
                         }
                       >
                         +

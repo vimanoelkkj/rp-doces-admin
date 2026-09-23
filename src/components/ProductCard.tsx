@@ -12,9 +12,11 @@ export default function ProductCard({
   onAddToCart,
 }: ProductCardProps) {
   const [justAdded, setJustAdded] = useState(false);
+  const esgotado =
+    product.disponibilidade !== undefined && product.disponibilidade <= 0;
 
   const handleAdd = () => {
-    if (justAdded) return;
+    if (justAdded || esgotado) return;
     onAddToCart?.();
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1200);
@@ -38,6 +40,9 @@ export default function ProductCard({
           {product.originalPrice != null && (
             <span className="product-promo-badge">Promoção</span>
           )}
+          {esgotado && (
+            <span className="product-esgotado-badge">Esgotado</span>
+          )}
         </div>
         <h3 className="product-name">{product.name}</h3>
         {product.description && (
@@ -55,9 +60,10 @@ export default function ProductCard({
             </span>
           </span>
           <button
-            className={`add-button${justAdded ? " add-button--added" : ""}`}
-            aria-label={`Adicionar ${product.name}`}
+            className={`add-button${justAdded ? " add-button--added" : ""}${esgotado ? " add-button--esgotado" : ""}`}
+            aria-label={esgotado ? `${product.name} esgotado` : `Adicionar ${product.name}`}
             onClick={handleAdd}
+            disabled={esgotado}
           >
             {justAdded ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">

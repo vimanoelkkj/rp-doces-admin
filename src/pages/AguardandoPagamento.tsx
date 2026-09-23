@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { CartItem, useCart } from "../context/CartContext";
+import { fetchProducts } from "../api/products";
 import {
   gravarOperationKey,
   lerOperationKey,
@@ -67,7 +68,7 @@ type LoadingStep = 1 | 2;
 export default function AguardandoPagamento() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { clearCart } = useCart();
+  const { clearCart, reconcileWithProducts } = useCart();
   const state = location.state as CheckoutState | null;
 
   // A1: a MESMA identidade durante todo o ciclo de vida desta finalização.
@@ -88,6 +89,7 @@ export default function AguardandoPagamento() {
   const [loadingStep, setLoadingStep] = useState<LoadingStep>(1);
   const [payment, setPayment] = useState<CheckoutResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isEstoqueError, setIsEstoqueError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [resultadoPendente, setResultadoPendente] = useState<string | null>(null);
@@ -140,7 +142,28 @@ export default function AguardandoPagamento() {
             }
             return null;
           }
-          throw new Error(body.error || "Falha ao criar pagamento Pix");
+
+          const isEstoque =
+            response.status === 409 &&
+            (body.code === "ESTOQUE_INSUFICIENTE" ||
+              /estoque/i.test(body.error || ""));
+
+          if (isEstoque) {
+            // Reconcilia o carrinho com os dados mais recentes do estoque
+            fetchProducts()
+              .then((products) => {
+                reconcileWithProducts(products);
+              })
+              .catch(() => {});
+          }
+
+          const msg = isEstoque
+            ? (body.error || "O estoque de um ou mais itens selecionados não está mais disponível. Por favor, revise seu carrinho.")
+            : (body.error || "Falha ao criar pagamento Pix");
+
+          const erro = new Error(msg);
+          (erro as unknown as { isEstoque: boolean }).isEstoque = isEstoque;
+          throw erro;
         }
         return response.json() as Promise<CheckoutResponse>;
       })
@@ -157,6 +180,7 @@ export default function AguardandoPagamento() {
       .catch((err) => {
         if (controller.signal.aborted || cancelled) return;
         setErrorMessage(err.message);
+        setIsEstoqueError(Boolean((err as unknown as { isEstoque?: boolean })?.isEstoque));
         setStatus("erro");
       });
 
@@ -305,14 +329,38 @@ export default function AguardandoPagamento() {
                   />
                 </svg>
               </div>
-              <h1 className="payment-title">Não foi possível gerar o Pix</h1>
+              <h1 className="payment-title">
+                {isEstoqueError ? "Estoque indisponível" : "Não foi possível gerar o Pix"}
+              </h1>
               <p className="payment-subtitle">{errorMessage}</p>
-              <button
-                className="payment-btn-primary"
-                onClick={() => navigate("/checkout")}
-              >
-                Voltar ao checkout
-              </button>
+              <div className="aguardando-error-actions" style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%", maxWidth: "300px", margin: "20px auto 0" }}>
+                <button
+                  className="payment-btn-primary"
+                  onClick={() => navigate("/checkout")}
+                >
+                  Voltar ao checkout
+                </button>
+                {isEstoqueError && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/cardapio")}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "100px",
+                      border: "1px solid #d8c8b8",
+                      background: "#faf6f0",
+                      color: "#634738",
+                      fontFamily: "Manrope, sans-serif",
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    Revisar no cardápio
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

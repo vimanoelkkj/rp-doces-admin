@@ -114,6 +114,18 @@
   letter-spacing: 0.5px;
 }
 
+.product-esgotado-badge {
+  font-family: "Manrope", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: #7a3128;
+  background: #fbeceb;
+  border-radius: 4px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .product-prices {
   display: flex;
   flex-direction: column;
@@ -159,6 +171,16 @@
 
 .add-button:active {
   transform: scale(0.9);
+}
+
+.add-button:disabled,
+.add-button--esgotado {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background-color: #ede5dc;
+  color: #8c7a76;
+  pointer-events: none;
+  transform: none !important;
 }
 
 /* Estado "adicionado" */

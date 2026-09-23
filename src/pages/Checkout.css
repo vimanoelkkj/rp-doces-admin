@@ -56,6 +56,19 @@
   margin: 0 0 24px;
 }
 
+.checkout-estoque-aviso {
+  background: #fbf3eb;
+  border: 1px solid #eadfd3;
+  border-left: 4px solid #c28343;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #634738;
+}
+
 .checkout-items {
   display: flex;
   flex-direction: column;
