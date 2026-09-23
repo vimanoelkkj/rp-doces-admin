@@ -229,3 +229,163 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Web Push Card (PWA Admin V2)
+   ───────────────────────────────────────────────────────────── */
+
+.push-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: #ffffff;
+  border: 1px solid #eadfd3;
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(43, 29, 26, 0.04);
+}
+
+.push-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #f8f4f0;
+  color: #634738;
+  flex-shrink: 0;
+}
+
+.push-card[data-status="SUBSCRIBED"] .push-card-icon {
+  background: #eef7ee;
+  color: #2e7d32;
+}
+
+.push-card[data-status="DENIED"] .push-card-icon {
+  background: #fdf0ee;
+  color: #c62828;
+}
+
+.push-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.push-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.push-card-title {
+  font-family: "Fraunces", serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2b1d1a;
+  margin: 0;
+}
+
+.push-badge {
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.push-badge.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.push-badge.blocked {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.push-badge.unsupported {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+.push-badge.prompt {
+  background: #f3ece6;
+  color: #8c7a76;
+}
+
+.push-card-description {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6a5753;
+  margin: 6px 0 0;
+}
+
+.push-card-feedback {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #634738;
+  margin: 8px 0 0;
+}
+
+.push-card-actions {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.push-btn {
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.push-btn.primary {
+  background: #634738;
+  color: #ffffff;
+  border: 1px solid #634738;
+}
+
+.push-btn.primary:hover:not(:disabled) {
+  background: #4e372b;
+  border-color: #4e372b;
+}
+
+.push-btn.outline {
+  background: transparent;
+  color: #8c7a76;
+  border: 1px solid #eadfd3;
+}
+
+.push-btn.outline:hover:not(:disabled) {
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.push-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 660px) {
+  .push-card {
+    flex-direction: column;
+  }
+  .push-card-actions {
+    width: 100%;
+    margin-top: 10px;
+  }
+  .push-btn {
+    width: 100%;
+  }
+}

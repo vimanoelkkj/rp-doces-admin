@@ -28,10 +28,14 @@ import {
   type OperacaoRow,
 } from "../../lib/operacoes";
 import { isValidWhatsappBr, normalizeWhatsappBr } from "../../../shared/whatsapp";
+import { notificarNovoPedidoPagoSafe } from "../../lib/pushNotifier";
 
 interface Env {
   DB: D1Database;
   MP_ACCESS_TOKEN?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
 }
 
 interface PedidoListRow {
@@ -690,6 +694,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       } catch (err) {
         console.error("Falha ao baixar estoque do pedido manual recém-criado", pedidoId, err);
       }
+      await notificarNovoPedidoPagoSafe(env.DB, env, pedidoId, {
+        excludeUsuarioId: auth.user.id,
+      });
     }
 
     return Response.json(

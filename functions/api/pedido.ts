@@ -53,7 +53,7 @@ async function handleDetalhe(request: Request, env: Env): Promise<Response> {
     return jsonError("Pedido não encontrado", 404);
   }
 
-  const atual = await refreshPedidoStatus(env.DB, env.MP_ACCESS_TOKEN, pedido);
+  const atual = await refreshPedidoStatus(env.DB, env.MP_ACCESS_TOKEN, pedido, env);
 
   const { results: itens } = await env.DB.prepare(
     `SELECT produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos

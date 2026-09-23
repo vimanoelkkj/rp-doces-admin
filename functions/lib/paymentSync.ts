@@ -21,6 +21,7 @@ import {
   registrarFase,
   registrarObservacao,
 } from "./operacoes";
+import { notificarNovoPedidoPagoSafe, type PushEnv } from "./pushNotifier";
 
 export type MpMappedStatus = "PAGO" | "CANCELADO" | "EXPIRADO";
 
@@ -107,6 +108,7 @@ async function applyLedgerTransition(
   pagamentoId: number,
   novoStatus: MpMappedStatus | null,
   mp?: MpPaymentResponse,
+  env?: PushEnv,
 ): Promise<SyncPaymentResult> {
   if (mp) {
     if (!verifiedMpResponses.has(mp)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
@@ -176,6 +178,10 @@ async function applyLedgerTransition(
   const transicionou = atual.status !== novoStatus;
   await finalizePayment(db, pagamentoId, atual.pedido_id);
 
+  if (novoStatus === "PAGO" && transicionou && env) {
+    await notificarNovoPedidoPagoSafe(db, env, atual.pedido_id);
+  }
+
   return { ok: true, status: novoStatus, transicionou };
 }
 
@@ -185,9 +191,10 @@ export async function syncPaymentFromMp(
   db: D1Database,
   pagamentoId: number,
   mp: MpPaymentResponse,
+  env?: PushEnv,
 ): Promise<SyncPaymentResult> {
   if (!verifiedMpResponses.has(mp)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
-  return applyLedgerTransition(db, pagamentoId, mapMpStatus(mp.status), mp);
+  return applyLedgerTransition(db, pagamentoId, mapMpStatus(mp.status), mp, env);
 }
 
 // Caminho local de expiração (pix_expira_em vencido), sem nenhum dado do
@@ -408,7 +415,7 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
         ).bind(row.id, RECONCILE_AFTER_SECONDS).run();
         if (!claim.meta.changes) return;
         const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN!, row.mp_payment_id);
-        await syncPaymentFromMp(env.DB, row.id, payment);
+        await syncPaymentFromMp(env.DB, row.id, payment, env);
       } catch (err) {
         console.error("Falha ao reconciliar pagamento PIX_MP pendente/expirado", row.id, err);
       }
@@ -583,7 +590,7 @@ export async function recuperarOperacoesInconclusivas(
               fase: "REMOTO_CONHECIDO",
               mpPaymentId: busca.mpPaymentId,
             });
-            await syncPaymentFromMp(env.DB, bRow.id, payment);
+            await syncPaymentFromMp(env.DB, bRow.id, payment, env);
           }
           return;
         }
@@ -644,7 +651,7 @@ export async function recuperarOperacoesInconclusivas(
         });
 
         // Estado financeiro decidido só aqui, pelo caminho compartilhado.
-        await syncPaymentFromMp(env.DB, resolvido.pagamentoId, payment);
+        await syncPaymentFromMp(env.DB, resolvido.pagamentoId, payment, env);
       } catch (err) {
         console.error(
           "Falha ao recuperar operação inconclusiva",

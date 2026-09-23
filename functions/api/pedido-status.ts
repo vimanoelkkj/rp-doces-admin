@@ -39,7 +39,7 @@ async function handleStatus(request: Request, env: Env): Promise<Response> {
     return jsonError("Pedido não encontrado", 404);
   }
 
-  const atual = await refreshPedidoStatus(env.DB, env.MP_ACCESS_TOKEN, pedido);
+  const atual = await refreshPedidoStatus(env.DB, env.MP_ACCESS_TOKEN, pedido, env);
 
   return Response.json({ pedidoId: pedido.id, ...atual });
 }

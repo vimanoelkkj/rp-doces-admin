@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useNotificacoes, type Notificacao } from "./NotificacoesContext";
+import PushNotificationCard from "./PushNotificationCard";
 import "./AdminNotificacoes.css";
 
 // HUMAN-14 — página de notificações.
@@ -94,6 +95,8 @@ export default function AdminNotificacoes() {
           Marcar todas como lidas
         </button>
       </div>
+
+      <PushNotificationCard />
 
       <section className="notif-panel">
         {error && <p className="notif-error">{error}</p>}

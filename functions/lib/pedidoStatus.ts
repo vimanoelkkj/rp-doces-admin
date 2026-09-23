@@ -3,6 +3,7 @@
 import { resolveLedgerPaymentId } from "./comandaLedger";
 import { syncPaymentFromMp, expireLocalPayment, fetchMpPayment, resolveWebhookPayment } from "./paymentSync";
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
+import { type PushEnv } from "./pushNotifier";
 
 export interface PedidoStatusRow {
   id: number;
@@ -40,6 +41,7 @@ export async function refreshPedidoStatus(
   db: D1Database,
   mpAccessToken: string,
   pedido: PedidoStatusRow,
+  env?: PushEnv,
 ): Promise<StatusAtual> {
   // Verificação explícita antes de decidir: se já existe ledger, usa a
   // linha existente; só materializa o legado se genuinamente não existir
@@ -89,7 +91,7 @@ export async function refreshPedidoStatus(
       throw new Error("IDENTIDADE_PAGAMENTO_SITE_DIVERGENTE");
     }
     // Fora do catch de rede: falha derivada B3 não é falha de consulta MP.
-    transicionou = (await syncPaymentFromMp(db, pagamentoId, payment)).transicionou;
+    transicionou = (await syncPaymentFromMp(db, pagamentoId, payment, env)).transicionou;
   }
 
   const expiraEm = tentativa?.pix_expira_em ?? pedido.pix_expira_em;
