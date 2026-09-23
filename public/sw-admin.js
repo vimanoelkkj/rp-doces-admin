@@ -86,7 +86,7 @@ self.addEventListener("push", (event) => {
   const options = {
     body: data.body || "Novo pedido confirmado na loja.",
     icon: "/icons/admin-icon-192.png",
-    badge: "/icons/admin-icon-192.png",
+    badge: "/icons/admin-badge-72.png",
     tag: data.tag || (data.pedidoId ? `pedido-${data.pedidoId}` : "novo-pedido"),
     renotify: true,
     data: {
