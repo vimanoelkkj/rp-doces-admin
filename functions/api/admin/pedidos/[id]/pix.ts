@@ -33,6 +33,8 @@ const MENSAGENS: Record<string, string> = {
   CAPACIDADE_INSUFICIENTE: "Valor acima da capacidade disponível para novas cobranças Pix",
   PIX_PARA_SUBSTITUIR_INVALIDO:
     "O Pix informado para substituir não está mais disponível (já foi substituído, pago ou não pertence a este pedido)",
+  PIX_SUBSTITUTO_JA_PAGO:
+    "O Pix anterior já foi aprovado no Mercado Pago e o pedido foi atualizado.",
   ESTOQUE_INSUFICIENTE: "Um ou mais itens não possuem estoque suficiente disponível.",
   MERCADO_PAGO_RECUSOU: "O Mercado Pago recusou o pagamento Pix",
   MERCADO_PAGO_INDISPONIVEL:
@@ -47,6 +49,7 @@ const STATUS_HTTP: Record<string, number> = {
   VALOR_INVALIDO: 400,
   CAPACIDADE_INSUFICIENTE: 409,
   PIX_PARA_SUBSTITUIR_INVALIDO: 409,
+  PIX_SUBSTITUTO_JA_PAGO: 409,
   ESTOQUE_INSUFICIENTE: 409,
   MERCADO_PAGO_RECUSOU: 502,
   MERCADO_PAGO_INDISPONIVEL: 502,

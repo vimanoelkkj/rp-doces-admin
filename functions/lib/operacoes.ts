@@ -85,6 +85,7 @@ export const chaveReembolso = (key: string) => `a1:${key}:ref`;
 // erro de transporte, 5xx ambíguo, resposta local perdida ou sucesso remoto
 // seguido de falha local NUNCA produzem uma key MP nova.
 export const chaveMp = (key: string) => `a1:${key}:mp`;
+export const chaveCancelamento = (key: string) => `a1:${key}:cancel`;
 
 // Uma anulação de pedido pode precisar estornar mais de um pagamento PIX_MP
 // (ex.: pedido pago em duas cobranças). `pedido_operacoes.operation_key` é
@@ -508,9 +509,11 @@ const OPERACAO_INCONCLUSIVA_SQL = `
   WHERE o.fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')
     AND o.mp_idempotency_key IS NOT NULL
     AND o.mp_payment_id IS NULL
-    AND pp.mp_payment_id IS NULL
-    AND pp.metodo = 'PIX_MP'
-    AND pp.status IN ('PENDENTE', 'EXPIRADO')
+    AND (
+      (o.tipo <> 'PIX_ADMIN_REGENERACAO' AND pp.mp_payment_id IS NULL AND pp.metodo = 'PIX_MP' AND pp.status IN ('PENDENTE', 'EXPIRADO'))
+      OR
+      (o.tipo = 'PIX_ADMIN_REGENERACAO')
+    )
     AND o.expirado_em IS NULL
 `;
 

@@ -437,6 +437,8 @@ export type FinanceiroPedido = {
   /** Alias retrocompativel do liquido, mantido para leitores existentes. */
   pagoCentavos: number;
   totalCentavos: number;
+  excessoCentavos: number;
+  temExcesso: boolean;
   metodosConfirmados: LedgerMetodo[];
 };
 
@@ -480,6 +482,8 @@ export async function getFinanceiroPedido(db: D1Database, pedidoId: number): Pro
   ]);
   const totalCentavos = Number(pedido?.valor_total_centavos || 0);
   const liquidoCentavos = Math.max(0, brutoPagoCentavos - reembolsadoCentavos);
+  const excessoCentavos = Math.max(0, liquidoCentavos - totalCentavos);
+  const temExcesso = excessoCentavos > 0;
 
   return {
     status: (pedido?.status_pagamento as StatusFinanceiroAgregado) ?? "PENDENTE",
@@ -489,6 +493,8 @@ export async function getFinanceiroPedido(db: D1Database, pedidoId: number): Pro
     saldoCentavos: Math.max(0, totalCentavos - liquidoCentavos),
     pagoCentavos: liquidoCentavos,
     totalCentavos,
+    excessoCentavos,
+    temExcesso,
     metodosConfirmados: ordenarMetodos(metodos.results.map((r) => r.metodo)),
   };
 }
@@ -542,6 +548,8 @@ export async function getFinanceirosPorPedidos(
     const bruto = brutoPorPedido.get(p.id) ?? 0;
     const reembolsado = reembolsoPorPedido.get(p.id) ?? 0;
     const liquido = Math.max(0, bruto - reembolsado);
+    const excessoCentavos = Math.max(0, liquido - p.valorTotalCentavos);
+    const temExcesso = excessoCentavos > 0;
     resultado.set(p.id, {
       status: p.statusPagamento as StatusFinanceiroAgregado,
       brutoPagoCentavos: bruto,
@@ -550,6 +558,8 @@ export async function getFinanceirosPorPedidos(
       saldoCentavos: Math.max(0, p.valorTotalCentavos - liquido),
       pagoCentavos: liquido,
       totalCentavos: p.valorTotalCentavos,
+      excessoCentavos,
+      temExcesso,
       metodosConfirmados: ordenarMetodos(metodosPorPedido.get(p.id) ?? []),
     });
   }

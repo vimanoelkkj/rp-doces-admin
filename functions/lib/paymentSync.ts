@@ -475,7 +475,9 @@ export async function recuperarOperacoesInconclusivas(
           // guard B4 segurar a reserva (outro Pix pendente), `expireLocalPayment`
           // lança e a operação permanece na fila.
           if (operacao.pagamento_id != null && expiracaoDecorrida(operacao)) {
-            await expireLocalPayment(env.DB, operacao.pagamento_id);
+            if (operacao.tipo !== "PIX_ADMIN_REGENERACAO") {
+              await expireLocalPayment(env.DB, operacao.pagamento_id);
+            }
             await fecharOperacaoExpirada(env.DB, operacao.operation_key);
             return;
           }
@@ -502,6 +504,79 @@ export async function recuperarOperacoesInconclusivas(
         // Exatamente um candidato. A partir daqui a busca não decide mais
         // nada: o GET verificado é que produz autoridade financeira.
         const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN!, busca.mpPaymentId);
+
+        if (operacao.tipo === "PIX_ADMIN_REGENERACAO") {
+          let bRow = await env.DB.prepare(
+            `SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`,
+          )
+            .bind(referencia)
+            .first<{ id: number; status: string }>();
+
+          if (!bRow) {
+            // 9-H: B criado remotamente e persistência local falhou antes do batch.
+            // Executa batch atômico para persistir B sem criar outro pagamento no MP.
+            const txData = (payment as { point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }).point_of_interaction?.transaction_data;
+            const req = operacao.mp_request ? JSON.parse(operacao.mp_request) as { transaction_amount?: number } : null;
+            const valorCentavos = req?.transaction_amount
+              ? Math.round(Number(req.transaction_amount) * 100)
+              : 0;
+
+            const recoveryStatements = [
+              env.DB.prepare(
+                `UPDATE pedido_pagamentos
+                 SET status = 'CANCELADO',
+                     cancelado_em = COALESCE(cancelado_em, CURRENT_TIMESTAMP),
+                     atualizado_em = CURRENT_TIMESTAMP
+                 WHERE id = ? AND status = 'PENDENTE'`,
+              ).bind(operacao.pagamento_id),
+              env.DB.prepare(
+                `INSERT INTO pedido_pagamentos (
+                   pedido_id, metodo, origem, valor_centavos, status,
+                   registrado_por_usuario_id, idempotency_key, substitui_pagamento_id,
+                   mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
+                 )
+                 VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              ).bind(
+                operacao.pedido_id,
+                valorCentavos,
+                operacao.ator_usuario_id,
+                referencia,
+                operacao.pagamento_id,
+                String(payment.id),
+                payment.status,
+                txData?.qr_code ?? null,
+                txData?.qr_code_base64 ?? null,
+                txData?.ticket_url ?? null,
+                (payment as { date_of_expiration?: string }).date_of_expiration ?? null,
+              ),
+              env.DB.prepare(
+                `UPDATE pedido_operacoes
+                 SET fase = 'REMOTO_CONHECIDO',
+                     mp_payment_id = ?,
+                     pagamento_id = (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?),
+                     atualizado_em = CURRENT_TIMESTAMP
+                 WHERE operation_key = ?`,
+              ).bind(String(payment.id), referencia, operacao.operation_key),
+            ];
+
+            await env.DB.batch(recoveryStatements);
+            bRow = await env.DB.prepare(
+              `SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`,
+            )
+              .bind(referencia)
+              .first<{ id: number; status: string }>();
+          }
+
+          if (bRow) {
+            await registrarFase(env.DB, operacao.operation_key, {
+              fase: "REMOTO_CONHECIDO",
+              mpPaymentId: busca.mpPaymentId,
+            });
+            await syncPaymentFromMp(env.DB, bRow.id, payment);
+          }
+          return;
+        }
+
         const resolvido = await resolveWebhookPayment(env.DB, payment);
 
         if (resolvido.kind !== "found") {

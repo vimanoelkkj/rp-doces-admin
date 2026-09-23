@@ -22,10 +22,12 @@ import {
   type LedgerMetodo,
 } from "./comandaLedger";
 import { liberarReservaPedido, preparePedidoPhysicalProjection } from "./stock";
-import { postPagamentoMp } from "./mpPost";
+import { postPagamentoMp, cancelarPagamentoMp } from "./mpPost";
+import { fetchMpPayment, syncPaymentFromMp, type MpPaymentResponse } from "./paymentSync";
 import { chargeableCapacitySql, financialChargeSlotKey, liveAdminPixPredicate } from "./financialCoverage";
 import {
   buscarOperacao,
+  chaveCancelamento,
   chaveMp,
   chavePagamento,
   conflitoOperacao,
@@ -36,6 +38,7 @@ import {
   prepareClaimOperacao,
   prepareRegistrarFase,
   registrarFase,
+  FINGERPRINT_VERSAO,
   type ConflitoOperacao,
   type IdentidadeEsperada,
   type OperacaoRow,
@@ -100,6 +103,7 @@ export interface GerarPixAdminFalha {
     | "VALOR_INVALIDO"
     | "CAPACIDADE_INSUFICIENTE"
     | "PIX_PARA_SUBSTITUIR_INVALIDO"
+    | "PIX_SUBSTITUTO_JA_PAGO"
     | "ESTOQUE_INSUFICIENTE"
     | "MERCADO_PAGO_RECUSOU"
     | "MERCADO_PAGO_INDISPONIVEL"
@@ -213,10 +217,58 @@ async function replayPixAdmin(
   if (conflito) return { ok: false, erro: conflito };
 
   // Recusa comprovada do Mercado Pago é terminal para esta key.
-  if (operacao.fase === "RECUSADA") return { ok: false, erro: "MERCADO_PAGO_RECUSOU" };
+  if (operacao.fase === "RECUSADA") {
+    if (operacao.erro === "PIX_SUBSTITUTO_JA_PAGO") return { ok: false, erro: "PIX_SUBSTITUTO_JA_PAGO" };
+    if (operacao.erro === "PIX_PARA_SUBSTITUIR_INVALIDO") return { ok: false, erro: "PIX_PARA_SUBSTITUIR_INVALIDO" };
+    return { ok: false, erro: "MERCADO_PAGO_RECUSOU" };
+  }
 
   const snapshot = parseResultado<GerarPixAdminSucesso>(operacao);
-  if (snapshot) return { ...snapshot, ok: true, replay: true };
+  if (snapshot) {
+    if (!snapshot.pagamentoId && operacao.pagamento_id) {
+      snapshot.pagamentoId = operacao.pagamento_id;
+    }
+    return { ...snapshot, ok: true, replay: true };
+  }
+
+  if (operacao.tipo === "PIX_ADMIN_REGENERACAO") {
+    const bPagamento = await db
+      .prepare(
+        `SELECT id, valor_centavos, mp_payment_id, mp_status, mp_qr_code,
+                mp_qr_code_base64, mp_ticket_url, pix_expira_em
+         FROM pedido_pagamentos
+         WHERE substitui_pagamento_id = ? AND status = 'PENDENTE'
+         LIMIT 1`,
+      )
+      .bind(operacao.pagamento_id)
+      .first<{
+        id: number;
+        valor_centavos: number;
+        mp_payment_id: string | null;
+        mp_status: string | null;
+        mp_qr_code: string | null;
+        mp_qr_code_base64: string | null;
+        mp_ticket_url: string | null;
+        pix_expira_em: string | null;
+      }>();
+
+    if (bPagamento && bPagamento.mp_payment_id) {
+      return {
+        ok: true,
+        replay: true,
+        pagamentoId: bPagamento.id,
+        valorCentavos: bPagamento.valor_centavos,
+        mpPaymentId: bPagamento.mp_payment_id,
+        mpStatus: bPagamento.mp_status ?? "pending",
+        qrCode: bPagamento.mp_qr_code,
+        qrCodeBase64: bPagamento.mp_qr_code_base64,
+        ticketUrl: bPagamento.mp_ticket_url,
+        expiresAt: bPagamento.pix_expira_em,
+      };
+    }
+
+    return { ok: false, erro: "OPERACAO_EM_PROCESSAMENTO" };
+  }
 
   const pagamento = operacao.pagamento_id
     ? await db
@@ -294,6 +346,18 @@ export async function createAdminPixCharge(
 
     const existente = await buscarOperacao(db, operationKey);
     if (existente) return await replayPixAdmin(db, existente, identidade);
+  } else if (params.substituiId != null) {
+    operationKey = crypto.randomUUID();
+    identidade = {
+      tipo: "PIX_ADMIN_REGENERACAO",
+      escopo: "ADMIN",
+      atorUsuarioId: params.usuarioId,
+      fingerprint: fingerprint({
+        pedidoId: params.pedidoId,
+        valorCentavos: params.valorCentavos ?? null,
+        substituiId: params.substituiId ?? null,
+      }),
+    };
   }
 
   const pedido = await db
@@ -448,6 +512,306 @@ export async function createAdminPixCharge(
                       AND p.estoque_baixado_em IS NULL)
     `).bind(item.id, params.pedidoId, item.produto_id, item.quantidade),
   ]);
+
+  // R3 — Fluxo robusto de REGENERAÇÃO administrativa com cancelamento remoto do predecessor A
+  if (substituiId !== null) {
+    if (!operationKey || !identidade) {
+      return { ok: false, erro: "OPERATION_KEY_INVALIDA" };
+    }
+
+    const cancelKey = chaveCancelamento(operationKey);
+
+    // 1. Claim A1 antes de qualquer chamada remota ao Mercado Pago.
+    // O índice único parcial uq_pedido_operacoes_regeneracao_ativa serializa
+    // duas operações ativas sobre o mesmo pagamento predecessor A.
+    try {
+      await db
+        .prepare(
+          `INSERT INTO pedido_operacoes (
+             operation_key, tipo, escopo, ator_usuario_id, fingerprint_versao, fingerprint,
+             fase, mp_idempotency_key, mp_request, pedido_id, pagamento_id
+           )
+           VALUES (?, ?, ?, ?, ?, ?, 'LOCAL_CRIADA', ?, ?, ?, ?)`,
+        )
+        .bind(
+          operationKey,
+          identidade.tipo,
+          identidade.escopo,
+          identidade.atorUsuarioId,
+          FINGERPRINT_VERSAO,
+          identidade.fingerprint,
+          mpIdempotencyKey,
+          JSON.stringify(mpRequest),
+          params.pedidoId,
+          substituiId,
+        )
+        .run();
+    } catch {
+      const existente = await buscarOperacao(db, operationKey);
+      if (existente) return await replayPixAdmin(db, existente, identidade);
+      return { ok: false, erro: "OPERACAO_EM_PROCESSAMENTO" };
+    }
+
+    // 2. Proteção obrigatória pós-claim contra TOCTOU:
+    // Releia o pagamento predecessor A no banco antes de qualquer GET/PUT/POST no MP.
+    const aPosClaim = await db
+      .prepare(
+        `SELECT id, pedido_id, metodo, origem, status, mp_payment_id
+         FROM pedido_pagamentos
+         WHERE id = ?`,
+      )
+      .bind(substituiId)
+      .first<{
+        id: number;
+        pedido_id: number;
+        metodo: string;
+        origem: string;
+        status: string;
+        mp_payment_id: string | null;
+      }>();
+
+    const sucessorIncompativel = await db
+      .prepare(
+        `SELECT 1 FROM pedido_pagamentos suc
+         WHERE suc.substitui_pagamento_id = ?
+           AND suc.status IN ('PENDENTE', 'PAGO')
+         LIMIT 1`,
+      )
+      .bind(substituiId)
+      .first();
+
+    if (
+      !aPosClaim ||
+      aPosClaim.pedido_id !== params.pedidoId ||
+      aPosClaim.metodo !== "PIX_MP" ||
+      aPosClaim.origem !== "ADMIN" ||
+      aPosClaim.status !== "PENDENTE" ||
+      !aPosClaim.mp_payment_id ||
+      sucessorIncompativel !== null
+    ) {
+      await registrarFase(db, operationKey, {
+        fase: "RECUSADA",
+        erro: "PIX_PARA_SUBSTITUIR_INVALIDO",
+      });
+      return { ok: false, erro: "PIX_PARA_SUBSTITUIR_INVALIDO" };
+    }
+
+    // 3. Inspeção remota de A
+    let mpA: MpPaymentResponse;
+    try {
+      mpA = await fetchMpPayment(env.MP_ACCESS_TOKEN, aPosClaim.mp_payment_id);
+    } catch {
+      await registrarFase(db, operationKey, {
+        fase: "ENVIO_INCONCLUSIVO",
+        erro: "CONSULTA_PREDECESSOR_FALHOU",
+      });
+      return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
+    }
+
+    const statusRemotoA = String(mpA.status || "").toLowerCase();
+
+    if (statusRemotoA === "approved") {
+      await syncPaymentFromMp(db, aPosClaim.id, mpA);
+      await registrarFase(db, operationKey, {
+        fase: "RECUSADA",
+        erro: "PIX_SUBSTITUTO_JA_PAGO",
+      });
+      return { ok: false, erro: "PIX_SUBSTITUTO_JA_PAGO" };
+    }
+
+    let aConfirmadoNaoPagavel = false;
+    let aStatusCancelado = "CANCELADO";
+
+    if (statusRemotoA === "cancelled") {
+      aConfirmadoNaoPagavel = true;
+      if (mpA.status_detail === "expired") {
+        aStatusCancelado = "EXPIRADO";
+      }
+    } else if (statusRemotoA === "rejected") {
+      aConfirmadoNaoPagavel = true;
+    } else if (
+      statusRemotoA === "pending" ||
+      statusRemotoA === "in_process" ||
+      statusRemotoA === "authorized"
+    ) {
+      const cancelResultado = await cancelarPagamentoMp(
+        env.MP_ACCESS_TOKEN,
+        aPosClaim.mp_payment_id,
+        cancelKey,
+      );
+
+      if (cancelResultado.resultado === "SUCESSO" && cancelResultado.status === "cancelled") {
+        aConfirmadoNaoPagavel = true;
+        if (cancelResultado.statusDetail === "expired") {
+          aStatusCancelado = "EXPIRADO";
+        }
+      } else {
+        // Cancelamento inconclusivo: reconsulta A
+        let reconsulta: MpPaymentResponse | null = null;
+        try {
+          reconsulta = await fetchMpPayment(env.MP_ACCESS_TOKEN, aPosClaim.mp_payment_id);
+        } catch {
+          reconsulta = null;
+        }
+
+        if (reconsulta && reconsulta.status === "cancelled") {
+          aConfirmadoNaoPagavel = true;
+          if (reconsulta.status_detail === "expired") {
+            aStatusCancelado = "EXPIRADO";
+          }
+        } else if (reconsulta && reconsulta.status === "approved") {
+          await syncPaymentFromMp(db, aPosClaim.id, reconsulta);
+          await registrarFase(db, operationKey, {
+            fase: "RECUSADA",
+            erro: "PIX_SUBSTITUTO_JA_PAGO",
+          });
+          return { ok: false, erro: "PIX_SUBSTITUTO_JA_PAGO" };
+        } else {
+          // Continua pending/in_process/authorized ou consulta falhou:
+          await registrarFase(db, operationKey, {
+            fase: "ENVIO_INCONCLUSIVO",
+            erro: "CANCELAMENTO_INCONCLUSIVO",
+          });
+          return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
+        }
+      }
+    } else {
+      // Estados financeiros inesperados (refunded, charged_back, in_mediation, desconhecido): FAIL CLOSED
+      await registrarFase(db, operationKey, {
+        fase: "RECUSADA",
+        erro: "PIX_PARA_SUBSTITUIR_INVALIDO",
+      });
+      return { ok: false, erro: "PIX_PARA_SUBSTITUIR_INVALIDO" };
+    }
+
+    if (!aConfirmadoNaoPagavel) {
+      await registrarFase(db, operationKey, {
+        fase: "ENVIO_INCONCLUSIVO",
+        erro: "CANCELAMENTO_INCONCLUSIVO",
+      });
+      return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
+    }
+
+    // 4. Criação remota de B
+    const envio = await postPagamentoMp(env.MP_ACCESS_TOKEN, mpIdempotencyKey, mpRequest);
+
+    if (envio.resultado === "AMBIGUO") {
+      await registrarFase(db, operationKey, {
+        fase: "ENVIO_INCONCLUSIVO",
+        erro: `AMBIGUO:${envio.motivo}`,
+      });
+      return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
+    }
+
+    if (envio.resultado === "RECUSA_DEFINITIVA") {
+      await registrarFase(db, operationKey, {
+        fase: "RECUSADA",
+        erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`,
+      });
+      return { ok: false, erro: "MERCADO_PAGO_RECUSOU" };
+    }
+
+    const payment = envio.payment;
+    const txData = payment.point_of_interaction?.transaction_data;
+    const reservaExpiraEmSincronizada = payment.date_of_expiration
+      ? new Date(Date.parse(payment.date_of_expiration) + 60_000).toISOString()
+      : null;
+
+    const sucesso: GerarPixAdminSucesso = {
+      ok: true,
+      pagamentoId: 0,
+      valorCentavos,
+      mpPaymentId: String(payment.id),
+      mpStatus: payment.status,
+      qrCode: txData?.qr_code ?? null,
+      qrCodeBase64: txData?.qr_code_base64 ?? null,
+      ticketUrl: txData?.ticket_url ?? null,
+      expiresAt: payment.date_of_expiration,
+    };
+
+    // 5. Persistência atômica após criação remota
+    const finalStatements = [
+      ...reservaStatements,
+      preparePedidoPhysicalProjection(db, params.pedidoId),
+      db
+        .prepare(
+          `UPDATE pedido_pagamentos
+           SET status = ?,
+               cancelado_em = COALESCE(cancelado_em, CURRENT_TIMESTAMP),
+               atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'PENDENTE'`,
+        )
+        .bind(aStatusCancelado, substituiId),
+      db
+        .prepare(
+          `INSERT INTO pedido_pagamentos (
+             pedido_id, metodo, origem, valor_centavos, status,
+             registrado_por_usuario_id, idempotency_key, substitui_pagamento_id,
+             mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
+           )
+           VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          params.pedidoId,
+          valorCentavos,
+          params.usuarioId,
+          idempotencyKey,
+          substituiId,
+          String(payment.id),
+          payment.status,
+          txData?.qr_code ?? null,
+          txData?.qr_code_base64 ?? null,
+          txData?.ticket_url ?? null,
+          payment.date_of_expiration,
+        ),
+      ...waterfall.alocacoes.map((a) =>
+        db
+          .prepare(
+            `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
+             SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`,
+          )
+          .bind(idempotencyKey, a.itemId, a.valorCentavos),
+      ),
+      db
+        .prepare(
+          `UPDATE pedido_operacoes
+           SET fase = 'CONCLUIDA',
+               mp_payment_id = ?,
+               pagamento_id = (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?),
+               resultado = ?,
+               atualizado_em = CURRENT_TIMESTAMP
+           WHERE operation_key = ?`,
+        )
+        .bind(
+          String(payment.id),
+          idempotencyKey,
+          JSON.stringify(sucesso),
+          operationKey,
+        ),
+    ];
+
+    if (reservaExpiraEmSincronizada) {
+      finalStatements.push(
+        db
+          .prepare(`UPDATE pedidos SET reserva_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`)
+          .bind(reservaExpiraEmSincronizada, params.pedidoId),
+      );
+    }
+
+    const batchResults = await db.batch(finalStatements);
+    const bInsertIndex = reservaStatements.length + 2;
+    let bPagamentoId = Number(batchResults[bInsertIndex]?.meta?.last_row_id || 0);
+    if (!bPagamentoId) {
+      const bRow = await db
+        .prepare(`SELECT id FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`)
+        .bind(idempotencyKey)
+        .first<{ id: number }>();
+      bPagamentoId = Number(bRow?.id || 0);
+    }
+    sucesso.pagamentoId = bPagamentoId;
+
+    return sucesso;
+  }
 
   const statements = [
     ...reservaStatements,
