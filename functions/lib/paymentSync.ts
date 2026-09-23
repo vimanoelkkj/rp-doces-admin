@@ -65,8 +65,16 @@ export function mapMpStatus(mpStatus: string): MpMappedStatus | null {
 // tabela separados — Passo 5); a exclusão aqui é só a última linha de defesa.
 function isTransitionAllowed(statusAtual: string, novoStatus: MpMappedStatus, mp?: MpPaymentResponse): boolean {
   if (statusAtual === novoStatus) return true;
-  return statusAtual === "PENDENTE" ||
-    (statusAtual === "EXPIRADO" && novoStatus === "PAGO" && mp !== undefined && verifiedMpResponses.has(mp));
+  if (statusAtual === "PENDENTE") return true;
+  if (
+    statusAtual === "EXPIRADO" &&
+    (novoStatus === "PAGO" || novoStatus === "CANCELADO") &&
+    mp !== undefined &&
+    verifiedMpResponses.has(mp)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 // Finalização específica do Pix, repetível mesmo sem uma nova transição.
@@ -133,9 +141,12 @@ async function applyLedgerTransition(
     return { ok: true, status: pos?.status ?? atual.status, transicionou: false };
   }
 
-  // A aprovação pode ter lido PENDENTE e perdido a corrida para a expiração.
+  // A aprovação ou cancelamento podem ter lido PENDENTE e perdido a corrida para a expiração.
   // Revalida os estados elegíveis na própria escrita, sem retry recursivo.
-  const origemGuard = mp && novoStatus === "PAGO" ? "status IN ('PENDENTE', 'EXPIRADO')" : "status = 'PENDENTE'";
+  const origemGuard =
+    mp && (novoStatus === "PAGO" || novoStatus === "CANCELADO")
+      ? "status IN ('PENDENTE', 'EXPIRADO')"
+      : "status = 'PENDENTE'";
   const result = await db
     .prepare(
       `UPDATE pedido_pagamentos
