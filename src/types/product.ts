@@ -18,4 +18,6 @@ export interface Product {
    */
   originalPrice?: number;
   image: string;
+  /** Disponibilidade líquida para venda imediata: max(0, estoque - estoque_reservado). */
+  disponibilidade: number;
 }

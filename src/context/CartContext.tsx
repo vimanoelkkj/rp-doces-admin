@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import {
+  calculateAddQuantity,
+  calculateUpdateQuantity,
+  reconcileCartWithCatalog,
+  ItemWithAvailability,
+} from "./cartReconciliation";
 
 export interface CartItem {
   id: number;
@@ -6,6 +12,7 @@ export interface CartItem {
   price: number;
   image: string;
   quantity: number;
+  disponibilidade?: number;
 }
 
 const STORAGE_KEY = "rp-doces:cart";
@@ -27,6 +34,7 @@ interface CartContextType {
   updateQuantity: (id: number, qty: number) => void;
   removeItem: (id: number) => void;
   clearCart: () => void;
+  reconcileWithProducts: (catalog: ItemWithAvailability[]) => boolean;
   totalItems: number;
   totalPrice: number;
 }
@@ -46,11 +54,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [cartItems]);
 
   const addToCart = (item: Omit<CartItem, "quantity">) => {
+    // Produto com disponibilidade 0 não pode ser adicionado
+    if (item.disponibilidade !== undefined && item.disponibilidade <= 0) {
+      return;
+    }
+
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {
+        const disp =
+          item.disponibilidade !== undefined
+            ? item.disponibilidade
+            : existing.disponibilidade;
+        const newQty = calculateAddQuantity(existing.quantity, disp);
+        if (newQty === existing.quantity) {
+          return prev;
+        }
         return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
+          i.id === item.id
+            ? { ...i, quantity: newQty, ...(disp !== undefined ? { disponibilidade: disp } : {}) }
+            : i,
         );
       }
       return [...prev, { ...item, quantity: 1 }];
@@ -58,13 +81,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const updateQuantity = (id: number, qty: number) => {
-    if (qty <= 0) {
-      setCartItems((prev) => prev.filter((i) => i.id !== id));
-    } else {
-      setCartItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, quantity: qty } : i)),
-      );
-    }
+    setCartItems((prev) => {
+      const existing = prev.find((i) => i.id === id);
+      if (!existing) return prev;
+
+      const newQty = calculateUpdateQuantity(qty, existing.disponibilidade);
+      if (newQty <= 0) {
+        return prev.filter((i) => i.id !== id);
+      }
+      return prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i));
+    });
   };
 
   const removeItem = (id: number) => {
@@ -72,6 +98,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const clearCart = () => setCartItems([]);
+
+  const reconcileWithProducts = useCallback(
+    (catalog: ItemWithAvailability[]): boolean => {
+      let wasAdjusted = false;
+      setCartItems((prev) => {
+        const { reconciled, adjusted } = reconcileCartWithCatalog(prev, catalog);
+        wasAdjusted = adjusted;
+        if (adjusted) {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(reconciled));
+          } catch {
+            // localStorage indisponível
+          }
+          return reconciled;
+        }
+        return prev;
+      });
+      return wasAdjusted;
+    },
+    [],
+  );
 
   const totalItems = cartItems.reduce((sum, i) => sum + i.quantity, 0);
   const totalPrice = cartItems.reduce(
@@ -89,6 +136,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQuantity,
         removeItem,
         clearCart,
+        reconcileWithProducts,
         totalItems,
         totalPrice,
       }}

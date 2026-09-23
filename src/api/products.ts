@@ -29,6 +29,10 @@ function toProduct(row: ProdutoApiRow): Product {
     ? row.preco_promocional_centavos!
     : row.preco_centavos;
 
+  const estoque = typeof row.estoque === "number" ? row.estoque : 0;
+  const estoqueReservado = typeof row.estoque_reservado === "number" ? row.estoque_reservado : 0;
+  const disponibilidade = Math.max(0, estoque - estoqueReservado);
+
   return {
     id: row.id,
     name: row.nome,
@@ -42,6 +46,7 @@ function toProduct(row: ProdutoApiRow): Product {
     price: centavos / 100,
     originalPrice: emPromocao ? row.preco_centavos / 100 : undefined,
     image: imageUrlFor(row.image_key),
+    disponibilidade,
   };
 }
 

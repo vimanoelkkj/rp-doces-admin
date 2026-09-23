@@ -31,7 +31,14 @@ export default function Cardapio() {
     addToCart,
     updateQuantity,
     removeItem,
+    reconcileWithProducts,
   } = useCart();
+
+  useEffect(() => {
+    if (products.length > 0) {
+      reconcileWithProducts(products);
+    }
+  }, [products, reconcileWithProducts]);
 
   const headingRef = useScrollReveal<HTMLDivElement>(0.15);
 

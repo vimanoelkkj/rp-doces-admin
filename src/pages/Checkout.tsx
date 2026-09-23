@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
+import { fetchProducts } from "../api/products";
 import {
   formatWhatsappBr,
   isValidWhatsappBr,
@@ -17,13 +18,35 @@ import "./Checkout.css";
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { cartItems, totalPrice } = useCart();
+  const { cartItems, totalPrice, reconcileWithProducts } = useCart();
 
   const [nome, setNome] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [whatsappError, setWhatsappError] = useState<string | null>(null);
   const [recado, setRecado] = useState("");
   const [pagamento, setPagamento] = useState("pix");
+  const [estoqueAviso, setEstoqueAviso] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchProducts()
+      .then((products) => {
+        if (!active) return;
+        const adjusted = reconcileWithProducts(products);
+        if (adjusted) {
+          setEstoqueAviso(
+            "Atenção: alguns itens do seu pedido foram ajustados de acordo com a disponibilidade atual de estoque.",
+          );
+        }
+      })
+      .catch(() => {
+        // Se a rede falhar, segue com o carrinho salvo
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reconcileWithProducts]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +114,11 @@ export default function Checkout() {
           {/* Coluna esquerda — Resumo do pedido */}
           <div className="checkout-order">
             <h2 className="checkout-section-title">Seu pedido</h2>
+            {estoqueAviso && (
+              <div className="checkout-estoque-aviso" role="alert">
+                {estoqueAviso}
+              </div>
+            )}
             <div className="checkout-items">
               {cartItems.map((item) => (
                 <div key={item.id} className="checkout-item">
