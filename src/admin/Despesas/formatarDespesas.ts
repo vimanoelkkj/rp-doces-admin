@@ -4,6 +4,15 @@
 export const formatarPreco = (centavos: number) =>
   `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
+function valorUnitarioParaTexto(centavos: number): string {
+  const [inteiro, decimais = ""] = (centavos / 100).toFixed(5).split(".");
+  const decimaisNecessarios = decimais.replace(/0+$/, "").padEnd(2, "0");
+  return `${inteiro},${decimaisNecessarios}`;
+}
+
+export const formatarValorUnitario = (centavos: number) =>
+  `R$ ${valorUnitarioParaTexto(centavos)}`;
+
 export const formatarPrecoComSinal = (centavos: number) =>
   `${centavos < 0 ? "-" : ""}R$ ${(Math.abs(centavos) / 100).toFixed(2).replace(".", ",")}`;
 
@@ -15,18 +24,22 @@ export const formatarDataBr = (isoDate: string) => {
   return `${dia}/${mes}/${ano}`;
 };
 
-// Mesmo formato aceito para dinheiro em PedidoDetalheModal: vírgula ou
-// ponto como separador decimal, até 2 casas.
+// Valor unitário aceita até 5 casas decimais em reais para não perder
+// centavos no total quando a compra tem muitas unidades (ex.: 1,16305 × 200).
+// O retorno continua em centavos, mas pode conter até 3 casas fracionárias.
 export function parseValorReais(valor: string): number | null {
   const limpo = valor.trim().replace(/\s/g, "");
   if (!limpo) return null;
   const normalizado = limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
-  if (!/^\d+(?:\.\d{1,2})?$/.test(normalizado)) return null;
-  const centavos = Math.round(Number(normalizado) * 100);
-  return Number.isSafeInteger(centavos) ? centavos : null;
+  if (!/^\d+(?:\.\d{1,5})?$/.test(normalizado)) return null;
+
+  const [reais, fracao = ""] = normalizado.split(".");
+  const unidadesCemMilesimos = Number(reais) * 100_000 + Number(fracao.padEnd(5, "0"));
+  if (!Number.isSafeInteger(unidadesCemMilesimos)) return null;
+  return unidadesCemMilesimos / 1000;
 }
 
-export const centavosParaValorInput = (centavos: number) => (centavos / 100).toFixed(2).replace(".", ",");
+export const centavosParaValorInput = (centavos: number) => valorUnitarioParaTexto(centavos);
 
 // Quantidade aceita até 3 casas decimais (1,5 kg / 0,5 kg / 30 un).
 export function parseQuantidade(valor: string): number | null {

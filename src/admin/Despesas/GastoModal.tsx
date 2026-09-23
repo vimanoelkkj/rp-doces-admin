@@ -11,6 +11,7 @@ import {
 } from "../../../shared/despesas";
 import {
   formatarPreco,
+  formatarValorUnitario,
   formatarDataBr,
   parseValorReais,
   parseQuantidade,
@@ -326,7 +327,7 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                 <div className="gasto-detalhe-item" key={item.id}>
                   <div>
                     <strong>{item.descricao}</strong>
-                    <span>{item.quantidade.toLocaleString("pt-BR")} {DESPESA_UNIDADE_LABEL[item.unidade]} × {formatarPreco(item.valorUnitarioCentavos)}</span>
+                    <span>{item.quantidade.toLocaleString("pt-BR")} {DESPESA_UNIDADE_LABEL[item.unidade]} × {formatarValorUnitario(item.valorUnitarioCentavos)}</span>
                   </div>
                   <strong>{formatarPreco(item.valorTotalCentavos)}</strong>
                 </div>

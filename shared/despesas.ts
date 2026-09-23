@@ -76,6 +76,11 @@ export const DESPESA_STATUS_LABEL: Record<DespesaStatus, string> = {
 // de arredondamento de ponto flutuante que uma coluna REAL teria.
 export const QUANTIDADE_MILESIMOS_POR_UNIDADE = 1000;
 
+// O valor unitário pode precisar de frações de centavo (ex.: R$ 232,61 /
+// 200 un = R$ 1,16305 por unidade). Mantemos até 3 casas abaixo do centavo,
+// equivalentes a 5 casas decimais em reais, sem perder o total em centavos.
+export const MILICENTAVOS_POR_CENTAVO = 1000;
+
 // Converte a quantidade decimal digitada pelo operador (ex.: 1.5) para o
 // inteiro persistido. Arredonda para o milésimo mais próximo — 3 casas
 // decimais é precisão mais que suficiente para compras do negócio.
@@ -88,13 +93,15 @@ export function deMilesimos(quantidadeMilesimos: number): number {
 }
 
 // Total do item = quantidade × valor unitário, sempre derivado no servidor,
-// nunca aceito do cliente. Arredondamento determinístico: meio para cima
-// (padrão de Math.round para valores positivos), nunca truncamento — assim
-// "1,5 kg a R$7,50/kg" fecha em exatamente R$11,25 (1125 centavos), sem
-// depender de qual lado arredonda.
+// nunca aceito do cliente. O valor unitário chega em centavos e pode ter até
+// 3 casas fracionárias; convertemos para milicentavos antes da multiplicação.
+// BigInt evita perda de precisão intermediária em quantidades/valores altos.
 export function calcularValorTotalCentavos(
   quantidadeMilesimos: number,
   valorUnitarioCentavos: number,
 ): number {
-  return Math.round((quantidadeMilesimos * valorUnitarioCentavos) / QUANTIDADE_MILESIMOS_POR_UNIDADE);
+  const valorUnitarioMilicentavos = Math.round(valorUnitarioCentavos * MILICENTAVOS_POR_CENTAVO);
+  const divisor = BigInt(QUANTIDADE_MILESIMOS_POR_UNIDADE * MILICENTAVOS_POR_CENTAVO);
+  const numerador = BigInt(quantidadeMilesimos) * BigInt(valorUnitarioMilicentavos);
+  return Number((numerador + divisor / 2n) / divisor);
 }

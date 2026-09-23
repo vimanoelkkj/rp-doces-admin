@@ -84,9 +84,17 @@ export function validarItens(raw: unknown): ValidarItensResultado {
     if (!Number.isSafeInteger(quantidadeMilesimos) || quantidadeMilesimos <= 0) {
       return { ok: false, erro: "Quantidade inválida" };
     }
-    if (typeof valorUnitarioCentavos !== "number" || !Number.isSafeInteger(valorUnitarioCentavos)
+    if (typeof valorUnitarioCentavos !== "number" || !Number.isFinite(valorUnitarioCentavos)
         || valorUnitarioCentavos <= 0 || valorUnitarioCentavos > MAX_VALOR_UNITARIO_CENTAVOS) {
-      return { ok: false, erro: "Valor unitário deve ser um inteiro em centavos maior que zero" };
+      return { ok: false, erro: "Valor unitário deve ser maior que zero" };
+    }
+    // Até 3 casas abaixo do centavo = até 5 casas decimais em reais.
+    // A coluna SQLite tem afinidade INTEGER, mas armazena REAL quando o valor
+    // não é inteiro; os totais continuam sempre persistidos em centavos inteiros.
+    const valorUnitarioMilicentavos = Math.round(valorUnitarioCentavos * 1000);
+    if (!Number.isSafeInteger(valorUnitarioMilicentavos)
+        || Math.abs(valorUnitarioCentavos * 1000 - valorUnitarioMilicentavos) > 1e-6) {
+      return { ok: false, erro: "Valor unitário aceita no máximo 5 casas decimais em reais" };
     }
 
     const valorTotalCentavos = calcularValorTotalCentavos(quantidadeMilesimos, valorUnitarioCentavos);
