@@ -81,14 +81,25 @@ export function useAdminPwa() {
     const shouldRegister =
       import.meta.env.PROD || window.location.search.includes("pwa=1");
 
-    if (isSupported && shouldRegister && !swRegistered) {
-      swRegistered = true;
-      navigator.serviceWorker
-        .register("/sw-admin.js", { scope: "/admin" })
-        .catch((err) => {
-          console.warn("[Admin PWA] Falha ao registrar Service Worker:", err);
-          swRegistered = false;
+    if (isSupported && shouldRegister) {
+      if (!swRegistered) {
+        swRegistered = true;
+        navigator.serviceWorker
+          .register("/sw-admin.js", { scope: "/admin" })
+          .then((reg) => {
+            // Força verificação ativa de atualização no primeiro registro
+            reg.update().catch(() => {});
+          })
+          .catch((err) => {
+            console.warn("[Admin PWA] Falha ao registrar Service Worker:", err);
+            swRegistered = false;
+          });
+      } else {
+        // Se já registrado nesta sessão, garante verificação de update do SW
+        navigator.serviceWorker.getRegistration("/admin").then((reg) => {
+          reg?.update().catch(() => {});
         });
+      }
     }
 
     // 5. Cleanup ao sair do escopo /admin.
