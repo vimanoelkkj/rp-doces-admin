@@ -5,12 +5,26 @@ import { useLocation } from "react-router-dom";
 
 let swRegistered = false;
 
+const STOREFRONT_THEME_COLOR = "#eddcc6";
+const ADMIN_LIGHT_THEME_COLOR = "#faf6f0";
+const ADMIN_DARK_THEME_COLOR = "#1a1412";
+
+function getAdminThemeColor() {
+  const themeAttr = document.documentElement.getAttribute("data-admin-theme");
+  const savedTheme = window.localStorage.getItem("admin-theme");
+  const isDark =
+    themeAttr === "dark" || (themeAttr === null && savedTheme === "dark");
+
+  return isDark ? ADMIN_DARK_THEME_COLOR : ADMIN_LIGHT_THEME_COLOR;
+}
+
 export function useAdminPwa() {
   const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!location.pathname.startsWith("/admin")) return;
+    if (!isAdminRoute) return;
 
     // 1. Injeta o manifesto dinamicamente no <head>
     let manifestLink = document.querySelector<HTMLLinkElement>(
@@ -36,14 +50,31 @@ export function useAdminPwa() {
       document.head.appendChild(appleIcon);
     }
 
-    // 3. Ajusta o theme-color do navegador para o tom escuro do painel
-    const themeMeta = document.querySelector<HTMLMetaElement>(
+    // 3. Mantém a status bar do PWA sincronizada com o tema do Admin.
+    // O tema claro usa exatamente a cor do header mobile.
+    let themeMeta = document.querySelector<HTMLMetaElement>(
       'meta[name="theme-color"]',
     );
-    const originalThemeColor = themeMeta ? themeMeta.content : "#eddcc6";
-    if (themeMeta) {
-      themeMeta.content = "#1a1412";
+    if (!themeMeta) {
+      themeMeta = document.createElement("meta");
+      themeMeta.name = "theme-color";
+      themeMeta.setAttribute("data-admin-pwa", "true");
+      document.head.appendChild(themeMeta);
     }
+
+    const syncThemeColor = () => {
+      if (themeMeta) {
+        themeMeta.content = getAdminThemeColor();
+      }
+    };
+
+    syncThemeColor();
+
+    const themeObserver = new MutationObserver(syncThemeColor);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-admin-theme"],
+    });
 
     // 4. Registra o Service Worker administrativo com escopo restrito a /admin
     const isSupported = "serviceWorker" in navigator;
@@ -60,14 +91,18 @@ export function useAdminPwa() {
         });
     }
 
-    // 5. Cleanup se o usuário sair do escopo /admin
+    // 5. Cleanup ao sair do escopo /admin.
+    // Em transições internas (/admin -> /admin/login), mantém os metadados,
+    // mas sempre encerra o observer desta instância do hook.
     return () => {
+      themeObserver.disconnect();
+
       if (window.location.pathname.startsWith("/admin")) {
         return;
       }
 
       if (themeMeta) {
-        themeMeta.content = originalThemeColor;
+        themeMeta.content = STOREFRONT_THEME_COLOR;
       }
 
       const injectedManifest = document.querySelector(
@@ -80,5 +115,5 @@ export function useAdminPwa() {
       );
       injectedAppleIcon?.remove();
     };
-  }, [location.pathname]);
+  }, [isAdminRoute]);
 }
