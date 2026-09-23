@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminTheme } from "../theme/AdminThemeContext";
+import { useAdminPwa } from "../pwa/useAdminPwa";
 import "./AdminLogin.css";
 
 const IconMoon = () => (
@@ -42,6 +43,7 @@ const IconSun = () => (
 );
 
 export default function AdminLogin() {
+  useAdminPwa();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useAdminTheme();
   const [step, setStep] = useState<"username" | "password">("username");
