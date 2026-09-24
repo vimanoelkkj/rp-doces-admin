@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import "./ProductCard.css";
 import { Product } from "../types/product";
 
@@ -12,6 +13,7 @@ export default function ProductCard({
   onAddToCart,
 }: ProductCardProps) {
   const [justAdded, setJustAdded] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
   const esgotado =
     product.disponibilidade !== undefined && product.disponibilidade <= 0;
 
@@ -23,7 +25,11 @@ export default function ProductCard({
   };
 
   return (
-    <article className="product-card">
+    <motion.article
+      className="product-card"
+      whileHover={shouldReduceMotion ? undefined : { y: -4 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+    >
       <div className="product-image-wrapper">
         <img
           src={product.image}
@@ -59,28 +65,51 @@ export default function ProductCard({
               R$ {product.price.toFixed(2).replace(".", ",")}
             </span>
           </span>
-          <button
+          <motion.button
             className={`add-button${justAdded ? " add-button--added" : ""}${esgotado ? " add-button--esgotado" : ""}`}
             aria-label={esgotado ? `${product.name} esgotado` : `Adicionar ${product.name}`}
             onClick={handleAdd}
             disabled={esgotado}
+            whileHover={shouldReduceMotion || esgotado ? undefined : { scale: 1.12 }}
+            whileTap={shouldReduceMotion || esgotado ? undefined : { scale: 0.92 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
           >
-            {justAdded ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M5 13L9 17L19 7"
-                  stroke="#fff"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ) : (
-              "+"
-            )}
-          </button>
+            <AnimatePresence mode="wait" initial={false}>
+              {justAdded ? (
+                <motion.span
+                  key="check"
+                  initial={shouldReduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+                  animate={shouldReduceMotion ? { opacity: 1 } : { scale: 1, opacity: 1 }}
+                  exit={shouldReduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M5 13L9 17L19 7"
+                      stroke="#fff"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="plus"
+                  initial={shouldReduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+                  animate={shouldReduceMotion ? { opacity: 1 } : { scale: 1, opacity: 1 }}
+                  exit={shouldReduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  +
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
         </div>
       </div>
-    </article>
+    </motion.article>
   );
 }
