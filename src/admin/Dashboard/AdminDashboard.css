@@ -7,7 +7,9 @@
   display: flex;
   min-height: 100vh;
   background: #faf6f0;
+  position: relative;
 }
+
 
 .admin-main {
   margin-left: 260px;

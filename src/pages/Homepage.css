@@ -18,6 +18,17 @@
   display: block;
 }
 
+.wave-primary {
+  fill: #EDDCC6;
+}
+
+.wave-secondary {
+  fill: #DDBFA5;
+  opacity: 0.15;
+}
+
+
+
 /* ===== HERO ===== */
 .hero {
   position: relative;
