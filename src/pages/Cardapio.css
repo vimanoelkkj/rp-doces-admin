@@ -195,6 +195,16 @@
   display: block;
 }
 
+.cardapio-wave .wave-primary {
+  fill: #EDDCC6;
+}
+
+.cardapio-wave .wave-secondary {
+  fill: #DDBFA5;
+  opacity: 0.15;
+}
+
+
 @media (max-width: 1024px) {
   .cardapio-content {
     padding: 40px 40px 80px;

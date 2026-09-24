@@ -27,6 +27,11 @@ html[data-admin-theme="dark"] .admin-wave svg path {
   fill: #2e2420;
 }
 
+html[data-admin-theme="dark"] .admin-wave .wave-secondary {
+  opacity: 0.22;
+}
+
+
 /* ═══════════════════════════════════════════
    Sidebar
    ═══════════════════════════════════════════ */

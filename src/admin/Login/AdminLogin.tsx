@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminTheme } from "../theme/AdminThemeContext";
 import { useAdminPwa } from "../pwa/useAdminPwa";
+import AdminWave from "../components/AdminWave";
 import "./AdminLogin.css";
 
 const IconMoon = () => (
@@ -118,19 +119,7 @@ export default function AdminLogin() {
   return (
     <div className="admin-login-page">
       {/* Background wave decoration */}
-      <div className="admin-login-wave" aria-hidden="true">
-        <svg
-          viewBox="0 0 1440 500"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0 0H1440V300C1440 300 1320 500 1080 450C840 400 720 500 480 420C240 340 120 440 0 380V0Z"
-            fill="#EDDCC6"
-          />
-        </svg>
-      </div>
+      <AdminWave />
 
       {/* Login Card */}
       <div className="admin-login-card">
