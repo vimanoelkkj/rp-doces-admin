@@ -40,6 +40,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       usuarioId: auth.user.id,
     });
     if (!resolucao.ok) {
+      if (resolucao.erro === "PEDIDO_NAO_ENCONTRADO") {
+        return Response.json({ error: "Pedido não encontrado" }, { status: 404 });
+      }
       return Response.json({ error: resolucao.mensagem, code: resolucao.erro }, { status: 409 });
     }
 

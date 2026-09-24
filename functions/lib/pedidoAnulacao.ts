@@ -102,11 +102,24 @@ export async function resolverPixNaoPagosParaAnulacao(
   const pedido = await db.prepare(`SELECT id FROM pedidos WHERE id = ?`).bind(pedidoId).first();
   if (!pedido) return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO", mensagem: "Pedido não encontrado." };
 
-  if (await temEstornoAnulacaoAtivo(db, pedidoId)) {
+  const estornoPendente = (await db.prepare(`
+    SELECT 1 FROM pedido_reembolso_pix_mp_intencoes
+    WHERE pedido_id = ?
+      AND pedido_item_cancelamento_id IS NULL
+      AND pedido_item_troca_id IS NULL
+      AND status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO')
+    LIMIT 1
+  `).bind(pedidoId).first()) || (await db.prepare(`
+    SELECT 1 FROM pedido_reembolsos
+    WHERE pedido_id = ? AND status = 'PENDENTE'
+    LIMIT 1
+  `).bind(pedidoId).first());
+
+  if (estornoPendente) {
     return {
       ok: false,
       erro: "ANULACAO_REFUND_PENDENTE",
-      mensagem: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
+      mensagem: ANULACAO_ERROS.ANULACAO_REFUND_PENDENTE,
     };
   }
 
@@ -114,8 +127,8 @@ export async function resolverPixNaoPagosParaAnulacao(
   if (reembolsaveis.length > 0) {
     return {
       ok: false,
-      erro: "PIX_JA_PAGO",
-      mensagem: "Há recebimento Mercado Pago confirmado para este pedido. Trate o estorno/reembolso antes da anulação.",
+      erro: "ANULACAO_MP_RECEBIDO",
+      mensagem: ANULACAO_ERROS.ANULACAO_MP_RECEBIDO,
     };
   }
 
@@ -156,8 +169,8 @@ export async function resolverPixNaoPagosParaAnulacao(
   if (!accessToken) {
     return {
       ok: false,
-      erro: "MERCADO_PAGO_NAO_CONFIGURADO",
-      mensagem: "Credenciais do Mercado Pago não configuradas para resolver cobranças pendentes.",
+      erro: "ANULACAO_MP_PENDENTE",
+      mensagem: ANULACAO_ERROS.ANULACAO_MP_PENDENTE,
     };
   }
 

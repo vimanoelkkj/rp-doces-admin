@@ -419,6 +419,8 @@ test('adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa soment
     saldoCentavos: 1200,
     pagoCentavos: 3000,
     totalCentavos: 4200,
+    excessoCentavos: 0,
+    temExcesso: false,
     metodosConfirmados: ['PIX_MP'],
   });
 
