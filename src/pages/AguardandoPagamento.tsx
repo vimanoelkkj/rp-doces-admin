@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import Header from "../components/Header";
+import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
 import { CartItem, useCart } from "../context/CartContext";
 import { fetchProducts } from "../api/products";
@@ -298,23 +298,7 @@ export default function AguardandoPagamento() {
     timeLeft != null ? (timeLeft % 60).toString().padStart(2, "0") : "--";
 
   return (
-    <div className="aguardando-page">
-      <div className="aguardando-wave-container" aria-hidden="true">
-        <svg
-          viewBox="0 0 1440 434"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0 0V324.8C120 433.067 253.333 460.133 400 406C546.667 351.867 680 340.267 800 371.2C920 402.133 1053.33 394.4 1200 348C1320 309.333 1400 270.667 1440 232V0H0Z"
-            fill="#EDDCC6"
-          />
-        </svg>
-      </div>
-
-      <Header minimal />
-
+    <StorefrontFrame minimalHeader className="aguardando-page">
       <main className="aguardando-content">
         <div className="aguardando-card">
           {status === "erro" && (
@@ -417,6 +401,6 @@ export default function AguardandoPagamento() {
       </main>
 
       <Footer watermarkOnly />
-    </div>
+    </StorefrontFrame>
   );
 }

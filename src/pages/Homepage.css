@@ -1,26 +1,71 @@
 .homepage {
-  padding-top: 64px;
+  --wave-visual-height: clamp(160px, 18vw, 200px);
+  position: relative;
+  z-index: 1;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
-/* ===== WAVE DECORATION ===== */
+.homepage-content {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  overflow-y: auto;
+  overflow-x: clip;
+  padding-top: 72px;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--wave-visual-height) - 20px),
+    rgba(0, 0, 0, 0.08) calc(var(--wave-visual-height) - 4px),
+    rgba(0, 0, 0, 0.22) calc(var(--wave-visual-height) + 14px),
+    rgba(0, 0, 0, 0.42) calc(var(--wave-visual-height) + 32px),
+    rgba(0, 0, 0, 0.64) calc(var(--wave-visual-height) + 50px),
+    rgba(0, 0, 0, 0.82) calc(var(--wave-visual-height) + 66px),
+    rgba(0, 0, 0, 0.94) calc(var(--wave-visual-height) + 80px),
+    black calc(var(--wave-visual-height) + 94px),
+    black 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--wave-visual-height) - 20px),
+    rgba(0, 0, 0, 0.08) calc(var(--wave-visual-height) - 4px),
+    rgba(0, 0, 0, 0.22) calc(var(--wave-visual-height) + 14px),
+    rgba(0, 0, 0, 0.42) calc(var(--wave-visual-height) + 32px),
+    rgba(0, 0, 0, 0.64) calc(var(--wave-visual-height) + 50px),
+    rgba(0, 0, 0, 0.82) calc(var(--wave-visual-height) + 66px),
+    rgba(0, 0, 0, 0.94) calc(var(--wave-visual-height) + 80px),
+    black calc(var(--wave-visual-height) + 94px),
+    black 100%
+  );
+}
+
 .wave-container {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 0;
+  height: var(--wave-visual-height);
+  overflow: visible;
+  z-index: 4;
   pointer-events: none;
 }
 
 .wave-container svg {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
+  overflow: visible;
 }
 
 .wave-primary {
   fill: var(--store-wave-primary);
 }
+
 
 .wave-secondary {
   fill: var(--store-wave-secondary);
@@ -30,7 +75,7 @@
 /* ===== HERO ===== */
 .hero {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: flex-start;
   gap: 64px;
@@ -241,7 +286,9 @@
 
 /* ===== STORY SECTION ===== */
 .story-section {
-  background: var(--store-bg-alt);
+  position: relative;
+  z-index: 2;
+  background: transparent;
   padding: 110px 80px;
   max-width: 1440px;
   margin: 0 auto;
@@ -321,6 +368,8 @@
 
 /* ===== PROCESS SECTION ===== */
 .process-section {
+  position: relative;
+  z-index: 2;
   padding: 80px 80px;
   display: flex;
   flex-direction: column;
@@ -484,7 +533,9 @@
 
 /* ===== INSTAGRAM SECTION ===== */
 .instagram-section {
-  background: var(--store-bg-alt);
+  position: relative;
+  z-index: 2;
+  background: transparent;
   padding: 100px 80px;
   max-width: 1440px;
   margin: 0 auto;
@@ -552,6 +603,8 @@
 
 /* ===== CONTACT SECTION ===== */
 .contact-section {
+  position: relative;
+  z-index: 2;
   padding: 80px 80px;
   display: flex;
   flex-direction: column;
@@ -762,7 +815,13 @@
    ============================================ */
 @media (max-width: 768px) {
   .homepage {
-    padding-top: 56px;
+    --wave-visual-height: clamp(100px, 24vw, 125px);
+  }
+
+  .homepage-content {
+    /* No estado inicial, o primeiro conteúdo nasce já abaixo da zona de fade.
+       O padding faz parte do scroller e desaparece naturalmente ao rolar. */
+    padding-top: calc(var(--wave-visual-height) + 32px);
   }
 
   /* --- HERO --- */

@@ -1,5 +1,5 @@
 import Header from "../components/Header";
-import { useState, useEffect, type MouseEvent } from "react";
+import { useState, useEffect, useRef, type MouseEvent } from "react";
 import Footer from "../components/Footer";
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "../hooks/useScrollReveal";
@@ -42,6 +42,7 @@ const INSTAGRAM_ANDROID_URL =
 
 export default function Homepage() {
   const shouldReduceMotion = useReducedMotion();
+  const scrollContainerRef = useRef<HTMLElement>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [storeConfig, setStoreConfig] = useState(DEFAULT_STORE_CONFIG);
   const { products } = useCatalogProducts();
@@ -75,15 +76,20 @@ export default function Homepage() {
   }, []);
 
   useEffect(() => {
+    const scroller = scrollContainerRef.current;
+    if (!scroller) return;
+
     const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 1);
+      setShowBackToTop(scroller.scrollTop > 1);
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+
+    handleScroll();
+    scroller.addEventListener("scroll", handleScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", handleScroll);
   }, []);
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const openInstagram = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -127,7 +133,7 @@ export default function Homepage() {
           xmlns="http://www.w3.org/2000/svg"
           preserveAspectRatio="none"
         >
-          <motion.path
+<motion.path
             className="wave-secondary"
             d={SECONDARY_A}
             animate={
@@ -167,11 +173,11 @@ export default function Homepage() {
           />
         </svg>
       </div>
-
       <Header />
 
-      {/* ===== HERO ===== */}
-      <section className="hero">
+      <main className="homepage-content" ref={scrollContainerRef}>
+        {/* ===== HERO ===== */}
+        <section className="hero">
         <div className="hero-left">
           <div className="hero-eyebrow">
             <span className="hero-tag">Artesanal &amp; Exclusivo</span>
@@ -816,6 +822,7 @@ export default function Homepage() {
       </section>
 
       <Footer />
+      </main>
       {createPortal(
         <button
           className={`back-to-top ${showBackToTop ? "back-to-top--visible" : ""}`}

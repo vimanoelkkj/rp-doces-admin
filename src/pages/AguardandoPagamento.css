@@ -1,28 +1,5 @@
 .aguardando-page {
-  position: relative;
-  padding-top: 64px;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--store-bg);
-}
-
-.aguardando-wave-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-.aguardando-wave-container svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-.aguardando-wave-container svg path {
-  fill: var(--store-wave-primary);
-  transition: fill 0.3s ease;
+  background: transparent;
 }
 
 .aguardando-content {
