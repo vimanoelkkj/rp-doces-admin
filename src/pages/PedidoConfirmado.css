@@ -1,13 +1,13 @@
 .confirmado-page {
   position: relative;
   padding-top: 64px;
-  background-color: #faf6f0;
+  background-color: var(--store-bg);
   min-height: 100vh;
 }
 
-/* Mesmo fundo da página, sem a caixa mais clara do Footer padrão. */
+/* Mesmo fundo da página */
 .confirmado-page .footer {
-  background: #faf6f0;
+  background: var(--store-bg);
 }
 
 /* Onda */
@@ -23,6 +23,10 @@
   width: 100%;
   height: auto;
   display: block;
+}
+.confirmado-wave svg path {
+  fill: var(--store-wave-primary);
+  transition: fill 0.3s ease;
 }
 
 /* Conteúdo */
@@ -60,6 +64,15 @@
   animation: check-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s both;
 }
 
+.confirmado-check circle {
+  fill: var(--store-accent);
+  transition: fill 0.3s ease;
+}
+.confirmado-check path {
+  stroke: var(--store-surface-card);
+  transition: stroke 0.3s ease;
+}
+
 @keyframes cupcake-pop {
   0% {
     transform: scale(0);
@@ -94,22 +107,26 @@
   font-family: "Fraunces", serif;
   font-size: 32px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0 0 8px;
+  transition: color 0.3s ease;
 }
 .confirmado-hero p {
   font-family: "Manrope", sans-serif;
   font-size: 15px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 /* Card */
 .confirmado-card {
-  background: #fffaf7;
-  border: 1px solid #eadfd3;
+  background: var(--store-surface-card);
+  border: 1px solid var(--store-border);
   border-radius: 20px;
   padding: 32px;
+  box-shadow: var(--store-shadow-card);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .confirmado-header {
@@ -122,20 +139,23 @@
   font-family: "Fraunces", serif;
   font-size: 22px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0;
+  transition: color 0.3s ease;
 }
 .confirmado-date {
   font-family: "Manrope", sans-serif;
   font-size: 12px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
+  transition: color 0.3s ease;
 }
 .confirmado-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #e8f5e9;
+  background: rgba(76, 175, 80, 0.15);
   color: #4caf50;
+  border: 1px solid rgba(76, 175, 80, 0.3);
   font-family: "Manrope", sans-serif;
   font-size: 12px;
   font-weight: 700;
@@ -145,17 +165,19 @@
 
 .confirmado-divider {
   height: 1px;
-  background: #eadfd3;
+  background: var(--store-border);
   margin: 24px 0;
+  transition: background-color 0.3s ease;
 }
 
 .confirmado-label {
   font-family: "Manrope", sans-serif;
   font-size: 11px;
   font-weight: 700;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   letter-spacing: 0.5px;
   margin-bottom: 16px;
+  transition: color 0.3s ease;
 }
 
 /* Timeline */
@@ -174,43 +196,46 @@
 .tl-step span {
   font-family: "Manrope", sans-serif;
   font-size: 11px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   text-align: center;
   max-width: 100px;
+  transition: color 0.3s ease;
 }
 .tl-step--done span,
 .tl-step--current span {
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   font-weight: 600;
 }
 .tl-dot {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #eadfd3;
+  background: var(--store-border);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 .tl-step--done .tl-dot {
-  background: #634738;
+  background: var(--store-accent);
 }
 .tl-step--current .tl-dot {
-  background: #fff;
-  border: 3px solid #634738;
+  background: var(--store-surface-card);
+  border: 3px solid var(--store-accent);
 }
 .tl-line {
   flex: 1;
   height: 2px;
-  background: #eadfd3;
+  background: var(--store-border);
   margin-top: 15px;
   min-width: 20px;
+  transition: background-color 0.3s ease;
 }
 .tl-line--done {
-  background: #634738;
+  background: var(--store-accent);
 }
 .tl-line--active {
-  background: linear-gradient(to right, #634738, #eadfd3);
+  background: linear-gradient(to right, var(--store-accent), var(--store-border));
 }
 
 /* Itens */
@@ -225,6 +250,7 @@
   height: 56px;
   border-radius: 12px;
   object-fit: cover;
+  border: 1px solid var(--store-border-soft);
 }
 .confirmado-item-info {
   flex: 1;
@@ -236,18 +262,21 @@
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
+  transition: color 0.3s ease;
 }
 .confirmado-item-detail {
   font-family: "Manrope", sans-serif;
   font-size: 12px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
+  transition: color 0.3s ease;
 }
 .confirmado-item-price {
   font-family: "Fraunces", serif;
   font-size: 18px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
+  transition: color 0.3s ease;
 }
 
 /* Resumo */
@@ -259,15 +288,16 @@
   justify-content: space-between;
   font-family: "Manrope", sans-serif;
   font-size: 13px;
-  color: #63524e;
+  color: var(--store-text);
   margin-bottom: 8px;
+  transition: color 0.3s ease;
 }
 .confirmado-summary-total {
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #eadfd3;
+  border-top: 1px solid var(--store-border);
 }
 .confirmado-total-value {
   font-family: "Fraunces", serif;
@@ -280,19 +310,19 @@
 .confirmado-btn {
   width: 100%;
   padding: 16px;
-  background-color: #634738;
-  color: #ffffff;
-  border: none;
+  background-color: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border: 1px solid var(--store-btn-primary-border);
   border-radius: 100px;
   font-family: "Inter", sans-serif;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.3px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s ease;
 }
 .confirmado-btn:hover {
-  background-color: #4e3429;
+  background-color: var(--store-btn-primary-hover);
 }
 
 .confirmado-track-link {
@@ -301,14 +331,18 @@
   margin-top: 12px;
   font-family: "Manrope", sans-serif;
   font-size: 13px;
-  color: #634738;
+  color: var(--store-accent);
   text-decoration: underline;
   text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+.confirmado-track-link:hover {
+  color: var(--store-accent-hover);
 }
 
 .tl-step--done span {
   text-decoration: line-through;
-  color: #b5a59f;
+  color: var(--store-text-subtle);
   font-weight: 400;
 }
 

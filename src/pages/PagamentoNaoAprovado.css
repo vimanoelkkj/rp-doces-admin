@@ -1,7 +1,7 @@
 .recusado-page {
   position: relative;
   padding-top: 64px;
-  background-color: #faf6f0;
+  background-color: var(--store-bg);
   min-height: 100vh;
 }
 
@@ -18,6 +18,10 @@
   width: 100%;
   height: auto;
   display: block;
+}
+.recusado-wave svg path {
+  fill: var(--store-wave-primary);
+  transition: fill 0.3s ease;
 }
 
 /* Conteúdo */
@@ -93,22 +97,26 @@
   font-family: "Fraunces", serif;
   font-size: 32px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0 0 8px;
+  transition: color 0.3s ease;
 }
 .recusado-hero p {
   font-family: "Manrope", sans-serif;
   font-size: 15px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 /* Card */
 .recusado-card {
-  background: #fffaf7;
-  border: 1px solid #eadfd3;
+  background: var(--store-surface-card);
+  border: 1px solid var(--store-border);
   border-radius: 20px;
   padding: 32px;
+  box-shadow: var(--store-shadow-card);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Alerta */
@@ -117,9 +125,11 @@
   align-items: flex-start;
   gap: 14px;
   padding: 20px;
-  background: #fff8f0;
-  border: 1px solid #f0dcc8;
+  background: var(--store-surface-highlight);
+  border: 1px solid var(--store-border);
+  border-left: 4px solid var(--store-accent);
   border-radius: 14px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 .recusado-alert-icon {
   font-size: 20px;
@@ -130,31 +140,35 @@
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   display: block;
   margin-bottom: 4px;
+  transition: color 0.3s ease;
 }
 .recusado-alert p {
   font-family: "Manrope", sans-serif;
   font-size: 13px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   line-height: 1.5;
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .recusado-divider {
   height: 1px;
-  background: #eadfd3;
+  background: var(--store-border);
   margin: 24px 0;
+  transition: background-color 0.3s ease;
 }
 
 .recusado-label {
   font-family: "Manrope", sans-serif;
   font-size: 11px;
   font-weight: 700;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   letter-spacing: 0.5px;
   margin-bottom: 16px;
+  transition: color 0.3s ease;
 }
 
 /* Itens */
@@ -169,6 +183,7 @@
   height: 56px;
   border-radius: 12px;
   object-fit: cover;
+  border: 1px solid var(--store-border-soft);
 }
 .recusado-item-info {
   flex: 1;
@@ -180,18 +195,21 @@
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
+  transition: color 0.3s ease;
 }
 .recusado-item-detail {
   font-family: "Manrope", sans-serif;
   font-size: 12px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
+  transition: color 0.3s ease;
 }
 .recusado-item-price {
   font-family: "Fraunces", serif;
   font-size: 18px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
+  transition: color 0.3s ease;
 }
 
 /* Resumo */
@@ -200,41 +218,42 @@
   justify-content: space-between;
   font-family: "Manrope", sans-serif;
   font-size: 13px;
-  color: #63524e;
+  color: var(--store-text);
   margin-bottom: 8px;
+  transition: color 0.3s ease;
 }
 .recusado-summary-total {
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #eadfd3;
+  border-top: 1px solid var(--store-border);
 }
 .recusado-total-value {
   font-family: "Fraunces", serif;
   font-size: 20px;
   font-weight: 600;
-  color: #d38b80;
+  color: var(--store-accent);
 }
 
 /* Botões */
 .recusado-btn-primary {
   width: 100%;
   padding: 16px;
-  background-color: #634738;
-  color: #ffffff;
-  border: none;
+  background-color: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border: 1px solid var(--store-btn-primary-border);
   border-radius: 100px;
   font-family: "Inter", sans-serif;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.3px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s ease;
   margin-bottom: 12px;
 }
 .recusado-btn-primary:hover {
-  background-color: #4e3429;
+  background-color: var(--store-btn-primary-hover);
 }
 
 .recusado-btn-secondary {
@@ -242,7 +261,7 @@
   padding: 12px;
   background: none;
   border: none;
-  color: #634738;
+  color: var(--store-accent);
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 600;
@@ -250,6 +269,10 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   margin-bottom: 16px;
+  transition: color 0.2s ease;
+}
+.recusado-btn-secondary:hover {
+  color: var(--store-accent-hover);
 }
 
 /* WhatsApp */
@@ -260,14 +283,19 @@
   gap: 8px;
   font-family: "Manrope", sans-serif;
   font-size: 13px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   padding-top: 8px;
+  transition: color 0.3s ease;
 }
 .recusado-help a {
-  color: #4caf50;
+  color: var(--store-accent);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+.recusado-help a:hover {
+  color: var(--store-accent-hover);
 }
 
 /* ===== MOBILE ===== */

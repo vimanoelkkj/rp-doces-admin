@@ -343,19 +343,8 @@ export default function AguardandoPagamento() {
                 {isEstoqueError && (
                   <button
                     type="button"
+                    className="payment-btn-secondary"
                     onClick={() => navigate("/cardapio")}
-                    style={{
-                      padding: "12px 24px",
-                      borderRadius: "100px",
-                      border: "1px solid #d8c8b8",
-                      background: "#faf6f0",
-                      color: "#634738",
-                      fontFamily: "Manrope, sans-serif",
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      transition: "all 0.15s",
-                    }}
                   >
                     Revisar no cardápio
                   </button>

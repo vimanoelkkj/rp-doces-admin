@@ -19,15 +19,13 @@
 }
 
 .wave-primary {
-  fill: #EDDCC6;
+  fill: var(--store-wave-primary);
 }
 
 .wave-secondary {
-  fill: #DDBFA5;
-  opacity: 0.15;
+  fill: var(--store-wave-secondary);
+  opacity: var(--store-wave-secondary-opacity);
 }
-
-
 
 /* ===== HERO ===== */
 .hero {
@@ -58,21 +56,22 @@
 
 .hero-tag {
   display: inline-block;
-  background: rgba(99, 71, 56, 0.08);
-  color: #634738;
+  background: var(--store-surface-soft);
+  color: var(--store-text);
   font-family: "Manrope", sans-serif;
   font-size: 12px;
   font-weight: 700;
   padding: 6px 14px;
   border-radius: 100px;
   letter-spacing: 0.3px;
+  border: 1px solid var(--store-border);
 }
 
 .hero-location {
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 500;
-  color: #8c7a76;
+  color: var(--store-text-subtle);
 }
 
 .hero-title {
@@ -80,7 +79,7 @@
   font-weight: 600;
   font-size: 56px;
   line-height: 1.1;
-  color: #634738;
+  color: var(--store-text-heading);
   margin-bottom: 32px;
 }
 
@@ -88,7 +87,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 18px;
   line-height: 1.6;
-  color: #63524e;
+  color: var(--store-text-muted);
   margin-bottom: 32px;
   max-width: 628px;
 }
@@ -97,23 +96,23 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #634738;
-  color: #fff;
+  background: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border: 1px solid var(--store-btn-primary-border);
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 700;
   padding: 14px 28px;
   border-radius: 100px;
-  border: none;
   cursor: pointer;
   text-decoration: none;
   transition:
-    background 0.2s,
+    background-color 0.2s,
     transform 0.15s;
 }
 
 .btn-primary:hover {
-  background: #4e3529;
+  background: var(--store-btn-primary-hover);
   transform: translateY(-1px);
 }
 
@@ -130,8 +129,8 @@
 }
 
 .trust-card {
-  background: #fff;
-  border: 1px solid #eadfd3;
+  background: var(--store-surface-card);
+  border: 1px solid var(--store-border);
   border-radius: 16px;
   padding: 24px 28px;
   display: flex;
@@ -143,12 +142,14 @@
   max-width: 200px;
   transition:
     transform 0.2s ease,
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    background-color 0.25s ease,
+    border-color 0.25s ease;
 }
 
 .trust-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(43, 29, 26, 0.08);
+  box-shadow: var(--store-shadow-card);
 }
 
 .trust-card-icon {
@@ -163,12 +164,12 @@
   font-family: "Fraunces", serif;
   font-size: 15px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
 }
 
 .trust-card-desc {
   font-size: 13px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   line-height: 1.4;
 }
 
@@ -186,7 +187,8 @@
   top: 40px;
   left: 40px;
   border-radius: 50%;
-  background: #e8c5c8;
+  background: var(--store-accent-soft);
+  transition: background-color 0.3s ease;
 }
 
 .hero-cake-image {
@@ -204,10 +206,11 @@
   position: absolute;
   bottom: 0;
   left: -10px;
-  background: #fff;
+  background: var(--store-surface-elevated);
+  border: 1px solid var(--store-border);
   padding: 16px;
   border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--store-shadow);
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -218,7 +221,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 11px;
   font-weight: 700;
-  color: #634738;
+  color: var(--store-accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -227,21 +230,22 @@
   font-family: "Fraunces", serif;
   font-weight: 600;
   font-size: 15px;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
 }
 
 .floating-city {
   font-family: "Manrope", sans-serif;
   font-size: 12px;
-  color: #63524e;
+  color: var(--store-text-muted);
 }
 
 /* ===== STORY SECTION ===== */
 .story-section {
-  background: #f5efe6;
+  background: var(--store-bg-alt);
   padding: 110px 80px;
   max-width: 1440px;
   margin: 0 auto;
+  transition: background-color 0.25s ease;
 }
 
 .story-inner {
@@ -279,7 +283,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 700;
-  color: #634738;
+  color: var(--store-accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -289,19 +293,19 @@
   font-weight: 600;
   font-size: 40px;
   line-height: 1.2;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
 }
 
 .story-text {
   font-family: "Manrope", sans-serif;
   font-size: 16px;
   line-height: 1.7;
-  color: #63524e;
+  color: var(--store-text-muted);
 }
 
 .story-quote {
   border: none;
-  border-left: 3px solid #634738;
+  border-left: 3px solid var(--store-accent);
   margin: 0;
   padding: 4px 0 4px 24px;
 }
@@ -312,7 +316,7 @@
   font-style: italic;
   font-size: 18px;
   line-height: 1.4;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
 }
 
 /* ===== PROCESS SECTION ===== */
@@ -336,7 +340,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 600;
-  color: #d38b80;
+  color: var(--store-accent);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -345,7 +349,7 @@
   font-family: "Fraunces", serif;
   font-size: 36px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0;
   line-height: 1.3;
 }
@@ -359,20 +363,21 @@
 
 .step-card {
   position: relative;
-  background: linear-gradient(to left, #fffdf9 0%, #f5efe6 100%);
-  border: 1px solid #eadfd3;
+  background: var(--store-surface-card);
+  border: 1px solid var(--store-border);
   border-radius: 24px;
   padding: 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .icon-badge {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background-color: #eddcc6;
+  background-color: var(--store-surface-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -389,7 +394,7 @@
   font-family: "Fraunces", serif;
   font-size: 20px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0;
 }
 
@@ -397,7 +402,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 400;
-  color: #63524e;
+  color: var(--store-text-muted);
   line-height: 1.6;
   margin: 0;
 }
@@ -406,7 +411,7 @@
 .accent-dot {
   position: absolute;
   border-radius: 50%;
-  background-color: #d38b80;
+  background-color: var(--store-accent);
 }
 
 .dot-top-right {
@@ -429,23 +434,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #634738;
-  color: #fff;
+  background: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border: 1px solid var(--store-btn-primary-border);
   font-family: "Inter", sans-serif;
   font-size: 16px;
   font-weight: 500;
   padding: 16px 32px;
   border-radius: 100px;
-  border: none;
   cursor: pointer;
   text-decoration: none;
   transition:
-    background 0.2s,
+    background-color 0.2s,
     transform 0.15s;
 }
 
 .btn-cardapio:hover {
-  background: #4e3529;
+  background: var(--store-btn-primary-hover);
   transform: translateY(-1px);
 }
 
@@ -479,10 +484,11 @@
 
 /* ===== INSTAGRAM SECTION ===== */
 .instagram-section {
-  background: #f5efe6;
+  background: var(--store-bg-alt);
   padding: 100px 80px;
   max-width: 1440px;
   margin: 0 auto;
+  transition: background-color 0.25s ease;
 }
 
 .instagram-header {
@@ -502,27 +508,28 @@
   font-family: "Fraunces", serif;
   font-weight: 600;
   font-size: 32px;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
 }
 
 .btn-instagram {
   display: inline-flex;
   align-items: center;
-  background: #000;
-  color: #faf5ed;
+  background: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border: 1px solid var(--store-btn-primary-border);
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 700;
   padding: 14px 28px;
   border-radius: 100px;
-  border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.2s;
+  transition: background-color 0.2s, transform 0.15s;
 }
 
 .btn-instagram:hover {
-  background: #222;
+  background: var(--store-btn-primary-hover);
+  transform: translateY(-1px);
 }
 
 .instagram-gallery {
@@ -565,22 +572,24 @@
   font-family: "Fraunces", serif;
   font-weight: 600;
   font-size: 40px;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
 }
 
 .contact-card {
-  background-color: #fffaf7;
-  border-left: 6px solid #634738;
+  background-color: var(--store-surface-card);
+  border: 1px solid var(--store-border);
+  border-left: 6px solid var(--store-accent);
   border-radius: 16px;
   padding: 40px;
   max-width: 700px;
   width: 100%;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .contact-accent-bar {
   width: 6px;
   flex-shrink: 0;
-  background: #634738;
+  background: var(--store-accent);
 }
 
 .contact-content {
@@ -601,7 +610,7 @@
   width: 36px;
   height: 36px;
   border-radius: 18px;
-  background: #f7ecee;
+  background: var(--store-surface-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -612,7 +621,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 12px;
   font-weight: 600;
-  color: #634738;
+  color: var(--store-accent);
   text-transform: uppercase;
   display: block;
 }
@@ -621,12 +630,12 @@
   font-family: "Fraunces", serif;
   font-weight: 600;
   font-size: 22px;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
 }
 
 .contact-divider {
   border: none;
-  border-top: 1px solid rgba(99, 71, 56, 0.12);
+  border-top: 1px solid var(--store-border-soft);
   margin: 0 0 32px;
 }
 
@@ -647,13 +656,13 @@
   font-family: "Manrope", sans-serif;
   font-size: 13px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin-bottom: 4px;
 }
 .contact-info-item p {
   font-family: "Manrope", sans-serif;
   font-size: 14px;
-  color: #63524e;
+  color: var(--store-text-muted);
   line-height: 1.5;
 }
 
@@ -662,20 +671,21 @@
   align-items: center;
   gap: 8px;
   align-self: flex-start;
-  background: #634738;
-  color: #fff;
+  background: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border: 1px solid var(--store-btn-primary-border);
   font-family: "Manrope", sans-serif;
   font-size: 13px;
   font-weight: 700;
   padding: 14px 28px;
   border-radius: 100px;
-  border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.2s;
+  transition: background-color 0.2s, transform 0.15s;
 }
 .btn-whatsapp:hover {
-  background: #4e3529;
+  background: var(--store-btn-primary-hover);
+  transform: translateY(-1px);
 }
 
 /* ===== Scroll Reveal ===== */
@@ -780,16 +790,19 @@
   .hero-tag {
     font-size: 11px;
     padding: 4px 12px;
-    background: rgba(99, 71, 56, 0.15);
+    background: var(--store-surface-soft);
+    color: var(--store-text);
+    border: 1px solid var(--store-border);
   }
 
   .hero-location {
     font-size: 13px;
+    color: var(--store-text-subtle);
   }
   .hero-title {
     font-size: 36px;
     line-height: 1.2;
-    color: #634738;
+    color: var(--store-text-heading);
     margin-bottom: 0;
   }
   .hero-description {
@@ -797,6 +810,7 @@
     line-height: 1.6;
     margin-bottom: 20px;
     max-width: 100%;
+    color: var(--store-text-muted);
   }
 
   .hero-cta {
@@ -837,8 +851,8 @@
     text-align: center;
     padding: 16px 12px;
     gap: 8px;
-    background: #fff;
-    border: 1px solid #eadfd3;
+    background: var(--store-surface-card);
+    border: 1px solid var(--store-border);
     border-radius: 16px;
     aspect-ratio: 1;
     justify-content: center;
@@ -860,11 +874,11 @@
     font-family: "Manrope", sans-serif;
     font-size: 13px;
     font-weight: 700;
-    color: #2b1d1a;
+    color: var(--store-text-heading);
   }
   .trust-card-desc {
     font-size: 11px;
-    color: #8c7a76;
+    color: var(--store-text-muted);
     line-height: 1.3;
   }
 
@@ -900,6 +914,7 @@
   .story-content h2 {
     font-size: 28px;
     line-height: 1.2;
+    color: var(--store-text-heading);
   }
   .story-content {
     gap: 16px;
@@ -907,12 +922,14 @@
   .story-text {
     font-size: 14px;
     line-height: 1.6;
+    color: var(--store-text-muted);
   }
   .story-quote {
     padding: 0 0 0 12px;
   }
   .story-quote p {
     font-size: 14px;
+    color: var(--store-text-heading);
   }
 
   /* --- PROCESS --- */
@@ -928,8 +945,9 @@
   }
   .process-label {
     display: inline-block;
-    background: rgba(99, 71, 56, 0.15);
-    color: #634738;
+    background: var(--store-surface-soft);
+    color: var(--store-accent);
+    border: 1px solid var(--store-border);
     font-size: 11px;
     font-weight: 700;
     padding: 4px 12px;
@@ -941,6 +959,7 @@
   .process-title {
     font-size: 28px;
     line-height: 1.2;
+    color: var(--store-text-heading);
   }
   .process-cards {
     grid-template-columns: 1fr;
@@ -951,11 +970,14 @@
     padding: 16px;
     gap: 12px;
     flex-direction: column;
+    background: var(--store-surface-card);
+    border: 1px solid var(--store-border);
   }
   .icon-badge {
     width: 32px;
     height: 32px;
     align-self: flex-start;
+    background-color: var(--store-surface-soft);
   }
   .icon-badge svg {
     width: 16px;
@@ -963,9 +985,11 @@
   }
   .step-title {
     font-size: 16px;
+    color: var(--store-text-heading);
   }
   .step-description {
     font-size: 13px;
+    color: var(--store-text-muted);
   }
   .step-text {
     gap: 4px;
@@ -994,8 +1018,9 @@
 
   .instagram-title-group .section-tag {
     display: inline-block;
-    background: rgba(99, 71, 56, 0.15);
-    color: #634738;
+    background: var(--store-surface-soft);
+    color: var(--store-accent);
+    border: 1px solid var(--store-border);
     font-size: 11px;
     font-weight: 700;
     padding: 4px 12px;
@@ -1005,6 +1030,7 @@
   .instagram-title-group h2 {
     font-size: 28px;
     line-height: 1.2;
+    color: var(--store-text-heading);
   }
   .btn-instagram {
     display: none;
@@ -1044,8 +1070,9 @@
   }
   .contact-header .section-tag {
     display: inline-block;
-    background: rgba(99, 71, 56, 0.15);
-    color: #634738;
+    background: var(--store-surface-soft);
+    color: var(--store-accent);
+    border: 1px solid var(--store-border);
     font-size: 11px;
     font-weight: 700;
     padding: 4px 12px;
@@ -1054,10 +1081,12 @@
   .contact-header h2 {
     font-size: 28px;
     line-height: 1.2;
+    color: var(--store-text-heading);
   }
   .contact-card {
     border-left: none;
-    background: #ffffff;
+    background: var(--store-surface-card);
+    border: 1px solid var(--store-border);
     border-radius: 20px;
     padding: 20px;
     box-shadow: none;
@@ -1070,6 +1099,7 @@
   }
   .contact-location-header h3 {
     font-size: 18px;
+    color: var(--store-text-heading);
   }
   .contact-divider {
     display: none;
@@ -1081,13 +1111,16 @@
   }
   .contact-info-item h4 {
     font-size: 12px;
+    color: var(--store-text-heading);
   }
   .contact-info-item p {
     font-size: 13px;
+    color: var(--store-text-muted);
   }
   .contact-icon-bg {
     width: 32px;
     height: 32px;
+    background: var(--store-surface-soft);
   }
   .btn-whatsapp {
     align-self: stretch;
@@ -1163,15 +1196,15 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #634738;
-  color: #fff;
-  border: none;
+  background: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border: 1px solid var(--store-btn-primary-border);
   cursor: pointer;
   font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(43, 29, 26, 0.2);
+  box-shadow: var(--store-shadow);
   z-index: 90;
   opacity: 0;
   transform: translateY(16px);
@@ -1188,5 +1221,5 @@
 }
 .back-to-top:hover {
   transform: scale(1.1);
-  background: #4e3529;
+  background: var(--store-btn-primary-hover);
 }

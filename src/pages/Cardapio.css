@@ -1,8 +1,9 @@
 .cardapio-page {
-  background-color: #faf6f0;
+  background-color: var(--store-bg);
   min-height: 100vh;
   padding-top: 80px;
   position: relative;
+  transition: background-color 0.25s ease;
 }
 
 .cardapio-content {
@@ -30,7 +31,7 @@
   font-family: "Fraunces", serif;
   font-size: 48px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0;
 }
 
@@ -38,7 +39,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 16px;
   font-weight: 400;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   margin: 0;
 }
 
@@ -54,24 +55,27 @@
   font-weight: 600;
   padding: 10px 20px;
   border-radius: 100px;
-  border: none;
+  border: 1px solid var(--store-border);
   cursor: pointer;
   transition:
     background-color 0.3s,
+    border-color 0.3s,
     color 0.3s,
     transform 0.2s;
-  background-color: #f7ecee;
-  color: #634738;
+  background-color: var(--store-surface-soft);
+  color: var(--store-text);
 }
 
 .filter-tab.active {
-  background-color: #634738;
-  color: #ffffff;
+  background-color: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border-color: var(--store-btn-primary-border);
   transform: scale(1.05);
 }
 
 .filter-tab:hover:not(.active) {
-  background-color: #eadfd3;
+  background-color: var(--store-surface-highlight);
+  color: var(--store-accent);
   transform: scale(1.05);
 }
 
@@ -82,7 +86,7 @@
 .cardapio-empty-state {
   font-family: "Manrope", sans-serif;
   font-size: 16px;
-  color: #8c7a76;
+  color: var(--store-text-subtle);
   /* Compensa a proporção da onda decorativa (viewBox 1440x500, ~34.7vw de
      altura) para que o footer nunca fique sob ela quando não há produtos
      a exibir — sem isso, o conteúdo real fica curto demais e a onda
@@ -148,7 +152,7 @@
   font-family: "Fraunces", serif;
   font-size: 28px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0;
 }
 
@@ -174,11 +178,9 @@
   height: 100%;
 }
 
-/* Footer é compartilhado por várias páginas com fundos diferentes
-   (Footer.css usa #f5efe6); aqui ele precisa casar com o fundo desta
-   página (#faf6f0) para não criar uma quebra visual sutil na transição. */
+/* Footer é compartilhado por várias páginas com fundos diferentes */
 .cardapio-page .footer {
-  background: #faf6f0;
+  background: var(--store-bg);
 }
 
 .cardapio-wave {
@@ -196,12 +198,12 @@
 }
 
 .cardapio-wave .wave-primary {
-  fill: #EDDCC6;
+  fill: var(--store-wave-primary);
 }
 
 .cardapio-wave .wave-secondary {
-  fill: #DDBFA5;
-  opacity: 0.15;
+  fill: var(--store-wave-secondary);
+  opacity: var(--store-wave-secondary-opacity);
 }
 
 

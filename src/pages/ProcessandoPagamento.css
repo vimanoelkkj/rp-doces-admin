@@ -5,9 +5,10 @@
   align-items: center;
   justify-content: center;
   min-height: 100dvh;
-  background: #FAF6F0;
+  background: var(--store-bg);
   padding: 40px 24px;
   position: relative;
+  transition: background-color 0.3s ease;
 }
 
 .processando-content {
@@ -27,6 +28,11 @@
   transform-origin: 60px 56px; /* center of the donut, not the SVG */
 }
 
+.donut-spinner circle:nth-child(3) {
+  fill: var(--store-bg);
+  transition: fill 0.3s ease;
+}
+
 /* ── Dots ── */
 .processando-dots {
   display: flex;
@@ -37,9 +43,10 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #634738;
+  background: var(--store-accent);
   opacity: 0.3;
   animation: dot-pulse 1.4s ease-in-out infinite;
+  transition: background-color 0.3s ease;
 }
 
 .processando-dot:nth-child(2) {
@@ -55,17 +62,19 @@
   font-family: 'Manrope', sans-serif;
   font-weight: 600;
   font-size: 16px;
-  color: #2B1D1A;
+  color: var(--store-text-heading);
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .processando-subtitle {
   font-family: 'Manrope', sans-serif;
   font-weight: 400;
   font-size: 13px;
-  color: #8C7A76;
+  color: var(--store-text-muted);
   margin: 0;
   margin-top: -10px;
+  transition: color 0.3s ease;
 }
 
 .processando-footer {
@@ -74,8 +83,9 @@
   font-family: 'Fraunces', serif;
   font-weight: 600;
   font-size: 14px;
-  color: #8C7A76;
+  color: var(--store-text-muted);
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 /* ── Animations ── */
@@ -100,32 +110,6 @@
     opacity: 1;
     transform: scale(1.2);
   }
-}
-
-/* ── Dark mode ── */
-[data-theme="dark"] .processando-screen {
-  background: #1A1412;
-}
-
-[data-theme="dark"] .processando-title {
-  color: #FAF6F0;
-}
-
-[data-theme="dark"] .processando-subtitle {
-  color: #A89B92;
-}
-
-[data-theme="dark"] .processando-footer {
-  color: #A89B92;
-}
-
-[data-theme="dark"] .processando-dot {
-  background: #EADFD3;
-}
-
-/* Dark mode: donut hole matches dark bg */
-[data-theme="dark"] .donut-spinner circle:nth-child(3) {
-  fill: #1A1412;
 }
 
 /* ── Reduced motion ── */
