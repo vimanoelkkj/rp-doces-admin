@@ -24,7 +24,6 @@ export type {
 // 2. Domínio Legado (ledger/legacy.ts)
 export type {
   LegacyStatusResult,
-  PagamentoLedger,
   MaterializeResult,
 } from "./ledger/legacy";
 
@@ -32,7 +31,6 @@ export {
   ledgerPaymentStatus,
   ensureLegacyPaymentMaterialized,
   resolveLedgerPaymentId,
-  getVirtualOrRealPayment,
 } from "./ledger/legacy";
 
 // 3. Domínio de Alocações (ledger/allocations.ts)
@@ -53,7 +51,6 @@ export type {
 
 export {
   getPaidCentavos,
-  computeFinancialStatus,
   getRefundedCentavos,
   getNetPaidCentavos,
   recalculatePedidoStatusPagamento,

@@ -24,15 +24,6 @@ export async function getPaidCentavos(db: D1Database, pedidoId: number): Promise
   return Number(row?.total || 0);
 }
 
-export function computeFinancialStatus(
-  totalCentavos: number,
-  pagoCentavos: number,
-): StatusFinanceiroAgregado {
-  if (pagoCentavos <= 0) return "PENDENTE";
-  if (pagoCentavos < totalCentavos) return "PARCIAL";
-  return "PAGO";
-}
-
 // Passo 5: dinheiro devolvido. Nunca muta pedido_pagamentos — o reembolso
 // vive inteiramente em pedido_reembolsos, como um evento independente.
 export async function getRefundedCentavos(db: D1Database, pedidoId: number): Promise<number> {
