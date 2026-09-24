@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { CartItem } from "../context/CartContext";
-import Header from "../components/Header";
+import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
 import "./PedidoConfirmado.css";
 
@@ -81,24 +81,7 @@ export default function PedidoConfirmado() {
   const totalPrice = state.totalCentavos / 100;
 
   return (
-    <div className="confirmado-page">
-      {/* Onda decorativa */}
-      <div className="confirmado-wave" aria-hidden="true">
-        <svg
-          viewBox="0 0 1440 434"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0 0V324.8C120 433.067 253.333 460.133 400 406C546.667 351.867 680 340.267 800 371.2C920 402.133 1053.33 394.4 1200 348C1320 309.333 1400 270.667 1440 232V0H0Z"
-            fill="#EDDCC6"
-          />
-        </svg>
-      </div>
-
-      <Header minimal />
-
+    <StorefrontFrame minimalHeader className="confirmado-page">
       <main className="confirmado-content">
         {/* Seção Aprovado */}
         <div className="confirmado-hero">
@@ -332,6 +315,6 @@ export default function PedidoConfirmado() {
       </main>
 
       <Footer />
-    </div>
+    </StorefrontFrame>
   );
 }

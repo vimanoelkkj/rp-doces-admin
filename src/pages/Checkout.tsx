@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "../components/Header";
+import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
 import { fetchProducts } from "../api/products";
@@ -73,8 +73,7 @@ export default function Checkout() {
 
   if (cartItems.length === 0) {
     return (
-      <div className="checkout-page">
-        <Header minimal />
+      <StorefrontFrame minimalHeader className="checkout-page">
         <main className="checkout-empty">
           <h1>Seu carrinho está vazio</h1>
           <p>Adicione produtos antes de finalizar o pedido.</p>
@@ -86,29 +85,12 @@ export default function Checkout() {
           </button>
         </main>
         <Footer />
-      </div>
+      </StorefrontFrame>
     );
   }
 
   return (
-    <div className="checkout-page">
-      {/* Onda decorativa — mesma estrutura da Homepage */}
-      <div className="checkout-wave-container" aria-hidden="true">
-        <svg
-          viewBox="0 0 1440 434"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0 0V324.8C120 433.067 253.333 460.133 400 406C546.667 351.867 680 340.267 800 371.2C920 402.133 1053.33 394.4 1200 348C1320 309.333 1400 270.667 1440 232V0H0Z"
-            fill="#EDDCC6"
-          />
-        </svg>
-      </div>
-
-      <Header minimal />
-
+    <StorefrontFrame minimalHeader className="checkout-page">
       <main className="checkout-content">
         <div className="checkout-card">
           {/* Coluna esquerda — Resumo do pedido */}
@@ -221,6 +203,6 @@ export default function Checkout() {
       </main>
 
       <Footer watermarkOnly />
-    </div>
+    </StorefrontFrame>
   );
 }

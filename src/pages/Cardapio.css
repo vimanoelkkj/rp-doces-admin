@@ -1,9 +1,5 @@
 .cardapio-page {
-  background-color: var(--store-bg);
-  min-height: 100vh;
-  padding-top: 80px;
-  position: relative;
-  transition: background-color 0.25s ease;
+  background: transparent;
 }
 
 .cardapio-content {
@@ -183,29 +179,6 @@
   background: var(--store-bg);
 }
 
-.cardapio-wave {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 0;
-  pointer-events: none;
-}
-.cardapio-wave svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.cardapio-wave .wave-primary {
-  fill: var(--store-wave-primary);
-}
-
-.cardapio-wave .wave-secondary {
-  fill: var(--store-wave-secondary);
-  opacity: var(--store-wave-secondary-opacity);
-}
-
 
 @media (max-width: 1024px) {
   .cardapio-content {
@@ -221,9 +194,6 @@
 }
 
 @media (max-width: 768px) {
-  .cardapio-page {
-    padding-top: 56px;
-  }
   .cardapio-content {
     padding: 24px 16px 40px;
     gap: 32px;

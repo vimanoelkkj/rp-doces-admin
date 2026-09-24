@@ -3,7 +3,7 @@
     opacity 0.35s ease,
     transform 0.35s ease;
   opacity: 1;
-  transform: translateY(0);
+  transform: none;
 }
 
 .page-transition--out {
@@ -13,5 +13,5 @@
 
 .page-transition--in {
   opacity: 1;
-  transform: translateY(0);
+  transform: none;
 }

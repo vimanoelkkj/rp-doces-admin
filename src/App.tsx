@@ -28,8 +28,10 @@ function StorefrontRoutes() {
   const location = useLocation();
 
   return (
-    <PageTransition locationKey={location.key}>
-      <Routes location={location}>
+    <>
+      <div className="store-background" aria-hidden="true" />
+      <PageTransition locationKey={location.key}>
+        <Routes location={location}>
         <Route path="/" element={<Homepage />} />
         <Route path="/cardapio" element={<Cardapio />} />
         <Route path="/checkout" element={<Checkout />} />
@@ -50,6 +52,7 @@ function StorefrontRoutes() {
         <Route path="/dev/processando-pagamento" element={<ProcessandoPagamento />} />
       </Routes>
     </PageTransition>
+    </>
   );
 }
 

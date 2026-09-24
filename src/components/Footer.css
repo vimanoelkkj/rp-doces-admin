@@ -1,5 +1,7 @@
 .footer {
-  background: var(--store-bg-alt);
+  position: relative;
+  z-index: 2;
+  background: transparent;
   padding: 80px 80px 40px;
   max-width: 1440px;
   margin: 0 auto;

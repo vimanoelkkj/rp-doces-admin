@@ -105,8 +105,23 @@ img {
   display: block;
 }
 
+/* Camada de fundo fixa no viewport para o storefront */
+.store-background {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  background-color: var(--store-bg);
+  pointer-events: none;
+  z-index: 0;
+  transition: background-color 0.25s ease;
+  transform: translate3d(0, 0, 0);
+}
+
 .homepage {
   position: relative;
+  z-index: 1;
   overflow-x: clip;
 }
 
