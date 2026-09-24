@@ -1,155 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { novaOperationKey } from "../../lib/operationKey";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import "./PedidoDetalheModal.css";
-import { formatarFinanceiro, type FinanceiroPedido } from "./formatarFinanceiro";
 import AdicionarItemModal from "./AdicionarItemModal";
 import CancelamentoItemPreviewModal from "./CancelamentoItemPreviewModal";
 import TrocarItemModal from "./TrocarItemModal";
 import HistoricoComandaModal from "./HistoricoComandaModal";
 import ExcluirPedidoModal from "./ExcluirPedidoModal";
-import type { PedidoAnulacao } from "../../../shared/pedidoAnulacao";
-
-/* ── Types (espelham o retorno de GET /api/admin/pedidos/:id) ── */
-interface PedidoItemRow {
-  id: number;
-  produto_id: number | null;
-  produto_nome: string;
-  emoji: string | null;
-  quantidade: number;
-  valor_unitario_centavos: number;
-  valor_total_centavos: number;
-  status_item: string;
-  estoque_estado: string;
-  cancelamento_id: number | null;
-  cancelamento_status: string | null;
-  troca_id: number | null;
-  troca_status: string | null;
-  troca_item_origem_id: number | null;
-}
-
-type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
-type MetodoPagamentoManual = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO";
-
-interface PedidoRow {
-  id: number;
-  cliente_nome: string;
-  cliente_whatsapp: string;
-  observacao: string;
-  valor_total_centavos: number;
-  status_pagamento: string;
-  status_pedido: StatusPedido;
-  status_comanda: string;
-  criado_em: string;
-  pago_em: string | null;
-  origem_pedido: "SITE" | "MANUAL";
-  arquivado: number;
-  arquivado_em: string | null;
-}
-
-interface PixAdminPendente {
-  id: number;
-  valorCentavos: number;
-  qrCode: string | null;
-  qrCodeBase64: string | null;
-  ticketUrl: string | null;
-  expiresAt: string | null;
-}
-
-interface PedidoDetalheResponse {
-  anulacao?: PedidoAnulacao | null;
-  pedido: PedidoRow;
-  itens: PedidoItemRow[];
-  financeiro: FinanceiroPedido;
-  pixAdminPendentes: PixAdminPendente[];
-  capacidadeCobravelCentavos: number;
-  /** B-3: cobranças sem confirmação do Mercado Pago (leitura, nunca decisão). */
-  operacoesInconclusivas: {
-    tipo: string;
-    diagnostico: string | null;
-    atualizadoEm: string;
-  }[];
-}
+import {
+  STATUS_LABEL,
+  STATUS_TYPE,
+  formatarData,
+  formatarPreco,
+} from "./PedidoDetalhe/helpers";
+import PedidoItens from "./PedidoDetalhe/PedidoItens";
+import PedidoHeader from "./PedidoDetalhe/PedidoHeader";
+import PedidoPagamento from "./PedidoDetalhe/PedidoPagamento";
+import { usePedidoDetalhe } from "./PedidoDetalhe/usePedidoDetalhe";
 
 interface PedidoDetalheModalProps {
   orderId: number;
   onClose: () => void;
   onStatusChanged?: () => void;
 }
-
-/* ── Helpers ── */
-const formatarPreco = (centavos: number) =>
-  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
-
-const valorPagamentoInicial = (centavos: number) =>
-  (centavos / 100).toFixed(2).replace(".", ",");
-
-const parseValorPagamento = (valor: string) => {
-  const limpo = valor.trim().replace(/\s/g, "");
-  const normalizado = limpo.includes(",")
-    ? limpo.replace(/\./g, "").replace(",", ".")
-    : limpo;
-  if (!/^\d+(?:\.\d{1,2})?$/.test(normalizado)) return null;
-  const centavos = Math.round(Number(normalizado) * 100);
-  return Number.isSafeInteger(centavos) && centavos > 0 ? centavos : null;
-};
-
-const formatarData = (isoLike: string) => {
-  // SQLite CURRENT_TIMESTAMP é UTC e chega como "YYYY-MM-DD HH:mm:ss".
-  // Sem o sufixo Z, o navegador interpretava esse valor como horário LOCAL,
-  // exibindo o pedido com deslocamento de fuso (ex.: +3h no UTC-3).
-  const iso = isoLike.replace(" ", "T");
-  const comFuso = /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(iso) ? iso : `${iso}Z`;
-
-  return new Date(comFuso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-// Mesmo enum de produção (order.model.ts / OrderStatusSelect.tsx) — o admin
-// pode escolher qualquer status livremente, sem avanço linear forçado.
-const STATUS_PEDIDO_OPCOES: StatusPedido[] = [
-  "NOVO",
-  "PREPARANDO",
-  "PRONTO",
-  "ENTREGUE",
-  "CANCELADO",
-];
-
-const STATUS_LABEL: Record<StatusPedido, string> = {
-  NOVO: "Novo",
-  PREPARANDO: "Em produção",
-  PRONTO: "Pronto",
-  ENTREGUE: "Entregue",
-  CANCELADO: "Cancelado",
-};
-
-const STATUS_TYPE: Record<StatusPedido, "green" | "orange" | "blue" | "red"> = {
-  NOVO: "orange",
-  PREPARANDO: "orange",
-  PRONTO: "blue",
-  ENTREGUE: "green",
-  CANCELADO: "red",
-};
-
-const ITEM_STATUS_LABEL: Record<string, string> = {
-  ATIVO: "Ativo", CANCELADO: "Cancelado",
-  TROCA_PENDENTE: "Destino da troca · aguardando conclusão",
-};
-const STOCK_STATUS_LABEL: Record<string, string> = {
-  RESERVADO: "Estoque reservado", BAIXADO: "Estoque baixado",
-  LIBERADO: "Reserva liberada", REPOSTO: "Estoque reposto",
-};
-const FLOW_STATUS_LABEL: Record<string, string> = {
-  AGUARDANDO_REEMBOLSO: "Aguardando devolução", INCONCLUSIVO: "Estorno inconclusivo",
-  INCONCLUSIVA: "Troca inconclusiva", AGUARDANDO_COBRANCA: "Troca aguardando pagamento",
-  CONCLUIDO: "Cancelamento concluído", CONCLUIDA: "Troca concluída",
-};
 
 /* ── Component ── */
 export default function PedidoDetalheModal({
@@ -158,599 +31,57 @@ export default function PedidoDetalheModal({
   onStatusChanged,
 }: PedidoDetalheModalProps) {
   const modalProps = useAdminModal(true, onClose);
-  const [data, setData] = useState<PedidoDetalheResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [alterando, setAlterando] = useState(false);
-  const [statusError, setStatusError] = useState<string | null>(null);
-  const [arquivando, setArquivando] = useState(false);
-  const [arquivamentoError, setArquivamentoError] = useState<string | null>(null);
-  const [confirmarArquivamento, setConfirmarArquivamento] = useState(false);
-  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const statusMenuRef = useRef<HTMLDivElement>(null);
-  const moreMenuRef = useRef<HTMLDetailsElement>(null);
-  const [editandoNome, setEditandoNome] = useState(false);
-  const [clienteNome, setClienteNome] = useState("");
-  const [salvandoNome, setSalvandoNome] = useState(false);
-  const [nomeError, setNomeError] = useState<string | null>(null);
-  const [registrandoPagamento, setRegistrandoPagamento] = useState(false);
-  const [metodoPagamento, setMetodoPagamento] =
-    useState<MetodoPagamentoManual>("DINHEIRO");
-  const [valorPagamento, setValorPagamento] = useState("");
-  const [pagamentoEmVoo, setPagamentoEmVoo] = useState(false);
-  const [pagamentoError, setPagamentoError] = useState<string | null>(null);
-  const pagamentoEmVooRef = useRef(false);
-  const pagamentoKeyRef = useRef<string | null>(null);
-
-  // Pix administrativo: `gerando` cobre a ação sem substituto; `regenerandoId`
-  // guarda qual bloco específico está em voo (desabilita só aquele botão).
-  // `pixAviso` é o caminho AMBÍGUO (MERCADO_PAGO_INDISPONIVEL) — nunca junta
-  // com `pixError` genérico, porque a ação certa é diferente: nunca convidar
-  // a tentar de novo direto, só "atualizar e conferir o que persistiu".
-  const [gerando, setGerando] = useState(false);
-  const [regenerandoId, setRegenerandoId] = useState<number | null>(null);
-  const [pixError, setPixError] = useState<string | null>(null);
-  const [pixAviso, setPixAviso] = useState<string | null>(null);
-  const [agora, setAgora] = useState(() => Date.now());
-  const [copiedId, setCopiedId] = useState<number | null>(null);
-  const [adicionandoItem, setAdicionandoItem] = useState(false);
-  const [itemCancelamentoPreviewId, setItemCancelamentoPreviewId] = useState<number | null>(null);
-  const [itemTroca, setItemTroca] = useState<PedidoItemRow | null>(null);
-  const [historicoAberto, setHistoricoAberto] = useState(false);
-  const dataRef = useRef<PedidoDetalheResponse | null>(null);
-  const pixEmVooRef = useRef<Set<string>>(new Set());
-  const onStatusChangedRef = useRef(onStatusChanged);
-
-  useEffect(() => {
-    onStatusChangedRef.current = onStatusChanged;
-  }, [onStatusChanged]);
-
-  // A1: uma key por INTENÇÃO de cobrança. A identidade da ação já distingue
-  // "gerar Pix novo" de "regenerar o Pix X", então o mapa é indexado por
-  // ela. A key sobrevive a um retry da mesma ação (resposta perdida, erro de
-  // rede) e é descartada quando a ação se resolve — assim uma regeneração
-  // NOVA, iniciada explicitamente pelo operador depois, recebe key nova.
-  // No caminho AMBÍGUO a key é preservada de propósito: repetir a ação nunca
-  // pode nascer como uma segunda cobrança com outra identidade no MP.
-  const pixKeysRef = useRef<Map<string, string>>(new Map());
-
-  const carregarPedido = useCallback((silencioso = false) => {
-    if (!silencioso) setLoading(true);
-    return fetch(`/api/admin/pedidos/${orderId}`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Falha ao carregar pedido");
-        return response.json() as Promise<PedidoDetalheResponse>;
-      })
-      .then((result) => {
-        const anterior = dataRef.current;
-        const financeiroMudou = Boolean(
-          anterior &&
-            (anterior.financeiro.status !== result.financeiro.status ||
-              anterior.financeiro.pagoCentavos !== result.financeiro.pagoCentavos ||
-              anterior.financeiro.totalCentavos !== result.financeiro.totalCentavos),
-        );
-        dataRef.current = result;
-        setData(result);
-        if (result.anulacao) {
-          setEditandoNome(false);
-          setRegistrandoPagamento(false);
-          setAdicionandoItem(false);
-          setItemCancelamentoPreviewId(null);
-          setItemTroca(null);
-          setConfirmarArquivamento(false);
-          setConfirmarExclusao(false);
-          if (anterior && !anterior.anulacao) onStatusChangedRef.current?.();
-        }
-        // O modal de troca pode permanecer aberto durante a confirmação do
-        // Pix. Mantém o item aberto ligado à fotografia mais recente do GET
-        // para que a mudança AGUARDANDO_COBRANCA -> CONCLUIDA também atualize
-        // o detalhe da troca, sem criar um segundo polling.
-        setItemTroca((aberto) => {
-          if (!aberto) return aberto;
-          return result.itens.find((item) => item.id === aberto.id) ?? aberto;
-        });
-        setError(null);
-        if (silencioso && financeiroMudou) onStatusChangedRef.current?.();
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => {
-        if (!silencioso) setLoading(false);
-      });
-  }, [orderId]);
-
-  useEffect(() => {
-    dataRef.current = null;
-    setData(null);
-    setAdicionandoItem(false);
-    setEditandoNome(false);
-    setRegistrandoPagamento(false);
-    setPagamentoError(null);
-    pagamentoEmVooRef.current = false;
-    pagamentoKeyRef.current = null;
-    pixKeysRef.current.clear();
-    void carregarPedido();
-  }, [carregarPedido]);
-
-  // Contador de expiração dos Pix pendentes — só liga o relógio quando há
-  // algo pra contar. Nunca decide sozinho que um Pix expirou: só o
-  // backend/reconciliação tem autoridade pra transicionar PENDENTE ->
-  // EXPIRADO (paymentSync.ts); aqui é só exibição de "tempo informado pelo
-  // MP já passou", não uma mudança de estado local.
-  useEffect(() => {
-    if (!data || data.pixAdminPendentes.length === 0) return;
-    const interval = setInterval(() => setAgora(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [data]);
-
-  // O webhook segue sendo a autoridade da confirmação. Enquanto existir
-  // uma cobrança pendente, uma releitura espaçada traz a convergência para a
-  // tela sem exigir refresh manual nem manter polling quando não há trabalho.
-  useEffect(() => {
-    if (!data || data.pixAdminPendentes.length === 0) return;
-    const interval = setInterval(() => void carregarPedido(true), 5000);
-    return () => clearInterval(interval);
-  }, [carregarPedido, data]);
-
-  const gerarPix = (substituiId?: number, valorCentavos?: number) => {
-    setPixError(null);
-    setPixAviso(null);
-    if (substituiId) setRegenerandoId(substituiId);
-    else setGerando(true);
-
-    const acao = substituiId ? `regen:${substituiId}` : "novo";
-    if (pixEmVooRef.current.has(acao)) return;
-    pixEmVooRef.current.add(acao);
-    let operationKey = pixKeysRef.current.get(acao);
-    if (!operationKey) {
-      operationKey = novaOperationKey();
-      pixKeysRef.current.set(acao, operationKey);
-    }
-
-    fetch(`/api/admin/pedidos/${orderId}/pix`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        substituiId
-          ? { substituiId, operationKey }
-          : { operationKey, valorCentavos },
-      ),
-    })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          // Erro ambíguo ou operação ainda em processamento (código, não
-          // texto — nunca inferir pela mensagem): nunca sabemos se o MP criou
-          // a cobrança mesmo assim. Não convida a tentar de novo, só a
-          // atualizar e conferir o que persistiu (a próxima carga do GET
-          // reflete a verdade do ledger). A key é PRESERVADA: se a ação for
-          // repetida, ela recupera a MESMA operação em vez de abrir outra.
-          if (
-            body.code === "MERCADO_PAGO_INDISPONIVEL" ||
-            body.code === "OPERACAO_EM_PROCESSAMENTO"
-          ) {
-            setPixAviso(body.error ?? "Não foi possível confirmar a criação do Pix.");
-            return;
-          }
-          // Qualquer outro erro é conclusivo para esta intenção: descarta a
-          // key para que uma nova tentativa do operador seja tratada como a
-          // intenção nova que ela é.
-          pixKeysRef.current.delete(acao);
-          throw new Error(body.error ?? "Falha ao gerar Pix");
-        }
-        pixKeysRef.current.delete(acao);
-        return carregarPedido(true);
-      })
-      .catch((err) => setPixError(err.message))
-      .finally(() => {
-        pixEmVooRef.current.delete(acao);
-        setGerando(false);
-        setRegenerandoId(null);
-      });
-  };
-
-  const copiarCodigo = (pixId: number, codigo: string) => {
-    navigator.clipboard.writeText(codigo);
-    setCopiedId(pixId);
-    setTimeout(() => setCopiedId((atual) => (atual === pixId ? null : atual)), 2000);
-  };
-
-  useEffect(() => {
-    if (!statusMenuOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        statusMenuRef.current &&
-        !statusMenuRef.current.contains(e.target as Node)
-      ) {
-        setStatusMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [statusMenuOpen]);
-
-  // O menu de mais ações usa <details>, então o navegador só o fecha
-  // automaticamente ao clicar novamente no <summary>. Fechamos também ao
-  // clicar em qualquer ponto fora dele, inclusive dentro do próprio modal.
-  useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      const menu = moreMenuRef.current;
-      if (menu?.open && !menu.contains(event.target as Node)) {
-        menu.removeAttribute("open");
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
-
-  const alterarStatus = (novoStatus: StatusPedido) => {
-    setStatusMenuOpen(false);
-    if (!data || novoStatus === data.pedido.status_pedido) return;
-
-    setAlterando(true);
-    setStatusError(null);
-    fetch(`/api/admin/pedidos/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ statusPedido: novoStatus }),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          throw new Error(body.error ?? "Falha ao alterar status");
-        }
-        setData((prev) =>
-          prev
-            ? { ...prev, pedido: { ...prev.pedido, status_pedido: novoStatus } }
-            : prev,
-        );
-        onStatusChanged?.();
-      })
-      .catch((err) => setStatusError(err.message))
-      .finally(() => setAlterando(false));
-  };
-
-  const executarArquivamento = (arquivar: boolean) => {
-    if (!data || arquivando) return;
-
-    setArquivando(true);
-    setArquivamentoError(null);
-    fetch(`/api/admin/pedidos/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ arquivado: arquivar }),
-    })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(body.error ?? "Falha ao alterar arquivamento");
-        }
-        onStatusChangedRef.current?.();
-        onClose();
-      })
-      .catch((err) => setArquivamentoError(err.message))
-      .finally(() => setArquivando(false));
-  };
-
-  const clicarArquivar = () => {
-    if (!data || arquivando) return;
-    if (!anulado && data.pedido.arquivado === 0) {
-      setConfirmarArquivamento(true);
-      return;
-    }
-    executarArquivamento(false);
-  };
-
-  const iniciarEdicaoNome = () => {
-    if (!data) return;
-    setClienteNome(data.pedido.cliente_nome);
-    setNomeError(null);
-    setEditandoNome(true);
-  };
-
-  const salvarNome = () => {
-    if (!data || salvandoNome) return;
-    const nomeNormalizado = clienteNome.trim();
-    if (!nomeNormalizado) {
-      setNomeError("Informe o nome da cliente.");
-      return;
-    }
-    if (nomeNormalizado.length > 200) {
-      setNomeError("O nome deve ter no máximo 200 caracteres.");
-      return;
-    }
-    if (nomeNormalizado === data.pedido.cliente_nome) {
-      setEditandoNome(false);
-      return;
-    }
-
-    setSalvandoNome(true);
-    setNomeError(null);
-    fetch(`/api/admin/pedidos/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clienteNome: nomeNormalizado }),
-    })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(body.error ?? "Falha ao alterar nome da cliente");
-        }
-        setData((prev) =>
-          prev
-            ? {
-                ...prev,
-                pedido: {
-                  ...prev.pedido,
-                  cliente_nome: body.clienteNome ?? nomeNormalizado,
-                },
-              }
-            : prev,
-        );
-        setEditandoNome(false);
-        onStatusChangedRef.current?.();
-      })
-      .catch((err) => setNomeError(err.message))
-      .finally(() => setSalvandoNome(false));
-  };
-
-  const selecionarMetodoPagamento = (metodo: MetodoPagamentoManual) => {
-    setMetodoPagamento(metodo);
-    setPagamentoError(null);
-    pagamentoKeyRef.current = null;
-  };
-
-  const abrirRegistroPagamento = () => {
-    if (!data) return;
-    setValorPagamento(valorPagamentoInicial(data.capacidadeCobravelCentavos));
-    setPagamentoError(null);
-    pagamentoKeyRef.current = null;
-    setRegistrandoPagamento(true);
-  };
-
-  const registrarPagamento = () => {
-    if (!data || pagamentoEmVooRef.current) return;
-    const valorCentavos = parseValorPagamento(valorPagamento);
-    if (!valorCentavos) {
-      setPagamentoError("Informe um valor válido.");
-      return;
-    }
-    if (valorCentavos > data.capacidadeCobravelCentavos) {
-      setPagamentoError("O valor não pode ultrapassar o saldo em aberto.");
-      return;
-    }
-
-    pagamentoEmVooRef.current = true;
-    setPagamentoEmVoo(true);
-    setPagamentoError(null);
-    const operationKey = pagamentoKeyRef.current ?? novaOperationKey();
-    pagamentoKeyRef.current = operationKey;
-
-    fetch(`/api/admin/pedidos/${orderId}/pagamentos`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ metodo: metodoPagamento, valorCentavos, operationKey }),
-    })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(body.error ?? "Falha ao registrar pagamento");
-        }
-        pagamentoKeyRef.current = null;
-        setRegistrandoPagamento(false);
-        return carregarPedido(true);
-      })
-      .catch((err) => setPagamentoError(err.message))
-      .finally(() => {
-        pagamentoEmVooRef.current = false;
-        setPagamentoEmVoo(false);
-      });
-  };
-
-  const financeiro = data ? formatarFinanceiro(data.financeiro) : null;
-  const anulado = Boolean(data?.anulacao);
-  const podeRegistrarPagamento = Boolean(
-    data &&
-      !anulado && data.pedido.arquivado === 0 &&
-      data.capacidadeCobravelCentavos > 0 &&
-      (data.pedido.status_comanda === "ABERTA" ||
-        data.pedido.status_pedido === "ENTREGUE"),
-  );
-  const podeGerarPix = Boolean(
-    data &&
-      !anulado && data.pedido.arquivado === 0 &&
-      data.capacidadeCobravelCentavos > 0 &&
-      (data.pedido.status_comanda === "ABERTA" ||
-        data.pedido.status_pedido === "ENTREGUE"),
-  );
-  const trocaAguardandoCobranca = data?.itens.some(
-    (item) => item.troca_status === "AGUARDANDO_COBRANCA",
-  );
-  const itensAtuais = data?.itens.filter(
-    (item) => anulado || item.status_item === "ATIVO" || item.status_item === "TROCA_PENDENTE",
-  ) ?? [];
-
-  // "Ver detalhes" no histórico fecha o histórico e abre o modal específico
-  // por cima do principal — mesmo comportamento de quem abre a partir da
-  // lista de itens atual, sem empilhar um terceiro nível.
-  const verCancelamentoDoHistorico = (itemId: number) => {
-    if (anulado) return;
-    setHistoricoAberto(false);
-    setItemCancelamentoPreviewId(itemId);
-  };
-  const verTrocaDoHistorico = (itemId: number) => {
-    if (anulado) return;
-    const item = data?.itens.find((i) => i.id === itemId);
-    setHistoricoAberto(false);
-    if (item) setItemTroca(item);
-  };
+  const detalhe = usePedidoDetalhe({ orderId, onClose, onStatusChanged });
 
   return createPortal(
     <div className="pedmodal-overlay" {...modalProps}>
       <div className="pedmodal-card">
         {/* Header */}
-        <div className="pedmodal-header">
-          <div className="pedmodal-title-area">
-            {editandoNome && data && !anulado ? (
-              <form
-                className="pedmodal-name-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  salvarNome();
-                }}
-              >
-                <div className="pedmodal-name-controls">
-                  <span className="pedmodal-name-prefix">Pedido #{orderId} -</span>
-                  <input
-                    aria-label="Nome da cliente"
-                    value={clienteNome}
-                    onChange={(event) => setClienteNome(event.target.value)}
-                    maxLength={200}
-                    autoFocus
-                    disabled={salvandoNome}
-                  />
-                  <button
-                    type="submit"
-                    className="pedmodal-btn-name-save"
-                    disabled={salvandoNome}
-                  >
-                    {salvandoNome ? "Salvando..." : "Salvar"}
-                  </button>
-                  <button
-                    type="button"
-                    className="pedmodal-btn-name-cancel"
-                    onClick={() => setEditandoNome(false)}
-                    disabled={salvandoNome}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-                {nomeError && <span className="pedmodal-name-error">{nomeError}</span>}
-              </form>
-            ) : (
-              <div className="pedmodal-title-row">
-                <h2 className="pedmodal-title">
-                  Pedido #{orderId}
-                  {data ? ` - ${data.pedido.cliente_nome}` : ""}
-                </h2>
-                {data && !anulado && data.pedido.arquivado === 0 && (
-                  <button
-                    type="button"
-                    className="pedmodal-btn-name-edit"
-                    onClick={iniciarEdicaoNome}
-                    aria-label="Editar nome da cliente"
-                  >
-                    Editar nome
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="pedmodal-header-actions">
-            {data && !anulado && data.pedido.arquivado === 0 && (
-              <div className="pedmodal-status-dropdown" ref={statusMenuRef}>
-                <button
-                  type="button"
-                  className="pedmodal-btn-advance"
-                  onClick={() => setStatusMenuOpen((open) => !open)}
-                  disabled={alterando}
-                >
-                  Alterar status
-                </button>
-                {statusMenuOpen && (
-                  <ul className="pedmodal-status-menu">
-                    {STATUS_PEDIDO_OPCOES.map((status) => (
-                      <li key={status}>
-                        <button
-                          type="button"
-                          className={`pedmodal-status-option${
-                            status === data.pedido.status_pedido
-                              ? " pedmodal-status-option--current"
-                              : ""
-                          }${status === "CANCELADO" ? " pedmodal-status-option--danger" : ""}`}
-                          onClick={() => alterarStatus(status)}
-                        >
-                          {STATUS_LABEL[status]}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-            {data && !anulado &&
-              (data.pedido.arquivado === 1 ||
-                data.pedido.status_pedido === "ENTREGUE" ||
-                data.pedido.status_pedido === "CANCELADO") && (
-                <button
-                  type="button"
-                  className={
-                    data.pedido.arquivado === 1
-                      ? "pedmodal-btn-edit"
-                      : "pedmodal-btn-archive"
-                  }
-                  onClick={clicarArquivar}
-                  disabled={arquivando}
-                >
-                  {arquivando
-                    ? "Salvando..."
-                    : data.pedido.arquivado === 1
-                      ? "Restaurar"
-                      : "Arquivar pedido"}
-                </button>
-              )}
-            {data && !anulado && (
-              <details ref={moreMenuRef} className="pedmodal-more">
-                <summary aria-label="Mais ações do pedido">⋮</summary>
-                <button type="button" onClick={event => {
-                  event.currentTarget.closest("details")?.removeAttribute("open");
-                  setConfirmarExclusao(true);
-                }}>Excluir pedido</button>
-              </details>
-            )}
-            <button className="pedmodal-btn-close" onClick={onClose}>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <line x1="3" y1="3" x2="13" y2="13" />
-                <line x1="13" y1="3" x2="3" y2="13" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <PedidoHeader
+          orderId={orderId}
+          pedido={detalhe.data?.pedido ?? null}
+          anulado={detalhe.anulado}
+          editandoNome={detalhe.editandoNome}
+          clienteNome={detalhe.clienteNome}
+          salvandoNome={detalhe.salvandoNome}
+          nomeError={detalhe.nomeError}
+          alterando={detalhe.alterando}
+          arquivando={detalhe.arquivando}
+          onIniciarEdicaoNome={detalhe.iniciarEdicaoNome}
+          onCancelarEdicaoNome={() => detalhe.setEditandoNome(false)}
+          onSalvarNome={detalhe.salvarNome}
+          onClienteNomeChange={detalhe.setClienteNome}
+          onAlterarStatus={detalhe.alterarStatus}
+          onArquivar={detalhe.clicarArquivar}
+          onExcluir={() => detalhe.setConfirmarExclusao(true)}
+          onClose={onClose}
+        />
 
         <div className="pedmodal-divider" />
 
         {/* Body */}
-        {loading && <div className="pedmodal-body">Carregando...</div>}
-        {error && <div className="pedmodal-body">{error}</div>}
-        {data && (
+        {detalhe.loading && <div className="pedmodal-body">Carregando...</div>}
+        {detalhe.error && <div className="pedmodal-body">{detalhe.error}</div>}
+        {detalhe.data && (
           <div className="pedmodal-body">
-            {statusError && (
-              <p className="pedmodal-status-error">{statusError}</p>
+            {detalhe.statusError && (
+              <p className="pedmodal-status-error">{detalhe.statusError}</p>
             )}
-            {arquivamentoError && (
-              <p className="pedmodal-status-error">{arquivamentoError}</p>
+            {detalhe.arquivamentoError && (
+              <p className="pedmodal-status-error">{detalhe.arquivamentoError}</p>
             )}
             {/* Meta badges */}
             <div className="pedmodal-meta">
               <span className="pedmodal-badge pedmodal-badge--comanda">
-                Comanda #{data.pedido.id}
+                Comanda #{detalhe.data.pedido.id}
               </span>
               <span
-                className={`pedmodal-badge pedmodal-badge--${STATUS_TYPE[data.pedido.status_pedido]}`}
+                className={`pedmodal-badge pedmodal-badge--${STATUS_TYPE[detalhe.data.pedido.status_pedido]}`}
               >
-                {STATUS_LABEL[data.pedido.status_pedido]}
+                {STATUS_LABEL[detalhe.data.pedido.status_pedido]}
               </span>
-              {anulado && <span className="pedmodal-badge pedmodal-badge--red">Anulado</span>}
-              {data.pedido.arquivado === 1 && (
+              {detalhe.anulado && <span className="pedmodal-badge pedmodal-badge--red">Anulado</span>}
+              {detalhe.data.pedido.arquivado === 1 && (
                 <span className="pedmodal-badge pedmodal-badge--archived">
                   Arquivado
                 </span>
@@ -771,460 +102,142 @@ export default function PedidoDetalheModal({
                   <line x1="5" y1="1.5" x2="5" y2="4" />
                   <line x1="11" y1="1.5" x2="11" y2="4" />
                 </svg>
-                {formatarData(data.pedido.criado_em)} · Retirada
+                {formatarData(detalhe.data.pedido.criado_em)} · Retirada
               </span>
             </div>
 
-            {data.anulacao && (
+            {detalhe.data.anulacao && (
               <section className="pedmodal-anulacao" aria-label="Anulação">
                 <h3>Anulação</h3>
-                <p>{formatarData(data.anulacao.criado_em)} · {data.anulacao.usuario_nome}</p>
-                <p>Motivo: {data.anulacao.motivo || "Não informado"}</p>
-                <p>{data.anulacao.estoque_acao === "DEVOLVER"
+                <p>{formatarData(detalhe.data.anulacao.criado_em)} · {detalhe.data.anulacao.usuario_nome}</p>
+                <p>Motivo: {detalhe.data.anulacao.motivo || "Não informado"}</p>
+                <p>{detalhe.data.anulacao.estoque_acao === "DEVOLVER"
                   ? "Produtos baixados repostos e reservas liberadas, quando aplicável."
                   : "Estoque mantido como estava."}</p>
-                <p>Impacto nos totais: -{formatarPreco(data.anulacao.liquido_original_centavos)}</p>
+                <p>Impacto nos totais: -{formatarPreco(detalhe.data.anulacao.liquido_original_centavos)}</p>
                 <p>Os valores abaixo preservam o histórico original.</p>
               </section>
             )}
-            {/* Items */}
-            <div className="pedmodal-items">
-              <div className="pedmodal-items-header">
-                <span className="pedmodal-section-label">Itens do pedido</span>
-                <div className="pedmodal-items-header-actions">
-                  <button
-                    type="button"
-                    className="pedmodal-btn-historico"
-                    onClick={() => setHistoricoAberto(true)}
-                  >
-                    Histórico
-                  </button>
-                  {!anulado && data.pedido.arquivado === 0 &&
-                    data.pedido.origem_pedido === "MANUAL" &&
-                    data.pedido.status_comanda === "ABERTA" &&
-                    (data.pedido.status_pedido === "NOVO" ||
-                      data.pedido.status_pedido === "PREPARANDO") && (
-                      <button
-                        type="button"
-                        className="pedmodal-btn-add-item"
-                        onClick={() => setAdicionandoItem(true)}
-                      >
-                        + Adicionar produto
-                      </button>
-                    )}
-                </div>
-              </div>
-              {itensAtuais.map((item) => (
-                <div className="pedmodal-item-row" key={item.id}>
-                  <div className="pedmodal-item-info">
-                    <span className="pedmodal-item-name">
-                      {item.produto_nome} {item.emoji ?? ""}
-                    </span>
-                    <span className="pedmodal-item-state">
-                      {ITEM_STATUS_LABEL[item.status_item] ?? item.status_item} ·{" "}
-                      {STOCK_STATUS_LABEL[item.estoque_estado] ?? item.estoque_estado}
-                    </span>
-                    {item.status_item === "TROCA_PENDENTE" && (
-                      <span className="pedmodal-item-note">Fora do total até a troca ser concluída</span>
-                    )}
-                    <span className="pedmodal-item-qty">
-                      {item.quantidade}x{" "}
-                      {formatarPreco(item.valor_unitario_centavos)}
-                    </span>
-                  </div>
-                  <div className="pedmodal-item-actions">
-                    <span className="pedmodal-item-price">
-                      {formatarPreco(item.valor_total_centavos)}
-                    </span>
-                    {item.cancelamento_id && (
-                      <span className="pedmodal-item-qty">{FLOW_STATUS_LABEL[item.cancelamento_status ?? ""] ?? "Cancelamento em andamento"}</span>
-                    )}
-                    {item.troca_id && (
-                      <span className="pedmodal-item-qty">{FLOW_STATUS_LABEL[item.troca_status ?? ""] ?? "Troca em andamento"}</span>
-                    )}
-                    {!anulado && item.status_item === "ATIVO" &&
-                      data.pedido.status_comanda === "ABERTA" &&
-                      data.pedido.status_pedido !== "ENTREGUE" &&
-                      data.pedido.status_pedido !== "CANCELADO" &&
-                      (!item.troca_id || (item.troca_status === "CONCLUIDA" && item.troca_item_origem_id !== item.id)) && (
-                        <>
-                        <button
-                          type="button"
-                          className={`pedmodal-btn-cancel-item${item.cancelamento_id ? " pedmodal-btn-cancel-item--neutral" : ""}`}
-                          onClick={() => setItemCancelamentoPreviewId(item.id)}
-                        >
-                          {item.cancelamento_id ? "Ver cancelamento" : "Cancelar item"}
-                        </button>
-                        {!item.cancelamento_id && (
-                          <button type="button" className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral" onClick={() => setItemTroca(item)}>
-                            Trocar produto
-                          </button>
-                        )}
-                        </>
-                      )}
-                    {!anulado && item.cancelamento_id && item.status_item !== "ATIVO" && (
-                      <button type="button" className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral" onClick={() => setItemCancelamentoPreviewId(item.id)}>Ver cancelamento</button>
-                    )}
-                    {!anulado && item.troca_id && item.troca_item_origem_id === item.id && (
-                      <button type="button" className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral" onClick={() => setItemTroca(item)}>Ver troca</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Summary */}
-            <div className="pedmodal-summary">
-              <div className="pedmodal-summary-row">
-                <span className="pedmodal-summary-label">Subtotal</span>
-                <span className="pedmodal-summary-value">
-                  {formatarPreco(data.pedido.valor_total_centavos)}
-                </span>
-              </div>
-              <div className="pedmodal-summary-row pedmodal-summary-row--total">
-                <span className="pedmodal-total-label">Total</span>
-                <span className="pedmodal-total-value">
-                  {formatarPreco(data.pedido.valor_total_centavos)}
-                </span>
-              </div>
-            </div>
+            <PedidoItens
+              itens={detalhe.data.itens}
+              valorTotalCentavos={detalhe.data.pedido.valor_total_centavos}
+              anulado={detalhe.anulado}
+              arquivado={detalhe.data.pedido.arquivado === 1}
+              origemPedido={detalhe.data.pedido.origem_pedido}
+              statusComanda={detalhe.data.pedido.status_comanda}
+              statusPedido={detalhe.data.pedido.status_pedido}
+              onAbrirHistorico={() => detalhe.setHistoricoAberto(true)}
+              onAdicionarItem={() => detalhe.setAdicionandoItem(true)}
+              onVerCancelamento={(itemId) => detalhe.setItemCancelamentoPreviewId(itemId)}
+              onTrocarItem={(item) => detalhe.setItemTroca(item)}
+            />
 
             <div className="pedmodal-divider" />
 
-            {/* Payment */}
-            <div className="pedmodal-payment">
-              <span className="pedmodal-section-label">Pagamento</span>
-              <div className="pedmodal-payment-row">
-                <span className={`pedmodal-badge pedmodal-badge--${financeiro!.cor}`}>
-                  {financeiro!.badge}
-                </span>
-                {financeiro!.detalhe && (
-                  <span className="pedmodal-payment-method">{financeiro!.detalhe}</span>
-                )}
-              </div>
-
-              <div className="pedmodal-financial-grid">
-                <div className="pedmodal-financial-row">
-                  <span>Total</span>
-                  <strong>{formatarPreco(data.financeiro.totalCentavos)}</strong>
-                </div>
-                <div className="pedmodal-financial-row">
-                  <span>Pago</span>
-                  <strong>{formatarPreco(data.financeiro.brutoPagoCentavos)}</strong>
-                </div>
-                {data.financeiro.reembolsadoCentavos > 0 && (
-                  <div className="pedmodal-financial-row">
-                    <span>Reembolsado</span>
-                    <strong>- {formatarPreco(data.financeiro.reembolsadoCentavos)}</strong>
-                  </div>
-                )}
-                <div className="pedmodal-financial-row">
-                  <span>Líquido</span>
-                  <strong>{formatarPreco(data.financeiro.liquidoCentavos)}</strong>
-                </div>
-                <div className="pedmodal-financial-row pedmodal-financial-row--balance">
-                  <span>Saldo</span>
-                  <strong>{formatarPreco(data.financeiro.saldoCentavos)}</strong>
-                </div>
-              </div>
-
-              {data.financeiro.temExcesso && (
-                <div className="pedmodal-pix-aviso" role="alert">
-                  <span>
-                    ⚠ <strong>Sobrepagamento identificado:</strong> Recebido {formatarPreco(data.financeiro.liquidoCentavos)} de um total de {formatarPreco(data.financeiro.totalCentavos)} (excesso de {formatarPreco(data.financeiro.excessoCentavos)}).
-                  </span>
-                </div>
-              )}
-
-              {/* B-3: cobrança cujo envio ao Mercado Pago ficou inconclusivo.
-                  Reusa o mesmo bloco de aviso do caminho ambíguo, porque a
-                  ação correta é idêntica: nunca tentar de novo às cegas, só
-                  reler o que persistiu. A recuperação read-only roda sozinha
-                  na carga da listagem; este bloco existe para o caso não
-                  convergir. Nenhum estado é inventado aqui. */}
-              {data.operacoesInconclusivas.length > 0 && (
-                <div className="pedmodal-pix-aviso">
-                  <span>
-                    ⚠ {data.operacoesInconclusivas.length === 1 ? "Uma cobrança" : "Cobranças"} deste
-                    pedido não teve confirmação do Mercado Pago. Verificamos automaticamente; não
-                    gere outra sem conferir.
-                  </span>
-                  <button
-                    type="button"
-                    className="pedmodal-btn-edit"
-                    onClick={() => void carregarPedido(true)}
-                  >
-                    Atualizar pedido
-                  </button>
-                </div>
-              )}
-
-              {pixError && <p className="pedmodal-status-error">{pixError}</p>}
-              {pixAviso && (
-                <div className="pedmodal-pix-aviso">
-                  <span>⚠ {pixAviso}</span>
-                  <button
-                    type="button"
-                    className="pedmodal-btn-edit"
-                    onClick={() => {
-                      setPixAviso(null);
-                      void carregarPedido(true);
-                    }}
-                  >
-                    Atualizar pedido
-                  </button>
-                </div>
-              )}
-
-              {(podeRegistrarPagamento || podeGerarPix) && (
-                  <div className="pedmodal-charge-block">
-                    <div className="pedmodal-charge-action">
-                      <div>
-                        <strong>
-                          {trocaAguardandoCobranca
-                            ? "Troca aguardando pagamento"
-                            : "Saldo aguardando pagamento"}
-                        </strong>
-                        <span>
-                          Saldo: {formatarPreco(data.capacidadeCobravelCentavos)}.
-                        </span>
-                      </div>
-                      <div className="pedmodal-charge-buttons">
-                        {podeRegistrarPagamento && (
-                          <button
-                            type="button"
-                            className="pedmodal-btn-edit"
-                            onClick={abrirRegistroPagamento}
-                          >
-                            Registrar pagamento
-                          </button>
-                        )}
-                        {podeGerarPix && (
-                          <button
-                            type="button"
-                            className="pedmodal-btn-advance"
-                            onClick={() =>
-                              gerarPix(undefined, data.capacidadeCobravelCentavos)
-                            }
-                            disabled={gerando}
-                          >
-                            {gerando
-                              ? "Gerando..."
-                              : `Gerar Pix ${formatarPreco(data.capacidadeCobravelCentavos)}`}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {registrandoPagamento && (
-                      <div className="pedmodal-manual-payment">
-                        <div>
-                          <strong>Registrar pagamento recebido</strong>
-                          <span>O saldo em aberto já está preenchido.</span>
-                        </div>
-                        <label>
-                          Valor recebido
-                          <div className="pedmodal-money-input">
-                            <span>R$</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={valorPagamento}
-                              onChange={(event) => {
-                                setValorPagamento(event.target.value);
-                                setPagamentoError(null);
-                                pagamentoKeyRef.current = null;
-                              }}
-                              disabled={pagamentoEmVoo}
-                              aria-label="Valor recebido"
-                            />
-                          </div>
-                        </label>
-                        <label>
-                          Forma de pagamento
-                          <select
-                            value={metodoPagamento}
-                            onChange={(event) =>
-                              selecionarMetodoPagamento(
-                                event.target.value as MetodoPagamentoManual,
-                              )
-                            }
-                            disabled={pagamentoEmVoo}
-                          >
-                            <option value="DINHEIRO">Dinheiro</option>
-                            <option value="CARTAO">Cartão</option>
-                            <option value="PIX_EXTERNO">
-                              Pix recebido fora do sistema
-                            </option>
-                          </select>
-                        </label>
-                        {pagamentoError && (
-                          <p className="pedmodal-status-error">{pagamentoError}</p>
-                        )}
-                        <div className="pedmodal-manual-payment-actions">
-                          <button
-                            type="button"
-                            className="pedmodal-btn-advance"
-                            onClick={registrarPagamento}
-                            disabled={pagamentoEmVoo}
-                          >
-                            {pagamentoEmVoo ? "Registrando..." : "Confirmar pagamento"}
-                          </button>
-                          <button
-                            type="button"
-                            className="pedmodal-btn-edit"
-                            onClick={() => {
-                              setRegistrandoPagamento(false);
-                              setPagamentoError(null);
-                              pagamentoKeyRef.current = null;
-                            }}
-                            disabled={pagamentoEmVoo}
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-              {data.pixAdminPendentes.map((pix) => {
-                const expiraEmMs = pix.expiresAt ? Date.parse(pix.expiresAt) : null;
-                const vencido = expiraEmMs !== null && expiraEmMs <= agora;
-                const restanteS =
-                  expiraEmMs !== null ? Math.max(0, Math.floor((expiraEmMs - agora) / 1000)) : null;
-                const minutos =
-                  restanteS !== null ? String(Math.floor(restanteS / 60)).padStart(2, "0") : null;
-                const segundos = restanteS !== null ? String(restanteS % 60).padStart(2, "0") : null;
-
-                return (
-                  <div className="pedmodal-pix-card" key={pix.id}>
-                    <span className="pedmodal-pix-valor">
-                      Pix pendente · {formatarPreco(pix.valorCentavos)}
-                    </span>
-
-                    {pix.qrCodeBase64 && (
-                      <div className="pedmodal-pix-qr">
-                        <img
-                          src={`data:image/png;base64,${pix.qrCodeBase64}`}
-                          alt="QR Code Pix"
-                        />
-                      </div>
-                    )}
-
-                    {pix.qrCode && (
-                      <>
-                        <div className="pedmodal-pix-copy-row">
-                          <span className="pedmodal-pix-copy-label">PIX COPIA E COLA</span>
-                          <button
-                            type="button"
-                            className="pedmodal-pix-copy-btn"
-                            onClick={() => copiarCodigo(pix.id, pix.qrCode!)}
-                          >
-                            {copiedId === pix.id ? "Copiado!" : "Copiar código"}
-                          </button>
-                        </div>
-                        <div className="pedmodal-pix-code-box">{pix.qrCode}</div>
-                      </>
-                    )}
-
-                    {vencido ? (
-                      <div className="pedmodal-pix-vencido">
-                        <span>Expiração informada pelo Mercado Pago atingida</span>
-                        <button
-                          type="button"
-                          className="pedmodal-btn-edit"
-                          onClick={() => void carregarPedido(true)}
-                        >
-                          Atualizar pedido
-                        </button>
-                      </div>
-                    ) : (
-                      restanteS !== null && (
-                        <span className="pedmodal-pix-timer">
-                          ⏱ Expira em {minutos}:{segundos}
-                        </span>
-                      )
-                    )}
-
-                    {!anulado && data.pedido.arquivado === 0 && (
-                      <button
-                        type="button"
-                        className="pedmodal-btn-edit"
-                        onClick={() => gerarPix(pix.id)}
-                        disabled={regenerandoId === pix.id}
-                      >
-                        {regenerandoId === pix.id ? "Regenerando..." : "Regenerar Pix"}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <PedidoPagamento
+              pedido={detalhe.data.pedido}
+              financeiro={detalhe.data.financeiro}
+              capacidadeCobravelCentavos={detalhe.data.capacidadeCobravelCentavos}
+              pixAdminPendentes={detalhe.data.pixAdminPendentes}
+              operacoesInconclusivas={detalhe.data.operacoesInconclusivas}
+              anulado={detalhe.anulado}
+              trocaAguardandoCobranca={detalhe.trocaAguardandoCobranca}
+              registrandoPagamento={detalhe.registrandoPagamento}
+              metodoPagamento={detalhe.metodoPagamento}
+              valorPagamento={detalhe.valorPagamento}
+              pagamentoEmVoo={detalhe.pagamentoEmVoo}
+              pagamentoError={detalhe.pagamentoError}
+              gerando={detalhe.gerando}
+              regenerandoId={detalhe.regenerandoId}
+              pixError={detalhe.pixError}
+              pixAviso={detalhe.pixAviso}
+              agora={detalhe.agora}
+              copiedId={detalhe.copiedId}
+              onAbrirRegistroPagamento={detalhe.abrirRegistroPagamento}
+              onMetodoPagamentoChange={detalhe.selecionarMetodoPagamento}
+              onValorPagamentoChange={(valor) => {
+                detalhe.setValorPagamento(valor);
+                detalhe.setPagamentoError(null);
+                detalhe.pagamentoKeyRef.current = null;
+              }}
+              onRegistrarPagamento={detalhe.registrarPagamento}
+              onCancelarRegistroPagamento={() => {
+                detalhe.setRegistrandoPagamento(false);
+                detalhe.setPagamentoError(null);
+                detalhe.pagamentoKeyRef.current = null;
+              }}
+              onGerarPix={detalhe.gerarPix}
+              onCopiarCodigo={detalhe.copiarCodigo}
+              onAtualizarPedido={() => void detalhe.carregarPedido(true)}
+              onLimparPixAviso={() => {
+                detalhe.setPixAviso(null);
+                void detalhe.carregarPedido(true);
+              }}
+            />
           </div>
         )}
       </div>
-      {confirmarExclusao && data && !anulado && (
-        <ExcluirPedidoModal orderId={orderId} liquidoCentavos={data.financeiro.liquidoCentavos}
-          onClose={() => setConfirmarExclusao(false)} onDeleted={() => {
-            setConfirmarExclusao(false);
-            onStatusChangedRef.current?.();
+      {detalhe.confirmarExclusao && detalhe.data && !detalhe.anulado && (
+        <ExcluirPedidoModal orderId={orderId} liquidoCentavos={detalhe.data.financeiro.liquidoCentavos}
+          onClose={() => detalhe.setConfirmarExclusao(false)} onDeleted={() => {
+            detalhe.setConfirmarExclusao(false);
+            onStatusChanged?.();
             onClose();
           }} />
       )}
-      {confirmarArquivamento && (
+      {detalhe.confirmarArquivamento && (
         <ConfirmDialog
           title="Arquivar pedido"
           message="O pedido sairá da lista principal, mas todo o histórico financeiro e operacional será preservado."
           confirmLabel="Arquivar"
           cancelLabel="Cancelar"
           onConfirm={() => {
-            setConfirmarArquivamento(false);
-            executarArquivamento(true);
+            detalhe.setConfirmarArquivamento(false);
+            detalhe.executarArquivamento(true);
           }}
-          onCancel={() => setConfirmarArquivamento(false)}
+          onCancel={() => detalhe.setConfirmarArquivamento(false)}
         />
       )}
-      {data && historicoAberto && (
+      {detalhe.data && detalhe.historicoAberto && (
         <HistoricoComandaModal
           orderId={orderId}
-          onClose={() => setHistoricoAberto(false)}
-          readOnly={anulado}
-          onVerCancelamento={verCancelamentoDoHistorico}
-          onVerTroca={verTrocaDoHistorico}
+          onClose={() => detalhe.setHistoricoAberto(false)}
+          readOnly={detalhe.anulado}
+          onVerCancelamento={detalhe.verCancelamentoDoHistorico}
+          onVerTroca={detalhe.verTrocaDoHistorico}
         />
       )}
-      {data && !anulado && adicionandoItem && (
+      {detalhe.data && !detalhe.anulado && detalhe.adicionandoItem && (
         <AdicionarItemModal
           orderId={orderId}
-          onClose={() => setAdicionandoItem(false)}
+          onClose={() => detalhe.setAdicionandoItem(false)}
           onAdded={async () => {
-            await carregarPedido(true);
+            await detalhe.carregarPedido(true);
           }}
         />
       )}
-      {!anulado && itemCancelamentoPreviewId !== null && (
+      {!detalhe.anulado && detalhe.itemCancelamentoPreviewId !== null && (
         <CancelamentoItemPreviewModal
           orderId={orderId}
-          itemId={itemCancelamentoPreviewId}
-          onClose={() => setItemCancelamentoPreviewId(null)}
-          existingCancellationId={data?.itens.find((item) => item.id === itemCancelamentoPreviewId)?.cancelamento_id}
-          onChanged={async () => { await carregarPedido(true); onStatusChanged?.(); }}
+          itemId={detalhe.itemCancelamentoPreviewId}
+          onClose={() => detalhe.setItemCancelamentoPreviewId(null)}
+          existingCancellationId={detalhe.data?.itens.find((item) => item.id === detalhe.itemCancelamentoPreviewId)?.cancelamento_id}
+          onChanged={async () => { await detalhe.carregarPedido(true); onStatusChanged?.(); }}
         />
       )}
-      {!anulado && itemTroca && (
+      {!detalhe.anulado && detalhe.itemTroca && (
         <TrocarItemModal
           orderId={orderId}
-          item={itemTroca}
+          item={detalhe.itemTroca}
           existingExchangeId={
-            itemTroca.troca_item_origem_id === itemTroca.id
-              ? itemTroca.troca_id
+            detalhe.itemTroca.troca_item_origem_id === detalhe.itemTroca.id
+              ? detalhe.itemTroca.troca_id
               : null
           }
-          existingExchangeStatus={itemTroca.troca_status}
-          onClose={() => setItemTroca(null)}
+          existingExchangeStatus={detalhe.itemTroca.troca_status}
+          onClose={() => detalhe.setItemTroca(null)}
           onChanged={async () => {
-            await carregarPedido(true);
+            await detalhe.carregarPedido(true);
             onStatusChanged?.();
           }}
         />
