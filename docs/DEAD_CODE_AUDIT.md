@@ -336,13 +336,88 @@ Itens que **NÃO são dead code de aplicação**, mas devem ser tratados na fase
 2. Avaliar remoção de pastas vazias com `.gitkeep` (`src/services`, `src/utils`).
 3. Manutenção dos caches e artefatos ignorados (`.test-cache/`, `test-logs/`, `graphify-out/`).
 
+
 ---
 
 ## 15. ORDEM RECOMENDADA DE REMOÇÃO POSTERIOR
 
 Caso o usuário aprove a limpeza, esta é a ordem sequencial mais segura:
 
-1. **Passo 1 (Risco Zero):** Remoção dos 8 assets órfãos (`src/assets/*` e `public/images/insta-*.png`), liberando ~1.7 MB sem tocar em nenhuma linha de código TS/TSX.
+1. **Passo 1 (Concluído):** Remoção dos 8 assets órfãos (`src/assets/*` e `public/images/insta-*.png`), liberando ~1.7 MB sem tocar em nenhuma linha de código TS/TSX.
 2. **Passo 2 (Risco Quase Nulo):** Remoção dos 2 exports mortos (`getVirtualOrRealPayment` e `computeFinancialStatus`) em `legacy.ts`, `projection.ts` e na fachada `comandaLedger.ts`.
 3. **Passo 3 (Otimização Opcional):** Unificação dos helpers duplicados de formatação BRL e Margem em `formatarDespesas.ts` / `formatarFinanceiro.ts` / `AdminDashboard.tsx`.
 4. **Passo 4 (Higiene Git):** Desindexação do `.claude/launch.json`.
+
+---
+
+## 16. AUDITORIA CONTRATUAL DETALHADA — PASSO 2A (EXPORTS ÓRFÃOS)
+
+Auditoria aprofundada dos símbolos candidatos a remoção: `getVirtualOrRealPayment` e `computeFinancialStatus`.
+
+### 16.1. `getVirtualOrRealPayment`
+
+1. **Definição:**
+   - Arquivo: `functions/lib/ledger/legacy.ts:210-250`
+   - Assinatura: `export async function getVirtualOrRealPayment(db: D1Database, pedidoId: number): Promise<PagamentoLedger | null>`
+2. **Reexport:**
+   - Arquivo: `functions/lib/comandaLedger.ts:35`
+3. **Consumidores Reais:**
+   - **0 (Zero)**. Nenhuma rota HTTP, helper interno, script ou teste chama essa função.
+4. **Uso Indireto:**
+   - `export * as ledger` em `tests/helpers/b3.mjs:10`: O harness de teste expõe o namespace `app.ledger`, mas **nenhum** dos 47 testes (`tests/*.test.mjs`) acessa `app.ledger.getVirtualOrRealPayment`.
+   - Nenhuma invocação dinâmica, reflexão por string ou leitura via `fs`.
+5. **Histórico Forense (Git Log):**
+   - **Criação:** Commit `dd2cf2b` (*"rp-doces: add lazy legacy payment materialization and ledger read"*). Foi criada para alimentar a rota `functions/api/admin/pedidos/[id].ts` com o pagamento único do pedido.
+   - **Descontinuação:** Commit `689f885` (*"rp-doces: replace hardcoded payment label with financial projection"*). A rota `pedidos/[id].ts` substituiu a leitura de `pagamento` por `financeiro` via `getFinanceiroPedido(env.DB, id)`.
+   - **Conclusão Histórica:** O único consumidor que a função já teve foi removido há vários ciclos de desenvolvimento; a função permaneceu esquecida no código e foi movida para `legacy.ts` durante a modularização.
+6. **Imports e Types Exclusivos:**
+   - O tipo `PagamentoLedger` (`legacy.ts:50-52`) e a interface privada `PagamentoLedgerBase` (`legacy.ts:27-45`) existem **estritamente** para tipar o retorno de `getVirtualOrRealPayment`.
+   - Nenhum outro módulo ou teste utiliza `PagamentoLedger`.
+   - A remoção de `getVirtualOrRealPayment` permite eliminar também `PagamentoLedgerBase` e `PagamentoLedger`, sem afetar qualquer outra função de compatibilidade legada (`ensureLegacyPaymentMaterialized`, `resolveLedgerPaymentId`, etc.).
+7. **Natureza Pública / Interna de `comandaLedger.ts`:**
+   - **Módulo estritamente interno**.
+   - `package.json` possui `"private": true`, sem campos de exportação de pacote.
+   - `functions/lib/` é diretório interno de Cloudflare Pages Functions, sem exposição externa nem empacotamento npm.
+8. **Classificação Final:**
+   - **REMOVÍVEL COM ALTA CONFIANÇA**.
+9. **Arquivos a Alterar no Passo 2B:**
+   - `functions/lib/ledger/legacy.ts`: remover função e tipos exclusivos `PagamentoLedgerBase` / `PagamentoLedger`.
+   - `functions/lib/comandaLedger.ts`: remover reexport de `PagamentoLedger` e `getVirtualOrRealPayment`.
+
+---
+
+### 16.2. `computeFinancialStatus`
+
+1. **Definição:**
+   - Arquivo: `functions/lib/ledger/projection.ts:27-34`
+   - Assinatura: `export function computeFinancialStatus(totalCentavos: number, pagoCentavos: number): StatusFinanceiroAgregado`
+2. **Reexport:**
+   - Arquivo: `functions/lib/comandaLedger.ts:56`
+3. **Consumidores Reais:**
+   - **0 (Zero)**. Nenhuma rota HTTP, helper interno, script ou teste chama essa função.
+4. **Uso Indireto:**
+   - Exposta no namespace `app.ledger` de `tests/helpers/b3.mjs:10`, mas **zero** testes acessam `app.ledger.computeFinancialStatus`.
+   - Não é chamada nem mesmo dentro do próprio arquivo `projection.ts`.
+5. **Histórico Forense (Git Log):**
+   - **Criação:** Commit `e855aa8` (*"rp-doces: converge status_pagamento to aggregate financial projection"*). Foi criada para calcular em memória o status financeiro agregado (`PENDENTE`, `PARCIAL`, `PAGO`) na primeira versão de `recalculatePedidoStatusPagamento`.
+   - **Descontinuação:** Commit `ff8d8d7` (*"rp-doces: make financial reconciliation convergent"*). `recalculatePedidoStatusPagamento` foi refatorada para delegar o cálculo diretamente à projeção SQL atômica (`preparePedidoFinancialProjection(db, pedidoId)` via `STATUS_FINANCEIRO_SQL`), tornando o cálculo em memória obsoleto.
+   - **Conclusão Histórica:** O cálculo em JS foi substituído por projeção SQL determinística. A função JS ficou órfã desde então.
+6. **Imports e Types Exclusivos:**
+   - Utiliza apenas `StatusFinanceiroAgregado`, que é compartilhado por todo o subsistema financeiro e continua ativo.
+   - A remoção da função não requer remoção de types e tem risco zero de efeitos colaterais.
+7. **Natureza Pública / Interna de `comandaLedger.ts`:**
+   - **Módulo estritamente interno** (mesma justificativa acima).
+8. **Classificação Final:**
+   - **REMOVÍVEL COM ALTA CONFIANÇA**.
+9. **Arquivos a Alterar no Passo 2B:**
+   - `functions/lib/ledger/projection.ts`: remover função `computeFinancialStatus`.
+   - `functions/lib/comandaLedger.ts`: remover reexport de `computeFinancialStatus`.
+
+---
+
+### 16.3. Resumo dos Arquivos Impactados no Passo 2B
+Caso a remoção seja aprovada, as mudanças são cirúrgicas e restritas a 3 arquivos:
+1. `functions/lib/ledger/legacy.ts` (-45 linhas: remove `getVirtualOrRealPayment` e types `PagamentoLedgerBase`/`PagamentoLedger`)
+2. `functions/lib/ledger/projection.ts` (-8 linhas: remove `computeFinancialStatus`)
+3. `functions/lib/comandaLedger.ts` (-3 linhas: remove reexports nominais)
+
