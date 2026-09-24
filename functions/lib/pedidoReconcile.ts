@@ -2,7 +2,8 @@
 
 import { pedidoValidoSql, getPedidoAnulacao } from "./pedidoValido";
 
-import { recalculatePedidoStatusPagamento, type StatusFinanceiroAgregado } from "./comandaLedger";
+import { recalculatePedidoStatusPagamento } from "./ledger/projection";
+import type { StatusFinanceiroAgregado } from "./ledger/types";
 import { baixarEstoquePedido, type BaixaResultado } from "./stock";
 import { STATUS_FINANCEIRO_SQL } from "./pedidoFinanceiroSql";
 import { reconcileExchangeCharges } from "./itemExchange";
