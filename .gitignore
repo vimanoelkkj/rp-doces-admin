@@ -1,5 +1,5 @@
 node_modules
-dist
+dist/
 .wrangler
 
 # secrets
@@ -9,7 +9,12 @@ dist
 !.env.example
 
 *.log
+test-logs/
+.test-cache/
 .DS_Store
 graphify*
 .qoder
-.test-cache/
+.claude/
+.vscode/
+.idea/
+backup*/
