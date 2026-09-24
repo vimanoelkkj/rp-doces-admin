@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "node scripts/run-tests.mjs",
+    "test:cached": "node scripts/run-tests-cached.mjs",
     "preview": "vite preview",
     "pages:dev": "wrangler pages dev dist",
     "db:migrate:local": "wrangler d1 migrations apply rp-doces-db --local",
