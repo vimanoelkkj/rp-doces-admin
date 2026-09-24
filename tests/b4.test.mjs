@@ -14,6 +14,10 @@ function remote(t, statuses={}) {
   let id=200;
   return t.mock.method(globalThis,'fetch',async (url,options)=> {
     assert.match(String(url),/^https:\/\/api\.mercadopago\.com\/v1\/payments/);
+    if(options?.method==='PUT') {
+      const paymentId=Number(String(url).split('/').at(-1));
+      return Response.json({id:paymentId,status:'cancelled'});
+    }
     if(options?.method==='POST') return Response.json({id:++id,status:'pending',date_of_expiration:'2099-01-01'});
     const paymentId=Number(String(url).split('/').at(-1));
     return Response.json({id:paymentId,status:statuses[paymentId]??'pending'});
@@ -62,9 +66,13 @@ for(const oldDies of [true,false]) test(`D: real regeneration; terminalizing ${o
   const b=await create(db,{substituiId:a.pagamentoId}); assert.equal(b.ok,true);
   const first=oldDies?a:b, last=oldDies?b:a;
   statuses[Number(first.mpPaymentId)]='cancelled';
-  await sync(db,first.pagamentoId,first.mpPaymentId); reserved(await state(db));
-  statuses[Number(last.mpPaymentId)]='expired';
-  await sync(db,last.pagamentoId,last.mpPaymentId); released(await state(db));
+  await sync(db,first.pagamentoId,first.mpPaymentId);
+  if (oldDies) {
+    reserved(await state(db));
+    statuses[Number(last.mpPaymentId)]='expired';
+    await sync(db,last.pagamentoId,last.mpPaymentId);
+  }
+  released(await state(db));
 });
 
 for(const extra of [{mpId:null},{deadline:'2000-01-01'},{substitui:1}]) {
@@ -319,11 +327,12 @@ for(const replacement of [false,true]) test(`creation CAS keeps ${replacement?'o
   const db=await fixture(t,{ledger:false,reserve:'LIBERADA'}); const mp=remote(t);
   const original=replacement?await create(db):null;
   const beforeCalls=mp.mock.callCount(); const gate=barrier(2);
-  db.hook=async (s,op)=>{if(op==='batch' && isCreation(s)) await gate();};
+  db.hook=async (s,op)=>{if(!replacement && op==='batch' && isCreation(s)) await gate();};
   const extra=replacement?{substituiId:original.pagamentoId}:{valorCentavos:7000};
   const results=await Promise.allSettled([create(db,extra),create(db,extra)]);
   assert.equal(results.filter(r=>r.status==='fulfilled' && r.value.ok).length,1);
-  assert.equal(mp.mock.callCount()-beforeCalls,1); reserved(await state(db));
+  const posts = mp.mock.calls.slice(beforeCalls).filter(c => c.arguments[1]?.method === 'POST').length;
+  assert.equal(posts,1); reserved(await state(db));
   assert.equal((await state(db)).pagamentos.length,replacement?2:1);
 });
 

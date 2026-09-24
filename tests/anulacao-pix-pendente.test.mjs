@@ -418,7 +418,7 @@ test('J. Pix PAGO continua bloqueando anulação direta e exige tratamento finan
   // Bloqueio na API
   const response = await anular(db, session);
   assert.equal(response.status, 409);
-  assert.equal((await response.json()).code, 'PIX_JA_PAGO');
+  assert.equal((await response.json()).code, 'ANULACAO_MP_RECEBIDO');
 
   // Bloqueio direto na trigger D1 (ANULACAO_MP_RECEBIDO)
   await assert.rejects(

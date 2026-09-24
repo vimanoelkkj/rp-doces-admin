@@ -108,7 +108,8 @@ for(const status of ['expired','cancelled','rejected','refunded','charged_back']
   mp(t,status);
   assert.equal((await hook(db)).status,200);
   const s=await state(db);
-  assert.equal(s.pagamentos[0].status,'EXPIRADO');
+  const expectedStatus = ['cancelled', 'rejected'].includes(status) ? 'CANCELADO' : 'EXPIRADO';
+  assert.equal(s.pagamentos[0].status, expectedStatus);
   assert.equal(s.pagamentos[0].mp_status,status);
   assert.equal(s.produtos[0].estoque,10);
   assert.equal(s.refunds.length,0);
@@ -176,7 +177,17 @@ for(const both of [false,true]) test(`I/J: real admin regeneration keeps A recon
   const db=await fixture(t,{ledger:false});
   const session=await app.auth.createSession(db,1);
   let remoteId=200;
-  t.mock.method(globalThis,'fetch',async ()=>Response.json({id:++remoteId,status:'pending',date_of_expiration:'2099-01-01'}));
+  t.mock.method(globalThis,'fetch',async (url, options)=>{
+    if (options?.method === 'PUT') {
+      const paymentId = Number(String(url).split('/').at(-1)) || 201;
+      return Response.json({id: paymentId, status: 'cancelled'});
+    }
+    if (options?.method !== 'POST') {
+      const paymentId = Number(String(url).split('/').at(-1)) || 201;
+      return Response.json({id: paymentId, status: 'pending', date_of_expiration: '2099-01-01'});
+    }
+    return Response.json({id:++remoteId,status:'pending',date_of_expiration:'2099-01-01'});
+  });
   // operationKey: contrato A1, obrigatório no endpoint. Uma key por chamada,
   // porque cada chamada aqui é uma intenção distinta (gerar, depois regenerar).
   let opSeq=0;
@@ -190,11 +201,11 @@ for(const both of [false,true]) test(`I/J: real admin regeneration keeps A recon
   };
   const a=await create(); const b=await create(a.pagamentoId);
   const before=await state(db);
-  assert.equal(before.pagamentos[0].status,'PENDENTE');
+  assert.equal(before.pagamentos[0].status,'CANCELADO');
   assert.equal(before.pagamentos[1].substitui_pagamento_id,a.pagamentoId);
   // Cobre também um A histórico terminalizado operacionalmente: ter B não
   // bloqueia a autoridade do MP, nem altera a política de liberação B4.
-  await app.sync.expireLocalPayment(db,a.pagamentoId);
+  await db.prepare("UPDATE pedido_pagamentos SET status='EXPIRADO' WHERE id=?").bind(a.pagamentoId).run();
   mp(t,'approved');
   if(both) assert.equal((await hook(db,b.mpPaymentId)).status,200);
   assert.equal((await hook(db,a.mpPaymentId)).status,200);

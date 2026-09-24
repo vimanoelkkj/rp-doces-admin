@@ -365,7 +365,14 @@ function mpPost(t, {responder} = {}) {
   let id = 500;
   return t.mock.method(globalThis, 'fetch', async (url, options) => {
     assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/payments/);
-    if (options?.method !== 'POST') return Response.json({id: 101, status: 'approved'});
+    if (options?.method === 'PUT') {
+      const paymentId = Number(String(url).split('/').at(-1)) || 101;
+      return Response.json({id: paymentId, status: 'cancelled'});
+    }
+    if (options?.method !== 'POST') {
+      const paymentId = Number(String(url).split('/').at(-1)) || 101;
+      return Response.json({id: paymentId, status: paymentId === 101 ? 'approved' : 'pending'});
+    }
     const key = options.headers['X-Idempotency-Key'];
     if (responder) {
       const resposta = await responder({key, body: JSON.parse(options.body)});
@@ -745,9 +752,9 @@ test('pix ADMIN: regeneração com a mesma key => mesmo sucessor, mesmo depois d
   assert.equal(depois.body.pagamentoId, sucessor.body.pagamentoId);
   assert.equal((await state(db)).pagamentos.length, 2, 'nenhum terceiro Pix');
 
-  // Uma regeneração NOVA, explicitamente iniciada, usa key nova.
+  // Uma nova tentativa legítima, explicitamente iniciada, usa key nova.
   const nova = await corpo(await gerarPix(db, session, {
-    substituiId: original.body.pagamentoId, operationKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    valorCentavos: 5000, operationKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   }));
   assert.equal(nova.status, 201);
   assert.notEqual(nova.body.pagamentoId, sucessor.body.pagamentoId);

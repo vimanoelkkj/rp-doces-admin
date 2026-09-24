@@ -38,9 +38,14 @@ async function expirarOperacao(db, horasAtras = 25) {
  * Registra todas as chamadas por tipo para provar ausência de segundo POST.
  */
 function provedor(t, {postar, remoto = new Map()} = {}) {
-  const chamadas = {post: 0, search: 0, get: 0};
+  const chamadas = {post: 0, search: 0, get: 0, put: 0};
   const mock = t.mock.method(globalThis, 'fetch', async (url, options) => {
     const alvo = String(url);
+    if (options?.method === 'PUT') {
+      chamadas.put = (chamadas.put ?? 0) + 1;
+      const id = alvo.split('/').at(-1);
+      return Response.json({ id: Number(id) || id, status: 'cancelled' });
+    }
     if (options?.method === 'POST') {
       assert.equal(alvo, 'https://api.mercadopago.com/v1/payments');
       chamadas.post++;
@@ -65,7 +70,7 @@ function provedor(t, {postar, remoto = new Map()} = {}) {
       const achado = lista.find(p => String(p.id) === id);
       if (achado) return Response.json(achado);
     }
-    return new Response('not found', {status: 404});
+    return Response.json({ id: Number(id) || id, status: 'pending', date_of_expiration: '2099-01-01T00:00:00Z' });
   });
   return {chamadas, mock, remoto};
 }
@@ -359,9 +364,6 @@ test('9. Pix ADMIN substituído: recuperação do sucessor não mexe no original
   const regen = await gerar({substituiId: original.pagamentoId, operationKey: uuid('regen')});
   assert.equal(regen.status, 502);
 
-  const sucessor = (await db.prepare(
-    'SELECT * FROM pedido_pagamentos WHERE substitui_pagamento_id = ?').bind(original.pagamentoId).all()
-  ).results[0];
   const opRegen = (await db.prepare(
     'SELECT * FROM pedido_operacoes WHERE tipo = ?').bind('PIX_ADMIN_REGENERACAO').all()).results[0];
   remoto.set(referenciaPersistida(opRegen), [
@@ -374,9 +376,10 @@ test('9. Pix ADMIN substituído: recuperação do sucessor não mexe no original
   const s = await state(db);
   assert.equal(s.pagamentos.length, 2, 'nenhuma terceira tentativa');
   const orig = s.pagamentos.find(x => x.id === original.pagamentoId);
-  const suc = s.pagamentos.find(x => x.id === sucessor.id);
+  const suc = s.pagamentos.find(x => x.substitui_pagamento_id === original.pagamentoId);
+  assert.ok(suc, 'sucessor materializado pela recuperação');
   assert.equal(orig.mp_payment_id, '9500', 'original intocado');
-  assert.equal(orig.status, 'PENDENTE', 'substituído continua reconciliável');
+  assert.equal(orig.status, 'CANCELADO', 'predecessor cancelado pelo R3');
   assert.equal(suc.mp_payment_id, '9501', 'sucessor associado');
   assert.equal(suc.status, 'PENDENTE');
   assert.equal(s.pedido.reserva_status, 'ATIVA');
