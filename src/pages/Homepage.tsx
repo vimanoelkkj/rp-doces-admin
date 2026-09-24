@@ -300,7 +300,7 @@ export default function Homepage() {
           <div className="hero-ellipse" aria-hidden="true" />
           <img
             className="hero-cake-image"
-            src="/images/hero-cake.png"
+            src="/images/hero-cake.webp"
             alt="Bolo no pote artesanal R&P Doces"
           />
           <div className="floating-badge">
@@ -320,7 +320,7 @@ export default function Homepage() {
         <div className="story-inner">
           <div className="story-image-wrapper">
             <img
-              src="/images/story-image.png"
+              src="/images/story-image.webp"
               alt="Bolo artesanal R&P Doces"
               className="story-image"
             />
