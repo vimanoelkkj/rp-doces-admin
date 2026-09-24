@@ -20,7 +20,7 @@ test.after(() => {
   for (const channel of channels) { channel.port1.close(); channel.port2.close(); }
   globalThis.MessageChannel = NativeMessageChannel;
 });
-for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'localStorage']) {
+for (const name of ['window', 'document', 'navigator', 'Element', 'HTMLElement', 'MutationObserver', 'localStorage']) {
   Object.defineProperty(globalThis, name, {configurable: true, value: dom.window[name]});
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
