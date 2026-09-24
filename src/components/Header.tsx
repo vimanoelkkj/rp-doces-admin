@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useStoreTheme } from "../context/StoreThemeContext";
 import "./Header.css";
 
 interface HeaderProps {
@@ -13,6 +14,7 @@ interface HeaderProps {
 export default function Header({ minimal }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useStoreTheme();
   const isCardapio = location.pathname === "/cardapio";
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -225,8 +227,56 @@ export default function Header({ minimal }: HeaderProps) {
           </nav>
         )}
 
-        {!minimal && (
-          <div className="header-actions">
+        <div className="header-actions">
+          <button
+            type="button"
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            aria-label={
+              theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"
+            }
+            title={theme === "light" ? "Modo escuro" : "Modo claro"}
+          >
+            {theme === "light" ? (
+              <svg
+                className="theme-toggle-icon"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            ) : (
+              <svg
+                className="theme-toggle-icon"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            )}
+          </button>
+
+          {!minimal && (
             <button
               className={`mobile-menu-btn ${menuOpen ? "mobile-menu-btn--open" : ""}`}
               aria-label="Menu"
@@ -236,8 +286,8 @@ export default function Header({ minimal }: HeaderProps) {
               <span />
               <span />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
       {createPortal(
@@ -277,6 +327,21 @@ export default function Header({ minimal }: HeaderProps) {
               <button onClick={() => handleMenuLink("#contato")}>
                 Contato
               </button>
+              <div className="mobile-menu-theme-row">
+                <span>Tema</span>
+                <button
+                  type="button"
+                  className="mobile-theme-toggle-btn"
+                  onClick={toggleTheme}
+                  aria-label={
+                    theme === "light"
+                      ? "Ativar modo escuro"
+                      : "Ativar modo claro"
+                  }
+                >
+                  {theme === "light" ? "Modo escuro 🌙" : "Modo claro ☀️"}
+                </button>
+              </div>
             </div>
           </nav>
         </>,

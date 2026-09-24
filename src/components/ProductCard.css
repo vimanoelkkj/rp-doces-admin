@@ -1,17 +1,20 @@
 .product-card {
-  background: #faf6f0;
-  border: 1px solid #eadfd3;
+  background: var(--store-surface-card);
+  border: 1px solid var(--store-border);
   border-radius: 24px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   position: relative;
-  transition: box-shadow 0.3s ease;
+  transition:
+    box-shadow 0.3s ease,
+    background-color 0.25s ease,
+    border-color 0.25s ease;
   height: 100%;
 }
 
 .product-card:hover {
-  box-shadow: 0 12px 32px rgba(43, 29, 26, 0.08);
+  box-shadow: var(--store-shadow-card);
 }
 
 .product-image-wrapper {
@@ -54,7 +57,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 11px;
   font-weight: 700;
-  color: #634738;
+  color: var(--store-accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -63,7 +66,7 @@
   font-family: "Fraunces", serif;
   font-size: 20px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0;
   line-height: 1.3;
 }
@@ -72,11 +75,12 @@
   font-family: "Manrope", sans-serif;
   font-size: 13px;
   font-weight: 400;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   line-height: 1.5;
   margin: 4px 0 0;
   display: -webkit-box;
   -webkit-line-clamp: 4;
+  line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -95,7 +99,7 @@
   font-family: "Fraunces", serif;
   font-size: 18px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
 }
 
 /* ── HUMAN-12: promoção vigente ──
@@ -113,8 +117,8 @@
   font-family: "Manrope", sans-serif;
   font-size: 9px;
   font-weight: 700;
-  color: #634738;
-  background: #f5ede6;
+  color: var(--store-text);
+  background: var(--store-surface-soft);
   border-radius: 4px;
   padding: 2px 8px;
   text-transform: uppercase;
@@ -125,8 +129,8 @@
   font-family: "Manrope", sans-serif;
   font-size: 9px;
   font-weight: 700;
-  color: #7a3128;
-  background: #fbeceb;
+  color: var(--store-accent);
+  background: rgba(211, 139, 128, 0.15);
   border-radius: 4px;
   padding: 2px 8px;
   text-transform: uppercase;
@@ -143,7 +147,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 12px;
   font-weight: 400;
-  color: #8c7a76;
+  color: var(--store-text-subtle);
   text-decoration: line-through;
 }
 
@@ -152,17 +156,18 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background-color: #f7ecee;
-  border: none;
+  background-color: var(--store-surface-soft);
+  border: 1px solid var(--store-border);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
-  color: #634738;
+  color: var(--store-text);
   font-weight: 600;
   transition:
     background-color 0.3s,
+    border-color 0.3s,
     color 0.3s;
   flex-shrink: 0;
   position: relative;
@@ -171,20 +176,21 @@
 }
 
 .add-button:focus-visible {
-  outline: 2px solid #634738;
+  outline: 2px solid var(--store-border-focus);
   outline-offset: 2px;
 }
 
 .add-button:hover {
-  background-color: #eadfd3;
+  background-color: var(--store-surface-highlight);
+  color: var(--store-accent);
 }
 
 .add-button:disabled,
 .add-button--esgotado {
   opacity: 0.45;
   cursor: not-allowed;
-  background-color: #ede5dc;
-  color: #8c7a76;
+  background-color: var(--store-surface-soft);
+  color: var(--store-text-subtle);
   pointer-events: none;
 }
 
@@ -207,7 +213,7 @@
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background: #634738;
+  background: var(--store-text-muted);
   animation: tlPulse 1.4s infinite ease-in-out;
 }
 
@@ -258,6 +264,7 @@
   .product-description {
     font-size: 12px;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 
   .product-footer {

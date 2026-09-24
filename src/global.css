@@ -13,13 +13,86 @@ html {
   scroll-behavior: smooth;
 }
 
+:root {
+  /* Storefront Semantic Design Tokens — Light Theme */
+  --store-bg: #f5efe6;
+  --store-bg-alt: #f5efe6;
+  --store-surface: #ffffff;
+  --store-surface-card: #faf6f0;
+  --store-surface-elevated: #faf6f0;
+  --store-surface-soft: #f7ecee;
+  --store-surface-input: #ffffff;
+  --store-surface-highlight: #eadfd3;
+  --store-text: #2b1d1a;
+  --store-text-heading: #2b1d1a;
+  --store-text-muted: #63524e;
+  --store-text-subtle: #8c7a76;
+  --store-border: #eadfd3;
+  --store-border-soft: rgba(99, 71, 56, 0.12);
+  --store-border-focus: #d38b80;
+  --store-accent: #d38b80;
+  --store-accent-hover: #c17a6f;
+  --store-accent-soft: #f7ecee;
+  --store-wave-primary: #eddcc6;
+  --store-wave-secondary: #ddbfa5;
+  --store-wave-secondary-opacity: 0.15;
+  --store-header-bg: #eddcc6;
+  --store-header-icon-stroke: #634738;
+  --store-btn-primary-bg: #634738;
+  --store-btn-primary-text: #ffffff;
+  --store-btn-primary-hover: #4e3529;
+  --store-btn-primary-border: transparent;
+  --store-overlay: rgba(43, 29, 26, 0.4);
+  --store-shadow: 0 4px 16px rgba(43, 29, 26, 0.08);
+  --store-shadow-card: 0 12px 32px rgba(43, 29, 26, 0.08);
+  --store-shadow-modal: 0 8px 40px rgba(43, 29, 26, 0.2);
+}
+
+html[data-theme="dark"] {
+  /* Storefront Semantic Design Tokens — Dark Theme
+     Inspirado na linguagem dark do Admin (castanho-grafite, off-white, rosa accent),
+     porém mais quente, macio e editorial para a confeitaria. */
+  --store-bg: #161210;
+  --store-bg-alt: #1a1412;
+  --store-surface: #201916;
+  --store-surface-card: #231b18;
+  --store-surface-elevated: #2a211d;
+  --store-surface-soft: #312620;
+  --store-surface-input: #1a1412;
+  --store-surface-highlight: #382c26;
+  --store-text: #f4e9df;
+  --store-text-heading: #faf4ee;
+  --store-text-muted: #bfaea3;
+  --store-text-subtle: #9c8b82;
+  --store-border: #3d3029;
+  --store-border-soft: rgba(244, 233, 223, 0.08);
+  --store-border-focus: #e09a8e;
+  --store-accent: #d38b80;
+  --store-accent-hover: #e09a8e;
+  --store-accent-soft: #382421;
+  --store-wave-primary: #271f1b;
+  --store-wave-secondary: #3b2c26;
+  --store-wave-secondary-opacity: 0.28;
+  --store-header-bg: #271f1b;
+  --store-header-icon-stroke: #f4e9df;
+  --store-btn-primary-bg: #3d2e2b;
+  --store-btn-primary-text: #faf4ee;
+  --store-btn-primary-hover: #4e3a36;
+  --store-btn-primary-border: #523e35;
+  --store-overlay: rgba(0, 0, 0, 0.78);
+  --store-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --store-shadow-card: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --store-shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.65);
+}
+
 body {
   font-family: "Manrope", sans-serif;
-  background-color: #f5efe6;
-  color: #2b1d1a;
+  background-color: var(--store-bg);
+  color: var(--store-text);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 a {

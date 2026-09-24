@@ -6,6 +6,21 @@
     <meta name="theme-color" content="#eddcc6" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>R&P Doces - Artesanal & Exclusivo</title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("store-theme");
+          var theme =
+            saved === "dark" || saved === "light"
+              ? saved
+              : window.matchMedia &&
+                  window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

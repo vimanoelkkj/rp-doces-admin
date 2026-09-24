@@ -22,6 +22,7 @@ import AdminNotificacoes from "./admin/notificacoes/AdminNotificacoes";
 import AdminLayout from "./admin/components/AdminLayout";
 import { AdminThemeProvider } from "./admin/theme/AdminThemeContext";
 import "./admin/theme/admin-dark-theme.css";
+import { StoreThemeProvider } from "./context/StoreThemeContext";
 
 function StorefrontRoutes() {
   const location = useLocation();
@@ -88,7 +89,9 @@ export default function App() {
   return (
     <CartProvider>
       <BrowserRouter>
-        <StorefrontRoutes />
+        <StoreThemeProvider>
+          <StorefrontRoutes />
+        </StoreThemeProvider>
         <AdminRoutes />
       </BrowserRouter>
     </CartProvider>

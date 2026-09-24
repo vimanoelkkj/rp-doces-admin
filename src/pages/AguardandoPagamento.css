@@ -4,6 +4,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: var(--store-bg);
 }
 
 .aguardando-wave-container {
@@ -19,6 +20,10 @@
   height: auto;
   display: block;
 }
+.aguardando-wave-container svg path {
+  fill: var(--store-wave-primary);
+  transition: fill 0.3s ease;
+}
 
 .aguardando-content {
   position: relative;
@@ -32,9 +37,11 @@
 }
 
 .aguardando-card {
-  background: #ffffff;
+  background: var(--store-surface-card);
+  border: 1px solid var(--store-border);
   border-radius: 24px;
-  box-shadow: 0 2px 16px rgba(43, 29, 26, 0.06);
+  box-shadow: var(--store-shadow-card);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .aguardando-step {
@@ -52,33 +59,39 @@
   margin: 0 auto 20px;
 }
 .status-icon--error {
-  background: #fdecec;
+  background: rgba(211, 139, 128, 0.15);
 }
 
 .payment-title {
   font-family: "Fraunces", serif;
   font-size: 28px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
   margin: 0 0 8px;
+  transition: color 0.3s ease;
 }
 .payment-subtitle {
   font-family: "Manrope", sans-serif;
   font-size: 14px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   margin: 0 0 32px;
+  transition: color 0.3s ease;
 }
 
 .qr-code {
   width: 180px;
   height: 180px;
   margin: 0 auto 24px;
-  background: #f5efe6;
+  background: #ffffff;
+  border: 1px solid var(--store-border);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  padding: 8px;
+  box-sizing: border-box;
+  box-shadow: var(--store-shadow);
 }
 .qr-code img {
   width: 100%;
@@ -96,7 +109,7 @@
   font-family: "Manrope", sans-serif;
   font-size: 11px;
   font-weight: 700;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   letter-spacing: 0.5px;
 }
 .pix-copy-btn {
@@ -109,21 +122,31 @@
   font-family: "Manrope", sans-serif;
   font-size: 13px;
   font-weight: 600;
-  color: #634738;
+  color: var(--store-accent);
+  transition: color 0.2s ease;
 }
+.pix-copy-btn:hover:not(:disabled) {
+  color: var(--store-accent-hover);
+}
+.pix-copy-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .pix-code-box {
-  background: #ffffff;
-  border: 1px solid #eadfd3;
+  background: var(--store-surface-input);
+  border: 1px solid var(--store-border);
   border-radius: 12px;
   padding: 12px 16px;
   font-family: "Manrope", sans-serif;
   font-size: 12px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 16px;
   text-align: left;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 .pix-timer {
   display: flex;
@@ -132,26 +155,28 @@
   gap: 6px;
   font-family: "Manrope", sans-serif;
   font-size: 13px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   margin-bottom: 32px;
 }
 .pix-timer strong {
-  color: #d38b80;
+  color: var(--store-accent);
   font-weight: 700;
 }
 
 .payment-divider {
   height: 1px;
-  background: #eadfd3;
+  background: var(--store-border);
   margin: 0 0 20px;
+  transition: background-color 0.3s ease;
 }
 .payment-order-item {
   display: flex;
   justify-content: space-between;
   font-family: "Manrope", sans-serif;
   font-size: 14px;
-  color: #63524e;
+  color: var(--store-text);
   margin-bottom: 12px;
+  transition: color 0.3s ease;
 }
 .payment-total-row {
   display: flex;
@@ -163,44 +188,81 @@
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 700;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
+  transition: color 0.3s ease;
 }
 .payment-total-value {
   font-family: "Fraunces", serif;
   font-size: 24px;
   font-weight: 600;
-  color: #2b1d1a;
+  color: var(--store-text-heading);
+  transition: color 0.3s ease;
 }
 .payment-notice {
   font-family: "Manrope", sans-serif;
   font-size: 12px;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   line-height: 1.5;
+  transition: color 0.3s ease;
+}
+.payment-notice a {
+  color: var(--store-accent);
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+.payment-notice a:hover {
+  color: var(--store-accent-hover);
 }
 
 .payment-btn-primary {
   width: 100%;
   padding: 16px;
-  background-color: #634738;
-  color: #ffffff;
-  border: none;
+  background-color: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  border: 1px solid var(--store-btn-primary-border);
   border-radius: 100px;
   font-family: "Inter", sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   margin-top: 8px;
+  transition: background-color 0.2s ease;
 }
+.payment-btn-primary:hover {
+  background-color: var(--store-btn-primary-hover);
+}
+
+.payment-btn-secondary {
+  padding: 12px 24px;
+  border-radius: 100px;
+  border: 1px solid var(--store-border);
+  background: var(--store-surface-elevated);
+  color: var(--store-text);
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.payment-btn-secondary:hover {
+  background: var(--store-surface-soft);
+  border-color: var(--store-accent);
+}
+
 .payment-btn-link {
   display: block;
   margin: 12px auto 0;
   background: none;
   border: none;
-  color: #8c7a76;
+  color: var(--store-text-muted);
   font-family: "Manrope", sans-serif;
   font-size: 13px;
   text-decoration: underline;
   cursor: pointer;
+  transition: color 0.2s ease;
+}
+.payment-btn-link:hover {
+  color: var(--store-accent);
 }
 
 @media (max-width: 768px) {
