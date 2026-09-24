@@ -24,33 +24,6 @@ interface PedidoLegadoRow {
   pago_em: string | null;
 }
 
-interface PagamentoLedgerBase {
-  pedido_id: number;
-  metodo: LedgerMetodo;
-  origem: "SITE" | "ADMIN";
-  valor_centavos: number;
-  status: LedgerStatus;
-  mp_order_id: string | null;
-  mp_payment_id: string | null;
-  mp_status: string | null;
-  mp_status_detail: string | null;
-  mp_ticket_url: string | null;
-  mp_qr_code: string | null;
-  mp_qr_code_base64: string | null;
-  pix_expira_em: string | null;
-  criado_em: string | null;
-  atualizado_em: string | null;
-  pago_em: string | null;
-  cancelado_em: string | null;
-}
-
-// Discriminado por `legado`: com legado=false o compilador sabe que `id`
-// é number (linha real); com legado=true sabe que `id` é null (nunca foi
-// persistida). Impede confundir um pagamento virtual com um real.
-export type PagamentoLedger =
-  | (PagamentoLedgerBase & { legado: true; id: null })
-  | (PagamentoLedgerBase & { legado: false; id: number });
-
 export interface MaterializeResult {
   ok: boolean;
   materialized: boolean;
@@ -192,78 +165,4 @@ export async function resolveLedgerPaymentId(
   ).bind(pedidoId, mpPaymentId, mpPaymentId).all<{ id: number }>();
   if (results.length > 1) throw new Error("TENTATIVA_SITE_AMBIGUA");
   return results[0]?.id ?? null;
-}
-
-// Leitura pura: nunca escreve. Se já existe uma linha real, retorna ela.
-// Caso contrário, monta uma projeção virtual a partir dos campos legados de
-// `pedidos` — a mesma semântica de `legacyPayment()` de produção. Para
-// PARCIAL (agregado, não representável como um único pagamento) retorna
-// null: nem a leitura finge que existe um pagamento único ali.
-//
-// Um pedido pode ter mais de uma linha em pedido_pagamentos (ex.: o
-// placeholder PENDENTE criado na abertura manual do pedido, cancelado só
-// quando o pagamento real chega via registerAdminPayment) — "a mais antiga"
-// nunca é a resposta certa para "qual pagamento mostrar", porque o
-// placeholder cancelado sempre nasce primeiro (id menor) que o pagamento
-// real. PAGO vence qualquer coisa; CANCELADO só aparece se não houver mais
-// nada; empates dentro da mesma prioridade resolvem pelo mais recente.
-export async function getVirtualOrRealPayment(
-  db: D1Database,
-  pedidoId: number,
-): Promise<PagamentoLedger | null> {
-  const real = await db
-    .prepare(
-      `SELECT id, pedido_id, metodo, origem, valor_centavos, status,
-              mp_order_id, mp_payment_id, mp_status, mp_status_detail,
-              mp_ticket_url, mp_qr_code, mp_qr_code_base64, pix_expira_em,
-              criado_em, atualizado_em, pago_em, cancelado_em
-       FROM pedido_pagamentos WHERE pedido_id = ?
-       ORDER BY CASE status WHEN 'PAGO' THEN 0 WHEN 'CANCELADO' THEN 2 ELSE 1 END, id DESC
-       LIMIT 1`,
-    )
-    .bind(pedidoId)
-    .first<PagamentoLedgerBase & { id: number }>();
-
-  if (real) {
-    return { ...real, id: Number(real.id), legado: false };
-  }
-
-  const pedido = await db
-    .prepare(
-      `SELECT id, valor_total_centavos, status_pagamento, origem_pedido,
-              mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64,
-              mp_ticket_url, pix_expira_em, idempotency_key,
-              criado_em, atualizado_em, pago_em
-       FROM pedidos WHERE id = ? LIMIT 1`,
-    )
-    .bind(pedidoId)
-    .first<PedidoLegadoRow>();
-
-  if (!pedido || Number(pedido.valor_total_centavos || 0) <= 0) return null;
-
-  const statusResult = ledgerPaymentStatus(pedido.status_pagamento);
-  if (!statusResult.ok) return null;
-
-  return {
-    legado: true,
-    id: null,
-    pedido_id: pedido.id,
-    metodo: ledgerPaymentMethod(pedido),
-    origem: pedido.origem_pedido === "SITE" ? "SITE" : "ADMIN",
-    valor_centavos: Number(pedido.valor_total_centavos),
-    status: statusResult.status,
-    mp_order_id: null,
-    mp_payment_id: pedido.mp_payment_id,
-    mp_status: pedido.mp_status,
-    mp_status_detail: null,
-    mp_ticket_url: pedido.mp_ticket_url,
-    mp_qr_code: pedido.mp_qr_code,
-    mp_qr_code_base64: pedido.mp_qr_code_base64,
-    pix_expira_em: pedido.pix_expira_em,
-    criado_em: pedido.criado_em,
-    atualizado_em: pedido.atualizado_em,
-    pago_em: statusResult.status === "PAGO" ? pedido.pago_em : null,
-    cancelado_em:
-      statusResult.status === "CANCELADO" ? pedido.atualizado_em : null,
-  };
 }
