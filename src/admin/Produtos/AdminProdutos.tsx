@@ -66,11 +66,31 @@ function estoqueLivre(p: ProdutoAdmin) {
   return p.estoque - p.estoque_reservado;
 }
 
-function stockBadge(p: ProdutoAdmin): { text: string; type: "critical" | "available" } {
-  const livre = estoqueLivre(p);
-  if (livre <= 0) return { text: "Esgotado", type: "critical" };
-  if (livre <= 2) return { text: `Estoque crítico (${livre} disp)`, type: "critical" };
-  return { text: `${livre} disponíveis`, type: "available" };
+function stockBadge(p: ProdutoAdmin): {
+  availableText: string;
+  reservedText: string | null;
+  type: "critical" | "available";
+} {
+  const livre = Math.max(0, estoqueLivre(p));
+  const reservado = Math.max(0, p.estoque_reservado);
+
+  if (livre <= 0) {
+    return {
+      availableText: "Esgotado",
+      reservedText: reservado > 0 ? `${reservado} reservado${reservado === 1 ? "" : "s"}` : null,
+      type: "critical",
+    };
+  }
+
+  return {
+    availableText:
+      livre <= 2
+        ? `Estoque crítico (${livre} disp)`
+        : `${livre} disponíveis`,
+    reservedText:
+      reservado > 0 ? `${reservado} reservado${reservado === 1 ? "" : "s"}` : null,
+    type: livre <= 2 ? "critical" : "available",
+  };
 }
 
 /* ── Component ── */
@@ -247,11 +267,18 @@ export default function AdminProdutos() {
                         .toFixed(2)
                         .replace(".", ",")}
                     </span>
-                    <span
-                      className={`prod-stock-badge prod-stock-badge--${badge.type}`}
-                    >
-                      {badge.text}
-                    </span>
+                    <div className="prod-stock-summary">
+                      <span
+                        className={`prod-stock-badge prod-stock-badge--${badge.type}`}
+                      >
+                        {badge.availableText}
+                      </span>
+                      {badge.reservedText && (
+                        <span className="prod-stock-reserved">
+                          {badge.reservedText}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

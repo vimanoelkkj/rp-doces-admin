@@ -313,6 +313,27 @@
   color: #4e8c6f;
 }
 
+.prod-stock-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.prod-stock-reserved {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f6efe8;
+  border: 1px solid #eadfd3;
+  color: #8c6f5d;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 /* ═══════════════════════════════════════════
    Responsive
    ═══════════════════════════════════════════ */
