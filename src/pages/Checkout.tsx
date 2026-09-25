@@ -73,7 +73,7 @@ export default function Checkout() {
 
   if (cartItems.length === 0) {
     return (
-      <StorefrontFrame minimalHeader className="checkout-page">
+      <StorefrontFrame className="checkout-page">
         <main className="checkout-empty">
           <h1>Seu carrinho está vazio</h1>
           <p>Adicione produtos antes de finalizar o pedido.</p>
@@ -90,7 +90,7 @@ export default function Checkout() {
   }
 
   return (
-    <StorefrontFrame minimalHeader className="checkout-page">
+    <StorefrontFrame className="checkout-page">
       <main className="checkout-content">
         <div className="checkout-card">
           {/* Coluna esquerda — Resumo do pedido */}

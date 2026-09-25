@@ -298,7 +298,7 @@ export default function AguardandoPagamento() {
     timeLeft != null ? (timeLeft % 60).toString().padStart(2, "0") : "--";
 
   return (
-    <StorefrontFrame minimalHeader className="aguardando-page">
+    <StorefrontFrame className="aguardando-page">
       <main className="aguardando-content">
         <div className="aguardando-card">
           {status === "erro" && (

@@ -30,6 +30,7 @@ const StoreThemeContext = createContext<StoreThemeContextType>({
 });
 
 const STORAGE_KEY = "store-theme";
+const ADMIN_STORAGE_KEY = "admin-theme";
 
 function getSystemTheme(): StoreTheme {
   if (typeof window !== "undefined" && window.matchMedia) {
@@ -42,7 +43,7 @@ function getSystemTheme(): StoreTheme {
 
 function getInitialTheme(): StoreTheme {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(ADMIN_STORAGE_KEY);
     if (saved === "light" || saved === "dark") {
       return saved;
     }
@@ -123,9 +124,16 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<StoreTheme>(getInitialTheme);
   const isTransitioningRef = useRef(false);
 
-  // Sincroniza atributo no DOM
+  // Sincroniza atributos no DOM para Storefront e Admin
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-admin-theme", theme);
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+      localStorage.setItem(ADMIN_STORAGE_KEY, theme);
+    } catch {
+      // ignore
+    }
   }, [theme]);
 
   // Listener para mudança de preferência do sistema operacional,
@@ -136,10 +144,11 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e: MediaQueryListEvent) => {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(ADMIN_STORAGE_KEY);
         if (!saved) {
           const next = e.matches ? "dark" : "light";
           document.documentElement.setAttribute("data-theme", next);
+          document.documentElement.setAttribute("data-admin-theme", next);
           setThemeState(next);
         }
       } catch {
@@ -157,8 +166,10 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
 
     const applyThemeImmediately = (t: StoreTheme) => {
       document.documentElement.setAttribute("data-theme", t);
+      document.documentElement.setAttribute("data-admin-theme", t);
       try {
         localStorage.setItem(STORAGE_KEY, t);
+        localStorage.setItem(ADMIN_STORAGE_KEY, t);
       } catch {
         // ignore
       }

@@ -16,7 +16,9 @@ html[data-admin-theme="dark"] *::-webkit-scrollbar {
 }
 
 /* ── Page backgrounds ── */
-html[data-admin-theme="dark"] .admin-layout,
+html[data-admin-theme="dark"] .admin-layout {
+  background: transparent;
+}
 html[data-admin-theme="dark"] .adm-layout,
 html[data-admin-theme="dark"] .loj-layout {
   background: #1a1412;

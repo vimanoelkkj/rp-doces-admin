@@ -30,7 +30,7 @@ export default function PagamentoNaoAprovado() {
   const totalPrice = state.totalCentavos / 100;
 
   return (
-    <StorefrontFrame minimalHeader className="recusado-page">
+    <StorefrontFrame className="recusado-page">
       <main className="recusado-content">
         {/* Hero */}
         <div className="recusado-hero">

@@ -19,13 +19,13 @@ const SECONDARY_C =
 interface StorefrontFrameProps {
   children: ReactNode;
   className?: string;
-  minimalHeader?: boolean;
+  headerVariant?: "storefront" | "admin";
 }
 
 export default function StorefrontFrame({
   children,
   className = "",
-  minimalHeader = false,
+  headerVariant = "storefront",
 }: StorefrontFrameProps) {
   const shouldReduceMotion = useReducedMotion();
 
@@ -79,7 +79,7 @@ export default function StorefrontFrame({
         </svg>
       </div>
 
-      <Header minimal={minimalHeader} />
+      <Header variant={headerVariant} />
       <div className="storefront-frame__scroll">{children}</div>
     </div>
   );

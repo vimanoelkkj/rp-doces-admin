@@ -177,7 +177,7 @@ export default function Homepage() {
           />
         </svg>
       </div>
-      <Header />
+      <Header variant="storefront" />
 
       <main className="homepage-content" ref={scrollContainerRef}>
         {/* ===== HERO ===== */}

@@ -151,3 +151,7 @@ export function useNotificacoes(): NotificacoesApi {
   }
   return contexto;
 }
+
+export function useOptionalNotificacoes(): NotificacoesApi | null {
+  return useContext(NotificacoesContext);
+}

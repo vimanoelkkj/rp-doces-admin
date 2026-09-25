@@ -38,3 +38,7 @@ export function useAdminAuth() {
   }
   return ctx;
 }
+
+export function useOptionalAdminAuth() {
+  return useContext(AdminAuthContext);
+}

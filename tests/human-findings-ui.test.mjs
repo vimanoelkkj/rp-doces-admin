@@ -202,7 +202,7 @@ test('HUMAN-07/09: produto mascara preço e aceita estoque inteiro pelo teclado'
   let root;
   await ui.act(async () => { root = ui.mountProduct(container, () => {}); });
   await flush();
-  const stock = document.querySelector('input[aria-label="Estoque"]');
+  const stock = document.querySelector('input[aria-label="Estoque"], input[aria-label="Estoque total"]');
   const price = document.querySelector('input[inputmode="decimal"]');
   assert.equal(stock.type, 'text');
 

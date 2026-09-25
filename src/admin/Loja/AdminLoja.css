@@ -12,11 +12,18 @@
 
 .loj-main {
   flex: 1;
-  margin-left: 260px;
-  padding: 48px 56px 64px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 32px 40px;
   max-width: 1200px;
   position: relative;
   z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .loj-main {
+    padding: 20px 16px;
+  }
 }
 
 /* ── Header ── */

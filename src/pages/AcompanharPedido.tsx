@@ -102,7 +102,7 @@ export default function AcompanharPedido() {
     : -1;
 
   return (
-    <StorefrontFrame minimalHeader className="confirmado-page">
+    <StorefrontFrame className="confirmado-page">
       <main className="confirmado-content">
         {loading && (
           <div className="confirmado-hero">
