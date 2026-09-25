@@ -401,3 +401,79 @@
     width: 100%;
   }
 }
+
+
+/* ── Web Push Card — tema escuro ── */
+html[data-admin-theme="dark"] .push-card {
+  background: #1f1816;
+  border-color: #3d3230;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+}
+
+html[data-admin-theme="dark"] .push-card-icon {
+  background: #2b2220;
+  color: #d8c8c0;
+}
+
+html[data-admin-theme="dark"] .push-card[data-status="SUBSCRIBED"] .push-card-icon {
+  background: #1f3325;
+  color: #86c990;
+}
+
+html[data-admin-theme="dark"] .push-card[data-status="DENIED"] .push-card-icon {
+  background: #3a2020;
+  color: #ef9a9a;
+}
+
+html[data-admin-theme="dark"] .push-card-title {
+  color: #faf6f0;
+}
+
+html[data-admin-theme="dark"] .push-card-description {
+  color: #a89b92;
+}
+
+html[data-admin-theme="dark"] .push-card-feedback {
+  color: #d8c8c0;
+}
+
+html[data-admin-theme="dark"] .push-badge.prompt {
+  background: #3d2e2b;
+  color: #c9b9b0;
+}
+
+html[data-admin-theme="dark"] .push-badge.active {
+  background: #1f3325;
+  color: #86c990;
+}
+
+html[data-admin-theme="dark"] .push-badge.blocked {
+  background: #3a2020;
+  color: #ef9a9a;
+}
+
+html[data-admin-theme="dark"] .push-badge.unsupported {
+  background: #3a3020;
+  color: #e6bd70;
+}
+
+html[data-admin-theme="dark"] .push-btn.primary {
+  background: #6b4a3d;
+  border-color: #6b4a3d;
+  color: #ffffff;
+}
+
+html[data-admin-theme="dark"] .push-btn.primary:hover:not(:disabled) {
+  background: #7a5546;
+  border-color: #7a5546;
+}
+
+html[data-admin-theme="dark"] .push-btn.outline {
+  border-color: #4b3d39;
+  color: #b9aaa2;
+}
+
+html[data-admin-theme="dark"] .push-btn.outline:hover:not(:disabled) {
+  border-color: #ef9a9a;
+  color: #ef9a9a;
+}
