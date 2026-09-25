@@ -52,47 +52,51 @@ export async function checkLoginRateLimit(
   return { allowed: true, key };
 }
 
+// Uma única instrução atômica: o próximo número de falhas, o início da janela
+// e o bloqueio são decididos pelo SQL sobre o estado ATUAL da linha, sem
+// SELECT prévio. Antes, SELECT -> +1 em JS -> UPSERT perdia incrementos sob
+// tentativas concorrentes (duas leituras de 4 gravavam 5, e não 6).
+//
+// Janela válida: janela_inicio >= agora - WINDOW (mesmo significado de antes;
+// data ilegível vira NULL no julianday e reinicia a janela). No UPDATE do
+// SQLite, todas as expressões do SET leem os valores ANTERIORES da linha, então
+// o bloqueio é calculado a partir da mesma contagem que está sendo gravada.
 export async function recordLoginFailure(
   db: D1Database,
   key: string,
 ): Promise<void> {
-  const now = new Date();
-  const nowIso = now.toISOString();
-
-  const row = await db
-    .prepare(
-      `SELECT falhas, janela_inicio FROM auth_rate_limits WHERE chave = ?`,
-    )
-    .bind(key)
-    .first<RateLimitRow>();
-
-  let failures = 1;
-  let windowStart = nowIso;
-
-  if (row) {
-    const startMs = Date.parse(row.janela_inicio);
-    if (Number.isFinite(startMs) && now.getTime() - startMs <= WINDOW_MS) {
-      failures = row.falhas + 1;
-      windowStart = row.janela_inicio;
-    }
-  }
-
-  const blockedUntil =
-    failures >= MAX_FAILURES
-      ? new Date(now.getTime() + BLOCK_MS).toISOString()
-      : null;
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const windowCutoffIso = new Date(nowMs - WINDOW_MS).toISOString();
+  const blockedUntilIso = new Date(nowMs + BLOCK_MS).toISOString();
 
   await db
     .prepare(
       `INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
-       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+       VALUES (?1, 1, ?2, CASE WHEN 1 >= ?4 THEN ?3 ELSE NULL END, CURRENT_TIMESTAMP)
        ON CONFLICT(chave) DO UPDATE SET
-         falhas = excluded.falhas,
-         janela_inicio = excluded.janela_inicio,
-         bloqueado_ate = excluded.bloqueado_ate,
+         falhas = CASE
+           WHEN julianday(auth_rate_limits.janela_inicio) >= julianday(?5)
+             THEN auth_rate_limits.falhas + 1
+           ELSE 1
+         END,
+         janela_inicio = CASE
+           WHEN julianday(auth_rate_limits.janela_inicio) >= julianday(?5)
+             THEN auth_rate_limits.janela_inicio
+           ELSE ?2
+         END,
+         bloqueado_ate = CASE
+           WHEN (CASE
+                   WHEN julianday(auth_rate_limits.janela_inicio) >= julianday(?5)
+                     THEN auth_rate_limits.falhas + 1
+                   ELSE 1
+                 END) >= ?4
+             THEN ?3
+           ELSE NULL
+         END,
          atualizado_em = CURRENT_TIMESTAMP`,
     )
-    .bind(key, failures, windowStart, blockedUntil)
+    .bind(key, nowIso, blockedUntilIso, MAX_FAILURES, windowCutoffIso)
     .run();
 }
 

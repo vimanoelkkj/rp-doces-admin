@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { app, fixture } from './helpers/b3.mjs';
+import { app, fixture, barrier } from './helpers/b3.mjs';
 
 function postLogin(db, body, { origin = 'https://local.test', ip = '192.168.1.50' } = {}) {
   return app.login.onRequestPost({
@@ -212,4 +212,113 @@ test('código de login define constante estática de hash dummy com 100.000 iter
     /const hashParaVerificar =\s*user && user\.ativo\s*\?\s*user\.senha_hash\s*:\s*DUMMY_PASSWORD_HASH;/,
     'deve selecionar o hash dummy fixo quando usuário não existe ou está inativo',
   );
+});
+
+/* ───────────── M5: registro de falha atômico no rate limit do login ───────────── */
+
+const ESCRITA_RATE_LIMIT = 'INSERT INTO auth_rate_limits';
+const linhaRateLimit = (db, chave) =>
+  db.prepare('SELECT falhas, janela_inicio, bloqueado_ate FROM auth_rate_limits WHERE chave = ?').bind(chave).first();
+
+// Força N escritas de falha a estarem em voo ao mesmo tempo: cada uma para no
+// hook do D1 até todas chegarem ao ponto de escrita, e só então seguem juntas.
+function segurarEscritasAte(db, n) {
+  const gate = barrier(n);
+  let chegaram = 0;
+  db.hook = async (statements, op) => {
+    if (op === 'run' && statements.some(s => s.sql.includes(ESCRITA_RATE_LIMIT))) {
+      chegaram++;
+      await gate();
+    }
+    return statements;
+  };
+  return () => chegaram;
+}
+
+test('M5: recordLoginFailure não perde incrementos concorrentes (N = 6)', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const chave = 'm5-chave-concorrente';
+  const N = 6;
+  const chegaram = segurarEscritasAte(db, N);
+  await Promise.all(Array.from({ length: N }, () => app.rateLimit.recordLoginFailure(db, chave)));
+  db.hook = null;
+  assert.equal(chegaram(), N, 'as N escritas estavam em voo simultaneamente');
+  const linha = await linhaRateLimit(db, chave);
+  assert.equal(linha.falhas, N, 'nenhuma falha concorrente foi perdida');
+  assert.ok(linha.bloqueado_ate, 'bloqueio definido ao atingir o limite');
+  assert.ok(Date.parse(linha.bloqueado_ate) > Date.now());
+});
+
+test('M5: recordLoginFailure decide tudo numa única escrita, sem SELECT prévio', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const operacoes = [];
+  db.hook = async (statements, op) => {
+    for (const s of statements) operacoes.push([op, s.sql.trim().split(/\s+/)[0].toUpperCase()]);
+    return statements;
+  };
+  await app.rateLimit.recordLoginFailure(db, 'm5-uma-escrita');
+  db.hook = null;
+  assert.deepEqual(operacoes, [['run', 'INSERT']]);
+});
+
+test('M5: falhas concorrentes pela rota de login não se perdem e a próxima tentativa recebe 429', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  await setupUsers(db);
+  const N = 6;
+  const chegaram = segurarEscritasAte(db, N);
+  const respostas = await Promise.all(Array.from({ length: N }, () =>
+    postLogin(db, { username: 'admin_ativo', senha: 'senha-errada' })));
+  db.hook = null;
+  assert.equal(chegaram(), N);
+  assert.deepEqual(respostas.map(r => r.status), Array(N).fill(401),
+    'todas já tinham passado pelo check antes do bloqueio existir');
+
+  const { results } = await db.prepare('SELECT falhas, bloqueado_ate FROM auth_rate_limits').all();
+  assert.equal(results.length, 1, 'uma única chave IP|username');
+  assert.equal(results[0].falhas, N);
+  assert.ok(results[0].bloqueado_ate);
+
+  const proxima = await postLogin(db, { username: 'admin_ativo', senha: 'senha-errada' });
+  assert.equal(proxima.status, 429);
+  assert.ok(Number(proxima.headers.get('retry-after')) > 0);
+});
+
+test('M5: falha depois de janela vencida reinicia a contagem em 1, sem bloqueio', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const chave = 'm5-janela-vencida';
+  const antiga = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+  await db.prepare(`INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate)
+    VALUES (?, 4, ?, NULL)`).bind(chave, antiga).run();
+  const antes = Date.now();
+  await app.rateLimit.recordLoginFailure(db, chave);
+  const linha = await linhaRateLimit(db, chave);
+  assert.equal(linha.falhas, 1);
+  assert.equal(linha.bloqueado_ate, null);
+  assert.ok(Date.parse(linha.janela_inicio) >= antes - 1000, 'janela reiniciada agora');
+});
+
+test('M5: quarta falha na janela vira quinta e bloqueia na mesma escrita', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const chave = 'm5-limiar';
+  const inicio = new Date(Date.now() - 60 * 1000).toISOString();
+  await db.prepare(`INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate)
+    VALUES (?, 4, ?, NULL)`).bind(chave, inicio).run();
+  await app.rateLimit.recordLoginFailure(db, chave);
+  const linha = await linhaRateLimit(db, chave);
+  assert.equal(linha.falhas, 5);
+  assert.equal(linha.janela_inicio, inicio, 'janela preservada');
+  assert.ok(linha.bloqueado_ate);
+  const restante = Date.parse(linha.bloqueado_ate) - Date.now();
+  assert.ok(restante > 14 * 60 * 1000 && restante <= 15 * 60 * 1000, 'bloqueio de 15 minutos');
+});
+
+test('M5: login válido depois de falhas remove a chave IP|username', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const { activePassword } = await setupUsers(db);
+  for (let i = 0; i < 2; i++) {
+    assert.equal((await postLogin(db, { username: 'admin_ativo', senha: 'senha-errada' })).status, 401);
+  }
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM auth_rate_limits').first()).n, 1);
+  assert.equal((await postLogin(db, { username: 'admin_ativo', senha: activePassword })).status, 200);
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM auth_rate_limits').first()).n, 0);
 });
