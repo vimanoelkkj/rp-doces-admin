@@ -16,6 +16,7 @@ const MESSAGES: Record<string, string> = {
   VALOR_REFUND_DIVERGENTE: "O valor deve ser exatamente o saldo indicado pelo servidor.",
   MERCADO_PAGO_NAO_CONFIGURADO: "Mercado Pago não está configurado neste ambiente.",
   REFUND_REMOTO_EM_ANDAMENTO: "Já existe um estorno remoto em andamento para esta perna.",
+  SALDO_REEMBOLSAVEL_INSUFICIENTE: "O saldo reembolsável mudou antes da confirmação. Atualize e tente novamente.",
   ...OPERACAO_MENSAGENS,
 };
 

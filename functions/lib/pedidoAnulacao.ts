@@ -35,9 +35,11 @@ export interface PagamentoMpReembolsavel {
 }
 
 // Espelha exatamente a condição ANULACAO_MP_RECEBIDO da trigger
-// `pedido_anulacoes_validar_mp` (migration 0022): o saldo restante de cada
-// pagamento PIX_MP confirmado, descontados os estornos MP já confirmados
-// daquele mesmo pagamento_id. Não percorre a linhagem de trocas (migration
+// `pedido_anulacoes_validar_mp` (recriada na migration 0031): o saldo
+// restante de cada pagamento PIX_MP confirmado, descontados os estornos MP já
+// confirmados e os refunds manuais PIX_MP ("Pix devolvido por fora") daquele
+// mesmo pagamento_id — o manual já devolveu dinheiro e não pode ser devolvido
+// de novo pelo MP (M3). Refund manual de outro método não prova a devolução. Não percorre a linhagem de trocas (migration
 // 0021) de propósito — aqui o pedido inteiro está sendo anulado, não a
 // cobertura de um item específico, e cada pagamento é a unidade de refund.
 export async function listarPagamentosMpReembolsaveis(
@@ -49,8 +51,8 @@ export async function listarPagamentosMpReembolsaveis(
       SELECT pp.id AS pagamento_id, pp.valor_centavos AS valor_centavos,
         pp.valor_centavos - COALESCE((
           SELECT SUM(r.valor_centavos) FROM pedido_reembolsos r
-          WHERE r.pagamento_id=pp.id AND r.status='REEMBOLSADO'
-            AND r.origem='MERCADO_PAGO' AND r.metodo='PIX_MP' AND r.mp_refund_id IS NOT NULL
+          WHERE r.pagamento_id=pp.id AND r.status='REEMBOLSADO' AND r.metodo='PIX_MP'
+            AND (r.origem='MANUAL' OR (r.origem='MERCADO_PAGO' AND r.mp_refund_id IS NOT NULL))
         ),0) AS restante_centavos
       FROM pedido_pagamentos pp
       WHERE pp.pedido_id=? AND pp.metodo='PIX_MP' AND pp.status='PAGO'

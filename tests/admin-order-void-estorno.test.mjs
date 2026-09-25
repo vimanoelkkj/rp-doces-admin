@@ -281,7 +281,11 @@ test('12a: intencao por item CONFIRMADA (historica) nao bloqueia intencao de anu
   await db.batch([
     db.prepare(`UPDATE pedidos SET valor_total_centavos=5000 WHERE id=1`),
     db.prepare(`UPDATE pedido_itens SET quantidade=1,valor_unitario_centavos=5000,valor_total_centavos=5000 WHERE id=1`),
-    db.prepare(`UPDATE pedido_pagamentos SET valor_centavos=5000 WHERE id=1`),
+    // Pagamento de 6000 com 5000 alocados ao item cancelado: sobra capacidade
+    // real (1000) para a intenção de anulação. Com o pagamento inteiro já
+    // reembolsado pelo item, a intenção extra seria recusada pela capacidade
+    // (migration 0031), o que não é o que este teste investiga.
+    db.prepare(`UPDATE pedido_pagamentos SET valor_centavos=6000 WHERE id=1`),
     db.prepare(`UPDATE pedido_pagamento_alocacoes SET valor_centavos=5000 WHERE id=1`),
     db.prepare(`INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,
         valor_unitario_centavos,valor_total_centavos,status_item,estoque_estado)
@@ -392,10 +396,10 @@ test('12c: dois pagamentos PIX_MP no mesmo pedido sao tratados como pernas indep
   assert.equal(exclusao.status, 409, 'uma perna ainda pendente mantem a exclusao bloqueada');
 });
 
-/* ───────────── M3 (test-first): corrida refund manual × estorno de anulação ───────────── */
-// Teste INTENCIONALMENTE vermelho enquanto M3 não for corrigido: demonstra que
-// um refund manual PIX_MP e o estorno remoto de anulação do MESMO pagamento
-// podem, juntos, devolver mais do que foi pago.
+/* ───────────── M3: corrida refund manual × estorno de anulação ───────────── */
+// Regressão da corrida confirmada: um refund manual PIX_MP e o estorno remoto
+// de anulação do MESMO pagamento chegavam a 13000 sobre 10000 pagos. A
+// migration 0031 garante a capacidade no banco, em qualquer ordem.
 
 const deferredM3 = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return {promise, resolve}; };
 
@@ -481,9 +485,90 @@ test('M3: refund manual e estorno de anulação concorrentes nunca devolvem mais
     respostaAnulacao: rAnulacao.status,
     refunds, soma, intencoes, opsManuais, postsRefundMp: postsRefund.length, corposPost: postsRefund,
   };
-  console.log('M3 observado:', JSON.stringify(observado));
+  const ctx = JSON.stringify(observado);
 
-  // Invariante financeira que deveria valer: nunca devolver mais que o pago.
-  assert.ok(soma <= 10000,
-    `soma dos refunds (${soma}) excede o pagamento original (10000): ${JSON.stringify(observado)}`);
+  // A intenção de 10000 já estava em voo quando o manual tentou inserir.
+  assert.deepEqual(intencaoEmVoo, {status: 'PROCESSANDO', valor_centavos: 10000}, ctx);
+  // Manual recusado pelo banco (Guarda 2) como conflito de domínio, não 500.
+  assert.equal(rManual.status, 409, ctx);
+  assert.equal(rManual.body.code, 'REFUND_PIX_MP_REMOTO_EM_ANDAMENTO', ctx);
+  assert.equal(opsManuais, 0, 'o claim do manual foi revertido junto com o INSERT');
+  // Só o refund remoto existe, e a soma nunca passa do pago.
+  assert.deepEqual(refunds.map(r => [r.origem, Number(r.valor_centavos), r.status]),
+    [['MERCADO_PAGO', 10000, 'REEMBOLSADO']], ctx);
+  assert.equal(soma, 10000, ctx);
+  assert.deepEqual(intencoes.map(i => [i.status, Number(i.valor_centavos)]), [['CONFIRMADO', 10000]], ctx);
+  assert.deepEqual(postsRefund, [{amount: 100}], 'exatamente 1 POST ao Mercado Pago');
+  assert.equal(rAnulacao.status, 200, ctx);
+  assert.equal(rAnulacao.body.restanteTotalCentavos, 0, ctx);
+});
+
+test('M3 inversa: intenção calculada antes de um refund manual é recusada pela capacidade', async t => {
+  const db = await fixture(t, {paid: true, reserve: 'CONVERTIDA'});
+  const session = await app.auth.createSession(db, 1);
+
+  const anulacaoPausada = deferredM3();
+  const liberarAnulacao = deferredM3();
+
+  // Pausa a anulação imediatamente ANTES do batch que cria
+  // pedido_operacoes + pedido_reembolso_pix_mp_intencoes (valor já calculado).
+  let batchesIntencao = 0;
+  db.hook = async (statements, op) => {
+    if (op === 'batch' && statements.some(s => s.sql.includes('INSERT INTO pedido_reembolso_pix_mp_intencoes'))) {
+      batchesIntencao++;
+      if (batchesIntencao === 1) {
+        anulacaoPausada.resolve();
+        await liberarAnulacao.promise;
+      }
+    }
+    return statements;
+  };
+
+  const chamadasMp = [];
+  t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
+    chamadasMp.push(`${init.method ?? 'GET'} ${url}`);
+    if (String(url).endsWith('/refunds') && init.method === 'POST') {
+      const {amount} = JSON.parse(init.body);
+      return Response.json({id: 9401, payment_id: 101, amount, status: 'approved'}, {status: 201});
+    }
+    throw new Error(`chamada MP inesperada: ${init.method ?? 'GET'} ${url}`);
+  });
+
+  // 1-2) anulação calcula 10000 reembolsáveis e para antes de criar a intenção.
+  const anulacao = postEstorno(db, session, {operationKey: 'm3-inversa-anul-01'});
+  await anulacaoPausada.promise;
+
+  // 3) refund manual de 3000 conclui (ainda não há intenção).
+  const rManual = await corpo(await reembolsoManual(db, session,
+    {pagamentoId: 1, valorCentavos: 3000, motivo: 'devolvido por fora', operationKey: 'm3-inversa-manual-01'}));
+  assert.equal(rManual.status, 201);
+
+  // 4) a tentativa antiga de 10000 segue e bate na Guarda 1.
+  liberarAnulacao.resolve();
+  const rAntiga = await corpo(await anulacao);
+  db.hook = null;
+
+  assert.notEqual(rAntiga.status, 500, JSON.stringify(rAntiga.body));
+  assert.equal(rAntiga.body.restanteTotalCentavos, 7000, 'restante recomputado desconta o manual');
+  assert.deepEqual(chamadasMp, [], 'nenhum POST de 10000 ao Mercado Pago');
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_pix_mp_intencoes`).first()).n, 0);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_operacoes
+    WHERE mp_idempotency_key IS NOT NULL`).first()).n, 0, 'batch revertido: nenhuma pedido_operacoes órfã');
+  assert.equal((await db.prepare(`SELECT SUM(valor_centavos) s FROM pedido_reembolsos`).first()).s, 3000);
+
+  // 5) nova tentativa normal: usa o restante real.
+  const rNova = await corpo(await postEstorno(db, session, {operationKey: 'm3-inversa-anul-02'}));
+  assert.equal(rNova.status, 200);
+  assert.equal(rNova.body.restanteTotalCentavos, 0);
+  assert.equal(chamadasMp.length, 1);
+  assert.match(chamadasMp[0], /^POST .*\/refunds$/);
+  const refunds = (await db.prepare(`SELECT origem,valor_centavos FROM pedido_reembolsos ORDER BY id`).all()).results;
+  assert.deepEqual(refunds.map(r => [r.origem, Number(r.valor_centavos)]), [['MANUAL', 3000], ['MERCADO_PAGO', 7000]]);
+  assert.equal((await db.prepare(`SELECT SUM(valor_centavos) s FROM pedido_reembolsos`).first()).s, 10000);
+  const intencoes = (await db.prepare(`SELECT status,valor_centavos FROM pedido_reembolso_pix_mp_intencoes`).all()).results;
+  assert.deepEqual(intencoes.map(i => [i.status, Number(i.valor_centavos)]), [['CONFIRMADO', 7000]]);
+
+  // O pagamento está neutralizado (manual + MP): a anulação passa a ser possível.
+  const exclusao = await corpo(await anular(db, session));
+  assert.equal(exclusao.status, 200, JSON.stringify(exclusao.body));
 });

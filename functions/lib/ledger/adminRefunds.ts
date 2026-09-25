@@ -248,6 +248,12 @@ export async function registerManualRefund(
     // antes — não é papel deste helper mascarar erro inesperado.
     const vencedora = await recuperarVencedora();
     if (vencedora) return vencedora;
+    // M3 (migration 0031): uma intenção PIX_MP remota nasceu entre a leitura
+    // acima e este INSERT. O banco recusou o refund manual; o batch inteiro
+    // (inclusive o claim) foi revertido.
+    if (String((err as Error)?.message ?? err).includes("pix_mp_refund_manual_conflito_intencao")) {
+      return { ok: false, erro: "REFUND_PIX_MP_REMOTO_EM_ANDAMENTO" };
+    }
     throw err;
   }
 
