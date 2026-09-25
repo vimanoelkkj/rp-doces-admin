@@ -133,10 +133,14 @@ export default function AguardandoPagamento() {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           // A1: a operação já foi iniciada e o resultado remoto ainda não é
-          // conhecido. O pedido JÁ existe — nunca disparar outro checkout
-          // (isso criaria outro pedido, outra reserva e outra cobrança).
-          // Segue para a tela de acompanhamento que já existe.
-          if (body.code === "OPERACAO_EM_PROCESSAMENTO" && body.tokenPublico) {
+          // conhecido (retry que encontrou a operação em andamento, ou o
+          // primeiro envio com resultado ambíguo). O pedido JÁ existe —
+          // nunca disparar outro checkout (isso criaria outro pedido, outra
+          // reserva e outra cobrança). Segue para o acompanhamento dele.
+          const acompanhavel =
+            body.code === "OPERACAO_EM_PROCESSAMENTO" ||
+            body.code === "MERCADO_PAGO_INDISPONIVEL";
+          if (acompanhavel && typeof body.tokenPublico === "string" && body.tokenPublico) {
             if (!cancelled) {
               navigate(`/pedido/${encodeURIComponent(body.tokenPublico)}`);
             }
