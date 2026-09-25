@@ -273,7 +273,6 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
             document.documentElement.animate(
               {
                 opacity: [0, 1],
-                transform: ["scale(1.015)", "scale(1)"],
               },
               mobileAnimationOptions,
             );
