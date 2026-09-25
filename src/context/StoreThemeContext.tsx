@@ -250,6 +250,7 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
     }
 
     isTransitioningRef.current = true;
+    document.documentElement.setAttribute("data-theme-transitioning", "true");
 
     try {
       const transition = document.startViewTransition(() => {
@@ -284,9 +285,11 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
         });
 
       transition.finished.finally(() => {
+        document.documentElement.removeAttribute("data-theme-transitioning");
         isTransitioningRef.current = false;
       });
     } catch {
+      document.documentElement.removeAttribute("data-theme-transitioning");
       isTransitioningRef.current = false;
       applyThemeImmediately(next);
     }
