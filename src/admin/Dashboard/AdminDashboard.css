@@ -5,22 +5,30 @@
 /* ── Layout ── */
 .admin-layout {
   display: flex;
-  min-height: 100vh;
-  background: #faf6f0;
+  flex-direction: column;
+  min-height: 100%;
+  background: transparent;
   position: relative;
+  padding-top: 0;
 }
 
-
 .admin-main {
-  margin-left: 260px;
+  margin: 0 auto;
+  width: 100%;
   flex: 1;
-  padding: 40px;
+  padding: 32px 40px;
   display: flex;
   flex-direction: column;
   gap: 24px;
-  max-width: 1180px;
+  max-width: 1200px;
   position: relative;
   z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .admin-main {
+    padding: 20px 16px;
+  }
 }
 
 /* ═══════════════════════════════════════════

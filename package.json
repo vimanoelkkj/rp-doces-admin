@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
     "test:cached": "node scripts/run-tests-cached.mjs",
     "preview": "vite preview",

@@ -81,7 +81,7 @@ export default function PedidoConfirmado() {
   const totalPrice = state.totalCentavos / 100;
 
   return (
-    <StorefrontFrame minimalHeader className="confirmado-page">
+    <StorefrontFrame className="confirmado-page">
       <main className="confirmado-content">
         {/* Seção Aprovado */}
         <div className="confirmado-hero">

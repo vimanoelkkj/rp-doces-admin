@@ -1,21 +1,48 @@
 import { useState, useEffect, useRef } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useStoreTheme } from "../context/StoreThemeContext";
+import { useOptionalAdminAuth } from "../admin/auth/AdminAuthContext";
+import { useOptionalNotificacoes } from "../admin/notificacoes/NotificacoesContext";
+import {
+  IconDashboard,
+  IconProdutosCake,
+  IconBag,
+  IconReceipt,
+  IconStore,
+  IconUsers,
+  IconBell,
+} from "../admin/components/AdminSidebar";
 import "./Header.css";
 
-interface HeaderProps {
-  cartCount?: number;
-  minimal?: boolean;
-  onCartClick?: () => void;
+export interface HeaderProps {
+  variant?: "storefront" | "admin";
 }
 
-export default function Header({ minimal }: HeaderProps) {
+interface AdminNavItem {
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+  badge?: number;
+}
+
+export default function Header({ variant }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useStoreTheme();
-  const isCardapio = location.pathname === "/cardapio";
+  const adminAuth = useOptionalAdminAuth();
+  const notificacoesApi = useOptionalNotificacoes();
+
+  const isAdmin =
+    variant !== undefined
+      ? variant === "admin"
+      : location.pathname.startsWith("/admin");
+
+  const adminUser = adminAuth?.user ?? null;
+  const adminLogout = adminAuth?.logout;
+  const naoLidas = notificacoesApi?.naoLidas ?? 0;
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -71,6 +98,7 @@ export default function Header({ minimal }: HeaderProps) {
     };
   }, [menuOpen]);
 
+  // Handle smooth scroll when navigating to Home with pending hash after closing mobile menu
   useEffect(() => {
     if (menuOpen) return;
     const targetHash = pendingHashRef.current;
@@ -82,13 +110,18 @@ export default function Header({ minimal }: HeaderProps) {
       return;
     }
 
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     let innerFrameId: number;
     const frameId = requestAnimationFrame(() => {
       innerFrameId = requestAnimationFrame(() => {
         const id = targetHash.replace(/^#/, "");
         const el = document.getElementById(id);
         if (el) {
-          el.scrollIntoView({ behavior: "smooth" });
+          el.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth" });
           window.history.replaceState(null, "", targetHash);
         }
       });
@@ -100,16 +133,22 @@ export default function Header({ minimal }: HeaderProps) {
     };
   }, [menuOpen, location.pathname, navigate]);
 
+  // Handle smooth scroll on direct hash change / landing on Home
   useEffect(() => {
     if (location.pathname === "/" && location.hash) {
       const targetHash = location.hash;
+      const prefersReduced =
+        typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
       let innerFrameId: number;
       const frameId = requestAnimationFrame(() => {
         innerFrameId = requestAnimationFrame(() => {
           const id = targetHash.replace(/^#/, "");
           const el = document.getElementById(id);
           if (el) {
-            el.scrollIntoView({ behavior: "smooth" });
+            el.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth" });
           }
         });
       });
@@ -121,10 +160,32 @@ export default function Header({ minimal }: HeaderProps) {
     }
   }, [location.pathname, location.hash]);
 
-  const handleMenuLink = (hash: string) => {
-    if (!menuOpen) return;
-    pendingHashRef.current = hash;
-    closeMenu();
+  const handleStorefrontNav = (hash: string, event?: ReactMouseEvent) => {
+    if (event) {
+      event.preventDefault();
+    }
+
+    if (menuOpen) {
+      pendingHashRef.current = hash;
+      closeMenu();
+      return;
+    }
+
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (location.pathname === "/") {
+      const id = hash.replace(/^#/, "");
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth" });
+        window.history.pushState(null, "", hash);
+      }
+    } else {
+      navigate("/" + hash);
+    }
   };
 
   const handleDragStart = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -191,10 +252,34 @@ export default function Header({ minimal }: HeaderProps) {
     closeMenu();
   };
 
+  const adminNavItems: AdminNavItem[] = [
+    { to: "/admin", label: "Dashboard", icon: <IconDashboard /> },
+    { to: "/admin/produtos", label: "Produtos", icon: <IconProdutosCake /> },
+    { to: "/admin/pedidos", label: "Pedidos", icon: <IconBag /> },
+    { to: "/admin/despesas", label: "Despesas", icon: <IconReceipt /> },
+    { to: "/admin/loja", label: "Loja", icon: <IconStore /> },
+    { to: "/admin/administradores", label: "Administradores", icon: <IconUsers /> },
+    {
+      to: "/admin/notificacoes",
+      label: "Notificações",
+      icon: <IconBell />,
+      badge: naoLidas,
+    },
+  ];
+
+  const adminUserInitials = adminUser?.nome
+    ? adminUser.nome
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "AD";
+
   return (
     <>
-      <header className="header">
-        <Link to="/" className="logo">
+      <header className={`header ${isAdmin ? "header--admin" : ""}`}>
+        <Link to={isAdmin ? "/admin" : "/"} className="logo">
           <div className="logo-circle">
             <svg
               className="header-cake"
@@ -202,10 +287,11 @@ export default function Header({ minimal }: HeaderProps) {
               height="20"
               viewBox="0 0 20 20"
               fill="none"
+              aria-hidden="true"
             >
               <path
                 d="M16.6672 17.5V10.8336C16.6672 10.3916 16.4916 9.96772 16.179 9.65518C15.8664 9.34263 15.4425 9.16704 15.0004 9.16704H4.99962C4.55755 9.16704 4.1336 9.34263 3.82101 9.65518C3.50842 9.96772 3.33282 10.3916 3.33282 10.8336V17.5M3.33282 13.3335C3.33282 13.3335 3.74952 12.5002 4.99962 12.5002C6.24972 12.5002 7.08312 14.1668 8.33322 14.1668C9.58332 14.1668 10.4167 12.5002 11.6668 12.5002C12.9169 12.5002 13.7503 14.1668 15.0004 14.1668C16.2505 14.1668 16.6672 13.3335 16.6672 13.3335M1.66602 17.5H18.334M5.83302 6.66716V9.16704M10 6.66716V9.16704M14.167 6.66716V9.16704"
-                stroke="#634738"
+                stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -235,20 +321,94 @@ export default function Header({ minimal }: HeaderProps) {
           <span className="logo-text">R&amp;P Doces</span>
         </Link>
 
-        {!isCardapio && !minimal && (
-          <nav className="main-nav">
-            <a href="#cardapio">Cardápio</a>
-            <a href="#sobre">Sobre</a>
-            <a href="#onde-estamos">Onde estamos</a>
-            <a href="#contato">Contato</a>
+        {isAdmin ? (
+          <nav className="main-nav main-nav--admin" aria-label="Navegação administrativa">
+            {adminNavItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/admin"}
+                className={({ isActive }) =>
+                  `nav-link ${isActive ? "nav-link--active active" : ""}`
+                }
+              >
+                <span>{item.label}</span>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="header-nav-badge">
+                    {item.badge > 9 ? "9+" : item.badge}
+                  </span>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+        ) : (
+          <nav className="main-nav" aria-label="Navegação principal">
+            <a
+              href={location.pathname === "/" ? "#cardapio" : "/#cardapio"}
+              className="nav-link"
+              onClick={(e) => handleStorefrontNav("#cardapio", e)}
+            >
+              Cardápio
+            </a>
+            <a
+              href={location.pathname === "/" ? "#sobre" : "/#sobre"}
+              className="nav-link"
+              onClick={(e) => handleStorefrontNav("#sobre", e)}
+            >
+              Sobre
+            </a>
+            <a
+              href={location.pathname === "/" ? "#onde-estamos" : "/#onde-estamos"}
+              className="nav-link"
+              onClick={(e) => handleStorefrontNav("#onde-estamos", e)}
+            >
+              Onde estamos
+            </a>
+            <a
+              href={location.pathname === "/" ? "#contato" : "/#contato"}
+              className="nav-link"
+              onClick={(e) => handleStorefrontNav("#contato", e)}
+            >
+              Contato
+            </a>
           </nav>
         )}
 
         <div className="header-actions">
+          {isAdmin && adminUser && (
+            <div className="header-admin-user" title={`${adminUser.nome} (${adminUser.papel})`}>
+              <span className="header-admin-avatar">{adminUserInitials}</span>
+              {adminLogout && (
+                <button
+                  type="button"
+                  className="header-logout-btn"
+                  onClick={adminLogout}
+                  title="Sair do painel"
+                  aria-label="Sair do painel"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+
           <button
             type="button"
             className="theme-toggle-btn"
-            onClick={toggleTheme}
+            onClick={() => toggleTheme()}
             aria-label={
               theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"
             }
@@ -293,21 +453,19 @@ export default function Header({ minimal }: HeaderProps) {
             )}
           </button>
 
-          {!minimal && (
-            <button
-              ref={menuButtonRef}
-              type="button"
-              className={`mobile-menu-btn ${menuOpen ? "mobile-menu-btn--open" : ""}`}
-              aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
-              aria-expanded={menuOpen}
-              aria-controls="mobile-menu-drawer"
-              onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-          )}
+          <button
+            ref={menuButtonRef}
+            type="button"
+            className={`mobile-menu-btn ${menuOpen ? "mobile-menu-btn--open" : ""}`}
+            aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu-drawer"
+            onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
         </div>
       </header>
 
@@ -320,7 +478,7 @@ export default function Header({ minimal }: HeaderProps) {
           <nav
             ref={menuRef}
             id="mobile-menu-drawer"
-            aria-label="Menu principal"
+            aria-label={isAdmin ? "Menu administrativo" : "Menu principal"}
             className={`mobile-menu ${menuOpen ? "mobile-menu--open" : ""} ${isDragging ? "mobile-menu--dragging" : ""}`}
             style={
               menuOpen && dragOffset > 0
@@ -349,179 +507,274 @@ export default function Header({ minimal }: HeaderProps) {
                 />
               </svg>
             </div>
+
             <div className="mobile-menu-links">
-              <button
-                type="button"
-                className="mobile-menu-link"
-                onClick={() => handleMenuLink("#cardapio")}
-              >
-                <span className="mobile-menu-link-content">
-                  <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
-                    <svg
-                      className="mobile-menu-link-icon"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+              {isAdmin ? (
+                <>
+                  {adminNavItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.to === "/admin"}
+                      className={({ isActive }) =>
+                        `mobile-menu-link ${isActive ? "mobile-menu-link--active" : ""}`
+                      }
+                      onClick={closeMenu}
                     >
-                      <path d="M5 11l1.5 9h11l1.5-9H5z" />
-                      <path d="M4 11c0-2.2 1.8-4 4-4 1 0 2 .5 2.8 1.2.7-.7 1.8-1.2 2.8-1.2 2.2 0 4 1.8 4 4" />
-                      <circle cx="12" cy="4.5" r="1.5" fill="currentColor" stroke="none" />
-                      <path d="M9 14v4M12 14v4M15 14v4" strokeWidth="1.5" />
-                    </svg>
-                  </span>
-                  <span className="mobile-menu-link-text">
-                    Cardápio
-                    <svg
-                      className="mobile-menu-underline"
-                      width="42"
-                      height="6"
-                      viewBox="0 0 42 6"
-                      fill="none"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </span>
-                </span>
-              </button>
+                      <span className="mobile-menu-link-content">
+                        <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
+                          {item.icon}
+                        </span>
+                        <span className="mobile-menu-link-text">
+                          {item.label}
+                          {item.badge !== undefined && item.badge > 0 && (
+                            <span className="header-nav-badge mobile-badge">
+                              {item.badge > 9 ? "9+" : item.badge}
+                            </span>
+                          )}
+                          <svg
+                            className="mobile-menu-underline"
+                            width="42"
+                            height="6"
+                            viewBox="0 0 42 6"
+                            fill="none"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </span>
+                      </span>
+                    </NavLink>
+                  ))}
 
-              <button
-                type="button"
-                className="mobile-menu-link"
-                onClick={() => handleMenuLink("#sobre")}
-              >
-                <span className="mobile-menu-link-content">
-                  <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
-                    <svg
-                      className="mobile-menu-link-icon"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                  {adminLogout && (
+                    <button
+                      type="button"
+                      className="mobile-menu-link mobile-menu-link--logout"
+                      onClick={() => {
+                        closeMenu();
+                        adminLogout();
+                      }}
                     >
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                  </span>
-                  <span className="mobile-menu-link-text">
-                    Sobre
-                    <svg
-                      className="mobile-menu-underline"
-                      width="42"
-                      height="6"
-                      viewBox="0 0 42 6"
-                      fill="none"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </span>
-                </span>
-              </button>
+                      <span className="mobile-menu-link-content">
+                        <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                          </svg>
+                        </span>
+                        <span className="mobile-menu-link-text">
+                          Sair
+                          <svg
+                            className="mobile-menu-underline"
+                            width="42"
+                            height="6"
+                            viewBox="0 0 42 6"
+                            fill="none"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </span>
+                      </span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="mobile-menu-link"
+                    onClick={() => handleStorefrontNav("#cardapio")}
+                  >
+                    <span className="mobile-menu-link-content">
+                      <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
+                        <svg
+                          className="mobile-menu-link-icon"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 11l1.5 9h11l1.5-9H5z" />
+                          <path d="M4 11c0-2.2 1.8-4 4-4 1 0 2 .5 2.8 1.2.7-.7 1.8-1.2 2.8-1.2 2.2 0 4 1.8 4 4" />
+                          <circle cx="12" cy="4.5" r="1.5" fill="currentColor" stroke="none" />
+                          <path d="M9 14v4M12 14v4M15 14v4" strokeWidth="1.5" />
+                        </svg>
+                      </span>
+                      <span className="mobile-menu-link-text">
+                        Cardápio
+                        <svg
+                          className="mobile-menu-underline"
+                          width="42"
+                          height="6"
+                          viewBox="0 0 42 6"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </span>
+                    </span>
+                  </button>
 
-              <button
-                type="button"
-                className="mobile-menu-link"
-                onClick={() => handleMenuLink("#onde-estamos")}
-              >
-                <span className="mobile-menu-link-content">
-                  <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
-                    <svg
-                      className="mobile-menu-link-icon"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                  </span>
-                  <span className="mobile-menu-link-text">
-                    Onde estamos
-                    <svg
-                      className="mobile-menu-underline"
-                      width="42"
-                      height="6"
-                      viewBox="0 0 42 6"
-                      fill="none"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </span>
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    className="mobile-menu-link"
+                    onClick={() => handleStorefrontNav("#sobre")}
+                  >
+                    <span className="mobile-menu-link-content">
+                      <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
+                        <svg
+                          className="mobile-menu-link-icon"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                      </span>
+                      <span className="mobile-menu-link-text">
+                        Sobre
+                        <svg
+                          className="mobile-menu-underline"
+                          width="42"
+                          height="6"
+                          viewBox="0 0 42 6"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </span>
+                    </span>
+                  </button>
 
-              <button
-                type="button"
-                className="mobile-menu-link"
-                onClick={() => handleMenuLink("#contato")}
-              >
-                <span className="mobile-menu-link-content">
-                  <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
-                    <svg
-                      className="mobile-menu-link-icon"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                    </svg>
-                  </span>
-                  <span className="mobile-menu-link-text">
-                    Contato
-                    <svg
-                      className="mobile-menu-underline"
-                      width="42"
-                      height="6"
-                      viewBox="0 0 42 6"
-                      fill="none"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </span>
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    className="mobile-menu-link"
+                    onClick={() => handleStorefrontNav("#onde-estamos")}
+                  >
+                    <span className="mobile-menu-link-content">
+                      <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
+                        <svg
+                          className="mobile-menu-link-icon"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                      </span>
+                      <span className="mobile-menu-link-text">
+                        Onde estamos
+                        <svg
+                          className="mobile-menu-underline"
+                          width="42"
+                          height="6"
+                          viewBox="0 0 42 6"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </span>
+                    </span>
+                  </button>
 
+                  <button
+                    type="button"
+                    className="mobile-menu-link"
+                    onClick={() => handleStorefrontNav("#contato")}
+                  >
+                    <span className="mobile-menu-link-content">
+                      <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
+                        <svg
+                          className="mobile-menu-link-icon"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                        </svg>
+                      </span>
+                      <span className="mobile-menu-link-text">
+                        Contato
+                        <svg
+                          className="mobile-menu-underline"
+                          width="42"
+                          height="6"
+                          viewBox="0 0 42 6"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </span>
+                    </span>
+                  </button>
+                </>
+              )}
             </div>
           </nav>
         </>,

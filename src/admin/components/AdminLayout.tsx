@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useNavigate } from "react-router-dom";
-import AdminSidebar from "./AdminSidebar";
-import AdminMobileBottomNav from "./AdminMobileBottomNav";
-import AdminWave from "./AdminWave";
+import StorefrontFrame from "../../components/StorefrontFrame";
 import { AdminThemeProvider } from "../theme/AdminThemeContext";
 import { AdminAuthProvider, type AdminUser } from "../auth/AdminAuthContext";
 import { NotificacoesProvider } from "../notificacoes/NotificacoesContext";
@@ -48,12 +46,11 @@ export default function AdminLayout() {
         {/* HUMAN-14: o badge da navegação e a página de Notificações leem a
             mesma contagem — marcar como lida reflete nos dois sem recarregar. */}
         <NotificacoesProvider>
-          <div className="admin-layout">
-            <AdminWave />
-            <AdminSidebar />
-            <Outlet />
-            <AdminMobileBottomNav />
-          </div>
+          <StorefrontFrame headerVariant="admin">
+            <div className="admin-layout">
+              <Outlet />
+            </div>
+          </StorefrontFrame>
         </NotificacoesProvider>
       </AdminAuthProvider>
     </AdminThemeProvider>
