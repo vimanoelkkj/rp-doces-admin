@@ -11,6 +11,7 @@
 
 html {
   scroll-behavior: smooth;
+  background-color: var(--store-bg);
 }
 
 :root {
@@ -92,7 +93,6 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 a {
@@ -115,7 +115,6 @@ img {
   background-color: var(--store-bg);
   pointer-events: none;
   z-index: 0;
-  transition: background-color 0.25s ease;
   transform: translate3d(0, 0, 0);
 }
 
@@ -138,4 +137,32 @@ html.menu-open body,
 html.menu-open #root {
   overflow: hidden !important;
   height: 100vh !important;
+}
+
+/* ===== THEME TRANSITION (View Transitions API Circular Reveal) ===== */
+::view-transition-group(root) {
+  animation-duration: 0.48s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
 }

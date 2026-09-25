@@ -187,9 +187,7 @@
   max-width: 200px;
   transition:
     transform 0.2s ease,
-    box-shadow 0.2s ease,
-    background-color 0.25s ease,
-    border-color 0.25s ease;
+    box-shadow 0.2s ease;
 }
 
 .trust-card:hover {
@@ -233,7 +231,6 @@
   left: 40px;
   border-radius: 50%;
   background: var(--store-accent-soft);
-  transition: background-color 0.3s ease;
 }
 
 .hero-cake-image {
@@ -292,7 +289,6 @@
   padding: 110px 80px;
   max-width: 1440px;
   margin: 0 auto;
-  transition: background-color 0.25s ease;
 }
 
 .story-inner {
@@ -419,7 +415,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .icon-badge {
@@ -539,7 +534,6 @@
   padding: 100px 80px;
   max-width: 1440px;
   margin: 0 auto;
-  transition: background-color 0.25s ease;
 }
 
 .instagram-header {
@@ -636,7 +630,6 @@
   padding: 40px;
   max-width: 700px;
   width: 100%;
-  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .contact-accent-bar {

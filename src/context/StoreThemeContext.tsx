@@ -3,15 +3,24 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from "react";
+import { flushSync } from "react-dom";
 
 export type StoreTheme = "light" | "dark";
 
+export type ThemeTransitionOrigin =
+  | { x: number; y: number }
+  | MouseEvent
+  | React.MouseEvent
+  | HTMLElement
+  | null;
+
 interface StoreThemeContextType {
   theme: StoreTheme;
-  toggleTheme: () => void;
-  setTheme: (theme: StoreTheme) => void;
+  toggleTheme: (origin?: ThemeTransitionOrigin) => void;
+  setTheme: (theme: StoreTheme, origin?: ThemeTransitionOrigin) => void;
 }
 
 const StoreThemeContext = createContext<StoreThemeContextType>({
@@ -44,8 +53,75 @@ function getInitialTheme(): StoreTheme {
   return getSystemTheme();
 }
 
+interface ExtendedAnimationOptions extends KeyframeAnimationOptions {
+  pseudoElement?: string;
+}
+
+function getOriginCoords(origin?: ThemeTransitionOrigin): { x: number; y: number } {
+  if (origin) {
+    if (
+      "x" in origin &&
+      "y" in origin &&
+      typeof origin.x === "number" &&
+      typeof origin.y === "number"
+    ) {
+      return { x: origin.x, y: origin.y };
+    }
+
+    if ("currentTarget" in origin && origin.currentTarget instanceof HTMLElement) {
+      const rect = origin.currentTarget.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    }
+
+    if ("target" in origin && origin.target instanceof HTMLElement) {
+      const rect = origin.target.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    }
+
+    if (
+      "clientX" in origin &&
+      "clientY" in origin &&
+      typeof origin.clientX === "number" &&
+      typeof origin.clientY === "number"
+    ) {
+      return { x: origin.clientX, y: origin.clientY };
+    }
+
+    if (origin instanceof HTMLElement) {
+      const rect = origin.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    }
+  }
+
+  if (typeof document !== "undefined") {
+    const btn = document.querySelector<HTMLElement>(".theme-toggle-btn");
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    }
+  }
+
+  return {
+    x: typeof window !== "undefined" ? window.innerWidth - 48 : 0,
+    y: 28,
+  };
+}
+
 export function StoreThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<StoreTheme>(getInitialTheme);
+  const isTransitioningRef = useRef(false);
 
   // Sincroniza atributo no DOM
   useEffect(() => {
@@ -62,7 +138,9 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (!saved) {
-          setThemeState(e.matches ? "dark" : "light");
+          const next = e.matches ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", next);
+          setThemeState(next);
         }
       } catch {
         // ignore
@@ -73,25 +151,87 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  const toggleTheme = () => {
-    setThemeState((prev) => {
-      const next: StoreTheme = prev === "light" ? "dark" : "light";
+  const executeThemeChange = (next: StoreTheme, origin?: ThemeTransitionOrigin) => {
+    if (next === theme) return;
+    if (isTransitioningRef.current) return;
+
+    const applyThemeImmediately = (t: StoreTheme) => {
+      document.documentElement.setAttribute("data-theme", t);
       try {
-        localStorage.setItem(STORAGE_KEY, next);
+        localStorage.setItem(STORAGE_KEY, t);
       } catch {
         // ignore
       }
-      return next;
-    });
+      flushSync(() => {
+        setThemeState(t);
+      });
+    };
+
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (
+      typeof document === "undefined" ||
+      !("startViewTransition" in document) ||
+      typeof document.startViewTransition !== "function" ||
+      prefersReduced
+    ) {
+      applyThemeImmediately(next);
+      return;
+    }
+
+    isTransitioningRef.current = true;
+
+    try {
+      const transition = document.startViewTransition(() => {
+        applyThemeImmediately(next);
+      });
+
+      transition.ready
+        .then(() => {
+          const { x, y } = getOriginCoords(origin);
+          const maxDistX = Math.max(x, window.innerWidth - x);
+          const maxDistY = Math.max(y, window.innerHeight - y);
+          const maxRadius = Math.hypot(maxDistX, maxDistY);
+
+          const animationOptions: ExtendedAnimationOptions = {
+            duration: 480,
+            easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+            pseudoElement: "::view-transition-new(root)",
+          };
+
+          document.documentElement.animate(
+            {
+              clipPath: [
+                `circle(0px at ${x}px ${y}px)`,
+                `circle(${maxRadius}px at ${x}px ${y}px)`,
+              ],
+            },
+            animationOptions,
+          );
+        })
+        .catch(() => {
+          // Fallback silencioso caso pseudo-element animation falhe
+        });
+
+      transition.finished.finally(() => {
+        isTransitioningRef.current = false;
+      });
+    } catch {
+      isTransitioningRef.current = false;
+      applyThemeImmediately(next);
+    }
   };
 
-  const setTheme = (newTheme: StoreTheme) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, newTheme);
-    } catch {
-      // ignore
-    }
-    setThemeState(newTheme);
+  const toggleTheme = (origin?: ThemeTransitionOrigin) => {
+    const next: StoreTheme = theme === "light" ? "dark" : "light";
+    executeThemeChange(next, origin);
+  };
+
+  const setTheme = (newTheme: StoreTheme, origin?: ThemeTransitionOrigin) => {
+    executeThemeChange(newTheme, origin);
   };
 
   return (
