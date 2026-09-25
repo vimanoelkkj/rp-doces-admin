@@ -2,20 +2,25 @@ import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import "./ProductCard.css";
 import { Product } from "../types/product";
+import { remainingAvailability, getStockBadgeState } from "../context/cartReconciliation";
 
 interface ProductCardProps {
   product: Product;
+  quantityInCart?: number;
   onAddToCart?: () => void;
 }
 
 export default function ProductCard({
   product,
+  quantityInCart = 0,
   onAddToCart,
 }: ProductCardProps) {
   const [justAdded, setJustAdded] = useState(false);
   const shouldReduceMotion = useReducedMotion();
-  const esgotado =
-    product.disponibilidade !== undefined && product.disponibilidade <= 0;
+
+  const restante = remainingAvailability(product.disponibilidade, quantityInCart);
+  const esgotado = restante <= 0;
+  const stockBadge = getStockBadgeState(restante);
 
   const handleAdd = () => {
     if (justAdded || esgotado) return;
@@ -46,8 +51,16 @@ export default function ProductCard({
           {product.originalPrice != null && (
             <span className="product-promo-badge">Promoção</span>
           )}
-          {esgotado && (
+          {stockBadge === "esgotado" && (
             <span className="product-esgotado-badge">Esgotado</span>
+          )}
+          {stockBadge === "ultima_unidade" && (
+            <span className="product-low-stock-badge product-low-stock-badge--last">
+              Última unidade
+            </span>
+          )}
+          {stockBadge === "poucas_unidades" && (
+            <span className="product-low-stock-badge">Poucas unidades</span>
           )}
         </div>
         <h3 className="product-name">{product.name}</h3>
@@ -72,9 +85,9 @@ export default function ProductCard({
               e.currentTarget.blur();
               handleAdd();
             }}
-            disabled={esgotado}
-            whileHover={shouldReduceMotion || esgotado ? undefined : { scale: 1.12 }}
-            whileTap={shouldReduceMotion || esgotado ? undefined : { scale: 0.92 }}
+            disabled={esgotado || justAdded}
+            whileHover={shouldReduceMotion || esgotado || justAdded ? undefined : { scale: 1.12 }}
+            whileTap={shouldReduceMotion || esgotado || justAdded ? undefined : { scale: 0.92 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
           >
             <AnimatePresence mode="wait" initial={false}>

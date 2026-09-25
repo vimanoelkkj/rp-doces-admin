@@ -13,6 +13,8 @@ const bundle = await build({
         calculateAddQuantity,
         calculateUpdateQuantity,
         reconcileCartWithCatalog,
+        remainingAvailability,
+        getStockBadgeState,
       } from './src/context/cartReconciliation';
     `,
   },
@@ -27,6 +29,8 @@ const {
   calculateAddQuantity,
   calculateUpdateQuantity,
   reconcileCartWithCatalog,
+  remainingAvailability,
+  getStockBadgeState,
 } = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`
 );
@@ -246,3 +250,50 @@ test('reconcileCartWithCatalog não altera itens quando estoque é suficiente e 
   assert.equal(reconciled.length, 1);
   assert.equal(reconciled[0].quantity, 2);
 });
+
+test('remainingAvailability calcula estoque restante considerando itens no carrinho', () => {
+  // disponibilidade 1, carrinho 0 -> restante 1
+  assert.equal(remainingAvailability(1, 0), 1);
+
+  // disponibilidade 1, carrinho 1 -> restante 0
+  assert.equal(remainingAvailability(1, 1), 0);
+
+  // disponibilidade 3, carrinho 0 -> restante 3
+  assert.equal(remainingAvailability(3, 0), 3);
+
+  // disponibilidade 3, carrinho 2 -> restante 1
+  assert.equal(remainingAvailability(3, 2), 1);
+
+  // disponibilidade 3, carrinho 3 -> restante 0
+  assert.equal(remainingAvailability(3, 3), 0);
+
+  // disponibilidade 5, carrinho 1 -> restante 4
+  assert.equal(remainingAvailability(5, 1), 4);
+
+  // carrinho com quantidade maior que disponibilidade limita a 0 (nunca negativo)
+  assert.equal(remainingAvailability(2, 5), 0);
+
+  // disponibilidade indefinida trata como 0
+  assert.equal(remainingAvailability(undefined, 0), 0);
+});
+
+test('getStockBadgeState reflete o estoque restante com os badges corretos', () => {
+  // disponibilidade 3, carrinho 0 -> restante 3 -> baixo estoque ("poucas_unidades")
+  assert.equal(getStockBadgeState(remainingAvailability(3, 0)), 'poucas_unidades');
+
+  // disponibilidade 3, carrinho 2 -> restante 1 -> última unidade ("ultima_unidade")
+  assert.equal(getStockBadgeState(remainingAvailability(3, 2)), 'ultima_unidade');
+
+  // disponibilidade 3, carrinho 3 -> restante 0 -> esgotado ("esgotado")
+  assert.equal(getStockBadgeState(remainingAvailability(3, 3)), 'esgotado');
+
+  // disponibilidade 5, carrinho 1 -> restante 4 -> sem badge de estoque baixo (null)
+  assert.equal(getStockBadgeState(remainingAvailability(5, 1)), null);
+
+  // disponibilidade 1, carrinho 0 -> restante 1 -> última unidade ("ultima_unidade")
+  assert.equal(getStockBadgeState(remainingAvailability(1, 0)), 'ultima_unidade');
+
+  // disponibilidade 1, carrinho 1 -> restante 0 -> esgotado ("esgotado")
+  assert.equal(getStockBadgeState(remainingAvailability(1, 1)), 'esgotado');
+});
+
