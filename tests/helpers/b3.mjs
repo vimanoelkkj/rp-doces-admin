@@ -67,6 +67,9 @@ const bundle = await build({
       export * as adminPushTest from './functions/api/admin/push/test';
       export * as adminAdministradoresId from './functions/api/admin/administradores/[id]';
       export * as login from './functions/api/auth/login';
+      export * as adminReconciliar from './functions/api/admin/pedidos/reconciliar';
+      export * as adminOrderReconciliar from './functions/api/admin/pedidos/[id]/reconciliar';
+      export * as adminMaintenance from './functions/lib/adminPedidos/maintenance';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },

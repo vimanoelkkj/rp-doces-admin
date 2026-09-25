@@ -7,7 +7,6 @@ import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comand
 import { getCapacidadeCobravel, getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
 import { liberarReservaPedido, PIX_MP_PENDENTE_NO_PEDIDO_SQL } from "../../../lib/stock";
 import { listarOperacoesInconclusivasDoPedido } from "../../../lib/operacoes";
-import { reconcileLiveTabPedido } from "../../../lib/liveTabRecovery";
 
 interface Env {
   DB: D1Database;
@@ -83,14 +82,6 @@ export const onRequestGet: PagesFunction<Env> = async ({
   }
 
   try {
-    // A abertura do detalhe é um ponto controlado de recuperação. A fila é
-    // limitada e só consulta intenções inconclusivas ou antigas; fatos locais
-    // já persistidos também concluem cancelamento/troca de forma idempotente.
-    try {
-      await reconcileLiveTabPedido(env.DB, env.MP_ACCESS_TOKEN, id);
-    } catch (recoveryError) {
-      console.error("Recuperacao oportunista da comanda ficou pendente", { pedidoId: id }, recoveryError);
-    }
     const pedido = await env.DB.prepare(
       `SELECT id, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
               status_pagamento, status_pedido, status_comanda, origem_pedido,

@@ -3,7 +3,6 @@
 import { requireUser } from "../auth";
 import { pedidoValidoSql } from "../pedidoValido";
 import { getFinanceirosPorPedidos, type FinanceiroPedido } from "../comandaLedger";
-import { reconcilePedidosEmBackground } from "./maintenance";
 import type { Env } from "./types";
 
 interface PedidoListRow {
@@ -75,14 +74,6 @@ export async function listPedidos(
     const search = (url.searchParams.get("search") ?? "").trim().slice(0, 100);
     const tab = url.searchParams.get("status") ?? "todos";
     const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
-
-    // Manutenção oportunista só nasce na abertura canônica da tela.
-    // Paginação, filtros e busca são caminhos puramente de leitura: disparar
-    // as quatro reconciliações em TODA troca de página criava concorrência
-    // desnecessária no mesmo D1 enquanto a próxima página estava sendo lida.
-    if (page === 1 && tab === "todos" && !search) {
-      context.waitUntil(reconcilePedidosEmBackground(env));
-    }
 
     const tabFilter = TAB_FILTERS[tab] ?? "";
     const listScope = tab === "arquivados"

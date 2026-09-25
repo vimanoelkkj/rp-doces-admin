@@ -131,6 +131,14 @@ export default function AdminPedidos() {
     return () => window.removeEventListener("pedido-anulado", aoAnular);
   }, []);
 
+  // Reconciliação global disparada explicitamente uma vez na abertura da tela.
+  // Não reexecuta em paginação, busca ou troca de abas; falhas não bloqueiam a tela.
+  useEffect(() => {
+    fetch("/api/admin/pedidos/reconciliar", { method: "POST" }).catch((err) => {
+      console.warn("Falha na reconciliação inicial de pedidos", err);
+    });
+  }, []);
+
   // Debounce da busca
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(search), 300);
