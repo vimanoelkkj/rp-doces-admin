@@ -246,22 +246,32 @@ As seguintes páginas são telas de transição pura ou isolamento operacional e
 
 A plataforma adota design responsivo rigoroso sem quebra de leiautes em dispositivos compactos:
 
-- **Drawer Mobile Unificado:** O menu lateral mobile do Header utiliza **CSS puro com transições e `pointer-events`**, eliminando travamentos de Framer Motion no fechamento. Conta com suporte a gesto de arrastar para fechar (*drag-to-close*) e uma mini-onda decorativa interna.
+- **Drawer Mobile com Handle em Onda:** O menu lateral mobile do Header utiliza **CSS puro com transições e `pointer-events`**, eliminando travamentos de animações complexas. A barra reta genérica foi substituída pelo SVG ondulado rosa da confeitaria dentro do botão `.mobile-menu-close`, atuando como a própria alça acessível de arraste (*drag-to-close*).
+- **Clearance Inferior Estrutural do Admin Mobile (`--admin-mobile-nav-space`):** O layout administrativo reserva `88px` de padding inferior no container principal (`.admin-main`) para acomodar com folga a barra de navegação móvel fixa (`AdminMobileNav`). Regras genéricas de estilo entre telas foram isoladas para garantir que o último card ou formulário (ex.: `/admin/produtos`, `/admin/pedidos`) possa ser completamente rolado acima da barra.
 - **Navegação em Telas Médias:** O ponto de quebra para recolhimento da barra administrativa é estabelecido em `960px`, impedindo o estouro dos múltiplos botões do painel em tablets ou janelas compactas.
 - **Visualização de Comandas:** Em telas abaixo de `600px`, as tabelas de pedidos do Dashboard e da página de Pedidos deixam de exigir rolagem horizontal; cada linha se reconfigura automaticamente em um cartão vertical empilhado (*card grid*), com ações acessíveis ao toque.
 - **Safe Area Insets:** Margens inferiores consideram `env(safe-area-inset-bottom)` em aparelhos modernos (iOS/Android).
 
 ---
 
-## 9. Sistema de Temas e Dark Mode
+## 9. Sistema de Temas, Dark Mode e View Transitions API
 
 A aplicação oferece alternância instantânea entre modo claro e escuro:
 
-- **Sincronização Bidirecional Contínua:** O contexto único [StoreThemeContext.tsx](file:///c:/Users/zZzZz/Projetos/rp-doces/src/context/StoreThemeContext.tsx) gerencia o estado e sincroniza simultaneamente:
+- **Sincronização Bidirecional Contínua:** O contexto único [StoreThemeContext.tsx](file:///c:/Users/vitormanoel/dev/rp-doces/src/context/StoreThemeContext.tsx) gerencia o estado e sincroniza simultaneamente:
   - O atributo `data-theme` em `document.documentElement`.
   - O atributo `data-admin-theme` em `document.documentElement`.
   - As chaves `store-theme` e `admin-theme` em `localStorage`.
 - **Pass-through Transparente:** O `AdminThemeContext.tsx` atua como uma fachada transparente que delega chamadas diretamente ao `StoreThemeContext`. Alterar o tema no admin altera a loja, e vice-versa.
+- **Sincronização Dinâmica da Status Bar (PWA / Mobile):**
+  - O `<meta name="theme-color">` é atualizado em tempo real para sincronizar a barra de status do navegador móvel com a cor exata do header: `#eddcc6` (modo claro) e `#271f1b` (modo escuro).
+  - Um script inline no `<head>` do `index.html` aplica o tema antes do primeiro paint, prevenindo flash de tela branca (FOUC).
+  - Um `MutationObserver` no `StoreThemeContext` monitora mutações em `data-theme`/`data-admin-theme`, garantindo consistência mesmo em transições de rotas ou limpezas de PWA.
+- **View Transitions API Diferenciada por Dispositivo:**
+  - **Desktop / Telas Maiores:** Revelação circular radial (`clip-path: circle(...)`) a partir da posição exata do botão clicado com 480ms de duração e curva `cubic-bezier(0.4, 0, 0.2, 1)`.
+  - **Mobile ($\le 768\text{px}$):** Otimizado especificamente para alta taxa de atualização (telas 90Hz/120Hz). Utiliza crossfade acelerado por GPU com `opacity: [0, 1]` em 260ms e curva `cubic-bezier(0.2, 0.8, 0.2, 1)`. O `clip-path` pesado foi desativado no mobile para eliminar quedas de frames.
+  - **Zero Ghosting e Alinhamento 1:1:** O snapshot mobile opera sem transformação de escala (`scale`), garantindo alinhamento pixel-a-pixel perfeito entre o tema anterior e o novo, sem halos esbranquiçados, bordas duplas em cards ou piscadas nos cantos da tela.
+  - **Bypass de Acessibilidade:** Suporte integral a `prefers-reduced-motion: reduce`, aplicando a troca de tema instantânea sem animações.
 - **Paleta de Cores do Tema Escuro:**
   - Fundo principal: `#161210` e `#1a1412` (castanho chocolate nobre, evitando o preto puro `#000000`).
   - Ondas: `var(--store-wave-primary)` ajustada para `#271f1b` e secundária para `#3b2c26`.
@@ -505,6 +515,10 @@ A estabilidade da plataforma decorre de protocolos rigorosos de engenharia:
 - **B-1 (Visibilidade Operacional de Balcão):** Pedidos criados no balcão (`origem = 'MANUAL'`) permanecem visíveis imediatamente na listagem, independentemente de estarem pendentes.
 - **B-2 (Estorno Manual de Pix):** Registro contábil de estorno para pagamentos `PIX_MP` devolvidos por fora pelo lojista.
 - **B-3 (Recuperação de Envio Inconclusivo):** Varredura de busca via `GET /v1/payments/search` no Mercado Pago para descobrir cobranças criadas cujo retorno HTTP se perdeu por timeout.
+- **B5 (GETs Idempotentes e Livres de Efeitos Colaterais):** Segregação estrita de responsabilidade HTTP. As rotas `GET /api/admin/pedidos` e `GET /api/admin/pedidos/:id` operam como puramente de leitura. Efeitos colaterais de manutenção financeira e sincronização em background foram movidos para endpoints POST explícitos e idempotentes com proteção `sameOrigin`:
+  - `POST /api/admin/pedidos/reconciliar`: Executa em lote a rotina `reconcilePedidosEmBackground` para a lista de comandas.
+  - `POST /api/admin/pedidos/:id/reconciliar`: Executa a reconciliação sob demanda da comanda ativa (`reconcileLiveTabPedido`).
+  - No frontend, o hook `usePedidoDetalhe.ts` dispara o POST de reconciliação em modo *best-effort* antes do GET no carregamento inicial, nas chamadas explícitas e no polling silencioso, preservando a recuperação contínua sem violar a semântica HTTP.
 
 ---
 
@@ -689,8 +703,11 @@ A plataforma possui uma robusta rede de segurança com **50 suítes de testes au
 
 - **Cookies HttpOnly:** Sessões administrativas utilizam cookies com flags `HttpOnly; Secure; SameSite=Lax`, impedindo o roubo de tokens via JavaScript malicioso (XSS).
 - **Proteção Same-Origin:** Endpoints de mutação do painel exigem cabeçalhos de mesma origem para repelir ataques de CSRF (Cross-Site Request Forgery).
+- **Mitigação de Timing Attack e Enumeração de Usuários (PBKDF2 Dummy):** O endpoint de login administrativo (`POST /api/auth/login`) executa verificação de senha em tempo equivalente para qualquer cenário. Quando o usuário não existe ou está inativo, a rotina realiza uma checagem contra um hash PBKDF2 dummy estático e válido (`pbkdf2_sha256` com 100.000 iterações), eliminando vazamento de enumeração de contas por medição de latência de resposta.
+- **Hardening na Alteração da Própria Senha:** O endpoint de atualização de credenciais (`POST /api/admin/administradores/:id/senha`) exige expressamente a senha atual (`senha_atual`) do operador autenticado e valida sua correspondência antes de aplicar a nova senha com salt criptográfico.
 - **Validação Rigorosa de Assinatura:** Eventos de gateway só são aceitos quando acompanhados da assinatura criptográfica HMAC SHA-256 válida.
 - **Constraints a Nível de Banco de Dados:** A integridade de estoque e a exclusão mútua de operações contam com travas relacionais em SQLite (`UNIQUE`, `CHECK`), blindando a plataforma contra inconsistências mesmo em cenários de alta concorrência.
+- **Segregação Estrita de Efeitos Colaterais em GETs:** Endpoints de consulta (`GET /api/admin/pedidos` e `GET /api/admin/pedidos/:id`) operam exclusivamente como leitura pura, delegando mutações de recuperação a rotas POST dedicadas (`/reconciliar`).
 
 ---
 
@@ -713,6 +730,8 @@ A plataforma possui uma robusta rede de segurança com **50 suítes de testes au
    - Nenhuma linha de pagamento confirmada é alterada ou cancelada retrospectivamente. Estornos geram fatos contábeis próprios, mantendo a trilha de auditoria limpa.
 3. **Header Único com Degradação Elegante:**
    - O mesmo componente de cabeçalho atende à loja e ao painel de administração, evitando divergências de layout e sincronizando o estado de temas e responsividade de ponta a ponta.
+4. **View Transitions com Especialização por Dispositivo:**
+   - Animação radial por `clip-path` preservada no desktop, enquanto o mobile adota crossfade puro por `opacity` via GPU sem transformações de escala, garantindo fluidez máxima em 90/120Hz sem ghosting ou piscadas visuais.
 
 ---
 
@@ -735,12 +754,15 @@ A plataforma possui uma robusta rede de segurança com **50 suítes de testes au
 | **Carrinho & Sacola** | ✅ | Persistência em `localStorage` com auto-reconciliação de estoque. |
 | **Checkout Pix** | ✅ | Emissão com idempotência A1, QR Code dinâmico e cópia-e-cola. |
 | **Acompanhamento de Pedido** | ✅ | Acesso público por token com atualização de status em tempo real. |
-| **Header Unificado** | ✅ | Fonte única de verdade para loja e admin, com drawer mobile CSS. |
+| **Header Unificado** | ✅ | Fonte única de verdade para loja e admin, com drawer mobile CSS e handle ondulado. |
 | **Wave e Fade Animados** | ✅ | Efeito visual presente na loja e no painel admin via `StorefrontFrame`. |
 | **Tema Dark Chocolate** | ✅ | Sincronização simultânea de `data-theme` e `data-admin-theme`. |
+| **View Transitions (Mobile/Desktop)** | ✅ | Revelação radial no desktop e crossfade GPU 260ms fluido em 90/120Hz no mobile. |
 | **Dashboard Administrativo** | ✅ | Indicadores financeiros do dia, comandas em aberto e ranking de vendas. |
-| **Catálogo Administrativo** | ✅ | CRUD de produtos, categorias com emojis e upload de fotos no Cloudflare R2. |
-| **Gestão de Comandas (Admin)** | ✅ | Criação manual, pagamentos múltiplos, geração de Pix e histórico. |
+| **Catálogo Administrativo** | ✅ | CRUD de produtos, categorias com emojis, upload R2 e clearance inferior mobile. |
+| **Gestão de Comandas (Admin)** | ✅ | Criação manual, pagamentos múltiplos, geração de Pix, anulação e histórico. |
+| **Reconciliação Segregada (POST)** | ✅ | Rotas POST dedicadas para sincronização; GETs 100% puros e sem efeitos colaterais. |
+| **Segurança & Anti-Enumeração** | ✅ | Verificação de senha timing-safe via dummy PBKDF2 e proteção na troca de senha. |
 | **Livro de Despesas** | ✅ | Lançamento e controle de custos operacionais com cálculo de lucro líquido. |
 | **Anulação Auditável** | ✅ | Cancelamento definitivo de comandas com proteção relacional imutável. |
 | **Web Push Notifications** | ✅ | Notificações no navegador para alertas operacionais e novos pedidos pagos. |
