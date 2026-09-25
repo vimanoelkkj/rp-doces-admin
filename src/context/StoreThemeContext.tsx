@@ -259,6 +259,27 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
 
       transition.ready
         .then(() => {
+          const isMobile =
+            typeof window !== "undefined" &&
+            Boolean(window.matchMedia && window.matchMedia("(max-width: 768px)").matches);
+
+          if (isMobile) {
+            const mobileAnimationOptions: ExtendedAnimationOptions = {
+              duration: 260,
+              easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+              pseudoElement: "::view-transition-new(root)",
+            };
+
+            document.documentElement.animate(
+              {
+                opacity: [0, 1],
+                transform: ["scale(1.015)", "scale(1)"],
+              },
+              mobileAnimationOptions,
+            );
+            return;
+          }
+
           const { x, y } = getOriginCoords(origin);
           const maxDistX = Math.max(x, window.innerWidth - x);
           const maxDistY = Math.max(y, window.innerHeight - y);
