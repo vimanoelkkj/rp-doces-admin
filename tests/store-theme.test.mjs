@@ -52,7 +52,7 @@ test("StoreTheme: Header.tsx includes theme toggle button with accessible attrib
   assert.match(headerCode, /useStoreTheme/);
   assert.match(headerCode, /theme-toggle-btn/);
   assert.match(headerCode, /aria-label/);
-  assert.match(headerCode, /mobile-theme-toggle-btn/);
+  assert.match(headerCode, /theme-toggle-icon/);
 });
 
 test("StoreTheme: No CSS image filters (brightness, contrast, invert) applied to product images", () => {
