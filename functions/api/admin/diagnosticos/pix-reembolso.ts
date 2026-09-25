@@ -18,6 +18,7 @@
 import { requireUser, sameOrigin } from "../../../lib/auth";
 import { parseOperationKey } from "../../../lib/operacoes";
 import { postRefundMp } from "../../../lib/mpRefund";
+import { fetchMpPayment, type MpPaymentResponse } from "../../../lib/paymentSync";
 
 interface Env {
   DB: D1Database;
@@ -32,6 +33,7 @@ interface DiagnosticoRefundInput {
 const MENSAGENS: Record<string, string> = {
   MP_PAYMENT_ID_INVALIDO: "Identificador do pagamento de diagnóstico ausente ou inválido",
   OPERATION_KEY_INVALIDA: "Identificação da operação ausente ou inválida",
+  PAGAMENTO_NAO_DIAGNOSTICO: "O pagamento informado não corresponde a um Pix de diagnóstico válido",
   MERCADO_PAGO_NAO_CONFIGURADO: "Mercado Pago não está configurado neste ambiente",
   MERCADO_PAGO_RECUSOU: "O Mercado Pago recusou o estorno de diagnóstico",
   MERCADO_PAGO_INDISPONIVEL:
@@ -41,6 +43,7 @@ const MENSAGENS: Record<string, string> = {
 const STATUS_HTTP: Record<string, number> = {
   MP_PAYMENT_ID_INVALIDO: 400,
   OPERATION_KEY_INVALIDA: 400,
+  PAGAMENTO_NAO_DIAGNOSTICO: 400,
   MERCADO_PAGO_NAO_CONFIGURADO: 503,
   MERCADO_PAGO_RECUSOU: 502,
   MERCADO_PAGO_INDISPONIVEL: 502,
@@ -94,6 +97,42 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       MENSAGENS.MERCADO_PAGO_NAO_CONFIGURADO,
       STATUS_HTTP.MERCADO_PAGO_NAO_CONFIGURADO,
       "MERCADO_PAGO_NAO_CONFIGURADO",
+    );
+  }
+
+  let payment: MpPaymentResponse;
+  try {
+    payment = await fetchMpPayment(env.MP_ACCESS_TOKEN, mpPaymentId);
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && "status" in err && (err as { status?: number }).status === 404) {
+      return jsonError(
+        MENSAGENS.PAGAMENTO_NAO_DIAGNOSTICO,
+        STATUS_HTTP.PAGAMENTO_NAO_DIAGNOSTICO,
+        "PAGAMENTO_NAO_DIAGNOSTICO",
+      );
+    }
+    console.error("Falha ao consultar pagamento no Mercado Pago antes do estorno de diagnóstico", err);
+    return jsonError(
+      MENSAGENS.MERCADO_PAGO_INDISPONIVEL,
+      STATUS_HTTP.MERCADO_PAGO_INDISPONIVEL,
+      "MERCADO_PAGO_INDISPONIVEL",
+    );
+  }
+
+  const ehIdCorreto = String(payment.id) === mpPaymentId;
+  const ehExternalRefValida =
+    typeof payment.external_reference === "string" &&
+    payment.external_reference.startsWith("ADMIN_DIAG_PIX:");
+  const ehValorValido =
+    typeof payment.transaction_amount === "number" &&
+    Math.round(payment.transaction_amount * 100) === 1;
+  const ehPix = payment.payment_method_id === "pix";
+
+  if (!ehIdCorreto || !ehExternalRefValida || !ehValorValido || !ehPix) {
+    return jsonError(
+      MENSAGENS.PAGAMENTO_NAO_DIAGNOSTICO,
+      STATUS_HTTP.PAGAMENTO_NAO_DIAGNOSTICO,
+      "PAGAMENTO_NAO_DIAGNOSTICO",
     );
   }
 
