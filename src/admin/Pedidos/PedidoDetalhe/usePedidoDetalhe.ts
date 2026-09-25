@@ -75,7 +75,11 @@ export function usePedidoDetalhe({
 
   const carregarPedido = useCallback((silencioso = false) => {
     if (!silencioso) setLoading(true);
-    return fetch(`/api/admin/pedidos/${orderId}`)
+    return fetch(`/api/admin/pedidos/${orderId}/reconciliar`, { method: "POST" })
+      .catch((err) => {
+        console.warn("Falha na reconciliação da comanda", err);
+      })
+      .then(() => fetch(`/api/admin/pedidos/${orderId}`))
       .then(async (response) => {
         if (!response.ok) throw new Error("Falha ao carregar pedido");
         return response.json() as Promise<PedidoDetalheResponse>;
