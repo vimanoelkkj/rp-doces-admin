@@ -230,9 +230,11 @@ export default function AguardandoPagamento() {
       if (cancelled || inFlight) return;
       inFlight = true;
       try {
+        // POST: o GET é somente leitura; a recuperação (MP, expiração) é
+        // explícita e o servidor limita a consulta ao MP a uma por 15s.
         const response = await fetch(
           `/api/pedido-status?token=${encodeURIComponent(payment.tokenPublico)}`,
-          { signal: controller.signal },
+          { method: "POST", signal: controller.signal },
         );
         if (cancelled || !response.ok) return;
         const data = (await response.json()) as PedidoStatusResponse;

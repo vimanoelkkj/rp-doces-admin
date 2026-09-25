@@ -82,6 +82,9 @@ test('M: timer zero with approval in flight never navigates to failure; normal s
   const pending=deferred();
   const {calls,advance}=await mount(t,()=>pending.promise);
   assert.equal(calls.length,1);
+  // M7: o polling é o gatilho explícito de recuperação (POST); o GET só lê.
+  assert.equal(calls[0].url,'/api/pedido-status?token=token');
+  assert.equal(calls[0].options?.method,'POST');
   await advance(8000);
   assert.equal(ui.currentPath,'/aguardando-pagamento');
   assert.match(container.textContent,/Prazo do QR encerrado/);

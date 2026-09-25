@@ -5,8 +5,20 @@ import {app, fixture, state, barrier, withWaitUntil} from './helpers/b3.mjs';
 const env = db => ({DB:db,MP_ACCESS_TOKEN:'fake',MP_WEBHOOK_SECRET:'b2-local-only'});
 const expired = db => db.prepare("UPDATE pedidos SET pix_expira_em='2000-01-01',reserva_expira_em='2000-01-02' WHERE id=1").run();
 const recover = db => app.reconcile.reconcilePedidoAfterFinancialChange(db,1);
-const get = async (db, handler='polling', token='token') => {
-  const response=await app[handler].onRequestGet({request:new Request(`https://local.test/api/pedido?token=${token}`),env:env(db)});
+// M7: os GETs públicos são somente leitura; a recuperação (MP, expiração,
+// reconciliação) é o POST /api/pedido-status. Estes testes cobrem a lógica de
+// recuperação, então abrem explicitamente a janela do throttle de 15s antes
+// de cada chamada; o throttle em si é coberto em
+// public-pedido-reconcile.test.mjs. 'detail' = POST de recuperação seguido da
+// leitura pura de GET /api/pedido.
+const abrirJanelaMp = db => db.prepare(`UPDATE pedido_pagamentos SET atualizado_em=datetime('now','-1 minute')
+  WHERE metodo='PIX_MP' AND status IN ('PENDENTE','EXPIRADO')`).run();
+const consultar = async (db, handler='polling', token='token') => {
+  await abrirJanelaMp(db);
+  const reconciliado=await app.polling.onRequestPost({env:env(db),request:new Request(`https://local.test/api/pedido-status?token=${token}`,
+    {method:'POST',headers:{Origin:'https://local.test'}})});
+  const response=handler==='polling' ? reconciliado
+    : await app.detail.onRequestGet({request:new Request(`https://local.test/api/pedido?token=${token}`),env:env(db)});
   return {response,body:await response.json()};
 };
 function mp(t,status,extra={}) {
@@ -54,7 +66,7 @@ test('A: real checkout creation then authoritative GET approval preserves normal
   assert.equal(response.status,200);
   const checkout=await response.json();
   mp(t,'approved');
-  assert.equal((await get(db,'polling',checkout.tokenPublico)).body.statusPagamento,'PAGO');
+  assert.equal((await consultar(db,'polling',checkout.tokenPublico)).body.statusPagamento,'PAGO');
   assert.equal((await db.prepare('SELECT status FROM pedido_pagamentos').first()).status,'PAGO');
   assert.equal((await db.prepare('SELECT estoque FROM produtos WHERE id=1').first()).estoque,8);
 });
@@ -63,7 +75,7 @@ for(const handler of ['polling','detail']) test(`B: ${handler} queries approved 
   const db=await fixture(t);
   await expired(db);
   const fetch=mp(t,'approved',{date_approved:'2026-09-01T12:00:00Z'});
-  const r=await get(db,handler);
+  const r=await consultar(db,handler);
   assert.equal(r.response.status,200);
   assert.equal(r.body.statusPagamento,'PAGO');
   assert.equal(fetch.mock.callCount(),1);
@@ -75,7 +87,7 @@ for(const handler of ['polling','detail']) test(`B: ${handler} queries approved 
 test('C: public detail recovers already expired ledger and released reserve',async t=>{
   const db=await fixture(t);
   await app.sync.expireLocalPayment(db,1);
-  assert.equal((await get(db,'detail')).body.statusPagamento,'PAGO');
+  assert.equal((await consultar(db,'detail')).body.statusPagamento,'PAGO');
   paid(await state(db));
 });
 
@@ -119,10 +131,10 @@ test('E: expired deadline + pending GET expires operationally; next polling appr
   const db=await fixture(t);
   await expired(db);
   mp(t,'pending');
-  assert.equal((await get(db)).body.statusPagamento,'EXPIRADO');
+  assert.equal((await consultar(db)).body.statusPagamento,'EXPIRADO');
   assert.equal((await state(db)).pedido.reserva_status,'LIBERADA');
   mp(t,'approved');
-  assert.equal((await get(db)).body.statusPagamento,'PAGO');
+  assert.equal((await consultar(db)).body.statusPagamento,'PAGO');
   paid(await state(db));
 });
 
@@ -133,13 +145,13 @@ for(const failure of ['500','timeout']) test(`F: ${failure} after deadline does 
     if(failure==='timeout') throw new DOMException('timeout','TimeoutError');
     return new Response('unavailable',{status:500});
   });
-  assert.equal((await get(db)).body.statusPagamento,'EXPIRADO');
+  assert.equal((await consultar(db)).body.statusPagamento,'EXPIRADO');
   const s=await state(db);
   assert.equal(s.pagamentos[0].mp_status,null);
   assert.equal(s.pedido.status_pagamento,'PENDENTE');
   assert.equal(s.produtos[0].estoque,10);
   mp(t,'approved');
-  assert.equal((await get(db)).body.statusPagamento,'PAGO');
+  assert.equal((await consultar(db)).body.statusPagamento,'PAGO');
   paid(await state(db));
 });
 
@@ -224,7 +236,7 @@ for(const order of ['expire-between-read-and-write','approval-before-expire-writ
   if(order==='parallel-handlers') {
     const gate=barrier(2);
     t.mock.method(globalThis,'fetch',async ()=>{await gate();return Response.json({id:101,status:'approved'});});
-    await Promise.all([get(db),hook(db)]);
+    await Promise.all([consultar(db),hook(db)]);
   } else {
     db.hook=async (s,op)=>{
       if(op==='run' && s[0].sql.includes('SET status = ?') &&
@@ -305,7 +317,7 @@ for(const amount of [4000,10000]) test(`polling: aggregate ${amount===4000?'PARC
   await db.prepare("INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,idempotency_key) VALUES(1,'DINHEIRO','ADMIN',?,'PAGO','manual')").bind(amount).run();
   await recover(db);
   await expired(db);
-  assert.equal((await get(db)).body.statusPagamento,'PAGO');
+  assert.equal((await consultar(db)).body.statusPagamento,'PAGO');
   const s=await state(db); paid(s);
   assert.equal(s.pagamentos.length,2);
   assert.equal(await app.ledger.getPaidCentavos(db,1),10000+amount);
@@ -345,7 +357,7 @@ test('polling: an ADMIN attempt inserted first cannot receive the SITE approval'
   await db.prepare("UPDATE pedido_pagamentos SET origem='ADMIN',mp_payment_id='202' WHERE id=1").run();
   await db.prepare("INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,mp_payment_id,idempotency_key) VALUES(1,'PIX_MP','SITE',10000,'PENDENTE','101','site-second')").run();
   const fetch=mp(t,'approved');
-  assert.equal((await get(db)).body.statusPagamento,'PAGO');
+  assert.equal((await consultar(db)).body.statusPagamento,'PAGO');
   assert.equal(fetch.mock.calls[0].arguments[0],'https://api.mercadopago.com/v1/payments/101');
   const s=await state(db);
   assert.equal(s.pagamentos[0].status,'PENDENTE');
@@ -363,14 +375,14 @@ test('polling: pending MP snapshot cannot return EXPIRADO when concurrent webhoo
       assert.equal((await hook(db)).status,200);
     }
   };
-  assert.equal((await get(db)).body.statusPagamento,'PAGO');
+  assert.equal((await consultar(db)).body.statusPagamento,'PAGO');
   paid(await state(db));
 });
 
 test('polling: GET failure before deadline keeps PENDENTE and active reservation',async t=>{
   const db=await fixture(t);
   t.mock.method(globalThis,'fetch',async()=>new Response('offline',{status:500}));
-  assert.equal((await get(db)).body.statusPagamento,'PENDENTE');
+  assert.equal((await consultar(db)).body.statusPagamento,'PENDENTE');
   const s=await state(db);
   assert.equal(s.pedido.reserva_status,'ATIVA');
   assert.equal(s.pagamentos[0].cancelado_em,null);

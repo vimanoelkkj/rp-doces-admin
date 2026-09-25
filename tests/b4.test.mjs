@@ -158,7 +158,9 @@ for(const path of ['polling','sweep']) test(`SITE + ADMIN: ${path} expiration re
   await db.prepare("UPDATE pedido_pagamentos SET pix_expira_em='2000-01-01' WHERE id=1").run();
   if(path==='sweep') await app.sync.liberarReservasVencidasLocalmente(env(db));
   else {
-    const r=await app.polling.onRequestGet({env:env(db),request:new Request('https://local.test/api/pedido-status?token=token')});
+    // M7: a expiração pelo polling acontece no POST (o GET só lê).
+    const r=await app.polling.onRequestPost({env:env(db),request:new Request('https://local.test/api/pedido-status?token=token',
+      {method:'POST',headers:{Origin:'https://local.test'}})});
     assert.equal(r.status,200);
   }
   reserved(await state(db)); assert.equal((await state(db)).pagamentos[0].status,'EXPIRADO');

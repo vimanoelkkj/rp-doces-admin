@@ -1,7 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { resolveLedgerPaymentId } from "./comandaLedger";
-import { syncPaymentFromMp, expireLocalPayment, fetchMpPayment, resolveWebhookPayment } from "./paymentSync";
+import {
+  claimPendingPixPaymentReconciliation,
+  syncPaymentFromMp,
+  expireLocalPayment,
+  fetchMpPayment,
+  resolveWebhookPayment,
+} from "./paymentSync";
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 import { type PushEnv } from "./pushNotifier";
 
@@ -26,6 +32,29 @@ async function statusDoPagamento(db: D1Database, pagamentoId: number | null): Pr
     .bind(pagamentoId)
     .first<{ status: string }>();
   return row?.status ?? null;
+}
+
+// M7: leitura PURA do status público, para os GETs do storefront. Nenhuma
+// escrita, nenhuma rede, nenhuma materialização de legado. Mesmos critérios
+// de `resolveLedgerPaymentId` para achar a tentativa SITE PIX_MP (o status
+// público é o dessa tentativa, não o agregado) e o mesmo fail-closed quando
+// a identidade é ambígua. Sem tentativa SITE — ou pedido legado ainda sem
+// ledger — usa a projeção já persistida em `pedidos`. A recuperação (MP,
+// expiração, reconciliação) acontece só em `refreshPedidoStatus`, via POST.
+export async function readPedidoStatus(
+  db: D1Database,
+  pedido: PedidoStatusRow,
+): Promise<StatusAtual> {
+  const { results } = await db.prepare(
+    `SELECT id, status FROM pedido_pagamentos
+     WHERE pedido_id = ? AND origem = 'SITE' AND metodo = 'PIX_MP'
+       AND (? IS NULL OR mp_payment_id = ? OR mp_payment_id IS NULL) LIMIT 2`,
+  ).bind(pedido.id, pedido.mp_payment_id, pedido.mp_payment_id).all<{ id: number; status: string }>();
+  if (results.length > 1) throw new Error("TENTATIVA_SITE_AMBIGUA");
+  return {
+    statusPagamento: results[0]?.status ?? pedido.status_pagamento,
+    statusPedido: pedido.status_pedido,
+  };
 }
 
 // Consulta a tentativa SITE, inclusive expirada, antes da expiração local.
@@ -74,7 +103,10 @@ export async function refreshPedidoStatus(
     .bind(pagamentoId).first<{ mp_payment_id: string | null; pix_expira_em: string | null }>();
   const mpId = tentativa?.mp_payment_id ?? pedido.mp_payment_id;
   let payment;
-  if (mpId && mpAccessToken) {
+  // M7: no máximo uma consulta ao MP por tentativa a cada 15s, qualquer que
+  // seja o ritmo do polling. Sem o claim, segue só com o estado local (a
+  // expiração abaixo continua valendo).
+  if (mpId && mpAccessToken && await claimPendingPixPaymentReconciliation(db, pagamentoId)) {
     try {
       payment = await fetchMpPayment(mpAccessToken, mpId);
     } catch (err) {
