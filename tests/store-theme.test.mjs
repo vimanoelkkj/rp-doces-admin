@@ -74,3 +74,26 @@ test("StoreTheme: No CSS image filters (brightness, contrast, invert) applied to
     assert.ok(!content.includes("filter: invert"), `${relPath} must not use filter: invert`);
   }
 });
+
+test("StoreTheme: anti-flash script in index.html syncs meta[name='theme-color'] with exact header colors", () => {
+  const html = fs.readFileSync(path.resolve("index.html"), "utf-8");
+  assert.match(html, /<meta\s+name=["']theme-color["']/);
+  assert.match(html, /querySelector\(["']meta\[name=["\\]*theme-color["\\]*\]["']\)/);
+  assert.match(html, /#271f1b/);
+  assert.match(html, /#eddcc6/);
+});
+
+test("StoreTheme: StoreThemeContext exports header theme colors and synchronizes statusbar dynamically", () => {
+  const contextCode = fs.readFileSync(path.resolve("src/context/StoreThemeContext.tsx"), "utf-8");
+  assert.match(contextCode, /HEADER_LIGHT_THEME_COLOR\s*=\s*["']#eddcc6["']/);
+  assert.match(contextCode, /HEADER_DARK_THEME_COLOR\s*=\s*["']#271f1b["']/);
+  assert.match(contextCode, /syncMetaThemeColor/);
+  assert.match(contextCode, /MutationObserver/);
+});
+
+test("StoreTheme: useAdminPwa restores storefront theme-color dynamically on cleanup", () => {
+  const adminPwaCode = fs.readFileSync(path.resolve("src/admin/pwa/useAdminPwa.ts"), "utf-8");
+  assert.match(adminPwaCode, /getStorefrontThemeColor/);
+  assert.doesNotMatch(adminPwaCode, /themeMeta\.content\s*=\s*STOREFRONT_THEME_COLOR/);
+});
+

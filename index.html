@@ -18,6 +18,10 @@
                 ? "dark"
                 : "light";
           document.documentElement.setAttribute("data-theme", theme);
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute("content", theme === "dark" ? "#271f1b" : "#eddcc6");
+          }
         } catch (e) {}
       })();
     </script>
