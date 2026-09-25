@@ -319,6 +319,7 @@ export default function Header({ variant }: HeaderProps) {
             </svg>
           </div>
           <span className="logo-text">R&amp;P Doces</span>
+          {isAdmin && <span className="header-admin-badge">Admin</span>}
         </Link>
 
         {isAdmin ? (
