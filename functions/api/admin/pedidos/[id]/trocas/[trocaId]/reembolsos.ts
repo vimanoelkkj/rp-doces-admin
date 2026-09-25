@@ -10,7 +10,8 @@ const messages:Record<string,string>={TROCA_NAO_ENCONTRADA:"Troca não encontrad
   PAGAMENTO_ALOCACAO_INVALIDA:"A perna financeira não pertence a esta troca.",PIX_MP_REFUND_REMOTO_PENDENTE:"O estorno Mercado Pago será tratado em uma fase futura.",
   VALOR_REFUND_DIVERGENTE:"Confirme exatamente o valor calculado pelo servidor.",
   MERCADO_PAGO_NAO_CONFIGURADO:"Mercado Pago não está configurado neste ambiente.",
-  REFUND_REMOTO_EM_ANDAMENTO:"Já existe um estorno remoto em andamento para esta perna.",...OPERACAO_MENSAGENS};
+  REFUND_REMOTO_EM_ANDAMENTO:"Já existe um estorno remoto em andamento para esta perna.",
+  SALDO_REEMBOLSAVEL_INSUFICIENTE:"O saldo reembolsável mudou antes da confirmação. Atualize e tente novamente.",...OPERACAO_MENSAGENS};
 const fail=(message:string,status:number,code?:string)=>Response.json({error:message,...(code?{code}:{})},{status});
 export const onRequestPost:PagesFunction<Env>=async({request,env,params})=>{
   if(!sameOrigin(request))return fail("Origem inválida",403);

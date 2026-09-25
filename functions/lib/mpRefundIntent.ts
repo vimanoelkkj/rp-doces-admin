@@ -36,7 +36,7 @@ interface IntentRow {
 export type PixMpRefundIntentResult =
   | { ok: true; intencao: PixMpRefundIntentView; reembolsoId?: number; replay?: boolean }
   | { ok: false; erro: "OPERACAO_CONFLITO_TIPO" | "OPERACAO_CONFLITO_ESCOPO" |
-      "OPERACAO_CONFLITO_PAYLOAD" | "REFUND_REMOTO_EM_ANDAMENTO" };
+      "OPERACAO_CONFLITO_PAYLOAD" | "REFUND_REMOTO_EM_ANDAMENTO" | "SALDO_REEMBOLSAVEL_INSUFICIENTE" };
 
 // `pagamentoAlocacaoId`, `cancellationId` e `exchangeId` ausentes ao mesmo
 // tempo identificam o terceiro caso (0023): reembolso do saldo restante de
@@ -162,6 +162,12 @@ async function ensureIntent(
         return { ok: false, erro: "REFUND_REMOTO_EM_ANDAMENTO" };
       }
       return winnerForLeg;
+    }
+    // M3 (migration 0031): o valor calculado ficou obsoleto (outro refund
+    // consumiu capacidade do pagamento). O batch inteiro foi revertido:
+    // nenhuma operação órfã, nenhuma intenção, nenhum POST ao Mercado Pago.
+    if (String((error as Error)?.message ?? error).includes("pix_mp_refund_capacidade_excedida")) {
+      return { ok: false, erro: "SALDO_REEMBOLSAVEL_INSUFICIENTE" };
     }
     throw error;
   }

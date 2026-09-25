@@ -221,7 +221,7 @@ type ExchangeError = "OPERATION_KEY_INVALIDA" | "PREVIEW_OBSOLETO" | "PRECO_ALTE
   "ESTOQUE_INSUFICIENTE" | "PIX_PENDENTE" | "TROCA_NAO_ENCONTRADA" |
   "TROCA_NAO_AGUARDANDO" | "PAGAMENTO_ALOCACAO_INVALIDA" |
   "PIX_MP_REFUND_REMOTO_PENDENTE" | "VALOR_REFUND_DIVERGENTE" |
-  "MERCADO_PAGO_NAO_CONFIGURADO" | "REFUND_REMOTO_EM_ANDAMENTO" |
+  "MERCADO_PAGO_NAO_CONFIGURADO" | "REFUND_REMOTO_EM_ANDAMENTO" | "SALDO_REEMBOLSAVEL_INSUFICIENTE" |
   "OPERACAO_INCOMPLETA" | "ESTORNO_ANULACAO_ATIVO" | ConflitoOperacao;
 export type ExchangeResult = { ok: true; troca: ExchangeView; replay?: boolean; reembolsoId?: number; refundStatus?: PixMpRefundIntentStatus }
   | { ok: false; erro: ExchangeError; preview?: ItemExchangePreview; precoAtualCentavos?: number };

@@ -101,9 +101,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         operationKey: legOperationKey, fingerprint: identity.fingerprint,
         valorCentavos: pendente.restanteCentavos, accessToken: env.MP_ACCESS_TOKEN,
       });
-      // Um conflito aqui só pode vir de uma reutilização incompatível da
-      // sub-key derivada (nunca do cliente) — segue para as demais pernas em
-      // vez de abortar o estorno inteiro por causa de uma perna corrompida.
+      // Conflito de uma perna — reutilização incompatível da sub-key derivada
+      // ou SALDO_REEMBOLSAVEL_INSUFICIENTE (M3: outro refund consumiu a
+      // capacidade entre o cálculo e a criação da intenção; nada foi enviado
+      // ao MP). Segue para as demais pernas; o estado é recomputado abaixo.
       if (resultado.ok === false) {
         console.error("Conflito ao reconciliar estorno de anulacao", { pedidoId, pendente }, resultado.erro);
       }
