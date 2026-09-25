@@ -679,8 +679,8 @@ export default function Homepage() {
         ref={contactRef}
       >
         <div className="contact-header">
-          <span className="section-tag">Venha nos Visitar</span>
-          <h2>Onde Encontrar</h2>
+          <span className="section-tag">Nosso Espaço</span>
+          <h2>Nosso cantinho no Cambuí</h2>
         </div>
 
         <div className="contact-card">
@@ -693,18 +693,18 @@ export default function Homepage() {
                   height="16"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#634738"
+                  stroke="var(--store-header-icon-stroke)"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                  <circle cx="12" cy="10" r="3" />
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>
               </div>
               <div>
-                <span className="contact-label">Localização</span>
-                <h3>{storeConfig.localName}</h3>
+                <h4>Localização</h4>
+                <p className="contact-location-name">{storeConfig.localName}</p>
               </div>
             </div>
 
@@ -718,7 +718,7 @@ export default function Homepage() {
                     height="14"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#634738"
+                    stroke="var(--store-header-icon-stroke)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -751,7 +751,7 @@ export default function Homepage() {
                     height="14"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#634738"
+                    stroke="var(--store-header-icon-stroke)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -774,7 +774,7 @@ export default function Homepage() {
                     height="14"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#634738"
+                    stroke="var(--store-header-icon-stroke)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -803,7 +803,7 @@ export default function Homepage() {
                     height="14"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#634738"
+                    stroke="var(--store-header-icon-stroke)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
