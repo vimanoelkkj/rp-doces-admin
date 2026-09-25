@@ -171,7 +171,13 @@ html.menu-open #root {
 }
 
 @media (max-width: 768px) {
+  ::view-transition-group(root) {
+    animation-duration: 0.26s;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
   :root {
     --app-header-height: 56px;
   }
 }
+

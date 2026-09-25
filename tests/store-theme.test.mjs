@@ -97,3 +97,45 @@ test("StoreTheme: useAdminPwa restores storefront theme-color dynamically on cle
   assert.doesNotMatch(adminPwaCode, /themeMeta\.content\s*=\s*STOREFRONT_THEME_COLOR/);
 });
 
+test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserva radial reveal no desktop", () => {
+  const contextCode = fs.readFileSync(path.resolve("src/context/StoreThemeContext.tsx"), "utf-8");
+
+  // 1. Desktop continua tendo o radial clipPath
+  assert.match(contextCode, /clipPath:\s*\[[\s\S]*?circle\(0px at/);
+  assert.match(contextCode, /circle\(\$\{maxRadius\}px at/);
+
+  // 2. Existe detecção específica para mobile max-width: 768px
+  assert.match(contextCode, /matchMedia\(\s*["']\(max-width:\s*768px\)["']\s*\)/);
+
+  // 3. O caminho mobile usa opacity
+  assert.match(contextCode, /opacity:\s*\[0,\s*1\]/);
+
+  // 4. O caminho mobile usa transform
+  assert.match(contextCode, /transform:\s*\[["']scale\(1\.015?\)["'],\s*["']scale\(1\)["']\]/);
+
+  // 5. O caminho mobile NÃO usa clipPath (verifica isoladamente o bloco mobile)
+  const mobileBlockMatch = contextCode.match(/if\s*\(\s*isMobile\s*\)\s*\{([\s\S]*?)\n\s*return;\s*\}/);
+  assert.ok(mobileBlockMatch, "bloco condicional mobile deve existir");
+  assert.doesNotMatch(mobileBlockMatch[1], /clipPath/i, "caminho mobile não deve usar clipPath");
+
+  // 6. prefers-reduced-motion continua preservado
+  assert.match(contextCode, /matchMedia\(\s*["']\(prefers-reduced-motion:\s*reduce\)["']\s*\)/);
+
+  // 7. Duração mobile está abaixo da duração desktop
+  const desktopDurationMatch = contextCode.match(/const\s*\{\s*x,\s*y\s*\}[\s\S]*?duration:\s*(\d+)/);
+  const mobileDurationMatch = contextCode.match(/if\s*\(\s*isMobile\s*\)[\s\S]*?duration:\s*(\d+)/);
+  assert.ok(desktopDurationMatch, "deve ter duração no caminho desktop");
+  assert.ok(mobileDurationMatch, "deve ter duração no caminho mobile");
+  const desktopDuration = Number(desktopDurationMatch[1]);
+  const mobileDuration = Number(mobileDurationMatch[1]);
+  assert.ok(
+    mobileDuration < desktopDuration,
+    `duração mobile (${mobileDuration}ms) deve ser menor que duração desktop (${desktopDuration}ms)`,
+  );
+  assert.ok(
+    mobileDuration >= 240 && mobileDuration <= 300,
+    `duração mobile (${mobileDuration}ms) deve estar entre 240ms e 300ms`,
+  );
+});
+
+
