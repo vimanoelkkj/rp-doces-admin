@@ -686,15 +686,15 @@ export default function Homepage() {
         <div className="contact-card">
           <div className="contact-accent-bar" aria-hidden="true" />
           <div className="contact-content">
-            <div className="contact-location-header">
-              <div className="contact-icon-bg">
+            <div className="contact-location-header contact-info-item">
+              <div className="contact-icon-wrap" aria-hidden="true">
                 <svg
-                  width="16"
-                  height="16"
+                  width="18"
+                  height="18"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="var(--store-header-icon-stroke)"
-                  strokeWidth="2"
+                  strokeWidth="1.9"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
@@ -702,9 +702,9 @@ export default function Homepage() {
                   <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>
               </div>
-              <div>
+              <div className="contact-info-text">
                 <h4>Localização</h4>
-                <p className="contact-location-name">{storeConfig.localName}</p>
+                <p>{storeConfig.localName}</p>
               </div>
             </div>
 
@@ -712,14 +712,14 @@ export default function Homepage() {
 
             <div className="contact-info-grid">
               <div className="contact-info-item">
-                <div className="contact-icon-bg">
+                <div className="contact-icon-wrap" aria-hidden="true">
                   <svg
-                    width="14"
-                    height="14"
+                    width="18"
+                    height="18"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="var(--store-header-icon-stroke)"
-                    strokeWidth="2"
+                    strokeWidth="1.9"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
@@ -727,7 +727,7 @@ export default function Homepage() {
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                 </div>
-                <div>
+                <div className="contact-info-text">
                   <h4>Endereço</h4>
                   {storeConfig.mapsLink ? (
                     <a
@@ -745,14 +745,14 @@ export default function Homepage() {
               </div>
 
               <div className="contact-info-item">
-                <div className="contact-icon-bg">
+                <div className="contact-icon-wrap" aria-hidden="true">
                   <svg
-                    width="14"
-                    height="14"
+                    width="18"
+                    height="18"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="var(--store-header-icon-stroke)"
-                    strokeWidth="2"
+                    strokeWidth="1.9"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
@@ -760,7 +760,7 @@ export default function Homepage() {
                     <polyline points="12 6 12 12 16 14" />
                   </svg>
                 </div>
-                <div>
+                <div className="contact-info-text">
                   <h4>Atendimento</h4>
                   <p>{storeSchedule}</p>
                   <p>{storeDelivery}</p>
@@ -768,21 +768,21 @@ export default function Homepage() {
               </div>
 
               <div className="contact-info-item">
-                <div className="contact-icon-bg">
+                <div className="contact-icon-wrap" aria-hidden="true">
                   <svg
-                    width="14"
-                    height="14"
+                    width="18"
+                    height="18"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="var(--store-header-icon-stroke)"
-                    strokeWidth="2"
+                    strokeWidth="1.9"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
                   </svg>
                 </div>
-                <div>
+                <div className="contact-info-text">
                   <h4>WhatsApp para Encomendas</h4>
                   <p>{storeWhatsapp}</p>
                 </div>
@@ -797,14 +797,14 @@ export default function Homepage() {
                 onClick={openInstagram}
                 style={{ color: "inherit", textDecoration: "none" }}
               >
-                <div className="contact-icon-bg">
+                <div className="contact-icon-wrap" aria-hidden="true">
                   <svg
-                    width="14"
-                    height="14"
+                    width="18"
+                    height="18"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="var(--store-header-icon-stroke)"
-                    strokeWidth="2"
+                    strokeWidth="1.9"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
@@ -813,7 +813,7 @@ export default function Homepage() {
                     <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
                   </svg>
                 </div>
-                <div>
+                <div className="contact-info-text">
                   <h4>Instagram</h4>
                   <p>@rp.doces_</p>
                 </div>

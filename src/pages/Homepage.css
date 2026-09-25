@@ -685,28 +685,7 @@
 }
 
 .contact-location-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
   margin-bottom: 24px;
-}
-
-.contact-location-header h4 {
-  font-family: "Manrope", sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--store-text-heading);
-  margin: 0 0 4px;
-  text-transform: none;
-}
-
-.contact-location-name {
-  font-family: "Manrope", sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--store-text-heading);
-  margin: 0;
-  line-height: 1.4;
 }
 
 .contact-divider {
@@ -724,22 +703,50 @@
 
 .contact-info-item {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-start;
 }
 
-.contact-info-item h4 {
+.contact-icon-wrap {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  background: transparent;
+}
+
+.contact-icon-wrap svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.contact-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contact-info-text h4 {
   font-family: "Manrope", sans-serif;
   font-size: 13px;
   font-weight: 700;
   color: var(--store-text-heading);
-  margin-bottom: 4px;
+  margin: 0;
+  line-height: 1.35;
+  text-transform: none;
 }
-.contact-info-item p {
+
+.contact-info-text p {
   font-family: "Manrope", sans-serif;
   font-size: 14px;
   color: var(--store-text-muted);
   line-height: 1.5;
+  margin: 0;
 }
 
 .btn-whatsapp {
@@ -1302,41 +1309,41 @@
     padding: 0;
   }
   .contact-location-header {
-    margin-bottom: 16px;
-    gap: 16px;
-    align-items: flex-start;
-  }
-  .contact-location-header h4 {
-    font-size: 12px;
-    color: var(--store-text-heading);
-    margin: 0 0 4px;
-    text-transform: none;
-  }
-  .contact-location-name {
-    font-size: 14px;
-    color: var(--store-text-heading);
-    margin: 0;
+    margin-bottom: 18px;
   }
   .contact-divider {
     display: none;
   }
   .contact-info-grid {
     grid-template-columns: 1fr;
-    gap: 16px;
-    margin-bottom: 20px;
+    gap: 18px;
+    margin-bottom: 22px;
   }
-  .contact-info-item h4 {
-    font-size: 12px;
+  .contact-info-item {
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .contact-icon-wrap {
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+    margin-top: 1px;
+  }
+  .contact-icon-wrap svg {
+    width: 18px;
+    height: 18px;
+  }
+  .contact-info-text h4 {
+    font-size: 13px;
     color: var(--store-text-heading);
+    margin: 0;
+    line-height: 1.35;
   }
-  .contact-info-item p {
+  .contact-info-text p {
     font-size: 13px;
     color: var(--store-text-muted);
-  }
-  .contact-icon-bg {
-    width: 32px;
-    height: 32px;
-    background: var(--store-surface-soft);
+    line-height: 1.5;
+    margin: 0;
   }
   .btn-whatsapp {
     align-self: stretch;
