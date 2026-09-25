@@ -500,9 +500,14 @@ export default function Header({ variant }: HeaderProps) {
                 onClick={handleDragHandleClick}
                 aria-label="Fechar menu"
                 title="Arraste para baixo para fechar"
-              />
-              <div className="mobile-menu-mini-wave" aria-hidden="true">
-                <svg width="56" height="6" viewBox="0 0 56 6" fill="none">
+              >
+                <svg
+                  width="56"
+                  height="6"
+                  viewBox="0 0 56 6"
+                  fill="none"
+                  aria-hidden="true"
+                >
                   <path
                     d="M1 3C9 1 18 5 28 3C38 1 47 5 55 3"
                     stroke="currentColor"
@@ -510,7 +515,7 @@ export default function Header({ variant }: HeaderProps) {
                     strokeLinecap="round"
                   />
                 </svg>
-              </div>
+              </button>
 
               <div className="mobile-menu-links">
                 <button

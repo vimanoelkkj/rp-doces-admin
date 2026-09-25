@@ -408,6 +408,9 @@ html[data-admin-theme="dark"] .header-admin-badge {
 
 .mobile-menu-close {
   align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
   width: 72px;
   height: 32px;
@@ -416,22 +419,17 @@ html[data-admin-theme="dark"] .header-admin-badge {
   background: transparent;
   border: none;
   border-radius: 999px;
+  color: var(--store-accent);
+  opacity: 0.32;
   cursor: grab;
   touch-action: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-menu-close::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 40px;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--store-border);
-  transform: translate(-50%, -50%);
+.mobile-menu-close svg {
+  display: block;
+  pointer-events: none;
 }
 
 .mobile-menu-close:active {
@@ -441,17 +439,6 @@ html[data-admin-theme="dark"] .header-admin-badge {
 .mobile-menu-close:focus-visible {
   outline: 2px solid var(--store-border-focus);
   outline-offset: 2px;
-}
-
-.mobile-menu-mini-wave {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: -6px 0 8px;
-  color: var(--store-accent);
-  opacity: 0.32;
-  pointer-events: none;
-  user-select: none;
 }
 
 .mobile-menu-links {
