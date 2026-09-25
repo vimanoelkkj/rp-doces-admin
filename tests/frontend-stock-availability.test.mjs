@@ -103,6 +103,66 @@ test('fetchProducts propaga disponibilidade = max(0, estoque - estoque_reservado
   assert.equal(produtos[2].disponibilidade, 0);
 });
 
+const produtoUnico = {
+  id: 1,
+  nome: 'Bolo de Pote',
+  categoria: 'BOLO_NO_POTE',
+  categoria_nome: 'Bolo no Pote',
+  descricao: '',
+  preco_centavos: 2500,
+  preco_promocional_centavos: null,
+  promocao_ativa: 0,
+  promocao_inicio: null,
+  promocao_fim: null,
+  destaque: 0,
+  ordem: 0,
+  estoque: 1,
+  estoque_reservado: 0,
+  image_key: null,
+};
+
+test('fetchProducts pede a liberação de reservas vencidas (POST) antes de ler o catálogo (GET)', async (t) => {
+  const chamadas = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    chamadas.push([options?.method ?? 'GET', String(url)]);
+    if (String(url) === '/api/reservas/reconciliar') return Response.json({ ok: true });
+    return Response.json({ produtos: [produtoUnico] });
+  });
+
+  const produtos = await fetchProducts();
+
+  assert.deepEqual(chamadas, [
+    ['POST', '/api/reservas/reconciliar'],
+    ['GET', '/api/produtos'],
+  ]);
+  assert.equal(produtos.length, 1);
+  assert.equal(produtos[0].disponibilidade, 1);
+});
+
+test('fetchProducts carrega o catálogo mesmo se a liberação de reservas falhar', async (t) => {
+  for (const falha of [
+    async () => { throw new TypeError('Failed to fetch'); },
+    async () => Response.json({ error: 'Origem inválida' }, { status: 403 }),
+  ]) {
+    const chamadas = [];
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+      chamadas.push([options?.method ?? 'GET', String(url)]);
+      if (String(url) === '/api/reservas/reconciliar') return falha();
+      return Response.json({ produtos: [produtoUnico] });
+    });
+
+    const produtos = await fetchProducts();
+
+    assert.deepEqual(chamadas.map(([m, u]) => `${m} ${u}`), [
+      'POST /api/reservas/reconciliar',
+      'GET /api/produtos',
+    ]);
+    assert.equal(produtos.length, 1);
+    assert.equal(produtos[0].name, 'Bolo de Pote');
+    t.mock.restoreAll();
+  }
+});
+
 test('calculateAddQuantity nunca ultrapassa a disponibilidade do item', () => {
   // Quantidade atual 2, disponibilidade 3 -> permite 3
   assert.equal(calculateAddQuantity(2, 3), 3);

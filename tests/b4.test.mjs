@@ -164,6 +164,43 @@ for(const path of ['polling','sweep']) test(`SITE + ADMIN: ${path} expiration re
   reserved(await state(db)); assert.equal((await state(db)).pagamentos[0].status,'EXPIRADO');
 });
 
+// M1: rota pública POST /api/reservas/reconciliar. Só limpeza local: qualquer
+// chamada de rede (Mercado Pago incluído) quebra o teste.
+const reconciliarReservas = (db, headers={Origin:'https://local.test'}) =>
+  app.reservasReconciliar.onRequestPost({env:{DB:db},
+    request:new Request('https://local.test/api/reservas/reconciliar',{method:'POST',headers})});
+const semRede = t => t.mock.method(globalThis,'fetch',async ()=>{ throw new Error('rede nunca deve ser usada'); });
+const vencerReserva = db => db.prepare("UPDATE pedidos SET reserva_expira_em='2000-01-01 00:00:00' WHERE id=1").run();
+
+test('M1: reserva SITE vencida é liberada pela rota pública, sem Mercado Pago',async t=>{
+  const db=await fixture(t); const net=semRede(t); await vencerReserva(db);
+  reserved(await state(db));
+  const r=await reconciliarReservas(db);
+  assert.equal(r.status,200); assert.deepEqual(await r.json(),{ok:true});
+  const s=await state(db);
+  assert.equal(s.pagamentos[0].status,'EXPIRADO');
+  released(s);
+  assert.equal(net.mock.callCount(),0);
+});
+
+test('M1: outro Pix pendente mantém a reserva (B4) mesmo com a tentativa SITE vencida',async t=>{
+  const db=await fixture(t); const net=semRede(t); await second(db); await vencerReserva(db);
+  const r=await reconciliarReservas(db);
+  assert.equal(r.status,200);
+  const s=await state(db);
+  assert.equal(s.pagamentos[0].status,'EXPIRADO');
+  assert.equal(s.pagamentos[1].status,'PENDENTE');
+  reserved(s);
+  assert.equal(net.mock.callCount(),0);
+});
+
+test('M1: rota pública recusa origem cruzada sem tocar em nada',async t=>{
+  const db=await fixture(t); await vencerReserva(db); const before=await state(db);
+  const r=await reconciliarReservas(db,{Origin:'https://evil.test'});
+  assert.equal(r.status,403);
+  assert.deepEqual(await state(db),before);
+});
+
 test('creation wins before release write: new pending Pix protects existing reservation and TTL',async t=>{
   const db=await fixture(t); remote(t); const before=await state(db); let inserted=false;
   db.hook=async (s,op)=>{

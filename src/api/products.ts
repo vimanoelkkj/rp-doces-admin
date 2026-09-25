@@ -50,7 +50,20 @@ function toProduct(row: ProdutoApiRow): Product {
   };
 }
 
+// Pede ao servidor que devolva ao estoque livre as reservas Pix já vencidas
+// antes de ler o catálogo, para a vitrine não mostrar como esgotado um item
+// preso por Pix abandonado. Best-effort: qualquer falha é ignorada e o
+// catálogo carrega do mesmo jeito. A regra de expiração vive só no servidor.
+async function liberarReservasVencidas(): Promise<void> {
+  try {
+    await fetch("/api/reservas/reconciliar", { method: "POST" });
+  } catch {
+    // ignora: o GET abaixo continua
+  }
+}
+
 export async function fetchProducts(): Promise<Product[]> {
+  await liberarReservasVencidas();
   const response = await fetch("/api/produtos");
   if (!response.ok) {
     throw new Error(`Falha ao carregar produtos (${response.status})`);

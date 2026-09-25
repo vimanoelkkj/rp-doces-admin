@@ -4,6 +4,7 @@ import { precoAtualCentavos, ProdutoRow } from "../lib/pricing";
 import { liberarReservaPedido } from "../lib/stock";
 import { postPagamentoMp } from "../lib/mpPost";
 import { checkCheckoutRateLimit } from "../lib/checkoutRateLimit";
+import { liberarReservasVencidasLocalmente } from "../lib/paymentSync";
 import {
   buscarOperacao,
   chaveMp,
@@ -167,6 +168,16 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
         headers: { "Retry-After": String(rateLimit.retryAfter) },
       },
     );
+  }
+
+  // M1: antes de ler `estoque_reservado` para validar esta NOVA compra,
+  // devolve ao estoque livre as reservas Pix do site já vencidas. Local, sem
+  // Mercado Pago, sob os guards B4. Replays saíram acima e não pagam esse
+  // custo; falha aqui nunca bloqueia o checkout.
+  try {
+    await liberarReservasVencidasLocalmente(env);
+  } catch (err) {
+    console.error("Falha ao liberar reservas vencidas antes do checkout", err);
   }
 
   const ids = [...new Set(body.items.map((i) => i.id))];
