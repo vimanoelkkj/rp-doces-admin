@@ -2,6 +2,7 @@ import { useEffect, useState, Suspense } from "react";
 import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import StorefrontFrame from "../../components/StorefrontFrame";
 import RouteLoadingFallback from "../../components/RouteLoadingFallback";
+import AdminMobileBottomNav from "./AdminMobileBottomNav";
 import { AdminThemeProvider } from "../theme/AdminThemeContext";
 import { AdminAuthProvider, type AdminUser } from "../auth/AdminAuthContext";
 import { NotificacoesProvider } from "../notificacoes/NotificacoesContext";
@@ -54,6 +55,7 @@ export default function AdminLayout() {
               </Suspense>
             </div>
           </StorefrontFrame>
+          <AdminMobileBottomNav />
         </NotificacoesProvider>
       </AdminAuthProvider>
     </AdminThemeProvider>

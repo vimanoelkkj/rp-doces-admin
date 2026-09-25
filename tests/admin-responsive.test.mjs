@@ -237,3 +237,15 @@ test('emoji do modal de categorias usa o mesmo catálogo do modal de novo produt
   assert.doesNotMatch(categorias, /const EMOJI_OPTIONS\s*=/,
     'o modal de categorias não tem mais sua própria lista de emojis');
 });
+
+test('Header no Admin mobile não renderiza hamburger nem drawer, preservando a bottom nav', async () => {
+  const headerCode = await readFile(new URL('../src/components/Header.tsx', import.meta.url), 'utf8');
+  assert.match(headerCode, /\{!isAdmin\s*&&\s*\(/, 'hamburger condicionado a !isAdmin');
+  assert.match(headerCode, /\{!isAdmin\s*&&\s*createPortal\(/, 'drawer mobile condicionado a !isAdmin');
+});
+
+test('AdminLayout renderiza AdminMobileBottomNav para navegação mobile', async () => {
+  const layoutCode = await readFile(new URL('../src/admin/components/AdminLayout.tsx', import.meta.url), 'utf8');
+  assert.match(layoutCode, /import\s+AdminMobileBottomNav\s+from\s+"\.\/AdminMobileBottomNav"/);
+  assert.match(layoutCode, /<AdminMobileBottomNav\s*\/>/);
+});
