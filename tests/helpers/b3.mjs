@@ -70,6 +70,7 @@ const bundle = await build({
       export * as adminReconciliar from './functions/api/admin/pedidos/reconciliar';
       export * as adminOrderReconciliar from './functions/api/admin/pedidos/[id]/reconciliar';
       export * as adminMaintenance from './functions/lib/adminPedidos/maintenance';
+      export * as reservasReconciliar from './functions/api/reservas/reconciliar';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },

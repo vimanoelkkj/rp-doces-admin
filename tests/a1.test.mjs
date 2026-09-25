@@ -493,6 +493,36 @@ test('checkout: payload incompatível é conflito; key nova é uma intenção no
   assert.equal((await db.prepare('SELECT estoque_reservado FROM produtos WHERE id=1').first()).estoque_reservado, 4);
 });
 
+test('checkout: nova compra libera antes a reserva vencida que prendia a última unidade (M1)', async t => {
+  const db = await siteLimpo(t);
+  await db.prepare('UPDATE produtos SET estoque=2 WHERE id=1').run();
+  const mp = mpPost(t);
+
+  const abandonado = await corpo(await checkout(db, {operationKey: KEY}));
+  assert.equal(abandonado.status, 200);
+  assert.equal((await db.prepare('SELECT estoque_reservado FROM produtos WHERE id=1').first()).estoque_reservado, 2,
+    'o Pix abandonado prende a última unidade');
+  await db.prepare("UPDATE pedidos SET reserva_expira_em='2000-01-01 00:00:00' WHERE id=?")
+    .bind(abandonado.body.pedidoId).run();
+  const chamadasAntes = mp.mock.calls.length;
+
+  const nova = await corpo(await checkout(db, {operationKey: KEY2}));
+  assert.equal(nova.status, 200, 'a limpeza roda antes da validação de estoque');
+  assert.notEqual(nova.body.pedidoId, abandonado.body.pedidoId);
+
+  const velho = await db.prepare('SELECT reserva_status FROM pedidos WHERE id=?').bind(abandonado.body.pedidoId).first();
+  assert.equal(velho.reserva_status, 'LIBERADA');
+  const tentativaVelha = await db.prepare('SELECT status FROM pedido_pagamentos WHERE pedido_id=?')
+    .bind(abandonado.body.pedidoId).first();
+  assert.equal(tentativaVelha.status, 'EXPIRADO');
+  assert.equal((await db.prepare('SELECT estoque_reservado FROM produtos WHERE id=1').first()).estoque_reservado, 2,
+    'a unidade liberada foi adquirida pela nova compra');
+
+  const novas = mp.mock.calls.slice(chamadasAntes);
+  assert.equal(novas.length, 1, 'nenhuma chamada extra ao Mercado Pago');
+  assert.equal(novas[0].arguments[1]?.method, 'POST', 'apenas o POST normal da nova compra');
+});
+
 test('checkout: key inválida/ausente é recusada antes de qualquer escrita', async t => {
   const db = await siteLimpo(t);
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('rede nunca deve ser usada'); });
