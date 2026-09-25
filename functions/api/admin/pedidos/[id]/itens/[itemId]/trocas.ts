@@ -5,7 +5,6 @@ import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../../../lib/pedidoAnu
 
 import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import { createItemExchange, getExchangeView, ItemExchangePreviewError } from "../../../../../../lib/itemExchange";
-import { reconcileLiveTabParent } from "../../../../../../lib/liveTabRecovery";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
 interface Env{DB:D1Database;MP_ACCESS_TOKEN?:string}
 const messages:Record<string,string>={PREVIEW_OBSOLETO:"A comanda mudou. Revise a troca novamente.",PRECO_ALTERADO:"O preço do produto mudou.",
@@ -14,10 +13,12 @@ const messages:Record<string,string>={PREVIEW_OBSOLETO:"A comanda mudou. Revise 
 const fail=(message:string,status:number,code?:string,extra:object={})=>Response.json({error:message,...(code?{code}:{}),...extra},{status});
 export const onRequestGet:PagesFunction<Env>=async({request,env,params})=>{
   const auth=await requireUser(env.DB,request);if("error" in auth)return auth.error;
-  let troca=await getExchangeView(env.DB,Number(params.id),Number(params.itemId));
-  if(troca){try{await reconcileLiveTabParent(env.DB,env.MP_ACCESS_TOKEN,{exchangeId:troca.id});
-    troca=await getExchangeView(env.DB,Number(params.id),Number(params.itemId));}
-    catch(error){console.error("Recuperacao oportunista de refund MP pendente",error);}}
+  const pedidoId=Number(params.id),itemId=Number(params.itemId);
+  if(!Number.isInteger(pedidoId)||pedidoId<=0||!Number.isInteger(itemId)||itemId<=0)
+    return fail("Identificador inválido",400,"ID_INVALIDO");
+  // Somente leitura: a retomada de refund/finalização pendente acontece por
+  // POST /api/admin/pedidos/:id/reconciliar, disparado pela tela antes deste GET.
+  const troca=await getExchangeView(env.DB,pedidoId,itemId);
   return troca?Response.json({troca}):fail("Troca não encontrada",404,"TROCA_NAO_ENCONTRADA");
 };
 export const onRequestPost:PagesFunction<Env>=async({request,env,params})=>{

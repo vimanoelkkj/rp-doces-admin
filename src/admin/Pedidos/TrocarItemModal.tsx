@@ -4,6 +4,7 @@ import { precoVigenteCentavos } from "../../../shared/promocao";
 import { novaOperationKey } from "../../lib/operationKey";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
 import { useAdminModal } from "../components/useAdminModal";
+import { reconciliarPedido } from "./reconciliarPedido";
 import "./AdicionarItemModal.css";
 import "./CancelamentoItemPreviewModal.css";
 
@@ -104,7 +105,10 @@ export default function TrocarItemModal({
   useEffect(() => {
     let active = true;
     if (existingExchangeId) {
-      fetch(`/api/admin/pedidos/${orderId}/itens/${item.id}/trocas`)
+      // O GET é somente leitura: a retomada de refund/finalização pendente é
+      // pedida antes, de forma explícita.
+      reconciliarPedido(orderId)
+        .then(() => fetch(`/api/admin/pedidos/${orderId}/itens/${item.id}/trocas`))
         .then(async (r) => {
           const b = await r.json();
           if (!r.ok) throw new Error(b.error);

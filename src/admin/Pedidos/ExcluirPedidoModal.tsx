@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import { novaOperationKey } from "../../lib/operationKey";
+import { reconciliarPedido } from "./reconciliarPedido";
 import "./ExcluirPedidoModal.css";
 
 type IntencaoStatus = "PENDENTE" | "PROCESSANDO" | "CONFIRMADO" | "RECUSADO" | "INCONCLUSIVO";
@@ -78,6 +79,9 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
   }
 
   async function carregarEstorno() {
+    // O GET é somente leitura: a retomada de um estorno parado é pedida antes,
+    // de forma explícita, em cada carga e em cada ciclo do polling.
+    await reconciliarPedido(orderId);
     try {
       const response = await fetch(`/api/admin/pedidos/${orderId}/anulacao/estorno`);
       if (!response.ok) return;

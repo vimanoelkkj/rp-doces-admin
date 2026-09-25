@@ -117,8 +117,18 @@ test('4: duas requests POST concorrentes com a mesma operationKey nao duplicam o
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_pix_mp_intencoes`).first()).n, 1);
 });
 
-// 5) reload durante PROCESSANDO recupera estado
-test('5: intencao presa em PROCESSANDO e recuperada oportunisticamente pelo GET', async t => {
+const reconciliarPedido = (db, session) => app.adminOrderReconciliar.onRequestPost({
+  env: {DB: db, MP_ACCESS_TOKEN: 'TEST_TOKEN'}, params: {id: '1'}, waitUntil() {},
+  request: new Request('https://local.test/api/admin/pedidos/1/reconciliar', {
+    method: 'POST', headers: {Origin: 'https://local.test', Cookie: cookieDe(session)},
+  }),
+});
+
+const intencaoAnulacao = db => db.prepare(`SELECT status,tentativas,mp_refund_id,atualizado_em
+  FROM pedido_reembolso_pix_mp_intencoes`).first();
+
+// 5) reload durante PROCESSANDO recupera estado — agora por POST explícito
+test('5: intencao presa em PROCESSANDO: GET so le; POST /reconciliar recupera', async t => {
   const {db, session} = await pedidoComMp(t);
   // Primeira tentativa: o Mercado Pago responde "in_process" (real estado
   // pendente do provedor) -- a intencao fica PROCESSANDO com mp_refund_id
@@ -131,11 +141,50 @@ test('5: intencao presa em PROCESSANDO e recuperada oportunisticamente pelo GET'
   // provedor ja tem o resultado definitivo.
   await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
     SET atualizado_em=datetime('now','-2 minutes')`).run();
+  // GET: somente leitura, mesmo com a intencao elegivel para recuperacao.
+  let rede = 0;
+  t.mock.method(globalThis, 'fetch', async () => { rede++; throw new Error('GET nao pode chamar a rede'); });
+  const escritas = [];
+  db.hook = async statements => {
+    for (const s of statements) if (/^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(s.sql)) escritas.push(s.sql);
+    return statements;
+  };
+  const antes = await intencaoAnulacao(db);
+  const leitura = await corpo(await getEstorno(db, session));
+  assert.equal(leitura.status, 200);
+  assert.equal(leitura.body.pernas[0].intencao.status, 'PROCESSANDO');
+  assert.equal(leitura.body.restanteTotalCentavos, 10000);
+  assert.equal(rede, 0, 'GET nao chama o Mercado Pago');
+  assert.deepEqual(escritas, [], 'GET nao escreve no D1');
+  assert.deepEqual(await intencaoAnulacao(db), antes);
+  db.hook = null;
+
+  // POST /reconciliar: o gatilho explicito conclui o refund sem novo clique.
   t.mock.method(globalThis, 'fetch', async () =>
     Response.json({id: 9001, payment_id: 101, amount: 100, status: 'approved'}, {status: 200}));
+  assert.equal((await reconciliarPedido(db, session)).status, 200);
   const {body} = await corpo(await getEstorno(db, session));
-  assert.equal(body.restanteTotalCentavos, 0, 'a recuperacao oportunista confirmou o refund sem novo clique');
+  assert.equal(body.restanteTotalCentavos, 0, 'a recuperacao explicita confirmou o refund sem novo clique');
   assert.equal(body.pernas.length, 0);
+});
+
+test('5b: GET com intencao INCONCLUSIVO sem refund remoto nunca reenvia o POST de refund', async t => {
+  const {db, session} = await pedidoComMp(t);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('connection lost'); });
+  const primeira = await corpo(await postEstorno(db, session));
+  assert.equal(primeira.body.pernas[0].intencao.status, 'INCONCLUSIVO');
+  const antes = await intencaoAnulacao(db);
+  assert.equal(antes.mp_refund_id, null, 'estado em que a recuperacao faria POST de refund');
+
+  const chamadas = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    chamadas.push(`${init?.method ?? 'GET'} ${url}`);
+    throw new Error('GET nao pode chamar a rede');
+  });
+  const r = await corpo(await getEstorno(db, session));
+  assert.equal(r.status, 200);
+  assert.deepEqual(chamadas, [], 'nenhum POST /refunds a partir do GET');
+  assert.deepEqual(await intencaoAnulacao(db), antes);
 });
 
 // 6) CONFIRMADO libera exclusao

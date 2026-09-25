@@ -6,7 +6,6 @@ import { listarPagamentosMpReembolsaveis } from "../../../../../lib/pedidoAnulac
 import {
   getPixMpRefundIntentForPagamento,
   reconcilePixMpRefundIntent,
-  recoverPixMpRefundIntentsForPedido,
   type PixMpRefundIntentView,
 } from "../../../../../lib/mpRefundIntent";
 import {
@@ -43,21 +42,16 @@ async function montarPernas(db: D1Database, pedidoId: number): Promise<PernaEsto
   })));
 }
 
-// GET: estado atual dos pagamentos PIX_MP ainda reembolsáveis deste pedido,
-// para o modal de exclusão decidir o que mostrar sem o cliente calcular
-// nada. Roda a mesma recuperação oportunista de `reconcileLiveTabPedido`
-// antes de ler, para um PROCESSANDO parado não ficar preso até o próximo
-// carregamento da tela do pedido.
+// GET: estado atual, somente leitura, dos pagamentos PIX_MP ainda
+// reembolsáveis deste pedido, para o modal de exclusão decidir o que mostrar
+// sem o cliente calcular nada. Nunca recupera intenções nem chama o Mercado
+// Pago: a retomada de um PROCESSANDO parado acontece por
+// POST /api/admin/pedidos/:id/reconciliar, que o modal dispara antes deste GET.
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
   const pedidoId = Number(params.id);
   if (!Number.isSafeInteger(pedidoId) || pedidoId <= 0) return fail("Id inválido", 400);
-
-  if (env.MP_ACCESS_TOKEN && !(await getPedidoAnulacao(env.DB, pedidoId))) {
-    try { await recoverPixMpRefundIntentsForPedido(env.DB, env.MP_ACCESS_TOKEN, pedidoId, 10); }
-    catch (error) { console.error("Recuperacao oportunista de estorno de anulacao", { pedidoId }, error); }
-  }
 
   const pernas = await montarPernas(env.DB, pedidoId);
   const restanteTotalCentavos = pernas.reduce((soma, p) => soma + p.restanteCentavos, 0);

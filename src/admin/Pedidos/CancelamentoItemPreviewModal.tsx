@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { novaOperationKey } from "../../lib/operationKey";
 import { useAdminModal } from "../components/useAdminModal";
+import { reconciliarPedido } from "./reconciliarPedido";
 import "./CancelamentoItemPreviewModal.css";
 
 interface PreviewPagamento {
@@ -105,7 +106,11 @@ export default function CancelamentoItemPreviewModal({
     const path = existingCancellationId
       ? `/api/admin/pedidos/${orderId}/itens/${itemId}/cancelamentos`
       : `/api/admin/pedidos/${orderId}/itens/${itemId}/cancelamento-preview`;
-    fetch(path)
+    // Cancelamento existente: o GET é somente leitura, então a retomada de
+    // refund/finalização pendente é pedida antes, de forma explícita. Um
+    // preview novo não depende disso.
+    (existingCancellationId ? reconciliarPedido(orderId) : Promise.resolve())
+      .then(() => fetch(path))
       .then(async (r) => {
         const b = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(b.error ?? "Falha ao carregar cancelamento");
