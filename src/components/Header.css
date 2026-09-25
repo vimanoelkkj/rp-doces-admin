@@ -14,6 +14,14 @@
   transition: background-color 0.3s ease;
 }
 
+html[data-theme-transitioning] .header {
+  transition: none !important;
+}
+
+html[data-theme-transitioning] .theme-toggle-btn {
+  transition-property: transform !important;
+}
+
 .logo {
   display: flex;
   align-items: center;
