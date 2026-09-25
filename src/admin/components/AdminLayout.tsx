@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import StorefrontFrame from "../../components/StorefrontFrame";
+import RouteLoadingFallback from "../../components/RouteLoadingFallback";
 import { AdminThemeProvider } from "../theme/AdminThemeContext";
 import { AdminAuthProvider, type AdminUser } from "../auth/AdminAuthContext";
 import { NotificacoesProvider } from "../notificacoes/NotificacoesContext";
@@ -48,7 +49,9 @@ export default function AdminLayout() {
         <NotificacoesProvider>
           <StorefrontFrame headerVariant="admin">
             <div className="admin-layout">
-              <Outlet />
+              <Suspense fallback={<RouteLoadingFallback />}>
+                <Outlet />
+              </Suspense>
             </div>
           </StorefrontFrame>
         </NotificacoesProvider>

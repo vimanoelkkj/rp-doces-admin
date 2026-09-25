@@ -1,0 +1,25 @@
+.route-loading-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 45vh;
+  width: 100%;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.route-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(211, 139, 128, 0.22);
+  border-top-color: var(--store-accent, #d38b80);
+  animation: route-spinner-rotate 0.75s linear infinite;
+  will-change: transform;
+}
+
+@keyframes route-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
