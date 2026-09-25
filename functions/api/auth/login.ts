@@ -25,6 +25,11 @@ interface UsuarioRow {
   ativo: number;
 }
 
+// Hash PBKDF2 dummy fixo e válido (100.000 iterações) para equalizar timing de verificação
+// quando o usuário não existe ou está inativo, mitigando enumeração por canal lateral de tempo.
+const DUMMY_PASSWORD_HASH =
+  "pbkdf2_sha256$100000$e5b19327f233004815af503c254fe388$c4b75d9d1d61ac77144801ab6f9e742ad509bba8757d29912da5dc0ac2eea41f";
+
 function jsonError(message: string, status: number, headers?: HeadersInit) {
   return Response.json({ error: message }, { status, headers });
 }
@@ -64,7 +69,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .bind(username)
     .first<UsuarioRow>();
 
-  if (!user || !user.ativo || !(await verifyPassword(senha, user.senha_hash))) {
+  const hashParaVerificar =
+    user && user.ativo
+      ? user.senha_hash
+      : DUMMY_PASSWORD_HASH;
+
+  const senhaCorreta = await verifyPassword(senha, hashParaVerificar);
+
+  if (!user || !user.ativo || !senhaCorreta) {
     await recordLoginFailure(env.DB, rate.key);
     await new Promise((r) => setTimeout(r, 350));
     return jsonError("Usuário ou senha incorretos", 401);
