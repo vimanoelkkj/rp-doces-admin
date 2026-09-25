@@ -522,21 +522,6 @@ export default function Header({ minimal }: HeaderProps) {
                 </span>
               </button>
 
-              <div className="mobile-menu-theme-row">
-                <span>Tema</span>
-                <button
-                  type="button"
-                  className="mobile-theme-toggle-btn"
-                  onClick={toggleTheme}
-                  aria-label={
-                    theme === "light"
-                      ? "Ativar modo escuro"
-                      : "Ativar modo claro"
-                  }
-                >
-                  {theme === "light" ? "Modo escuro 🌙" : "Modo claro ☀️"}
-                </button>
-              </div>
             </div>
           </nav>
         </>,
