@@ -20,6 +20,7 @@ const IconClose = () => (
 interface AlterarSenhaModalProps {
   adminId: number | null;
   adminNome: string;
+  isSelf: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -27,17 +28,30 @@ interface AlterarSenhaModalProps {
 export default function AlterarSenhaModal({
   adminId,
   adminNome,
+  isSelf,
   onClose,
   onSaved,
 }: AlterarSenhaModalProps) {
-  const modalProps = useAdminModal(adminId != null, onClose);
+  const [senhaAtual, setSenhaAtual] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const handleClose = () => {
+    setSenhaAtual("");
+    setSenha("");
+    setConfirmar("");
+    setError(null);
+    onClose();
+  };
+
+  const modalProps = useAdminModal(adminId != null, handleClose);
+
   const senhasIguais = senha === confirmar;
-  const canSubmit = senha.length >= 8 && senhasIguais;
+  const canSubmit = isSelf
+    ? senhaAtual.trim().length > 0 && senha.length >= 8 && senhasIguais
+    : senha.length >= 8 && senhasIguais;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,18 +59,29 @@ export default function AlterarSenhaModal({
 
     setSaving(true);
     setError(null);
+
+    const payload: { acao: string; senha: string; senhaAtual?: string } = {
+      acao: "resetar_senha",
+      senha,
+    };
+    if (isSelf) {
+      payload.senhaAtual = senhaAtual;
+    }
+
     fetch(`/api/admin/administradores/${adminId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acao: "resetar_senha", senha }),
+      body: JSON.stringify(payload),
     })
       .then(async (response) => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error ?? "Falha ao alterar senha");
         }
+        setSenhaAtual("");
         setSenha("");
         setConfirmar("");
+        setError(null);
         onSaved();
         onClose();
       })
@@ -75,14 +100,31 @@ export default function AlterarSenhaModal({
           <div>
             <span className="nadm-kicker">EQUIPE</span>
             <h2 className="nadm-title">Alterar senha</h2>
-            <p className="nadm-subtitle">Nova senha para {adminNome}.</p>
+            <p className="nadm-subtitle">
+              {isSelf
+                ? "Altere a senha da sua conta."
+                : `Nova senha para ${adminNome}.`}
+            </p>
           </div>
-          <button className="nadm-close" onClick={onClose}>
+          <button className="nadm-close" onClick={handleClose}>
             <IconClose />
           </button>
         </div>
 
         <form className="nadm-body" onSubmit={handleSubmit}>
+          {isSelf && (
+            <div className="nadm-field">
+              <label>SENHA ATUAL</label>
+              <input
+                type="password"
+                placeholder="Sua senha atual"
+                value={senhaAtual}
+                onChange={(e) => setSenhaAtual(e.target.value)}
+                autoFocus
+              />
+            </div>
+          )}
+
           <div className="nadm-field">
             <label>NOVA SENHA</label>
             <input
@@ -90,15 +132,15 @@ export default function AlterarSenhaModal({
               placeholder="Mín. 8 caracteres"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
-              autoFocus
+              autoFocus={!isSelf}
             />
           </div>
 
           <div className="nadm-field">
-            <label>CONFIRMAR SENHA</label>
+            <label>{isSelf ? "CONFIRMAR NOVA SENHA" : "CONFIRMAR SENHA"}</label>
             <input
               type="password"
-              placeholder="Repita a senha"
+              placeholder={isSelf ? "Repita a nova senha" : "Repita a senha"}
               value={confirmar}
               onChange={(e) => setConfirmar(e.target.value)}
               className={confirmar && !senhasIguais ? "nadm-input--error" : ""}
@@ -111,7 +153,11 @@ export default function AlterarSenhaModal({
           {error && <p className="nadm-error-text">{error}</p>}
 
           <div className="nadm-footer">
-            <button type="button" className="nadm-btn-cancel" onClick={onClose}>
+            <button
+              type="button"
+              className="nadm-btn-cancel"
+              onClick={handleClose}
+            >
               Cancelar
             </button>
             <button
