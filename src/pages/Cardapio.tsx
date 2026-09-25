@@ -35,6 +35,14 @@ export default function Cardapio() {
     reconcileWithProducts,
   } = useCart();
 
+  const cartQuantities = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const item of cartItems) {
+      map.set(item.id, (map.get(item.id) ?? 0) + item.quantity);
+    }
+    return map;
+  }, [cartItems]);
+
   useEffect(() => {
     if (products.length > 0) {
       reconcileWithProducts(products);
@@ -192,6 +200,7 @@ export default function Cardapio() {
                     >
                       <ProductCard
                         product={product}
+                        quantityInCart={cartQuantities.get(product.id) ?? 0}
                         onAddToCart={() => addToCart(product)}
                       />
                     </div>

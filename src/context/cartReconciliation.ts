@@ -13,6 +13,34 @@ export interface ReconcilableCartItem {
 }
 
 /**
+ * Calcula o estoque restante de um item considerando a quantidade já presente no carrinho.
+ */
+export function remainingAvailability(
+  disponibilidade?: number,
+  quantityInCart: number = 0
+): number {
+  if (disponibilidade === undefined) return 0;
+  return Math.max(0, disponibilidade - Math.max(0, quantityInCart));
+}
+
+export type StockBadgeState = "esgotado" | "ultima_unidade" | "poucas_unidades" | null;
+
+/**
+ * Determina o estado visual do badge de estoque com base no estoque restante.
+ * Regra:
+ * restante === 0 -> "esgotado" (Esgotado)
+ * restante === 1 -> "ultima_unidade" (Última unidade)
+ * restante >= 2 && restante <= 3 -> "poucas_unidades" (Poucas unidades)
+ * restante > 3 -> null (sem badge)
+ */
+export function getStockBadgeState(restante: number): StockBadgeState {
+  if (restante <= 0) return "esgotado";
+  if (restante === 1) return "ultima_unidade";
+  if (restante <= 3) return "poucas_unidades";
+  return null;
+}
+
+/**
  * Calcula a quantidade após tentar adicionar 1 unidade de um item,
  * respeitando a disponibilidade máxima conhecida.
  */

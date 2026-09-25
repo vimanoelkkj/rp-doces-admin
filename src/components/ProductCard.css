@@ -134,6 +134,25 @@
   letter-spacing: 0.5px;
 }
 
+.product-low-stock-badge {
+  font-family: "Manrope", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--store-text-muted);
+  background: var(--store-surface-soft);
+  border-radius: 4px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.product-low-stock-badge--last {
+  color: var(--store-accent);
+  background: var(--store-accent-soft);
+  border: 1px solid var(--store-accent);
+  padding: 1px 7px;
+}
+
 .product-prices {
   display: flex;
   flex-direction: column;
@@ -212,6 +231,7 @@
 .add-button--added {
   background-color: #4caf50;
   color: #fff;
+  opacity: 1;
   pointer-events: none;
 }
 
