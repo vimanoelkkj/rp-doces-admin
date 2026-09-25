@@ -110,12 +110,10 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
   // 3. O caminho mobile usa opacity
   assert.match(contextCode, /opacity:\s*\[0,\s*1\]/);
 
-  // 4. O caminho mobile usa transform
-  assert.match(contextCode, /transform:\s*\[["']scale\(1\.015?\)["'],\s*["']scale\(1\)["']\]/);
-
-  // 5. O caminho mobile NÃO usa clipPath (verifica isoladamente o bloco mobile)
+  // 4. O caminho mobile NÃO usa transform scale (evita deslocamento espacial e piscada branca nos cantos/cards)
   const mobileBlockMatch = contextCode.match(/if\s*\(\s*isMobile\s*\)\s*\{([\s\S]*?)\n\s*return;\s*\}/);
   assert.ok(mobileBlockMatch, "bloco condicional mobile deve existir");
+  assert.doesNotMatch(mobileBlockMatch[1], /scale\(/i, "caminho mobile não deve usar scale para evitar ghosting");
   assert.doesNotMatch(mobileBlockMatch[1], /clipPath/i, "caminho mobile não deve usar clipPath");
 
   // 6. prefers-reduced-motion continua preservado
