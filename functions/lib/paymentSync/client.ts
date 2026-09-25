@@ -14,6 +14,8 @@ export interface MpPaymentResponse {
   readonly status_detail?: string | null;
   readonly date_approved?: string | null;
   readonly external_reference?: string | null;
+  readonly transaction_amount?: number | null;
+  readonly payment_method_id?: string | null;
   readonly [MP_GET_VERIFIED]: true;
 }
 
@@ -45,6 +47,8 @@ export async function fetchMpPayment(accessToken: string, paymentId: string): Pr
       id: payment.id, status: payment.status,
       status_detail: payment.status_detail, date_approved: payment.date_approved,
       external_reference: payment.external_reference,
+      transaction_amount: typeof payment.transaction_amount === "number" ? payment.transaction_amount : null,
+      payment_method_id: typeof payment.payment_method_id === "string" ? payment.payment_method_id : null,
       [MP_GET_VERIFIED]: true as const,
     });
     verifiedMpResponses.add(verified);
