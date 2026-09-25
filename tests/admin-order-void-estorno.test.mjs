@@ -391,3 +391,99 @@ test('12c: dois pagamentos PIX_MP no mesmo pedido sao tratados como pernas indep
   const exclusao = await corpo(await anular(db, session));
   assert.equal(exclusao.status, 409, 'uma perna ainda pendente mantem a exclusao bloqueada');
 });
+
+/* ───────────── M3 (test-first): corrida refund manual × estorno de anulação ───────────── */
+// Teste INTENCIONALMENTE vermelho enquanto M3 não for corrigido: demonstra que
+// um refund manual PIX_MP e o estorno remoto de anulação do MESMO pagamento
+// podem, juntos, devolver mais do que foi pago.
+
+const deferredM3 = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return {promise, resolve}; };
+
+const reembolsoManual = (db, session, body) => app.adminRefund.onRequestPost({
+  env: {DB: db}, params: {id: '1'}, waitUntil() {},
+  request: new Request('https://local.test/api/admin/pedidos/1/reembolsos', {
+    method: 'POST', headers: {Origin: 'https://local.test', 'Content-Type': 'application/json',
+      Cookie: cookieDe(session)}, body: JSON.stringify(body),
+  }),
+});
+
+test('M3: refund manual e estorno de anulação concorrentes nunca devolvem mais que o pago', async t => {
+  // Pedido SITE/NOVO (elegível aos dois caminhos), 1 PIX_MP PAGO de 10000, sem devolução prévia.
+  const db = await fixture(t, {paid: true, reserve: 'CONVERTIDA'});
+  const session = await app.auth.createSession(db, 1);
+
+  const manualLeuSemIntencao = deferredM3();
+  const manualPausado = deferredM3();
+  const liberarManual = deferredM3();
+  const mpRecebeuPost = deferredM3();
+  const liberarMp = deferredM3();
+
+  // Hook determinístico no D1: observa a leitura de "intenção ativa" do
+  // refund manual e pausa o manual imediatamente ANTES do batch que insere
+  // em pedido_reembolsos.
+  db.hook = async (statements, op) => {
+    if (statements.some(s => s.sql.includes('FROM pedido_reembolso_pix_mp_intencoes')
+        && s.sql.includes("status IN ('PENDENTE','PROCESSANDO','INCONCLUSIVO') LIMIT 1"))) {
+      manualLeuSemIntencao.resolve();
+    }
+    if (op === 'batch' && statements.some(s => s.sql.includes('INSERT INTO pedido_reembolsos')
+        && s.sql.includes("'MANUAL'"))) {
+      manualPausado.resolve();
+      await liberarManual.promise;
+    }
+    return statements;
+  };
+
+  // Mercado Pago determinístico: o POST de refund só responde (aprovado,
+  // valor integral) quando o teste liberar.
+  const postsRefund = [];
+  t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
+    if (String(url).endsWith('/refunds') && init.method === 'POST') {
+      postsRefund.push(JSON.parse(init.body));
+      mpRecebeuPost.resolve();
+      await liberarMp.promise;
+      return Response.json({id: 9301, payment_id: 101, amount: 100, status: 'approved'}, {status: 201});
+    }
+    throw new Error(`chamada MP inesperada: ${init.method ?? 'GET'} ${url}`);
+  });
+
+  // 1-2) manual lê "sem intenção ativa" e para antes do INSERT.
+  const manual = reembolsoManual(db, session,
+    {pagamentoId: 1, valorCentavos: 3000, motivo: 'devolvido por fora', operationKey: 'm3-manual-0001'});
+  await manualLeuSemIntencao.promise;
+  await manualPausado.promise;
+
+  // 3) anulação cria a intenção integral e chega ao POST no MP, sem concluir.
+  const anulacao = postEstorno(db, session, {operationKey: 'm3-anulacao-0001'});
+  await mpRecebeuPost.promise;
+  const intencaoEmVoo = await db.prepare(
+    `SELECT status,valor_centavos FROM pedido_reembolso_pix_mp_intencoes`).first();
+
+  // 4) manual segue e tenta registrar 3000.
+  liberarManual.resolve();
+  const rManual = await corpo(await manual);
+
+  // 5) MP aprova o refund integral de 10000.
+  liberarMp.resolve();
+  const rAnulacao = await corpo(await anulacao);
+  db.hook = null;
+
+  const refunds = (await db.prepare(
+    `SELECT origem,valor_centavos,status FROM pedido_reembolsos WHERE pagamento_id=1 ORDER BY id`).all()).results;
+  const soma = refunds.reduce((s, r) => s + Number(r.valor_centavos), 0);
+  const intencoes = (await db.prepare(`SELECT status,valor_centavos FROM pedido_reembolso_pix_mp_intencoes`).all()).results;
+  const opsManuais = (await db.prepare(`SELECT COUNT(*) n FROM pedido_operacoes
+    WHERE operation_key='m3-manual-0001'`).first()).n;
+
+  const observado = {
+    intencaoEmVooQuandoManualInseriu: intencaoEmVoo,
+    respostaManual: {status: rManual.status, code: rManual.body.code ?? null},
+    respostaAnulacao: rAnulacao.status,
+    refunds, soma, intencoes, opsManuais, postsRefundMp: postsRefund.length, corposPost: postsRefund,
+  };
+  console.log('M3 observado:', JSON.stringify(observado));
+
+  // Invariante financeira que deveria valer: nunca devolver mais que o pago.
+  assert.ok(soma <= 10000,
+    `soma dos refunds (${soma}) excede o pagamento original (10000): ${JSON.stringify(observado)}`);
+});
