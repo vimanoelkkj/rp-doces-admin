@@ -1,4 +1,10 @@
 /* Bottom navigation mobile: usa a paleta, os ícones e o movimento da sidebar. */
+:root {
+  --admin-mobile-nav-height: 70px;
+  --admin-mobile-nav-offset: 12px;
+  --admin-mobile-nav-space: calc(var(--admin-mobile-nav-height) + var(--admin-mobile-nav-offset) + env(safe-area-inset-bottom));
+}
+
 .admin-mobile-bottom-nav,
 .admin-mobile-sheet-backdrop {
   display: none;
@@ -9,9 +15,9 @@
     position: fixed;
     z-index: 350;
     right: 12px;
-    bottom: calc(var(--admin-mobile-nav-offset) + env(safe-area-inset-bottom));
+    bottom: calc(var(--admin-mobile-nav-offset, 12px) + env(safe-area-inset-bottom));
     left: 12px;
-    height: var(--admin-mobile-nav-height);
+    height: var(--admin-mobile-nav-height, 70px);
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     align-items: stretch;
@@ -180,7 +186,7 @@
   .admin-mobile-more-sheet {
     position: absolute;
     right: 12px;
-    bottom: calc(var(--admin-mobile-nav-space) + 8px);
+    bottom: calc(var(--admin-mobile-nav-space, 82px) + 8px);
     left: 12px;
     max-width: 560px;
     margin-inline: auto;

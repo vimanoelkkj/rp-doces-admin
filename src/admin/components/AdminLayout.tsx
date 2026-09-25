@@ -53,9 +53,9 @@ export default function AdminLayout() {
               <Suspense fallback={<RouteLoadingFallback />}>
                 <Outlet />
               </Suspense>
+              <AdminMobileBottomNav />
             </div>
           </StorefrontFrame>
-          <AdminMobileBottomNav />
         </NotificacoesProvider>
       </AdminAuthProvider>
     </AdminThemeProvider>
