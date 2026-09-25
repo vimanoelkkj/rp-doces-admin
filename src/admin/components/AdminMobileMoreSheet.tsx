@@ -173,8 +173,8 @@ export default function AdminMobileMoreSheet({ children }: Props) {
             <button
               type="button"
               className="admin-mobile-sheet-item admin-mobile-sheet-item--theme"
-              onClick={() => {
-                toggleTheme();
+              onClick={(e) => {
+                toggleTheme(e);
                 close();
               }}
             >
