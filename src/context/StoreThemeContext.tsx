@@ -32,6 +32,38 @@ const StoreThemeContext = createContext<StoreThemeContextType>({
 const STORAGE_KEY = "store-theme";
 const ADMIN_STORAGE_KEY = "admin-theme";
 
+export const HEADER_LIGHT_THEME_COLOR = "#eddcc6";
+export const HEADER_DARK_THEME_COLOR = "#271f1b";
+
+export function getHeaderThemeColor(theme: StoreTheme): string {
+  return theme === "dark" ? HEADER_DARK_THEME_COLOR : HEADER_LIGHT_THEME_COLOR;
+}
+
+export function syncMetaThemeColor(targetTheme?: StoreTheme): string {
+  if (typeof document === "undefined") return HEADER_LIGHT_THEME_COLOR;
+
+  const resolvedTheme: StoreTheme =
+    targetTheme ||
+    (document.documentElement.getAttribute("data-theme") as StoreTheme) ||
+    (window.localStorage.getItem(STORAGE_KEY) as StoreTheme) ||
+    (window.localStorage.getItem(ADMIN_STORAGE_KEY) as StoreTheme) ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light");
+
+  const color = getHeaderThemeColor(resolvedTheme);
+  let metaThemeColor = document.querySelector<HTMLMetaElement>(
+    'meta[name="theme-color"]'
+  );
+  if (!metaThemeColor) {
+    metaThemeColor = document.createElement("meta");
+    metaThemeColor.name = "theme-color";
+    document.head.appendChild(metaThemeColor);
+  }
+  metaThemeColor.content = color;
+  return color;
+}
+
 function getSystemTheme(): StoreTheme {
   if (typeof window !== "undefined" && window.matchMedia) {
     if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
@@ -124,20 +156,38 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<StoreTheme>(getInitialTheme);
   const isTransitioningRef = useRef(false);
 
-  // Sincroniza atributos no DOM para Storefront e Admin
+  // Sincroniza atributos no DOM para Storefront e Admin e atualiza statusbar theme-color
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.setAttribute("data-admin-theme", theme);
-    const metaThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (metaThemeColor) {
-      metaThemeColor.content = theme === "dark" ? "#271f1b" : "#eddcc6";
-    }
+    syncMetaThemeColor(theme);
     try {
       localStorage.setItem(STORAGE_KEY, theme);
       localStorage.setItem(ADMIN_STORAGE_KEY, theme);
     } catch {
       // ignore
     }
+  }, [theme]);
+
+  // Observer contínuo para manter a status bar sincronizada em qualquer mutação de atributos de tema
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    syncMetaThemeColor();
+
+    const observer = new MutationObserver(() => {
+      const currentTheme =
+        (document.documentElement.getAttribute("data-theme") as StoreTheme) ||
+        theme;
+      syncMetaThemeColor(currentTheme);
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme", "data-admin-theme"],
+    });
+
+    return () => observer.disconnect();
   }, [theme]);
 
   // Listener para mudança de preferência do sistema operacional,
@@ -153,6 +203,7 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
           const next = e.matches ? "dark" : "light";
           document.documentElement.setAttribute("data-theme", next);
           document.documentElement.setAttribute("data-admin-theme", next);
+          syncMetaThemeColor(next);
           setThemeState(next);
         }
       } catch {
@@ -171,6 +222,7 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
     const applyThemeImmediately = (t: StoreTheme) => {
       document.documentElement.setAttribute("data-theme", t);
       document.documentElement.setAttribute("data-admin-theme", t);
+      syncMetaThemeColor(t);
       try {
         localStorage.setItem(STORAGE_KEY, t);
         localStorage.setItem(ADMIN_STORAGE_KEY, t);

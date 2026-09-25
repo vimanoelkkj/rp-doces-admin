@@ -5,9 +5,19 @@ import { useLocation } from "react-router-dom";
 
 let swRegistered = false;
 
-const STOREFRONT_THEME_COLOR = "#eddcc6";
 const HEADER_LIGHT_THEME_COLOR = "#eddcc6";
 const HEADER_DARK_THEME_COLOR = "#271f1b";
+
+function getStorefrontThemeColor() {
+  const themeAttr = document.documentElement.getAttribute("data-theme");
+  const savedTheme =
+    window.localStorage.getItem("store-theme") ||
+    window.localStorage.getItem("admin-theme");
+  const isDark =
+    themeAttr === "dark" || (themeAttr === null && savedTheme === "dark");
+
+  return isDark ? HEADER_DARK_THEME_COLOR : HEADER_LIGHT_THEME_COLOR;
+}
 
 function getAdminThemeColor() {
   const themeAttr =
@@ -117,7 +127,7 @@ export function useAdminPwa() {
       }
 
       if (themeMeta) {
-        themeMeta.content = STOREFRONT_THEME_COLOR;
+        themeMeta.content = getStorefrontThemeColor();
       }
 
       const injectedManifest = document.querySelector(
