@@ -258,7 +258,8 @@ test('M5: recordLoginFailure decide tudo numa única escrita, sem SELECT prévio
   };
   await app.rateLimit.recordLoginFailure(db, 'm5-uma-escrita');
   db.hook = null;
-  assert.deepEqual(operacoes, [['run', 'INSERT']]);
+  assert.ok(!operacoes.some(o => o[1] === 'SELECT'), 'sem SELECT prévio');
+  assert.deepEqual(operacoes.filter(o => o[1] !== 'DELETE'), [['run', 'INSERT']]);
 });
 
 test('M5: falhas concorrentes pela rota de login não se perdem e a próxima tentativa recebe 429', async t => {
@@ -322,3 +323,165 @@ test('M5: login válido depois de falhas remove a chave IP|username', async t =>
   assert.equal((await postLogin(db, { username: 'admin_ativo', senha: activePassword })).status, 200);
   assert.equal((await db.prepare('SELECT COUNT(*) n FROM auth_rate_limits').first()).n, 0);
 });
+
+/* ───────────── Higiene Operacional: cleanupStaleLoginRateLimits ───────────── */
+
+test('cleanupStaleLoginRateLimits: remove linha stale sem bloqueio (> 24h)', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const nowMs = 1750000000000;
+  const staleTime = new Date(nowMs - 25 * 3600 * 1000).toISOString();
+
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('stale-1', 2, ?, NULL, ?)
+  `).bind(staleTime, staleTime).run();
+
+  const changes = await app.rateLimit.cleanupStaleLoginRateLimits(db, nowMs);
+  assert.equal(changes, 1);
+
+  const row = await db.prepare('SELECT * FROM auth_rate_limits WHERE chave = ?').bind('stale-1').first();
+  assert.equal(row, null);
+});
+
+test('cleanupStaleLoginRateLimits: preserva linha recente sem bloqueio (< 24h)', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const nowMs = 1750000000000;
+  const recentTime = new Date(nowMs - 1 * 3600 * 1000).toISOString();
+
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('recente-1', 2, ?, NULL, ?)
+  `).bind(recentTime, recentTime).run();
+
+  const changes = await app.rateLimit.cleanupStaleLoginRateLimits(db, nowMs);
+  assert.equal(changes, 0);
+
+  const row = await db.prepare('SELECT * FROM auth_rate_limits WHERE chave = ?').bind('recente-1').first();
+  assert.ok(row);
+});
+
+test('cleanupStaleLoginRateLimits: preserva linha stale se bloqueio ainda estiver vigente no futuro', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const nowMs = 1750000000000;
+  const staleTime = new Date(nowMs - 25 * 3600 * 1000).toISOString();
+  const futureBlockedUntil = new Date(nowMs + 10 * 60 * 1000).toISOString();
+
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('stale-bloqueado-futuro', 5, ?, ?, ?)
+  `).bind(staleTime, futureBlockedUntil, staleTime).run();
+
+  const changes = await app.rateLimit.cleanupStaleLoginRateLimits(db, nowMs);
+  assert.equal(changes, 0);
+
+  const row = await db.prepare('SELECT * FROM auth_rate_limits WHERE chave = ?').bind('stale-bloqueado-futuro').first();
+  assert.ok(row, 'Linha com bloqueio futuro não pode ser removida');
+});
+
+test('cleanupStaleLoginRateLimits: remove linha stale com bloqueio expirado', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const nowMs = 1750000000000;
+  const staleTime = new Date(nowMs - 25 * 3600 * 1000).toISOString();
+  const pastBlockedUntil = new Date(nowMs - 20 * 3600 * 1000).toISOString();
+
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('stale-bloqueado-passado', 5, ?, ?, ?)
+  `).bind(staleTime, pastBlockedUntil, staleTime).run();
+
+  const changes = await app.rateLimit.cleanupStaleLoginRateLimits(db, nowMs);
+  assert.equal(changes, 1);
+
+  const row = await db.prepare('SELECT * FROM auth_rate_limits WHERE chave = ?').bind('stale-bloqueado-passado').first();
+  assert.equal(row, null);
+});
+
+test('cleanupStaleLoginRateLimits: respeita limite exato/conservador de 24 horas', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const nowMs = 1750000000000;
+  const quase24h = new Date(nowMs - (24 * 3600 * 1000 - 60000)).toISOString(); // 23h59m
+  const maisDe24h = new Date(nowMs - (24 * 3600 * 1000 + 60000)).toISOString(); // 24h01m
+
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('quase-24h', 1, ?, NULL, ?)
+  `).bind(quase24h, quase24h).run();
+
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('mais-de-24h', 1, ?, NULL, ?)
+  `).bind(maisDe24h, maisDe24h).run();
+
+  const changes = await app.rateLimit.cleanupStaleLoginRateLimits(db, nowMs);
+  assert.equal(changes, 1);
+
+  const rowPreservada = await db.prepare('SELECT * FROM auth_rate_limits WHERE chave = ?').bind('quase-24h').first();
+  assert.ok(rowPreservada, 'Linha abaixo de 24h deve ser preservada');
+
+  const rowRemovida = await db.prepare('SELECT * FROM auth_rate_limits WHERE chave = ?').bind('mais-de-24h').first();
+  assert.equal(rowRemovida, null, 'Linha acima de 24h deve ser removida');
+});
+
+test('cleanupStaleLoginRateLimits: prova de isolamento (não altera falhas recentes, bloqueios ativos nem chaves recém-gravadas)', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  const nowMs = 1750000000000;
+
+  // 1. Linha com 3 falhas recentes
+  const recentTime = new Date(nowMs - 2 * 60 * 1000).toISOString();
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('recente-falhas', 3, ?, NULL, ?)
+  `).bind(recentTime, recentTime).run();
+
+  // 2. Linha com 5 falhas e bloqueio ativo
+  const blockedUntil = new Date(nowMs + 10 * 60 * 1000).toISOString();
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('bloqueio-ativo', 5, ?, ?, ?)
+  `).bind(recentTime, blockedUntil, recentTime).run();
+
+  // 3. Linha stale (> 24h)
+  const staleTime = new Date(nowMs - 30 * 3600 * 1000).toISOString();
+  await db.prepare(`
+    INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+    VALUES ('stale-lixo', 1, ?, NULL, ?)
+  `).bind(staleTime, staleTime).run();
+
+  // Executa o cleanup
+  const changes = await app.rateLimit.cleanupStaleLoginRateLimits(db, nowMs);
+  assert.equal(changes, 1);
+
+  // Verifica que linha com falhas recentes manteve contagem intacta
+  const rowFalhas = await db.prepare('SELECT falhas, bloqueado_ate FROM auth_rate_limits WHERE chave = ?').bind('recente-falhas').first();
+  assert.equal(rowFalhas.falhas, 3);
+  assert.equal(rowFalhas.bloqueado_ate, null);
+
+  // Verifica que linha bloqueada manteve bloqueio intacto
+  const rowBloqueada = await db.prepare('SELECT falhas, bloqueado_ate FROM auth_rate_limits WHERE chave = ?').bind('bloqueio-ativo').first();
+  assert.equal(rowBloqueada.falhas, 5);
+  assert.equal(rowBloqueada.bloqueado_ate, blockedUntil);
+
+  // Nova chave gravada por recordLoginFailure permanece no banco
+  await app.rateLimit.recordLoginFailure(db, 'nova-chave-falha');
+  const rowNova = await db.prepare('SELECT falhas FROM auth_rate_limits WHERE chave = ?').bind('nova-chave-falha').first();
+  assert.equal(rowNova.falhas, 1);
+});
+
+test('cleanupStaleLoginRateLimits: falha no cleanup (best-effort) não quebra recordLoginFailure', async t => {
+  const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
+  db.hook = async (statements) => {
+    if (statements.some(s => s.sql.includes('DELETE FROM auth_rate_limits WHERE julianday'))) {
+      throw new Error('Erro simulado no cleanup');
+    }
+    return statements;
+  };
+
+  await assert.doesNotReject(async () => {
+    for (let i = 0; i < 50; i++) {
+      await app.rateLimit.recordLoginFailure(db, `chave-resiliente-${i}`);
+    }
+  });
+
+  db.hook = null;
+});
+

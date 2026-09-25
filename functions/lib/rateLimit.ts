@@ -52,6 +52,30 @@ export async function checkLoginRateLimit(
   return { allowed: true, key };
 }
 
+export const CLEANUP_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+export async function cleanupStaleLoginRateLimits(
+  db: D1Database,
+  nowMs = Date.now(),
+): Promise<number> {
+  const cutoffIso = new Date(nowMs - CLEANUP_RETENTION_MS).toISOString();
+  const nowIso = new Date(nowMs).toISOString();
+
+  const result = await db
+    .prepare(
+      `DELETE FROM auth_rate_limits
+       WHERE julianday(atualizado_em) < julianday(?)
+         AND (
+           bloqueado_ate IS NULL
+           OR julianday(bloqueado_ate) <= julianday(?)
+         )`,
+    )
+    .bind(cutoffIso, nowIso)
+    .run();
+
+  return result.meta?.changes ?? 0;
+}
+
 // Uma única instrução atômica: o próximo número de falhas, o início da janela
 // e o bloqueio são decididos pelo SQL sobre o estado ATUAL da linha, sem
 // SELECT prévio. Antes, SELECT -> +1 em JS -> UPSERT perdia incrementos sob
@@ -91,13 +115,21 @@ export async function recordLoginFailure(
                      THEN auth_rate_limits.falhas + 1
                    ELSE 1
                  END) >= ?4
-             THEN ?3
+               THEN ?3
            ELSE NULL
          END,
          atualizado_em = CURRENT_TIMESTAMP`,
     )
     .bind(key, nowIso, blockedUntilIso, MAX_FAILURES, windowCutoffIso)
     .run();
+
+  if (crypto.getRandomValues(new Uint8Array(1))[0] < 13) {
+    try {
+      await cleanupStaleLoginRateLimits(db, nowMs);
+    } catch (err) {
+      console.warn("Falha ao limpar rate limit de login", err);
+    }
+  }
 }
 
 export async function clearLoginFailures(
