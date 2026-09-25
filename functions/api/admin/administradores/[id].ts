@@ -1,6 +1,17 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { requireUser, hashPassword, validatePassword, sameOrigin } from "../../../lib/auth";
+import {
+  requireUser,
+  hashPassword,
+  validatePassword,
+  verifyPassword,
+  sameOrigin,
+} from "../../../lib/auth";
+import {
+  checkLoginRateLimit,
+  recordLoginFailure,
+  clearLoginFailures,
+} from "../../../lib/rateLimit";
 
 interface Env {
   DB: D1Database;
@@ -9,6 +20,7 @@ interface Env {
 interface AcaoBody {
   acao?: string;
   senha?: string;
+  senhaAtual?: string;
   ativo?: boolean;
   papel?: string;
 }
@@ -18,8 +30,12 @@ interface TargetRow {
   papel: string;
 }
 
-function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+function jsonError(
+  message: string,
+  status: number,
+  headers?: Record<string, string>,
+) {
+  return Response.json({ error: message }, { status, headers });
 }
 
 function isOwner(papel: string) {
@@ -65,9 +81,52 @@ async function handlePut({
   }
 
   if (body.acao === "resetar_senha") {
-    if (id !== auth.user.id && !isOwner(auth.user.papel)) {
+    const isSelf = id === auth.user.id;
+    if (!isSelf && !isOwner(auth.user.papel)) {
       return jsonError("Sem permissão para redefinir esta senha", 403);
     }
+
+    if (isSelf) {
+      const senhaAtual =
+        typeof body.senhaAtual === "string" ? body.senhaAtual : "";
+      if (!senhaAtual) {
+        return jsonError("Senha atual obrigatória", 400);
+      }
+
+      const rate = await checkLoginRateLimit(
+        env.DB,
+        request,
+        auth.user.username,
+      );
+      if (!rate.allowed) {
+        return jsonError(
+          "Muitas tentativas. Tente novamente em alguns minutos",
+          429,
+          { "retry-after": String(rate.retryAfter) },
+        );
+      }
+
+      const usuario = await env.DB.prepare(
+        `SELECT senha_hash FROM usuarios_admin WHERE id = ?`,
+      )
+        .bind(id)
+        .first<{ senha_hash: string }>();
+      if (!usuario || !usuario.senha_hash) {
+        return jsonError("Administrador não encontrado", 404);
+      }
+
+      const senhaAtualCorreta = await verifyPassword(
+        senhaAtual,
+        usuario.senha_hash,
+      );
+      if (!senhaAtualCorreta) {
+        await recordLoginFailure(env.DB, rate.key);
+        return jsonError("Senha atual incorreta", 400);
+      }
+
+      await clearLoginFailures(env.DB, rate.key);
+    }
+
     const senha = body.senha ?? "";
     const erro = validatePassword(senha);
     if (erro) return jsonError(erro, 400);

@@ -99,7 +99,7 @@ function formatDesde(iso: string) {
 }
 
 export default function AdminAdministradores() {
-  const { user } = useAdminAuth();
+  const { user, logout } = useAdminAuth();
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -306,8 +306,15 @@ export default function AdminAdministradores() {
       <AlterarSenhaModal
         adminId={senhaAlvo?.id ?? null}
         adminNome={senhaAlvo?.nome ?? ""}
+        isSelf={senhaAlvo != null && senhaAlvo.id === user.id}
         onClose={() => setSenhaAlvo(null)}
-        onSaved={carregarAdmins}
+        onSaved={() => {
+          if (senhaAlvo?.id === user.id) {
+            logout();
+          } else {
+            carregarAdmins();
+          }
+        }}
       />
     </main>
   );
