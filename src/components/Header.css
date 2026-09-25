@@ -215,15 +215,28 @@ html[data-admin-theme="dark"] .header-admin-badge {
   flex-shrink: 0;
 }
 
-.theme-toggle-btn:hover {
-  background: var(--store-surface-highlight);
-  color: var(--store-accent);
-  transform: scale(1.05);
+@media (hover: hover) {
+  .theme-toggle-btn:hover {
+    background: var(--store-surface-highlight);
+    color: var(--store-accent);
+    transform: scale(1.05);
+  }
+}
+
+.theme-toggle-btn:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .theme-toggle-btn:focus-visible {
   outline: 2px solid var(--store-border-focus);
   outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .theme-toggle-btn:focus,
+  .theme-toggle-btn:focus-visible {
+    outline: none;
+  }
 }
 
 .theme-toggle-icon {

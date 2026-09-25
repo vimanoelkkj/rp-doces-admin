@@ -409,7 +409,10 @@ export default function Header({ variant }: HeaderProps) {
           <button
             type="button"
             className="theme-toggle-btn"
-            onClick={(e) => toggleTheme(e)}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              toggleTheme(e);
+            }}
             aria-label={
               theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"
             }

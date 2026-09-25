@@ -222,7 +222,10 @@ export default function CartWidget({
             ref={cartFabRef}
             key="cart-fab"
             className="cart-fab"
-            onClick={onOpen}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onOpen();
+            }}
             aria-label="Abrir carrinho"
             initial={shouldReduceMotion ? { opacity: 0 } : { scale: 0, opacity: 0 }}
             animate={
@@ -297,7 +300,10 @@ export default function CartWidget({
                 <button
                   ref={closeButtonRef}
                   className="cart-close-btn"
-                  onClick={onClose}
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    onClose();
+                  }}
                   aria-label="Fechar"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -379,9 +385,10 @@ export default function CartWidget({
                               </span>
                               <div className="cart-qty-controls">
                                 <button
-                                  onClick={() =>
-                                    onUpdateQuantity(item.id, item.quantity - 1)
-                                  }
+                                  onClick={(e) => {
+                                    e.currentTarget.blur();
+                                    onUpdateQuantity(item.id, item.quantity - 1);
+                                  }}
                                   aria-label={`Diminuir quantidade de ${item.name}`}
                                 >
                                   −
@@ -407,9 +414,10 @@ export default function CartWidget({
                                   {item.quantity}
                                 </motion.span>
                                 <button
-                                  onClick={() =>
-                                    onUpdateQuantity(item.id, item.quantity + 1)
-                                  }
+                                  onClick={(e) => {
+                                    e.currentTarget.blur();
+                                    onUpdateQuantity(item.id, item.quantity + 1);
+                                  }}
                                   disabled={
                                     item.disponibilidade !== undefined &&
                                     item.quantity >= item.disponibilidade
@@ -471,11 +479,20 @@ export default function CartWidget({
                       </p>
                       <button
                         className="cart-checkout-btn"
-                        onClick={handleCheckout}
+                        onClick={(e) => {
+                          e.currentTarget.blur();
+                          handleCheckout();
+                        }}
                       >
                         CONTINUAR PARA PAGAMENTO
                       </button>
-                      <button className="cart-continue-btn" onClick={onClose}>
+                      <button
+                        className="cart-continue-btn"
+                        onClick={(e) => {
+                          e.currentTarget.blur();
+                          onClose();
+                        }}
+                      >
                         Continuar comprando
                       </button>
                     </div>

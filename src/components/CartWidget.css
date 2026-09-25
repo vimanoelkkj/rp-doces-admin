@@ -29,14 +29,27 @@
   transition: transform 0.2s, background-color 0.2s;
 }
 
-.cart-fab:hover {
-  background-color: var(--store-btn-primary-hover);
-  transform: scale(1.05);
+@media (hover: hover) {
+  .cart-fab:hover {
+    background-color: var(--store-btn-primary-hover);
+    transform: scale(1.05);
+  }
+}
+
+.cart-fab:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .cart-fab:focus-visible {
   outline: 2px solid var(--store-border-focus);
   outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .cart-fab:focus,
+  .cart-fab:focus-visible {
+    outline: none;
+  }
 }
 
 .cart-fab-badge {
@@ -137,15 +150,32 @@
   justify-content: center;
   transition: background-color 0.2s, color 0.2s;
 }
-.cart-close-btn:hover,
-.cart-back-btn:hover {
-  background-color: var(--store-surface-highlight);
-  color: var(--store-accent);
+@media (hover: hover) {
+  .cart-close-btn:hover,
+  .cart-back-btn:hover {
+    background-color: var(--store-surface-highlight);
+    color: var(--store-accent);
+  }
 }
+
+.cart-close-btn:focus:not(:focus-visible),
+.cart-back-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .cart-close-btn:focus-visible,
 .cart-back-btn:focus-visible {
   outline: 2px solid var(--store-border-focus);
   outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .cart-close-btn:focus,
+  .cart-close-btn:focus-visible,
+  .cart-back-btn:focus,
+  .cart-back-btn:focus-visible {
+    outline: none;
+  }
 }
 
 .cart-modal-items {
@@ -214,6 +244,17 @@
   justify-content: center;
   transition: opacity 0.15s, background-color 0.15s, border-color 0.15s;
 }
+.cart-qty-controls button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (pointer: coarse) {
+  .cart-qty-controls button:focus,
+  .cart-qty-controls button:focus-visible {
+    outline: none;
+  }
+}
+
 .cart-qty-controls button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -238,9 +279,11 @@
   opacity: 0.7;
   transition: opacity 0.2s, color 0.2s;
 }
-.cart-remove-btn:hover {
-  opacity: 1;
-  color: var(--store-accent);
+@media (hover: hover) {
+  .cart-remove-btn:hover {
+    opacity: 1;
+    color: var(--store-accent);
+  }
 }
 
 .cart-modal-footer {
@@ -288,9 +331,23 @@
   transition: background-color 0.2s, transform 0.15s;
   margin-bottom: 8px;
 }
-.cart-checkout-btn:hover {
-  background-color: var(--store-btn-primary-hover);
+@media (hover: hover) {
+  .cart-checkout-btn:hover {
+    background-color: var(--store-btn-primary-hover);
+  }
 }
+
+.cart-checkout-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (pointer: coarse) {
+  .cart-checkout-btn:focus,
+  .cart-checkout-btn:focus-visible {
+    outline: none;
+  }
+}
+
 .cart-continue-btn {
   width: 100%;
   padding: 10px;
@@ -305,8 +362,10 @@
   text-underline-offset: 2px;
   transition: color 0.2s;
 }
-.cart-continue-btn:hover {
-  color: var(--store-accent);
+@media (hover: hover) {
+  .cart-continue-btn:hover {
+    color: var(--store-accent);
+  }
 }
 
 /* ===== CHECKOUT STEP ===== */

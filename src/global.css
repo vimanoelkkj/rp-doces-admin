@@ -9,6 +9,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
 html {
   scroll-behavior: smooth;
   background-color: var(--store-bg);

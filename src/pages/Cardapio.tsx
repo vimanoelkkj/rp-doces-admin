@@ -132,7 +132,10 @@ export default function Cardapio() {
               role="tab"
               aria-selected={activeFilter === null}
               className={`filter-tab ${activeFilter === null ? "active" : ""}`}
-              onClick={() => handleFilterChange(null)}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                handleFilterChange(null);
+              }}
             >
               Todos
             </button>
@@ -142,7 +145,10 @@ export default function Cardapio() {
                 role="tab"
                 aria-selected={activeFilter === slug}
                 className={`filter-tab ${activeFilter === slug ? "active" : ""}`}
-                onClick={() => handleFilterChange(slug)}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  handleFilterChange(slug);
+                }}
               >
                 {nome}
               </button>
