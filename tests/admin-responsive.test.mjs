@@ -249,3 +249,12 @@ test('AdminLayout renderiza AdminMobileBottomNav para navegação mobile', async
   assert.match(layoutCode, /import\s+AdminMobileBottomNav\s+from\s+"\.\/AdminMobileBottomNav"/);
   assert.match(layoutCode, /<AdminMobileBottomNav\s*\/>/);
 });
+
+test('Header exibe badge Admin adaptativo ao lado da logo no admin', async () => {
+  const headerCode = await readFile(new URL('../src/components/Header.tsx', import.meta.url), 'utf8');
+  assert.match(headerCode, /isAdmin\s*&&\s*<span className="header-admin-badge">Admin<\/span>/);
+
+  const headerCss = await readFile(new URL('../src/components/Header.css', import.meta.url), 'utf8');
+  assert.match(headerCss, /\.header-admin-badge\s*\{/);
+  assert.match(headerCss, /html\[data-theme="dark"\]\s+\.header-admin-badge/);
+});
