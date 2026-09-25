@@ -64,11 +64,15 @@ async function despacharParaInscricoes(
     return { ok: false, motivo: "VAPID_NAO_CONFIGURADO" };
   }
 
-  // 1. Subscriptions ativas elegíveis
-  let query = "SELECT id, endpoint, p256dh, auth, usuario_id FROM push_inscricoes";
+  // 1. Subscriptions ativas elegíveis (pertencentes a administradores ativos)
+  let query =
+    "SELECT pi.id, pi.endpoint, pi.p256dh, pi.auth, pi.usuario_id " +
+    "FROM push_inscricoes pi " +
+    "JOIN usuarios_admin u ON u.id = pi.usuario_id " +
+    "WHERE u.ativo = 1";
   const params: unknown[] = [];
   if (options?.excludeUsuarioId) {
-    query += " WHERE usuario_id != ?";
+    query += " AND pi.usuario_id != ?";
     params.push(options.excludeUsuarioId);
   }
 
