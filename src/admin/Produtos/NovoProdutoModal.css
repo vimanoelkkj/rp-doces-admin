@@ -231,6 +231,42 @@
   box-shadow: inset 0 -2px 0 #634738;
 }
 
+.np-stock-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #8c7a76;
+}
+
+.np-stock-breakdown strong {
+  color: #634738;
+  font-weight: 700;
+}
+
+.np-stock-breakdown-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #cbbcaf;
+  flex-shrink: 0;
+}
+
+.np-stock-breakdown small {
+  flex-basis: 100%;
+  color: #b45353;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.np-stock-breakdown--warning strong {
+  color: #b45353;
+}
+
 /* ── Emoji grid ── */
 .np-emoji-grid {
   display: grid;
