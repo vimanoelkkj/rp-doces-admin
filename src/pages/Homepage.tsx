@@ -119,7 +119,11 @@ export default function Homepage() {
     }
   };
   const storyRef = useScrollReveal<HTMLElement>();
-  const processRef = useScrollReveal<HTMLElement>();
+  const processHeaderRef = useScrollReveal<HTMLDivElement>();
+  const step1Ref = useScrollReveal<HTMLElement>();
+  const step2Ref = useScrollReveal<HTMLElement>();
+  const step3Ref = useScrollReveal<HTMLElement>();
+  const processCtaRef = useScrollReveal<HTMLDivElement>();
   const instaRef = useScrollReveal<HTMLElement>();
   const contactRef = useScrollReveal<HTMLElement>();
 
@@ -413,22 +417,21 @@ export default function Homepage() {
       </section>
 
       {/* Process Section */}
-      <section
-        id="cardapio"
-        className="process-section scroll-reveal"
-        ref={processRef}
-      >
-        <div className="process-header">
+      <section id="cardapio" className="process-section">
+        <div className="process-header scroll-reveal" ref={processHeaderRef}>
           <span className="process-label">Como funciona</span>
           <h2 className="process-title">
             Um momento especial entre se cuidar e se deliciar.
           </h2>
         </div>
 
-        <div className="process-cards">
-          {/* Card 1 — Faça seu pedido */}
-          <div className="step-card">
-            <div className="icon-badge">
+        <div className="process-journey">
+          {/* Etapa 1 — Seu pedido, do seu jeito */}
+          <article
+            className="journey-step journey-step--1 scroll-reveal"
+            ref={step1Ref}
+          >
+            <div className="journey-step__marker">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <rect
                   x="5"
@@ -436,7 +439,7 @@ export default function Homepage() {
                   width="14"
                   height="20"
                   rx="2.5"
-                  stroke="#634738"
+                  stroke="var(--store-header-icon-stroke)"
                   strokeWidth="1.8"
                   fill="none"
                 />
@@ -445,14 +448,14 @@ export default function Homepage() {
                   y1="4.5"
                   x2="15"
                   y2="4.5"
-                  stroke="#634738"
+                  stroke="var(--store-header-icon-stroke)"
                   strokeWidth="1.2"
                   strokeLinecap="round"
                 />
-                <circle cx="12" cy="19.5" r="1" fill="#634738" />
+                <circle cx="12" cy="19.5" r="1" fill="var(--store-header-icon-stroke)" />
                 <path
                   d="M8 12.5L10.5 15L16 9.5"
-                  stroke="#634738"
+                  stroke="var(--store-accent)"
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -469,29 +472,32 @@ export default function Homepage() {
                 </path>
               </svg>
             </div>
-            <div className="step-text">
-              <h3 className="step-title">Faça seu pedido</h3>
-              <p className="step-description">
+            <div className="journey-step__content">
+              <h3 className="journey-step__title">Seu pedido, do seu jeito</h3>
+              <p className="journey-step__desc">
                 Escolha entre nossos sabores disponíveis aqui no site, ou no
                 salão
               </p>
             </div>
-          </div>
+          </article>
 
-          {/* Card 2 — Momento Relax */}
-          <div className="step-card">
-            <div className="icon-badge">
+          {/* Etapa 2 — Uma pausa para saborear */}
+          <article
+            className="journey-step journey-step--2 scroll-reveal"
+            ref={step2Ref}
+          >
+            <div className="journey-step__marker">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 {/* Pote — corpo com fundo arredondado */}
                 <path
                   d="M5 8.5C5 8.5 5 18 5.5 19C6 20 7 20.5 12 20.5C17 20.5 18 20 18.5 19C19 18 19 8.5 19 8.5"
-                  stroke="#634738"
+                  stroke="var(--store-header-icon-stroke)"
                   strokeWidth="1.6"
                   fill="none"
                   strokeLinecap="round"
                 />
                 {/* Tampa */}
-                <rect x="4" y="7" width="16" height="2" rx="1" fill="#634738" />
+                <rect x="4" y="7" width="16" height="2" rx="1" fill="var(--store-header-icon-stroke)" />
                 {/* Camada 1 — chocolate */}
                 <rect
                   x="6"
@@ -499,8 +505,8 @@ export default function Homepage() {
                   width="12"
                   height="3"
                   rx="0.5"
-                  fill="#634738"
-                  opacity="0.7"
+                  fill="var(--store-btn-primary-bg)"
+                  opacity="0.8"
                 />
                 {/* Camada 2 — creme */}
                 <rect
@@ -509,7 +515,7 @@ export default function Homepage() {
                   width="12"
                   height="3"
                   rx="0.5"
-                  fill="#EDDCC6"
+                  fill="var(--store-wave-primary)"
                 />
                 {/* Camada 3 — morango/rosa */}
                 <rect
@@ -518,14 +524,14 @@ export default function Homepage() {
                   width="12"
                   height="3"
                   rx="0.5"
-                  fill="#D38B80"
-                  opacity="0.8"
+                  fill="var(--store-accent)"
+                  opacity="0.85"
                 />
                 {/* Cobertura chantilly no topo — ondulada */}
                 <path
                   d="M7 10C7 10 8 8.5 9.5 9C11 9.5 10.5 8 12 8C13.5 8 13 9.5 14.5 9C16 8.5 17 10 17 10"
-                  fill="#FAF6F0"
-                  stroke="#EADFD3"
+                  fill="var(--store-surface)"
+                  stroke="var(--store-border)"
                   strokeWidth="0.5"
                 />
                 {/* Colher animada */}
@@ -553,35 +559,38 @@ export default function Homepage() {
                     y1="1"
                     x2="15"
                     y2="5.5"
-                    stroke="#634738"
+                    stroke="var(--store-header-icon-stroke)"
                     strokeWidth="1.4"
                     strokeLinecap="round"
                   />
                   {/* Cabeça da colher */}
-                  <ellipse cx="15" cy="6.5" rx="1.8" ry="1.2" fill="#634738" />
+                  <ellipse cx="15" cy="6.5" rx="1.8" ry="1.2" fill="var(--store-header-icon-stroke)" />
                   {/* Reflexo na colher */}
                   <ellipse
                     cx="14.5"
                     cy="6.3"
                     rx="0.6"
                     ry="0.4"
-                    fill="#8C7A76"
+                    fill="var(--store-text-subtle)"
                   />
                 </g>
               </svg>
             </div>
-            <div className="step-text">
-              <h3 className="step-title">Momento Relax</h3>
-              <p className="step-description">
+            <div className="journey-step__content">
+              <h3 className="journey-step__title">Uma pausa para saborear</h3>
+              <p className="journey-step__desc">
                 Saboreie seu bolo ou pudim enquanto realiza seus procedimentos
                 de beleza e autocuidado
               </p>
             </div>
-          </div>
+          </article>
 
-          {/* Card 3 — Adorável rotina */}
-          <div className="step-card">
-            <div className="icon-badge">
+          {/* Etapa 3 — Um carinho que acompanha */}
+          <article
+            className="journey-step journey-step--3 scroll-reveal"
+            ref={step3Ref}
+          >
+            <div className="journey-step__marker">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <g>
                   <animateTransform
@@ -593,7 +602,7 @@ export default function Homepage() {
                   />
                   <path
                     d="M12 7V18M12 7C11.5 5.5 10.8 4.5 10 3.8C9.2 3.1 8.2 2.8 7.5 3C6.5 3.3 6 4.2 6 5C6 5.8 6.5 6.5 7 7M12 7C12.5 5.5 13.2 4.5 14 3.8C14.8 3.1 15.8 2.8 16.5 3C17.5 3.3 18 4.2 18 5C18 5.8 17.5 6.5 17 7"
-                    stroke="#634738"
+                    stroke="var(--store-accent)"
                     strokeWidth="1.8"
                     strokeLinecap="round"
                   />
@@ -603,32 +612,34 @@ export default function Homepage() {
                     width="14"
                     height="4"
                     rx="1"
-                    stroke="#634738"
+                    stroke="var(--store-header-icon-stroke)"
                     strokeWidth="1.8"
                     fill="none"
                   />
                   <path
                     d="M6.5 11V18C6.5 19.1 7.4 20 8.5 20H15.5C16.6 20 17.5 19.1 17.5 18V11"
-                    stroke="#634738"
+                    stroke="var(--store-header-icon-stroke)"
                     strokeWidth="1.8"
                     strokeLinecap="round"
                   />
                 </g>
               </svg>
             </div>
-            <div className="step-text">
-              <h3 className="step-title">Adorável rotina</h3>
-              <p className="step-description">
+            <div className="journey-step__content">
+              <h3 className="journey-step__title">Um carinho que acompanha</h3>
+              <p className="journey-step__desc">
                 Leve bolos para adoçar a familia! Com embalagens seguras e
                 prontas para viagem!
               </p>
             </div>
-          </div>
+          </article>
         </div>
 
-        <Link to="/cardapio" className="btn-cardapio">
-          Ver cardápio
-        </Link>
+        <div className="process-cta-wrap scroll-reveal" ref={processCtaRef}>
+          <Link to="/cardapio" className="btn-cardapio">
+            Ver cardápio
+          </Link>
+        </div>
       </section>
 
       {/* ===== INSTAGRAM ===== */}

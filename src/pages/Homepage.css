@@ -362,116 +362,148 @@
   color: var(--store-text-heading);
 }
 
-/* ===== PROCESS SECTION ===== */
+/* ===== PROCESS SECTION (EDITORIAL REDESIGN) ===== */
 .process-section {
   position: relative;
   z-index: 2;
-  padding: 80px 80px;
+  padding: 104px 48px 96px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 48px;
+  gap: 68px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .process-header {
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 600px;
+  align-items: center;
+  gap: 14px;
+  max-width: 580px;
 }
 
 .process-label {
   font-family: "Manrope", sans-serif;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--store-accent);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.8px;
 }
 
 .process-title {
   font-family: "Fraunces", serif;
-  font-size: 36px;
+  font-size: 38px;
   font-weight: 600;
   color: var(--store-text-heading);
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
 }
 
-.process-cards {
+/* Editorial Journey */
+.process-journey {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  grid-template-columns: 1fr 1fr 1fr;
+  column-gap: 52px;
+  row-gap: 32px;
+  width: 100%;
+  align-items: start;
+}
+
+/* Individual Journey Steps — No cards, no backgrounds, no borders, no boxes */
+.journey-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+  position: relative;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* Desktop Asymmetric Rhythm */
+.journey-step--1 {
+  transform: translateY(0);
+}
+
+.journey-step--2 {
+  transform: translateY(32px);
+}
+
+.journey-step--3 {
+  transform: translateY(12px);
+}
+
+/* Animated Icon Marker (Centered) */
+.journey-step__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: transparent;
+  border: none;
+  margin: 0 auto;
+}
+
+.journey-step__marker svg {
+  width: 36px;
+  height: 36px;
+  display: block;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .journey-step:hover .journey-step__marker svg {
+    transform: translateY(-3px) scale(1.08);
+  }
+}
+
+/* Typography & Content Hierarchy */
+.journey-step__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.journey-step__title {
+  font-family: "Fraunces", serif;
+  font-size: 23px;
+  font-weight: 600;
+  color: var(--store-text-heading);
+  line-height: 1.3;
+  margin: 0;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.journey-step__desc {
+  font-family: "Manrope", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--store-text-muted);
+  line-height: 1.65;
+  margin: 0 auto;
+  max-width: 320px;
+  text-align: center;
+}
+
+/* CTA Wrap & Button */
+.process-cta-wrap {
+  margin-top: 36px;
+  display: flex;
+  justify-content: center;
   width: 100%;
 }
 
-.step-card {
-  position: relative;
-  background: var(--store-surface-card);
-  border: 1px solid var(--store-border);
-  border-radius: 24px;
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.icon-badge {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: var(--store-surface-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: flex-end;
-}
-
-.step-text {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.step-title {
-  font-family: "Fraunces", serif;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--store-text-heading);
-  margin: 0;
-}
-
-.step-description {
-  font-family: "Manrope", sans-serif;
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--store-text-muted);
-  line-height: 1.6;
-  margin: 0;
-}
-
-/* Accent dots */
-.accent-dot {
-  position: absolute;
-  border-radius: 50%;
-  background-color: var(--store-accent);
-}
-
-.dot-top-right {
-  width: 16px;
-  height: 16px;
-  top: -8px;
-  right: 28px;
-}
-.dot-bottom-left {
-  width: 12px;
-  height: 12px;
-  bottom: 33px;
-  left: -6px;
-}
-
-/* CTA Button */
 .btn-cardapio {
   position: relative;
   overflow: hidden;
@@ -481,21 +513,26 @@
   background: var(--store-btn-primary-bg);
   color: var(--store-btn-primary-text);
   border: 1px solid var(--store-btn-primary-border);
-  font-family: "Inter", sans-serif;
+  font-family: "Manrope", sans-serif;
   font-size: 16px;
-  font-weight: 500;
-  padding: 16px 32px;
-  border-radius: 100px;
+  font-weight: 600;
+  padding: 16px 36px;
+  border-radius: 9999px;
   cursor: pointer;
   text-decoration: none;
+  letter-spacing: 0.01em;
   transition:
-    background-color 0.2s,
-    transform 0.15s;
+    background-color 0.25s ease,
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 
 .btn-cardapio:hover {
   background: var(--store-btn-primary-hover);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .btn-cardapio::after {
@@ -747,27 +784,128 @@
   transform: translateY(0);
 }
 
-.scroll-reveal .step-card {
+/* Scroll Reveal: Independent Step Scroll Reveal as User Scrolls */
+.process-header.scroll-reveal {
   opacity: 0;
-  transform: translateY(30px);
+  transform: translateY(20px);
   transition:
-    opacity 0.6s ease,
-    transform 0.6s ease;
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.scroll-reveal.revealed .step-card:nth-child(1) {
+
+.process-header.scroll-reveal.revealed {
   opacity: 1;
   transform: translateY(0);
-  transition-delay: 0.1s;
 }
-.scroll-reveal.revealed .step-card:nth-child(2) {
+
+/* Prevent generic .scroll-reveal from wiping out desktop asymmetric translateY */
+.journey-step.scroll-reveal {
+  opacity: 1;
+  transition: none;
+}
+
+.journey-step--1.scroll-reveal {
+  transform: translateY(0);
+}
+.journey-step--2.scroll-reveal {
+  transform: translateY(32px);
+}
+.journey-step--3.scroll-reveal {
+  transform: translateY(12px);
+}
+
+/* Initial hidden state for step children */
+.journey-step.scroll-reveal .journey-step__marker {
+  opacity: 0;
+  transform: translateY(16px) scale(0.92);
+  transition:
+    opacity 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.journey-step.scroll-reveal .journey-step__title {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.journey-step.scroll-reveal .journey-step__desc {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* When a step is scrolled into view and receives .revealed */
+.journey-step.revealed .journey-step__marker {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: 0.04s;
+}
+
+.journey-step.revealed .journey-step__title {
   opacity: 1;
   transform: translateY(0);
-  transition-delay: 0.25s;
+  transition-delay: 0.11s;
 }
-.scroll-reveal.revealed .step-card:nth-child(3) {
+
+.journey-step.revealed .journey-step__desc {
   opacity: 1;
   transform: translateY(0);
-  transition-delay: 0.4s;
+  transition-delay: 0.18s;
+}
+
+/* Desktop stagger in case steps enter viewport simultaneously */
+@media (min-width: 769px) {
+  .journey-step--2.revealed .journey-step__marker {
+    transition-delay: 0.14s;
+  }
+  .journey-step--2.revealed .journey-step__title {
+    transition-delay: 0.21s;
+  }
+  .journey-step--2.revealed .journey-step__desc {
+    transition-delay: 0.28s;
+  }
+
+  .journey-step--3.revealed .journey-step__marker {
+    transition-delay: 0.24s;
+  }
+  .journey-step--3.revealed .journey-step__title {
+    transition-delay: 0.31s;
+  }
+  .journey-step--3.revealed .journey-step__desc {
+    transition-delay: 0.38s;
+  }
+}
+
+/* CTA Wrap Scroll Reveal */
+.process-cta-wrap.scroll-reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.process-cta-wrap.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.08s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-header.scroll-reveal,
+  .journey-step.scroll-reveal .journey-step__marker,
+  .journey-step.scroll-reveal .journey-step__title,
+  .journey-step.scroll-reveal .journey-step__desc,
+  .process-cta-wrap.scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
 }
 
 .scroll-reveal .instagram-gallery img {
@@ -984,72 +1122,96 @@
     color: var(--store-text-heading);
   }
 
-  /* --- PROCESS --- */
+  /* --- PROCESS (EDITORIAL REDESIGN) --- */
   .process-section {
-    padding: 48px 16px;
-    gap: 24px;
-    align-items: flex-start;
+    padding: 64px 20px;
+    gap: 48px;
+    align-items: center;
   }
   .process-header {
     text-align: center;
     align-items: center;
     width: 100%;
+    gap: 12px;
   }
   .process-label {
     display: inline-block;
-    background: var(--store-surface-soft);
-    color: var(--store-accent);
-    border: 1px solid var(--store-border);
     font-size: 11px;
     font-weight: 700;
-    padding: 4px 12px;
-    border-radius: 100px;
+    letter-spacing: 1.5px;
+    color: var(--store-accent);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
   }
-
   .process-title {
     font-size: 28px;
-    line-height: 1.2;
+    line-height: 1.25;
+    text-align: center;
     color: var(--store-text-heading);
   }
-  .process-cards {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  .step-card {
-    border-radius: 16px;
-    padding: 16px;
-    gap: 12px;
+  .process-journey {
+    display: flex;
     flex-direction: column;
-    background: var(--store-surface-card);
-    border: 1px solid var(--store-border);
+    gap: 52px;
+    width: 100%;
+    align-items: center;
   }
-  .icon-badge {
-    width: 32px;
-    height: 32px;
-    align-self: flex-start;
-    background-color: var(--store-surface-soft);
+  .journey-step {
+    align-self: center !important;
+    transform: none !important;
+    padding-top: 0 !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 360px;
   }
-  .icon-badge svg {
-    width: 16px;
-    height: 16px;
+  .journey-step.scroll-reveal {
+    transform: none !important;
   }
-  .step-title {
-    font-size: 16px;
+  .journey-step__marker {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto;
+    justify-content: center;
+  }
+  .journey-step__marker svg {
+    width: 34px;
+    height: 34px;
+  }
+  .journey-step__content {
+    gap: 8px;
+    width: 100%;
+    align-items: center;
+  }
+  .journey-step__title {
+    font-size: 20px;
+    line-height: 1.3;
+    text-align: center;
     color: var(--store-text-heading);
   }
-  .step-description {
-    font-size: 13px;
+  .journey-step__desc {
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 300px;
+    text-align: center;
+    margin: 0 auto;
     color: var(--store-text-muted);
   }
-  .step-text {
-    gap: 4px;
+  .process-cta-wrap {
+    margin-top: 16px;
+    width: 100%;
+    max-width: 360px;
+    justify-content: center;
   }
   .btn-cardapio {
-    align-self: flex-start;
-    font-size: 15px;
-    padding: 14px 24px;
+    width: 100%;
+    min-height: 52px;
+    font-size: 16px;
+    padding: 16px 28px;
+    text-align: center;
+    justify-content: center;
   }
 
   /* --- INSTAGRAM --- */
@@ -1213,6 +1375,12 @@
   }
   .process-section {
     padding: 80px 40px;
+  }
+  .process-journey {
+    column-gap: 36px;
+  }
+  .journey-step__title {
+    font-size: 21px;
   }
   .instagram-section {
     padding: 80px 40px;
