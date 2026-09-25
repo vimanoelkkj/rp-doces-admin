@@ -6,6 +6,24 @@ import { syncPaymentFromMp, expireLocalPayment } from "./ledgerSync";
 const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
 
+// Throttle de consulta ao Mercado Pago por tentativa PIX_MP, compartilhado
+// pela reconciliação do admin e pelo POST público de acompanhamento. CAS em
+// `atualizado_em` ANTES da chamada externa: só um chamador por janela de 15s
+// consulta o MP, e uma falha de rede também consome a janela. Elegível apenas
+// PENDENTE/EXPIRADO (EXPIRADO -> PAGO tardio continua recuperável). Não altera
+// fatos nem timestamps históricos financeiros.
+export async function claimPendingPixPaymentReconciliation(
+  db: D1Database,
+  pagamentoId: number,
+): Promise<boolean> {
+  const claim = await db.prepare(
+    `UPDATE pedido_pagamentos SET atualizado_em = CURRENT_TIMESTAMP
+     WHERE id = ? AND metodo = 'PIX_MP' AND status IN ('PENDENTE', 'EXPIRADO')
+       AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')`,
+  ).bind(pagamentoId, RECONCILE_AFTER_SECONDS).run();
+  return Number(claim.meta.changes || 0) > 0;
+}
+
 // Reconciliação oportunista: chamada a partir de GET /api/admin/pedidos.
 // Seleciona pelo ledger (pedido_pagamentos), não pela projeção agregada em
 // pedidos.status_pagamento — depois do Passo 5, um pedido PENDENTE no
@@ -33,12 +51,7 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
       try {
         // Claim por candidato: concorrência e falhas de rede também respeitam
         // o throttle. Não altera fatos nem timestamps históricos financeiros.
-        const claim = await env.DB.prepare(
-          `UPDATE pedido_pagamentos SET atualizado_em = CURRENT_TIMESTAMP
-           WHERE id = ? AND status IN ('PENDENTE', 'EXPIRADO')
-             AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')`,
-        ).bind(row.id, RECONCILE_AFTER_SECONDS).run();
-        if (!claim.meta.changes) return;
+        if (!(await claimPendingPixPaymentReconciliation(env.DB, row.id))) return;
         const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN!, row.mp_payment_id);
         await syncPaymentFromMp(env.DB, row.id, payment, env);
       } catch (err) {

@@ -2,7 +2,7 @@
 
 import { pedidoValidoSql } from "../lib/pedidoValido";
 
-import { refreshPedidoStatus, PedidoStatusRow } from "../lib/pedidoStatus";
+import { readPedidoStatus, PedidoStatusRow } from "../lib/pedidoStatus";
 
 interface Env {
   DB: D1Database;
@@ -53,7 +53,8 @@ async function handleDetalhe(request: Request, env: Env): Promise<Response> {
     return jsonError("Pedido não encontrado", 404);
   }
 
-  const atual = await refreshPedidoStatus(env.DB, env.MP_ACCESS_TOKEN, pedido, env);
+  // Somente leitura (M7): a recuperação acontece via POST /api/pedido-status.
+  const atual = await readPedidoStatus(env.DB, pedido);
 
   const { results: itens } = await env.DB.prepare(
     `SELECT produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos

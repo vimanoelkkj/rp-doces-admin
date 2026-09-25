@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 // Fachada pública pura do subsistema paymentSync.
-// Reexporta nominalmente os 14 símbolos históricos.
+// Reexporta nominalmente os símbolos públicos do subsistema.
 
 export type {
   MpMappedStatus,
@@ -35,6 +35,7 @@ export {
 export {
   reconcilePendingPixPayments,
   liberarReservasVencidasLocalmente,
+  claimPendingPixPaymentReconciliation,
 } from "./paymentSync/sweeps";
 
 export {

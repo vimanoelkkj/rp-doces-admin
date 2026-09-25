@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
@@ -41,6 +41,41 @@ export default function AcompanharPedido() {
   const [pedido, setPedido] = useState<PedidoDetalhe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const reconciliandoRef = useRef(false);
+  const montadoRef = useRef(true);
+
+  useEffect(() => {
+    montadoRef.current = true;
+    return () => {
+      montadoRef.current = false;
+    };
+  }, []);
+
+  // Recuperação do pagamento (MP, expiração) por POST explícito — o GET de
+  // detalhes é somente leitura. Best-effort e fora do caminho de renderização:
+  // uma consulta lenta ao MP nunca atrasa os detalhes. Um POST por vez.
+  const reconciliarStatus = useCallback(async () => {
+    if (!token || reconciliandoRef.current) return;
+    reconciliandoRef.current = true;
+    try {
+      const response = await fetch(
+        `/api/pedido-status?token=${encodeURIComponent(token)}`,
+        { method: "POST" },
+      );
+      if (!response.ok) return;
+      const atual = (await response.json()) as Pick<PedidoDetalhe, "statusPagamento" | "statusPedido">;
+      if (!montadoRef.current) return;
+      setPedido((anterior) =>
+        anterior
+          ? { ...anterior, statusPagamento: atual.statusPagamento, statusPedido: atual.statusPedido }
+          : anterior,
+      );
+    } catch {
+      // ignora: o próximo ciclo tenta de novo
+    } finally {
+      reconciliandoRef.current = false;
+    }
+  }, [token]);
 
   const carregarPedido = useCallback(
     async (mostrarLoading = false) => {
@@ -59,13 +94,14 @@ export default function AcompanharPedido() {
 
         setPedido((await response.json()) as PedidoDetalhe);
         setError(null);
+        void reconciliarStatus();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Falha ao atualizar pedido");
       } finally {
         if (mostrarLoading) setLoading(false);
       }
     },
-    [token],
+    [token, reconciliarStatus],
   );
 
   useEffect(() => {

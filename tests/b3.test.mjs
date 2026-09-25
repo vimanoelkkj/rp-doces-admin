@@ -340,7 +340,12 @@ for (const handler of ['polling', 'detail']) test(`${handler}: early return with
   await db.prepare("UPDATE pedidos SET pix_expira_em='2000-01-01T00:00:00Z' WHERE id=1").run();
   t.mock.method(globalThis, 'fetch', () => { throw new Error('network must not be used'); });
   for (let i = 0; i < 2; i++) {
-    const response = await app[handler].onRequestGet({request: new Request('https://local.test/api/pedido?token=token'), env:{DB:db,MP_ACCESS_TOKEN:'fake'}});
+    // M7: a recuperação é o POST /api/pedido-status; os GETs só leem.
+    const env = {DB:db,MP_ACCESS_TOKEN:'fake'};
+    const post = await app.polling.onRequestPost({env, request: new Request('https://local.test/api/pedido-status?token=token',
+      {method: 'POST', headers: {Origin: 'https://local.test'}})});
+    assert.equal(post.status, 200);
+    const response = await app[handler].onRequestGet({request: new Request('https://local.test/api/pedido?token=token'), env});
     assert.equal(response.status, 200);
     assert.equal((await response.json()).statusPagamento, 'PAGO');
   }
