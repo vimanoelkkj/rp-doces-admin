@@ -68,7 +68,10 @@ export default function ProductCard({
           <motion.button
             className={`add-button${justAdded ? " add-button--added" : ""}${esgotado ? " add-button--esgotado" : ""}`}
             aria-label={esgotado ? `${product.name} esgotado` : `Adicionar ${product.name}`}
-            onClick={handleAdd}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              handleAdd();
+            }}
             disabled={esgotado}
             whileHover={shouldReduceMotion || esgotado ? undefined : { scale: 1.12 }}
             whileTap={shouldReduceMotion || esgotado ? undefined : { scale: 0.92 }}

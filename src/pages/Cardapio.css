@@ -69,10 +69,23 @@
   transform: scale(1.05);
 }
 
-.filter-tab:hover:not(.active) {
-  background-color: var(--store-surface-highlight);
-  color: var(--store-accent);
-  transform: scale(1.05);
+@media (hover: hover) {
+  .filter-tab:hover:not(.active) {
+    background-color: var(--store-surface-highlight);
+    color: var(--store-accent);
+    transform: scale(1.05);
+  }
+}
+
+.filter-tab:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (pointer: coarse) {
+  .filter-tab:focus,
+  .filter-tab:focus-visible {
+    outline: none;
+  }
 }
 
 .filter-tab:active {

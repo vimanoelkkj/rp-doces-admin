@@ -172,14 +172,31 @@
   pointer-events: auto;
 }
 
+.add-button:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .add-button:focus-visible {
   outline: 2px solid var(--store-border-focus);
   outline-offset: 2px;
 }
 
-.add-button:hover {
+@media (hover: hover) {
+  .add-button:hover {
+    background-color: var(--store-surface-highlight);
+    color: var(--store-accent);
+  }
+}
+
+.add-button:active {
   background-color: var(--store-surface-highlight);
-  color: var(--store-accent);
+}
+
+@media (pointer: coarse) {
+  .add-button:focus,
+  .add-button:focus-visible {
+    outline: none;
+  }
 }
 
 .add-button:disabled,
