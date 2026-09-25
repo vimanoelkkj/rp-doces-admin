@@ -42,6 +42,17 @@ function isOwner(papel: string) {
   return papel === "OWNER";
 }
 
+function isLastActiveOwnerError(error: unknown): boolean {
+  if (!error) return false;
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : String((error as { message?: unknown })?.message ?? error);
+  return message.toLowerCase().includes("ultimo_owner_ativo");
+}
+
 async function getTarget(db: D1Database, id: number) {
   return db
     .prepare(`SELECT ativo, papel FROM usuarios_admin WHERE id = ?`)
@@ -168,11 +179,21 @@ async function handlePut({
       }
     }
 
-    await env.DB.prepare(
-      `UPDATE usuarios_admin SET ativo = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
-    )
-      .bind(body.ativo ? 1 : 0, id)
-      .run();
+    try {
+      await env.DB.prepare(
+        `UPDATE usuarios_admin SET ativo = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+      )
+        .bind(body.ativo ? 1 : 0, id)
+        .run();
+    } catch (err: unknown) {
+      if (isLastActiveOwnerError(err)) {
+        return jsonError(
+          "A loja precisa manter pelo menos um administrador mestre ativo",
+          409,
+        );
+      }
+      throw err;
+    }
 
     if (!body.ativo) {
       await env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`)
@@ -211,14 +232,24 @@ async function handlePut({
       }
     }
 
-    await env.DB.batch([
-      env.DB.prepare(
-        `UPDATE usuarios_admin SET papel = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
-      ).bind(body.papel, id),
-      env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(
-        id,
-      ),
-    ]);
+    try {
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE usuarios_admin SET papel = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+        ).bind(body.papel, id),
+        env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(
+          id,
+        ),
+      ]);
+    } catch (err: unknown) {
+      if (isLastActiveOwnerError(err)) {
+        return jsonError(
+          "A loja precisa manter pelo menos um administrador mestre ativo",
+          409,
+        );
+      }
+      throw err;
+    }
     return Response.json({ ok: true });
   }
 
