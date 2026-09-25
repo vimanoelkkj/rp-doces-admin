@@ -4,7 +4,7 @@ import {app, fixture, state, barrier} from './helpers/b3.mjs';
 
 // A1 — regressões de identidade lógica/idempotência.
 //
-// A investigação (docs/investigacoes/A1-IDEMPOTENCIA.md) já PROVOU a
+// A investigação de idempotência (consolidada no README.md) já provou a
 // vulnerabilidade com 38 cenários. Esta suíte não a repete: ela prova a
 // CORREÇÃO, com o código real de produção, D1 local descartável criado pelas
 // migrations (constraints e rollback de verdade) e Mercado Pago simulado.
