@@ -6,16 +6,20 @@ import { useLocation } from "react-router-dom";
 let swRegistered = false;
 
 const STOREFRONT_THEME_COLOR = "#eddcc6";
-const ADMIN_LIGHT_THEME_COLOR = "#faf6f0";
-const ADMIN_DARK_THEME_COLOR = "#1a1412";
+const HEADER_LIGHT_THEME_COLOR = "#eddcc6";
+const HEADER_DARK_THEME_COLOR = "#271f1b";
 
 function getAdminThemeColor() {
-  const themeAttr = document.documentElement.getAttribute("data-admin-theme");
-  const savedTheme = window.localStorage.getItem("admin-theme");
+  const themeAttr =
+    document.documentElement.getAttribute("data-admin-theme") ||
+    document.documentElement.getAttribute("data-theme");
+  const savedTheme =
+    window.localStorage.getItem("admin-theme") ||
+    window.localStorage.getItem("store-theme");
   const isDark =
     themeAttr === "dark" || (themeAttr === null && savedTheme === "dark");
 
-  return isDark ? ADMIN_DARK_THEME_COLOR : ADMIN_LIGHT_THEME_COLOR;
+  return isDark ? HEADER_DARK_THEME_COLOR : HEADER_LIGHT_THEME_COLOR;
 }
 
 export function useAdminPwa() {
@@ -73,7 +77,7 @@ export function useAdminPwa() {
     const themeObserver = new MutationObserver(syncThemeColor);
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-admin-theme"],
+      attributeFilter: ["data-admin-theme", "data-theme"],
     });
 
     // 4. Registra o Service Worker administrativo com escopo restrito a /admin

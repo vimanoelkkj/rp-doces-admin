@@ -128,6 +128,10 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.setAttribute("data-admin-theme", theme);
+    const metaThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.content = theme === "dark" ? "#271f1b" : "#eddcc6";
+    }
     try {
       localStorage.setItem(STORAGE_KEY, theme);
       localStorage.setItem(ADMIN_STORAGE_KEY, theme);
