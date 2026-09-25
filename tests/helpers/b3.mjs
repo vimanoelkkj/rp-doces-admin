@@ -66,6 +66,7 @@ const bundle = await build({
       export * as adminPushRetry from './functions/api/admin/push/retry';
       export * as adminPushTest from './functions/api/admin/push/test';
       export * as adminAdministradoresId from './functions/api/admin/administradores/[id]';
+      export * as login from './functions/api/auth/login';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
