@@ -61,8 +61,16 @@ interface CheckoutSucesso {
   totalCentavos: number;
 }
 
-function jsonError(message: string, status: number, code?: string) {
-  return Response.json(code ? { error: message, code } : { error: message }, { status });
+function jsonError(
+  message: string,
+  status: number,
+  code?: string,
+  extra?: Record<string, unknown>,
+) {
+  return Response.json(
+    { ...(code ? { error: message, code } : { error: message }), ...extra },
+    { status },
+  );
 }
 
 const MAX_ITEMS_PER_PEDIDO = 50;
@@ -360,7 +368,13 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       fase: "ENVIO_INCONCLUSIVO",
       erro: `AMBIGUO:${envio.motivo}`,
     });
-    return jsonError(MENSAGEM_MP_INDISPONIVEL, 502, "MERCADO_PAGO_INDISPONIVEL");
+    // O pedido já existe: devolve a identidade pública dele para o cliente
+    // acompanhar, em vez de induzir uma nova finalização (nova key, novo
+    // pedido, nova reserva). Continua 502: nada foi provado.
+    return jsonError(MENSAGEM_MP_INDISPONIVEL, 502, "MERCADO_PAGO_INDISPONIVEL", {
+      pedidoId,
+      tokenPublico,
+    });
   }
 
   if (envio.resultado === "RECUSA_DEFINITIVA") {

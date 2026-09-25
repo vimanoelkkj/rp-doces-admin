@@ -516,7 +516,7 @@ for (const [nome, resposta] of [
   test(`checkout: resultado ambíguo (${nome}) mantém a operação inconclusiva e a reserva`, async t => {
     const db = await siteLimpo(t);
     silenciarLogs(t);
-    mpPost(t, {responder: async () => {
+    const mp = mpPost(t, {responder: async () => {
       if (resposta === null) throw new Error('transport failure');
       return resposta.clone();
     }});
@@ -526,7 +526,18 @@ for (const [nome, resposta] of [
     assert.equal(r.body.code, 'MERCADO_PAGO_INDISPONIVEL');
 
     const s = await state(db);
-    const pedido = (await db.prepare('SELECT * FROM pedidos').all()).results[0];
+    const pedidos = (await db.prepare('SELECT * FROM pedidos').all()).results;
+    assert.equal(pedidos.length, 1, 'exatamente um pedido');
+    const pedido = pedidos[0];
+    // M6: a PRIMEIRA resposta ambígua já identifica o pedido persistido,
+    // para o cliente acompanhá-lo em vez de finalizar de novo.
+    assert.equal(r.body.pedidoId, pedido.id);
+    assert.equal(r.body.tokenPublico, pedido.token_publico);
+    assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === 'POST').length, 1,
+      'exatamente um POST ao Mercado Pago');
+    assert.equal((await db.prepare(
+      `SELECT COUNT(*) AS n FROM pedido_itens WHERE estoque_estado = 'RESERVADO'`).first()).n, 1,
+      'exatamente uma reserva');
     const pagamento = (await db.prepare('SELECT * FROM pedido_pagamentos').all()).results[0];
     assert.equal(pagamento.status, 'PENDENTE', 'nunca FALHOU: rejeição não foi provada');
     assert.equal(pedido.reserva_status, 'ATIVA', 'reserva do PEDIDO preservada (B4)');
