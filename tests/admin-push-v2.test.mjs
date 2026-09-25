@@ -919,3 +919,386 @@ test("POST /api/admin/push/test: erro no push service retorna 502 e não quebra 
     globalThis.fetch = originalFetch;
   }
 });
+
+/* ──────────────────── 8. Elegibilidade de Subscriptions (Apenas Usuários Ativos) ──────────────────── */
+
+test("pushNotifier: ADMIN ativo com subscription válida recebe exatamente 1 push", async (t) => {
+  const { db } = await bancada(t);
+  const keys = gerarChavesClient();
+
+  // Usuário 1 já é ativo (fixture)
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/active-user", keys.p256dh, keys.auth)
+    .run();
+
+  await db
+    .prepare(
+      `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
+       VALUES (301, 'tok-301', 'Cliente Ativo', '11999999999', 5000, 'idemp-301', 'SITE', 'PAGO', 'NOVO')`
+    )
+    .run();
+
+  const dispatchedUrls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://push.mock.test/")) {
+      dispatchedUrls.push(String(url));
+      return new Response(null, { status: 201 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const env = {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+      VAPID_SUBJECT,
+    };
+
+    const res = await app.pushNotifier.notificarNovoPedidoPago(db, env, 301);
+    assert.equal(res.ok, true);
+    assert.equal(res.enviado, true);
+    assert.equal(res.sucessos, 1);
+    assert.deepEqual(dispatchedUrls, ["https://push.mock.test/active-user"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("pushNotifier: ADMIN inativo com subscription no banco tem zero chamadas e subscription é preservada", async (t) => {
+  const { db } = await bancada(t);
+  const keys = gerarChavesClient();
+
+  const passHash = await app.auth.hashPassword("senha-inativo");
+  await db
+    .prepare(
+      `INSERT INTO usuarios_admin (id, nome, username, email, senha_hash, papel, ativo)
+       VALUES (2, 'Admin Inativo', 'admin_inativo', 'inativo@local.test', ?, 'ADMIN', 0)`
+    )
+    .bind(passHash)
+    .run();
+
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(2, "https://push.mock.test/inactive-user", keys.p256dh, keys.auth)
+    .run();
+
+  await db
+    .prepare(
+      `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
+       VALUES (302, 'tok-302', 'Cliente Inativo', '11999999999', 5000, 'idemp-302', 'SITE', 'PAGO', 'NOVO')`
+    )
+    .run();
+
+  const dispatchedUrls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://push.mock.test/")) {
+      dispatchedUrls.push(String(url));
+      return new Response(null, { status: 201 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const env = {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+      VAPID_SUBJECT,
+    };
+
+    const res = await app.pushNotifier.notificarNovoPedidoPago(db, env, 302);
+    assert.equal(res.ok, true);
+    assert.equal(res.enviado, false);
+    assert.equal(res.destinatarios, 0);
+
+    // Zero chamadas ao push service
+    assert.equal(dispatchedUrls.length, 0);
+
+    // A subscription NÃO foi removida
+    const sub = await db.prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/inactive-user'").first();
+    assert.ok(sub, "Subscription de usuário inativo deve permanecer armazenada");
+
+    // Evento converge para ENVIADO
+    const ev = await db.prepare("SELECT status FROM push_eventos WHERE pedido_id = 302 AND evento = 'PEDIDO_PAGO'").first();
+    assert.equal(ev.status, "ENVIADO");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("pushNotifier: cenário misto (Admin A ativo, Admin B inativo) envia apenas para A", async (t) => {
+  const { db } = await bancada(t);
+  const keysA = gerarChavesClient();
+  const keysB = gerarChavesClient();
+
+  const passHash = await app.auth.hashPassword("senha-b");
+  await db
+    .prepare(
+      `INSERT INTO usuarios_admin (id, nome, username, email, senha_hash, papel, ativo)
+       VALUES (2, 'Admin B', 'admin_b', 'adminb@local.test', ?, 'ADMIN', 0)`
+    )
+    .bind(passHash)
+    .run();
+
+  // Admin A (id 1, ativo)
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/sub-a", keysA.p256dh, keysA.auth)
+    .run();
+
+  // Admin B (id 2, inativo)
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(2, "https://push.mock.test/sub-b", keysB.p256dh, keysB.auth)
+    .run();
+
+  await db
+    .prepare(
+      `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
+       VALUES (303, 'tok-303', 'Cliente Misto', '11999999999', 5000, 'idemp-303', 'SITE', 'PAGO', 'NOVO')`
+    )
+    .run();
+
+  const dispatchedUrls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://push.mock.test/")) {
+      dispatchedUrls.push(String(url));
+      return new Response(null, { status: 201 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const env = {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+      VAPID_SUBJECT,
+    };
+
+    const res = await app.pushNotifier.notificarNovoPedidoPago(db, env, 303);
+    assert.equal(res.ok, true);
+    assert.equal(res.enviado, true);
+    assert.equal(res.sucessos, 1);
+
+    // Somente A recebeu
+    assert.deepEqual(dispatchedUrls, ["https://push.mock.test/sub-a"]);
+
+    // Ambas subscriptions continuam armazenadas no banco
+    const totalSubs = await db.prepare("SELECT COUNT(*) as total FROM push_inscricoes").first();
+    assert.equal(totalSubs.total, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("pushNotifier: reativação de admin torna a mesma subscription elegível automaticamente", async (t) => {
+  const { db } = await bancada(t);
+  const keysB = gerarChavesClient();
+
+  const passHash = await app.auth.hashPassword("senha-b");
+  await db
+    .prepare(
+      `INSERT INTO usuarios_admin (id, nome, username, email, senha_hash, papel, ativo)
+       VALUES (2, 'Admin B', 'admin_b', 'adminb@local.test', ?, 'ADMIN', 0)`
+    )
+    .bind(passHash)
+    .run();
+
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(2, "https://push.mock.test/sub-b-reativacao", keysB.p256dh, keysB.auth)
+    .run();
+
+  await db
+    .prepare(
+      `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
+       VALUES (304, 'tok-304', 'Pedido 1', '11999999999', 5000, 'idemp-304', 'SITE', 'PAGO', 'NOVO'),
+              (305, 'tok-305', 'Pedido 2', '11999999999', 6000, 'idemp-305', 'SITE', 'PAGO', 'NOVO')`
+    )
+    .run();
+
+  const dispatchedUrls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://push.mock.test/")) {
+      dispatchedUrls.push(String(url));
+      return new Response(null, { status: 201 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const env = {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+      VAPID_SUBJECT,
+    };
+
+    // 1. Enquanto inativo: não recebe push para pedido 304
+    const res1 = await app.pushNotifier.notificarNovoPedidoPago(db, env, 304);
+    assert.equal(res1.ok, true);
+    assert.equal(res1.enviado, false);
+    assert.equal(dispatchedUrls.length, 0);
+
+    // 2. Reativa o usuário diretamente no banco
+    await db.prepare("UPDATE usuarios_admin SET ativo = 1 WHERE id = 2").run();
+
+    // 3. Dispara outro pedido 305: a MESMA subscription B passa a receber
+    const res2 = await app.pushNotifier.notificarNovoPedidoPago(db, env, 305);
+    assert.equal(res2.ok, true);
+    assert.equal(res2.enviado, true);
+    assert.equal(res2.sucessos, 1);
+    assert.deepEqual(dispatchedUrls, ["https://push.mock.test/sub-b-reativacao"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("pushNotifier: excludeUsuarioId funciona junto com filtro de ativo=1", async (t) => {
+  const { db } = await bancada(t);
+  const keysA = gerarChavesClient();
+  const keysB = gerarChavesClient();
+
+  const passHash = await app.auth.hashPassword("senha-b");
+  await db
+    .prepare(
+      `INSERT INTO usuarios_admin (id, nome, username, email, senha_hash, papel, ativo)
+       VALUES (2, 'Admin B', 'admin_b', 'adminb@local.test', ?, 'ADMIN', 1)`
+    )
+    .bind(passHash)
+    .run();
+
+  // Ambos inscritos (A e B)
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/exclude-a", keysA.p256dh, keysA.auth)
+    .run();
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(2, "https://push.mock.test/exclude-b", keysB.p256dh, keysB.auth)
+    .run();
+
+  await db
+    .prepare(
+      `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
+       VALUES (306, 'tok-306', 'Pedido Exclude 1', '11999999999', 5000, 'idemp-306', 'SITE', 'PAGO', 'NOVO'),
+              (307, 'tok-307', 'Pedido Exclude 2', '11999999999', 5000, 'idemp-307', 'SITE', 'PAGO', 'NOVO')`
+    )
+    .run();
+
+  const dispatchedUrls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://push.mock.test/")) {
+      dispatchedUrls.push(String(url));
+      return new Response(null, { status: 201 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const env = {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+      VAPID_SUBJECT,
+    };
+
+    // Excluindo A: somente B recebe
+    const res1 = await app.pushNotifier.notificarNovoPedidoPago(db, env, 306, { excludeUsuarioId: 1 });
+    assert.equal(res1.ok, true);
+    assert.equal(res1.sucessos, 1);
+    assert.deepEqual(dispatchedUrls, ["https://push.mock.test/exclude-b"]);
+
+    // Agora desativa B
+    await db.prepare("UPDATE usuarios_admin SET ativo = 0 WHERE id = 2").run();
+    dispatchedUrls.length = 0;
+
+    // Excluindo A novamente: B agora está inativo, então ninguém recebe
+    const res2 = await app.pushNotifier.notificarNovoPedidoPago(db, env, 307, { excludeUsuarioId: 1 });
+    assert.equal(res2.ok, true);
+    assert.equal(res2.enviado, false);
+    assert.equal(res2.destinatarios, 0);
+    assert.equal(dispatchedUrls.length, 0);
+
+    const ev = await db.prepare("SELECT status FROM push_eventos WHERE pedido_id = 307 AND evento = 'PEDIDO_PAGO'").first();
+    assert.equal(ev.status, "ENVIADO");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("pushNotifier: retry/reconciliação não reenvia para subscription de usuário inativo", async (t) => {
+  const { db } = await bancada(t);
+  const keysB = gerarChavesClient();
+
+  const passHash = await app.auth.hashPassword("senha-b");
+  await db
+    .prepare(
+      `INSERT INTO usuarios_admin (id, nome, username, email, senha_hash, papel, ativo)
+       VALUES (2, 'Admin B', 'admin_b', 'adminb@local.test', ?, 'ADMIN', 0)`
+    )
+    .bind(passHash)
+    .run();
+
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(2, "https://push.mock.test/sub-retry-inativo", keysB.p256dh, keysB.auth)
+    .run();
+
+  await db
+    .prepare(
+      `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
+       VALUES (308, 'tok-308', 'Pedido Retry', '11999999999', 5000, 'idemp-308', 'SITE', 'PAGO', 'NOVO')`
+    )
+    .run();
+
+  // Evento em FALHA candidato para reconciliação
+  await db
+    .prepare(
+      `INSERT INTO push_eventos (pedido_id, evento, status, tentativas, ultimo_erro, criado_em, atualizado_em)
+       VALUES (308, 'PEDIDO_PAGO', 'FALHA', 1, 'Previous error', datetime('now', '-50 seconds'), datetime('now', '-40 seconds'))`
+    )
+    .run();
+
+  const dispatchedUrls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://push.mock.test/")) {
+      dispatchedUrls.push(String(url));
+      return new Response(null, { status: 201 });
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const env = {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+      VAPID_SUBJECT,
+    };
+
+    const res = await app.pushNotifier.reconciliarPushEventosFalhos(db, env, { backoffSeconds: 30 });
+    assert.equal(res.ok, true);
+    assert.equal(res.processados, 1);
+    assert.equal(res.sucessos, 1);
+
+    // Como o único inscrito está inativo, zero chamadas ao push service foram feitas
+    assert.equal(dispatchedUrls.length, 0);
+
+    // O evento convergiu para ENVIADO porque não restavam destinatários elegíveis
+    const ev = await db.prepare("SELECT status FROM push_eventos WHERE pedido_id = 308 AND evento = 'PEDIDO_PAGO'").first();
+    assert.equal(ev.status, "ENVIADO");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
