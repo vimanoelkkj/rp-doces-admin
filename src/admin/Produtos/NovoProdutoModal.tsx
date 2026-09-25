@@ -127,6 +127,11 @@ export default function NovoProdutoModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const modalProps = useAdminModal(open, onClose);
 
+  const estoqueReservado = isEdit ? Math.max(0, produto?.estoque_reservado ?? 0) : 0;
+  const estoqueAtual = /^\d+$/.test(stock) ? Number(stock) : 0;
+  const estoqueLivre = Math.max(0, estoqueAtual - estoqueReservado);
+  const estoqueAbaixoDaReserva = isEdit && estoqueAtual < estoqueReservado;
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -452,7 +457,7 @@ export default function NovoProdutoModal({
                   className="np-stepper-value"
                   value={stock}
                   inputMode="numeric"
-                  aria-label="Estoque"
+                  aria-label="Estoque total"
                   onChange={(e) => {
                     if (/^\d*$/.test(e.target.value)) setStock(e.target.value);
                   }}
@@ -465,6 +470,27 @@ export default function NovoProdutoModal({
                   <IconPlus />
                 </button>
               </div>
+              {isEdit && (
+                <div
+                  className={`np-stock-breakdown${estoqueAbaixoDaReserva ? " np-stock-breakdown--warning" : ""}`}
+                  aria-live="polite"
+                >
+                  <span>
+                    <strong>{estoqueReservado}</strong>{" "}
+                    {estoqueReservado === 1 ? "reservado" : "reservados"}
+                  </span>
+                  <span className="np-stock-breakdown-dot" aria-hidden="true" />
+                  <span>
+                    <strong>{estoqueLivre}</strong>{" "}
+                    {estoqueLivre === 1 ? "disponível" : "disponíveis"} para venda
+                  </span>
+                  {estoqueAbaixoDaReserva && (
+                    <small>
+                      O estoque total ficou abaixo da quantidade já reservada.
+                    </small>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
