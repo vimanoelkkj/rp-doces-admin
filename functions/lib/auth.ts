@@ -13,7 +13,7 @@ export interface AdminUser {
   papel: "OWNER" | "ADMIN";
 }
 
-function bytesToHex(bytes: ArrayBuffer): string {
+function bytesToHex(bytes: ArrayBuffer | Uint8Array): string {
   return [...new Uint8Array(bytes)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");

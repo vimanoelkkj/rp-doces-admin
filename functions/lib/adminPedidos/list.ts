@@ -153,6 +153,8 @@ export async function listPedidos(
         saldoCentavos: p.valor_total_centavos,
         pagoCentavos: 0,
         totalCentavos: p.valor_total_centavos,
+        excessoCentavos: 0,
+        temExcesso: false,
         metodosConfirmados: [],
       },
     }));

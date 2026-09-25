@@ -1,7 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import {
-  getComandaSaldo,
   getItensComSaldo,
   computeWaterfallAllocations,
   type LedgerMetodo,

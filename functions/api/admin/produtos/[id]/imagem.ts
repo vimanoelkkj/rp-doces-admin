@@ -101,7 +101,10 @@ export const onRequestPost: PagesFunction<Env> = async ({
       return jsonError("Envie a imagem como multipart/form-data", 400);
     }
 
-    const file = form.get("image");
+    // O tipo padrão do @cloudflare/workers-types declara `get(): string | null`
+    // (runtime anterior a 2021-11-03). Com a compatibility_date do projeto o
+    // upload chega como File; `unknown` + instanceof valida isso em runtime.
+    const file: unknown = form.get("image");
     if (!(file instanceof File)) {
       return jsonError("Envie uma imagem válida", 400);
     }

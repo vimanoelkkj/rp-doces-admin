@@ -45,7 +45,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const metodoStatusResult = validarMetodoEStatus(body.metodoPagamento, body.statusPagamento);
   if (!metodoStatusResult.ok) return jsonError(metodoStatusResult.erro, 400);
   const { metodo: metodoPagamento, status: statusPagamento } = metodoStatusResult;
-  const nascePago = statusPagamento === "PAGO";
 
   const clienteNome = (body.clienteNome ?? "").trim().slice(0, MAX_TEXT_LENGTH_MANUAL);
   const clienteWhatsappInput = (body.clienteWhatsapp ?? "").trim();
