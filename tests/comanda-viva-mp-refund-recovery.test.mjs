@@ -586,3 +586,112 @@ test("RECUSADO é terminal para recuperação automática e não chama o provedo
   assert.equal(view.pernasPendentes[0].refundRemoto.status, "RECUSADO");
   assert.equal(view.pernasPendentes[0].refundRemoto.podeVerificar, false);
 });
+
+/* ── M2: GETs de estado são somente leitura; a retomada é POST /reconciliar ── */
+
+const cookieDe = session => session.cookie.split(';')[0];
+const ESCRITA_SQL = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i;
+
+// Qualquer rede (Mercado Pago incluído) e qualquer escrita no D1 durante o GET
+// ficam registradas para o teste afirmar que não aconteceram.
+function observarGet(t, db) {
+  const rede = [];
+  const escritas = [];
+  t.mock.method(globalThis, 'fetch', async url => {
+    rede.push(String(url));
+    throw new Error(`GET somente leitura não pode chamar a rede: ${url}`);
+  });
+  db.hook = async statements => {
+    for (const s of statements) if (ESCRITA_SQL.test(s.sql)) escritas.push(s.sql);
+    return statements;
+  };
+  return { rede, escritas };
+}
+
+const intencao = db => db.prepare(`SELECT status,tentativas,mp_refund_id,atualizado_em
+  FROM pedido_reembolso_pix_mp_intencoes`).first();
+
+const getRota = (rota, db, session, url, params) => rota.onRequestGet({
+  env: { DB: db, MP_ACCESS_TOKEN: 'TEST_TOKEN' }, params, waitUntil() {},
+  request: new Request(`https://local.test${url}`, { headers: { Cookie: cookieDe(session) } }),
+});
+
+const reconciliar = (db, session) => app.adminOrderReconciliar.onRequestPost({
+  env: { DB: db, MP_ACCESS_TOKEN: 'TEST_TOKEN' }, params: { id: '1' }, waitUntil() {},
+  request: new Request('https://local.test/api/admin/pedidos/1/reconciliar', {
+    method: 'POST', headers: { Origin: 'https://local.test', Cookie: cookieDe(session) },
+  }),
+});
+
+test('M2: GET de cancelamento com refund INCONCLUSIVO não chama o MP nem escreve; POST /reconciliar retoma', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const session = await app.auth.createSession(db, 1);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('connection lost'); });
+  const first = await app.itemCancellation.confirmCancellationRefund(db, refundInput(cancellation, leg, 'm2-cancel-01'));
+  assert.equal(first.refundStatus, 'INCONCLUSIVO');
+  t.mock.restoreAll();
+  const antes = await intencao(db);
+  assert.equal(antes.mp_refund_id, null, 'estado em que a recuperação reenviaria o POST de refund');
+
+  const obs = observarGet(t, db);
+  const r = await getRota(app.adminItemCancellation, db, session,
+    '/api/admin/pedidos/1/itens/1/cancelamentos', { id: '1', itemId: '1' });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).cancelamento.id, cancellation.id);
+  assert.deepEqual(obs.rede, [], 'nenhuma chamada ao Mercado Pago');
+  assert.deepEqual(obs.escritas, [], 'nenhuma escrita no D1');
+  assert.deepEqual(await intencao(db), antes, 'intenção intacta');
+
+  db.hook = null;
+  t.mock.restoreAll();
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    if (init?.method === 'POST') posts++;
+    return Response.json({ id: 7201, payment_id: 9001, amount: 5, status: 'approved' }, { status: 201 });
+  });
+  assert.equal((await reconciliar(db, session)).status, 200);
+  assert.equal(posts, 1, 'a retomada explícita reenvia o refund com a mesma intenção');
+  assert.equal((await intencao(db)).status, 'CONFIRMADO');
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+});
+
+test('M2: GET de troca com refund INCONCLUSIVO não chama o MP nem escreve; POST /reconciliar retoma', async t => {
+  const { db, exchange } = await exchangeScenario(t);
+  const session = await app.auth.createSession(db, 1);
+  const leg = exchange.refundsPendentes[0];
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('connection lost'); });
+  const first = await app.itemExchange.confirmExchangeRefund(db, { pedidoId: 1, exchangeId: exchange.id,
+    usuarioId: 1, operationKey: 'm2-exchange-01', pagamentoId: leg.pagamentoId,
+    pagamentoAlocacaoId: leg.pagamentoAlocacaoId, valorCentavos: leg.valorCentavos,
+    confirmacao: true, mpAccessToken: 'TEST_TOKEN' });
+  assert.equal(first.ok, true);
+  t.mock.restoreAll();
+  const antes = await intencao(db);
+  assert.equal(antes.status, 'INCONCLUSIVO');
+  assert.equal(antes.mp_refund_id, null);
+
+  const obs = observarGet(t, db);
+  const r = await getRota(app.adminItemExchange, db, session,
+    '/api/admin/pedidos/1/itens/1/trocas', { id: '1', itemId: '1' });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).troca.id, exchange.id);
+  assert.deepEqual(obs.rede, [], 'nenhuma chamada ao Mercado Pago');
+  assert.deepEqual(obs.escritas, [], 'nenhuma escrita no D1');
+  assert.deepEqual(await intencao(db), antes, 'intenção intacta');
+
+  db.hook = null;
+  t.mock.restoreAll();
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ id: 7202, payment_id: 9002, amount: 3, status: 'approved' }, { status: 201 }));
+  assert.equal((await reconciliar(db, session)).status, 200);
+  assert.equal((await intencao(db)).status, 'CONFIRMADO');
+});
+
+test('M2: GET de troca valida os identificadores', async t => {
+  const { db } = await exchangeScenario(t);
+  const session = await app.auth.createSession(db, 1);
+  const r = await getRota(app.adminItemExchange, db, session,
+    '/api/admin/pedidos/x/itens/1/trocas', { id: 'x', itemId: '1' });
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).code, 'ID_INVALIDO');
+});

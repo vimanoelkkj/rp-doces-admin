@@ -1735,3 +1735,143 @@ test("pedido arquivado fica em modo historico e pode ser restaurado", async t =>
     await unmount(root);
   }
 });
+
+/* ── M2: a tela pede POST /reconciliar antes dos GETs somente leitura ── */
+
+const RECONCILIAR = 'POST /api/admin/pedidos/1/reconciliar';
+
+function registrarChamadas(calls, handler) {
+  return async (url, init = {}) => {
+    calls.push(`${init.method ?? 'GET'} ${new URL(String(url), 'https://local.test').pathname}`);
+    return handler(url, init);
+  };
+}
+
+function precedidoPorReconciliar(calls, alvo) {
+  const indices = calls.flatMap((c, i) => (c === alvo ? [i] : []));
+  assert.ok(indices.length > 0, `${alvo} deveria ter sido chamado`);
+  for (const i of indices) assert.equal(calls[i - 1], RECONCILIAR, `${alvo} precisa vir logo após ${RECONCILIAR}`);
+  return indices.length;
+}
+
+const cancelamentoExistente = {
+  id: 14, status: 'INCONCLUSIVO', estoqueAcao: 'NAO_REPOR', estoqueEstado: 'BAIXADO',
+  reembolsoPendenteCentavos: 500,
+  financeiro: {status: 'PARCIAL', totalCentavos: 3000, liquidoCentavos: 2500, saldoCentavos: 500},
+  reembolsosConfirmados: [],
+  pernasPendentes: [{pagamentoId: 7, pagamentoAlocacaoId: 11, metodo: 'PIX_MP', valorCentavos: 500,
+    confirmacaoManualPermitida: false,
+    refundRemoto: {status: 'INCONCLUSIVO', tentativas: 1, mpRefundId: null, ultimoErro: 'transport',
+      operationKey: 'm2-ui-cancel-01', atualizadoEm: '2026-01-01 12:00:00', podeVerificar: true}}],
+};
+const detalheComCancelamento = () => detalhe({itens: [{...detalhe().itens[0], cancelamento_id: 14,
+  cancelamento_status: 'INCONCLUSIVO', troca_id: null, troca_status: null, troca_item_origem_id: null}]});
+
+const trocaExistente = {
+  id: 21, status: 'INCONCLUSIVA', reembolsoPendenteCentavos: 300,
+  refundsPendentes: [{pagamentoId: 7, pagamentoAlocacaoId: 11, metodo: 'PIX_MP', valorCentavos: 300,
+    confirmacaoManualPermitida: false,
+    refundRemoto: {status: 'INCONCLUSIVO', tentativas: 1, mpRefundId: null, ultimoErro: 'timeout',
+      operationKey: 'm2-ui-troca-01', atualizadoEm: '2026-01-01 12:00:00', podeVerificar: true}}],
+};
+const detalheComTroca = () => detalhe({itens: [{...detalhe().itens[0], troca_id: 21,
+  troca_status: 'INCONCLUSIVA', troca_item_origem_id: 1, cancelamento_id: null, cancelamento_status: null}]});
+
+const abrirBotaoItem = async regex => {
+  const botao = [...document.querySelectorAll('.pedmodal-btn-cancel-item')].find(b => regex.test(b.textContent));
+  assert.ok(botao);
+  await ui.act(async () => botao.click());
+  await flush();
+};
+
+test('M2: ExcluirPedidoModal faz POST /reconciliar antes de cada GET do estorno, inclusive no polling', async t => {
+  const calls = [];
+  const root = await mountWith(t, registrarChamadas(calls, async url => {
+    if (String(url).endsWith('/anulacao/estorno')) return estorno([{pagamentoId: 1, valorCentavos: 3000,
+      restanteCentavos: 3000, intencao: {status: 'PROCESSANDO', ultimoErro: null, podeVerificar: true}}]);
+    return Response.json(detalhe({total: 4000, pago: 4000}));
+  }));
+  t.mock.timers.enable({apis: ['setInterval']});
+  try {
+    await ui.act(async () => document.querySelector('.pedmodal-more button').click());
+    await flush(); await flush();
+    assert.equal(precedidoPorReconciliar(calls, 'GET /api/admin/pedidos/1/anulacao/estorno'), 1);
+    await ui.act(async () => t.mock.timers.tick(3000));
+    await flush(); await flush();
+    assert.equal(precedidoPorReconciliar(calls, 'GET /api/admin/pedidos/1/anulacao/estorno'), 2,
+      'o ciclo do polling também passa pelo POST explícito');
+  } finally { await unmount(root); }
+});
+
+test('M2: falha no POST /reconciliar não impede o GET do estorno', async t => {
+  const calls = [];
+  const root = await mountWith(t, registrarChamadas(calls, async (url, init) => {
+    if (String(url).endsWith('/reconciliar') && init.method === 'POST') throw new TypeError('Failed to fetch');
+    if (String(url).endsWith('/anulacao/estorno')) return estorno([{pagamentoId: 1, valorCentavos: 3000,
+      restanteCentavos: 3000, intencao: null}]);
+    return Response.json(detalhe({total: 4000, pago: 4000}));
+  }));
+  try {
+    await ui.act(async () => document.querySelector('.pedmodal-more button').click());
+    await flush(); await flush();
+    precedidoPorReconciliar(calls, 'GET /api/admin/pedidos/1/anulacao/estorno');
+    assert.ok(document.querySelector('.excluir-pedido-estorno-botao'), 'o estado lido continua sendo exibido');
+  } finally { await unmount(root); }
+});
+
+test('M2: cancelamento existente faz POST /reconciliar antes do GET; falha no POST não bloqueia', async t => {
+  for (const falhar of [false, true]) {
+    const calls = [];
+    const root = await mountWith(t, registrarChamadas(calls, async (url, init) => {
+      const href = String(url);
+      if (href.endsWith('/reconciliar') && init.method === 'POST' && falhar) throw new TypeError('Failed to fetch');
+      if (href.endsWith('/cancelamentos')) return Response.json({cancelamento: cancelamentoExistente});
+      return Response.json(detalheComCancelamento());
+    }));
+    try {
+      await abrirBotaoItem(/ver cancelamento/i);
+      await flush();
+      precedidoPorReconciliar(calls, 'GET /api/admin/pedidos/1/itens/1/cancelamentos');
+      assert.match(document.querySelector('.cancelpreview-card').textContent,
+        /Não foi possível confirmar o resultado do estorno/);
+    } finally { await unmount(root); t.mock.restoreAll(); }
+  }
+});
+
+test('M2: troca existente faz POST /reconciliar antes do GET; falha no POST não bloqueia', async t => {
+  for (const falhar of [false, true]) {
+    const calls = [];
+    const root = await mountWith(t, registrarChamadas(calls, async (url, init) => {
+      const href = String(url);
+      if (href.endsWith('/reconciliar') && init.method === 'POST' && falhar) throw new TypeError('Failed to fetch');
+      if (href.endsWith('/itens/1/trocas')) return Response.json({troca: trocaExistente});
+      return Response.json(detalheComTroca());
+    }));
+    try {
+      await abrirBotaoItem(/ver troca/i);
+      await flush();
+      precedidoPorReconciliar(calls, 'GET /api/admin/pedidos/1/itens/1/trocas');
+      assert.ok(document.querySelector('.additem-card'));
+    } finally { await unmount(root); t.mock.restoreAll(); }
+  }
+});
+
+test('M2: preview de cancelamento ou troca NOVOS não exige POST /reconciliar', async t => {
+  for (const [regex, alvo] of [[/cancelar/i, '/cancelamento-preview'], [/trocar produto/i, '/api/admin/produtos']]) {
+    const calls = [];
+    const root = await mountWith(t, registrarChamadas(calls, async url => {
+      const href = String(url);
+      if (href.endsWith('/cancelamento-preview')) return Response.json({error: 'x'}, {status: 409});
+      if (href.endsWith('/api/admin/produtos')) return Response.json({produtos: []});
+      return Response.json(detalhe());
+    }));
+    try {
+      const antes = calls.length;
+      await abrirBotaoItem(regex);
+      await flush();
+      const depois = calls.slice(antes);
+      assert.ok(depois.some(c => c.endsWith(alvo)), `${alvo} deveria ter sido chamado`);
+      assert.equal(depois.includes(RECONCILIAR), false, 'abrir um fluxo novo não reconcilia');
+    } finally { await unmount(root); t.mock.restoreAll(); }
+  }
+});

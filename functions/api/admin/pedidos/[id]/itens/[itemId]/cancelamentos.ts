@@ -8,7 +8,6 @@ import {
   createItemCancellation,
   getCancellationView,
 } from "../../../../../../lib/itemCancellation";
-import { reconcileLiveTabParent } from "../../../../../../lib/liveTabRecovery";
 import { ItemCancellationPreviewError } from "../../../../../../lib/itemCancellationPreview";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
 
@@ -36,14 +35,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   if (!Number.isInteger(value.pedidoId) || !Number.isInteger(value.itemId)) {
     return errorJson("Identificador inválido", 400, "ID_INVALIDO");
   }
-  let cancelamento = await getCancellationView(env.DB, value.pedidoId, value.itemId);
-  if (cancelamento) {
-    try {
-      await reconcileLiveTabParent(env.DB, env.MP_ACCESS_TOKEN,
-        { cancellationId: cancelamento.id });
-      cancelamento = await getCancellationView(env.DB, value.pedidoId, value.itemId);
-    } catch (error) { console.error("Recuperacao oportunista de refund MP pendente", error); }
-  }
+  // Somente leitura: a retomada de refund/finalização pendente acontece por
+  // POST /api/admin/pedidos/:id/reconciliar, disparado pela tela antes deste GET.
+  const cancelamento = await getCancellationView(env.DB, value.pedidoId, value.itemId);
   return cancelamento
     ? Response.json({ cancelamento })
     : errorJson("Cancelamento não encontrado", 404, "CANCELAMENTO_NAO_ENCONTRADO");
