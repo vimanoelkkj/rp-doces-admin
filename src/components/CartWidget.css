@@ -70,7 +70,6 @@
   right: 32px;
   width: 380px;
   max-height: 70vh;
-  transition: background-color 0.25s, border-color 0.25s;
 }
 .cart-modal--checkout {
   width: 820px;
