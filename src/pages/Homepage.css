@@ -13,7 +13,9 @@
   z-index: 2;
   overflow-y: auto;
   overflow-x: clip;
-  padding-top: 72px;
+  /* No desktop, o primeiro conteúdo nasce abaixo da wave/fade,
+     seguindo a mesma lógica já usada no mobile. */
+  padding-top: calc(var(--wave-visual-height) + 40px);
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   -webkit-mask-image: linear-gradient(
