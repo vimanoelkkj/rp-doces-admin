@@ -258,3 +258,27 @@ test('Header exibe badge Admin adaptativo ao lado da logo no admin', async () =>
   assert.match(headerCss, /\.header-admin-badge\s*\{/);
   assert.match(headerCss, /html\[data-theme="dark"\]\s+\.header-admin-badge/);
 });
+
+test('layout mobile administrativo reserva espaço inferior para a bottom nav de forma compartilhada', async () => {
+  const css = await readFile(
+    new URL('../src/admin/components/AdminMobileNavigation.css', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(
+    css,
+    /\.admin-layout\s+:is\(\.admin-main,\s*\.adm-main,\s*\.loj-main\)/,
+    'regra cobre containers de páginas administrativas sob .admin-layout com maior especificidade',
+  );
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*900px\)[\s\S]*?\.admin-layout\s+:is\(\.admin-main,\s*\.adm-main,\s*\.loj-main\)[\s\S]*?padding-bottom:\s*calc\(56px\s*\+\s*var\(--admin-mobile-nav-space\)\)\s*!important/,
+    'clearance inferior garantido em <= 900px resistente a sobrescritas de páginas específicas',
+  );
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*600px\)[\s\S]*?\.admin-layout\s+:is\(\.admin-main,\s*\.adm-main,\s*\.loj-main\)[\s\S]*?padding-bottom:\s*calc\(40px\s*\+\s*var\(--admin-mobile-nav-space\)\)\s*!important/,
+    'clearance inferior preservado com espaçamento menor em telas <= 600px',
+  );
+});
+

@@ -10,6 +10,19 @@
   display: none;
 }
 
+/* Garante clearance inferior compartilhado para que o conteúdo não termine atrás da bottom navigation fixa */
+@media (max-width: 900px) {
+  .admin-layout :is(.admin-main, .adm-main, .loj-main) {
+    padding-bottom: calc(56px + var(--admin-mobile-nav-space)) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-layout :is(.admin-main, .adm-main, .loj-main) {
+    padding-bottom: calc(40px + var(--admin-mobile-nav-space)) !important;
+  }
+}
+
 @media (max-width: 900px) {
   .admin-mobile-bottom-nav {
     position: fixed;
