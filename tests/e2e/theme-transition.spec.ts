@@ -3,27 +3,16 @@ import { test, expect, type Page, type TestInfo } from "@playwright/test";
 /**
  * Valida a transição de tema (View Transitions API + radial reveal) no desktop.
  *
- * Requer o app rodando (padrão http://localhost:5173, sobrescreva com BASE_URL)
- * e com ao menos um produto listado em /cardapio.
- *
- * Usa o Chrome real instalado. Sobrescreva o caminho com CHROME_PATH se necessário.
+ * baseURL, viewport, reducedMotion e o navegador (Chromium do Playwright por
+ * padrão, ou CHROME_PATH) ficam centralizados em playwright.config.ts, que
+ * também sobe o Vite sozinho (webServer). Requer ao menos um produto
+ * listado em /cardapio quando THEME_TEST_PATH aponta para lá.
  */
 
-const CHROME_PATH =
-  process.env.CHROME_PATH ??
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const BASE_URL = process.env.BASE_URL ?? "http://localhost:5173";
 const PAGE_PATH = process.env.THEME_TEST_PATH ?? "/";
 
 const TOLERANCE_PX = 0.5;
 const SCREENSHOT_POINTS = 5;
-
-test.use({
-  baseURL: BASE_URL,
-  viewport: { width: 1440, height: 900 },
-  reducedMotion: "no-preference",
-  launchOptions: { executablePath: CHROME_PATH },
-});
 
 type Rect = { x: number; y: number; width: number; height: number };
 type Rects = Record<"header" | "logo" | "themeButton" | "firstCard", Rect>;
@@ -302,8 +291,6 @@ async function runTransition(
     `${label}: ::view-transition-old(root) animando (ghosting)`,
   ).toEqual([]);
 }
-
-test.setTimeout(90000);
 
 test.describe("transição de tema (desktop)", () => {
   test.beforeEach(async ({ page }) => {

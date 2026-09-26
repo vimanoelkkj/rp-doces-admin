@@ -11,6 +11,10 @@ dist/
 *.log
 test-logs/
 .test-cache/
+
+# Playwright
+test-results/
+playwright-report/
 .DS_Store
 graphify*
 .qoder
