@@ -10,6 +10,7 @@
 // (pago_em / concluido_em).
 
 import { pedidoValidoSql } from "./pedidoValido";
+import { storeDateSql } from "./storeDay";
 
 export interface ResultadoFinanceiro {
   faturamentoLiquidoCentavos: number;
@@ -31,8 +32,12 @@ export async function getResultadoFinanceiro(
   // Sem params: acumulado geral, na mesma definição de "Caixa total"
   // (getStoreAnalytics) — bate com o que o dono vê como saldo da loja,
   // em vez de recortar só o dia e destoar do card de cima.
-  const filtroPagamentos = params ? "AND date(pago_em) BETWEEN ? AND ?" : "";
-  const filtroReembolsos = params ? "AND date(concluido_em) BETWEEN ? AND ?" : "";
+  // pago_em/concluido_em são instantes (UTC ou ISO com offset): o recorte usa
+  // o dia comercial da loja (America/Sao_Paulo, ver storeDay.ts).
+  // data_competencia já é uma data comercial YYYY-MM-DD escolhida pelo
+  // usuário — comparada como está, sem conversão de fuso.
+  const filtroPagamentos = params ? `AND ${storeDateSql("pago_em")} BETWEEN ? AND ?` : "";
+  const filtroReembolsos = params ? `AND ${storeDateSql("concluido_em")} BETWEEN ? AND ?` : "";
   const filtroDespesas = params ? "AND d.data_competencia BETWEEN ? AND ?" : "";
   const row = await db.prepare(`SELECT
       MAX(0,
