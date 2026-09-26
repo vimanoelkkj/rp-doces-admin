@@ -3,20 +3,27 @@
    Mobile: bottom sheet quase full-screen, com o botão de adicionar fixo
    no rodapé. Mesmos tokens da loja (tema claro/escuro). */
 
-.pdm-backdrop {
+.pdm-root {
   position: fixed;
   inset: 0;
   z-index: 1100;
-  background: var(--store-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 32px;
+}
+
+/* Camada própria, só cor: pinta instantaneamente e cobre a página. */
+.pdm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--store-overlay);
   animation: pdm-fade 0.18s ease-out;
 }
 
 .pdm-dialog {
   position: relative;
+  z-index: 1;
   display: flex;
   width: min(880px, 100%);
   max-height: min(640px, calc(100dvh - 64px));
@@ -247,14 +254,15 @@
   to { opacity: 1; }
 }
 
+/* Só transform: o diálogo nunca fica semitransparente sobre a página. */
 @keyframes pdm-rise {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(16px); }
+  to { transform: translateY(0); }
 }
 
 /* ===== Mobile: bottom sheet ===== */
 @media (max-width: 768px) {
-  .pdm-backdrop {
+  .pdm-root {
     align-items: flex-end;
     padding: 0;
   }

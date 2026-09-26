@@ -31,10 +31,10 @@ export default function ProductDetailsModal({
   const imagemRef = useRef<HTMLImageElement>(null);
   const [imagemPronta, setImagemPronta] = useState(false);
 
-  // A foto do detalhe é um <img> novo. Sem isto, nos primeiros quadros só o
-  // fundo da área da foto aparece e a imagem "pula" em seguida — no mobile
-  // isso é um flash no topo do bottom sheet. Imagem já em cache (a mesma do
-  // card) é marcada pronta antes do primeiro paint; senão, entra com fade.
+  // A foto do detalhe é um <img> novo: imagem já em cache (a mesma do card) é
+  // marcada pronta antes do primeiro paint; senão, entra com fade quando
+  // carregar. A decodificação fica assíncrona para não travar a pintura do
+  // modal esperando a foto.
   useLayoutEffect(() => {
     const img = imagemRef.current;
     setImagemPronta(Boolean(img && img.complete && img.naturalWidth > 0));
@@ -91,13 +91,13 @@ export default function ProductDetailsModal({
   };
 
   return createPortal(
-    <div
-      className="pdm-backdrop"
-      onMouseDown={(e) => {
-        // Só o próprio backdrop fecha; cliques dentro do conteúdo não.
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    // Backdrop e diálogo são irmãos, em camadas separadas: o backdrop é só uma
+    // cor (pinta no primeiro quadro e cobre a página inteira) e o diálogo
+    // anima só transform. Com os dois numa única camada com opacidade
+    // animada, o Chrome no Android mostrava pedaços ainda não pintados do
+    // modal com a página por baixo, sem escurecer (o "flash" no topo).
+    <div className="pdm-root">
+      <div className="pdm-backdrop" aria-hidden="true" onMouseDown={onClose} />
       <div
         ref={dialogRef}
         className="pdm-dialog"
@@ -124,7 +124,7 @@ export default function ProductDetailsModal({
               src={product.image}
               alt={product.name}
               className={`pdm-image${imagemPronta ? " pdm-image--pronta" : ""}`}
-              decoding="sync"
+              decoding="async"
               onLoad={() => setImagemPronta(true)}
               onError={() => setImagemPronta(true)}
             />
