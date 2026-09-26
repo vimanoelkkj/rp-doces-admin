@@ -6,6 +6,9 @@ name: CI
 # (03h em Brasília = 06h UTC) e o disparo manual repetem a mesma suíte para
 # detectar deriva do ambiente (imagem do runner, Node) e servem de execução
 # integral antes de um release.
+#
+# A publicação em produção (job `deploy`, no fim) só acontece em push na main,
+# depois do check `CI` verde.
 on:
   pull_request:
   push:
@@ -124,3 +127,117 @@ jobs:
           test "${{ needs.checks.result }}" = "success"
           test "${{ needs.tests.result }}" = "success"
           test "${{ needs.e2e.result }}" = "success"
+
+  # Publicação em produção (Cloudflare Pages). Só depois do check agregado `CI`
+  # verde (qualquer fatia vermelha, cancelada ou pulada => este job é pulado) e
+  # só em push na main: nunca em pull request, agendamento ou disparo manual.
+  # O interruptor `DEPLOY_ENABLED` (variável do repositório) mantém a
+  # publicação DESLIGADA até você ligá-la, depois de desativar o deploy
+  # automático da integração Git no painel da Cloudflare.
+  # Se este job falhar, o check `CI` continua verde (é outro job); a execução
+  # fica vermelha para a falha de publicação não passar despercebida.
+  deploy:
+    name: Deploy produção (Cloudflare Pages)
+    needs: ci-status
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Escopo dos segredos e ponto opcional de aprovação manual (Settings > Environments).
+    environment: production
+    # Uma publicação por vez; nunca cancela uma em andamento.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      PAGES_PROJECT: rp-doces
+      PRODUCTION_URL: https://rpdoces.com.br
+    steps:
+      - uses: actions/checkout@v7
+
+      # Falha cedo se faltar credencial. Se a main já avançou, este commit foi
+      # superado: uma execução antiga nunca sobrescreve uma versão mais nova.
+      - name: Conferir credenciais e se o commit ainda é a main
+        id: gate
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Secrets CLOUDFLARE_API_TOKEN e/ou CLOUDFLARE_ACCOUNT_ID não configurados (environment production)."
+            exit 1
+          fi
+          remote_head="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$remote_head" != "$GITHUB_SHA" ]; then
+            echo "::notice::Commit ${GITHUB_SHA::7} superado por ${remote_head::7} na main: nada será publicado por esta execução."
+            echo "### Deploy ignorado: commit superado" >> "$GITHUB_STEP_SUMMARY"
+            echo "A main já está em \`${remote_head::7}\`; esta execução (\`${GITHUB_SHA::7}\`) não publica." >> "$GITHUB_STEP_SUMMARY"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "superseded=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.gate.outputs.superseded == 'false'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - if: steps.gate.outputs.superseded == 'false'
+        run: npm ci
+
+      # Mesmo commit e mesmo lockfile que o CI aprovou. Pages Functions (functions/),
+      # bindings D1/R2 e compatibility_date vêm do wrangler.toml; os secrets
+      # (MP_*, VAPID_*, ...) continuam na Cloudflare e não são tocados.
+      - if: steps.gate.outputs.superseded == 'false'
+        run: npm run build
+
+      - name: Publicar no Cloudflare Pages
+        if: steps.gate.outputs.superseded == 'false'
+        run: |
+          set -euo pipefail
+          # Última checagem imediatamente antes de publicar (fecha a janela da corrida).
+          remote_head="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$remote_head" != "$GITHUB_SHA" ]; then
+            echo "::notice::main avançou para ${remote_head::7} durante o build: publicação cancelada."
+            echo "### Deploy ignorado: commit superado durante o build" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          npx wrangler pages deploy dist \
+            --project-name "$PAGES_PROJECT" \
+            --branch main \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-message "$(git log -1 --format=%s)" \
+            --commit-dirty=false
+
+      # O deployment de produção com este SHA precisa aparecer no topo da lista
+      # e o site publicado precisa responder (fumaça somente de leitura).
+      - name: Verificar deployment
+        if: steps.gate.outputs.superseded == 'false'
+        run: |
+          set -euo pipefail
+          short="${GITHUB_SHA::7}"
+          found=0
+          for attempt in 1 2 3 4 5 6; do
+            if npx wrangler pages deployment list --project-name "$PAGES_PROJECT" --environment production 2>/dev/null \
+                 | grep "Production" | head -n 3 | grep -q "$short"; then
+              found=1
+              break
+            fi
+            sleep 10
+          done
+          if [ "$found" != 1 ]; then
+            echo "::error::Deployment de produção do commit $short não apareceu na Cloudflare."
+            exit 1
+          fi
+          curl -fsS --retry 8 --retry-delay 8 --retry-all-errors -o /dev/null "$PRODUCTION_URL/"
+          curl -fsS --retry 8 --retry-delay 8 --retry-all-errors "$PRODUCTION_URL/api/produtos" | grep -q '"produtos"'
+          echo "### Publicado em produção" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit \`$short\` no ar em $PRODUCTION_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sinalizar falha de publicação
+        if: failure()
+        run: |
+          echo "::error::A PUBLICAÇÃO FALHOU. O CI está verde, mas o commit ${GITHUB_SHA::7} pode não estar em produção; confira o deployment no painel da Cloudflare."
+          echo "### PUBLICAÇÃO FALHOU" >> "$GITHUB_STEP_SUMMARY"
+          echo "O check \`CI\` passou, mas o deploy do commit \`${GITHUB_SHA::7}\` falhou. Verifique o painel da Cloudflare e reexecute o job." >> "$GITHUB_STEP_SUMMARY"
