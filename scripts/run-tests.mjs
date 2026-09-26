@@ -1,5 +1,5 @@
 import { appendFileSync, readdirSync, readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -25,6 +25,63 @@ const files = readdirSync(testsDir)
   .map((file) => path.join(testsDir, file));
 
 const rel = (file) => path.relative(root, file).split(path.sep).join("/");
+
+// Marcas de tempo para correlacionar o log do GitHub (carimbado quando o
+// RUNNER processa a linha) com o que o processo Node fez de fato: instante
+// UTC + relógio monotônico desde o início do script.
+const scriptStart = process.hrtime.bigint();
+const utc = () => new Date().toISOString();
+const monotonic = () => (Number(process.hrtime.bigint() - scriptStart) / 1e9).toFixed(1);
+
+// Saída dos testes -> log do CI. Testes que importam o bundle por
+// `data:text/javascript;base64,...` sem `//# sourceURL` fazem TODO frame de
+// stack trace carregar o bundle inteiro (~1,5 MB por linha). O GitHub Actions
+// leva ~70 s para processar cada uma dessas linhas: na execução #3 do CI, 21
+// linhas (33 MB) seguraram o passo por ~25 min, embora o Node tivesse
+// terminado em 187 s. Aqui as linhas são reduzidas antes de chegar ao log;
+// mensagem e posição (arquivo:linha:coluna) de cada frame continuam visíveis.
+const MAX_LINE_LENGTH = 4000;
+const DATA_URL = /data:[\w/+.-]+;base64,[A-Za-z0-9+/=]{200,}/g;
+
+function sanitizeLine(line) {
+  let out = line.replace(DATA_URL, (match) => `data:<bundle base64 omitido: ${match.length} caracteres>`);
+  if (out.length > MAX_LINE_LENGTH) {
+    out = `${out.slice(0, MAX_LINE_LENGTH)} ...[linha truncada: ${out.length} caracteres]`;
+  }
+  return out;
+}
+
+function forwardLines(stream, target) {
+  let pending = "";
+  stream.setEncoding("utf8");
+  stream.on("data", (chunk) => {
+    pending += chunk;
+    let newline;
+    while ((newline = pending.indexOf("\n")) !== -1) {
+      target.write(`${sanitizeLine(pending.slice(0, newline))}\n`);
+      pending = pending.slice(newline + 1);
+    }
+  });
+  stream.on("end", () => {
+    if (pending) target.write(sanitizeLine(pending));
+  });
+}
+
+// Roda um arquivo de teste isolado; resolve só depois que todas as linhas de
+// stdout/stderr foram repassadas (evento "close"), então `[tempo]` nunca
+// aparece antes da saída do próprio arquivo.
+function runTestFile(file) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--test", file], {
+      cwd: root,
+      stdio: ["inherit", "pipe", "pipe"],
+    });
+    forwardLines(child.stdout, process.stdout);
+    forwardLines(child.stderr, process.stderr);
+    child.on("error", reject);
+    child.on("close", (status) => resolve({ status }));
+  });
+}
 
 // Peso estimado só para equilibrar as fatias (nunca decide o que roda). O
 // custo de um teste vem quase todo da bancada D1/Miniflare de tests/helpers;
@@ -121,18 +178,20 @@ if (flag("list")) {
 const keepGoing = flag("keep-going");
 const results = [];
 
+console.log(`[tempo] script iniciado ${utc()}`);
+process.on("exit", (code) => console.log(`[tempo] processo Node encerrando ${utc()} (código ${code})`));
+
 for (const file of selected) {
   const started = process.hrtime.bigint();
-  const result = spawnSync(process.execPath, ["--test", file], {
-    cwd: root,
-    stdio: "inherit",
-  });
+  const startedAt = utc();
+  const result = await runTestFile(file);
   const seconds = Number(process.hrtime.bigint() - started) / 1e9;
 
-  if (result.error) throw result.error;
   const ok = result.status === 0;
   results.push({ file: rel(file), seconds, ok });
-  console.log(`[tempo] ${rel(file)} ${seconds.toFixed(1)}s ${ok ? "ok" : "FALHOU"}`);
+  console.log(
+    `[tempo] ${rel(file)} ${seconds.toFixed(1)}s ${ok ? "ok" : "FALHOU"} (${startedAt} -> ${utc()})`,
+  );
 
   if (!ok && !keepGoing) {
     process.exit(result.status ?? 1);
@@ -140,6 +199,7 @@ for (const file of selected) {
 }
 
 // Resumo de tempos (mais lentos primeiro), também no resumo do job do GitHub.
+console.log(`[tempo] gerando resumo ${utc()} (monotônico ${monotonic()}s)`);
 const total = results.reduce((sum, r) => sum + r.seconds, 0);
 const failed = results.filter((r) => !r.ok);
 const slowest = [...results].sort((a, b) => b.seconds - a.seconds).slice(0, 10);
@@ -161,6 +221,10 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   ];
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"));
 }
+
+// Se o passo do CI durar bem mais que isto, o tempo foi gasto FORA do script
+// (fila de log do runner, npm, shell): compare com o carimbo do próprio GitHub.
+console.log(`[tempo] fim do script ${utc()} (monotônico ${monotonic()}s desde o início)`);
 
 if (failed.length) {
   console.error(`\nArquivos com falha:\n${failed.map((r) => `  - ${r.file}`).join("\n")}`);
