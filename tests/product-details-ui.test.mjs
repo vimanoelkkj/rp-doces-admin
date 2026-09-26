@@ -273,6 +273,29 @@ test('foto do modal só aparece quando carregada (sem flash do fundo) e sem imag
   await semFoto.desmontar();
 });
 
+test('preço do modal acompanha a quantidade selecionada (total, promoção e unitário)', async () => {
+  const produto = { ...completo, price: 15.9, originalPrice: 18.9, disponibilidade: 5 };
+  const m = await montar(ui.modal({ product: produto, onClose: () => {}, onAddToCart: () => {} }));
+  const d = dialogo();
+  const preco = () => texto(d.querySelector('.pdm-price-row .product-price'));
+  const original = () => texto(d.querySelector('.pdm-price-row .product-price-original'));
+  const unitario = () => d.querySelector('.pdm-price-row .product-price-unit');
+  assert.equal(preco(), 'R$ 15,90');
+  assert.equal(original(), 'R$ 18,90');
+  assert.equal(unitario(), null, 'com 1 unidade não mostra "cada"');
+
+  const [menos, mais] = d.querySelectorAll('.pdm-stepper-btn');
+  await clicar(mais);
+  await clicar(mais);
+  assert.equal(preco(), 'R$ 47,70', '3 × 15,90 sem erro de ponto flutuante');
+  assert.equal(original(), 'R$ 56,70');
+  assert.equal(texto(unitario()), 'R$ 15,90 cada');
+
+  await clicar(menos);
+  assert.equal(preco(), 'R$ 31,80');
+  await m.desmontar();
+});
+
 test('H: modal de produto sem descrição/peso/ingredientes/alérgenos não gera blocos vazios', async () => {
   const m = await montar(ui.modal({ product: minimo, onClose: () => {}, onAddToCart: () => {} }));
   const d = dialogo();
