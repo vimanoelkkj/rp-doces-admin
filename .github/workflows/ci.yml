@@ -186,6 +186,17 @@ jobs:
       - if: steps.gate.outputs.superseded == 'false'
         run: npm ci
 
+      # Só leitura (SELECT via API REST) com token PRÓPRIO, só "D1 Read": o
+      # CLOUDFLARE_API_TOKEN (deploy do Pages) é zerado neste passo. Bloqueia a
+      # publicação se houver migration pendente, histórico inconsistente ou se a
+      # Cloudflare não responder. Nunca aplica migrations: isso é manual, antes do deploy.
+      - name: Verificar migrations D1 (somente leitura)
+        if: steps.gate.outputs.superseded == 'false'
+        env:
+          CLOUDFLARE_D1_READ_TOKEN: ${{ secrets.CLOUDFLARE_D1_READ_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ""
+        run: node scripts/check-d1-migrations.mjs
+
       # Mesmo commit e mesmo lockfile que o CI aprovou. Pages Functions (functions/),
       # bindings D1/R2 e compatibility_date vêm do wrangler.toml; os secrets
       # (MP_*, VAPID_*, ...) continuam na Cloudflare e não são tocados.
