@@ -31,13 +31,32 @@ export function StockBadge({ restante }: { restante: number }) {
   return null;
 }
 
-export function ProductPrices({ product, className = "" }: { product: Product; className?: string }) {
+// Total em centavos para evitar erro de ponto flutuante (ex.: 15,90 × 3).
+const totalBRL = (unitario: number, quantidade: number) =>
+  formatBRL((Math.round(unitario * 100) * quantidade) / 100);
+
+// `quantity` (padrão 1) multiplica o preço exibido, com a mesma regra de
+// promoção: o normal riscado e o promocional viram totais juntos. Só
+// exibição — o valor cobrado é sempre recalculado pelo backend.
+export function ProductPrices({
+  product,
+  className = "",
+  quantity = 1,
+}: {
+  product: Product;
+  className?: string;
+  quantity?: number;
+}) {
+  const q = Number.isInteger(quantity) && quantity > 1 ? quantity : 1;
   return (
     <span className={`product-prices ${className}`.trim()}>
       {product.originalPrice != null && (
-        <span className="product-price-original">{formatBRL(product.originalPrice)}</span>
+        <span className="product-price-original">{totalBRL(product.originalPrice, q)}</span>
       )}
-      <span className="product-price">{formatBRL(product.price)}</span>
+      <span className="product-price">{totalBRL(product.price, q)}</span>
+      {q > 1 && (
+        <span className="product-price-unit">{formatBRL(product.price)} cada</span>
+      )}
     </span>
   );
 }

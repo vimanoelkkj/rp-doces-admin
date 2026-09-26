@@ -194,8 +194,8 @@ export default function ProductDetailsModal({
           </div>
 
           <div className="pdm-footer">
-            <div className="pdm-price-row">
-              <ProductPrices product={product} />
+            <div className="pdm-price-row" aria-live="polite">
+              <ProductPrices product={product} quantity={quantidade} />
               <span className={`pdm-availability${esgotado ? " pdm-availability--esgotado" : ""}`}>
                 {esgotado ? "Esgotado" : "Disponível"}
               </span>
