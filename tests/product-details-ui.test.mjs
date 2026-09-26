@@ -208,22 +208,54 @@ test('G: modal mostra descrição, peso, ingredientes, alérgenos, preços e ace
   assert.equal(texto(d.querySelector('.product-promo-badge')), 'Promoção');
   assert.equal(texto(d.querySelector('.pdm-add')), 'Adicionar à sacola');
 
-  // Clique dentro do conteúdo não fecha; backdrop, Escape e botão fecham.
+  // Clique dentro do conteúdo não fecha.
   await ui.act(async () => {
     d.querySelector('.pdm-description').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   });
+  await flush(250);
   assert.equal(fechou, 0);
-  await ui.act(async () => {
-    document.querySelector('.pdm-backdrop').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-  });
-  assert.equal(fechou, 1);
-  await ui.act(async () => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-  });
-  assert.equal(fechou, 2);
-  await clicar(d.querySelector('.pdm-close'));
-  assert.equal(fechou, 3);
   await m.desmontar();
+});
+
+const CAMINHOS_FECHAR = {
+  backdrop: () => document.querySelector('.pdm-backdrop')
+    .dispatchEvent(new MouseEvent('mousedown', { bubbles: true })),
+  Escape: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+  'botão ×': () => document.querySelector('.pdm-close').click(),
+};
+
+for (const [caminho, disparar] of Object.entries(CAMINHOS_FECHAR)) {
+  test(`fechar pelo ${caminho}: anima a saída e só depois chama onClose, uma única vez`, async () => {
+    let fechou = 0;
+    const m = await montar(ui.modal({
+      product: completo, onClose: () => { fechou++; }, onAddToCart: () => {},
+    }));
+    await ui.act(async () => { disparar(); });
+    assert.equal(fechou, 0, 'aguarda a animação de saída');
+    assert.ok(document.querySelector('.pdm-root').classList.contains('pdm-root--fechando'));
+    // Pedidos repetidos durante a saída não geram outro onClose.
+    await ui.act(async () => { CAMINHOS_FECHAR.Escape(); });
+    await flush(250);
+    assert.equal(fechou, 1);
+    await m.desmontar();
+  });
+}
+
+test('com prefers-reduced-motion, fecha na hora sem animação', async () => {
+  const original = window.matchMedia;
+  window.matchMedia = (query) => ({ ...original(query), matches: query.includes('reduce') });
+  try {
+    let fechou = 0;
+    const m = await montar(ui.modal({
+      product: completo, onClose: () => { fechou++; }, onAddToCart: () => {},
+    }));
+    await clicar(document.querySelector('.pdm-close'));
+    assert.equal(fechou, 1);
+    assert.equal(document.querySelector('.pdm-root--fechando'), null);
+    await m.desmontar();
+  } finally {
+    window.matchMedia = original;
+  }
 });
 
 test('foto do modal só aparece quando carregada (sem flash do fundo) e sem imagem mostra o bloco neutro', async () => {

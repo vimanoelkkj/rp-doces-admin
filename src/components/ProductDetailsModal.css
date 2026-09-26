@@ -260,6 +260,36 @@
   to { transform: translateY(0); }
 }
 
+/* ── Saída: backdrop some e o diálogo desce. A duração acompanha
+   DURACAO_FECHAR_MS em ProductDetailsModal.tsx. ── */
+.pdm-root--fechando {
+  pointer-events: none;
+}
+
+.pdm-root--fechando .pdm-backdrop {
+  animation: pdm-fade-out 0.18s ease-in forwards;
+}
+
+.pdm-root--fechando .pdm-dialog {
+  animation: pdm-sair 0.18s ease-in forwards;
+}
+
+@keyframes pdm-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes pdm-sair {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(16px); }
+}
+
+/* Bottom sheet desliza para fora da tela. */
+@keyframes pdm-sair-sheet {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
 /* ===== Mobile: bottom sheet ===== */
 @media (max-width: 768px) {
   .pdm-root {
@@ -296,11 +326,17 @@
   .pdm-footer {
     padding: 14px 20px calc(16px + env(safe-area-inset-bottom));
   }
+
+  .pdm-root--fechando .pdm-dialog {
+    animation-name: pdm-sair-sheet;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pdm-backdrop,
-  .pdm-dialog {
+  .pdm-dialog,
+  .pdm-root--fechando .pdm-backdrop,
+  .pdm-root--fechando .pdm-dialog {
     animation: none;
   }
 

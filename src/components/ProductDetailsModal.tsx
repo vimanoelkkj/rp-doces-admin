@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "./ProductCard.css";
 import "./ProductDetailsModal.css";
@@ -13,6 +13,9 @@ interface ProductDetailsModalProps {
   /** Adiciona `quantity` unidades; o limite final continua no CartContext. */
   onAddToCart: (quantity: number) => void;
 }
+
+// Mesma duração das animações de saída em ProductDetailsModal.css.
+const DURACAO_FECHAR_MS = 180;
 
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -30,6 +33,30 @@ export default function ProductDetailsModal({
   const [adicionado, setAdicionado] = useState(false);
   const imagemRef = useRef<HTMLImageElement>(null);
   const [imagemPronta, setImagemPronta] = useState(false);
+  const [fechando, setFechando] = useState(false);
+  const fechandoRef = useRef(false);
+
+  // Todo fechamento (×, Escape, backdrop) passa por aqui: toca a animação de
+  // saída e só então avisa o pai, que desmonta o modal. Pedidos repetidos
+  // durante a saída são ignorados. Com reduced motion, fecha na hora.
+  const fechar = useCallback(() => {
+    if (fechandoRef.current) return;
+    fechandoRef.current = true;
+    const reduzMovimento =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduzMovimento) {
+      onClose();
+      return;
+    }
+    setFechando(true);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!fechando) return;
+    const timer = setTimeout(onClose, DURACAO_FECHAR_MS);
+    return () => clearTimeout(timer);
+  }, [fechando, onClose]);
 
   // A foto do detalhe é um <img> novo: imagem já em cache (a mesma do card) é
   // marcada pronta antes do primeiro paint; senão, entra com fade quando
@@ -57,7 +84,7 @@ export default function ProductDetailsModal({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        fechar();
         return;
       }
       if (e.key !== "Tab" || !dialogRef.current) return;
@@ -75,7 +102,7 @@ export default function ProductDetailsModal({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, [fechar]);
 
   useEffect(() => {
     if (!adicionado) return;
@@ -96,8 +123,8 @@ export default function ProductDetailsModal({
     // anima só transform. Com os dois numa única camada com opacidade
     // animada, o Chrome no Android mostrava pedaços ainda não pintados do
     // modal com a página por baixo, sem escurecer (o "flash" no topo).
-    <div className="pdm-root">
-      <div className="pdm-backdrop" aria-hidden="true" onMouseDown={onClose} />
+    <div className={`pdm-root${fechando ? " pdm-root--fechando" : ""}`}>
+      <div className="pdm-backdrop" aria-hidden="true" onMouseDown={fechar} />
       <div
         ref={dialogRef}
         className="pdm-dialog"
@@ -109,7 +136,7 @@ export default function ProductDetailsModal({
           ref={closeRef}
           type="button"
           className="pdm-close"
-          onClick={onClose}
+          onClick={fechar}
           aria-label="Fechar detalhes"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
