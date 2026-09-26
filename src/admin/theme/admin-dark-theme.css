@@ -24,15 +24,6 @@ html[data-admin-theme="dark"] .loj-layout {
   background: #1a1412;
 }
 
-/* ── Wave ── */
-html[data-admin-theme="dark"] .admin-wave svg path {
-  fill: #2e2420;
-}
-
-html[data-admin-theme="dark"] .admin-wave .wave-secondary {
-  opacity: 0.22;
-}
-
 
 /* ═══════════════════════════════════════════
    Sidebar

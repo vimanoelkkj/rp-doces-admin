@@ -199,3 +199,31 @@ for (const path of ['/nao-existe', '/admin/nao-existe']) {
     assert.equal(avisosDaRota.length, 1, 'exatamente um aviso (nada foi suprimido nem duplicado)');
   });
 }
+
+// A onda da tela de login é a MESMA do header (componente StorefrontWave
+// compartilhado): mesmo wrapper, mesmo SVG e mesmos paths, sem a antiga AdminWave.
+test('/admin/login usa a mesma onda do header (/cardapio), sem a antiga .admin-wave', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({}));
+  const ui = await compilarApp(true);
+  const assinatura = async (path) => {
+    const r = await renderizarRota(ui, path);
+    const wrapper = r.container.querySelectorAll('.storefront-frame__wave');
+    const svg = wrapper[0]?.querySelector('svg');
+    const sig = {
+      wrappers: wrapper.length,
+      ariaHidden: wrapper[0]?.getAttribute('aria-hidden'),
+      viewBox: svg?.getAttribute('viewBox'),
+      preserveAspectRatio: svg?.getAttribute('preserveAspectRatio'),
+      paths: [...(wrapper[0]?.querySelectorAll('path') ?? [])].map((p) => p.getAttribute('class')),
+      ondaAntiga: r.container.querySelectorAll('.admin-wave').length,
+    };
+    await r.desmontar();
+    return sig;
+  };
+  const header = await assinatura('/cardapio');
+  const login = await assinatura('/admin/login');
+  assert.equal(header.wrappers, 1);
+  assert.deepEqual(login, header, 'a onda do login tem exatamente a estrutura da onda do header');
+  assert.equal(login.ondaAntiga, 0);
+  assert.deepEqual(login.paths, ['wave-secondary', 'wave-primary']);
+});

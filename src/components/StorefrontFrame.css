@@ -50,30 +50,6 @@
   display: none;
 }
 
-.storefront-frame__wave {
-  position: fixed;
-  inset: 0 0 auto;
-  height: var(--storefront-wave-height);
-  z-index: 4;
-  pointer-events: none;
-}
-
-.storefront-frame__wave svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-  overflow: visible;
-}
-
-.storefront-frame__wave .wave-primary {
-  fill: var(--store-wave-primary);
-}
-
-.storefront-frame__wave .wave-secondary {
-  fill: var(--store-wave-secondary);
-  opacity: var(--store-wave-secondary-opacity);
-}
-
 .storefront-frame .footer {
   background: transparent;
 }
