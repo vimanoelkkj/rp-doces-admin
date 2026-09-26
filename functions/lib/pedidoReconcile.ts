@@ -4,7 +4,7 @@ import { pedidoValidoSql, getPedidoAnulacao } from "./pedidoValido";
 
 import { recalculatePedidoStatusPagamento } from "./ledger/projection";
 import type { StatusFinanceiroAgregado } from "./ledger/types";
-import { baixarEstoquePedido, type BaixaResultado } from "./stock";
+import { baixarEstoquePedido, itemEstoquePendenteSql, type BaixaResultado } from "./stock";
 import { STATUS_FINANCEIRO_SQL } from "./pedidoFinanceiroSql";
 import { reconcileExchangeCharges } from "./itemExchange";
 
@@ -62,9 +62,7 @@ export async function reconcilePedidosDivergentes(db: D1Database): Promise<void>
                SELECT 1
                FROM pedido_itens pi
                WHERE pi.pedido_id = p.id
-                 AND pi.status_item = 'ATIVO'
-                 AND pi.produto_id IS NOT NULL
-                 AND pi.estoque_estado IN ('RESERVADO', 'SEM_RESERVA', 'LIBERADO')
+                 AND ${itemEstoquePendenteSql("pi")}
              ) AS estoque_pendente
       FROM pedidos p
       WHERE ${pedidoValidoSql('p.id')} AND EXISTS (SELECT 1 FROM pedido_pagamentos pp WHERE pp.pedido_id = p.id)

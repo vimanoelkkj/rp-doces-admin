@@ -9,6 +9,7 @@ import {
   resolveWebhookPayment,
 } from "./paymentSync";
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
+import { pedidoTemEstoquePendente } from "./stock";
 import { type PushEnv } from "./pushNotifier";
 
 export interface PedidoStatusRow {
@@ -23,6 +24,9 @@ export interface PedidoStatusRow {
 export interface StatusAtual {
   statusPagamento: string;
   statusPedido: string;
+  // Pagamento confirmado, mas a baixa física ainda não convergiu (ver
+  // pedidoTemEstoquePendente). Sempre o estado persistido ao fim do request.
+  estoquePendente: boolean;
 }
 
 async function statusDoPagamento(db: D1Database, pagamentoId: number | null): Promise<string | null> {
@@ -54,6 +58,7 @@ export async function readPedidoStatus(
   return {
     statusPagamento: results[0]?.status ?? pedido.status_pagamento,
     statusPedido: pedido.status_pedido,
+    estoquePendente: await pedidoTemEstoquePendente(db, pedido.id),
   };
 }
 
@@ -87,6 +92,7 @@ export async function refreshPedidoStatus(
     return {
       statusPagamento: statusEspecificoAtual ?? statusAgregado,
       statusPedido: pedido.status_pedido,
+      estoquePendente: await pedidoTemEstoquePendente(db, pedido.id),
     };
   }
 
@@ -96,6 +102,7 @@ export async function refreshPedidoStatus(
     return {
       statusPagamento: statusEspecificoAtual ?? statusAgregado,
       statusPedido: pedido.status_pedido,
+      estoquePendente: await pedidoTemEstoquePendente(db, pedido.id),
     };
   }
 
@@ -132,8 +139,14 @@ export async function refreshPedidoStatus(
     await expireLocalPayment(db, pagamentoId);
   }
   const statusPagamento = await statusDoPagamento(db, pagamentoId) ?? statusAgregado;
+  // Lido depois de sync/expiração: reflete a baixa já tentada neste request.
+  const estoquePendente = await pedidoTemEstoquePendente(db, pedido.id);
+  // Pagamento confirmado com baixa física pendente (Pix tardio após reserva
+  // LIBERADA, sem estoque livre) mantém o pedido NOVO: a verdade financeira
+  // continua PAGO, mas o preparo não começa sem os itens. Nunca rebaixa um
+  // status já mais avançado.
   const novoStatusPedido =
-    transicionou && statusPagamento === "PAGO" && pedido.status_pedido === "NOVO"
+    transicionou && statusPagamento === "PAGO" && !estoquePendente && pedido.status_pedido === "NOVO"
       ? "PREPARANDO"
       : pedido.status_pedido;
 
@@ -150,5 +163,5 @@ export async function refreshPedidoStatus(
       .run();
   }
 
-  return { statusPagamento, statusPedido: novoStatusPedido };
+  return { statusPagamento, statusPedido: novoStatusPedido, estoquePendente };
 }

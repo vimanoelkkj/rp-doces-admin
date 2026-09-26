@@ -49,7 +49,7 @@ test('M7: GET /api/pedido-status é puro — sem rede e sem escrita, mesmo com P
   for (let i = 0; i < 3; i++) {
     const r = await getStatus(db);
     assert.equal(r.status, 200);
-    assert.deepEqual(await r.json(), {pedidoId: 1, statusPagamento: 'PENDENTE', statusPedido: 'NOVO'});
+    assert.deepEqual(await r.json(), {pedidoId: 1, statusPagamento: 'PENDENTE', statusPedido: 'NOVO', estoquePendente: false});
   }
   db.hook = null;
   assert.deepEqual(chamadas, []);
@@ -74,6 +74,7 @@ test('M7: GET /api/pedido é puro e mantém o contrato de detalhes', async t => 
   assert.equal(body.itens.length, 1);
   assert.equal(body.statusPagamento, 'PENDENTE');
   assert.equal(body.statusPedido, 'NOVO');
+  assert.equal(body.estoquePendente, false);
   assert.deepEqual(chamadas, []);
   assert.deepEqual(escritas, []);
   assert.deepEqual(await state(db), antes);
@@ -105,12 +106,14 @@ test('M7: POST exige mesma origem e, com MP approved, sincroniza normalmente', a
 
   const r = await postStatus(db);
   assert.equal(r.status, 200);
-  assert.deepEqual(await r.json(), {pedidoId: 1, statusPagamento: 'PAGO', statusPedido: 'PREPARANDO'});
+  assert.deepEqual(await r.json(), {pedidoId: 1, statusPagamento: 'PAGO', statusPedido: 'PREPARANDO', estoquePendente: false});
   assert.deepEqual(chamadas, ['GET https://api.mercadopago.com/v1/payments/101']);
   const s = await state(db);
   assert.equal(s.pagamentos[0].status, 'PAGO');
   assert.equal(s.pedido.status_pagamento, 'PAGO');
   assert.equal(s.produtos[0].estoque, 8);
+  assert.ok(s.itens.every(i => i.estoque_estado === 'BAIXADO'));
+  assert.equal(s.pedido.status_pedido, 'PREPARANDO');
 });
 
 test('M7: polling repetido consulta o MP no máximo uma vez por janela de 15s', async t => {
@@ -187,4 +190,111 @@ test('M7: claim compartilhado — a janela aberta pelo POST público também thr
   assert.equal((await postStatus(db)).status, 200);
   await app.sync.reconcilePendingPixPayments(env(db));
   assert.equal(chamadas.length, 1, 'mesmo claim: o sweep respeita a janela já consumida');
+});
+
+// Pix tardio depois que a reserva expirou e foi LIBERADA. O estoque físico
+// livre foi consumido por outro pedido (estoque_reservado=2 de terceiros em
+// estoque=3): a baixa recusa com ESTOQUE_INSUFICIENTE e nada fica negativo.
+async function pixTardioSemEstoque(t) {
+  const db = await fixture(t);
+  await app.sync.expireLocalPayment(db, 1);
+  await db.prepare('UPDATE produtos SET estoque=3, estoque_reservado=2 WHERE id=1').run();
+  await abrirJanela(db);
+  t.mock.method(console, 'error', () => {});
+  const chamadas = mercadoPago(t, () => Response.json({id: 101, status: 'approved'}));
+  return {db, chamadas};
+}
+
+test('Pix tardio: EXPIRADO + reserva LIBERADA + estoque insuficiente -> PAGO, NOVO, estoquePendente', async t => {
+  const {db, chamadas} = await pixTardioSemEstoque(t);
+  const antes = await state(db);
+  assert.equal(antes.pagamentos[0].status, 'EXPIRADO');
+  assert.ok(antes.itens.every(i => i.estoque_estado === 'LIBERADO'));
+
+  const r = await postStatus(db);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(),
+    {pedidoId: 1, statusPagamento: 'PAGO', statusPedido: 'NOVO', estoquePendente: true});
+  assert.equal(chamadas.length, 1);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos[0].status, 'PAGO', 'verdade financeira continua autoritativa');
+  assert.equal(s.pedido.status_pagamento, 'PAGO');
+  assert.equal(s.pedido.status_pedido, 'NOVO', 'não promove para PREPARANDO sem baixa física');
+  assert.equal(s.refunds.length, 0, 'sem refund automático');
+  assert.equal(s.produtos[0].estoque, 3, 'estoque não fica negativo nem é consumido');
+  assert.equal(s.produtos[0].estoque_reservado, 2, 'reserva de outros pedidos intacta');
+  assert.ok(s.itens.every(i => i.estoque_estado === 'LIBERADO'), 'LIBERADO não volta a RESERVADO');
+  assert.equal(s.pedido.estoque_baixado_em, null);
+});
+
+test('Pix tardio: GET público lê estoquePendente sem MP e sem escrita', async t => {
+  const {db, chamadas} = await pixTardioSemEstoque(t);
+  assert.equal((await postStatus(db)).status, 200);
+  const chamadasAposPost = chamadas.length;
+  const antes = await state(db);
+  const escritas = registrarEscritas(db);
+  const status = await getStatus(db);
+  const detalhe = await getDetalhe(db);
+  db.hook = null;
+  assert.deepEqual(await status.json(),
+    {pedidoId: 1, statusPagamento: 'PAGO', statusPedido: 'NOVO', estoquePendente: true});
+  const body = await detalhe.json();
+  assert.equal(body.statusPagamento, 'PAGO');
+  assert.equal(body.statusPedido, 'NOVO');
+  assert.equal(body.estoquePendente, true);
+  assert.equal(chamadas.length, chamadasAposPost, 'GET não consulta o MP');
+  assert.deepEqual(escritas, []);
+  assert.deepEqual(await state(db), antes);
+});
+
+test('Pix tardio: estoque volta -> reconciliação baixa exatamente uma vez e estoquePendente zera', async t => {
+  const {db} = await pixTardioSemEstoque(t);
+  assert.equal((await postStatus(db)).status, 200);
+
+  await db.prepare('UPDATE produtos SET estoque=10 WHERE id=1').run();
+  await app.reconcile.reconcilePedidosDivergentes(db);
+  await app.reconcile.reconcilePedidosDivergentes(db);
+  await app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
+
+  let s = await state(db);
+  assert.equal(s.produtos[0].estoque, 8, 'baixa única de 2 unidades');
+  assert.equal(s.produtos[0].estoque_reservado, 2, 'reserva de outros pedidos intacta');
+  assert.ok(s.itens.every(i => i.estoque_estado === 'BAIXADO'));
+  assert.equal(s.pedido.reserva_status, 'CONVERTIDA');
+  assert.equal(s.pagamentos[0].status, 'PAGO');
+  assert.equal(s.pedido.status_pagamento, 'PAGO');
+
+  const r = await postStatus(db);
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.statusPagamento, 'PAGO');
+  assert.equal(body.estoquePendente, false);
+  // Sem nova transição financeira, o POST não promove o eixo operacional;
+  // o pedido segue NOVO + PAGO, como um pagamento recebido por webhook.
+  assert.equal(body.statusPedido, 'NOVO');
+  s = await state(db);
+  assert.equal(s.produtos[0].estoque, 8, 'POST repetido não baixa de novo');
+
+  const get = await (await getStatus(db)).json();
+  assert.equal(get.estoquePendente, false);
+});
+
+test('Pix tardio: estoque pendente nunca rebaixa status operacional avançado', async t => {
+  const {db} = await pixTardioSemEstoque(t);
+  assert.equal((await postStatus(db)).status, 200);
+  await db.prepare(`UPDATE pedidos SET status_pedido='PREPARANDO' WHERE id=1`).run();
+  const body = await (await postStatus(db)).json();
+  assert.equal(body.statusPedido, 'PREPARANDO');
+  assert.equal(body.estoquePendente, true);
+  assert.equal((await state(db)).pedido.status_pedido, 'PREPARANDO');
+});
+
+test('estoquePendente ignora pedido sem produto controlado', async t => {
+  const {db} = await pixTardioSemEstoque(t);
+  await db.prepare('UPDATE pedido_itens SET produto_id=NULL WHERE id=1').run();
+  const body = await (await postStatus(db)).json();
+  assert.equal(body.statusPagamento, 'PAGO');
+  assert.equal(body.estoquePendente, false);
+  assert.equal(await app.stock.pedidoTemEstoquePendente(db, 1), false);
 });

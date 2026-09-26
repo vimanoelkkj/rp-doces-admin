@@ -146,10 +146,12 @@ test('H: expired/released late payment remains authoritative and B3 reclaims onc
   await sync(db,1,101);
   let s=await state(db); assert.equal(s.pagamentos[0].status,'PAGO');
   assert.equal(s.pedido.estoque_baixado_em,null); assert.equal(s.produtos[0].estoque_reservado,2);
+  assert.equal(s.produtos[0].estoque,3); assert.equal(await app.stock.pedidoTemEstoquePendente(db,1),true);
   await db.prepare('UPDATE produtos SET estoque=10 WHERE id=1').run();
   await app.reconcile.reconcilePedidosDivergentes(db); await reconcile(db);
   s=await state(db); assert.equal(s.produtos[0].estoque,8); assert.equal(s.produtos[0].estoque_reservado,2);
   assert.equal(s.pedido.reserva_status,'CONVERTIDA'); assert.equal(s.pagamentos.length,1);
+  assert.equal(await app.stock.pedidoTemEstoquePendente(db,1),false);
 });
 
 for(const path of ['polling','sweep']) test(`SITE + ADMIN: ${path} expiration retains ADMIN reserve`,async t=>{
