@@ -68,8 +68,16 @@ jobs:
         run: npm test -- --verify-shards=${{ strategy.job-total }}
 
       # --keep-going: reporta todos os arquivos com falha da fatia, não só o primeiro.
+      # As linhas [ci] e [tempo] (UTC) permitem separar o que é tempo do script
+      # do que é fila de log do runner: compare com a duração que o GitHub mostra
+      # para o passo (ver scripts/run-tests.mjs).
       - name: Rodar fatia
-        run: npm test -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} --keep-going
+        run: |
+          echo "[ci] passo iniciado $(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+          status=0
+          npm test -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} --keep-going || status=$?
+          echo "[ci] npm retornou ao shell $(date -u +%Y-%m-%dT%H:%M:%S.%3NZ) (status=$status)"
+          exit "$status"
 
   e2e:
     name: E2E (Playwright)
