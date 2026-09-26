@@ -210,28 +210,93 @@ jobs:
             --commit-message "$(git log -1 --format=%s)" \
             --commit-dirty=false
 
-      # O deployment de produção com este SHA precisa aparecer no topo da lista
-      # e o site publicado precisa responder (fumaça somente de leitura).
+      # Confere pela API oficial da Cloudflare (a tabela do Wrangler não é um
+      # formato estável): precisa existir um deployment de PRODUÇÃO com o SHA
+      # completo deste commit e ele precisa ter terminado com sucesso. O upload
+      # leva um instante para aparecer/concluir, então a consulta repete a cada
+      # VERIFY_INTERVAL s por no máximo VERIFY_TIMEOUT s. Falha real (deploy
+      # failure/canceled, 401/403/404 da API) reprova na hora, sem esperar.
+      # Sem pipelines com `grep -q`/`head`: com pipefail eles dão SIGPIPE e
+      # reprovam mesmo com o resultado certo. VERIFY_*/CF_API_BASE existem só para
+      # testes; em produção valem os padrões abaixo.
       - name: Verificar deployment
         if: steps.gate.outputs.superseded == 'false'
         run: |
           set -euo pipefail
+          interval="${VERIFY_INTERVAL:-10}"
+          deadline=$((SECONDS + ${VERIFY_TIMEOUT:-180}))
+          api="${CF_API_BASE:-https://api.cloudflare.com/client/v4}"
+          url="$api/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT/deployments?env=production&per_page=10"
           short="${GITHUB_SHA::7}"
-          found=0
-          for attempt in 1 2 3 4 5 6; do
-            if npx wrangler pages deployment list --project-name "$PAGES_PROJECT" --environment production 2>/dev/null \
-                 | grep "Production" | head -n 3 | grep -q "$short"; then
-              found=1
-              break
+          attempt=0
+          state="ausente"
+          verified=0
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            attempt=$((attempt + 1))
+            # -w acrescenta o status HTTP na última linha; a resposta fica em variável.
+            if ! response="$(curl -sS --max-time 15 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -w '\n%{http_code}' "$url")"; then
+              echo "tentativa $attempt: falha de rede ao consultar a API da Cloudflare"
+              sleep "$interval"
+              continue
             fi
-            sleep 10
+            http_code="${response##*$'\n'}"
+            body="${response%$'\n'*}"
+            case "$http_code" in
+              200) ;;
+              401 | 403 | 404)
+                echo "::error::API da Cloudflare respondeu HTTP $http_code (token sem permissão de Pages, conta ou projeto incorretos)."
+                jq -r '.errors[]? | "  código \(.code): \(.message)"' <<<"$body" || true
+                exit 1
+                ;;
+              *)
+                echo "tentativa $attempt: API da Cloudflare respondeu HTTP $http_code"
+                sleep "$interval"
+                continue
+                ;;
+            esac
+            if ! state="$(jq -r --arg sha "$GITHUB_SHA" '
+                if .success != true then "api-sem-sucesso"
+                else
+                  [.result[]? | select(.environment == "production" and .deployment_trigger.metadata.commit_hash == $sha)]
+                  | if length == 0 then "ausente"
+                    elif any(.[]; .latest_stage.name == "deploy" and .latest_stage.status == "success") then "deploy:success"
+                    else (sort_by(.created_on) | reverse | .[0].latest_stage | "\(.name):\(.status)") end
+                end' <<<"$body")"; then
+              echo "tentativa $attempt: resposta da API ilegível"
+              state="ilegivel"
+              sleep "$interval"
+              continue
+            fi
+            case "$state" in
+              deploy:success)
+                verified=1
+                break
+                ;;
+              *:failure | *:canceled)
+                echo "::error::Deployment de produção do commit $short terminou com falha na Cloudflare ($state)."
+                exit 1
+                ;;
+              ausente) echo "tentativa $attempt: deployment do commit $short ainda não apareceu" ;;
+              *) echo "tentativa $attempt: publicação do commit $short em andamento ($state)" ;;
+            esac
+            sleep "$interval"
           done
-          if [ "$found" != 1 ]; then
-            echo "::error::Deployment de produção do commit $short não apareceu na Cloudflare."
+          if [ "$verified" != 1 ]; then
+            echo "::error::Publicação do commit $short não confirmada em ${VERIFY_TIMEOUT:-180}s (último estado: $state)."
             exit 1
           fi
-          curl -fsS --retry 8 --retry-delay 8 --retry-all-errors -o /dev/null "$PRODUCTION_URL/"
-          curl -fsS --retry 8 --retry-delay 8 --retry-all-errors "$PRODUCTION_URL/api/produtos" | grep -q '"produtos"'
+          echo "Deployment de produção do commit $short confirmado (deploy:success)."
+          # Fumaça somente leitura do site publicado. O corpo vai para uma
+          # variável: nada de `curl | grep -q`.
+          curl -fsS --max-time 30 --retry 8 --retry-delay 8 --retry-all-errors -o /dev/null "$PRODUCTION_URL/"
+          produtos="$(curl -fsS --max-time 30 --retry 8 --retry-delay 8 --retry-all-errors "$PRODUCTION_URL/api/produtos")"
+          case "$produtos" in
+            *'"produtos"'*) ;;
+            *)
+              echo "::error::$PRODUCTION_URL/api/produtos não devolveu a lista de produtos."
+              exit 1
+              ;;
+          esac
           echo "### Publicado em produção" >> "$GITHUB_STEP_SUMMARY"
           echo "Commit \`$short\` no ar em $PRODUCTION_URL" >> "$GITHUB_STEP_SUMMARY"
 
