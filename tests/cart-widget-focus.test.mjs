@@ -164,7 +164,7 @@ test('foco: abrir pelo CartFAB -> dialog recebe foco -> fechar via Escape -> foc
 
   // 2. Focar no CartFAB inicial
   initialFab.focus();
-  assert.strictEqual(document.activeElement, initialFab, 'Foco deve estar no CartFAB inicial antes de abrir');
+  assert.ok(document.activeElement === initialFab, 'Foco deve estar no CartFAB inicial antes de abrir');
 
   // 3. Abrir a Sacola pelo CartFAB
   await ui.act(async () => {
@@ -178,7 +178,7 @@ test('foco: abrir pelo CartFAB -> dialog recebe foco -> fechar via Escape -> foc
 
   const closeButton = document.querySelector('.cart-close-btn');
   assert.ok(closeButton, 'Botão fechar deve estar montado');
-  assert.strictEqual(document.activeElement, closeButton, 'Foco inicial deve ir para o botão Fechar do dialog');
+  assert.ok(document.activeElement === closeButton, 'Foco inicial deve ir para o botão Fechar do dialog');
   assert.ok(dialog.contains(document.activeElement), 'Foco deve estar contido dentro do dialog');
 
   // Aguarda até a animação de saída do AnimatePresence desanexar o CartFAB inicial
@@ -213,10 +213,11 @@ test('foco: abrir pelo CartFAB -> dialog recebe foco -> fechar via Escape -> foc
   assert.ok(document.contains(newFab), 'Novo CartFAB está conectado ao document');
 
   // 7. O document.activeElement DEVE ser o novo CartFAB conectado ao DOM
-  assert.strictEqual(
-    document.activeElement,
-    newFab,
-    'document.activeElement deve ser o novo CartFAB após fechamento via Escape',
+  // Comparação booleana: assert.strictEqual entre nós DOM, ao falhar, faz o
+  // node:assert gerar um diff gigante do DOM e estoura a memória.
+  assert.ok(
+    document.activeElement === newFab,
+    'O foco deve retornar ao novo CartFAB conectado',
   );
   assert.ok(
     document.contains(document.activeElement),
@@ -261,9 +262,8 @@ test('foco: abrir por elemento externo conectado -> fechar via Escape -> foco re
   });
   await flush();
 
-  assert.strictEqual(
-    document.activeElement,
-    externalBtn,
+  assert.ok(
+    document.activeElement === externalBtn,
     'Foco deve retornar ao gatilho externo que continuou conectado ao documento',
   );
   assert.ok(document.contains(externalBtn), 'Gatilho externo continua conectado');

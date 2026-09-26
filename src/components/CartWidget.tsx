@@ -77,7 +77,9 @@ export default function CartWidget({
     if (isOpen) {
       const activeEl = document.activeElement as HTMLElement | null;
       lastFocusedElementRef.current = activeEl;
-      openedByFabRef.current = Boolean(
+      // O clique do FAB dá blur() antes de onOpen(), então aqui o elemento
+      // ativo já é o body: a origem foi registrada no onClick do FAB.
+      openedByFabRef.current = openedByFabRef.current || Boolean(
         activeEl && (
           activeEl === cartFabRef.current ||
           cartFabRef.current?.contains(activeEl) ||
@@ -103,14 +105,16 @@ export default function CartWidget({
       lastFocusedElementRef.current = null;
       openedByFabRef.current = false;
 
-      if (previousElement && document.contains(previousElement)) {
-        previousElement.focus?.();
-      } else if (wasOpenedByFab) {
+      if (wasOpenedByFab) {
+        // O FAB é desmontado enquanto o carrinho está aberto (AnimatePresence)
+        // e remontado ao fechar: foca o NOVO FAB conectado, nunca o antigo.
         frameId = requestAnimationFrame(() => {
           if (cartFabRef.current && document.contains(cartFabRef.current)) {
             cartFabRef.current.focus();
           }
         });
+      } else if (previousElement && document.contains(previousElement)) {
+        previousElement.focus?.();
       }
     }
 
@@ -223,6 +227,7 @@ export default function CartWidget({
             key="cart-fab"
             className="cart-fab"
             onClick={(e) => {
+              openedByFabRef.current = true;
               e.currentTarget.blur();
               onOpen();
             }}
