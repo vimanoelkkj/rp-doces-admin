@@ -53,6 +53,10 @@ export interface ProdutoAdmin {
   estoque_reservado: number;
   emoji: string;
   image_key: string | null;
+  // Migration 0033: detalhes exibidos no cardápio ('' = não informado).
+  peso_texto: string;
+  ingredientes: string;
+  alergenicos: string;
 }
 
 interface CategoriaResumo {

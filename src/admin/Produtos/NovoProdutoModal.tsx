@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { ALERGENICOS_MAX, INGREDIENTES_MAX, PESO_TEXTO_MAX } from "../../../shared/produtoDetalhes";
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "./AdminProdutos";
 import { useAdminModal } from "../components/useAdminModal";
@@ -112,6 +113,9 @@ export default function NovoProdutoModal({
   const [selectedEmoji, setSelectedEmoji] = useState<number | null>(null);
   const [price, setPrice] = useState("0,00");
   const [description, setDescription] = useState("");
+  const [pesoTexto, setPesoTexto] = useState("");
+  const [ingredientes, setIngredientes] = useState("");
+  const [alergenicos, setAlergenicos] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [produtoAtivo, setProdutoAtivo] = useState(true);
   const [disponivelVenda, setDisponivelVenda] = useState(true);
@@ -196,6 +200,9 @@ export default function NovoProdutoModal({
     setSelectedEmoji(null);
     setPrice("0,00");
     setDescription("");
+    setPesoTexto("");
+    setIngredientes("");
+    setAlergenicos("");
     setImagePreview(null);
     setProdutoAtivo(true);
     setDisponivelVenda(true);
@@ -234,6 +241,9 @@ export default function NovoProdutoModal({
     setSelectedEmoji(emojiIndex >= 0 ? emojiIndex : null);
     setPrice(formatCentsAsBrlInput(produto.preco_centavos));
     setDescription(produto.descricao);
+    setPesoTexto(produto.peso_texto ?? "");
+    setIngredientes(produto.ingredientes ?? "");
+    setAlergenicos(produto.alergenicos ?? "");
     setImagePreview(imageUrlFor(produto.image_key));
     setProdutoAtivo(produto.ativo === 1);
     setDisponivelVenda(produto.disponivel === 1);
@@ -310,6 +320,10 @@ export default function NovoProdutoModal({
           nome: name,
           categoria: category,
           descricao: description,
+          // O backend faz trim e valida os limites; aqui é só conveniência.
+          pesoTexto: pesoTexto.trim(),
+          ingredientes: ingredientes.trim(),
+          alergenicos: alergenicos.trim(),
           precoCentavos,
           estoque,
           emoji: selectedEmoji != null ? EMOJI_OPTIONS[selectedEmoji].char : "",
@@ -579,6 +593,42 @@ export default function NovoProdutoModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
+            />
+          </div>
+
+          <div className="np-field np-field--full">
+            <label htmlFor="np-peso">PESO / PORÇÃO</label>
+            <input
+              id="np-peso"
+              type="text"
+              placeholder="Ex.: 220 g"
+              value={pesoTexto}
+              onChange={(e) => setPesoTexto(e.target.value)}
+              maxLength={PESO_TEXTO_MAX}
+            />
+          </div>
+
+          <div className="np-field np-field--full">
+            <label htmlFor="np-ingredientes">INGREDIENTES</label>
+            <textarea
+              id="np-ingredientes"
+              placeholder="Ex.: leite condensado, creme de leite, frutas vermelhas…"
+              value={ingredientes}
+              onChange={(e) => setIngredientes(e.target.value)}
+              maxLength={INGREDIENTES_MAX}
+              rows={3}
+            />
+          </div>
+
+          <div className="np-field np-field--full">
+            <label htmlFor="np-alergenicos">ALÉRGENOS — OPCIONAL</label>
+            <textarea
+              id="np-alergenicos"
+              placeholder="Ex.: contém leite e derivados. Pode conter traços de glúten."
+              value={alergenicos}
+              onChange={(e) => setAlergenicos(e.target.value)}
+              maxLength={ALERGENICOS_MAX}
+              rows={2}
             />
           </div>
 

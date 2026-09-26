@@ -12,6 +12,16 @@ interface ProdutoApiRow extends PromocaoCampos {
   estoque: number;
   estoque_reservado: number;
   image_key: string | null;
+  peso_texto?: string | null;
+  ingredientes?: string | null;
+  alergenicos?: string | null;
+}
+
+// Campos de texto opcionais: vazio (ou só espaços) vira undefined, para a UI
+// não renderizar blocos vazios.
+function textoOpcional(valor: string | null | undefined): string | undefined {
+  const texto = typeof valor === "string" ? valor.trim() : "";
+  return texto || undefined;
 }
 
 // As imagens públicas são servidas pela Pages Function em /api/images/:key.
@@ -43,6 +53,9 @@ function toProduct(row: ProdutoApiRow): Product {
     // campo já existia na resposta.
     categorySlug: row.categoria,
     description: row.descricao || undefined,
+    weightText: textoOpcional(row.peso_texto),
+    ingredients: textoOpcional(row.ingredientes),
+    allergens: textoOpcional(row.alergenicos),
     price: centavos / 100,
     originalPrice: emPromocao ? row.preco_centavos / 100 : undefined,
     image: imageUrlFor(row.image_key),

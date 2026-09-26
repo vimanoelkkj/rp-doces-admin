@@ -30,7 +30,8 @@ interface CartContextType {
   cartItems: CartItem[];
   cartOpen: boolean;
   setCartOpen: (open: boolean) => void;
-  addToCart: (item: Omit<CartItem, "quantity">) => void;
+  /** Adiciona `quantity` unidades (padrão 1), sempre limitado à disponibilidade. */
+  addToCart: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   updateQuantity: (id: number, qty: number) => void;
   removeItem: (id: number) => void;
   clearCart: () => void;
@@ -53,11 +54,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [cartItems]);
 
-  const addToCart = (item: Omit<CartItem, "quantity">) => {
+  const addToCart = (item: Omit<CartItem, "quantity">, quantity = 1) => {
     // Produto com disponibilidade 0 não pode ser adicionado
     if (item.disponibilidade !== undefined && item.disponibilidade <= 0) {
       return;
     }
+    if (!Number.isInteger(quantity) || quantity < 1) return;
 
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
@@ -66,7 +68,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           item.disponibilidade !== undefined
             ? item.disponibilidade
             : existing.disponibilidade;
-        const newQty = calculateAddQuantity(existing.quantity, disp);
+        const newQty = calculateAddQuantity(existing.quantity, disp, quantity);
         if (newQty === existing.quantity) {
           return prev;
         }
@@ -76,7 +78,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
             : i,
         );
       }
-      return [...prev, { ...item, quantity: 1 }];
+      // Um único setState funcional, já limitado: nunca N chamadas de +1.
+      return [...prev, { ...item, quantity: calculateAddQuantity(0, item.disponibilidade, quantity) }];
     });
   };
 

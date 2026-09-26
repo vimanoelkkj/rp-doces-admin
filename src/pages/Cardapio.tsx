@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Footer from "../components/Footer";
 import ProductCard from "../components/ProductCard";
+import ProductDetailsModal from "../components/ProductDetailsModal";
 import CartWidget from "../components/CartWidget";
 import { useCatalogProducts } from "../hooks/useCatalogProducts";
 import { useCart } from "../context/CartContext";
@@ -24,6 +25,9 @@ export default function Cardapio() {
   const [displayFilter, setDisplayFilter] = useState<CategoryFilter>(null);
   const [containerHeight, setContainerHeight] = useState<number | "auto">("auto");
   const productsAreaRef = useRef<HTMLDivElement>(null);
+  // Id (não o objeto): o detalhe sempre lê o produto atual do catálogo, com a
+  // disponibilidade mais recente.
+  const [detalheId, setDetalheId] = useState<number | null>(null);
 
   const {
     cartItems,
@@ -48,6 +52,10 @@ export default function Cardapio() {
       reconcileWithProducts(products);
     }
   }, [products, reconcileWithProducts]);
+
+  const produtoDetalhe =
+    detalheId === null ? null : products.find((p) => p.id === detalheId) ?? null;
+  const fecharDetalhe = useCallback(() => setDetalheId(null), []);
 
   const headingRef = useScrollReveal<HTMLDivElement>(0.15);
 
@@ -202,6 +210,7 @@ export default function Cardapio() {
                         product={product}
                         quantityInCart={cartQuantities.get(product.id) ?? 0}
                         onAddToCart={() => addToCart(product)}
+                        onOpenDetails={() => setDetalheId(product.id)}
                       />
                     </div>
                   ))}
@@ -213,6 +222,14 @@ export default function Cardapio() {
         </main>
         <Footer />
       </StorefrontFrame>
+      {produtoDetalhe && (
+        <ProductDetailsModal
+          product={produtoDetalhe}
+          quantityInCart={cartQuantities.get(produtoDetalhe.id) ?? 0}
+          onClose={fecharDetalhe}
+          onAddToCart={(quantidade) => addToCart(produtoDetalhe, quantidade)}
+        />
+      )}
       <CartWidget
         items={cartItems}
         isOpen={cartOpen}

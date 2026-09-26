@@ -11,6 +11,11 @@ import {
   type ProdutoInput,
   validarProdutoPromocao,
 } from "../../../lib/produtoPromocao";
+import {
+  normalizarDetalhesProduto,
+  type ProdutoDetalhesInput,
+  validarDetalhesProduto,
+} from "../../../lib/produtoDetalhes";
 
 const MAX_TEXT_LENGTH = 1000;
 
@@ -26,7 +31,7 @@ async function categoriaValida(db: D1Database, categoria: string): Promise<boole
   return !!row && row.ativo === 1;
 }
 
-function validarProduto(body: ProdutoInput) {
+function validarProduto(body: ProdutoInput & ProdutoDetalhesInput) {
   const nome = body.nome?.trim();
   const categoria = body.categoria?.trim();
   if (!nome || !categoria) return "Nome e categoria são obrigatórios";
@@ -39,7 +44,7 @@ function validarProduto(body: ProdutoInput) {
   if (!Number.isInteger(body.estoque) || body.estoque! < 0) {
     return "Estoque inválido";
   }
-  return validarProdutoPromocao(body);
+  return validarDetalhesProduto(body) ?? validarProdutoPromocao(body);
 }
 
 export const onRequestPut: PagesFunction<Env> = async ({
@@ -57,7 +62,7 @@ export const onRequestPut: PagesFunction<Env> = async ({
     return jsonError("Id inválido", 400);
   }
 
-  let body: ProdutoInput;
+  let body: ProdutoInput & ProdutoDetalhesInput;
   try {
     body = await request.json();
   } catch {
@@ -87,12 +92,18 @@ export const onRequestPut: PagesFunction<Env> = async ({
     }
 
     const promocao = normalizarPromocao(body);
+    // Campo ausente no payload (cliente antigo) preserva o valor gravado.
+    const detalhes = normalizarDetalhesProduto(body);
     const result = await env.DB.prepare(
       `UPDATE produtos
        SET nome = ?, categoria = ?, descricao = ?, preco_centavos = ?, estoque = ?,
            emoji = ?, ativo = ?, disponivel = ?, destaque = ?,
            promocao_ativa = ?, preco_promocional_centavos = ?,
-           promocao_inicio = ?, promocao_fim = ?, atualizado_em = CURRENT_TIMESTAMP
+           promocao_inicio = ?, promocao_fim = ?,
+           peso_texto = COALESCE(?, peso_texto),
+           ingredientes = COALESCE(?, ingredientes),
+           alergenicos = COALESCE(?, alergenicos),
+           atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`,
     )
       .bind(
@@ -109,6 +120,9 @@ export const onRequestPut: PagesFunction<Env> = async ({
         promocao.precoPromocionalCentavos,
         promocao.promocaoInicio,
         promocao.promocaoFim,
+        detalhes.pesoTexto,
+        detalhes.ingredientes,
+        detalhes.alergenicos,
         id,
       )
       .run();

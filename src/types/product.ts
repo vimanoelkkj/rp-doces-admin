@@ -10,6 +10,12 @@ export interface Product {
    */
   categorySlug: string;
   description?: string;
+  /** Peso/porção em texto livre ("220 g", "1 unidade"). Ausente quando vazio. */
+  weightText?: string;
+  /** Lista de ingredientes. Ausente quando vazia. */
+  ingredients?: string;
+  /** Alérgenos. Ausente quando vazio. */
+  allergens?: string;
   price: number;
   /**
    * HUMAN-12: preço normal, presente só quando há promoção vigente. Serve
