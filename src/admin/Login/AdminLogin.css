@@ -26,6 +26,12 @@
   display: block;
 }
 
+/* A onda do header é position: fixed com z-index 4; aqui ela fica atrás do
+   cartão (z-index 1), como a onda de fundo do login sempre ficou. */
+.admin-login-page .storefront-frame__wave {
+  z-index: 0;
+}
+
 /* ===== Login Card ===== */
 .admin-login-card {
   position: relative;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminTheme } from "../theme/AdminThemeContext";
 import { useAdminPwa } from "../pwa/useAdminPwa";
-import AdminWave from "../components/AdminWave";
+import StorefrontWave from "../../components/StorefrontWave";
 import "./AdminLogin.css";
 
 const IconMoon = () => (
@@ -118,8 +118,8 @@ export default function AdminLogin() {
 
   return (
     <div className="admin-login-page">
-      {/* Background wave decoration */}
-      <AdminWave />
+      {/* Mesma onda do header da loja e do admin (componente compartilhado) */}
+      <StorefrontWave />
 
       {/* Login Card */}
       <div className="admin-login-card">
