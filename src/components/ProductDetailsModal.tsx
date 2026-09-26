@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "./ProductCard.css";
 import "./ProductDetailsModal.css";
@@ -28,6 +28,17 @@ export default function ProductDetailsModal({
   const closeRef = useRef<HTMLButtonElement>(null);
   const [selecionada, setSelecionada] = useState(1);
   const [adicionado, setAdicionado] = useState(false);
+  const imagemRef = useRef<HTMLImageElement>(null);
+  const [imagemPronta, setImagemPronta] = useState(false);
+
+  // A foto do detalhe é um <img> novo. Sem isto, nos primeiros quadros só o
+  // fundo da área da foto aparece e a imagem "pula" em seguida — no mobile
+  // isso é um flash no topo do bottom sheet. Imagem já em cache (a mesma do
+  // card) é marcada pronta antes do primeiro paint; senão, entra com fade.
+  useLayoutEffect(() => {
+    const img = imagemRef.current;
+    setImagemPronta(Boolean(img && img.complete && img.naturalWidth > 0));
+  }, [product.image]);
 
   // Mesma regra do card: disponibilidade menos o que já está na sacola.
   const restante = remainingAvailability(product.disponibilidade, quantityInCart);
@@ -108,7 +119,15 @@ export default function ProductDetailsModal({
 
         <div className="pdm-media">
           {product.image ? (
-            <img src={product.image} alt={product.name} className="pdm-image" />
+            <img
+              ref={imagemRef}
+              src={product.image}
+              alt={product.name}
+              className={`pdm-image${imagemPronta ? " pdm-image--pronta" : ""}`}
+              decoding="sync"
+              onLoad={() => setImagemPronta(true)}
+              onError={() => setImagemPronta(true)}
+            />
           ) : (
             <div className="pdm-image pdm-image--vazia" aria-hidden="true" />
           )}
