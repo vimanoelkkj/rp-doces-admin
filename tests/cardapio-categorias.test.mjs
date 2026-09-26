@@ -174,3 +174,72 @@ test('falha ao carregar produtos não derruba a página e não inventa categoria
   assert.deepEqual(abas, ['Todos'], 'sem produtos, nenhuma categoria inventada além da opção sintética');
   assert.match(container.textContent, /Falha ao carregar produtos/, 'erro existente do hook é exibido, não escondido');
 });
+
+// ── Skeleton anti-piscada ──
+// Catálogo rápido (< 150ms) não mostra skeleton; lento mostra cards "fantasma"
+// no lugar dos reais e, uma vez visível, o skeleton fica pelo menos 400ms.
+const esperar = (ms) => ui.act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+
+function catalogoControlado(t) {
+  let liberar;
+  const pronto = new Promise((r) => { liberar = r; });
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url === '/api/config') return Response.json({config: {
+      days: [], openTime: '09:00', closeTime: '20:00', localName: 'R&P Doces', address: '',
+      mapsLink: '', deliveryStatus: 'unavailable', whatsapp: '11999999999', defaultMessage: '',
+    }});
+    if (url === '/api/produtos') {
+      await pronto;
+      return Response.json({produtos: [produto(1, 'BOLO_NO_POTE', 'Bolo no Pote', 'Morango')]});
+    }
+    return Response.json({});
+  });
+  return () => liberar();
+}
+
+async function montarControlado(t) {
+  let root;
+  await ui.act(async () => { root = ui.mount(container); });
+  t.after(async () => { await ui.act(async () => root.unmount()); container.innerHTML = ''; });
+}
+
+const skeleton = () => container.querySelector('[role="status"][aria-busy="true"]');
+const cardsReais = () => container.querySelectorAll('.product-card:not(.product-card--skeleton)').length;
+
+test('skeleton: catálogo rápido não pisca skeleton nenhum', async t => {
+  const liberar = catalogoControlado(t);
+  liberar(); // resposta já disponível: carrega bem antes de 150ms
+  await montarControlado(t);
+  await esperar(50);
+  assert.ok(skeleton() === null, 'não aparece em carregamento rápido');
+  await esperar(300);
+  assert.ok(skeleton() === null, 'skeleton sumiu');
+  assert.equal(container.querySelectorAll('.product-card--skeleton').length, 0);
+  assert.equal(cardsReais(), 1);
+});
+
+test('skeleton: catálogo lento mostra cards fantasma e segura o mínimo de 400ms', async t => {
+  const liberar = catalogoControlado(t);
+  await montarControlado(t);
+  await esperar(220);
+  assert.ok(skeleton(), 'skeleton aparece depois de 150ms de espera');
+  assert.match(skeleton().textContent, /Carregando cardápio/, 'anúncio acessível');
+  assert.equal(container.querySelectorAll('.product-card--skeleton').length, 4);
+  assert.equal(container.querySelectorAll('.filter-tab-skeleton').length, 2, 'espaço das abas reservado');
+  assert.equal(cardsReais(), 0);
+
+  // Dados chegam logo depois de aparecer: o skeleton continua até o mínimo.
+  liberar();
+  await esperar(60);
+  assert.ok(skeleton(), 'não some num piscar');
+  assert.equal(cardsReais(), 0, 'cards reais só entram na troca');
+  const abas = [...container.querySelectorAll('[role="tab"]')].map(el => el.textContent);
+  assert.deepEqual(abas, ['Todos'], 'abas reais também esperam a troca');
+
+  await esperar(450);
+  assert.ok(skeleton() === null, 'skeleton sumiu');
+  assert.equal(container.querySelectorAll('.filter-tab-skeleton').length, 0);
+  assert.equal(cardsReais(), 1);
+  assert.deepEqual([...container.querySelectorAll('[role="tab"]')].map(el => el.textContent),
+    ['Todos', 'Bolo no Pote']);
+});

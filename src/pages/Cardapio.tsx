@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Footer from "../components/Footer";
 import ProductCard from "../components/ProductCard";
 import ProductDetailsModal from "../components/ProductDetailsModal";
+import ProductCardSkeleton from "../components/ProductCardSkeleton";
+import { useSkeletonVisibility } from "../hooks/useSkeletonVisibility";
 import CartWidget from "../components/CartWidget";
 import { useCatalogProducts } from "../hooks/useCatalogProducts";
 import { useCart } from "../context/CartContext";
@@ -18,6 +20,9 @@ type CategoryFilter = string | null;
 
 export default function Cardapio() {
   const { products, loading, error } = useCatalogProducts();
+  // Skeleton só em carregamento lento, e nunca num piscar (ver o hook).
+  // Enquanto visível, segura os cards reais para a troca acontecer de uma vez.
+  const mostrarSkeleton = useSkeletonVisibility(loading);
   const categories = useMemo(() => catalogCategories(products), [products]);
 
   const [activeFilter, setActiveFilter] = useState<CategoryFilter>(null);
@@ -155,7 +160,7 @@ export default function Cardapio() {
             >
               Todos
             </button>
-            {categories.map(({ slug, nome }) => (
+            {!mostrarSkeleton && categories.map(({ slug, nome }) => (
               <button
                 key={slug}
                 role="tab"
@@ -169,11 +174,14 @@ export default function Cardapio() {
                 {nome}
               </button>
             ))}
+            {mostrarSkeleton &&
+              [0, 1].map((i) => (
+                <span key={i} className="filter-tab-skeleton skeleton-shimmer" aria-hidden="true" />
+              ))}
           </div>
         </div>
 
-        {loading && <p className="cardapio-subtitle">Carregando cardápio…</p>}
-        {error && <p className="cardapio-subtitle">{error}</p>}
+        {error && !mostrarSkeleton && <p className="cardapio-subtitle">{error}</p>}
 
         <div
           className="products-area"
@@ -186,13 +194,27 @@ export default function Cardapio() {
             ref={productsAreaRef}
             className={`products-area-inner ${isFiltering ? "products-area--out" : "products-area--in"}`}
           >
-            {!loading && !error && filteredProducts.length === 0 && (
+            {mostrarSkeleton && (
+              <section className="category-group" role="status" aria-busy="true">
+                <span className="skeleton-sr-only">Carregando cardápio…</span>
+                <span className="skeleton-category-title skeleton-shimmer" aria-hidden="true" />
+                <div className="products-grid" aria-hidden="true">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="product-card-wrapper">
+                      <ProductCardSkeleton />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {!loading && !mostrarSkeleton && !error && filteredProducts.length === 0 && (
               <p className="cardapio-empty-state">
                 Nenhum produto disponível no momento.
               </p>
             )}
 
-            {groupedProducts.map(({ slug, nome, products: categoryProducts }) => (
+            {!mostrarSkeleton && groupedProducts.map(({ slug, nome, products: categoryProducts }) => (
               <section
                 key={slug}
                 className="category-group scroll-reveal revealed"
