@@ -540,3 +540,79 @@ test('48: dashboard expõe resultadoFinanceiro acumulado (não só do dia seleci
   assert.equal(body.resultadoFinanceiro.lucroEstimadoCentavos, 6000);
   assert.equal(body.resultadoFinanceiro.margemEstimada, 60);
 });
+
+// ── Fronteira UTC/São Paulo no recorte do resultado financeiro ──
+// pago_em/concluido_em são instantes UTC (ou ISO com offset, como o
+// date_approved do Mercado Pago); o período filtra pelo dia comercial
+// America/Sao_Paulo (UTC-03:00):
+//   2026-09-26 01:30:00 UTC = 25/09 22:30 em SP -> dia 25
+//   2026-09-26 03:30:00 UTC = 26/09 00:30 em SP -> dia 26
+const resultadoPeriodo = async (db, session, desde, ate = desde) =>
+  (await listar(db, session, {desde, ate}).then(corpo)).body.resultadoFinanceiro;
+
+test('UTC/SP: pagamento entra somente no dia comercial correto, inclusive ISO com offset', async t => {
+  const {db, session} = await setup(t);
+  await db.batch([
+    db.prepare(`UPDATE pedidos SET valor_total_centavos=11000, origem_pedido='MANUAL' WHERE id=1`),
+    db.prepare(`UPDATE pedido_pagamentos SET metodo='DINHEIRO', origem='ADMIN', mp_payment_id=NULL,
+      valor_centavos=6000, status='PAGO', pago_em='2026-09-26 01:30:00' WHERE id=1`),
+    db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+      idempotency_key,pago_em) VALUES(2,1,'DINHEIRO','ADMIN',4000,'PAGO','p-26','2026-09-26 03:30:00')`),
+    // Formato do Mercado Pago: 22:30-04:00 = 02:30 UTC do dia 26 = 23:30 em SP, dia 25.
+    db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+      mp_payment_id,idempotency_key,pago_em)
+      VALUES(3,1,'PIX_MP','SITE',1000,'PAGO','903','p-iso','2026-09-25T22:30:00.000-04:00')`),
+  ]);
+  // Despesa com data_competencia 26: data comercial explícita, sem conversão.
+  await criar(db, session, despesaBasica({
+    dataCompetencia: '2026-09-26', itens: [itemBasico({valorUnitarioCentavos: 100, quantidade: 5})],
+  }));
+
+  const dia25 = await resultadoPeriodo(db, session, '2026-09-25');
+  assert.equal(dia25.faturamentoLiquidoCentavos, 7000, '01:30Z e 22:30-04:00 pertencem ao dia 25');
+  assert.equal(dia25.despesasCentavos, 0);
+
+  const dia26 = await resultadoPeriodo(db, session, '2026-09-26');
+  assert.equal(dia26.faturamentoLiquidoCentavos, 4000, 'só o pagamento de 03:30Z pertence ao dia 26');
+  assert.equal(dia26.despesasCentavos, 500, 'data_competencia 26 continua no dia 26');
+
+  const ambos = await resultadoPeriodo(db, session, '2026-09-25', '2026-09-26');
+  assert.equal(ambos.faturamentoLiquidoCentavos, 11000);
+  assert.equal(ambos.despesasCentavos, 500);
+
+  // Sem período continua acumulado geral.
+  const geral = await app.resultadoFinanceiro.getResultadoFinanceiro(db);
+  assert.equal(geral.faturamentoLiquidoCentavos, 11000);
+  assert.equal(geral.despesasCentavos, 500);
+});
+
+test('UTC/SP: refund concluído às 01:30Z pertence ao dia comercial anterior', async t => {
+  const {db, session} = await setup(t);
+  await db.batch([
+    db.prepare(`UPDATE pedidos SET valor_total_centavos=15000, origem_pedido='MANUAL' WHERE id=1`),
+    // R$100 no dia 25 (12:00 em SP).
+    db.prepare(`UPDATE pedido_pagamentos SET metodo='DINHEIRO', origem='ADMIN', mp_payment_id=NULL,
+      valor_centavos=10000, status='PAGO', pago_em='2026-09-25 15:00:00' WHERE id=1`),
+    // R$50 no dia 26 (09:00 em SP).
+    db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+      idempotency_key,pago_em) VALUES(2,1,'DINHEIRO','ADMIN',5000,'PAGO','p-26','2026-09-26 12:00:00')`),
+    // R$30 às 01:30Z do dia 26 = 22:30 do dia 25 em SP.
+    db.prepare(`INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,status,
+      idempotency_key,concluido_em)
+      VALUES(1,1,'MANUAL','DINHEIRO',3000,'REEMBOLSADO','refund-0130z','2026-09-26 01:30:00')`),
+    // R$10 com offset explícito: 23:30-03:00 = 02:30Z do dia 26 = dia 25 em SP.
+    db.prepare(`INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,status,
+      idempotency_key,concluido_em)
+      VALUES(1,1,'MANUAL','DINHEIRO',1000,'REEMBOLSADO','refund-iso','2026-09-25T23:30:00.000-03:00')`),
+  ]);
+
+  const dia25 = await resultadoPeriodo(db, session, '2026-09-25');
+  assert.equal(dia25.faturamentoLiquidoCentavos, 6000, '100 - 30 - 10 no dia 25');
+
+  const dia26 = await resultadoPeriodo(db, session, '2026-09-26');
+  assert.equal(dia26.faturamentoLiquidoCentavos, 5000, 'dia 26 não herda os refunds do dia 25');
+
+  const ambos = await resultadoPeriodo(db, session, '2026-09-25', '2026-09-26');
+  assert.equal(ambos.faturamentoLiquidoCentavos, 11000);
+  assert.equal((await app.resultadoFinanceiro.getResultadoFinanceiro(db)).faturamentoLiquidoCentavos, 11000);
+});
