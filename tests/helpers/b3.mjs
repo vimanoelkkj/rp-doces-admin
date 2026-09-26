@@ -53,6 +53,7 @@ const bundle = await build({
       export * as diagnosticoPixReembolso from './functions/api/admin/diagnosticos/pix-reembolso';
       export * as dashboard from './functions/api/admin/dashboard';
       export * as dashboardAnalytics from './functions/lib/dashboardAnalytics';
+      export * as storeDay from './functions/lib/storeDay';
       export * as paymentSync from './functions/lib/paymentSync';
       export * as despesas from './functions/lib/despesas';
       export * as resultadoFinanceiro from './functions/lib/resultadoFinanceiro';
