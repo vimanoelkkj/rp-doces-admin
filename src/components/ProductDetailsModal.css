@@ -169,6 +169,7 @@
 }
 
 .pdm-availability {
+  flex-shrink: 0;
   font-family: "Manrope", sans-serif;
   font-size: 12px;
   font-weight: 600;
