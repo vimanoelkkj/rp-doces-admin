@@ -226,8 +226,16 @@ test('HUMAN-07/09: produto mascara preço e aceita estoque inteiro pelo teclado'
 test('HUMAN-11: catálogo revalida no foco sem polling e evita requests duplicados', async t => {
   let now = 1_000;
   t.mock.method(Date, 'now', () => now);
+  // fetchProducts() faz POST /api/reservas/reconciliar e só então
+  // GET /api/produtos. Só o GET é uma consulta ao catálogo; o POST é contado
+  // à parte (senão o "1º request" seria a reconciliação, não o catálogo).
   let requests = 0;
-  t.mock.method(globalThis, 'fetch', async () => {
+  const chamadas = [];
+  t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
+    const metodo = (init.method ?? 'GET').toUpperCase();
+    chamadas.push(`${metodo} ${url}`);
+    if (metodo === 'POST' && url === '/api/reservas/reconciliar') return Response.json({ok: true});
+    assert.ok(metodo === 'GET' && url === '/api/produtos', `request inesperado: ${metodo} ${url}`);
     requests += 1;
     return Response.json({produtos: [{
       id: 1, nome: requests === 1 ? 'Antigo' : 'Atualizado', categoria: 'bolo',
@@ -242,15 +250,25 @@ test('HUMAN-11: catálogo revalida no foco sem polling e evita requests duplicad
   await flush();
   assert.equal(document.getElementById('catalog-state').textContent, 'Antigo');
   assert.equal(requests, 1);
+  assert.deepEqual(chamadas, ['POST /api/reservas/reconciliar', 'GET /api/produtos'],
+    'carga inicial: reconcilia reservas e só então lê o catálogo');
 
   now += 2_001;
   await ui.act(async () => window.dispatchEvent(new Event('focus')));
   await flush();
   assert.equal(document.getElementById('catalog-state').textContent, 'Atualizado');
   assert.equal(requests, 2);
+  assert.deepEqual(chamadas.slice(2), ['POST /api/reservas/reconciliar', 'GET /api/produtos'],
+    'revalidação no foco repete a reconciliação antes do GET');
 
   await ui.act(async () => window.dispatchEvent(new Event('focus')));
   await flush();
   assert.equal(requests, 2, 'segundo evento imediato é deduplicado');
+  assert.equal(chamadas.length, 4, 'deduplicação também não dispara outro POST de reconciliação');
+
+  // Sem polling: passar o tempo sem eventos de foco/visibilidade não gera requests.
+  now += 60_000;
+  await flush();
+  assert.equal(chamadas.length, 4, 'sem polling em segundo plano');
   await unmount(root);
 });
