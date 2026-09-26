@@ -53,10 +53,14 @@ export function ProductPrices({
       {product.originalPrice != null && (
         <span className="product-price-original">{totalBRL(product.originalPrice, q)}</span>
       )}
-      <span className="product-price">{totalBRL(product.price, q)}</span>
-      {q > 1 && (
-        <span className="product-price-unit">{formatBRL(product.price)} cada</span>
-      )}
+      {/* "cada" na mesma linha do total: aparecer/sumir não muda a altura
+          (no bottom sheet, uma linha nova empurrava o modal para cima). */}
+      <span className="product-price-line">
+        <span className="product-price">{totalBRL(product.price, q)}</span>
+        {q > 1 && (
+          <span className="product-price-unit">{formatBRL(product.price)} cada</span>
+        )}
+      </span>
     </span>
   );
 }

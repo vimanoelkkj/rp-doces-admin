@@ -290,6 +290,8 @@ test('preço do modal acompanha a quantidade selecionada (total, promoção e un
   assert.equal(preco(), 'R$ 47,70', '3 × 15,90 sem erro de ponto flutuante');
   assert.equal(original(), 'R$ 56,70');
   assert.equal(texto(unitario()), 'R$ 15,90 cada');
+  // Na mesma linha do total (não cria linha nova que desloca o bottom sheet).
+  assert.equal(unitario().parentElement, d.querySelector('.pdm-price-row .product-price').parentElement);
 
   await clicar(menos);
   assert.equal(preco(), 'R$ 31,80');

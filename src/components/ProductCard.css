@@ -233,11 +233,18 @@
   gap: 2px;
 }
 
+.product-price-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
 .product-price-unit {
   font-family: "Manrope", sans-serif;
   font-size: 12px;
   font-weight: 500;
   color: var(--store-text-subtle);
+  white-space: nowrap;
 }
 
 .product-price-original {
