@@ -527,3 +527,20 @@
     padding: 24px 16px calc(40px + var(--admin-mobile-nav-space));
   }
 }
+
+/* ═══════════════════════════════════════════
+   Desktop (>= 901px): sidebar fixa à esquerda no lugar do header
+   horizontal. Complementa o bloco acima (<= 900px), sem sobreposição.
+   O header e a barra inferior só existem no modo compacto. A onda continua
+   na largura toda, atrás da sidebar (que é transparente, como no original);
+   só o scroll do conteúdo recua a largura da sidebar.
+   ═══════════════════════════════════════════ */
+@media (min-width: 901px) {
+  .storefront-frame--admin .header {
+    display: none;
+  }
+
+  .storefront-frame--admin .storefront-frame__scroll {
+    left: 260px;
+  }
+}
