@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 interface DatePickerDropdownProps {
   value: Date;
   onChange: (date: Date) => void;
+  // Dia comercial atual da loja; sem ele, cai no relógio local.
+  today?: Date;
 }
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -96,6 +98,7 @@ export { formatDisplay };
 export default function DatePickerDropdown({
   value,
   onChange,
+  today: todayProp,
 }: DatePickerDropdownProps) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(value.getFullYear());
@@ -132,7 +135,7 @@ export default function DatePickerDropdown({
   };
 
   const days = buildMonthGrid(viewYear, viewMonth);
-  const today = new Date();
+  const today = todayProp ?? new Date();
   const isViewingCurrentOrFutureMonth =
     viewYear > today.getFullYear() ||
     (viewYear === today.getFullYear() && viewMonth >= today.getMonth());

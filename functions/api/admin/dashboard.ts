@@ -5,6 +5,7 @@ import { pedidoValidoSql } from "../../lib/pedidoValido";
 import { requireUser } from "../../lib/auth";
 import { getStoreAnalytics } from "../../lib/dashboardAnalytics";
 import { getResultadoFinanceiro } from "../../lib/resultadoFinanceiro";
+import { storeDateSql, storeToday } from "../../lib/storeDay";
 
 interface Env {
   DB: D1Database;
@@ -46,6 +47,12 @@ function jsonError(message: string, status: number) {
 }
 
 const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+// Data comercial (America/Sao_Paulo) dos timestamps UTC usados nos filtros
+// diários. Ver functions/lib/storeDay.ts.
+const PAGO_EM_DIA = storeDateSql("pago_em");
+const CRIADO_EM_DIA = storeDateSql("criado_em");
+const P_CRIADO_EM_DIA = storeDateSql("p.criado_em");
 
 // "A receber" é estado atual da loja, não resultado do dia selecionado.
 // O CTE usa o mesmo princípio do ledger: bruto PAGO menos refunds
@@ -108,10 +115,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
     const url = new URL(request.url);
-    const data = url.searchParams.get("date") ?? "";
-    const hoje = url.searchParams.get("today") ?? data;
-    if (!DATA_REGEX.test(data) || !DATA_REGEX.test(hoje)) {
-      return jsonError("Parâmetro date/today inválido (esperado YYYY-MM-DD)", 400);
+    // "Hoje" é sempre o dia comercial da loja, derivado aqui. O antigo
+    // parâmetro `today` (data local do navegador) é ignorado: não é mais
+    // autoridade. `date` é uma data comercial explícita escolhida no
+    // calendário; ausente, vale o dia de hoje da loja.
+    const hoje = storeToday();
+    const data = url.searchParams.get("date") ?? hoje;
+    if (!DATA_REGEX.test(data)) {
+      return jsonError("Parâmetro date inválido (esperado YYYY-MM-DD)", 400);
     }
 
     const [
@@ -131,20 +142,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // UI, "pagamento(s) confirmado(s)"), não pedidos.
       env.DB.prepare(
         `SELECT COUNT(*) AS count, COALESCE(SUM(valor_centavos), 0) AS total
-         FROM pedido_pagamentos WHERE ${pedidoValidoSql('pedido_pagamentos.pedido_id')} AND status = 'PAGO' AND date(pago_em) = ?`,
+         FROM pedido_pagamentos WHERE ${pedidoValidoSql('pedido_pagamentos.pedido_id')} AND status = 'PAGO' AND ${PAGO_EM_DIA} = ?`,
       )
         .bind(data)
         .first<ValorContagem>(),
       // Estado financeiro ATUAL: atravessa a virada do dia e independe do
-      // filtro de data do dashboard. "anteriores" usa a data local enviada
-      // pelo browser, então selecionar outro dia no calendário não apaga a
-      // fila operacional de cobrança.
+      // filtro de data do dashboard. "anteriores" usa o dia comercial atual
+      // da loja, então selecionar outro dia no calendário não apaga a fila
+      // operacional de cobrança.
       env.DB.prepare(
         `${PENDENCIAS_FINANCEIRAS_CTE}
          SELECT
            COUNT(*) AS count,
            COALESCE(SUM(saldo_centavos), 0) AS total,
-           COALESCE(SUM(CASE WHEN date(criado_em) < ? THEN 1 ELSE 0 END), 0) AS anteriores
+           COALESCE(SUM(CASE WHEN ${CRIADO_EM_DIA} < ? THEN 1 ELSE 0 END), 0) AS anteriores
          FROM pendencias
          WHERE saldo_centavos > 0`,
       )
@@ -159,14 +170,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
            criado_em,
            saldo_centavos,
            CASE
-             WHEN date(criado_em) < ?
-             THEN MAX(1, CAST(julianday(?) - julianday(date(criado_em)) AS INTEGER))
+             WHEN ${CRIADO_EM_DIA} < ?
+             THEN MAX(1, CAST(julianday(?) - julianday(${CRIADO_EM_DIA}) AS INTEGER))
              ELSE 0
            END AS dias_em_aberto
          FROM pendencias
          WHERE saldo_centavos > 0
          ORDER BY
-           CASE WHEN date(criado_em) < ? THEN 0 ELSE 1 END,
+           CASE WHEN ${CRIADO_EM_DIA} < ? THEN 0 ELSE 1 END,
            criado_em ASC,
            id ASC
          LIMIT 4`,
@@ -178,7 +189,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // participa por definição.
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE ${pedidoValidoSql('pedidos.id')} AND status_pagamento IN ('PARCIAL', 'PAGO') AND status_comanda = 'ABERTA' AND date(criado_em) = ?`,
+         WHERE ${pedidoValidoSql('pedidos.id')} AND status_pagamento IN ('PARCIAL', 'PAGO') AND status_comanda = 'ABERTA' AND ${CRIADO_EM_DIA} = ?`,
       )
         .bind(data)
         .first<{ count: number }>(),
@@ -187,7 +198,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // até virar decisão de negócio explícita incluir parcial aqui.
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE ${pedidoValidoSql('pedidos.id')} AND status_pagamento = 'PAGO' AND status_pedido = 'NOVO' AND date(criado_em) = ?`,
+         WHERE ${pedidoValidoSql('pedidos.id')} AND status_pagamento = 'PAGO' AND status_pedido = 'NOVO' AND ${CRIADO_EM_DIA} = ?`,
       )
         .bind(data)
         .first<{ count: number }>(),
@@ -201,7 +212,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         `SELECT p.id, p.cliente_nome, p.valor_total_centavos, p.status_pedido,
                 (SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = p.id) AS itens_count
          FROM pedidos p
-         WHERE ${pedidoValidoSql('p.id')} AND p.status_pagamento IN ('PARCIAL', 'PAGO') AND date(p.criado_em) = ?
+         WHERE ${pedidoValidoSql('p.id')} AND p.status_pagamento IN ('PARCIAL', 'PAGO') AND ${P_CRIADO_EM_DIA} = ?
          ORDER BY p.criado_em DESC
          LIMIT 8`,
       )
@@ -216,6 +227,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
     return Response.json({
       data,
+      hoje,
       recebidoHoje: recebidoHoje ?? { count: 0, total: 0 },
       aReceber: aReceber ?? { count: 0, total: 0, anteriores: 0 },
       pagamentosPendentes: pagamentosPendentes.results,

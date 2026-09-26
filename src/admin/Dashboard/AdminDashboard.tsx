@@ -72,6 +72,8 @@ interface PedidoRecenteRow {
 
 interface DashboardResponse {
   data: string;
+  // Dia comercial atual da loja (America/Sao_Paulo), definido pelo backend.
+  hoje: string;
   recebidoHoje: ValorContagem;
   aReceber: AReceberResumo;
   pagamentosPendentes: PendenciaPagamentoRow[];
@@ -108,6 +110,14 @@ const formatarPrecoComSinal = (centavos: number) =>
 const formatarMargem = (margem: number | null) =>
   margem === null ? "—" : `${margem.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 
+// Datas do dashboard são datas comerciais "YYYY-MM-DD", não instantes. O Date
+// abaixo é só o contêiner de calendário do DatePicker (ano/mês/dia locais) e
+// ida e volta preserva o mesmo dia, qualquer que seja o fuso do navegador.
+function parseDateISO(iso: string): Date {
+  const [yyyy, mm, dd] = iso.split("-").map(Number);
+  return new Date(yyyy, mm - 1, dd);
+}
+
 function formatDateISO(d: Date): string {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -129,18 +139,15 @@ const statusClass = (s: StatusPedido) =>
       ? "dash-badge--blue"
       : "dash-badge--orange";
 
-function isToday(d: Date): boolean {
-  const now = new Date();
-  return formatDateISO(d) === formatDateISO(now);
-}
-
 const idadePendencia = (dias: number) =>
   dias <= 0 ? "Hoje" : dias === 1 ? "Desde ontem" : `Há ${dias} dias`;
 
 /* ── Component ── */
 export default function AdminDashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // null = "hoje" da loja, decidido pelo backend (não pelo relógio/fuso do
+  // navegador). Uma data escolhida no calendário é enviada explicitamente.
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -154,7 +161,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     setLoading(true);
     fetch(
-      `/api/admin/dashboard?date=${formatDateISO(selectedDate)}&today=${formatDateISO(new Date())}`,
+      selectedDate
+        ? `/api/admin/dashboard?date=${selectedDate}`
+        : "/api/admin/dashboard",
     )
       .then(async (response) => {
         if (!response.ok) throw new Error("Falha ao carregar dashboard");
@@ -167,6 +176,10 @@ export default function AdminDashboard() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [selectedDate, refreshKey]);
+
+  const hojeLoja = data?.hoje ?? null;
+  const dataExibida = selectedDate ?? hojeLoja;
+  const exibindoHoje = selectedDate === null || selectedDate === hojeLoja;
 
   const maiorVendido = data?.maisVendidos.reduce(
     (max, item) => Math.max(max, item.quantidade),
@@ -184,10 +197,16 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="dash-header-actions">
-            <DatePickerDropdown value={selectedDate} onChange={setSelectedDate} />
+            <DatePickerDropdown
+              // Antes da primeira resposta ainda não há "hoje" da loja; o
+              // relógio local é só um placeholder visual até ela chegar.
+              value={dataExibida ? parseDateISO(dataExibida) : new Date()}
+              today={hojeLoja ? parseDateISO(hojeLoja) : undefined}
+              onChange={(d) => setSelectedDate(formatDateISO(d))}
+            />
             <button
               className="dash-btn-today"
-              onClick={() => setSelectedDate(new Date())}
+              onClick={() => setSelectedDate(null)}
             >
               Hoje
             </button>
@@ -199,9 +218,9 @@ export default function AdminDashboard() {
           <span className="dash-results-bold">Resultados por dia</span>
           <span className="dash-results-dot" />
           <span className="dash-results-light">
-            {isToday(selectedDate)
+            {exibindoHoje || !dataExibida
               ? "Atualizado em tempo real"
-              : `Dados de ${formatDateISO(selectedDate).split("-").reverse().join("/")}`}
+              : `Dados de ${dataExibida.split("-").reverse().join("/")}`}
           </span>
         </div>
 

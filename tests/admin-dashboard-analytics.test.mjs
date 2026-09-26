@@ -4,11 +4,11 @@ import {app, fixture} from './helpers/b3.mjs';
 
 const cookieDe = session => session.cookie.split(';')[0];
 
-const dashboardRequest = (db, cookie = '', date = '2099-01-01', today = date) =>
+const dashboardRequest = (db, cookie = '', date = '2099-01-01') =>
   app.dashboard.onRequestGet({
     env: {DB: db},
     request: new Request(
-      `https://local.test/api/admin/dashboard?date=${date}&today=${today}`,
+      `https://local.test/api/admin/dashboard?date=${date}`,
       {headers: cookie ? {Cookie: cookie} : {}},
     ),
   });
@@ -183,6 +183,8 @@ test('dashboard exige autenticacao, agrega no backend e nao modifica o dominio',
 
 
 test('a receber atravessa a virada do dia e some somente quando o saldo zera', async t => {
+  // "Hoje" é derivado no backend: 01/01/2099 12:00 em São Paulo.
+  t.mock.timers.enable({apis: ['Date'], now: Date.parse('2099-01-01T15:00:00Z')});
   const db = await fixture(t, {ledger: false, reserve: 'ATIVA'});
   await db.prepare(`UPDATE pedidos
     SET origem_pedido='MANUAL',
@@ -194,7 +196,7 @@ test('a receber atravessa a virada do dia e some somente quando o saldo zera', a
     WHERE id=1`).run();
 
   const session = await app.auth.createSession(db, 1);
-  let response = await dashboardRequest(db, cookieDe(session), '2099-01-01', '2099-01-01');
+  let response = await dashboardRequest(db, cookieDe(session), '2099-01-01');
   assert.equal(response.status, 200);
   let body = await response.json();
 
@@ -209,8 +211,156 @@ test('a receber atravessa a virada do dia e some somente quando o saldo zera', a
     VALUES(1,'DINHEIRO','ADMIN',4000,'PAGO','quit-next-day',CURRENT_TIMESTAMP)`).run();
   await db.prepare(`UPDATE pedidos SET status_pagamento='PAGO' WHERE id=1`).run();
 
-  response = await dashboardRequest(db, cookieDe(session), '2099-01-01', '2099-01-01');
+  response = await dashboardRequest(db, cookieDe(session), '2099-01-01');
   body = await response.json();
   assert.deepEqual(body.aReceber, {count: 0, total: 0, anteriores: 0});
   assert.deepEqual(body.pagamentosPendentes, []);
+});
+
+// ── Dia comercial da loja (America/Sao_Paulo, UTC-03:00) ──
+// 2026-09-26 01:30 UTC = 25/09 22:30 em SP -> dia 25.
+// 2026-09-26 03:30 UTC = 26/09 00:30 em SP -> dia 26.
+const agora = (t, iso) => t.mock.timers.enable({apis: ['Date'], now: Date.parse(iso)});
+
+test('dia comercial: storeToday segue America/Sao_Paulo, não UTC', () => {
+  const {storeToday} = app.storeDay;
+  assert.equal(storeToday(new Date('2026-09-26T01:30:00Z')), '2026-09-25');
+  assert.equal(storeToday(new Date('2026-09-26T02:59:59Z')), '2026-09-25');
+  assert.equal(storeToday(new Date('2026-09-26T03:00:00Z')), '2026-09-26');
+  assert.equal(storeToday(new Date('2026-09-26T03:30:00Z')), '2026-09-26');
+});
+
+test('dia comercial: storeDateSql converte CURRENT_TIMESTAMP (UTC) e ISO do Mercado Pago', async t => {
+  const db = await fixture(t);
+  const {storeDateSql, storeToday} = app.storeDay;
+  const casos = [
+    ['2026-09-26 01:30:00', '2026-09-25'],
+    ['2026-09-26 02:59:59', '2026-09-25'],
+    ['2026-09-26 03:00:00', '2026-09-26'],
+    ['2026-09-26 03:30:00', '2026-09-26'],
+    // date_approved do MP vem com offset explícito: 22:30-04:00 = 02:30 UTC = 23:30 SP.
+    ['2026-09-25T22:30:00.000-04:00', '2026-09-25'],
+    ['2026-09-26T03:30:00.000Z', '2026-09-26'],
+  ];
+  for (const [ts, esperado] of casos) {
+    assert.equal(await db.prepare(`SELECT ${storeDateSql('?')} AS d`).bind(ts).first('d'), esperado, ts);
+    // SQL (offset fixo) e JS (fuso IANA) concordam.
+    assert.equal(storeToday(new Date(ts.includes('T') ? ts : `${ts.replace(' ', 'T')}Z`)), esperado, ts);
+  }
+});
+
+async function viradaFixture(t) {
+  const db = await fixture(t, {ledger: false, reserve: 'CONVERTIDA'});
+  await db.batch([
+    // Pedido 1: criado 25/09 22:30 em SP (26/09 01:30 UTC).
+    db.prepare(`UPDATE pedidos SET criado_em='2026-09-26 01:30:00', status_pagamento='PAGO',
+      status_pedido='NOVO', status_comanda='ABERTA', valor_total_centavos=10000 WHERE id=1`),
+    // Pedido 2: criado 26/09 00:30 em SP (26/09 03:30 UTC).
+    db.prepare(`INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,
+      idempotency_key,reserva_status,status_pagamento,status_pedido,status_comanda,criado_em)
+      VALUES(2,'token-2','Cliente 2','000',3000,'pedido-2','CONVERTIDA','PAGO','NOVO','ABERTA',
+      '2026-09-26 03:30:00')`),
+    db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+      idempotency_key,pago_em) VALUES(1,1,'DINHEIRO','ADMIN',6000,'PAGO','p1','2026-09-26 01:30:00')`),
+    // Pix MP aprovado às 22:30-04:00 = 23:30 em SP, ainda dia 25.
+    db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+      mp_payment_id,idempotency_key,pago_em)
+      VALUES(2,1,'PIX_MP','SITE',4000,'PAGO','901','p2','2026-09-25T22:30:00.000-04:00')`),
+    db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+      idempotency_key,pago_em) VALUES(3,2,'DINHEIRO','ADMIN',3000,'PAGO','p3','2026-09-26 03:30:00')`),
+  ]);
+  return db;
+}
+
+test('virada UTC/Brasil: recebido, comandas, aguardando preparo e pedidos do dia seguem o dia da loja', async t => {
+  const db = await viradaFixture(t);
+  const session = await app.auth.createSession(db, 1);
+
+  const dia25 = await (await dashboardRequest(db, cookieDe(session), '2026-09-25')).json();
+  assert.equal(dia25.data, '2026-09-25');
+  assert.deepEqual(dia25.recebidoHoje, {count: 2, total: 10000});
+  assert.equal(dia25.comandasAbertas, 1);
+  assert.equal(dia25.aguardandoPreparo, 1);
+  assert.deepEqual(dia25.pedidosRecentes.map(p => p.id), [1]);
+
+  const dia26 = await (await dashboardRequest(db, cookieDe(session), '2026-09-26')).json();
+  assert.deepEqual(dia26.recebidoHoje, {count: 1, total: 3000});
+  assert.equal(dia26.comandasAbertas, 1);
+  assert.equal(dia26.aguardandoPreparo, 1);
+  assert.deepEqual(dia26.pedidosRecentes.map(p => p.id), [2]);
+
+  // Métricas globais não dependem do dia.
+  assert.deepEqual(dia25.financeiro, dia26.financeiro);
+  assert.equal(dia25.financeiro.brutoCentavos, 13000);
+  assert.deepEqual(dia25.resultadoFinanceiro, dia26.resultadoFinanceiro);
+  assert.deepEqual(dia25.catalogo, dia26.catalogo);
+});
+
+test('today vem do backend: 01:30 UTC ainda é hoje=25/09; parâmetro today do navegador é ignorado', async t => {
+  agora(t, '2026-09-26T01:45:00Z');
+  const db = await viradaFixture(t);
+  const session = await app.auth.createSession(db, 1);
+
+  for (const today of [null, '2026-09-26', '2031-01-01']) {
+    const url = today
+      ? `https://local.test/api/admin/dashboard?today=${today}`
+      : 'https://local.test/api/admin/dashboard';
+    const response = await app.dashboard.onRequestGet({
+      env: {DB: db},
+      request: new Request(url, {headers: {Cookie: cookieDe(session)}}),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.hoje, '2026-09-25');
+    assert.equal(body.data, '2026-09-25');
+    assert.deepEqual(body.recebidoHoje, {count: 2, total: 10000});
+    assert.deepEqual(body.pedidosRecentes.map(p => p.id), [1]);
+  }
+});
+
+test('today vem do backend: 03:30 UTC já é hoje=26/09', async t => {
+  agora(t, '2026-09-26T03:30:00Z');
+  const db = await viradaFixture(t);
+  const session = await app.auth.createSession(db, 1);
+  const body = await (await app.dashboard.onRequestGet({
+    env: {DB: db},
+    request: new Request('https://local.test/api/admin/dashboard', {headers: {Cookie: cookieDe(session)}}),
+  })).json();
+  assert.equal(body.hoje, '2026-09-26');
+  assert.equal(body.data, '2026-09-26');
+  assert.deepEqual(body.recebidoHoje, {count: 1, total: 3000});
+});
+
+test('virada UTC/Brasil: pendências "anteriores" e dias em aberto usam o dia comercial', async t => {
+  // Agora: 25/09 22:45 em SP (26/09 01:45 UTC).
+  agora(t, '2026-09-26T01:45:00Z');
+  const db = await fixture(t, {ledger: false, reserve: 'ATIVA'});
+  await db.batch([
+    // Criado 24/09 22:30 em SP (25/09 01:30 UTC): dia anterior, 1 dia em aberto.
+    db.prepare(`UPDATE pedidos SET origem_pedido='MANUAL', status_pedido='ENTREGUE',
+      status_comanda='ENCERRADA', status_pagamento='PENDENTE', valor_total_centavos=4000,
+      criado_em='2026-09-25 01:30:00' WHERE id=1`),
+    // Criado 25/09 00:30 em SP (25/09 03:30 UTC): hoje, 0 dia.
+    db.prepare(`INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,
+      idempotency_key,reserva_status,status_pagamento,status_pedido,status_comanda,origem_pedido,criado_em)
+      VALUES(2,'token-2','Cliente 2','000',1500,'pedido-2','LIBERADA','PENDENTE','ENTREGUE','ENCERRADA',
+      'MANUAL','2026-09-25 03:30:00')`),
+  ]);
+  const session = await app.auth.createSession(db, 1);
+
+  // Mesmo com um dia histórico selecionado, a fila "a receber" usa o hoje da loja.
+  for (const date of [null, '2026-09-01']) {
+    const url = date
+      ? `https://local.test/api/admin/dashboard?date=${date}`
+      : 'https://local.test/api/admin/dashboard';
+    const body = await (await app.dashboard.onRequestGet({
+      env: {DB: db},
+      request: new Request(url, {headers: {Cookie: cookieDe(session)}}),
+    })).json();
+    assert.deepEqual(body.aReceber, {count: 2, total: 5500, anteriores: 1});
+    assert.deepEqual(
+      body.pagamentosPendentes.map(p => [p.id, p.dias_em_aberto]),
+      [[1, 1], [2, 0]],
+    );
+  }
 });
