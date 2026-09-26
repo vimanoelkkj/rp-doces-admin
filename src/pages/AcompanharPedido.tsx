@@ -19,7 +19,11 @@ interface PedidoDetalhe {
   itens: PedidoItem[];
   statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO" | "REEMBOLSADO";
   statusPedido: "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
+  // Pagamento confirmado, mas os itens ainda não foram separados do estoque.
+  estoquePendente: boolean;
 }
+
+type StatusPublico = Pick<PedidoDetalhe, "statusPagamento" | "statusPedido" | "estoquePendente">;
 
 const STEPS: { key: PedidoDetalhe["statusPedido"]; label: string }[] = [
   { key: "NOVO", label: "Pedido recebido" },
@@ -63,11 +67,16 @@ export default function AcompanharPedido() {
         { method: "POST" },
       );
       if (!response.ok) return;
-      const atual = (await response.json()) as Pick<PedidoDetalhe, "statusPagamento" | "statusPedido">;
+      const atual = (await response.json()) as StatusPublico;
       if (!montadoRef.current) return;
       setPedido((anterior) =>
         anterior
-          ? { ...anterior, statusPagamento: atual.statusPagamento, statusPedido: atual.statusPedido }
+          ? {
+              ...anterior,
+              statusPagamento: atual.statusPagamento,
+              statusPedido: atual.statusPedido,
+              estoquePendente: atual.estoquePendente,
+            }
           : anterior,
       );
     } catch {
@@ -182,7 +191,20 @@ export default function AcompanharPedido() {
 
               <div className="confirmado-divider" />
 
-              {pedido.statusPagamento === "PAGO" && (
+              {pedido.statusPagamento === "PAGO" && pedido.estoquePendente && (
+                <>
+                  <div className="confirmado-label">
+                    ACOMPANHAMENTO DE PREPARO
+                  </div>
+                  <p className="confirmado-item-detail" role="status">
+                    Pagamento confirmado. Estamos verificando a disponibilidade
+                    dos itens antes de iniciar o preparo. Acompanhe por aqui.
+                  </p>
+                  <div className="confirmado-divider" />
+                </>
+              )}
+
+              {pedido.statusPagamento === "PAGO" && !pedido.estoquePendente && (
                 <>
                   <div className="confirmado-label">
                     ACOMPANHAMENTO DE PREPARO

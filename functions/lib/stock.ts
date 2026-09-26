@@ -34,6 +34,31 @@ interface ItemPedidoRow {
 
 const ESTADOS_BAIXAVEIS_SQL = "('RESERVADO', 'SEM_RESERVA', 'LIBERADO')";
 
+// Item ativo controlado cuja baixa física ainda não aconteceu. BAIXADO,
+// REPOSTO e NAO_APLICAVEL não são pendência. Fonte única da regra usada pela
+// reconciliação de divergentes e pelo status público (`estoquePendente`).
+export function itemEstoquePendenteSql(alias: string): string {
+  return `${alias}.status_item = 'ATIVO'
+    AND ${alias}.produto_id IS NOT NULL
+    AND ${alias}.estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}`;
+}
+
+// Estoque pendente derivado, sem coluna: o pedido está financeiramente PAGO
+// (projeção agregada) e ainda tem item controlado sem baixa física — p.ex. Pix
+// pago depois que a reserva já foi LIBERADA e sem estoque livre suficiente.
+// Somente leitura; a convergência continua em `baixarEstoquePedido`.
+export async function pedidoTemEstoquePendente(db: D1Database, pedidoId: number): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT EXISTS (
+                SELECT 1 FROM pedido_itens pi
+                WHERE pi.pedido_id = p.id AND ${itemEstoquePendenteSql("pi")}
+              ) AS pendente
+              FROM pedidos p WHERE p.id = ? AND p.status_pagamento = 'PAGO'`)
+    .bind(pedidoId)
+    .first<{ pendente: number }>();
+  return Boolean(row?.pendente);
+}
+
 // Mantem os campos globais como uma projecao derivada. A prioridade e:
 // alguma reserva viva -> ATIVA; alguma reserva ja liberada/reposta ->
 // LIBERADA; algum item ainda sem reserva -> SEM_RESERVA; todos os itens
