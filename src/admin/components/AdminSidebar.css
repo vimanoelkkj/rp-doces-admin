@@ -2,6 +2,33 @@
    AdminSidebar — shared sidebar for admin
    ═══════════════════════════════════════════ */
 
+/* Contêiner das páginas do admin. Vive aqui (e não no CSS do Dashboard)
+   porque este arquivo carrega junto com o AdminLayout em qualquer rota:
+   com code splitting, abrir /admin/produtos direto não carregava o CSS do
+   Dashboard e a página ficava sem largura máxima nem padding. Precisa vir
+   antes dos ajustes de tablet/mobile mais abaixo neste arquivo. */
+.admin-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: transparent;
+  position: relative;
+  padding-top: 0;
+}
+
+.admin-main {
+  margin: 0 auto;
+  width: 100%;
+  flex: 1;
+  padding: 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1200px;
+  position: relative;
+  z-index: 1;
+}
+
 .admin-mobile-header {
   display: none;
 }
