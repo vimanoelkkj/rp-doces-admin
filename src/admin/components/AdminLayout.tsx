@@ -1,6 +1,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import StorefrontFrame from "../../components/StorefrontFrame";
+import AdminSidebar from "./AdminSidebar";
 import RouteLoadingFallback from "../../components/RouteLoadingFallback";
 import AdminMobileBottomNav from "./AdminMobileBottomNav";
 import { AdminThemeProvider } from "../theme/AdminThemeContext";
@@ -48,7 +49,11 @@ export default function AdminLayout() {
         {/* HUMAN-14: o badge da navegação e a página de Notificações leem a
             mesma contagem — marcar como lida reflete nos dois sem recarregar. */}
         <NotificacoesProvider>
-          <StorefrontFrame headerVariant="admin">
+          {/* Sidebar fixa do desktop (>= 901px). Fica FORA do frame: dentro do
+              scroll ela seria atingida pela máscara de fade. Abaixo de 900px
+              o CSS a esconde e entram o header e a barra inferior. */}
+          <AdminSidebar />
+          <StorefrontFrame headerVariant="admin" className="storefront-frame--admin">
             <div className="admin-layout">
               <Suspense fallback={<RouteLoadingFallback />}>
                 <Outlet />
