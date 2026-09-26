@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { app, fixture, state, barrier, isProjection, isPhysical, refund, withWaitUntil } from './helpers/b3.mjs';
+import { app, fixture, state, barrier, isProjection, isPhysical, refund } from './helpers/b3.mjs';
 
 const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
 const approve = async db => app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment('fake', '101'));
@@ -403,24 +403,52 @@ test('another conversion completed between reads is a successful no-op', async t
   converted(await state(db));
 });
 
-test('admin GET repairs a paid ledger before the stale reservation expiration sweep', async t => {
+test('admin reconciliation repairs a paid ledger despite the stale expired reservation; GET only reads', async t => {
+  // Ledger PAGO, projeção ainda PENDENTE/ATIVA e reserva_expira_em vencida.
   const db=await fixture(t,{paid:true});
   await db.prepare("UPDATE pedidos SET reserva_expira_em='2000-01-01' WHERE id=1").run();
   const session=await app.auth.createSession(db,1);
-  const list=()=>withWaitUntil(app.admin.onRequestGet, {
-    request:new Request('https://local.test/api/admin/pedidos',{headers:{Cookie:session.cookie.split(';')[0]}}),env:{DB:db},
+  const cookie=session.cookie.split(';')[0];
+  const env={DB:db,MP_ACCESS_TOKEN:'fake'};
+  const listar=()=>app.admin.onRequestGet({
+    request:new Request('https://local.test/api/admin/pedidos',{headers:{Cookie:cookie}}),env,
   });
-  // The repair now runs off `context.waitUntil` instead of blocking the
-  // response (deliberate since "stop blocking orders list on Mercado
-  // Pago"), so the FIRST response can still read the pre-repair projection.
-  // `withWaitUntil` still lets the test wait for that background work
-  // deterministically; the repair itself is what this test verifies, via
-  // the ledger/stock state and a second listing read.
-  const first=await list();
-  assert.equal(first.status,200);
+  const chamadasMp=[];
+  t.mock.method(globalThis,'fetch',async url=>{ chamadasMp.push(String(url)); throw new Error('unexpected network'); });
+
+  // 1) GET é somente leitura: não repara, não libera, não baixa, não consulta o MP.
+  const antes=await state(db);
+  assert.equal(antes.pedido.status_pagamento,'PENDENTE');
+  assert.equal(antes.pedido.reserva_status,'ATIVA');
+  const escritas=[];
+  db.hook=async statements=>{
+    for (const s of statements) if (/^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(s.sql)) escritas.push(s.sql);
+    return statements;
+  };
+  const leituraAntes=await listar();
+  db.hook=null;
+  assert.equal(leituraAntes.status,200);
+  assert.deepEqual(escritas,[],'GET /api/admin/pedidos não escreve nada');
+  assert.deepEqual(chamadasMp,[],'GET /api/admin/pedidos não consulta o Mercado Pago');
+  assert.deepEqual(await state(db),antes,'GET não altera ledger, projeção, reserva nem estoque');
+
+  // 2) A manutenção explícita (sessão + mesma origem) converge: o pagamento
+  // não se perde, a reserva vencida vira baixa física (não liberação).
+  const r=await app.adminReconciliar.onRequestPost({
+    request:new Request('https://local.test/api/admin/pedidos/reconciliar',{
+      method:'POST',headers:{Cookie:cookie,Origin:'https://local.test'},
+    }),env,
+  });
+  assert.equal(r.status,200);
   converted(await state(db));
-  const second=await list();
-  assert.equal((await second.json()).total,1,'a leitura seguinte já reflete o reparo feito em segundo plano');
+
+  // 3) GET posterior apenas lê o estado já corrigido.
+  const corrigido=await state(db);
+  const leituraDepois=await listar();
+  const body=await leituraDepois.json();
+  assert.equal(body.total,1);
+  assert.equal(body.pedidos[0].status_pagamento,'PAGO');
+  assert.deepEqual(await state(db),corrigido);
 });
 
 test('manual payment uses the convergent result without changing registration semantics', async t => {

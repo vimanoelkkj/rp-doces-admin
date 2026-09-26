@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {app, fixture, state, barrier, withWaitUntil} from './helpers/b3.mjs';
+import {app, fixture, state, barrier} from './helpers/b3.mjs';
 
 const env = db => ({DB:db,MP_ACCESS_TOKEN:'fake',MP_WEBHOOK_SECRET:'b2-local-only'});
 const expired = db => db.prepare("UPDATE pedidos SET pix_expira_em='2000-01-01',reserva_expira_em='2000-01-02' WHERE id=1").run();
@@ -36,11 +36,24 @@ async function hook(db, id=101, payloadStatus='approved', signatureValid=true) {
     body:JSON.stringify({data:{id},status:payloadStatus}),
   }),env:env(db)});
 }
-async function list(db) {
+// A manutenção global do admin (sweep Pix, reconciliação, reservas vencidas)
+// é o POST explícito /api/admin/pedidos/reconciliar — sessão + mesma origem.
+// GET /api/admin/pedidos é somente leitura.
+async function reconciliarAdmin(db) {
   const session=await app.auth.createSession(db,1);
-  return withWaitUntil(app.admin.onRequestGet, {request:new Request('https://local.test/api/admin/pedidos',{
+  const response=await app.adminReconciliar.onRequestPost({request:new Request('https://local.test/api/admin/pedidos/reconciliar',{
+    method:'POST',headers:{Cookie:session.cookie.split(';')[0],Origin:'https://local.test'},
+  }),env:env(db)});
+  assert.equal(response.status,200);
+  return response;
+}
+async function listarAdmin(db) {
+  const session=await app.auth.createSession(db,1);
+  const response=await app.admin.onRequestGet({request:new Request('https://local.test/api/admin/pedidos',{
     headers:{Cookie:session.cookie.split(';')[0]},
   }),env:env(db)});
+  assert.equal(response.status,200);
+  return response;
 }
 function paid(s) {
   assert.equal(s.pagamentos[0].status,'PAGO');
@@ -334,21 +347,27 @@ test('sweep: bounded, throttled, concurrent-safe and failing old expired candida
     if(id===101) return new Response('offline',{status:500});
     return Response.json({id,status:'approved'});
   });
-  await list(db);
-  assert.equal(calls.length,4,'one admin GET is bounded to four MP calls');
-  await Promise.all([list(db),list(db)]);
-  assert.equal(new Set(calls).size,calls.length);
-  await list(db);
+  // GET da listagem nunca consulta o MP, mesmo com candidatos elegíveis.
+  const antesDoGet=await state(db);
+  await listarAdmin(db);
+  assert.equal(calls.length,0,'GET /api/admin/pedidos é somente leitura');
+  assert.deepEqual(await state(db),antesDoGet);
+
+  await reconciliarAdmin(db);
+  assert.equal(calls.length,4,'one admin reconciliation run is bounded to four MP calls');
+  await Promise.all([reconciliarAdmin(db),reconciliarAdmin(db)]);
+  assert.equal(new Set(calls).size,calls.length,'concurrent runs never query the same payment twice');
+  await reconciliarAdmin(db);
   assert.equal(calls.length,7);
-  await list(db);
-  assert.equal(calls.length,7);
+  await reconciliarAdmin(db);
+  assert.equal(calls.length,7,'throttle: nothing left to query within the window');
   const s=await state(db);
   assert.equal(s.pagamentos[0].status,'EXPIRADO');
   assert.equal(s.pagamentos.filter(p=>p.status==='PAGO').length,6);
   assert.equal(s.produtos[0].estoque,8);
   await db.prepare("UPDATE pedido_pagamentos SET atualizado_em='1990-01-01' WHERE id=1").run();
   mp(t,'approved');
-  await list(db);
+  await reconciliarAdmin(db);
   assert.equal((await state(db)).pagamentos[0].status,'PAGO','no age cutoff makes the old failed candidate irrecoverable');
 });
 
