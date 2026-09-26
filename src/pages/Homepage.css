@@ -12,6 +12,7 @@
   inset: 0;
   z-index: 2;
   overflow-y: auto;
+  scrollbar-width: none;
   overflow-x: clip;
   /* No desktop, o primeiro conteúdo nasce abaixo da wave/fade,
      seguindo a mesma lógica já usada no mobile. */
@@ -44,6 +45,10 @@
     black calc(var(--wave-visual-height) + 94px),
     black 100%
   );
+}
+
+.homepage-content::-webkit-scrollbar {
+  display: none;
 }
 
 .wave-container {

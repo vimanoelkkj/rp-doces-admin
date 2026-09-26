@@ -13,6 +13,7 @@
   inset: 0;
   z-index: 2;
   overflow-y: auto;
+  scrollbar-width: none;
   overflow-x: clip;
   padding-top: calc(var(--storefront-wave-height) + 40px);
   overscroll-behavior-y: contain;
@@ -43,6 +44,10 @@
     black calc(var(--storefront-wave-height) + 94px),
     black 100%
   );
+}
+
+.storefront-frame__scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .storefront-frame__wave {
