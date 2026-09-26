@@ -291,3 +291,78 @@ test('Pix ADMIN sobre pedido MANUAL preserva B4: reserva única e retida enquant
   assert.equal(lista.total, 1);
   assert.equal(lista.pedidos[0].id, criado.pedidoId);
 });
+
+// ── Aba "Hoje" no dia comercial da loja (America/Sao_Paulo, UTC-03:00) ──
+// 2026-09-26 01:30 UTC = 25/09 22:30 em SP -> dia 25.
+// 2026-09-26 03:30 UTC = 26/09 00:30 em SP -> dia 26.
+// O "hoje" vem do backend (storeToday) com o relógio mockado, como no dashboard.
+const DIA_25_SP = Date.parse('2026-09-26T01:45:00Z'); // 25/09 22:45 em SP
+const DIA_26_SP = Date.parse('2026-09-26T04:00:00Z'); // 26/09 01:00 em SP
+
+async function viradaPedidos(t) {
+  t.mock.timers.enable({apis: ['Date'], now: DIA_25_SP});
+  const {db, session} = await balcao(t);
+  await db.batch([
+    db.prepare(`INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,
+      idempotency_key,origem_pedido,status_pagamento,status_pedido,criado_em)
+      VALUES(10,'tok-10','Ana Fronteira','000',1000,'k-10','MANUAL','PENDENTE','NOVO','2026-09-26 01:30:00')`),
+    db.prepare(`INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,
+      idempotency_key,origem_pedido,status_pagamento,status_pedido,criado_em)
+      VALUES(11,'tok-11','Bruno Virada','000',1000,'k-11','MANUAL','PENDENTE','PRONTO','2026-09-26 03:30:00')`),
+  ]);
+  return {db, session};
+}
+const ids = lista => lista.pedidos.map(p => p.id);
+
+test('aba Hoje e counts.hoje seguem o dia comercial de SP, não o dia UTC (A/B/C)', async t => {
+  const {db, session} = await viradaPedidos(t);
+
+  // Hoje da loja = 25: só o pedido de 01:30 UTC (22:30 do dia 25 em SP).
+  let hoje = await listagem(db, session, '?status=hoje');
+  assert.deepEqual(ids(hoje), [10]);
+  assert.equal(hoje.total, 1);
+  assert.equal(hoje.counts.hoje, 1, 'contador usa o mesmo predicado da aba');
+
+  // Hoje da loja = 26: inverte.
+  t.mock.timers.setTime(DIA_26_SP);
+  hoje = await listagem(db, session, '?status=hoje');
+  assert.deepEqual(ids(hoje), [11]);
+  assert.equal(hoje.total, 1);
+  assert.equal(hoje.counts.hoje, 1);
+});
+
+test('busca + aba Hoje juntas preservam a ordem dos binds; outras abas não mudam (D/E)', async t => {
+  const {db, session} = await viradaPedidos(t);
+
+  // D) status=hoje (1º bind) + busca por nome/id (binds seguintes) + LIMIT/OFFSET.
+  let r = await listagem(db, session, '?status=hoje&search=Ana');
+  assert.deepEqual(ids(r), [10]);
+  assert.equal(r.total, 1);
+  r = await listagem(db, session, '?status=hoje&search=Bruno');
+  assert.deepEqual(ids(r), [], 'pedido do dia 26 não é de hoje no dia 25');
+  assert.equal(r.total, 0);
+  r = await listagem(db, session, '?status=hoje&search=RP-10&page=1');
+  assert.deepEqual(ids(r), [10]);
+
+  t.mock.timers.setTime(DIA_26_SP);
+  r = await listagem(db, session, '?status=hoje&search=Bruno');
+  assert.deepEqual(ids(r), [11]);
+  r = await listagem(db, session, '?status=hoje&search=Ana');
+  assert.deepEqual(ids(r), []);
+
+  // E) Demais abas independem do dia.
+  for (const agora of [DIA_25_SP, DIA_26_SP]) {
+    t.mock.timers.setTime(agora);
+    const todos = await listagem(db, session);
+    assert.deepEqual(ids(todos).sort(), [10, 11]);
+    assert.equal(todos.counts.todos, 2);
+    assert.equal(todos.counts.novos, 1);
+    assert.equal(todos.counts.prontos, 1);
+    assert.equal(todos.counts.em_producao, 0);
+    assert.equal(todos.counts.entregues, 0);
+    assert.equal(todos.counts.arquivados, 0);
+    assert.deepEqual(ids(await listagem(db, session, '?status=novos')), [10]);
+    assert.deepEqual(ids(await listagem(db, session, '?status=prontos')), [11]);
+    assert.deepEqual(ids(await listagem(db, session, '?status=prontos&search=Bruno')), [11]);
+  }
+});
