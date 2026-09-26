@@ -11,6 +11,11 @@ import {
   type ProdutoInput,
   validarProdutoPromocao,
 } from "../../lib/produtoPromocao";
+import {
+  normalizarDetalhesProduto,
+  type ProdutoDetalhesInput,
+  validarDetalhesProduto,
+} from "../../lib/produtoDetalhes";
 
 const MAX_TEXT_LENGTH = 1000;
 
@@ -26,7 +31,7 @@ async function categoriaValida(db: D1Database, categoria: string): Promise<boole
   return !!row && row.ativo === 1;
 }
 
-function validarProduto(body: ProdutoInput) {
+function validarProduto(body: ProdutoInput & ProdutoDetalhesInput) {
   const nome = body.nome?.trim();
   const categoria = body.categoria?.trim();
   if (!nome || !categoria) return "Nome e categoria são obrigatórios";
@@ -39,7 +44,7 @@ function validarProduto(body: ProdutoInput) {
   if (!Number.isInteger(body.estoque) || body.estoque! < 0) {
     return "Estoque inválido";
   }
-  return validarProdutoPromocao(body);
+  return validarDetalhesProduto(body) ?? validarProdutoPromocao(body);
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -50,7 +55,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const { results } = await env.DB.prepare(
       `SELECT id, nome, categoria, descricao, preco_centavos, preco_promocional_centavos,
               promocao_inicio, promocao_fim, promocao_ativa, disponivel, ativo, destaque, ordem,
-              estoque, estoque_reservado, emoji, image_key
+              estoque, estoque_reservado, emoji, image_key,
+              peso_texto, ingredientes, alergenicos
        FROM produtos ORDER BY categoria, ordem, nome`,
     ).all();
     return Response.json({ produtos: results });
@@ -66,7 +72,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 
-  let body: ProdutoInput;
+  let body: ProdutoInput & ProdutoDetalhesInput;
   try {
     body = await request.json();
   } catch {
@@ -82,12 +88,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const promocao = normalizarPromocao(body);
+  const detalhes = normalizarDetalhesProduto(body);
 
   try {
     const result = await env.DB.prepare(
       `INSERT INTO produtos (nome, categoria, descricao, preco_centavos, estoque, emoji, ativo, disponivel, destaque,
-                             promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                             promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim,
+                             peso_texto, ingredientes, alergenicos)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         body.nome!.trim(),
@@ -103,6 +111,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         promocao.precoPromocionalCentavos,
         promocao.promocaoInicio,
         promocao.promocaoFim,
+        detalhes.pesoTexto ?? "",
+        detalhes.ingredientes ?? "",
+        detalhes.alergenicos ?? "",
       )
       .run();
 

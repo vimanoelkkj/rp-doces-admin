@@ -41,18 +41,21 @@ export function getStockBadgeState(restante: number): StockBadgeState {
 }
 
 /**
- * Calcula a quantidade após tentar adicionar 1 unidade de um item,
- * respeitando a disponibilidade máxima conhecida.
+ * Calcula a quantidade após tentar adicionar `quantity` unidades (padrão 1)
+ * de um item, respeitando a disponibilidade máxima conhecida. Quantidade
+ * inválida (não inteira ou < 1) não altera nada.
  */
 export function calculateAddQuantity(
   currentQuantity: number,
-  disponibilidade?: number
+  disponibilidade?: number,
+  quantity: number = 1
 ): number {
+  if (!Number.isInteger(quantity) || quantity < 1) return currentQuantity;
   if (disponibilidade !== undefined) {
     if (disponibilidade <= 0) return currentQuantity;
-    return Math.min(currentQuantity + 1, Math.max(0, disponibilidade));
+    return Math.min(currentQuantity + quantity, Math.max(0, disponibilidade));
   }
-  return currentQuantity + 1;
+  return currentQuantity + quantity;
 }
 
 /**

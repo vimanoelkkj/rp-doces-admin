@@ -297,3 +297,22 @@ test('getStockBadgeState reflete o estoque restante com os badges corretos', () 
   assert.equal(getStockBadgeState(remainingAvailability(1, 1)), 'esgotado');
 });
 
+test('calculateAddQuantity com quantidade: soma limitada à disponibilidade', () => {
+  // C) quantidade > 1 sem exceder a disponibilidade
+  assert.equal(calculateAddQuantity(0, 5, 3), 3);
+  // D) disponibilidade 5 com 3 no carrinho -> só +2 cabem
+  assert.equal(calculateAddQuantity(3, 5, 2), 5);
+  // E) pedido acima do disponível é limitado
+  assert.equal(calculateAddQuantity(3, 5, 10), 5);
+  assert.equal(calculateAddQuantity(0, 5, 99), 5);
+  // esgotado nunca adiciona
+  assert.equal(calculateAddQuantity(0, 0, 3), 0);
+  // quantidade inválida não altera nada
+  assert.equal(calculateAddQuantity(2, 5, 0), 2);
+  assert.equal(calculateAddQuantity(2, 5, -1), 2);
+  assert.equal(calculateAddQuantity(2, 5, 1.5), 2);
+  // padrão continua sendo +1 (chamadores existentes)
+  assert.equal(calculateAddQuantity(2, 5), 3);
+  // legado sem disponibilidade conhecida
+  assert.equal(calculateAddQuantity(1, undefined, 3), 4);
+});

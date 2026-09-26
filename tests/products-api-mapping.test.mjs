@@ -52,3 +52,39 @@ test('fallback de categoria ausente ainda produz um slug utilizável', async t =
   assert.equal(produto.categorySlug, 'SEM_CATEGORIA');
   assert.equal(produto.category, 'SEM_CATEGORIA');
 });
+
+// Migration 0033: detalhes do produto. A API pública devolve os textos crus;
+// o mapeamento aplica trim e transforma vazio em undefined, para a UI não
+// renderizar blocos vazios.
+const linhaBase = {
+  id: 3, nome: 'Encanto', categoria: 'BOLO_NO_POTE', categoria_nome: 'Bolo no Pote',
+  descricao: 'Creme suave', preco_centavos: 1500, preco_promocional_centavos: null,
+  promocao_ativa: 0, promocao_inicio: null, promocao_fim: null,
+  destaque: 0, ordem: 0, estoque: 5, estoque_reservado: 0, image_key: null,
+};
+
+test('A: fetchProducts mapeia peso, ingredientes e alérgenos', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({
+    produtos: [{...linhaBase, peso_texto: ' 220 g ', ingredientes: 'Leite condensado, creme de leite',
+      alergenicos: 'Contém leite.'}],
+  }));
+  const [produto] = await fetchProducts();
+  assert.equal(produto.weightText, '220 g');
+  assert.equal(produto.ingredients, 'Leite condensado, creme de leite');
+  assert.equal(produto.allergens, 'Contém leite.');
+});
+
+test('B: campos de detalhe vazios, só espaços ou ausentes viram undefined', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({
+    produtos: [
+      {...linhaBase, peso_texto: '', ingredientes: '   ', alergenicos: ''},
+      {...linhaBase, id: 4},
+      {...linhaBase, id: 5, peso_texto: null, ingredientes: null, alergenicos: null},
+    ],
+  }));
+  for (const produto of await fetchProducts()) {
+    assert.equal(produto.weightText, undefined);
+    assert.equal(produto.ingredients, undefined);
+    assert.equal(produto.allergens, undefined);
+  }
+});

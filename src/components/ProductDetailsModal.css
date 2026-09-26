@@ -1,0 +1,291 @@
+/* ===== Detalhes do produto =====
+   Desktop: modal centralizado, foto de um lado e informações do outro.
+   Mobile: bottom sheet quase full-screen, com o botão de adicionar fixo
+   no rodapé. Mesmos tokens da loja (tema claro/escuro). */
+
+.pdm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: var(--store-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  animation: pdm-fade 0.18s ease-out;
+}
+
+.pdm-dialog {
+  position: relative;
+  display: flex;
+  width: min(880px, 100%);
+  max-height: min(640px, calc(100dvh - 64px));
+  background: var(--store-surface-elevated);
+  border: 1px solid var(--store-border);
+  border-radius: 24px;
+  box-shadow: var(--store-shadow-modal);
+  overflow: hidden;
+  animation: pdm-rise 0.22s ease-out;
+}
+
+.pdm-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--store-border);
+  background: var(--store-surface-elevated);
+  color: var(--store-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.pdm-media {
+  flex: 0 0 50%;
+  min-height: 360px;
+  background: var(--store-surface-soft);
+}
+
+.pdm-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pdm-image--vazia {
+  min-height: 240px;
+}
+
+.pdm-body {
+  flex: 1 1 50%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdm-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 28px 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pdm-title {
+  font-family: "Fraunces", serif;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--store-text-heading);
+  margin: 0;
+  padding-right: 40px;
+}
+
+.pdm-description {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--store-text-muted);
+  margin: 4px 0 0;
+  white-space: pre-line;
+}
+
+.pdm-section {
+  margin-top: 10px;
+}
+
+.pdm-section-title {
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--store-text-subtle);
+  margin: 0 0 4px;
+}
+
+.pdm-section-text {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--store-text);
+  margin: 0;
+  white-space: pre-line;
+}
+
+.pdm-footer {
+  border-top: 1px solid var(--store-border);
+  padding: 16px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--store-surface-elevated);
+}
+
+.pdm-price-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pdm-price-row .product-price {
+  font-size: 22px;
+}
+
+.pdm-availability {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--store-text-muted);
+}
+
+.pdm-availability--esgotado {
+  color: var(--store-accent);
+}
+
+.pdm-actions {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.pdm-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--store-border);
+  border-radius: 999px;
+  background: var(--store-surface-input);
+  flex-shrink: 0;
+}
+
+.pdm-stepper-btn {
+  width: 40px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--store-text);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.pdm-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pdm-stepper-value {
+  min-width: 28px;
+  text-align: center;
+  font-family: "Manrope", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--store-text-heading);
+}
+
+.pdm-add {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--store-btn-primary-border);
+  background: var(--store-btn-primary-bg);
+  color: var(--store-btn-primary-text);
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+@media (hover: hover) {
+  .pdm-add:not(:disabled):hover {
+    background: var(--store-btn-primary-hover);
+  }
+}
+
+.pdm-add--added {
+  background: #4caf50;
+  border-color: #4caf50;
+  color: #fff;
+}
+
+.pdm-add:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pdm-close:focus-visible,
+.pdm-stepper-btn:focus-visible,
+.pdm-add:focus-visible {
+  outline: 2px solid var(--store-border-focus);
+  outline-offset: 2px;
+}
+
+@keyframes pdm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pdm-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Mobile: bottom sheet ===== */
+@media (max-width: 768px) {
+  .pdm-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .pdm-dialog {
+    flex-direction: column;
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 24px 24px 0 0;
+    border-bottom: 0;
+  }
+
+  .pdm-media {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: min(34dvh, 75vw);
+  }
+
+  .pdm-body {
+    flex: 1 1 auto;
+  }
+
+  .pdm-scroll {
+    padding: 20px 20px 12px;
+  }
+
+  .pdm-title {
+    font-size: 22px;
+  }
+
+  .pdm-footer {
+    padding: 14px 20px calc(16px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pdm-backdrop,
+  .pdm-dialog {
+    animation: none;
+  }
+}

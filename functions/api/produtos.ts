@@ -22,6 +22,10 @@ interface ProdutoRow {
   estoque: number;
   estoque_reservado: number;
   image_key: string | null;
+  // Migration 0033: texto livre; '' = não informado.
+  peso_texto: string;
+  ingredientes: string;
+  alergenicos: string;
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
@@ -30,7 +34,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
             p.descricao, p.preco_centavos,
             p.preco_promocional_centavos, p.promocao_ativa,
             p.promocao_inicio, p.promocao_fim,
-            p.destaque, p.ordem, p.estoque, p.estoque_reservado, p.image_key
+            p.destaque, p.ordem, p.estoque, p.estoque_reservado, p.image_key,
+            p.peso_texto, p.ingredientes, p.alergenicos
      FROM produtos p
      LEFT JOIN categorias c ON c.id = p.categoria
      WHERE p.disponivel = 1

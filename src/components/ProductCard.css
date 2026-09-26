@@ -82,6 +82,80 @@
   overflow: hidden;
 }
 
+/* ── Foto e nome abrem o detalhe ── */
+.product-image-button {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.product-image-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translate(-50%, 4px);
+  font-family: "Manrope", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--store-text);
+  background: var(--store-surface-elevated);
+  border-radius: 999px;
+  padding: 5px 12px;
+  box-shadow: var(--store-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+@media (hover: hover) {
+  .product-image-button:hover .product-image-hint {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.product-image-button:focus-visible .product-image-hint {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.product-image-button:focus-visible,
+.product-name-button:focus-visible {
+  outline: 2px solid var(--store-border-focus);
+  outline-offset: -2px;
+}
+
+.product-name-button {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+@media (hover: hover) {
+  .product-name-button:hover {
+    color: var(--store-accent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-image-hint {
+    transition: none;
+  }
+}
+
 .product-footer {
   display: flex;
   justify-content: space-between;

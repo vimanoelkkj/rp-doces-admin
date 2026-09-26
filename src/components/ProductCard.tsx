@@ -2,25 +2,28 @@ import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import "./ProductCard.css";
 import { Product } from "../types/product";
-import { remainingAvailability, getStockBadgeState } from "../context/cartReconciliation";
+import { remainingAvailability } from "../context/cartReconciliation";
+import { ProductPrices, PromoBadge, StockBadge } from "./productDisplay";
 
 interface ProductCardProps {
   product: Product;
   quantityInCart?: number;
   onAddToCart?: () => void;
+  /** Abre o detalhe do produto. Acionado só pela foto e pelo nome. */
+  onOpenDetails?: () => void;
 }
 
 export default function ProductCard({
   product,
   quantityInCart = 0,
   onAddToCart,
+  onOpenDetails,
 }: ProductCardProps) {
   const [justAdded, setJustAdded] = useState(false);
   const shouldReduceMotion = useReducedMotion();
 
   const restante = remainingAvailability(product.disponibilidade, quantityInCart);
   const esgotado = restante <= 0;
-  const stockBadge = getStockBadgeState(restante);
 
   const handleAdd = () => {
     if (justAdded || esgotado) return;
@@ -36,48 +39,54 @@ export default function ProductCard({
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
     >
       <div className="product-image-wrapper">
-        <img
-          src={product.image}
-          alt={product.name}
-          className="product-image"
-          loading="lazy"
-        />
+        {onOpenDetails ? (
+          // Só a foto e o nome abrem o detalhe; o card inteiro não é clicável
+          // e o botão + fica fora destes botões (sem botões aninhados).
+          <button
+            type="button"
+            className="product-image-button"
+            onClick={onOpenDetails}
+            aria-label={`Ver detalhes de ${product.name}`}
+          >
+            <img
+              src={product.image}
+              alt=""
+              className="product-image"
+              loading="lazy"
+            />
+            <span className="product-image-hint" aria-hidden="true">Ver detalhes</span>
+          </button>
+        ) : (
+          <img
+            src={product.image}
+            alt={product.name}
+            className="product-image"
+            loading="lazy"
+          />
+        )}
       </div>
       <div className="product-info">
         <div className="product-meta-row">
           <span className="product-category">{product.category}</span>
           {/* HUMAN-12: selo só aparece com promoção vigente. Estrutura do
               card preservada — é um acréscimo ao lado da categoria. */}
-          {product.originalPrice != null && (
-            <span className="product-promo-badge">Promoção</span>
-          )}
-          {stockBadge === "esgotado" && (
-            <span className="product-esgotado-badge">Esgotado</span>
-          )}
-          {stockBadge === "ultima_unidade" && (
-            <span className="product-low-stock-badge product-low-stock-badge--last">
-              Última unidade
-            </span>
-          )}
-          {stockBadge === "poucas_unidades" && (
-            <span className="product-low-stock-badge">Poucas unidades</span>
-          )}
+          <PromoBadge product={product} />
+          <StockBadge restante={restante} />
         </div>
-        <h3 className="product-name">{product.name}</h3>
+        <h3 className="product-name">
+          {onOpenDetails ? (
+            <button type="button" className="product-name-button" onClick={onOpenDetails}>
+              {product.name}
+            </button>
+          ) : (
+            product.name
+          )}
+        </h3>
         {product.description && (
           <p className="product-description">{product.description}</p>
         )}
         <div className="product-footer">
-          <span className="product-prices">
-            {product.originalPrice != null && (
-              <span className="product-price-original">
-                R$ {product.originalPrice.toFixed(2).replace(".", ",")}
-              </span>
-            )}
-            <span className="product-price">
-              R$ {product.price.toFixed(2).replace(".", ",")}
-            </span>
-          </span>
+          <ProductPrices product={product} />
           <motion.button
             className={`add-button${justAdded ? " add-button--added" : ""}${esgotado ? " add-button--esgotado" : ""}`}
             aria-label={esgotado ? `${product.name} esgotado` : `Adicionar ${product.name}`}
