@@ -14,9 +14,19 @@ const AguardandoPagamento = lazy(() => import("./pages/AguardandoPagamento"));
 const PedidoConfirmado = lazy(() => import("./pages/PedidoConfirmado"));
 const PagamentoNaoAprovado = lazy(() => import("./pages/PagamentoNaoAprovado"));
 const AcompanharPedido = lazy(() => import("./pages/AcompanharPedido"));
-const PreparandoPedido = lazy(() => import("./pages/PreparandoPedido"));
-const GerandoPagamento = lazy(() => import("./pages/GerandoPagamento"));
-const ProcessandoPagamento = lazy(() => import("./pages/ProcessandoPagamento"));
+
+// Preview isolado das telas de loading — ficam paradas em loop, sem passar
+// pelo checkout real. Só para inspeção visual, por isso só existem em `npm run
+// dev`: em produção `import.meta.env.DEV` é `false`, as rotas /dev/* não são
+// registradas e estes lazy() são eliminados do bundle. (As páginas em si
+// continuam no build porque o fluxo real de AguardandoPagamento as importa.)
+const DEV_PREVIEW_ROUTES = import.meta.env.DEV
+  ? [
+      { path: "/dev/preparando-pedido", Page: lazy(() => import("./pages/PreparandoPedido")) },
+      { path: "/dev/gerando-pagamento", Page: lazy(() => import("./pages/GerandoPagamento")) },
+      { path: "/dev/processando-pagamento", Page: lazy(() => import("./pages/ProcessandoPagamento")) },
+    ]
+  : [];
 
 // Admin routes (lazy)
 const AdminLogin = lazy(() => import("./admin/Login"));
@@ -51,11 +61,9 @@ function StorefrontRoutes() {
               element={<PagamentoNaoAprovado />}
             />
             <Route path="/pedido/:token" element={<AcompanharPedido />} />
-            {/* Preview isolado das telas de loading — ficam paradas em loop,
-                sem passar pelo checkout real. Só para inspeção visual. */}
-            <Route path="/dev/preparando-pedido" element={<PreparandoPedido />} />
-            <Route path="/dev/gerando-pagamento" element={<GerandoPagamento />} />
-            <Route path="/dev/processando-pagamento" element={<ProcessandoPagamento />} />
+            {DEV_PREVIEW_ROUTES.map(({ path, Page }) => (
+              <Route key={path} path={path} element={<Page />} />
+            ))}
           </Routes>
         </Suspense>
       </PageTransition>
