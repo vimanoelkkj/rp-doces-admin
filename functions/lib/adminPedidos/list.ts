@@ -3,6 +3,7 @@
 import { requireUser } from "../auth";
 import { pedidoValidoSql } from "../pedidoValido";
 import { getFinanceirosPorPedidos, type FinanceiroPedido } from "../comandaLedger";
+import { storeDateSql, storeToday } from "../storeDay";
 import type { Env } from "./types";
 
 interface PedidoListRow {
@@ -29,8 +30,14 @@ interface CountsRow {
 }
 
 const ITEMS_PER_PAGE = 8;
+// "Hoje" é o dia comercial da loja (America/Sao_Paulo, ver storeDay.ts), não
+// o dia UTC: um pedido às 22:30 em SP (01:30 UTC do dia seguinte) é de hoje.
+// O dia vem sempre do backend (storeToday) e entra como parâmetro — a aba e o
+// contador usam exatamente este mesmo predicado.
+const HOJE_SQL = `${storeDateSql("criado_em")} = ?`;
+
+// Filtros de aba sem parâmetro. "hoje" é tratado à parte porque recebe bind.
 const TAB_FILTERS: Record<string, string> = {
-  hoje: "AND date(criado_em) = date('now')",
   novos: "AND status_pedido = 'NOVO'",
   em_producao: "AND status_pedido = 'PREPARANDO'",
   prontos: "AND status_pedido = 'PRONTO'",
@@ -75,7 +82,11 @@ export async function listPedidos(
     const tab = url.searchParams.get("status") ?? "todos";
     const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
 
-    const tabFilter = TAB_FILTERS[tab] ?? "";
+    const hoje = storeToday();
+    const tabFilter = tab === "hoje" ? `AND ${HOJE_SQL}` : TAB_FILTERS[tab] ?? "";
+    // Ordem dos binds = ordem dos placeholders no SQL:
+    // tabFilter, searchFilter e, na página, LIMIT/OFFSET.
+    const tabParams: string[] = tab === "hoje" ? [hoje] : [];
     const listScope = tab === "arquivados"
       ? "arquivado = 1"
       : `arquivado = 0 AND ${PEDIDOS_OPERACIONAIS_SQL}`;
@@ -100,7 +111,7 @@ export async function listPedidos(
         `SELECT COUNT(*) AS count FROM pedidos
          WHERE ${pedidoValidoSql('pedidos.id')} AND ${listScope} ${tabFilter} ${searchFilter}`,
       )
-        .bind(...searchParams)
+        .bind(...tabParams, ...searchParams)
         .first<{ count: number }>(),
       env.DB.prepare(
         `SELECT id, cliente_nome, valor_total_centavos, status_pagamento, status_pedido, criado_em
@@ -109,13 +120,13 @@ export async function listPedidos(
          ORDER BY criado_em DESC
          LIMIT ? OFFSET ?`,
       )
-        .bind(...searchParams, ITEMS_PER_PAGE, offset)
+        .bind(...tabParams, ...searchParams, ITEMS_PER_PAGE, offset)
         .all<PedidoListRow>(),
       env.DB.prepare(
         `SELECT
            COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL} THEN 1 ELSE 0 END),0) AS todos,
            COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
-                     AND date(criado_em)=date('now') THEN 1 ELSE 0 END),0) AS hoje,
+                     AND ${HOJE_SQL} THEN 1 ELSE 0 END),0) AS hoje,
            COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
                      AND status_pedido='NOVO' THEN 1 ELSE 0 END),0) AS novos,
            COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
@@ -126,7 +137,9 @@ export async function listPedidos(
                      AND status_pedido='ENTREGUE' THEN 1 ELSE 0 END),0) AS entregues,
            COALESCE(SUM(CASE WHEN arquivado=1 THEN 1 ELSE 0 END),0) AS arquivados
          FROM pedidos WHERE ${pedidoValidoSql('pedidos.id')}`,
-      ).first<CountsRow>(),
+      )
+        .bind(hoje)
+        .first<CountsRow>(),
     ]);
 
     const count = Number(countRow?.count ?? 0);
