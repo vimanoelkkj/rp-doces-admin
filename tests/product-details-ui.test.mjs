@@ -222,6 +222,21 @@ test('G: modal mostra descrição, peso, ingredientes, alérgenos, preços e ace
   await m.desmontar();
 });
 
+test('foto do modal só aparece quando carregada (sem flash do fundo) e sem imagem mostra o bloco neutro', async () => {
+  const m = await montar(ui.modal({ product: completo, onClose: () => {}, onAddToCart: () => {} }));
+  const img = dialogo().querySelector('.pdm-image');
+  assert.equal(img.getAttribute('decoding'), 'sync');
+  assert.equal(img.classList.contains('pdm-image--pronta'), false, 'ainda não carregada');
+  await ui.act(async () => { img.dispatchEvent(new Event('load')); });
+  assert.equal(img.classList.contains('pdm-image--pronta'), true);
+  await m.desmontar();
+
+  const semFoto = await montar(ui.modal({ product: minimo, onClose: () => {}, onAddToCart: () => {} }));
+  assert.equal(dialogo().querySelector('img'), null);
+  assert.ok(dialogo().querySelector('.pdm-image--vazia'));
+  await semFoto.desmontar();
+});
+
 test('H: modal de produto sem descrição/peso/ingredientes/alérgenos não gera blocos vazios', async () => {
   const m = await montar(ui.modal({ product: minimo, onClose: () => {}, onAddToCart: () => {} }));
   const d = dialogo();
