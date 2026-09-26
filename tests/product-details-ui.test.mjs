@@ -184,6 +184,10 @@ test('G: modal mostra descrição, peso, ingredientes, alérgenos, preços e ace
   const d = dialogo();
   assert.ok(d);
   assert.equal(d.getAttribute('aria-modal'), 'true');
+  // Backdrop em camada separada do diálogo (irmãos), não o envolvendo.
+  const backdrop = document.querySelector('.pdm-backdrop');
+  assert.equal(backdrop.contains(d), false);
+  assert.equal(backdrop.parentElement, d.parentElement);
   const titulo = document.getElementById(d.getAttribute('aria-labelledby'));
   assert.equal(texto(titulo), completo.name);
   assert.equal(document.activeElement, d.querySelector('.pdm-close'), 'foco inicial no fechar');
@@ -225,7 +229,7 @@ test('G: modal mostra descrição, peso, ingredientes, alérgenos, preços e ace
 test('foto do modal só aparece quando carregada (sem flash do fundo) e sem imagem mostra o bloco neutro', async () => {
   const m = await montar(ui.modal({ product: completo, onClose: () => {}, onAddToCart: () => {} }));
   const img = dialogo().querySelector('.pdm-image');
-  assert.equal(img.getAttribute('decoding'), 'sync');
+  assert.equal(img.getAttribute('decoding'), 'async', 'não trava a pintura do modal esperando a foto');
   assert.equal(img.classList.contains('pdm-image--pronta'), false, 'ainda não carregada');
   await ui.act(async () => { img.dispatchEvent(new Event('load')); });
   assert.equal(img.classList.contains('pdm-image--pronta'), true);
