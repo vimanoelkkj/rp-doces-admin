@@ -33,6 +33,7 @@ export default function AdminWave() {
         <motion.path
           className="wave-secondary"
           d={SECONDARY_A}
+          initial={{ d: SECONDARY_A }}
           animate={
             shouldReduceMotion
               ? undefined
@@ -52,6 +53,7 @@ export default function AdminWave() {
         <motion.path
           className="wave-primary"
           d={PRIMARY_A}
+          initial={{ d: PRIMARY_A }}
           animate={
             shouldReduceMotion
               ? undefined
