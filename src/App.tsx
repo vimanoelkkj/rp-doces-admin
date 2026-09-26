@@ -64,6 +64,11 @@ function StorefrontRoutes() {
             {DEV_PREVIEW_ROUTES.map(({ path, Page }) => (
               <Route key={path} path={path} element={<Page />} />
             ))}
+            {/* As duas árvores de rotas (loja e admin) são montadas em toda URL.
+                O admin pertence à AdminRoutes: aqui ele existe só para o React
+                Router não avisar "No routes matched" em toda página do admin.
+                Uma rota realmente inexistente continua avisando. */}
+            <Route path="/admin/*" element={null} />
           </Routes>
         </Suspense>
       </PageTransition>
@@ -74,6 +79,11 @@ function StorefrontRoutes() {
 // Rotas administrativas ficam fora do PageTransition (sem a onda/animação do storefront).
 // Compartilham o mesmo Header global do storefront com navegação contextual.
 function AdminRoutes() {
+  const { pathname } = useLocation();
+  // Fora de /admin não há nada a casar: evita o aviso "No routes matched" em
+  // todas as páginas da loja (o aviso segue valendo para /admin/inexistente).
+  if (pathname !== "/admin" && !pathname.startsWith("/admin/")) return null;
+
   return (
     <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>

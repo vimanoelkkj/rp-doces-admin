@@ -151,3 +151,51 @@ test('produção: rotas reais do fluxo continuam registradas (não é o App inte
   await ui.act(async () => root.unmount());
   container.innerHTML = '';
 });
+
+// ── Console limpo: rotas válidas não avisam, rota inexistente avisa, ondas sem d="undefined" ──
+// A loja e o admin são duas árvores <Routes> montadas em TODA URL. Antes, cada
+// uma avisava "No routes matched" nas rotas da outra, em toda página válida.
+// E as ondas (motion.path com d animado) gravavam d="undefined" no primeiro
+// render, o que o navegador reporta como erro de SVG.
+async function renderizarComConsole(t, path) {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({}));
+  const avisos = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => { avisos.push(args.join(' ')); };
+  const dValoresInvalidos = [];
+  const setAttributeOriginal = dom.window.Element.prototype.setAttribute;
+  dom.window.Element.prototype.setAttribute = function (name, value) {
+    if (name === 'd' && (value === undefined || String(value) === 'undefined')) dValoresInvalidos.push(this.getAttribute('class'));
+    return setAttributeOriginal.call(this, name, value);
+  };
+  try {
+    const ui = await compilarApp(true);
+    const r = await renderizarRota(ui, path);
+    const ondas = [...r.container.querySelectorAll('svg path[class^="wave"]')].map((p) => p.getAttribute('d') ?? '');
+    await r.desmontar();
+    return { avisos, dValoresInvalidos, ondas };
+  } finally {
+    console.warn = originalWarn;
+    dom.window.Element.prototype.setAttribute = setAttributeOriginal;
+  }
+}
+
+const semRotaCasada = (avisos) => avisos.filter((a) => a.includes('No routes matched location'));
+
+for (const path of ['/', '/cardapio', '/admin/login']) {
+  test(`console limpo em ${path}: sem "No routes matched" e sem d="undefined" nas ondas`, async (t) => {
+    const { avisos, dValoresInvalidos, ondas } = await renderizarComConsole(t, path);
+    assert.deepEqual(semRotaCasada(avisos), [], `${path} é uma rota válida e não deve avisar`);
+    assert.deepEqual(dValoresInvalidos, [], 'nenhuma onda pode receber d="undefined"');
+    assert.ok(ondas.length >= 2, 'as ondas foram renderizadas');
+    assert.ok(ondas.every((d) => d.startsWith('M')), 'todas as ondas têm um caminho SVG válido');
+  });
+}
+
+for (const path of ['/nao-existe', '/admin/nao-existe']) {
+  test(`rota realmente inexistente continua avisando: ${path}`, async (t) => {
+    const { avisos } = await renderizarComConsole(t, path);
+    const avisosDaRota = semRotaCasada(avisos).filter((a) => a.includes(`"${path}"`));
+    assert.equal(avisosDaRota.length, 1, 'exatamente um aviso (nada foi suprimido nem duplicado)');
+  });
+}
