@@ -148,14 +148,19 @@ html.menu-open #root {
 
 /* ===== THEME TRANSITION (View Transitions API Circular Reveal) ===== */
 ::view-transition-group(root) {
-  animation-duration: 0.48s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation: none;
+}
+
+::view-transition-image-pair(root) {
+  isolation: auto;
 }
 
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+  height: 100%;
+  width: 100%;
 }
 
 ::view-transition-old(root) {
@@ -175,11 +180,6 @@ html.menu-open #root {
 }
 
 @media (max-width: 768px) {
-  ::view-transition-group(root) {
-    animation-duration: 0.26s;
-    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-
   :root {
     --app-header-height: 56px;
   }

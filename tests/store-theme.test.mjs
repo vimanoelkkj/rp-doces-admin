@@ -99,6 +99,7 @@ test("StoreTheme: useAdminPwa restores storefront theme-color dynamically on cle
 
 test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserva radial reveal no desktop", () => {
   const contextCode = fs.readFileSync(path.resolve("src/context/StoreThemeContext.tsx"), "utf-8");
+  const css = fs.readFileSync(path.resolve("src/global.css"), "utf-8");
 
   // 1. Desktop continua tendo o radial clipPath
   assert.match(contextCode, /clipPath:\s*\[[\s\S]*?circle\(0px at/);
@@ -116,8 +117,13 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
   assert.doesNotMatch(mobileBlockMatch[1], /scale\(/i, "caminho mobile não deve usar scale para evitar ghosting");
   assert.doesNotMatch(mobileBlockMatch[1], /clipPath/i, "caminho mobile não deve usar clipPath");
 
+  // 5. Nenhuma transformação scale no desktop ou no context
+  assert.doesNotMatch(contextCode, /scale\(/i, "nenhum scale deve ser introduzido no context");
+  assert.doesNotMatch(contextCode, /transform:/i, "nenhum transform manual deve ser aplicado no context");
+
   // 6. prefers-reduced-motion continua preservado
   assert.match(contextCode, /matchMedia\(\s*["']\(prefers-reduced-motion:\s*reduce\)["']\s*\)/);
+  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
 
   // 7. Duração mobile está abaixo da duração desktop
   const desktopDurationMatch = contextCode.match(/const\s*\{\s*x,\s*y\s*\}[\s\S]*?duration:\s*(\d+)/);
@@ -126,6 +132,7 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
   assert.ok(mobileDurationMatch, "deve ter duração no caminho mobile");
   const desktopDuration = Number(desktopDurationMatch[1]);
   const mobileDuration = Number(mobileDurationMatch[1]);
+  assert.equal(desktopDuration, 480, "duração desktop deve ser 480ms");
   assert.ok(
     mobileDuration < desktopDuration,
     `duração mobile (${mobileDuration}ms) deve ser menor que duração desktop (${desktopDuration}ms)`,
@@ -134,6 +141,18 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
     mobileDuration >= 240 && mobileDuration <= 300,
     `duração mobile (${mobileDuration}ms) deve estar entre 240ms e 300ms`,
   );
+
+  // 8. ::view-transition-group(root) com animation: none (sem animação geométrica implícita)
+  assert.match(
+    css,
+    /::view-transition-group\(root\)\s*\{\s*animation:\s*none;\s*\}/,
+    "::view-transition-group(root) deve ter animation: none para evitar deslocamento espacial",
+  );
+
+  // 9. new(root) continua sendo o único pseudo-elemento animado manualmente no desktop e mobile
+  assert.match(contextCode, /pseudoElement:\s*"::view-transition-new\(root\)"/);
+  assert.doesNotMatch(contextCode, /::view-transition-old\(root\)/);
+  assert.doesNotMatch(contextCode, /::view-transition-group\(root\)/);
 });
 
 
