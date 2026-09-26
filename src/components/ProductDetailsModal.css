@@ -13,17 +13,23 @@
   padding: 32px;
 }
 
-/* Camada própria, só cor: pinta instantaneamente e cobre a página. */
+/* Camada própria, só cor: pinta instantaneamente e cobre a página.
+   will-change mantém as camadas do modal estáveis: sem ele, o Chrome no
+   Android desfaz a camada ao fim da animação e, a cada atualização
+   (quantidade, total), repintava o modal inteiro — trechos ficavam em branco
+   por um quadro. */
 .pdm-backdrop {
   position: absolute;
   inset: 0;
   background: var(--store-overlay);
   animation: pdm-fade 0.18s ease-out;
+  will-change: opacity;
 }
 
 .pdm-dialog {
   position: relative;
   z-index: 1;
+  will-change: transform;
   display: flex;
   width: min(880px, 100%);
   max-height: min(640px, calc(100dvh - 64px));
@@ -137,7 +143,12 @@
   white-space: pre-line;
 }
 
+/* Camada própria: trocar quantidade/total repinta só esta faixa, não a
+   foto, a sombra e os cantos arredondados do diálogo. */
 .pdm-footer {
+  position: relative;
+  z-index: 1;
+  will-change: transform;
   border-top: 1px solid var(--store-border);
   padding: 16px 28px 24px;
   display: flex;
