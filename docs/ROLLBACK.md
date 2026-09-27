@@ -13,7 +13,7 @@ Guia para o operador durante um incidente em produção. Leia "Regras" e "Mapa" 
 
 ## Regras
 
-1. **Pausar publicações não desfaz nada.** `DEPLOY_ENABLED=false` só impede *novos* deploys. O que já
+1. **Pausar publicações não desfaz nada.** `DEPLOY_ENABLED=false` só impede _novos_ deploys. O que já
    está no ar continua no ar.
 2. **Restaurar uma versão não desfaz o banco.** O rollback do Pages troca o deployment ativo. O D1
    continua no schema atual. Migrations aplicadas ficam aplicadas.
@@ -30,14 +30,14 @@ Guia para o operador durante um incidente em produção. Leia "Regras" e "Mapa" 
 
 Arquivo: `.github/workflows/ci.yml`.
 
-| Pergunta | Resposta |
-|---|---|
-| **Qual commit é publicado?** | Só o commit de um `push` na `main` (`GITHUB_SHA`), depois do check agregado `CI` verde (`needs: ci-status`). PRs, agendamento (cron 06h UTC) e disparo manual **não** publicam. |
-| **Como `DEPLOY_ENABLED` controla?** | O job `deploy` tem `if: ... && vars.DEPLOY_ENABLED == 'true'`. Como é avaliado antes do job existir, precisa ser **variável de repositório** (Settings > Secrets and variables > Actions > Variables), não de environment. Valor diferente de `true` (ou ausente) = job `deploy` pulado; o `CI` continua verde. Não interrompe um deploy já em andamento. |
-| **Verificação do HEAD** | O passo "Conferir credenciais e se o commit ainda é a main" compara `git ls-remote origin refs/heads/main` com `GITHUB_SHA`. Se a `main` já avançou, o commit é "superado" e nada é publicado. Repete a checagem logo antes do `wrangler pages deploy`. Um deploy por vez (`concurrency: deploy-production`, sem cancelar o que está rodando). |
-| **D1 Migration Guard** | Antes do build, `scripts/check-d1-migrations.mjs` faz só `SELECT` no D1 remoto com `CLOUDFLARE_D1_READ_TOKEN`. Bloqueia se houver migration pendente, lacuna, migration remota desconhecida para o commit, duplicata, ordem trocada ou schema da última migration ausente, ou se a Cloudflare/credencial falhar. **Nunca aplica migrations.** Migrations são aplicadas manualmente, *antes* do deploy. |
-| **Verificação pós-upload** | O passo "Verificar deployment" consulta a API de deployments e exige um deployment de **produção** com o SHA completo e `deploy:success`; depois faz fumaça em `/` e `/api/produtos`. |
-| **Publicação pela Git da Cloudflare** | Desativada. Só o GitHub Actions publica (`wrangler pages deploy dist --commit-hash $GITHUB_SHA`). |
+| Pergunta                              | Resposta                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Qual commit é publicado?**          | Só o commit de um `push` na `main` (`GITHUB_SHA`), depois do check agregado `CI` verde (`needs: ci-status`). PRs, agendamento (cron 06h UTC) e disparo manual **não** publicam.                                                                                                                                                                                                                        |
+| **Como `DEPLOY_ENABLED` controla?**   | O job `deploy` tem `if: ... && vars.DEPLOY_ENABLED == 'true'`. Como é avaliado antes do job existir, precisa ser **variável de repositório** (Settings > Secrets and variables > Actions > Variables), não de environment. Valor diferente de `true` (ou ausente) = job `deploy` pulado; o `CI` continua verde. Não interrompe um deploy já em andamento.                                              |
+| **Verificação do HEAD**               | O passo "Conferir credenciais e se o commit ainda é a main" compara `git ls-remote origin refs/heads/main` com `GITHUB_SHA`. Se a `main` já avançou, o commit é "superado" e nada é publicado. Repete a checagem logo antes do `wrangler pages deploy`. Um deploy por vez (`concurrency: deploy-production`, sem cancelar o que está rodando).                                                         |
+| **D1 Migration Guard**                | Antes do build, `scripts/check-d1-migrations.mjs` faz só `SELECT` no D1 remoto com `CLOUDFLARE_D1_READ_TOKEN`. Bloqueia se houver migration pendente, lacuna, migration remota desconhecida para o commit, duplicata, ordem trocada ou schema da última migration ausente, ou se a Cloudflare/credencial falhar. **Nunca aplica migrations.** Migrations são aplicadas manualmente, _antes_ do deploy. |
+| **Verificação pós-upload**            | O passo "Verificar deployment" consulta a API de deployments e exige um deployment de **produção** com o SHA completo e `deploy:success`; depois faz fumaça em `/` e `/api/produtos`.                                                                                                                                                                                                                  |
+| **Publicação pela Git da Cloudflare** | Desativada. Só o GitHub Actions publica (`wrangler pages deploy dist --commit-hash $GITHUB_SHA`).                                                                                                                                                                                                                                                                                                      |
 
 ### Limitações ao restaurar uma versão anterior
 
@@ -79,6 +79,7 @@ gh variable list --repo vimanoelkkj/rp-doces-admin   # confira: DEPLOY_ENABLED f
 ```
 
 Depois:
+
 - Veja se há deploy **em andamento ou na fila** (Actions > CI > job "Deploy produção"). Um deploy já
   iniciado termina; um pendente na fila do `concurrency` também pode rodar. Se for um deploy indesejado,
   cancele a execução em Actions (Cancel workflow). Cancelar durante o upload pode deixar deployment
@@ -139,13 +140,13 @@ Se (b) estiver **vazio**: o schema é o mesmo do alvo. Restaurar é seguro do po
 
 Se (b) listar arquivos, **leia cada um** e classifique:
 
-| Tipo de mudança na migration | Código antigo continua funcionando? |
-|---|---|
-| `CREATE TABLE` / `CREATE INDEX` novos; `ADD COLUMN` nulo ou com `DEFAULT` | Em geral sim. Só ignora o novo. |
-| `ADD COLUMN ... NOT NULL` sem `DEFAULT` | **Não**: `INSERT` do código antigo falha. |
+| Tipo de mudança na migration                                                 | Código antigo continua funcionando?                                  |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `CREATE TABLE` / `CREATE INDEX` novos; `ADD COLUMN` nulo ou com `DEFAULT`    | Em geral sim. Só ignora o novo.                                      |
+| `ADD COLUMN ... NOT NULL` sem `DEFAULT`                                      | **Não**: `INSERT` do código antigo falha.                            |
 | `CREATE TRIGGER` / `CHECK` / `UNIQUE` novos (estoque, Pix, reembolso, admin) | **Talvez não**: o código antigo pode violar a regra. Leia o gatilho. |
-| `DROP`, `RENAME`, mudança de tipo | **Não**. |
-| Migration que transformou dados (`UPDATE`/`INSERT ... SELECT`) | Avalie: o código antigo lê os dados no formato antigo? |
+| `DROP`, `RENAME`, mudança de tipo                                            | **Não**.                                                             |
+| Migration que transformou dados (`UPDATE`/`INSERT ... SELECT`)               | Avalie: o código antigo lê os dados no formato antigo?               |
 
 Só restaure se **todas** forem compatíveis. Caso contrário, não restaure: vá à seção C. Em dúvida, trate
 como incompatível.
@@ -170,6 +171,7 @@ curl -sS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
 ```
 
 Notas:
+
 - Não existe comando `wrangler` de rollback (o Wrangler só lista, cria, faz tail e apaga deployments).
 - Dá para voltar à versão mais nova pelo mesmo mecanismo (rollback "para frente").
 - **Não** "restaure" refazendo `wrangler pages deploy` de uma pasta local: publicaria código sem CI nem
@@ -187,6 +189,7 @@ Notas:
 ## 7. Reativar os deployments com segurança
 
 Só depois de:
+
 - a correção estar na `main` por **PR revisado** (de preferência `git revert` do commit problemático, ver abaixo);
 - o CI da correção verde;
 - a produção estável no alvo restaurado, ou você ter certeza de que o próximo deploy é a correção.
@@ -220,8 +223,8 @@ A `main` deve continuar a receber commits por PR; nunca reescreva o histórico.
 ### A. Deploy com problema visual ou funcional (banco intacto)
 
 1. Seção 1 (pausar). 2. Seção 2 (SHA atual) e 3 (alvo). 3. Seção 4: `git diff ALVO..origin/main -- migrations/`
-vazio ou só aditivo e compatível. 4. Seção 5 (rollback pelo painel). 5. Seção 6. 6. Correção por revert via PR e
-seção 7.
+   vazio ou só aditivo e compatível. 4. Seção 5 (rollback pelo painel). 5. Seção 6. 6. Correção por revert via PR e
+   seção 7.
 
 Se o problema é só de frontend e a correção é rápida, prefira um PR de correção (o pipeline é seguro) em vez
 de rollback, mantendo a pausa até o CI ficar verde.
@@ -283,13 +286,14 @@ são dados financeiros.
 
 Há dois tokens, com escopos diferentes. Secrets em GitHub > Settings > Environments > `production`.
 
-| Secret | Usado por | Permissão mínima |
-|---|---|---|
-| `CLOUDFLARE_API_TOKEN` | deploy do Pages e verificação do deployment | Account > Cloudflare Pages > Edit |
-| `CLOUDFLARE_D1_READ_TOKEN` | somente o Migration Guard | Account > D1 > Read |
-| `CLOUDFLARE_ACCOUNT_ID` | ambos | (não é segredo de acesso) |
+| Secret                     | Usado por                                   | Permissão mínima                  |
+| -------------------------- | ------------------------------------------- | --------------------------------- |
+| `CLOUDFLARE_API_TOKEN`     | deploy do Pages e verificação do deployment | Account > Cloudflare Pages > Edit |
+| `CLOUDFLARE_D1_READ_TOKEN` | somente o Migration Guard                   | Account > D1 > Read               |
+| `CLOUDFLARE_ACCOUNT_ID`    | ambos                                       | (não é segredo de acesso)         |
 
 **Identificar qual falhou:**
+
 - Guard: o job para em "Verificar migrations D1" com "Secret CLOUDFLARE_D1_READ_TOKEN ausente" ou
   "Cloudflare recusou as credenciais (HTTP 401/403)". Exit 2.
 - Deploy/verificação: "Secrets CLOUDFLARE_API_TOKEN e/ou CLOUDFLARE_ACCOUNT_ID não configurados", erro do Wrangler de
@@ -302,10 +306,14 @@ Há dois tokens, com escopos diferentes. Secrets em GitHub > Settings > Environm
   já definida no terminal ou de um prompt; não digite o valor na linha do comando.
 
 **Substituir:**
+
 1. Cloudflare > My Profile (ou Account) > API Tokens > criar token com a permissão mínima da tabela,
-   restrito à conta. 2. Copie o valor **uma vez**. 3. GitHub > Settings > Environments > production >
-   edite o secret com o mesmo nome (ou `gh secret set NOME --env production --repo vimanoelkkj/rp-doces-admin`
-   e cole o valor no prompt interativo). 4. **Revogue** o token antigo na Cloudflare.
+   restrito à conta.
+2. Copie o valor **uma vez**.
+3. GitHub > Settings > Environments > production > edite o secret com o mesmo nome (ou
+   `gh secret set NOME --env production --repo vimanoelkkj/rp-doces-admin` e cole o valor no prompt
+   interativo).
+4. **Revogue** o token antigo na Cloudflare.
 5. Reexecute o job `deploy` (Re-run) se o commit ainda for a `main`.
 
 Não amplie o `CLOUDFLARE_API_TOKEN` para ler D1, nem use o de leitura para publicar. Nunca imprima nem comite valores.
@@ -313,12 +321,14 @@ Não amplie o `CLOUDFLARE_API_TOKEN` para ler D1, nem use o de leitura para publ
 ### E. Publicação de um commit antigo
 
 O pipeline já protege contra sobrescrever versão mais nova (não dependa só disso):
+
 - Gate no início do job e nova checagem imediatamente antes do upload (`git ls-remote` da `main`).
 - Só `push` na `main` publica; re-executar execução antiga vira "superado".
 - Migration Guard: um commit antigo, com o banco mais novo, falha por "migrations desconhecidas".
 - Fila única por `concurrency`.
 
 Ao operar:
+
 - **Não** reexecute execuções antigas do workflow para "voltar" versão. Use o rollback do painel.
 - Pause (seção 1) antes de qualquer restauração, senão o próximo push publica por cima.
 - Se um deploy antigo já foi publicado por engano: identifique o SHA (seção 2) e restaure o deployment correto

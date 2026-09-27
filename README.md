@@ -9,11 +9,12 @@
 A **R&P Doces** é uma confeitaria artesanal com operação híbrida: e-commerce público voltado para clientes finais e painel de retaguarda (PDV/ERP) voltado para operação interna no balcão e gestão do negócio.
 
 ### Objetivos Centrais da Plataforma
+
 1. **Atendimento Público Sem Atrito:** Catálogo em tempo real com controle rigoroso de disponibilidade física, sacola persistida no cliente, checkout Pix dinâmico e acompanhamento transparente do pedido sem necessidade de cadastro burocrático inicial.
 2. **Operação de Balcão e Comandas em Tempo Real:** Criação imediata de pedidos balcão com geração de cobrança Pix na maquininha/tela, pagamentos múltiplos (dinheiro, cartão, Pix externo), cancelamento com devolução atômica de itens e controle auditável de anulações.
 3. **Integridade Financeira e Contábil:** Eliminação de reconciliações manuais por meio de um ledger contábil em partidas dobradas, preservação imutável de fatos financeiros, idempotência estrita em todas as operações de escrita (`operationKey`) e concorrência resolvida via constraints no banco relacional.
 4. **Reserva Física Confiável (Anti-Overselling):** Estoque livre calculado dinamicamente, reserva em duas fases (local + prazo do gateway) e conversão em baixa física somente no momento da confirmação financeira.
-5. **Aparência e Identidade Visual Únicas:** Design editorial acolhedor para a confeitaria, com animações suaves de onda, máscaras de gradiente na rolagem, tema escuro nativo (*warm dark chocolate*) e componentes unificados entre a loja e o painel de administração.
+5. **Aparência e Identidade Visual Únicas:** Design editorial acolhedor para a confeitaria, com animações suaves de onda, máscaras de gradiente na rolagem, tema escuro nativo (_warm dark chocolate_) e componentes unificados entre a loja e o painel de administração.
 
 ---
 
@@ -42,6 +43,7 @@ A **R&P Doces** é uma confeitaria artesanal com operação híbrida: e-commerce
 A stack da plataforma foi estritamente verificada contra as dependências do código real:
 
 ### Frontend
+
 - **React 18:** Biblioteca base para a Single Page Application (`react@18.3.1`, `react-dom@18.3.1`).
 - **TypeScript 5:** Tipagem estática em toda a camada cliente (`typescript@5.5.3`).
 - **Vite 5:** Bundler de alta performance e servidor de desenvolvimento local (`vite@5.4.0`, `@vitejs/plugin-react@4.3.1`).
@@ -51,6 +53,7 @@ A stack da plataforma foi estritamente verificada contra as dependências do có
 - **PWA (Progressive Web App):** Service Worker dedicado para o painel admin (`public/sw-admin.js`, `public/admin-manifest.webmanifest`, `public/admin-offline.html`).
 
 ### Backend (Serverless Edge)
+
 - **Cloudflare Pages Functions:** Endpoints HTTP serverless executados no edge global da Cloudflare (`functions/api/**`).
 - **TypeScript nativo no backend:** Tipagem de contextos e bindings via `@cloudflare/workers-types@4.20260702.1`.
 - **Cloudflare D1 (SQLite Engine):** Banco de dados relacional distribuído, com suporte a transações atômicas com `db.batch()` e constraints nativas de integridade.
@@ -58,12 +61,15 @@ A stack da plataforma foi estritamente verificada contra as dependências do có
 - **Wrangler 3:** CLI oficial da Cloudflare para execução de migrações, bindings locais e simulação de ambiente (`wrangler@3.78.0`).
 
 ### Gateway de Pagamento
+
 - **Mercado Pago Payments API:** Utiliza exclusivamente o endpoint de pagamentos diretos (`/v1/payments`) com Pix dinâmico, verificação criptográfica de Webhooks via HMAC-SHA256 e polling síncrono. Deliberadamente **não** utiliza a Orders API legada.
 
 ### Notificações
+
 - **Web Push Protocol:** Notificações push push-to-device usando chaves VAPID geradas e criptografia AES-GCM via `@mmmike/web-push@1.3.0`.
 
 ### Infraestrutura de Testes
+
 - **Node.js Native Test Runner:** Execução direta com `node --test` através de scripts orquestradores em JavaScript ES Modules (`scripts/run-tests.mjs`).
 - **JSDOM:** Simulação de árvore DOM para componentes React com listeners e portais (`jsdom@30.1.0`).
 - **Miniflare & esbuild:** Subida de D1 e bindings locais descartáveis em memória durante testes de concorrência e idempotência.
@@ -225,18 +231,22 @@ O storefront da R&P Doces foi projetado para oferecer uma experiência de compra
 Anteriormente, o sistema contava com headers divergentes entre a loja e o painel de administração. O repositório foi padronizado em torno de uma **fonte única de verdade**:
 
 ### Componente `Header.tsx`
+
 - **Componente Único:** Atende **100% das páginas** do projeto que possuem cabeçalho.
 - **Detecção Contextual:** A prop `variant="storefront" | "admin"` define o conjunto de navegação. Caso omitida, o Header inspeciona automaticamente `location.pathname` (rotas que começam com `/admin` ativam a variante administrativa).
 - **Navegação do Storefront:** Links de navegação para âncoras da página inicial (`#cardapio`, `#sobre`, `#onde-estamos`, `#contato`) com rolagem suave inter-rotas (se clicado a partir de outra página, navega para a Home antes de rolar suavemente). Exibe também a contagem da sacola e o seletor de tema.
-- **Navegação do Admin:** Links operacionais (*Dashboard*, *Produtos*, *Pedidos*, *Despesas*, *Loja*, *Administradores*, *Notificações* com badge de não lidas sincronizado), avatar do operador logado e ação de logout imediata.
+- **Navegação do Admin:** Links operacionais (_Dashboard_, _Produtos_, _Pedidos_, _Despesas_, _Loja_, _Administradores_, _Notificações_ com badge de não lidas sincronizado), avatar do operador logado e ação de logout imediata.
 
 ### Casca Unificada `StorefrontFrame.tsx`
+
 - **Onda Orgânica com Framer Motion:** Desenhos vetoriais dinâmicos (`wave-primary` e `wave-secondary`) posicionados fixamente no topo a `z-index: 4`. Respeita a preferência do usuário por redução de movimento (`prefers-reduced-motion`).
 - **Degradê de Máscara (`mask-image`):** O container de rolagem (`.storefront-frame__scroll`) utiliza `-webkit-mask-image` e `mask-image` com gradiente linear suave para fazer o conteúdo surgir e desaparecer gradualmente logo abaixo da onda.
 - **Compartilhamento Integral:** Tanto a vitrine pública quanto o painel administrativo (`AdminLayout.tsx`) utilizam o `<StorefrontFrame>` com o mesmo efeito de onda e fade, garantindo elegância e coesão visual em toda a plataforma.
 
 ### Exceções Sem Header (Telas Cheias)
+
 As seguintes páginas são telas de transição pura ou isolamento operacional e não recebem o cabeçalho:
+
 - Telas de loading do checkout: `PreparandoPedido`, `GerandoPagamento`, `ProcessandoPagamento`.
 - Tela de acesso: `AdminLogin` (possui sua própria onda de fundo via `AdminWave.tsx`).
 
@@ -246,10 +256,10 @@ As seguintes páginas são telas de transição pura ou isolamento operacional e
 
 A plataforma adota design responsivo rigoroso sem quebra de leiautes em dispositivos compactos:
 
-- **Drawer Mobile com Handle em Onda:** O menu lateral mobile do Header utiliza **CSS puro com transições e `pointer-events`**, eliminando travamentos de animações complexas. A barra reta genérica foi substituída pelo SVG ondulado rosa da confeitaria dentro do botão `.mobile-menu-close`, atuando como a própria alça acessível de arraste (*drag-to-close*).
+- **Drawer Mobile com Handle em Onda:** O menu lateral mobile do Header utiliza **CSS puro com transições e `pointer-events`**, eliminando travamentos de animações complexas. A barra reta genérica foi substituída pelo SVG ondulado rosa da confeitaria dentro do botão `.mobile-menu-close`, atuando como a própria alça acessível de arraste (_drag-to-close_).
 - **Clearance Inferior Estrutural do Admin Mobile (`--admin-mobile-nav-space`):** O layout administrativo reserva `88px` de padding inferior no container principal (`.admin-main`) para acomodar com folga a barra de navegação móvel fixa (`AdminMobileNav`). Regras genéricas de estilo entre telas foram isoladas para garantir que o último card ou formulário (ex.: `/admin/produtos`, `/admin/pedidos`) possa ser completamente rolado acima da barra.
 - **Navegação em Telas Médias:** O ponto de quebra para recolhimento da barra administrativa é estabelecido em `960px`, impedindo o estouro dos múltiplos botões do painel em tablets ou janelas compactas.
-- **Visualização de Comandas:** Em telas abaixo de `600px`, as tabelas de pedidos do Dashboard e da página de Pedidos deixam de exigir rolagem horizontal; cada linha se reconfigura automaticamente em um cartão vertical empilhado (*card grid*), com ações acessíveis ao toque.
+- **Visualização de Comandas:** Em telas abaixo de `600px`, as tabelas de pedidos do Dashboard e da página de Pedidos deixam de exigir rolagem horizontal; cada linha se reconfigura automaticamente em um cartão vertical empilhado (_card grid_), com ações acessíveis ao toque.
 - **Safe Area Insets:** Margens inferiores consideram `env(safe-area-inset-bottom)` em aparelhos modernos (iOS/Android).
 
 ---
@@ -289,7 +299,7 @@ A aplicação oferece alternância instantânea entre modo claro e escuro:
   - `AGENDADA_FUTURA`: Início programado em instante ISO UTC futuro.
   - `VIGENTE`: Ativa e dentro do período (ou sem agendamento obrigatório).
   - `EXPIRADA`: Período encerrado.
-  *A expiração é decorrente do próprio dado no instante da leitura — dispensando rotinas de cron para ligar ou desligar promoções.*
+    _A expiração é decorrente do próprio dado no instante da leitura — dispensando rotinas de cron para ligar ou desligar promoções._
 - **Reconciliação da Sacola:** Quando um item tem seu estoque reduzido ou esgotado por compras de terceiros, a função `reconcileCartWithCatalog` diminui a quantidade no carrinho para o limite disponível ou remove o item zerado, exibindo um alerta amigável ao cliente.
 
 ---
@@ -343,12 +353,14 @@ O checkout é a porta de entrada para a compra pública:
 
 ## 15. Motor de Estoque e Reserva Atômica
 
-O controle de estoque da R&P Doces impede o problema de *overselling* (vender itens além da capacidade física real) através de garantias relacionais:
+O controle de estoque da R&P Doces impede o problema de _overselling_ (vender itens além da capacidade física real) através de garantias relacionais:
 
 ### Fórmula de Disponibilidade
+
 $$\text{Estoque Disponível (Livre)} = \max(0, \text{estoque} - \text{estoque\_reservado})$$
 
 ### Ciclo de Vida da Reserva
+
 1. **Reserva na Criação (Ativa):**
    - No checkout público ou no pedido balcão, a reserva nasce com `reserva_status = 'ATIVA'`.
    - O banco impõe a constraint SQLite: `CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque)`. Se duas compras simultâneas disputarem a última unidade de um bolo, uma das transações é abortada pelo banco relacional, garantindo integridade absoluta sem travamentos manuais lentos.
@@ -387,12 +399,15 @@ A plataforma utiliza um modelo contábil de partidas financeiras para eliminar q
 ```
 
 ### Principais Entidades
+
 - **`pedido_pagamentos`:** Registra cada tentativa individual de pagamento (Pix Mercado Pago, Dinheiro, Cartão, Pix Externo).
 - **`pedido_pagamento_alocacoes`:** Distribui o valor recebido especificamente entre os itens do pedido via algoritmo waterfall (cascata).
 - **`pedido_reembolsos`:** Registra fatos independentes de estorno, apontando para o pagamento de origem.
 
 ### Status Financeiro Agregado (Projeção Pura)
+
 O status financeiro do pedido **nunca** é gravado manualmente como uma verdade isolada; ele é derivado via query SQL com base no valor líquido confirmado:
+
 - $\text{Líquido Confirmado} \le 0 \implies \mathbf{PENDENTE}$
 - $0 < \text{Líquido Confirmado} < \text{Total do Pedido} \implies \mathbf{PARCIAL}$
 - $\text{Líquido Confirmado} \ge \text{Total do Pedido} \implies \mathbf{PAGO}$
@@ -444,7 +459,9 @@ O sistema distingue claramente quatro ações que outrora eram confundidas:
 ```
 
 ### Anulação Auditável (`POST /api/admin/pedidos/:id/anulacao`)
+
 Criada para situações de erro operacional grave (ex.: pedido lançado em duplicidade ou cancelado antes de qualquer entrega):
+
 - **Garantia de Imutabilidade:** Insere registro em `pedido_anulacoes` e ativa gatilhos relacionais no banco que bloqueiam permanentemente qualquer mutação futura naquele pedido ou em seus itens.
 - **Tratamento de Estoque Controlado:** O operador escolhe expressamente se deseja devolver os itens ao estoque livre (`devolverEstoque: true`) ou descartá-los por perda física.
 - **Proteção do Mercado Pago:** A anulação é terminantemente recusada caso existam cobranças Pix pendentes ou pagamentos `PAGO` sem cobertura integral de estorno verificado.
@@ -456,6 +473,7 @@ Criada para situações de erro operacional grave (ex.: pedido lançado em dupli
 Seguindo o padrão de arquitetura modular, a camada de lógica foi segregada em 4 subsistemas centrais no backend e 1 no frontend:
 
 ### 21.1. `ledger/` (Motor Contábil)
+
 - **Fachada:** `functions/lib/comandaLedger.ts`
 - **Módulos:**
   - `types.ts`: Tipagens contábeis, enums e contratos de transição.
@@ -466,6 +484,7 @@ Seguindo o padrão de arquitetura modular, a camada de lógica foi segregada em 
   - `legacy.ts`: Compatibilidade com comandas anteriores ao ledger.
 
 ### 21.2. `pix/` (Gateway Pix Administrativo)
+
 - **Fachada:** `functions/lib/comandaPix.ts`
 - **Módulos:**
   - `types.ts`: Contratos de requisição Pix no balcão.
@@ -475,6 +494,7 @@ Seguindo o padrão de arquitetura modular, a camada de lógica foi segregada em 
   - `replay.ts`: Replay idempotente de cobranças já emitidas.
 
 ### 21.3. `paymentSync/` (Sincronização e Reconciliação)
+
 - **Fachada:** `functions/lib/paymentSync.ts`
 - **Módulos:**
   - `types.ts`: Mapeamentos de payloads do provedor.
@@ -486,6 +506,7 @@ Seguindo o padrão de arquitetura modular, a camada de lógica foi segregada em 
   - `inconclusiveRecovery.ts`: Protocolo B3 para resgate de transações incertas.
 
 ### 21.4. `adminPedidos/` (Orquestração do Balcão)
+
 - **Consumidores:** `functions/api/admin/pedidos.ts`
 - **Módulos:**
   - `list.ts`: Listagem paginada enriquecida com projeções contábeis em lote.
@@ -494,6 +515,7 @@ Seguindo o padrão de arquitetura modular, a camada de lógica foi segregada em 
   - `manualReplay.ts`: Replay de comandas manuais enviadas repetidamente.
 
 ### 21.5. Frontend Admin: `PedidoDetalhe/`
+
 - **Orquestrador:** `src/admin/Pedidos/PedidoDetalheModal.tsx`
 - **Componentes Especializados:**
   - `PedidoHeader.tsx`: Cabeçalho com status operacional e ações rápidas.
@@ -518,7 +540,7 @@ A estabilidade da plataforma decorre de protocolos rigorosos de engenharia:
 - **B5 (GETs Idempotentes e Livres de Efeitos Colaterais):** Segregação estrita de responsabilidade HTTP. As rotas `GET /api/admin/pedidos` e `GET /api/admin/pedidos/:id` operam como puramente de leitura. Efeitos colaterais de manutenção financeira e sincronização em background foram movidos para endpoints POST explícitos e idempotentes com proteção `sameOrigin`:
   - `POST /api/admin/pedidos/reconciliar`: Executa em lote a rotina `reconcilePedidosEmBackground` para a lista de comandas.
   - `POST /api/admin/pedidos/:id/reconciliar`: Executa a reconciliação sob demanda da comanda ativa (`reconcileLiveTabPedido`).
-  - No frontend, o hook `usePedidoDetalhe.ts` dispara o POST de reconciliação em modo *best-effort* antes do GET no carregamento inicial, nas chamadas explícitas e no polling silencioso, preservando a recuperação contínua sem violar a semântica HTTP.
+  - No frontend, o hook `usePedidoDetalhe.ts` dispara o POST de reconciliação em modo _best-effort_ antes do GET no carregamento inicial, nas chamadas explícitas e no polling silencioso, preservando a recuperação contínua sem violar a semântica HTTP.
 
 ---
 
@@ -539,7 +561,7 @@ Toda escrita crítica no sistema requer uma chave de operação:
 - **Endpoint de Recepção:** `POST /api/webhooks/mercadopago`.
 - **Validação Criptográfica HMAC-SHA256:**
   - O header `x-signature` é inspecionado extraindo o timestamp `ts` e a assinatura criptográfica `v1`.
-  - O hash calculado sobre a query string e o corpo é comparado em tempo constante (*timing-safe equal*) contra o segredo `MP_WEBHOOK_SECRET`.
+  - O hash calculado sobre a query string e o corpo é comparado em tempo constante (_timing-safe equal_) contra o segredo `MP_WEBHOOK_SECRET`.
   - Requisições sem assinatura válida são sumariamente rejeitadas com código HTTP `401 Unauthorized`.
 - **Nunca Confia no Payload:** O webhook do Mercado Pago serve apenas como um sinalizador de evento. O backend nunca extrai o status diretamente do corpo do webhook; ele realiza uma chamada segura para `fetchMpPayment` para obter o dado oficial e imutável antes de atualizar o ledger.
 
@@ -621,10 +643,12 @@ O banco de dados D1 evolui estritamente através das migrações sequenciais em 
 ## 28. Desenvolvimento Local e Variáveis de Ambiente
 
 ### Pré-requisitos
+
 - Node.js versão 18 ou 20 LTS.
 - npm versão 9 ou superior.
 
 ### Variáveis de Ambiente Locais (`.dev.vars`)
+
 Para executar localmente com suporte ao gateway e notificações, crie o arquivo `.dev.vars` na raiz (o arquivo é ignorado no Git por conter segredos):
 
 ```bash
@@ -639,6 +663,7 @@ VAPID_SUBJECT="mailto:contato@rpdoces.com.br"
 ```
 
 ### Inicialização do Ambiente
+
 ```bash
 # 1. Instalar dependências
 npm install
@@ -659,23 +684,24 @@ npm run pages:dev
 
 ## 29. Scripts npm e Ciclo de Vida
 
-| Comando | Descrição |
-| :--- | :--- |
-| `npm run dev` | Inicia o servidor Vite para desenvolvimento rápido da interface SPA. |
-| `npm run build` | Valida tipos do frontend (`tsc --noEmit`) e gera a pasta de produção `dist/`. |
-| `npm run typecheck` | Executa a checagem de tipos do TypeScript sem gerar arquivos. |
-| `npm test` | Executa a suíte completa de 50 testes automatizados com `node --test`. |
-| `npm run test:cached` | Executa testes ignorando suítes cujos arquivos fonte não foram alterados. |
-| `npm run preview` | Previsualiza a pasta `dist/` estaticamente. |
-| `npm run pages:dev` | Roda o emulador do Cloudflare Pages com banco D1 local e Functions. |
-| `npm run db:migrate:local` | Aplica todas as migrações pendentes no banco D1 local. |
-| `npm run db:seed:local` | Popula o banco local com o catálogo inicial de doces e bolos. |
+| Comando                    | Descrição                                                                     |
+| :------------------------- | :---------------------------------------------------------------------------- |
+| `npm run dev`              | Inicia o servidor Vite para desenvolvimento rápido da interface SPA.          |
+| `npm run build`            | Valida tipos do frontend (`tsc --noEmit`) e gera a pasta de produção `dist/`. |
+| `npm run typecheck`        | Executa a checagem de tipos do TypeScript sem gerar arquivos.                 |
+| `npm test`                 | Executa a suíte completa de 50 testes automatizados com `node --test`.        |
+| `npm run test:cached`      | Executa testes ignorando suítes cujos arquivos fonte não foram alterados.     |
+| `npm run preview`          | Previsualiza a pasta `dist/` estaticamente.                                   |
+| `npm run pages:dev`        | Roda o emulador do Cloudflare Pages com banco D1 local e Functions.           |
+| `npm run db:migrate:local` | Aplica todas as migrações pendentes no banco D1 local.                        |
+| `npm run db:seed:local`    | Popula o banco local com o catálogo inicial de doces e bolos.                 |
 
 ---
 
 ## 30. Compilação, Build e TypeScript
 
 O comando `npm run build` executa:
+
 ```bash
 tsc --noEmit && vite build
 ```
@@ -748,24 +774,24 @@ A plataforma possui uma robusta rede de segurança com **50 suítes de testes au
 
 ## 36. Estado Atual do Sistema (Checklist de Componentes)
 
-| Módulo / Funcionalidade | Situação | Observações |
-| :--- | :---: | :--- |
-| **Storefront Institucional** | ✅ | Home, Cardápio, Sobre, Contato e Rodapé funcionando perfeitamente. |
-| **Carrinho & Sacola** | ✅ | Persistência em `localStorage` com auto-reconciliação de estoque. |
-| **Checkout Pix** | ✅ | Emissão com idempotência A1, QR Code dinâmico e cópia-e-cola. |
-| **Acompanhamento de Pedido** | ✅ | Acesso público por token com atualização de status em tempo real. |
-| **Header Unificado** | ✅ | Fonte única de verdade para loja e admin, com drawer mobile CSS e handle ondulado. |
-| **Wave e Fade Animados** | ✅ | Efeito visual presente na loja e no painel admin via `StorefrontFrame`. |
-| **Tema Dark Chocolate** | ✅ | Sincronização simultânea de `data-theme` e `data-admin-theme`. |
-| **View Transitions (Mobile/Desktop)** | ✅ | Revelação radial no desktop e crossfade GPU 260ms fluido em 90/120Hz no mobile. |
-| **Dashboard Administrativo** | ✅ | Indicadores financeiros do dia, comandas em aberto e ranking de vendas. |
-| **Catálogo Administrativo** | ✅ | CRUD de produtos, categorias com emojis, upload R2 e clearance inferior mobile. |
-| **Gestão de Comandas (Admin)** | ✅ | Criação manual, pagamentos múltiplos, geração de Pix, anulação e histórico. |
-| **Reconciliação Segregada (POST)** | ✅ | Rotas POST dedicadas para sincronização; GETs 100% puros e sem efeitos colaterais. |
-| **Segurança & Anti-Enumeração** | ✅ | Verificação de senha timing-safe via dummy PBKDF2 e proteção na troca de senha. |
-| **Livro de Despesas** | ✅ | Lançamento e controle de custos operacionais com cálculo de lucro líquido. |
-| **Anulação Auditável** | ✅ | Cancelamento definitivo de comandas com proteção relacional imutável. |
-| **Web Push Notifications** | ✅ | Notificações no navegador para alertas operacionais e novos pedidos pagos. |
-| **Ledger Contábil** | ✅ | Partidas financeiras, waterfall de alocações e projeção líquida em SQL. |
-| **Reserva Atômica de Estoque** | ✅ | Constraints `CHECK` no SQLite impedindo qualquer venda excedente. |
-| **Suíte de Testes (50 Suítes)** | ✅ | 100% dos testes aprovados cobrindo concorrência, domínio e UI. |
+| Módulo / Funcionalidade               | Situação | Observações                                                                        |
+| :------------------------------------ | :------: | :--------------------------------------------------------------------------------- |
+| **Storefront Institucional**          |    ✅    | Home, Cardápio, Sobre, Contato e Rodapé funcionando perfeitamente.                 |
+| **Carrinho & Sacola**                 |    ✅    | Persistência em `localStorage` com auto-reconciliação de estoque.                  |
+| **Checkout Pix**                      |    ✅    | Emissão com idempotência A1, QR Code dinâmico e cópia-e-cola.                      |
+| **Acompanhamento de Pedido**          |    ✅    | Acesso público por token com atualização de status em tempo real.                  |
+| **Header Unificado**                  |    ✅    | Fonte única de verdade para loja e admin, com drawer mobile CSS e handle ondulado. |
+| **Wave e Fade Animados**              |    ✅    | Efeito visual presente na loja e no painel admin via `StorefrontFrame`.            |
+| **Tema Dark Chocolate**               |    ✅    | Sincronização simultânea de `data-theme` e `data-admin-theme`.                     |
+| **View Transitions (Mobile/Desktop)** |    ✅    | Revelação radial no desktop e crossfade GPU 260ms fluido em 90/120Hz no mobile.    |
+| **Dashboard Administrativo**          |    ✅    | Indicadores financeiros do dia, comandas em aberto e ranking de vendas.            |
+| **Catálogo Administrativo**           |    ✅    | CRUD de produtos, categorias com emojis, upload R2 e clearance inferior mobile.    |
+| **Gestão de Comandas (Admin)**        |    ✅    | Criação manual, pagamentos múltiplos, geração de Pix, anulação e histórico.        |
+| **Reconciliação Segregada (POST)**    |    ✅    | Rotas POST dedicadas para sincronização; GETs 100% puros e sem efeitos colaterais. |
+| **Segurança & Anti-Enumeração**       |    ✅    | Verificação de senha timing-safe via dummy PBKDF2 e proteção na troca de senha.    |
+| **Livro de Despesas**                 |    ✅    | Lançamento e controle de custos operacionais com cálculo de lucro líquido.         |
+| **Anulação Auditável**                |    ✅    | Cancelamento definitivo de comandas com proteção relacional imutável.              |
+| **Web Push Notifications**            |    ✅    | Notificações no navegador para alertas operacionais e novos pedidos pagos.         |
+| **Ledger Contábil**                   |    ✅    | Partidas financeiras, waterfall de alocações e projeção líquida em SQL.            |
+| **Reserva Atômica de Estoque**        |    ✅    | Constraints `CHECK` no SQLite impedindo qualquer venda excedente.                  |
+| **Suíte de Testes (50 Suítes)**       |    ✅    | 100% dos testes aprovados cobrindo concorrência, domínio e UI.                     |
