@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {app, fixture, state, barrier, isProjection, refund} from './helpers/b3.mjs';
+import {app, fixture, state, barrier, isProjection, refund, approvedMp} from './helpers/b3.mjs';
 
 const env = db => ({DB:db, MP_ACCESS_TOKEN:'fake'});
 const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db,1);
@@ -20,7 +20,8 @@ function remote(t, statuses={}) {
     }
     if(options?.method==='POST') return Response.json({id:++id,status:'pending',date_of_expiration:'2099-01-01'});
     const paymentId=Number(String(url).split('/').at(-1));
-    return Response.json({id:paymentId,status:statuses[paymentId]??'pending'});
+    const status=statuses[paymentId]??'pending';
+    return Response.json(status==='approved' ? approvedMp({id:paymentId}) : {id:paymentId,status});
   });
 }
 const sync = async (db,id,mpId) => app.sync.syncPaymentFromMp(db,id,await app.sync.fetchMpPayment('fake',String(mpId)));
@@ -308,10 +309,16 @@ for(const path of ['ADMIN','SITE']) for(const status of ['approved','cancelled',
   test(`late ${path} POST refusal cannot overwrite verified ${status}`,async t=>{
     const db=await fixture(t,{ledger:false,reserve:'LIBERADA'}); t.mock.method(console,'error',()=>{});
     if(path==='SITE') await db.prepare('DELETE FROM pedidos WHERE id=1').run();
-    let confirmed;
+    let confirmed, requestBody;
     t.mock.method(globalThis,'fetch',async (url,options)=>{
       assert.match(String(url),/^https:\/\/api\.mercadopago\.com\/v1\/payments/);
-      if(options?.method!=='POST') return Response.json({id:101,status});
+      if(options?.method!=='POST') return Response.json(status==='approved'
+        ? approvedMp({
+          id:101, transaction_amount:requestBody.transaction_amount,
+          external_reference:requestBody.external_reference,
+        })
+        : {id:101,status});
+      requestBody=JSON.parse(options.body);
       const payment=await db.prepare('SELECT id FROM pedido_pagamentos ORDER BY id DESC LIMIT 1').first();
       await db.prepare("UPDATE pedido_pagamentos SET mp_payment_id='101' WHERE id=?").bind(payment.id).run();
       await sync(db,payment.id,101); // webhook/GET path wins before POST completes

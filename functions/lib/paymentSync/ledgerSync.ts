@@ -9,18 +9,19 @@ import { liberarReservaPedido } from "../stock";
 import { notificarNovoPedidoPagoSafe, type PushEnv } from "../pushNotifier";
 
 // Matriz de transição de pedido_pagamentos.status (Passo 6, aprovada):
-// PENDENTE -> PAGO/CANCELADO/EXPIRADO: permitido.
+// PENDENTE -> PAGO/CANCELADO/EXPIRADO/REEMBOLSADO: permitido.
 // Qualquer estado -> ele mesmo: no-op idempotente, permitido.
 // EXPIRADO -> PAGO: apenas com resposta verificada de GET MP.
 // PAGO/CANCELADO/FALHOU/REEMBOLSADO -> outra coisa: recusado.
-// REEMBOLSADO nunca é alcançado por este caminho (reembolso é evento e
-// tabela separados — Passo 5); a exclusão aqui é só a última linha de defesa.
+// PAGO -> REEMBOLSADO continua proibido: reembolso de pagamento contabilizado
+// permanece evento separado. O terminal colapsado só representa a tentativa
+// capturada e devolvida antes de entrar no financeiro local.
 function isTransitionAllowed(statusAtual: string, novoStatus: MpMappedStatus, mp?: MpPaymentResponse): boolean {
   if (statusAtual === novoStatus) return true;
   if (statusAtual === "PENDENTE") return true;
   if (
     statusAtual === "EXPIRADO" &&
-    (novoStatus === "PAGO" || novoStatus === "CANCELADO") &&
+    (novoStatus === "PAGO" || novoStatus === "CANCELADO" || novoStatus === "REEMBOLSADO") &&
     mp !== undefined &&
     isVerifiedMpResponse(mp)
   ) {
@@ -35,7 +36,10 @@ async function finalizePayment(db: D1Database, pagamentoId: number, pedidoId: nu
   await reconcilePedidoAfterFinancialChange(db, pedidoId);
   const atual = await db.prepare(`SELECT metodo, status FROM pedido_pagamentos WHERE id = ?`)
     .bind(pagamentoId).first<{ metodo: string; status: LedgerStatus }>();
-  if (atual?.metodo === "PIX_MP" && (atual.status === "CANCELADO" || atual.status === "EXPIRADO")) {
+  if (
+    atual?.metodo === "PIX_MP" &&
+    (atual.status === "CANCELADO" || atual.status === "EXPIRADO" || atual.status === "REEMBOLSADO")
+  ) {
     const liberacao = await liberarReservaPedido(db, pedidoId);
     if (!liberacao.ok) throw new Error(liberacao.erro); // log no helper; permite retry do chamador
   }
@@ -45,6 +49,43 @@ interface PagamentoRow {
   id: number;
   pedido_id: number;
   status: LedgerStatus;
+  mp_status: string | null;
+  mp_status_detail: string | null;
+  origem: string;
+  valor_centavos: number;
+  idempotency_key: string | null;
+  token_publico: string;
+}
+
+function decimalParaCentavos(valor: number | string | null | undefined): number | null {
+  if (typeof valor === "number" && !Number.isFinite(valor)) return null;
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(String(valor ?? "").trim());
+  if (!match) return null;
+  const centavos = BigInt(match[1]) * 100n + BigInt((match[2] ?? "").padEnd(2, "0") || "0");
+  return centavos <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(centavos) : null;
+}
+
+function diagnosticoIntegridadeMp(atual: PagamentoRow, mp: MpPaymentResponse): string | null {
+  const valor = decimalParaCentavos(mp.transaction_amount);
+  if (valor === null) return "INTEGRIDADE_MP:VALOR_INVALIDO";
+  if (valor !== atual.valor_centavos) return "INTEGRIDADE_MP:VALOR_DIVERGENTE";
+  if (mp.payment_method_id !== "pix") return "INTEGRIDADE_MP:METODO_DIVERGENTE";
+  const referenciaEsperada = atual.origem === "SITE" ? atual.token_publico : atual.idempotency_key;
+  if (!referenciaEsperada || mp.external_reference !== referenciaEsperada) {
+    return "INTEGRIDADE_MP:REFERENCIA_DIVERGENTE";
+  }
+  if (mp.currency_id !== "BRL") return "INTEGRIDADE_MP:MOEDA_DIVERGENTE";
+  return null;
+}
+
+function identidadeTerminalMpCompativel(atual: PagamentoRow, mp: MpPaymentResponse): boolean {
+  const referenciaEsperada = atual.origem === "SITE" ? atual.token_publico : atual.idempotency_key;
+  return Boolean(
+    referenciaEsperada &&
+    mp.external_reference === referenciaEsperada &&
+    mp.payment_method_id === "pix" &&
+    mp.currency_id === "BRL"
+  );
 }
 
 // Núcleo compartilhado: aplica (ou recusa) uma transição já mapeada, com
@@ -73,19 +114,78 @@ async function applyLedgerTransition(
     throw new Error("TRANSICAO_LOCAL_INVALIDA");
   }
   const atual = await db
-    .prepare(`SELECT id, pedido_id, status FROM pedido_pagamentos WHERE id = ?`)
+    .prepare(`SELECT pp.id, pp.pedido_id, pp.status, pp.mp_status, pp.mp_status_detail,
+                     pp.origem, pp.valor_centavos,
+                     pp.idempotency_key, p.token_publico
+              FROM pedido_pagamentos pp
+              JOIN pedidos p ON p.id = pp.pedido_id
+              WHERE pp.id = ?`)
     .bind(pagamentoId)
     .first<PagamentoRow>();
   if (!atual) return { ok: false, status: null, transicionou: false };
 
-  if (mp) {
+  // Uma aprovacao remota ja observada, mas ainda nao validada, e um fato
+  // financeiro inconclusivo. Expiracao local e respostas posteriores nao
+  // aprovadas nao provam que o efeito remoto deixou de existir.
+  const mpStatusAtual = String(atual.mp_status || "").toLowerCase();
+  const mpStatusRecebido = String(mp?.status || "").toLowerCase();
+  const integridadeRemotaPendente =
+    !["PAGO", "REEMBOLSADO"].includes(atual.status) &&
+    ["approved", "refunded"].includes(mpStatusAtual);
+  const resolucaoSemCaptura =
+    mpStatusAtual === "approved" &&
+    ["cancelled", "rejected"].includes(mpStatusRecebido) &&
+    identidadeTerminalMpCompativel(atual, mp!);
+  const resolucaoReembolsada =
+    mpStatusRecebido === "refunded" &&
+    !["PAGO", "REEMBOLSADO"].includes(atual.status) &&
+    identidadeTerminalMpCompativel(atual, mp!);
+
+  if (!mp && novoStatus === "EXPIRADO" && integridadeRemotaPendente) {
+    return { ok: true, status: atual.status, transicionou: false };
+  }
+  if (
+    mp && mpStatusRecebido === "refunded" &&
+    !["PAGO", "REEMBOLSADO"].includes(atual.status) &&
+    !resolucaoReembolsada
+  ) {
+    await db.prepare(
+      `UPDATE pedido_pagamentos
+       SET mp_status = 'refunded',
+           mp_status_detail = 'INTEGRIDADE_MP:REFUNDED_REQUER_CONCILIACAO',
+           atualizado_em = CURRENT_TIMESTAMP
+       WHERE id = ? AND status = ?`,
+    ).bind(pagamentoId, atual.status).run();
+    return { ok: true, status: atual.status, transicionou: false };
+  }
+  if (mp && mpStatusAtual === "refunded" && atual.status !== "REEMBOLSADO" && !resolucaoReembolsada) {
+    return { ok: true, status: atual.status, transicionou: false };
+  }
+  if (mp && mpStatusAtual === "refunded" && atual.status === "REEMBOLSADO") {
+    await finalizePayment(db, pagamentoId, atual.pedido_id);
+    return { ok: true, status: atual.status, transicionou: false };
+  }
+  if (
+    mp && mpStatusRecebido !== "approved" && mpStatusAtual === "approved" &&
+    !resolucaoSemCaptura && !resolucaoReembolsada
+  ) {
+    return { ok: true, status: atual.status, transicionou: false };
+  }
+
+  const diagnostico = mp && novoStatus === "PAGO" && atual.status !== "PAGO"
+    ? diagnosticoIntegridadeMp(atual, mp)
+    : null;
+
+  if (mp && !resolucaoSemCaptura && !resolucaoReembolsada) {
     await db
       .prepare(
         `UPDATE pedido_pagamentos SET mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
       )
-      .bind(mp.status, mp.status_detail ?? null, pagamentoId)
+      .bind(mp.status, diagnostico ?? mp.status_detail ?? null, pagamentoId)
       .run();
   }
+
+  if (diagnostico) return { ok: true, status: atual.status, transicionou: false };
 
   if (!novoStatus || !isTransitionAllowed(atual.status, novoStatus, mp) || atual.status === novoStatus) {
     await finalizePayment(db, pagamentoId, atual.pedido_id);
@@ -97,21 +197,50 @@ async function applyLedgerTransition(
   // A aprovação ou cancelamento podem ter lido PENDENTE e perdido a corrida para a expiração.
   // Revalida os estados elegíveis na própria escrita, sem retry recursivo.
   const origemGuard =
-    mp && (novoStatus === "PAGO" || novoStatus === "CANCELADO")
+    mp && (novoStatus === "PAGO" || novoStatus === "CANCELADO" || novoStatus === "REEMBOLSADO")
       ? "status IN ('PENDENTE', 'EXPIRADO')"
       : "status = 'PENDENTE'";
+  const integridadeGuard = mp && novoStatus === "PAGO"
+    ? `AND valor_centavos = ? AND origem = ? AND idempotency_key IS ?
+       AND EXISTS (SELECT 1 FROM pedidos p WHERE p.id = pedido_pagamentos.pedido_id AND p.token_publico = ?)`
+    : "";
+  const expiracaoIntegridadeGuard = !mp && novoStatus === "EXPIRADO"
+    ? "AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')"
+    : "";
+  const resolucaoIntegridadeSet = resolucaoSemCaptura || resolucaoReembolsada
+    ? ", mp_status = ?, mp_status_detail = ?"
+    : "";
+  const resolucaoIntegridadeGuard = resolucaoSemCaptura
+    ? "AND LOWER(COALESCE(mp_status, '')) = 'approved'"
+    : "";
   const result = await db
     .prepare(
       `UPDATE pedido_pagamentos
        SET status = ?,
            pago_em = CASE WHEN ? = 'PAGO' THEN COALESCE(pago_em, ?, CURRENT_TIMESTAMP) ELSE pago_em END,
-           cancelado_em = CASE WHEN ? IN ('CANCELADO', 'EXPIRADO') THEN COALESCE(cancelado_em, CURRENT_TIMESTAMP) ELSE cancelado_em END,
+           cancelado_em = CASE WHEN ? IN ('CANCELADO', 'EXPIRADO') THEN COALESCE(cancelado_em, CURRENT_TIMESTAMP) ELSE cancelado_em END
+           ${resolucaoIntegridadeSet},
            atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND ${origemGuard}
-         ${mp ? "AND metodo = 'PIX_MP' AND mp_payment_id = ? AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos outro WHERE outro.mp_payment_id = ? AND outro.metodo = 'PIX_MP' AND outro.id != pedido_pagamentos.id)" : ""}`,
+         ${mp ? "AND metodo = 'PIX_MP' AND mp_payment_id = ? AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos outro WHERE outro.mp_payment_id = ? AND outro.metodo = 'PIX_MP' AND outro.id != pedido_pagamentos.id)" : ""}
+         ${expiracaoIntegridadeGuard}
+         ${resolucaoIntegridadeGuard}
+         ${integridadeGuard}`,
     )
-    .bind(novoStatus, novoStatus, mp?.date_approved ?? null, novoStatus, pagamentoId,
-      ...(mp ? [String(mp.id), String(mp.id)] : []))
+    .bind(novoStatus, novoStatus, mp?.date_approved ?? null, novoStatus,
+      ...(resolucaoSemCaptura || resolucaoReembolsada
+        ? [
+            mp!.status,
+            resolucaoSemCaptura
+              ? "INTEGRIDADE_MP:RESOLVIDA_SEM_CAPTURA"
+              : "INTEGRIDADE_MP:REFUNDED_RECONHECIDO",
+          ]
+        : []),
+      pagamentoId,
+      ...(mp ? [String(mp.id), String(mp.id)] : []),
+      ...(integridadeGuard
+        ? [atual.valor_centavos, atual.origem, atual.idempotency_key, atual.token_publico]
+        : []))
     .run();
 
   const aplicou = Number(result?.meta?.changes || 0) > 0;

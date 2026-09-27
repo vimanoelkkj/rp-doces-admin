@@ -81,6 +81,12 @@ const bundle = await build({
 const source = `${bundle.outputFiles[0].text}\n//# sourceURL=rp-doces-b3-bundle.mjs`;
 export const app = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
+export const approvedMp = (extra = {}) => ({
+  id: 101, status: 'approved', transaction_amount: 100,
+  payment_method_id: 'pix', external_reference: 'token', currency_id: 'BRL',
+  ...extra,
+});
+
 const migrations = [];
 for (const file of (await readdir('migrations')).filter(f => f.endsWith('.sql')).sort()) {
   const sql = (await readFile(`migrations/${file}`, 'utf8')).replace(/--[^\n]*/g, '');
@@ -103,7 +109,7 @@ export async function fixture(t, { paid = false, reserve = 'ATIVA', ledger = tru
   // Rede MP simulada; a autoridade continua nascendo no GET de produção.
   t.mock.method(globalThis, 'fetch', async url => {
     if (!String(url).startsWith('https://api.mercadopago.com/v1/payments/')) throw new Error('unexpected network');
-    return Response.json({id: Number(String(url).split('/').at(-1)), status: 'approved'});
+    return Response.json(approvedMp({id: Number(String(url).split('/').at(-1))}));
   });
   const mf = new Miniflare({
     modules: true, script: bridge, cf: false,

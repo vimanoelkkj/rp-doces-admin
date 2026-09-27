@@ -2,7 +2,7 @@
 
 import type { LedgerStatus } from "../comandaLedger";
 
-export type MpMappedStatus = "PAGO" | "CANCELADO" | "EXPIRADO";
+export type MpMappedStatus = "PAGO" | "CANCELADO" | "EXPIRADO" | "REEMBOLSADO";
 
 export interface SyncPaymentResult {
   ok: boolean;

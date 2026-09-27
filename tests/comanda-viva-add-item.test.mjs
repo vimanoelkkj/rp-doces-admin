@@ -377,10 +377,12 @@ test('Pix ADMIN pendente conserva valor e capacidade futura absorve somente o no
 test('adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa somente o item novo', async t => {
   const {db, session} = await prepararComanda(t);
   let posts = 0;
+  let mpRequest;
   t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
     if (options.method === 'POST') {
       posts += 1;
-      assert.equal(JSON.parse(options.body).transaction_amount, 12);
+      mpRequest = JSON.parse(options.body);
+      assert.equal(mpRequest.transaction_amount, 12);
       return Response.json({
         id: 777,
         status: 'pending',
@@ -393,7 +395,14 @@ test('adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa soment
       });
     }
     const id = Number(String(url).split('/').at(-1));
-    return Response.json({id, status: id === 777 ? 'approved' : 'pending'});
+    return Response.json(id === 777 ? {
+      id,
+      status: 'approved',
+      transaction_amount: mpRequest.transaction_amount,
+      payment_method_id: 'pix',
+      currency_id: 'BRL',
+      external_reference: mpRequest.external_reference,
+    } : {id, status: 'pending'});
   });
 
   const addResponse = await adicionar(db, session, {key: 'live-tab-add-00000001'});
@@ -433,6 +442,10 @@ test('adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa soment
   const pixBody = await primeira.json();
   assert.equal(pixBody.valorCentavos, 1200);
   assert.equal(pixBody.qrCode, 'pix-copia-e-cola-777');
+  const pagamentoAdmin = await db.prepare(
+    "SELECT idempotency_key FROM pedido_pagamentos WHERE origem='ADMIN'",
+  ).first();
+  assert.equal(mpRequest.external_reference, pagamentoAdmin.idempotency_key);
 
   const retry = await gerarPix(db, session, {
     key: 'live-tab-pix-00000001', valorCentavos: 1200,

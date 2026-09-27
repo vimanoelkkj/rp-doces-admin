@@ -136,7 +136,8 @@ export async function recuperarOperacoesInconclusivas(
                  SET status = 'CANCELADO',
                      cancelado_em = COALESCE(cancelado_em, CURRENT_TIMESTAMP),
                      atualizado_em = CURRENT_TIMESTAMP
-                 WHERE id = ? AND status = 'PENDENTE'`,
+                 WHERE id = ? AND status = 'PENDENTE'
+                   AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`,
               ).bind(operacao.pagamento_id),
               env.DB.prepare(
                 `INSERT INTO pedido_pagamentos (

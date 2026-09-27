@@ -128,13 +128,45 @@ export const onRequestGet: PagesFunction<Env> = async ({
     // de ser cego: a recuperação read-only tenta convergir sozinha, e o que
     // não converge (ambiguidade, provedor indisponível) fica visível aqui
     // para intervenção em vez de silenciosamente preso.
-    const operacoesInconclusivas = (
+    const operacoesInconclusivas: Array<{
+      tipo: string;
+      diagnostico: string | null;
+      atualizadoEm: string;
+    }> = (
       await listarOperacoesInconclusivasDoPedido(env.DB, id)
     ).map((o) => ({
       tipo: o.tipo,
       diagnostico: o.erro,
       atualizadoEm: o.atualizado_em,
     }));
+    const { results: pagamentosComIntegridadePendente } = await env.DB.prepare(
+      `SELECT
+         CASE
+           WHEN LOWER(COALESCE(pp.mp_status, '')) = 'refunded'
+             THEN COALESCE(pp.mp_status_detail, 'INTEGRIDADE_MP:REFUNDED_REQUER_CONCILIACAO')
+           ELSE COALESCE(pp.mp_status_detail, 'INTEGRIDADE_MP:APROVACAO_DIVERGENTE')
+         END AS diagnostico,
+         pp.atualizado_em
+       FROM pedido_pagamentos pp
+       WHERE pp.pedido_id = ? AND pp.metodo = 'PIX_MP'
+         AND (
+           (pp.status NOT IN ('PAGO', 'REEMBOLSADO')
+             AND LOWER(COALESCE(pp.mp_status, '')) IN ('approved', 'refunded'))
+           OR (pp.status = 'PAGO' AND LOWER(COALESCE(pp.mp_status, '')) = 'refunded'
+             AND COALESCE((SELECT SUM(r.valor_centavos) FROM pedido_reembolsos r
+                           WHERE r.pagamento_id = pp.id AND r.status = 'REEMBOLSADO'), 0)
+                 < pp.valor_centavos)
+           OR (pp.status = 'REEMBOLSADO'
+             AND LOWER(COALESCE(pp.mp_status, '')) = 'refunded'
+             AND pp.mp_status_detail = 'INTEGRIDADE_MP:REFUNDED_RECONHECIDO')
+         )
+       ORDER BY pp.atualizado_em DESC`,
+    ).bind(id).all<{ diagnostico: string; atualizado_em: string }>();
+    operacoesInconclusivas.push(...pagamentosComIntegridadePendente.map((pagamento) => ({
+      tipo: "PIX_MP_INTEGRIDADE",
+      diagnostico: pagamento.diagnostico,
+      atualizadoEm: pagamento.atualizado_em,
+    })));
 
     return Response.json({
       pedido,

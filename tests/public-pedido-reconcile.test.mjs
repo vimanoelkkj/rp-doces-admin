@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {app, fixture, state} from './helpers/b3.mjs';
+import {app, fixture, state, approvedMp} from './helpers/b3.mjs';
 
 // M7: GET /api/pedido e GET /api/pedido-status são somente leitura. A
 // recuperação do pagamento (Mercado Pago, expiração local, reconciliação) é
@@ -96,7 +96,7 @@ test('M7: POST exige mesma origem e, com MP approved, sincroniza normalmente', a
   const db = await fixture(t);
   await abrirJanela(db);
   const chamadas = mercadoPago(t, url =>
-    Response.json({id: Number(String(url).split('/').at(-1)), status: 'approved'}));
+    Response.json(approvedMp({id: Number(String(url).split('/').at(-1))})));
 
   const antes = await state(db);
   const cruzado = await postStatus(db, {Origin: 'https://evil.test'});
@@ -161,7 +161,7 @@ test('M7: EXPIRADO -> PAGO tardio continua recuperável pelo POST', async t => {
   await app.sync.expireLocalPayment(db, 1);
   assert.equal((await state(db)).pagamentos[0].status, 'EXPIRADO');
   await abrirJanela(db);
-  const chamadas = mercadoPago(t, () => Response.json({id: 101, status: 'approved'}));
+  const chamadas = mercadoPago(t, () => Response.json(approvedMp()));
   const r = await postStatus(db);
   assert.equal(r.status, 200);
   assert.equal((await r.json()).statusPagamento, 'PAGO');
@@ -201,7 +201,7 @@ async function pixTardioSemEstoque(t) {
   await db.prepare('UPDATE produtos SET estoque=3, estoque_reservado=2 WHERE id=1').run();
   await abrirJanela(db);
   t.mock.method(console, 'error', () => {});
-  const chamadas = mercadoPago(t, () => Response.json({id: 101, status: 'approved'}));
+  const chamadas = mercadoPago(t, () => Response.json(approvedMp()));
   return {db, chamadas};
 }
 

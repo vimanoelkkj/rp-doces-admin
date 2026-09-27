@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { app, fixture, state } from './helpers/b3.mjs';
+import { app, fixture, state, approvedMp } from './helpers/b3.mjs';
 
 const env = (db) => ({ DB: db, MP_ACCESS_TOKEN: 'fake_mp_token' });
 
@@ -64,16 +64,22 @@ test('R3 - B: A approved antes da regeneração -> sincroniza -> B não criado',
   const db = await fixture(t, { ledger: false });
   let postCount = 0;
   let putCalled = false;
+  let requestBody;
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     if (options?.method === 'POST') {
       postCount++;
+      requestBody = JSON.parse(options.body);
       return Response.json({ id: 101, status: 'pending', date_of_expiration: '2099-01-01' });
     }
     if (options?.method === 'PUT') {
       putCalled = true;
       return Response.json({ id: 101, status: 'cancelled' });
     }
-    return Response.json({ id: 101, status: 'approved', date_approved: '2026-09-23T15:00:00Z' });
+    return Response.json(approvedMp({
+      id: 101, date_approved: '2026-09-23T15:00:00Z',
+      transaction_amount: requestBody.transaction_amount,
+      external_reference: requestBody.external_reference,
+    }));
   });
 
   const a = await app.pix.createAdminPixCharge(env(db), {

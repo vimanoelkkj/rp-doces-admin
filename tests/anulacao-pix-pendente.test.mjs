@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { app, fixture, state } from './helpers/b3.mjs';
+import { app, fixture, state, approvedMp } from './helpers/b3.mjs';
 
 const env = (db) => ({ DB: db, MP_ACCESS_TOKEN: 'fake_mp_token' });
 
@@ -103,11 +103,9 @@ test('D. Pix approved durante consulta -> sincroniza PAGO -> anulação recusada
   const session = await app.auth.createSession(db, 1);
 
   t.mock.method(globalThis, 'fetch', async (url) => {
-    return Response.json({
-      id: 101,
-      status: 'approved',
+    return Response.json(approvedMp({
       date_approved: '2026-09-23T16:00:00Z',
-    });
+    }));
   });
 
   const response = await anular(db, session);
@@ -282,12 +280,11 @@ test('H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery encontra payment a
       });
     }
     if (urlStr.includes('/v1/payments/999')) {
-      return Response.json({
+      return Response.json(approvedMp({
         id: 999,
-        status: 'approved',
         date_approved: '2026-09-23T16:00:00Z',
         external_reference: 'token',
-      });
+      }));
     }
     throw new Error(`Unexpected url: ${urlStr}`);
   });

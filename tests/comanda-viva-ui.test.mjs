@@ -116,7 +116,7 @@ const detalhe = (overrides = {}) => {
     },
     capacidadeCobravelCentavos: overrides.capacidade ?? Math.max(0, total - pago),
     pixAdminPendentes: overrides.pix ?? [],
-    operacoesInconclusivas: [],
+    operacoesInconclusivas: overrides.operacoes ?? [],
   };
 };
 
@@ -132,6 +132,27 @@ async function unmount(root) {
   await ui.act(async () => root.unmount());
   container.innerHTML = '';
 }
+
+test('divergencia financeira do MP aparece como aviso administrativo explicito e unico', async t => {
+  const root = await mountWith(t, async () => Response.json(detalhe({
+    operacoes: [{
+      tipo: 'PIX_MP_INTEGRIDADE',
+      diagnostico: 'INTEGRIDADE_MP:REFUNDED_REQUER_CONCILIACAO',
+      atualizadoEm: '2026-09-27 12:00:00',
+    }],
+  })));
+  try {
+    const avisos = [...document.querySelectorAll('.pedmodal-pix-aviso')]
+      .filter(element => /divergencia financeira/i.test(
+        element.textContent.normalize('NFD').replace(/\p{Diacritic}/gu, ''),
+      ));
+    assert.equal(avisos.length, 1);
+    assert.match(
+      avisos[0].textContent.normalize('NFD').replace(/\p{Diacritic}/gu, ''),
+      /intervencao humana/i,
+    );
+  } finally { await unmount(root); }
+});
 
 test('excluir pedido exige escolha de estoque, confirma uma vez e atualiza a listagem', async t => {
   let calls = 0, refreshed = 0, closed = 0, notified = 0, resolvePost;

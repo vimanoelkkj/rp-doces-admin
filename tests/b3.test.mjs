@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { app, fixture, state, barrier, isProjection, isPhysical, refund } from './helpers/b3.mjs';
+import { app, fixture, state, barrier, isProjection, isPhysical, refund, approvedMp } from './helpers/b3.mjs';
 
 const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
 const approve = async db => app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment('fake', '101'));
@@ -354,7 +354,7 @@ for (const handler of ['polling', 'detail']) test(`${handler}: early return with
 
 test('signed webhook retry repairs a failure after ledger commit', async t => {
   const db = await fixture(t);
-  t.mock.method(globalThis, 'fetch', async () => Response.json({id:101,status:'approved'}));
+  t.mock.method(globalThis, 'fetch', async () => Response.json(approvedMp()));
   const secret = 'local-test-only';
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC',hash:'SHA-256'},false,['sign']);
   const signature = Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode('id:101;request-id:b3;ts:1;'))).toString('hex');

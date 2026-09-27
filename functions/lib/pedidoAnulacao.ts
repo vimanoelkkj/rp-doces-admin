@@ -243,7 +243,8 @@ export async function resolverPixNaoPagosParaAnulacao(
           db.prepare(
             `UPDATE pedido_pagamentos
              SET status = 'CANCELADO', cancelado_em = COALESCE(cancelado_em, CURRENT_TIMESTAMP), atualizado_em = CURRENT_TIMESTAMP
-             WHERE id = ? AND status = 'PENDENTE'`,
+             WHERE id = ? AND status = 'PENDENTE'
+               AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`,
           ).bind(operacao.pagamento_id),
           db.prepare(
             `INSERT INTO pedido_pagamentos (
@@ -291,7 +292,14 @@ export async function resolverPixNaoPagosParaAnulacao(
       if (resolvido.kind === "found") {
         targetPagamentoId = resolvido.pagamentoId;
       } else if (operacao.pagamento_id) {
-        await db.prepare("UPDATE pedido_pagamentos SET mp_payment_id = ?, mp_status = ? WHERE id = ?")
+        await db.prepare(`UPDATE pedido_pagamentos
+          SET mp_payment_id = ?,
+              mp_status = CASE
+                WHEN status NOT IN ('PAGO', 'REEMBOLSADO')
+                 AND LOWER(COALESCE(mp_status, '')) IN ('approved', 'refunded') THEN mp_status
+                ELSE ?
+              END
+          WHERE id = ?`)
           .bind(String(payment.id), payment.status, operacao.pagamento_id).run();
         targetPagamentoId = operacao.pagamento_id;
       }

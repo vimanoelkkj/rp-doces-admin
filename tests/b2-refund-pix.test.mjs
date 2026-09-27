@@ -237,11 +237,10 @@ test('B2 preservado: refunded/charged_back do MP não alteram o ledger por conta
   await app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
   const antes = await state(db);
 
-  // Investigado, deliberadamente NÃO sincronizado neste blocker: `refunded`
-  // e `charged_back` não têm mapeamento, então o GET verificado só registra
-  // o status bruto para diagnóstico e nunca inventa um fato de devolução.
+  // PAGO nunca é rebaixado: `refunded` vira somente diagnóstico remoto;
+  // o fato local de reembolso continua separado. `charged_back` segue fora.
   for (const status of ['refunded', 'charged_back']) {
-    assert.equal(app.sync.mapMpStatus(status), null, `${status} não é estado final mapeado`);
+    assert.equal(app.sync.mapMpStatus(status), status === 'refunded' ? 'REEMBOLSADO' : null);
     t.mock.method(globalThis, 'fetch', async () => Response.json({id: 101, status}));
     const r = await app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment('fake', '101'));
     assert.equal(r.transicionou, false);

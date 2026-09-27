@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {app, fixture, state, refund} from './helpers/b3.mjs';
+import {app, fixture, state, refund, approvedMp} from './helpers/b3.mjs';
 
 // Política: o pedido NÃO pode ser cancelado enquanto existir qualquer
 // `PIX_MP/PENDENTE` seu. A regra pertence ao PEDIDO (coerente com o B4) e é
@@ -175,7 +175,7 @@ test('11. corrida: criação de Pix ADMIN entre a decisão e a escrita do cancel
 test('12. corrida: webhook aprova o Pix entre a decisão e a escrita do cancelamento', async t => {
   silenciar(t);
   const db = await fixture(t);
-  t.mock.method(globalThis, 'fetch', async () => Response.json({id: 101, status: 'approved'}));
+  t.mock.method(globalThis, 'fetch', async () => Response.json(approvedMp()));
 
   let aprovou = false;
   db.hook = async (s, op) => {

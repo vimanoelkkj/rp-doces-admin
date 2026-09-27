@@ -14,8 +14,9 @@ export interface MpPaymentResponse {
   readonly status_detail?: string | null;
   readonly date_approved?: string | null;
   readonly external_reference?: string | null;
-  readonly transaction_amount?: number | null;
+  readonly transaction_amount?: number | string | null;
   readonly payment_method_id?: string | null;
+  readonly currency_id?: string | null;
   readonly [MP_GET_VERIFIED]: true;
 }
 
@@ -46,9 +47,13 @@ export async function fetchMpPayment(accessToken: string, paymentId: string): Pr
     const verified = Object.freeze({
       id: payment.id, status: payment.status,
       status_detail: payment.status_detail, date_approved: payment.date_approved,
-      external_reference: payment.external_reference,
-      transaction_amount: typeof payment.transaction_amount === "number" ? payment.transaction_amount : null,
+      external_reference: typeof payment.external_reference === "string" ? payment.external_reference : null,
+      transaction_amount:
+        typeof payment.transaction_amount === "number" || typeof payment.transaction_amount === "string"
+          ? payment.transaction_amount
+          : null,
       payment_method_id: typeof payment.payment_method_id === "string" ? payment.payment_method_id : null,
+      currency_id: typeof payment.currency_id === "string" ? payment.currency_id : null,
       [MP_GET_VERIFIED]: true as const,
     });
     verifiedMpResponses.add(verified);

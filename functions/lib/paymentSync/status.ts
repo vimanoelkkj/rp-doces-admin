@@ -10,5 +10,6 @@ export function mapMpStatus(mpStatus: string): MpMappedStatus | null {
   if (status === "approved") return "PAGO";
   if (status === "rejected" || status === "cancelled") return "CANCELADO";
   if (status === "expired") return "EXPIRADO";
+  if (status === "refunded") return "REEMBOLSADO";
   return null;
 }

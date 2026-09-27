@@ -67,6 +67,9 @@ export default function PedidoPagamento({
   onLimparPixAviso,
 }: PedidoPagamentoProps) {
   const finFormatado = formatarFinanceiro(financeiro);
+  const temDivergenciaFinanceiraMp = operacoesInconclusivas.some(
+    (operacao) => operacao.tipo === "PIX_MP_INTEGRIDADE",
+  );
   const podeRegistrarPagamento = Boolean(
     !anulado &&
       pedido.arquivado === 0 &&
@@ -134,11 +137,17 @@ export default function PedidoPagamento({
           na carga da listagem; este bloco existe para o caso não
           convergir. Nenhum estado é inventado aqui. */}
       {operacoesInconclusivas.length > 0 && (
-        <div className="pedmodal-pix-aviso">
+        <div className="pedmodal-pix-aviso" role="alert">
           <span>
-            ⚠ {operacoesInconclusivas.length === 1 ? "Uma cobrança" : "Cobranças"} deste
-            pedido não teve confirmação do Mercado Pago. Verificamos automaticamente; não
-            gere outra sem conferir.
+            {temDivergenciaFinanceiraMp ? (
+              <>⚠ <strong>Divergência financeira do Mercado Pago:</strong> pagamento ou
+                reembolso remoto não conciliado. Preserve o estoque e encaminhe para
+                intervenção humana antes de gerar outra cobrança.</>
+            ) : (
+              <>⚠ {operacoesInconclusivas.length === 1 ? "Uma cobrança" : "Cobranças"} deste
+                pedido não teve confirmação do Mercado Pago. Verificamos automaticamente; não
+                gere outra sem conferir.</>
+            )}
           </span>
           <button
             type="button"

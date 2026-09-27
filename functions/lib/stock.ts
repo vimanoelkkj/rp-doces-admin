@@ -254,10 +254,16 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
   }
 }
 
-// Cobranca Pix viva pertence ao pedido, independentemente de id remoto,
-// deadline local ou cadeia de substituicao.
+// Cobranca Pix viva ou captura remota ainda nao conciliada pertence ao
+// pedido, independentemente de id remoto, deadline local ou cadeia de
+// substituicao. `mp_status` approved/refunded e o fato estruturado; o detalhe
+// textual serve somente para diagnostico. REEMBOLSADO local ja reconheceu a
+// captura e devolucao, portanto nao e uma cobranca viva.
 export const PIX_MP_PENDENTE_NO_PEDIDO_SQL = `EXISTS (SELECT 1 FROM pedido_pagamentos pp
-                  WHERE pp.pedido_id = pedidos.id AND pp.metodo = 'PIX_MP' AND pp.status = 'PENDENTE')`;
+                  WHERE pp.pedido_id = pedidos.id AND pp.metodo = 'PIX_MP'
+                    AND (pp.status = 'PENDENTE'
+                      OR (pp.status NOT IN ('PAGO', 'REEMBOLSADO')
+                        AND LOWER(COALESCE(pp.mp_status, '')) IN ('approved', 'refunded'))))`;
 
 export const REGENERACAO_PIX_ATIVA_SQL = `EXISTS (
   SELECT 1 FROM pedido_operacoes o

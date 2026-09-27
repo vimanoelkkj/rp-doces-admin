@@ -489,7 +489,9 @@ export async function createAdminPixCharge(
 
     await db
       .prepare(
-        `UPDATE pedido_pagamentos SET status = 'FALHOU', atualizado_em = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDENTE'`,
+        `UPDATE pedido_pagamentos SET status = 'FALHOU', atualizado_em = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = 'PENDENTE'
+           AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`,
       )
       .bind(pagamentoId)
       .run();
@@ -541,7 +543,13 @@ export async function createAdminPixCharge(
     db
       .prepare(
         `UPDATE pedido_pagamentos
-         SET mp_payment_id = ?, mp_status = ?, mp_qr_code = ?, mp_qr_code_base64 = ?,
+         SET mp_payment_id = ?,
+             mp_status = CASE
+               WHEN status NOT IN ('PAGO', 'REEMBOLSADO')
+                AND LOWER(COALESCE(mp_status, '')) IN ('approved', 'refunded') THEN mp_status
+               ELSE ?
+             END,
+             mp_qr_code = ?, mp_qr_code_base64 = ?,
              mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
          WHERE id = ?`,
       )

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {app, fixture, state, barrier} from './helpers/b3.mjs';
+import {app, fixture, state, barrier, approvedMp} from './helpers/b3.mjs';
 
 const env = db => ({DB:db,MP_ACCESS_TOKEN:'fake',MP_WEBHOOK_SECRET:'b2-local-only'});
 const expired = db => db.prepare("UPDATE pedidos SET pix_expira_em='2000-01-01',reserva_expira_em='2000-01-02' WHERE id=1").run();
@@ -25,7 +25,8 @@ function mp(t,status,extra={}) {
   return t.mock.method(globalThis,'fetch',async (url,options)=> {
     assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/payments\/\d+$/);
     assert.equal(options.headers.Authorization,'Bearer fake');
-    return Response.json({id:Number(String(url).split('/').at(-1)),status,...extra});
+    const id=Number(String(url).split('/').at(-1));
+    return Response.json(status==='approved' ? approvedMp({id,...extra}) : {id,status,...extra});
   });
 }
 async function hook(db, id=101, payloadStatus='approved', signatureValid=true) {
@@ -78,7 +79,7 @@ test('A: real checkout creation then authoritative GET approval preserves normal
   })});
   assert.equal(response.status,200);
   const checkout=await response.json();
-  mp(t,'approved');
+  mp(t,'approved',{external_reference:checkout.tokenPublico});
   assert.equal((await consultar(db,'polling',checkout.tokenPublico)).body.statusPagamento,'PAGO');
   assert.equal((await db.prepare('SELECT status FROM pedido_pagamentos').first()).status,'PAGO');
   assert.equal((await db.prepare('SELECT estoque FROM produtos WHERE id=1').first()).estoque,8);
@@ -231,7 +232,11 @@ for(const both of [false,true]) test(`I/J: real admin regeneration keeps A recon
   // Cobre também um A histórico terminalizado operacionalmente: ter B não
   // bloqueia a autoridade do MP, nem altera a política de liberação B4.
   await db.prepare("UPDATE pedido_pagamentos SET status='EXPIRADO' WHERE id=?").bind(a.pagamentoId).run();
-  mp(t,'approved');
+  const referencias=new Map(before.pagamentos.map(p=>[Number(p.mp_payment_id),p.idempotency_key]));
+  t.mock.method(globalThis,'fetch',async url=>{
+    const id=Number(String(url).split('/').at(-1));
+    return Response.json(approvedMp({id,external_reference:referencias.get(id)}));
+  });
   if(both) assert.equal((await hook(db,b.mpPaymentId)).status,200);
   assert.equal((await hook(db,a.mpPaymentId)).status,200);
   const s=await state(db);
@@ -248,7 +253,7 @@ for(const order of ['expire-between-read-and-write','approval-before-expire-writ
   await expired(db);
   if(order==='parallel-handlers') {
     const gate=barrier(2);
-    t.mock.method(globalThis,'fetch',async ()=>{await gate();return Response.json({id:101,status:'approved'});});
+    t.mock.method(globalThis,'fetch',async ()=>{await gate();return Response.json(approvedMp());});
     await Promise.all([consultar(db),hook(db)]);
   } else {
     db.hook=async (s,op)=>{
@@ -345,7 +350,7 @@ test('sweep: bounded, throttled, concurrent-safe and failing old expired candida
   t.mock.method(globalThis,'fetch',async url=>{
     const id=Number(String(url).split('/').at(-1)); calls.push(id);
     if(id===101) return new Response('offline',{status:500});
-    return Response.json({id,status:'approved'});
+    return Response.json(approvedMp({id,external_reference:`expired-${id-100}`}));
   });
   // GET da listagem nunca consulta o MP, mesmo com candidatos elegíveis.
   const antesDoGet=await state(db);

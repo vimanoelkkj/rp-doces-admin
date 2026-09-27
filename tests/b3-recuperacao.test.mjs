@@ -68,7 +68,9 @@ function provedor(t, {postar, remoto = new Map()} = {}) {
     const id = alvo.split('/').at(-1);
     for (const lista of remoto.values()) {
       const achado = lista.find(p => String(p.id) === id);
-      if (achado) return Response.json(achado);
+      if (achado) return Response.json({
+        transaction_amount: 100, payment_method_id: 'pix', currency_id: 'BRL', ...achado,
+      });
     }
     return Response.json({ id: Number(id) || id, status: 'pending', date_of_expiration: '2099-01-01T00:00:00Z' });
   });

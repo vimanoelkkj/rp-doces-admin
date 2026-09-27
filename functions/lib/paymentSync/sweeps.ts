@@ -79,6 +79,7 @@ export async function liberarReservasVencidasLocalmente(env: { DB: D1Database })
      WHERE p.status_pagamento = 'PENDENTE'
        AND p.reserva_status = 'ATIVA'
        AND pp.metodo = 'PIX_MP' AND pp.origem = 'SITE' AND pp.status = 'PENDENTE'
+       AND LOWER(COALESCE(pp.mp_status, '')) NOT IN ('approved', 'refunded')
        AND p.reserva_expira_em IS NOT NULL
        AND datetime(p.reserva_expira_em) <= datetime('now')
      ORDER BY p.reserva_expira_em ASC
