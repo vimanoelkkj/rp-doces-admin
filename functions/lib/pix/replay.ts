@@ -57,7 +57,7 @@ export async function replayPixAdmin(
         pix_expira_em: string | null;
       }>();
 
-    if (bPagamento && bPagamento.mp_payment_id) {
+    if (bPagamento?.mp_payment_id) {
       return {
         ok: true,
         replay: true,

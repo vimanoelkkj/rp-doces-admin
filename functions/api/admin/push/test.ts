@@ -40,7 +40,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   // 4. Validação de endpoint
   const endpoint = typeof body.endpoint === "string" ? body.endpoint.trim() : "";
-  if (!endpoint || !endpoint.startsWith("https://") || endpoint.length > MAX_ENDPOINT_LENGTH) {
+  if (!endpoint?.startsWith("https://") || endpoint.length > MAX_ENDPOINT_LENGTH) {
     return jsonError("Endpoint inválido ou ausente (deve iniciar com https://)", 400);
   }
 

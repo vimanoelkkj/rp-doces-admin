@@ -256,7 +256,7 @@ test('pagamento posterior converte a reserva do pedido MANUAL em baixa física',
 
 test('Pix ADMIN sobre pedido MANUAL preserva B4: reserva única e retida enquanto pendente', async t => {
   const {db, session} = await balcao(t);
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     assert.equal(options?.method, 'POST');
     return Response.json({
       id: 777, status: 'pending', date_of_expiration: '2099-01-01T00:00:00Z',

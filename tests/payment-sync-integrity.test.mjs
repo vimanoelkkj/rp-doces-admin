@@ -381,7 +381,7 @@ test('resposta pending tardia do POST nao apaga approved divergente recebido por
   const secret = 'integrity-post-race';
   let externalReference;
 
-  t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options = {}) => {
     if (options.method === 'POST') {
       externalReference = JSON.parse(options.body).external_reference;
       const key = await crypto.subtle.importKey(

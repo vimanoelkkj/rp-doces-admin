@@ -106,7 +106,7 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
   assert.match(contextCode, /circle\(\$\{maxRadius\}px at/);
 
   // 2. Existe detecção específica para mobile max-width: 768px
-  assert.match(contextCode, /matchMedia\(\s*["']\(max-width:\s*768px\)["']\s*\)/);
+  assert.match(contextCode, /matchMedia\?\.\(\s*["']\(max-width:\s*768px\)["']\s*\)/);
 
   // 3. O caminho mobile usa opacity
   assert.match(contextCode, /opacity:\s*\[0,\s*1\]/);

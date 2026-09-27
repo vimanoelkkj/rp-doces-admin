@@ -8,7 +8,7 @@ test('R3 - A: A pending -> cancelamento confirmado -> B criado', async (t) => {
   const db = await fixture(t, { ledger: false });
   let putCalled = false;
   let postCount = 0;
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     if (options?.method === 'POST') {
       postCount++;
       return Response.json({
@@ -65,7 +65,7 @@ test('R3 - B: A approved antes da regeneração -> sincroniza -> B não criado',
   let postCount = 0;
   let putCalled = false;
   let requestBody;
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     if (options?.method === 'POST') {
       postCount++;
       requestBody = JSON.parse(options.body);
@@ -112,7 +112,7 @@ test('R3 - B: A approved antes da regeneração -> sincroniza -> B não criado',
 test('R3 - C: PUT cancelamento inconclusivo + reconsulta inconclusiva -> ENVIO_INCONCLUSIVO -> B não criado', async (t) => {
   const db = await fixture(t, { ledger: false });
   let postCount = 0;
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     if (options?.method === 'POST') {
       postCount++;
       return Response.json({ id: 101, status: 'pending', date_of_expiration: '2099-01-01' });
@@ -189,7 +189,7 @@ test('R3 - D: webhook cancelled de A durante LOCAL_CRIADA -> reserva NÃO libera
 test('R3 - E: duas regenerações simultâneas com operationKeys diferentes -> somente uma adquire o claim; somente uma pode tocar no Mercado Pago', async (t) => {
   const db = await fixture(t, { ledger: false });
   let mpCalls = 0;
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     mpCalls++;
     if (options?.method === 'POST') {
       return Response.json({ id: 101 + mpCalls, status: 'pending', date_of_expiration: '2099-01-01' });

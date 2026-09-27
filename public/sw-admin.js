@@ -9,7 +9,7 @@ self.addEventListener("install", (event) => {
       const response = await fetch(OFFLINE_URL).catch(() =>
         fetch("/admin-offline.html"),
       );
-      if (response && response.ok) {
+      if (response?.ok) {
         await cache.put(OFFLINE_URL, response.clone());
         await cache.put("/admin-offline.html", response);
       }

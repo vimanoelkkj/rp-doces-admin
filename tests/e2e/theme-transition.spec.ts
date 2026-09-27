@@ -114,7 +114,7 @@ async function installSampler(page: Page) {
       for (const a of document.getAnimations()) {
         const eff = a.effect as KeyframeEffect | null;
         const pseudo = eff?.pseudoElement ?? null;
-        if (pseudo && pseudo.includes("view-transition")) {
+        if (pseudo?.includes("view-transition")) {
           const known = w.__anims.some(
             (i: AnimInfo) => i.pseudo === pseudo,
           );

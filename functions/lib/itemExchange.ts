@@ -115,7 +115,7 @@ export async function getItemExchangePreview(
   const product = await db.prepare(`SELECT id,nome,preco_centavos,preco_promocional_centavos,promocao_ativa,
       promocao_inicio,promocao_fim,estoque,estoque_reservado,ativo,disponivel
     FROM produtos WHERE id=? LIMIT 1`).bind(params.produtoDestinoId).first<ProductRow>();
-  if (!product || product.ativo !== 1) throw new ItemExchangePreviewError("PRODUTO_NAO_ENCONTRADO", "Produto de destino não encontrado", 404);
+  if (product?.ativo !== 1) throw new ItemExchangePreviewError("PRODUTO_NAO_ENCONTRADO", "Produto de destino não encontrado", 404);
   const currentPrice = precoVigenteCentavos(product);
   if (currentPrice !== params.precoEsperadoCentavos) {
     throw new ItemExchangePreviewError("PRECO_ALTERADO", "O preço do produto mudou", 409,

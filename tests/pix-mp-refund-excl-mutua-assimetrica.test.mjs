@@ -49,13 +49,13 @@ async function criarCancelamentoAguardando(db, {pedidoId = 1, itemId = 1, key} =
 // (duas intencoes -- por item e de anulacao -- podem confirmar no mesmo teste).
 let proximoRefundId = 1;
 function mockAprovado() {
-  return async (url, init) => {
+  return async (_url, init) => {
     const body = init?.body ? JSON.parse(init.body) : {};
     return Response.json({id: proximoRefundId++, payment_id: 9001, amount: body.amount, status: 'approved'}, {status: 201});
   };
 }
 function mockEmProcesso() {
-  return async (url, init) => {
+  return async (_url, init) => {
     const body = init?.body ? JSON.parse(init.body) : {};
     return Response.json({id: proximoRefundId++, payment_id: 9001, amount: body.amount, status: 'in_process'}, {status: 201});
   };

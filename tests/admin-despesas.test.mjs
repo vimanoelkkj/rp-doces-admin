@@ -14,7 +14,7 @@ async function setup(t) {
   return {db, session};
 }
 
-function listar(db, session, query = {}, origin = true) {
+function listar(db, session, query = {}) {
   const params = new URLSearchParams({desde: '2026-01-01', ate: '2026-12-31', ...query});
   return app.adminDespesas.onRequestGet({
     env: {DB: db}, params: {}, waitUntil() {},
@@ -488,7 +488,7 @@ test('37-40: criar/editar/cancelar despesa nunca altera pedido_pagamentos/pedido
 });
 
 // 41) sameOrigin
-test('41: sameOrigin bloqueia mutações de origem cruzada antes de tocar o banco', async t => {
+test('41: sameOrigin bloqueia mutações de origem cruzada antes de tocar o banco', async () => {
   const poison = {prepare() { throw new Error('não pode acessar db'); }};
   const cross = await app.adminDespesas.onRequestPost({
     env: {DB: poison}, params: {}, waitUntil() {},

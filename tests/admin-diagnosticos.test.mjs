@@ -43,7 +43,7 @@ function testeRequest(session) {
 const pixEnv = (db, token = 'fake-token') => ({DB: db, MP_ACCESS_TOKEN: token});
 
 function mockMpSucesso(t) {
-  return t.mock.method(globalThis, 'fetch', async (url, options) => {
+  return t.mock.method(globalThis, 'fetch', async (url) => {
     assert.equal(url, 'https://api.mercadopago.com/v1/payments');
     return Response.json({
       id: 555,
@@ -234,7 +234,7 @@ test('consulta de status nunca escreve em pedido_pagamentos', async t => {
 });
 
 function mockMpRefundSucesso(t, refundId = 9001) {
-  return t.mock.method(globalThis, 'fetch', async (url, options) => {
+  return t.mock.method(globalThis, 'fetch', async (url) => {
     if (url === 'https://api.mercadopago.com/v1/payments/555') {
       return Response.json({
         id: 555,

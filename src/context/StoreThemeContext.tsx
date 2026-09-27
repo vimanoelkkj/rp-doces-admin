@@ -47,7 +47,7 @@ export function syncMetaThemeColor(targetTheme?: StoreTheme): string {
     (document.documentElement.getAttribute("data-theme") as StoreTheme) ||
     (window.localStorage.getItem(STORAGE_KEY) as StoreTheme) ||
     (window.localStorage.getItem(ADMIN_STORAGE_KEY) as StoreTheme) ||
-    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+    (window.matchMedia?.("(prefers-color-scheme: dark)").matches
       ? "dark"
       : "light");
 
@@ -261,7 +261,7 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
         .then(() => {
           const isMobile =
             typeof window !== "undefined" &&
-            Boolean(window.matchMedia && window.matchMedia("(max-width: 768px)").matches);
+            Boolean(window.matchMedia?.("(max-width: 768px)").matches);
 
           if (isMobile) {
             const mobileAnimationOptions: ExtendedAnimationOptions = {

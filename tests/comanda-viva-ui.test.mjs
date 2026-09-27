@@ -993,7 +993,7 @@ test('pagamento parcial preenche e registra somente o saldo restante', async t =
 test('edicao do nome atualiza o titulo e a listagem pai sem recarregar', async t => {
   let patchBody;
   let listRefreshes = 0;
-  const root = await mountWith(t, async (url, options = {}) => {
+  const root = await mountWith(t, async (_url, options = {}) => {
     if (options.method === 'PATCH') {
       patchBody = JSON.parse(options.body);
       return Response.json({ok: true, clienteNome: patchBody.clienteNome});

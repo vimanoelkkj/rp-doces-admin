@@ -102,7 +102,7 @@ test('D. Pix approved durante consulta -> sincroniza PAGO -> anulação recusada
   const db = await fixture(t);
   const session = await app.auth.createSession(db, 1);
 
-  t.mock.method(globalThis, 'fetch', async (url) => {
+  t.mock.method(globalThis, 'fetch', async () => {
     return Response.json(approvedMp({
       date_approved: '2026-09-23T16:00:00Z',
     }));
@@ -126,7 +126,7 @@ test('E. PUT timeout + GET cancelled -> converge -> anulação funciona', async 
   const session = await app.auth.createSession(db, 1);
 
   let initialGet = true;
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     if (options?.method === 'PUT') {
       const err = new Error('Gateway Timeout');
       err.name = 'AbortError';
@@ -155,7 +155,7 @@ test('F. PUT timeout + GET pending -> fail closed -> pedido não anulado', async
   const db = await fixture(t);
   const session = await app.auth.createSession(db, 1);
 
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     if (options?.method === 'PUT') {
       const err = new Error('Gateway Timeout');
       err.name = 'AbortError';

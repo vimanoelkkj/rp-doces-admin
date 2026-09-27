@@ -122,7 +122,7 @@ async function handlePut({
       )
         .bind(id)
         .first<{ senha_hash: string }>();
-      if (!usuario || !usuario.senha_hash) {
+      if (!usuario?.senha_hash) {
         return jsonError("Administrador não encontrado", 404);
       }
 

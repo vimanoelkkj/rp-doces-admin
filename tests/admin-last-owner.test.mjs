@@ -208,7 +208,7 @@ test('api: último OWNER não pode virar ADMIN', async t => {
 
 test('api: com dois OWNERs, desativar um normalmente funciona e remove a sessão', async t => {
   const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
-  const { sessionA, sessionB } = await setupTwoOwners(db);
+  const { sessionA } = await setupTwoOwners(db);
 
   const res = await putAdmin(db, sessionA, 2, { acao: 'toggle_ativo', ativo: false });
   assert.equal(res.status, 200);
@@ -225,7 +225,7 @@ test('api: com dois OWNERs, desativar um normalmente funciona e remove a sessão
 
 test('api: com dois OWNERs, rebaixar um normalmente funciona e remove a sessão', async t => {
   const db = await fixture(t, { ledger: false, reserve: 'SEM_RESERVA' });
-  const { sessionA, sessionB } = await setupTwoOwners(db);
+  const { sessionA } = await setupTwoOwners(db);
 
   const res = await putAdmin(db, sessionA, 2, { acao: 'alterar_papel', papel: 'ADMIN' });
   assert.equal(res.status, 200);
@@ -308,7 +308,7 @@ test('corrida determinística: A desativa B enquanto B desativa A (toggle_ativo)
   // Usamos um barrier(2) interceptando as chamadas que tentam UPDATE usuarios_admin.
   const syncBarrier = barrier(2);
 
-  db.hook = async (wire, operation) => {
+  db.hook = async (wire) => {
     const isUpdate = wire.some(s => s.sql.includes('UPDATE usuarios_admin'));
     if (isUpdate) {
       await syncBarrier();
@@ -330,7 +330,6 @@ test('corrida determinística: A desativa B enquanto B desativa A (toggle_ativo)
   assert.deepEqual(statuses, [200, 409], 'Exatamente uma operação deve vencer (200) e a outra ser recusada (409)');
 
   const loserRes = resA.status === 409 ? resA : resB;
-  const winnerRes = resA.status === 200 ? resA : resB;
   const loserBody = await loserRes.json();
   assert.equal(loserBody.error, 'A loja precisa manter pelo menos um administrador mestre ativo');
 
@@ -341,8 +340,6 @@ test('corrida determinística: A desativa B enquanto B desativa A (toggle_ativo)
   assert.equal(activeOwners.total, 1, 'Invariante: exatamente 1 OWNER ativo deve restar no banco');
 
   // Identifica quem ganhou e quem perdeu:
-  const loserTargetId = resA.status === 409 ? 2 : 1; // Quem a request perdedora tentou desativar
-  const loserCallerId = resA.status === 409 ? 1 : 2; // Quem fez a request perdedora
   const winnerCallerId = resA.status === 200 ? 1 : 2; // Quem fez a request vencedora
   const winnerTargetId = resA.status === 200 ? 2 : 1; // Quem foi desativado com sucesso
 
@@ -373,7 +370,7 @@ test('corrida determinística: A rebaixa B enquanto B rebaixa A (alterar_papel)'
   // Ambas as requisições leem COUNT(*) = 2 antes de qualquer batch ser executado
   const syncBarrier = barrier(2);
 
-  db.hook = async (wire, operation) => {
+  db.hook = async (wire) => {
     const isUpdate = wire.some(s => s.sql.includes('UPDATE usuarios_admin'));
     if (isUpdate) {
       await syncBarrier();
@@ -404,7 +401,6 @@ test('corrida determinística: A rebaixa B enquanto B rebaixa A (alterar_papel)'
   // Quem perdeu a corrida não teve o papel alterado pelo seu UPDATE que falhou,
   // e o batch inteiro fez rollback, preservando sessões da conta que não foi rebaixada.
   const winnerCallerId = resA.status === 200 ? 1 : 2;
-  const loserCallerId = resA.status === 409 ? 1 : 2;
   const demotedUserId = resA.status === 200 ? 2 : 1;
 
   const demotedUser = await db.prepare('SELECT papel, ativo FROM usuarios_admin WHERE id = ?').bind(demotedUserId).first();
@@ -431,7 +427,7 @@ test('corrida determinística misto: A desativa B enquanto B rebaixa A para ADMI
 
   const syncBarrier = barrier(2);
 
-  db.hook = async (wire, operation) => {
+  db.hook = async (wire) => {
     const isUpdate = wire.some(s => s.sql.includes('UPDATE usuarios_admin'));
     if (isUpdate) {
       await syncBarrier();

@@ -427,7 +427,7 @@ test('11/12. busca indisponível: não inventa rejeição, mantém identidade e 
   // Busca falha por transporte.
   p.mock.mock.restore();
   let buscas = 0;
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     if (options?.method === 'POST') throw new Error('nenhum POST deve ocorrer');
     buscas++;
     throw new Error('search transport failure');
@@ -779,7 +779,7 @@ test('R1 ADMIN: falha no batch de persistência fica LOCAL_CRIADA e é resgatada
 
 test('R2: busca NENHUM dentro do prazo (TTL vencido, margem não) permanece inconclusiva', async t => {
   silenciar(t);
-  const {db, provedor: p, operacao} = await siteInconclusivo(t);
+  const {db, provedor: p} = await siteInconclusivo(t);
   const antes = await state(db);
 
   await expirarOperacao(db, 2); // TTL venceu há 2h, mas a margem de 24h não.
@@ -799,7 +799,7 @@ test('R2: busca NENHUM dentro do prazo (TTL vencido, margem não) permanece inco
 
 test('R2: busca NENHUM após o prazo fecha a operação como EXPIRADA e libera a reserva', async t => {
   silenciar(t);
-  const {db, provedor: p, operacao} = await adminInconclusivo(t);
+  const {db, provedor: p} = await adminInconclusivo(t);
   const antes = await state(db);
   assert.equal(antes.pedido.reserva_status, 'ATIVA');
   assert.equal(antes.produtos[0].estoque_reservado, 2);
@@ -826,10 +826,10 @@ test('R2: busca NENHUM após o prazo fecha a operação como EXPIRADA e libera a
 
 test('R2: busca INDISPONÍVEL após o prazo não finaliza (não é confirmação negativa)', async t => {
   silenciar(t);
-  const {db, provedor: p, operacao} = await siteInconclusivo(t);
+  const {db, provedor: p} = await siteInconclusivo(t);
   await expirarOperacao(db);
   p.mock.mock.restore();
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
     if (options?.method === 'POST') throw new Error('nenhum POST deve ocorrer');
     throw new Error('search transport failure');
   });

@@ -209,7 +209,7 @@ test('código de login define constante estática de hash dummy com 100.000 iter
   assert.doesNotMatch(loginSrc, /hashPassword\(/, 'não deve gerar hash em runtime por requisição');
   assert.match(
     loginSrc,
-    /const hashParaVerificar =\s*user && user\.ativo\s*\?\s*user\.senha_hash\s*:\s*DUMMY_PASSWORD_HASH;/,
+    /const hashParaVerificar =\s*user\?\.ativo\s*\?\s*user\.senha_hash\s*:\s*DUMMY_PASSWORD_HASH;/,
     'deve selecionar o hash dummy fixo quando usuário não existe ou está inativo',
   );
 });

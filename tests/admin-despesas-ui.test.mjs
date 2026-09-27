@@ -244,7 +244,7 @@ test('45: excluir (cancelar) despesa reflete status Cancelada sem reload', async
 
 // 46) dark mode: toda classe usada por este componente tem contraparte no
 // arquivo central de tema escuro (nenhum texto escuro sobre fundo escuro).
-test('46: classes desp-*/gasto-* usadas no JSX têm cobertura no admin-dark-theme.css', async t => {
+test('46: classes desp-*/gasto-* usadas no JSX têm cobertura no admin-dark-theme.css', async () => {
   const [despTsx, gastoTsx, darkCss] = await Promise.all([
     readFile('src/admin/Despesas/AdminDespesas.tsx', 'utf8'),
     readFile('src/admin/Despesas/GastoModal.tsx', 'utf8'),
@@ -274,7 +274,7 @@ test('46: classes desp-*/gasto-* usadas no JSX têm cobertura no admin-dark-them
 
 // 47) mobile sem overflow grosseiro: a tabela desktop não encolhe — ela some
 // e cards verticais assumem, dentro do mesmo breakpoint.
-test('47: no breakpoint mobile a tabela desaparece e os cards assumem (sem encolher colunas)', async t => {
+test('47: no breakpoint mobile a tabela desaparece e os cards assumem (sem encolher colunas)', async () => {
   const css = await readFile('src/admin/Despesas/AdminDespesas.css', 'utf8');
   // \r?\n em vez de \n: o arquivo pode ter terminadores CRLF (ex.: depois de
   // um git stash/pop no Windows normalizar as quebras de linha).

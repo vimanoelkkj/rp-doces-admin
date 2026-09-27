@@ -17,7 +17,6 @@ import {app, fixture, state, barrier} from './helpers/b3.mjs';
 const KEY = '11111111-1111-4111-8111-111111111111';
 const KEY2 = '22222222-2222-4222-8222-222222222222';
 const cookieDe = session => session.cookie.split(';')[0];
-const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return {promise, resolve}; };
 const silenciarLogs = t => t.mock.method(console, 'error', () => {});
 
 function endpoint(modulo, db, {id = '1', body, session, env: extra = {}} = {}) {
@@ -224,7 +223,7 @@ test('refund: mesma key + mesmo payload => um único refund, retry recupera', as
 test('refund: mesma key concorrente => exatamente um refund', async t => {
   const {db, session} = await pedidoComPagamentoManual(t);
   const escritas = barrier(2);
-  db.hook = async (s, op) => {
+  db.hook = async (s) => {
     if (s.some(x => x.sql.includes('INSERT INTO pedido_reembolsos'))) await escritas();
   };
   const resultados = await ambas(

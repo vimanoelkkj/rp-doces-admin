@@ -64,7 +64,7 @@ export default function ProductDetailsModal({
   // modal esperando a foto.
   useLayoutEffect(() => {
     const img = imagemRef.current;
-    setImagemPronta(Boolean(img && img.complete && img.naturalWidth > 0));
+    setImagemPronta(Boolean(img?.complete && img.naturalWidth > 0));
   }, [product.image]);
 
   // Mesma regra do card: disponibilidade menos o que já está na sacola.

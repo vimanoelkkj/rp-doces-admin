@@ -70,13 +70,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .first<UsuarioRow>();
 
   const hashParaVerificar =
-    user && user.ativo
+    user?.ativo
       ? user.senha_hash
       : DUMMY_PASSWORD_HASH;
 
   const senhaCorreta = await verifyPassword(senha, hashParaVerificar);
 
-  if (!user || !user.ativo || !senhaCorreta) {
+  if (!user?.ativo || !senhaCorreta) {
     await recordLoginFailure(env.DB, rate.key);
     await new Promise((r) => setTimeout(r, 350));
     return jsonError("Usuário ou senha incorretos", 401);

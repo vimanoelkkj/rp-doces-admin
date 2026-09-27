@@ -47,7 +47,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       ? body.userAgent.slice(0, MAX_USER_AGENT_LENGTH)
       : (request.headers.get("User-Agent") || "").slice(0, MAX_USER_AGENT_LENGTH);
 
-  if (!endpoint || !endpoint.startsWith("https://") || endpoint.length > MAX_ENDPOINT_LENGTH) {
+  if (!endpoint?.startsWith("https://") || endpoint.length > MAX_ENDPOINT_LENGTH) {
     return jsonError("Endpoint inválido ou ausente (deve iniciar com https://)", 400);
   }
 

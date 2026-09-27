@@ -98,7 +98,7 @@ test('2: GET desconta um refund MP parcial ja confirmado', async t => {
 // 3) valor restante calculado corretamente (espelha o exemplo do enunciado:
 // recebido 0,03, refund confirmado 0,01, restante 0,02)
 test('3: restante = recebido - refunds MP confirmados, nunca refaz refund ja pago', async t => {
-  const {db, session} = await pedidoComMp(t);
+  const {db} = await pedidoComMp(t);
   await db.batch([
     db.prepare(`UPDATE pedido_pagamentos SET valor_centavos=3 WHERE id=1`),
     db.prepare(`UPDATE pedido_pagamento_alocacoes SET valor_centavos=3 WHERE id=1`),
@@ -298,7 +298,7 @@ test('11: o valor enviado pelo cliente no corpo do POST e ignorado; o servidor s
 
 // 12) nenhuma regressao em cancelamento/troca/refund existente + trava operacional
 test('12a: intencao por item CONFIRMADA (historica) nao bloqueia intencao de anulacao (migration 0024)', async t => {
-  const {db, session} = await pedidoComMp(t);
+  const {db} = await pedidoComMp(t);
   await db.batch([
     db.prepare(`UPDATE pedidos SET valor_total_centavos=5000 WHERE id=1`),
     db.prepare(`UPDATE pedido_itens SET quantidade=1,valor_unitario_centavos=5000,valor_total_centavos=5000 WHERE id=1`),
@@ -401,7 +401,7 @@ test('12c: dois pagamentos PIX_MP no mesmo pedido sao tratados como pernas indep
         mp_payment_id,idempotency_key,pago_em) VALUES(2,1,'PIX_MP','ADMIN',10000,'PAGO','202','pagamento-2',CURRENT_TIMESTAMP)`),
     db.prepare(`INSERT INTO pedido_pagamento_alocacoes(pagamento_id,pedido_item_id,valor_centavos) VALUES(2,1,10000)`),
   ]);
-  t.mock.method(globalThis, 'fetch', async (url, init) => {
+  t.mock.method(globalThis, 'fetch', async (url) => {
     const paymentId = String(url).match(/payments\/(\d+)\/refunds/)?.[1];
     if (paymentId === '101') return Response.json({id: 1, payment_id: 101, amount: 100, status: 'approved'}, {status: 201});
     if (paymentId === '202') throw new Error('falha de rede no segundo pagamento');

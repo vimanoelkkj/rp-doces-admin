@@ -207,7 +207,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       return jsonError("Quantidade inválida", 400);
     }
     const produto = produtosPorId.get(item.id);
-    if (!produto || !produto.disponivel) {
+    if (!produto?.disponivel) {
       return jsonError(`Produto ${item.id} indisponível`, 400);
     }
     const estoqueLivre = produto.estoque - produto.estoque_reservado;

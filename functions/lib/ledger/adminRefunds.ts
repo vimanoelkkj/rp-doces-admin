@@ -152,7 +152,7 @@ export async function registerManualRefund(
     )
     .bind(params.pagamentoId, params.pedidoId)
     .first<{ id: number; metodo: string; valor_centavos: number; status: string }>();
-  if (!pagamento || pagamento.status !== "PAGO") {
+  if (pagamento?.status !== "PAGO") {
     return { ok: false, erro: "PAGAMENTO_NAO_ENCONTRADO" };
   }
   if (!METODOS_MANUAIS_REEMBOLSAVEIS.has(pagamento.metodo)) {

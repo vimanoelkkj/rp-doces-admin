@@ -126,7 +126,7 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
     .bind(pedidoId)
     .first<{ status_pagamento: string; reserva_status: string; estoque_baixado_em: string | null }>();
 
-  if (!pedido || pedido.status_pagamento !== "PAGO") {
+  if (pedido?.status_pagamento !== "PAGO") {
     return { ok: true, baixado: false };
   }
 
