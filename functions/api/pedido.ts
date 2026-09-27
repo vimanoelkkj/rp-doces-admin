@@ -2,7 +2,7 @@
 
 import { pedidoValidoSql } from "../lib/pedidoValido";
 
-import { readPedidoStatus, PedidoStatusRow } from "../lib/pedidoStatus";
+import { readPedidoStatus, type PedidoStatusRow } from "../lib/pedidoStatus";
 
 interface Env {
   DB: D1Database;

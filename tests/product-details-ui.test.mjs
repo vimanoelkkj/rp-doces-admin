@@ -90,7 +90,7 @@ const bundle = await build({
   loader: { '.css': 'empty', '.png': 'dataurl', '.webp': 'dataurl', '.svg': 'dataurl' },
 });
 const ui = await import(
-  `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=product-details-bundle.mjs').toString('base64')}`
+  `data:text/javascript;base64,${Buffer.from(`${bundle.outputFiles[0].text}\n//# sourceURL=product-details-bundle.mjs`).toString('base64')}`
 );
 
 const flush = async (ms = 25) => { await ui.act(async () => { await new Promise((r) => setTimeout(r, ms)); }); };

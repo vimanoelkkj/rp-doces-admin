@@ -64,7 +64,7 @@ const bundle = await build({
   define: {'process.env.NODE_ENV': '"development"'}, loader: {'.css': 'empty', '.png': 'dataurl'},
 });
 const ui = await import(
-  `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=cardapio-bundle.mjs').toString('base64')}`
+  `data:text/javascript;base64,${Buffer.from(`${bundle.outputFiles[0].text}\n//# sourceURL=cardapio-bundle.mjs`).toString('base64')}`
 );
 const container = document.getElementById('root');
 const flush = () => ui.act(async () => { await new Promise(setImmediate); });

@@ -718,7 +718,7 @@ test("POST /api/admin/push/test: rejeita payload inválido ou endpoint malformad
   await testEndpoint({}, 400);
   await testEndpoint({ endpoint: "" }, 400);
   await testEndpoint({ endpoint: "http://insecure.test/1" }, 400);
-  await testEndpoint({ endpoint: "https://" + "a".repeat(1050) }, 400);
+  await testEndpoint({ endpoint: `https://${"a".repeat(1050)}` }, 400);
   await testEndpoint({ endpoint: 12345 }, 400);
 });
 

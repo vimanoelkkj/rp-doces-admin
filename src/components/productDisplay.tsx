@@ -1,7 +1,7 @@
 // Peças visuais compartilhadas entre ProductCard e ProductDetailsModal, para
 // o card e o detalhe nunca divergirem nas regras de preço/promoção e de
 // estoque. Estilos em ProductCard.css.
-import { Product } from "../types/product";
+import type { Product } from "../types/product";
 import { getStockBadgeState } from "../context/cartReconciliation";
 
 export const formatBRL = (valor: number) => `R$ ${valor.toFixed(2).replace(".", ",")}`;

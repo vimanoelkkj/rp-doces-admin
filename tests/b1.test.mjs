@@ -45,7 +45,7 @@ async function editor(db, {afterOrderRead} = {}) {
     call({id = '1', body = valid, raw, cookie = session.cookie.split(';')[0]} = {}) {
       return app.adminItems.onRequestPut({
         env: {DB: observed}, params: {id},
-        request: new Request('https://local.test/api/admin/pedidos/' + id + '/itens', {
+        request: new Request(`https://local.test/api/admin/pedidos/${id}/itens`, {
           method: 'PUT',
           headers: {'Content-Type': 'application/json', Cookie: cookie, Origin: 'https://local.test'},
           body: raw ?? JSON.stringify(body),
@@ -100,15 +100,15 @@ const scenarios = [
     await db.prepare("UPDATE pedido_pagamentos SET metodo='A_COMBINAR',origem='ADMIN',mp_payment_id=NULL WHERE id=1").run();
   }},
   ...['NOVO', 'PREPARANDO', 'PRONTO', 'ENTREGUE', 'CANCELADO'].map(status => ({
-    name: 'operational status ' + status,
+    name: `operational status ${status}`,
     setup: db => db.prepare('UPDATE pedidos SET status_pedido=? WHERE id=1').bind(status).run(),
   })),
   ...['CANCELADO', 'EXPIRADO', 'FALHOU', 'REEMBOLSADO'].map(status => ({
-    name: 'terminal ledger status ' + status,
+    name: `terminal ledger status ${status}`,
     setup: db => db.prepare('UPDATE pedido_pagamentos SET status=? WHERE id=1').bind(status).run(),
   })),
 ];
-for (const scenario of scenarios) test('B1 direct API: ' + scenario.name, async t => {
+for (const scenario of scenarios) test(`B1 direct API: ${scenario.name}`, async t => {
   const db = await fixture(t, scenario.options);
   await scenario.setup?.(db);
   await db.prepare("UPDATE pedido_itens SET criado_em='2026-01-01',adicionado_em='2026-01-02',adicionado_por_usuario_id=1 WHERE id=1").run();
@@ -135,8 +135,8 @@ test('B1 validation: malformed input is controlled, authentication precedes vali
       {produtoId: 1.5, quantidade: 1}, {produtoId: 1, quantidade: '1'},
       {produtoId: 1, quantidade: 0}, {produtoId: 1, quantidade: -1},
       {produtoId: 1, quantidade: 1.5}, {produtoId: 1, quantidade: 51}]
-      .map((item, i) => ['invalid item ' + i, {body: {itens: [item]}}]),
-    ...['0', '-1', '1.5', 'abc', 'Infinity', ''].map(id => ['invalid ID ' + id, {id}]),
+      .map((item, i) => [`invalid item ${i}`, {body: {itens: [item]}}]),
+    ...['0', '-1', '1.5', 'abc', 'Infinity', ''].map(id => [`invalid ID ${id}`, {id}]),
   ];
   for (const [name, input] of invalid) await t.test(name, async () => {
     const response = await edit.call(input);
@@ -237,7 +237,7 @@ const concurrent = [
   },
 ];
 for (const operation of concurrent) for (const order of ['editor finishes before write', 'operation finishes after editor read']) {
-  test('B1 concurrency: ' + operation.name + ' / ' + order, {timeout: 20000}, async t => {
+  test(`B1 concurrency: ${operation.name} / ${order}`, {timeout: 20000}, async t => {
     const db = await fixture(t, operation.options);
     await operation.setup?.(db);
     const reached = deferred(), resume = deferred();

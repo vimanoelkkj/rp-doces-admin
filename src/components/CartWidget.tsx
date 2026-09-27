@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
-import { CartItem } from "../context/CartContext";
+import type { CartItem } from "../context/CartContext";
 import "./CartWidget.css";
 
 interface CartWidgetProps {

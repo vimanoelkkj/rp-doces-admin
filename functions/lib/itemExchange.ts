@@ -529,7 +529,7 @@ export async function createItemExchange(db: D1Database, params: {
       return {ok:false,erro:"PRECO_ALTERADO",precoAtualCentavos:precoVigenteCentavos(currentPrice)};
     throw error;
   }
-  let row=await exchangeById(db,(await buscarOperacao(db,parsed.key))!.pedido_item_troca_id!);
+  const row=await exchangeById(db,(await buscarOperacao(db,parsed.key))!.pedido_item_troca_id!);
   if(!row)return {ok:false,erro:"OPERACAO_INCOMPLETA"};
   return {ok:true,troca:await exchangeView(db,row)};
 }

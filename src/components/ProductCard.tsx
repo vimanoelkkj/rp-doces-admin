@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import "./ProductCard.css";
-import { Product } from "../types/product";
+import type { Product } from "../types/product";
 import { remainingAvailability } from "../context/cartReconciliation";
 import { ProductPrices, PromoBadge, StockBadge } from "./productDisplay";
 

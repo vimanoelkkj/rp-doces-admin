@@ -106,7 +106,7 @@ export default function Header({ variant }: HeaderProps) {
     pendingHashRef.current = null;
 
     if (location.pathname !== "/") {
-      navigate("/" + targetHash);
+      navigate(`/${targetHash}`);
       return;
     }
 
@@ -184,7 +184,7 @@ export default function Header({ variant }: HeaderProps) {
         window.history.pushState(null, "", hash);
       }
     } else {
-      navigate("/" + hash);
+      navigate(`/${hash}`);
     }
   };
 

@@ -352,7 +352,7 @@ function ProductItemRow({
           value={item.quantidade}
           disabled={disabled}
           onChange={(e) =>
-            onChangeQty(Math.max(1, parseInt(e.target.value) || 1))
+            onChangeQty(Math.max(1, parseInt(e.target.value, 10) || 1))
           }
         />
 

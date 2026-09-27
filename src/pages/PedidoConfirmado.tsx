@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { CartItem } from "../context/CartContext";
+import type { CartItem } from "../context/CartContext";
 import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
 import "./PedidoConfirmado.css";

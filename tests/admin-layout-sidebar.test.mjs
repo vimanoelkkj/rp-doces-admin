@@ -75,7 +75,7 @@ const bundle = await build({
   loader: {'.css': 'empty', '.png': 'dataurl', '.svg': 'dataurl', '.webp': 'dataurl'},
 });
 const ui = await import(
-  `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=admin-layout-bundle.mjs').toString('base64')}`
+  `data:text/javascript;base64,${Buffer.from(`${bundle.outputFiles[0].text}\n//# sourceURL=admin-layout-bundle.mjs`).toString('base64')}`
 );
 
 const flush = (ms = 30) => ui.act(async () => { await new Promise((r) => setTimeout(r, ms)); });

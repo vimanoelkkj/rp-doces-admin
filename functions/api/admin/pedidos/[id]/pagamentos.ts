@@ -4,7 +4,7 @@ import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
 import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../lib/pedidoAnulacao";
 
 import { requireUser, sameOrigin } from "../../../../lib/auth";
-import { registerAdminPayment, MetodoManual } from "../../../../lib/comandaLedger";
+import { registerAdminPayment, type MetodoManual } from "../../../../lib/comandaLedger";
 import {
   OPERACAO_HTTP_STATUS,
   OPERACAO_MENSAGENS,

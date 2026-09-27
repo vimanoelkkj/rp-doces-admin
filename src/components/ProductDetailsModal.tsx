@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import "./ProductCard.css";
 import "./ProductDetailsModal.css";
-import { Product } from "../types/product";
+import type { Product } from "../types/product";
 import { remainingAvailability } from "../context/cartReconciliation";
 import { ProductPrices, PromoBadge, StockBadge } from "./productDisplay";
 

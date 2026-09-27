@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
-import { CartItem, useCart } from "../context/CartContext";
+import { type CartItem, useCart } from "../context/CartContext";
 import { fetchProducts } from "../api/products";
 import {
   gravarOperationKey,

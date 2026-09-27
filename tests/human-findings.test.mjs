@@ -65,7 +65,7 @@ test('HUMAN-02/05: NOVO é canônico e só ação explícita inicia produção',
   assert.equal(createdResponse.status, 201);
   const created = await createdResponse.json();
 
-  let row = await db.prepare('SELECT status_pedido, status_pagamento FROM pedidos WHERE id=?')
+  const row = await db.prepare('SELECT status_pedido, status_pagamento FROM pedidos WHERE id=?')
     .bind(created.pedidoId).first();
   assert.deepEqual(row, {status_pedido: 'NOVO', status_pagamento: 'PENDENTE'});
 

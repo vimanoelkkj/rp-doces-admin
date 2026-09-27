@@ -140,7 +140,7 @@ const bundle = await build({
 });
 
 const ui = await import(
-  `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=cart-widget-focus-bundle.mjs').toString('base64')}`
+  `data:text/javascript;base64,${Buffer.from(`${bundle.outputFiles[0].text}\n//# sourceURL=cart-widget-focus-bundle.mjs`).toString('base64')}`
 );
 
 const container = document.getElementById('root');

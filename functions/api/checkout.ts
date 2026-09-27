@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { precoAtualCentavos, ProdutoRow } from "../lib/pricing";
+import { precoAtualCentavos, type ProdutoRow } from "../lib/pricing";
 import { liberarReservaPedido } from "../lib/stock";
 import { postPagamentoMp } from "../lib/mpPost";
 import { checkCheckoutRateLimit } from "../lib/checkoutRateLimit";

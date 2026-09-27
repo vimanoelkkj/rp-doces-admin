@@ -1,4 +1,4 @@
-import { Product } from "../types/product";
+import type { Product } from "../types/product";
 import { promocaoVigente, type PromocaoCampos } from "../../shared/promocao";
 
 interface ProdutoApiRow extends PromocaoCampos {

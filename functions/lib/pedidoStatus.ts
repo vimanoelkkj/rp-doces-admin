@@ -10,7 +10,7 @@ import {
 } from "./paymentSync";
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 import { pedidoTemEstoquePendente } from "./stock";
-import { type PushEnv } from "./pushNotifier";
+import type { PushEnv } from "./pushNotifier";
 
 export interface PedidoStatusRow {
   id: number;

@@ -3,7 +3,7 @@
 import { pedidoValidoSql } from "../lib/pedidoValido";
 import { sameOrigin } from "../lib/auth";
 
-import { readPedidoStatus, refreshPedidoStatus, PedidoStatusRow } from "../lib/pedidoStatus";
+import { readPedidoStatus, refreshPedidoStatus, type PedidoStatusRow } from "../lib/pedidoStatus";
 
 interface Env {
   DB: D1Database;

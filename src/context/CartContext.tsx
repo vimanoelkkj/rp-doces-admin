@@ -1,9 +1,9 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import {
   calculateAddQuantity,
   calculateUpdateQuantity,
   reconcileCartWithCatalog,
-  ItemWithAvailability,
+  type ItemWithAvailability,
 } from "./cartReconciliation";
 
 export interface CartItem {

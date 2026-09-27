@@ -592,7 +592,7 @@ function ProductItemRow({
           max={selected ? estoqueLivre(selected) : undefined}
           value={item.quantidade}
           onChange={(e) => {
-            const parsed = Math.max(1, parseInt(e.target.value) || 1);
+            const parsed = Math.max(1, parseInt(e.target.value, 10) || 1);
             const limite = selected ? estoqueLivre(selected) : parsed;
             onChangeQty(Math.min(parsed, limite || 1));
           }}
