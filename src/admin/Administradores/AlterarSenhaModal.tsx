@@ -106,7 +106,7 @@ export default function AlterarSenhaModal({
                 : `Nova senha para ${adminNome}.`}
             </p>
           </div>
-          <button className="nadm-close" onClick={handleClose}>
+          <button type="button" className="nadm-close" onClick={handleClose}>
             <IconClose />
           </button>
         </div>

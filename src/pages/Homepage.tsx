@@ -838,6 +838,7 @@ export default function Homepage() {
       </main>
       {createPortal(
         <button
+          type="button"
           className={`back-to-top ${showBackToTop ? "back-to-top--visible" : ""}`}
           onClick={scrollToTop}
           aria-label="Voltar ao topo"

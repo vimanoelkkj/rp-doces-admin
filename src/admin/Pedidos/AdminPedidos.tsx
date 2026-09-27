@@ -251,6 +251,7 @@ export default function AdminPedidos() {
           </div>
           <div className="ped-header-actions">
             <button
+              type="button"
               className="ped-btn-primary"
               onClick={() => setNovoPedidoOpen(true)}
             >
@@ -299,6 +300,7 @@ export default function AdminPedidos() {
             <div className="ped-tabs">
               {TABS.map((tab) => (
                 <button
+                  type="button"
                   key={tab.key}
                   className={`ped-tab${activeTab === tab.key ? " ped-tab--active" : ""}`}
                   onClick={() => setActiveTab(tab.key)}
@@ -367,6 +369,7 @@ export default function AdminPedidos() {
             </span>
             <div className="ped-pagination-controls">
               <button
+                type="button"
                 className="ped-page-btn ped-page-arrow"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
@@ -387,6 +390,7 @@ export default function AdminPedidos() {
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(
                 (page) => (
                   <button
+                    type="button"
                     key={page}
                     className={`ped-page-btn ped-page-num${currentPage === page ? " ped-page-num--active" : ""}`}
                     onClick={() => setCurrentPage(page)}
@@ -396,6 +400,7 @@ export default function AdminPedidos() {
                 ),
               )}
               <button
+                type="button"
                 className="ped-page-btn ped-page-arrow"
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))

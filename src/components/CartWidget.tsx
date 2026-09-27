@@ -303,6 +303,7 @@ export default function CartWidget({
               <div className="cart-modal-header">
                 <h2 id="cart-modal-title">Seu pedido</h2>
                 <button
+                  type="button"
                   ref={closeButtonRef}
                   className="cart-close-btn"
                   onClick={(e) => {
@@ -390,6 +391,7 @@ export default function CartWidget({
                               </span>
                               <div className="cart-qty-controls">
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.currentTarget.blur();
                                     onUpdateQuantity(item.id, item.quantity - 1);
@@ -419,6 +421,7 @@ export default function CartWidget({
                                   {item.quantity}
                                 </motion.span>
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.currentTarget.blur();
                                     onUpdateQuantity(item.id, item.quantity + 1);
@@ -446,6 +449,7 @@ export default function CartWidget({
                               </div>
                             </div>
                             <button
+                              type="button"
                               className="cart-remove-btn"
                               onClick={() => onRemoveItem(item.id)}
                               aria-label="Remover"
@@ -483,6 +487,7 @@ export default function CartWidget({
                         Cambuí.
                       </p>
                       <button
+                        type="button"
                         className="cart-checkout-btn"
                         onClick={(e) => {
                           e.currentTarget.blur();
@@ -492,6 +497,7 @@ export default function CartWidget({
                         CONTINUAR PARA PAGAMENTO
                       </button>
                       <button
+                        type="button"
                         className="cart-continue-btn"
                         onClick={(e) => {
                           e.currentTarget.blur();

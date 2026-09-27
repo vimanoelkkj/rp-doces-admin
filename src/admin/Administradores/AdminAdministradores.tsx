@@ -163,6 +163,7 @@ export default function AdminAdministradores() {
         </div>
         {isOwner && (
           <button
+            type="button"
             className="adm-btn-new"
             onClick={() => setNovoAdminOpen(true)}
           >
@@ -259,6 +260,7 @@ export default function AdminAdministradores() {
               <div className="adm-card-actions">
                 {(isYou || isOwner) && (
                   <button
+                    type="button"
                     className="adm-action-btn"
                     onClick={() => setSenhaAlvo(admin)}
                   >
@@ -268,6 +270,7 @@ export default function AdminAdministradores() {
                 {!isYou && isOwner && (
                   <>
                     <button
+                      type="button"
                       className="adm-action-btn"
                       onClick={() =>
                         executarAcao(admin.id, {
@@ -281,6 +284,7 @@ export default function AdminAdministradores() {
                         : "Tornar mestre"}
                     </button>
                     <button
+                      type="button"
                       className="adm-action-btn adm-action-btn--danger"
                       onClick={() =>
                         executarAcao(admin.id, {

@@ -205,6 +205,7 @@ export default function AdminDashboard() {
               onChange={(d) => setSelectedDate(formatDateISO(d))}
             />
             <button
+              type="button"
               className="dash-btn-today"
               onClick={() => setSelectedDate(null)}
             >

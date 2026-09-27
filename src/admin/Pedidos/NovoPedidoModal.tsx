@@ -320,7 +320,7 @@ export default function NovoPedidoModal({
               Balcão, WhatsApp, boca a boca ou pedido feito fora do site.
             </p>
           </div>
-          <button className="nped-close" onClick={onClose}>
+          <button type="button" className="nped-close" onClick={onClose}>
             <IconClose />
           </button>
         </div>

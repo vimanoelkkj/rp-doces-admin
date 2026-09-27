@@ -285,7 +285,7 @@ export default function TrocarItemModal({
               {item.produto_nome} · {money(item.valor_total_centavos)}
             </p>
           </div>
-          <button className="additem-close" onClick={onClose}>
+          <button type="button" className="additem-close" onClick={onClose}>
             ×
           </button>
         </header>
@@ -429,10 +429,11 @@ export default function TrocarItemModal({
               </>
             )}
             <footer className="additem-actions">
-              <button className="additem-cancel" onClick={onClose}>
+              <button type="button" className="additem-cancel" onClick={onClose}>
                 Voltar
               </button>
               <button
+                type="button"
                 className="additem-confirm"
                 onClick={() => void confirm()}
                 disabled={!preview?.trocaExecutavel || saving}
@@ -483,7 +484,7 @@ export default function TrocarItemModal({
                   <span>{money(leg.valorCentavos)}</span>
                 </div>
                 {leg.confirmacaoManualPermitida ? (
-                  <button onClick={() => void refund(leg)} disabled={saving}>
+                  <button type="button" onClick={() => void refund(leg)} disabled={saving}>
                     Confirmar devolução
                   </button>
                 ) : (
@@ -495,7 +496,7 @@ export default function TrocarItemModal({
                       <span>O Mercado Pago recusou esta tentativa. Revise antes de iniciar outra operação.</span>
                     )}
                     {remoteCanRun(leg) ? (
-                      <button onClick={() => void refund(leg)} disabled={saving}>{remoteLabel(leg)}</button>
+                      <button type="button" onClick={() => void refund(leg)} disabled={saving}>{remoteLabel(leg)}</button>
                     ) : (
                       <span>{remoteLabel(leg)}</span>
                     )}
@@ -509,7 +510,7 @@ export default function TrocarItemModal({
                   ? `Pendente: ${money(exchange.reembolsoPendenteCentavos)}`
                   : "Sem devoluções pendentes"}
               </span>
-              <button onClick={onClose}>Fechar</button>
+              <button type="button" onClick={onClose}>Fechar</button>
             </div>
           </div>
         )}

@@ -202,7 +202,7 @@ export default function EditarPedidoModal({
               Adicione ou remova produtos desta comanda.
             </p>
           </div>
-          <button className="nped-close" onClick={onClose}>
+          <button type="button" className="nped-close" onClick={onClose}>
             <IconClose />
           </button>
         </div>

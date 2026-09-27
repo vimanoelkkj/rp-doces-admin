@@ -200,7 +200,7 @@ export default function PedidoHeader({
             </button>
           </details>
         )}
-        <button className="pedmodal-btn-close" onClick={onClose}>
+        <button type="button" className="pedmodal-btn-close" onClick={onClose}>
           <svg
             width="16"
             height="16"

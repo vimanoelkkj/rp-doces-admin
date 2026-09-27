@@ -150,6 +150,7 @@ export default function Cardapio() {
             aria-label="Filtrar produtos"
           >
             <button
+              type="button"
               role="tab"
               aria-selected={activeFilter === null}
               className={`filter-tab ${activeFilter === null ? "active" : ""}`}
@@ -162,6 +163,7 @@ export default function Cardapio() {
             </button>
             {!mostrarSkeleton && categories.map(({ slug, nome }) => (
               <button
+                type="button"
                 key={slug}
                 role="tab"
                 aria-selected={activeFilter === slug}

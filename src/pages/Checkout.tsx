@@ -78,6 +78,7 @@ export default function Checkout() {
           <h1>Seu carrinho está vazio</h1>
           <p>Adicione produtos antes de finalizar o pedido.</p>
           <button
+            type="button"
             className="back-to-menu-btn"
             onClick={() => navigate("/cardapio")}
           >

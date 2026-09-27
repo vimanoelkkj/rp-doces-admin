@@ -152,10 +152,11 @@ export default function PagamentoNaoAprovado() {
           <div className="recusado-divider" />
 
           {/* Ações */}
-          <button className="recusado-btn-primary" onClick={handleRetry}>
+          <button type="button" className="recusado-btn-primary" onClick={handleRetry}>
             TENTAR NOVAMENTE
           </button>
           <button
+            type="button"
             className="recusado-btn-secondary"
             onClick={() => navigate("/")}
           >

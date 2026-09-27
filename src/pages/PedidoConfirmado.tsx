@@ -300,7 +300,7 @@ export default function PedidoConfirmado() {
             </div>
           </div>
 
-          <button className="confirmado-btn" onClick={handleBackToMenu}>
+          <button type="button" className="confirmado-btn" onClick={handleBackToMenu}>
             VOLTAR AO INÍCIO
           </button>
           {state.tokenPublico && (

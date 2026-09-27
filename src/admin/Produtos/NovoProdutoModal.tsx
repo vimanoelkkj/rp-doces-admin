@@ -390,7 +390,7 @@ export default function NovoProdutoModal({
                 : "Cadastre um doce e ele já entra no catálogo administrativo."}
             </p>
           </div>
-          <button className="np-close" onClick={onClose}>
+          <button type="button" className="np-close" onClick={onClose}>
             <IconClose />
           </button>
         </div>

@@ -423,6 +423,7 @@ export default function AdminSidebar() {
               <span className="sidebar-user-role">{userRole}</span>
             </div>
             <button
+              type="button"
               className="sidebar-logout-btn"
               title="Sair"
               onClick={logout}

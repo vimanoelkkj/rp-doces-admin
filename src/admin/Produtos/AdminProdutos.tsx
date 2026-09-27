@@ -175,12 +175,14 @@ export default function AdminProdutos() {
           </div>
           <div className="prod-header-actions">
             <button
+              type="button"
               className="prod-btn-outline"
               onClick={() => setCategoriasOpen(true)}
             >
               Gerenciar categorias
             </button>
             <button
+              type="button"
               className="prod-btn-primary"
               onClick={() => setShowNewProduct(true)}
             >
@@ -205,6 +207,7 @@ export default function AdminProdutos() {
             <div className="prod-tabs">
               {tabs.map((tab) => (
                 <button
+                  type="button"
                   key={tab.key}
                   className={`prod-tab${
                     activeTab === tab.key ? " prod-tab--active" : ""

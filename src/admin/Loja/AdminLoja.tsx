@@ -355,6 +355,7 @@ export default function AdminLoja() {
                 <div className="loj-days-row">
                   {days.map((day, i) => (
                     <button
+                      type="button"
                       key={day.label}
                       className={`loj-day-pill ${day.active ? "loj-day-pill--active" : ""}`}
                       onClick={() => toggleDay(i)}
@@ -425,18 +426,21 @@ export default function AdminLoja() {
               <h2 className="loj-panel-title">Entregas</h2>
               <div className="loj-delivery-row">
                 <button
+                  type="button"
                   className={`loj-delivery-pill ${deliveryStatus === "soon" ? "loj-delivery-pill--active" : ""}`}
                   onClick={() => setDeliveryStatus("soon")}
                 >
                   Em breve
                 </button>
                 <button
+                  type="button"
                   className={`loj-delivery-pill ${deliveryStatus === "available" ? "loj-delivery-pill--active" : ""}`}
                   onClick={() => setDeliveryStatus("available")}
                 >
                   Disponíveis
                 </button>
                 <button
+                  type="button"
                   className={`loj-delivery-pill ${deliveryStatus === "unavailable" ? "loj-delivery-pill--active" : ""}`}
                   onClick={() => setDeliveryStatus("unavailable")}
                 >
@@ -563,8 +567,9 @@ export default function AdminLoja() {
                   </div>
                   <span className="loj-image-label">Imagem principal</span>
                   <div className="loj-image-actions">
-                    <button className="loj-image-link">Escolher</button>
+                    <button type="button" className="loj-image-link">Escolher</button>
                     <button
+                      type="button"
                       className="loj-image-link"
                       onClick={() => setHeroImg(null)}
                     >
@@ -582,8 +587,9 @@ export default function AdminLoja() {
                   </div>
                   <span className="loj-image-label">Nossa história</span>
                   <div className="loj-image-actions">
-                    <button className="loj-image-link">Escolher</button>
+                    <button type="button" className="loj-image-link">Escolher</button>
                     <button
+                      type="button"
                       className="loj-image-link"
                       onClick={() => setStoryImg(null)}
                     >
@@ -603,6 +609,7 @@ export default function AdminLoja() {
             <p className="loj-diag-success">Alterações salvas e publicadas.</p>
           )}
           <button
+            type="button"
             className="loj-btn-save"
             onClick={salvarConfiguracoes}
             disabled={configSaving || configLoading}
@@ -641,6 +648,7 @@ export default function AdminLoja() {
                 o banco está de pé e ativa.
               </p>
               <button
+                type="button"
                 className="loj-diag-action"
                 onClick={gerarPixDiagnostico}
                 disabled={pixLoading}
@@ -740,6 +748,7 @@ export default function AdminLoja() {
                 operando.
               </p>
               <button
+                type="button"
                 className="loj-diag-action"
                 onClick={dispararPedidoTeste}
                 disabled={testeLoading}

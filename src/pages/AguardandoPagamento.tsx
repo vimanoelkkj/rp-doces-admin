@@ -325,6 +325,7 @@ export default function AguardandoPagamento() {
               <p className="payment-subtitle">{errorMessage}</p>
               <div className="aguardando-error-actions" style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%", maxWidth: "300px", margin: "20px auto 0" }}>
                 <button
+                  type="button"
                   className="payment-btn-primary"
                   onClick={() => navigate("/checkout")}
                 >
@@ -363,7 +364,7 @@ export default function AguardandoPagamento() {
 
               <div className="pix-copy-row">
                 <span className="pix-copy-label">PIX COPIA E COLA</span>
-                <button className="pix-copy-btn" onClick={handleCopy} disabled={prazoEncerrado}>
+                <button type="button" className="pix-copy-btn" onClick={handleCopy} disabled={prazoEncerrado}>
                   {copied ? "Copiado!" : "Copiar código"}
                 </button>
               </div>

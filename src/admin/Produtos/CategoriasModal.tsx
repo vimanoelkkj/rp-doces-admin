@@ -111,7 +111,7 @@ export default function CategoriasModal({
               Crie categorias e use-as imediatamente nos produtos do cardápio.
             </p>
           </div>
-          <button className="catm-close" onClick={onClose}>
+          <button type="button" className="catm-close" onClick={onClose}>
             <IconClose />
           </button>
         </div>
@@ -222,7 +222,7 @@ export default function CategoriasModal({
           <span className="catm-footer-count">
             {categories.length} categorias no catálogo
           </span>
-          <button className="catm-btn-close" onClick={onClose}>
+          <button type="button" className="catm-btn-close" onClick={onClose}>
             Fechar
           </button>
         </div>

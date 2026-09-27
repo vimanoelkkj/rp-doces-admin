@@ -169,7 +169,7 @@ export default function NovoAdminModal({
               Crie uma conta para um novo membro da equipe.
             </p>
           </div>
-          <button className="nadm-close" onClick={onClose}>
+          <button type="button" className="nadm-close" onClick={onClose}>
             <IconClose />
           </button>
         </div>
