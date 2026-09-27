@@ -9,6 +9,7 @@
     "typecheck": "npm run typecheck:frontend && npm run typecheck:functions",
     "typecheck:frontend": "tsc --noEmit",
     "typecheck:functions": "tsc --noEmit -p tsconfig.functions.json",
+    "lint": "biome check .",
     "test": "node scripts/run-tests.mjs",
     "test:e2e": "playwright test",
     "test:cached": "node scripts/run-tests-cached.mjs",
@@ -26,6 +27,7 @@
     "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.14",
     "@cloudflare/workers-types": "^4.20260702.1",
     "@playwright/test": "^1.63.0",
     "@types/react": "^18.3.3",
