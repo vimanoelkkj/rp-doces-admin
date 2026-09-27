@@ -219,7 +219,7 @@ export async function createManualPedido(
       }),
     ];
 
-    let batchResults;
+    let batchResults: D1Result[];
     try {
       batchResults = await env.DB.batch(statements);
     } catch (err) {

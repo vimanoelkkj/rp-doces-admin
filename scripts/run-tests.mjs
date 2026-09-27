@@ -56,8 +56,9 @@ function forwardLines(stream, target) {
   stream.setEncoding("utf8");
   stream.on("data", (chunk) => {
     pending += chunk;
-    let newline;
-    while ((newline = pending.indexOf("\n")) !== -1) {
+    while (true) {
+      const newline = pending.indexOf("\n");
+      if (newline === -1) break;
       target.write(`${sanitizeLine(pending.slice(0, newline))}\n`);
       pending = pending.slice(newline + 1);
     }
@@ -146,10 +147,13 @@ if (verifyTotal !== undefined) {
   if (new Set(seen).size !== seen.length) problems.push("há arquivo repetido entre fatias");
   for (const file of files) if (!seen.includes(file)) problems.push(`fora de todas as fatias: ${rel(file)}`);
   for (const orphan of orphanTestFiles()) problems.push(`teste fora do runner (não seria executado): ${rel(orphan)}`);
-  bins.forEach((bin, i) =>
-    console.log(`fatia ${i + 1}/${total}: ${bin.files.length} arquivos, peso ${bin.weight.toFixed(1)}`));
+  bins.forEach((bin, i) => {
+    console.log(`fatia ${i + 1}/${total}: ${bin.files.length} arquivos, peso ${bin.weight.toFixed(1)}`);
+  });
   if (problems.length) {
-    problems.forEach((p) => console.error(`ERRO: ${p}`));
+    problems.forEach((p) => {
+      console.error(`ERRO: ${p}`);
+    });
     process.exit(1);
   }
   console.log(`OK: ${files.length} arquivos, cada um em exatamente uma das ${total} fatias.`);
@@ -171,7 +175,9 @@ if (shard !== undefined) {
 }
 
 if (flag("list")) {
-  selected.forEach((file) => console.log(rel(file)));
+  selected.forEach((file) => {
+    console.log(rel(file));
+  });
   process.exit(0);
 }
 
@@ -204,7 +210,9 @@ const total = results.reduce((sum, r) => sum + r.seconds, 0);
 const failed = results.filter((r) => !r.ok);
 const slowest = [...results].sort((a, b) => b.seconds - a.seconds).slice(0, 10);
 console.log(`\nResumo${label ? ` (${label})` : ""}: ${results.length} arquivos em ${total.toFixed(0)}s, ${failed.length} com falha`);
-slowest.forEach((r) => console.log(`  ${r.seconds.toFixed(1).padStart(7)}s  ${r.file}`));
+slowest.forEach((r) => {
+  console.log(`  ${r.seconds.toFixed(1).padStart(7)}s  ${r.file}`);
+});
 
 if (process.env.GITHUB_STEP_SUMMARY) {
   const lines = [

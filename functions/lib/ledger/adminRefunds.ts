@@ -226,7 +226,7 @@ export async function registerManualRefund(
   // Sem key, o caminho continua sendo exatamente o `.run()` de uma única
   // instrução que já existia — nenhuma mudança de comportamento nos
   // chamadores internos.
-  let result;
+  let result: D1Result;
   try {
     result = operationKey && identidade
       ? (

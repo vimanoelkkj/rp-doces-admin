@@ -273,7 +273,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   // (estoque_reservado <= estoque) de `produtos`, avaliado por linha no
   // instante de cada UPDATE — se violar, o batch inteiro (pedido, itens,
   // pagamento, alocações, reserva) é revertido.
-  let batchResults;
+  let batchResults: D1Result[];
   try {
     batchResults = await env.DB.batch([
       // B5: `cliente_email`, `produto_nome`, `quantidade` e

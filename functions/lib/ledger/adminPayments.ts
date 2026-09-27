@@ -243,7 +243,7 @@ export async function registerAdminPayment(
       : { ok: false, erro: replay.erro };
   };
 
-  let batchResults;
+  let batchResults: D1Result[];
   try {
     batchResults = await db.batch(statements);
   } catch {

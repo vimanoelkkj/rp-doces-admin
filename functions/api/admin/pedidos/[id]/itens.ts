@@ -453,7 +453,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         )
     `).bind(pedidoId, operationKey);
 
-    let results;
+    let results: D1Result[];
     try {
       results = await env.DB.batch([
         insertItem,

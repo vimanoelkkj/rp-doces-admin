@@ -121,12 +121,12 @@ async function installSampler(page: Page) {
           const kfs = eff!.getKeyframes() as Keyframe[];
           if (!known) {
             const props = new Set<string>();
-            kfs.forEach((k) =>
+            kfs.forEach((k) => {
               Object.keys(k).forEach((p) => {
                 if (!["offset", "easing", "composite", "computedOffset"].includes(p))
                   props.add(p);
-              }),
-            );
+              });
+            });
             w.__anims.push({
               pseudo,
               properties: [...props],

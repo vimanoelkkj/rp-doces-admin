@@ -414,7 +414,7 @@ export async function createAdminPixCharge(
       : []),
   ];
 
-  let batchResults;
+  let batchResults: D1Result[];
   try {
     batchResults = await db.batch(statements);
   } catch (err) {

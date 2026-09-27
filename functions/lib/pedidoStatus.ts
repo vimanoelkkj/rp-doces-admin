@@ -3,6 +3,7 @@
 import { resolveLedgerPaymentId } from "./comandaLedger";
 import {
   claimPendingPixPaymentReconciliation,
+  type MpPaymentResponse,
   syncPaymentFromMp,
   expireLocalPayment,
   fetchMpPayment,
@@ -109,7 +110,7 @@ export async function refreshPedidoStatus(
   const tentativa = await db.prepare(`SELECT mp_payment_id, pix_expira_em FROM pedido_pagamentos WHERE id = ?`)
     .bind(pagamentoId).first<{ mp_payment_id: string | null; pix_expira_em: string | null }>();
   const mpId = tentativa?.mp_payment_id ?? pedido.mp_payment_id;
-  let payment;
+  let payment: MpPaymentResponse | undefined;
   // M7: no máximo uma consulta ao MP por tentativa a cada 15s, qualquer que
   // seja o ritmo do polling. Sem o claim, segue só com o estado local (a
   // expiração abaixo continua valendo).

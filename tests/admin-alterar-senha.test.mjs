@@ -92,7 +92,9 @@ function changeValue(element, value) {
 
 function mountModal(props) {
   const container = dom.window.document.getElementById('root');
-  dom.window.document.querySelectorAll('.nadm-overlay').forEach((el) => el.remove());
+  dom.window.document.querySelectorAll('.nadm-overlay').forEach((el) => {
+    el.remove();
+  });
   container.innerHTML = '';
   return ui.mount(container, props);
 }
@@ -622,7 +624,9 @@ test('AdminAdministradores: ao alterar a senha da própria conta, logout() é ch
   });
 
   const container = dom.window.document.getElementById('root');
-  dom.window.document.querySelectorAll('.nadm-overlay').forEach((el) => el.remove());
+  dom.window.document.querySelectorAll('.nadm-overlay').forEach((el) => {
+    el.remove();
+  });
   container.innerHTML = '';
 
   let root;
@@ -715,7 +719,9 @@ test('AdminAdministradores: ao redefinir a senha de outra conta, logout() NÃO �
   });
 
   const container = dom.window.document.getElementById('root');
-  dom.window.document.querySelectorAll('.nadm-overlay').forEach((el) => el.remove());
+  dom.window.document.querySelectorAll('.nadm-overlay').forEach((el) => {
+    el.remove();
+  });
   container.innerHTML = '';
 
   let root;

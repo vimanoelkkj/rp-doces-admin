@@ -6,7 +6,13 @@
 // helper central `syncPaymentFromMp` (mesmo caminho usado pela
 // reconciliação oportunista do admin e pelo polling público).
 
-import { fetchMpPayment, resolveWebhookPayment, syncPaymentFromMp, validateMpWebhookSignature } from "../../lib/paymentSync";
+import {
+  fetchMpPayment,
+  type MpPaymentResponse,
+  resolveWebhookPayment,
+  syncPaymentFromMp,
+  validateMpWebhookSignature,
+} from "../../lib/paymentSync";
 
 interface Env {
   DB: D1Database;
@@ -64,7 +70,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   try {
-    let payment;
+    let payment: MpPaymentResponse;
     try {
       payment = await fetchMpPayment(env.MP_ACCESS_TOKEN, dataId);
     } catch (err) {

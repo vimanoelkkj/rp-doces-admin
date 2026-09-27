@@ -397,7 +397,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     const result = await main();
     if (!result.ok) {
       console.error("::error::Deploy BLOQUEADO: as migrations do D1 de produção não estão em dia.");
-      result.problems.forEach(p => console.error(`  - ${p}`));
+      result.problems.forEach(p => {
+        console.error(`  - ${p}`);
+      });
       summary(["### Deploy bloqueado: migrations D1", "", ...result.problems.map(p => `- ${p}`)]);
       process.exit(EXIT.BLOCKED);
     }
@@ -420,7 +422,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     console.error(
       `::error::Deploy BLOQUEADO: não foi possível confirmar as migrations do D1. ${error.message}`
     );
-    (error.details ?? []).forEach(d => console.error(`  - ${d}`));
+    (error.details ?? []).forEach(d => {
+      console.error(`  - ${d}`);
+    });
     summary(["### Deploy bloqueado: verificação de migrations D1 falhou", "", error.message]);
     process.exit(exitCode);
   }
