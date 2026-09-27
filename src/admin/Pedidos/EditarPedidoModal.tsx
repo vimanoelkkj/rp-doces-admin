@@ -73,9 +73,20 @@ const IconRemove = () => (
 
 /* ── Types ── */
 interface EditItem {
+  // Estável por linha, nunca reaproveitado pelo índice do array: usado como
+  // React key para o dropdown de cada linha (`useDropdown()`, estado local
+  // `open`) não vazar para a linha errada quando um item do meio é removido.
+  id: number;
   produtoId: number | null;
   quantidade: number;
 }
+
+let nextEditItemId = 0;
+const newEditItem = (produtoId: number | null, quantidade: number): EditItem => ({
+  id: nextEditItemId++,
+  produtoId,
+  quantidade,
+});
 
 interface PedidoItemRow {
   produto_id: number | null;
@@ -146,10 +157,7 @@ export default function EditarPedidoModal({
       .then(([detalhe, catalogo]) => {
         setProdutos(catalogo.produtos);
         setItems(
-          detalhe.itens.map((item) => ({
-            produtoId: item.produto_id,
-            quantidade: item.quantidade,
-          })),
+          detalhe.itens.map((item) => newEditItem(item.produto_id, item.quantidade)),
         );
         setError(null);
       })
@@ -168,7 +176,7 @@ export default function EditarPedidoModal({
   };
 
   const addItem = () => {
-    setItems((prev) => [...prev, { produtoId: null, quantidade: 1 }]);
+    setItems((prev) => [...prev, newEditItem(null, 1)]);
   };
 
   const produtoPorId = new Map(produtos.map((p) => [p.id, p]));
@@ -230,7 +238,7 @@ export default function EditarPedidoModal({
 
               {items.map((item, i) => (
                 <ProductItemRow
-                  key={i}
+                  key={item.id}
                   item={item}
                   produtos={produtos}
                   onChangeProduct={(idx) => updateItem(i, "produtoId", idx)}

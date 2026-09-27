@@ -79,9 +79,20 @@ const IconRemove = () => (
 
 /* ── Types ── */
 interface OrderItem {
+  // Estável por linha, nunca reaproveitado pelo índice do array: usado como
+  // React key para o dropdown de cada linha (`useDropdown()`, estado local
+  // `open`) não vazar para a linha errada quando um item do meio é removido.
+  id: number;
   produtoId: number | null;
   quantidade: number;
 }
+
+let nextOrderItemId = 0;
+const newOrderItem = (): OrderItem => ({
+  id: nextOrderItemId++,
+  produtoId: null,
+  quantidade: 1,
+});
 
 type MetodoPagamento = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO" | "A_COMBINAR";
 type StatusPagamento = "PENDENTE" | "PAGO";
@@ -143,9 +154,7 @@ export default function NovoPedidoModal({
 }: NovoPedidoModalProps) {
   const [clientName, setClientName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
-  const [items, setItems] = useState<OrderItem[]>([
-    { produtoId: null, quantidade: 1 },
-  ]);
+  const [items, setItems] = useState<OrderItem[]>([newOrderItem()]);
   const [metodoPagamento, setMetodoPagamento] = useState<MetodoPagamento>("DINHEIRO");
   const [statusPagamento, setStatusPagamento] = useState<StatusPagamento>("PENDENTE");
   const [observation, setObservation] = useState("");
@@ -177,7 +186,7 @@ export default function NovoPedidoModal({
     if (!open) return;
     setClientName("");
     setWhatsapp("");
-    setItems([{ produtoId: null, quantidade: 1 }]);
+    setItems([newOrderItem()]);
     setMetodoPagamento("DINHEIRO");
     setStatusPagamento("PENDENTE");
     setObservation("");
@@ -221,7 +230,7 @@ export default function NovoPedidoModal({
     setItems((prev) =>
       prev.length >= MAX_ITENS_PEDIDO_MANUAL
         ? prev
-        : [...prev, { produtoId: null, quantidade: 1 }],
+        : [...prev, newOrderItem()],
     );
   };
 
@@ -373,7 +382,7 @@ export default function NovoPedidoModal({
 
               {items.map((item, i) => (
                 <ProductItemRow
-                  key={i}
+                  key={item.id}
                   item={item}
                   produtos={produtosSelecionaveis}
                   onChangeProduct={(id) => updateItem(i, "produtoId", id)}
