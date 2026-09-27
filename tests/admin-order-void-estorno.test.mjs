@@ -37,6 +37,12 @@ const postEstorno = (db, session, body = {operationKey: KEY}, env = {MP_ACCESS_T
 
 async function corpo(response) { return {status: response.status, body: await response.json()}; }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return {promise, resolve};
+}
+
 // Pedido #1: PIX_MP PAGO R$100 (10000 centavos), manual/admin, comanda aberta
 // — a mesma forma de "pedido #50" do enunciado (payments MP + historico).
 async function pedidoComMp(t, overrides = {}) {
@@ -108,9 +114,24 @@ test('3: restante = recebido - refunds MP confirmados, nunca refaz refund ja pag
 // 4) clique duplo nao gera dois refunds
 test('4: duas requests POST concorrentes com a mesma operationKey nao duplicam o refund', async t => {
   const {db, session} = await pedidoComMp(t);
-  mockRefundAprovado(t);
-  const [a, b] = await Promise.all([postEstorno(db, session), postEstorno(db, session)]);
-  assert.deepEqual([a.status, b.status].sort(), [200, 200]);
+  const firstArrived = deferred();
+  const releaseFirst = deferred();
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, init = {}) => {
+    posts++;
+    firstArrived.resolve();
+    await releaseFirst.promise;
+    const body = init.body ? JSON.parse(init.body) : {};
+    return Response.json({id: 9001, payment_id: 101, amount: body.amount, status: 'approved'},
+      {status: 201});
+  });
+  const firstPromise = postEstorno(db, session);
+  await firstArrived.promise;
+  const second = await postEstorno(db, session);
+  releaseFirst.resolve();
+  const first = await firstPromise;
+  assert.deepEqual([first.status, second.status], [200, 202]);
+  assert.equal(posts, 1);
   const refunds = (await state(db)).refunds;
   assert.equal(refunds.length, 1);
   assert.equal(refunds[0].valor_centavos, 10000);

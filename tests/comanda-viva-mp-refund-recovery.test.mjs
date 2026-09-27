@@ -31,6 +31,22 @@ function refundInput(cancellation, leg, operationKey = 'refund-mp-operation-01')
     valorCentavos: leg.valorCentavos, confirmacao: true, mpAccessToken: 'TEST_TOKEN' };
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+async function refundCapacity(db, paymentId = 1) {
+  const row = await db.prepare(`SELECT pp.valor_centavos AS paid,
+    COALESCE((SELECT SUM(valor_centavos) FROM pedido_reembolsos
+      WHERE pagamento_id=pp.id AND status='REEMBOLSADO'),0) AS refunded,
+    COALESCE((SELECT SUM(valor_centavos) FROM pedido_reembolso_pix_mp_intencoes
+      WHERE pagamento_id=pp.id AND status IN ('PENDENTE','PROCESSANDO','INCONCLUSIVO')),0) AS reserved
+    FROM pedido_pagamentos pp WHERE pp.id=?`).bind(paymentId).first();
+  return { ...row, remaining: row.paid - row.refunded - row.reserved };
+}
+
 async function exchangeScenario(t, { destination = 1200, mixed = false } = {}) {
   const db = await fixture(t, { ledger: false, reserve: 'ATIVA' });
   const statements = [
@@ -63,6 +79,40 @@ async function exchangeScenario(t, { destination = 1200, mixed = false } = {}) {
   return { db, exchange: created.troca };
 }
 
+async function twoLegCapacityScenario(t) {
+  const db = await fixture(t, { ledger: false, reserve: 'ATIVA' });
+  await db.batch([
+    db.prepare(`UPDATE pedidos SET origem_pedido='MANUAL',status_comanda='ABERTA',
+      status_pagamento='PAGO',valor_total_centavos=10000 WHERE id=1`),
+    db.prepare(`UPDATE pedido_itens SET quantidade=1,valor_unitario_centavos=6000,
+      valor_total_centavos=6000 WHERE id=1`),
+    db.prepare(`INSERT INTO produtos(id,nome,categoria,preco_centavos,estoque,estoque_reservado)
+      VALUES(2,'Doce','DOCE',4000,10,1)`),
+    db.prepare(`INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,
+      valor_unitario_centavos,valor_total_centavos,status_item,estoque_estado,estoque_reservado_em)
+      VALUES(2,1,2,'Doce',1,4000,4000,'ATIVO','RESERVADO',CURRENT_TIMESTAMP)`),
+    db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+      mp_payment_id,idempotency_key,pago_em)
+      VALUES(1,1,'PIX_MP','ADMIN',10000,'PAGO','9901','capacity-payment',CURRENT_TIMESTAMP)`),
+    db.prepare(`INSERT INTO pedido_pagamento_alocacoes(id,pagamento_id,pedido_item_id,valor_centavos)
+      VALUES(1,1,1,6000)`),
+    db.prepare(`INSERT INTO pedido_pagamento_alocacoes(id,pagamento_id,pedido_item_id,valor_centavos)
+      VALUES(2,1,2,4000)`),
+    db.prepare(`INSERT INTO pedido_item_cancelamentos(id,pedido_id,pedido_item_id,status,
+      valor_item_centavos,valor_pago_associado_centavos,valor_reembolso_necessario_centavos,
+      estoque_acao,snapshot_financeiro)
+      VALUES(1,1,1,'AGUARDANDO_REEMBOLSO',6000,6000,6000,'LIBERAR_RESERVA','{}')`),
+    db.prepare(`INSERT INTO pedido_item_cancelamentos(id,pedido_id,pedido_item_id,status,
+      valor_item_centavos,valor_pago_associado_centavos,valor_reembolso_necessario_centavos,
+      estoque_acao,snapshot_financeiro)
+      VALUES(2,1,2,'AGUARDANDO_REEMBOLSO',4000,4000,4000,'LIBERAR_RESERVA','{}')`),
+    db.prepare(`INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,
+      valor_centavos,status,mp_refund_id,idempotency_key,concluido_em)
+      VALUES(1,1,'MERCADO_PAGO','PIX_MP',1000,'REEMBOLSADO','preexisting','preexisting',CURRENT_TIMESTAMP)`),
+  ]);
+  return db;
+}
+
 test('caso 1: pagamento PIX_MP 2000, item 500 envia somente amount 5 e confirma uma vez', async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   const calls = [];
@@ -85,7 +135,40 @@ test('caso 1: pagamento PIX_MP 2000, item 500 envia somente amount 5 e confirma 
     SET valor_centavos=501 WHERE id=1`).run(), /pix_mp_refund_identidade_imutavel/);
 });
 
-test('resposta perdida deixa INCONCLUSIVO e retry usa a mesma key/body sem refund duplo', async t => {
+test('C1: mesma operation key concorrente adquire um unico claim antes do POST', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const firstArrived = deferred();
+  const releaseFirst = deferred();
+  const remoteByKey = new Map();
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, init = {}) => {
+    posts++;
+    const key = init.headers['X-Idempotency-Key'];
+    if (!remoteByKey.has(key)) {
+      remoteByKey.set(key, { id: 7301, payment_id: 9001, amount: 5, status: 'approved' });
+    }
+    if (posts === 1) {
+      firstArrived.resolve();
+      await releaseFirst.promise;
+    }
+    return Response.json(remoteByKey.get(key), { status: 201 });
+  });
+  const input = refundInput(cancellation, leg, 'c1-same-operation-key');
+  const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
+  await firstArrived.promise;
+  const second = await app.itemCancellation.confirmCancellationRefund(db, input);
+  releaseFirst.resolve();
+  const first = await firstPromise;
+
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  assert.equal(posts, 1, 'somente o vencedor do claim pode enviar POST');
+  assert.equal(remoteByKey.size, 1);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.deepEqual(await refundCapacity(db), { paid: 2000, refunded: 500, reserved: 0, remaining: 1500 });
+});
+
+test('C5: timeout ambiguo apos efeito remoto reutiliza key sem refund duplo', async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   const calls = [];
   const remoteByKey = new Map();
@@ -102,6 +185,7 @@ test('resposta perdida deixa INCONCLUSIVO e retry usa a mesma key/body sem refun
   assert.equal(first.ok, true);
   assert.equal(first.refundStatus, 'INCONCLUSIVO');
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 0);
+  assert.deepEqual(await refundCapacity(db), { paid: 2000, refunded: 0, reserved: 500, remaining: 1500 });
   const second = await app.itemCancellation.confirmCancellationRefund(db, input);
   assert.equal(second.ok, true);
   assert.equal(second.refundStatus, 'CONFIRMADO');
@@ -110,17 +194,64 @@ test('resposta perdida deixa INCONCLUSIVO e retry usa a mesma key/body sem refun
   assert.equal(calls[0].body, calls[1].body);
   assert.equal(remoteByKey.size, 1);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.deepEqual(await refundCapacity(db), { paid: 2000, refunded: 500, reserved: 0, remaining: 1500 });
   const replay = await app.itemCancellation.confirmCancellationRefund(db, input);
   assert.equal(replay.ok, true);
   assert.equal(replay.replay, true);
   assert.equal(calls.length, 2);
 });
 
-test('MP confirma e D1 falha antes do ledger: retry consulta o mesmo refund e materializa uma vez', async t => {
+test('4xx apos envio ambiguo nao libera capacidade sem provar ausencia de efeito remoto', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const remoteByKey = new Map();
+  const calls = [];
+  let effects = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, init = {}) => {
+    const key = init.headers['X-Idempotency-Key'];
+    calls.push({ key, body: init.body });
+    if (!remoteByKey.has(key)) {
+      remoteByKey.set(key, { id: 7390, payment_id: 9001, amount: 5, status: 'approved' });
+      effects++;
+      throw new Error('response lost after provider commit');
+    }
+    return Response.json({ message: 'idempotency conflict without refund representation' },
+      { status: 409 });
+  });
+  const input = refundInput(cancellation, leg, 'ambiguous-then-4xx-same-key');
+
+  const first = await app.itemCancellation.confirmCancellationRefund(db, input);
+  assert.equal(first.refundStatus, 'INCONCLUSIVO');
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000, refunded: 0, reserved: 500, remaining: 1500,
+  });
+
+  const second = await app.itemCancellation.confirmCancellationRefund(db, input);
+  assert.equal(second.refundStatus, 'INCONCLUSIVO');
+  assert.equal(effects, 1, 'o MP simulado criou um unico refund para a chave estavel');
+  assert.equal(remoteByKey.size, 1);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].key, calls[1].key);
+  assert.equal(calls[0].body, calls[1].body);
+  assert.deepEqual(await db.prepare(`SELECT status,tentativas,mp_refund_id
+    FROM pedido_reembolso_pix_mp_intencoes`).first(), {
+    status: 'INCONCLUSIVO', tentativas: 2, mp_refund_id: null,
+  });
+  assert.equal((await db.prepare(`SELECT fase FROM pedido_operacoes
+    WHERE operation_key=?`).bind(input.operationKey).first()).fase, 'ENVIO_INCONCLUSIVO');
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 0);
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000, refunded: 0, reserved: 500, remaining: 1500,
+  });
+});
+
+test('C6: falha de persistencia apos MP usa GET e materializa uma vez', async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   const calls = [];
+  let effects = 0;
   t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
-    calls.push({ method: init.method ?? 'GET', url: String(url), body: init.body });
+    const method = init.method ?? 'GET';
+    calls.push({ method, url: String(url), body: init.body });
+    if (method === 'POST') effects++;
     return Response.json({ id: 7003, payment_id: 9001, amount: 5, status: 'approved' }, { status: 200 });
   });
   let failMaterialization = true;
@@ -136,36 +267,134 @@ test('MP confirma e D1 falha antes do ledger: retry consulta o mesmo refund e ma
   assert.equal(first.ok, true);
   assert.equal(first.refundStatus, 'INCONCLUSIVO');
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 0);
+  assert.deepEqual(await refundCapacity(db), { paid: 2000, refunded: 0, reserved: 500, remaining: 1500 });
   db.hook = null;
   const second = await app.itemCancellation.confirmCancellationRefund(db, input);
   assert.equal(second.ok, true);
   assert.equal(second.refundStatus, 'CONFIRMADO');
   assert.deepEqual(calls.map(c => c.method), ['POST', 'GET']);
+  assert.equal(effects, 1);
   assert.match(calls[1].url, /\/refunds\/7003$/);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_alocacoes`).first()).n, 1);
+  assert.deepEqual(await refundCapacity(db), { paid: 2000, refunded: 500, reserved: 0, remaining: 1500 });
 });
 
-test('duas abas com keys diferentes compartilham a perna remota e produzem um fato local', async t => {
+test('C2: keys distintas concorrentes compartilham claim e deixam aliases auditaveis', async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
+  const firstArrived = deferred();
+  const releaseFirst = deferred();
   const remoteByKey = new Map();
+  let posts = 0;
   t.mock.method(globalThis, 'fetch', async (_url, init = {}) => {
     const refund = { id: 7004, payment_id: 9001, amount: 5, status: 'approved' };
     if ((init.method ?? 'GET') === 'POST') {
+      posts++;
       const key = init.headers['X-Idempotency-Key'];
       if (!remoteByKey.has(key)) remoteByKey.set(key, refund);
+      if (posts === 1) {
+        firstArrived.resolve();
+        await releaseFirst.promise;
+      }
       return Response.json(remoteByKey.get(key), { status: 201 });
     }
     return Response.json(refund);
   });
-  const results = await Promise.all([
-    app.itemCancellation.confirmCancellationRefund(db, refundInput(cancellation, leg, 'refund-tab-remote-01')),
-    app.itemCancellation.confirmCancellationRefund(db, refundInput(cancellation, leg, 'refund-tab-remote-02')),
-  ]);
+  const firstPromise = app.itemCancellation.confirmCancellationRefund(
+    db, refundInput(cancellation, leg, 'refund-tab-remote-01'));
+  await firstArrived.promise;
+  const second = await app.itemCancellation.confirmCancellationRefund(
+    db, refundInput(cancellation, leg, 'refund-tab-remote-02'));
+  assert.equal(second.refundStatus, 'PROCESSANDO');
+  assert.deepEqual(await db.prepare(`SELECT operation_key,fase,reembolso_id FROM pedido_operacoes
+    WHERE operation_key='refund-tab-remote-02'`).first(), {
+    operation_key: 'refund-tab-remote-02', fase: 'LOCAL_CRIADA', reembolso_id: null,
+  });
+  releaseFirst.resolve();
+  const first = await firstPromise;
+  const results = [first, second];
   assert.equal(results.every(r => r.ok), true);
+  assert.equal(posts, 1);
   assert.equal(remoteByKey.size, 1);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_pix_mp_intencoes`).first()).n, 1);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.deepEqual((await db.prepare(`SELECT operation_key,fase,reembolso_id FROM pedido_operacoes
+    WHERE operation_key LIKE 'refund-tab-remote-%' ORDER BY operation_key`).all()).results, [
+    { operation_key: 'refund-tab-remote-01', fase: 'CONCLUIDA', reembolso_id: 1 },
+    { operation_key: 'refund-tab-remote-02', fase: 'CONCLUIDA', reembolso_id: 1 },
+  ]);
+  const aliasReplay = await app.itemCancellation.confirmCancellationRefund(
+    db, refundInput(cancellation, leg, 'refund-tab-remote-02'));
+  assert.equal(aliasReplay.replay, true);
+  assert.equal(posts, 1);
+  assert.deepEqual(await refundCapacity(db), { paid: 2000, refunded: 500, reserved: 0, remaining: 1500 });
+});
+
+test('C3: parciais concorrentes cuja soma excede capacidade param antes do segundo POST', async t => {
+  const db = await twoLegCapacityScenario(t);
+  const firstArrived = deferred();
+  const releaseFirst = deferred();
+  const remoteByKey = new Map();
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, init = {}) => {
+    posts++;
+    const key = init.headers['X-Idempotency-Key'];
+    if (!remoteByKey.has(key)) {
+      remoteByKey.set(key, { id: 7303, payment_id: 9901, amount: 60, status: 'approved' });
+    }
+    if (posts === 1) {
+      firstArrived.resolve();
+      await releaseFirst.promise;
+    }
+    return Response.json(remoteByKey.get(key), { status: 201 });
+  });
+  const params = (id, value, allocation) => ({ pedidoId: 1, pagamentoId: 1,
+    pagamentoAlocacaoId: allocation, cancellationId: id, usuarioId: 1,
+    operationKey: `c3-capacity-leg-${id}`, fingerprint: `c3-fingerprint-${id}`,
+    valorCentavos: value, accessToken: 'TEST_TOKEN' });
+  const firstPromise = app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(1, 6000, 1));
+  await firstArrived.promise;
+  const second = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(2, 4000, 2));
+  assert.deepEqual(second, { ok: false, erro: 'SALDO_REEMBOLSAVEL_INSUFICIENTE' });
+  assert.equal(posts, 1);
+  assert.deepEqual(await refundCapacity(db), { paid: 10000, refunded: 1000, reserved: 6000, remaining: 3000 });
+  releaseFirst.resolve();
+  await firstPromise;
+  assert.equal(remoteByKey.size, 1);
+  assert.deepEqual(await refundCapacity(db), { paid: 10000, refunded: 7000, reserved: 0, remaining: 3000 });
+});
+
+test('C4: request pausada antes do dispatch perde o CAS e nao envia segundo POST', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const beforeClaim = deferred();
+  const releaseClaim = deferred();
+  let paused = false;
+  let posts = 0;
+  db.hook = async statements => {
+    if (!paused && statements.some(statement => statement.sql.includes("SET status='PROCESSANDO'"))) {
+      paused = true;
+      beforeClaim.resolve();
+      await releaseClaim.promise;
+    }
+    return statements;
+  };
+  t.mock.method(globalThis, 'fetch', async () => {
+    posts++;
+    return Response.json({ id: 7304, payment_id: 9001, amount: 5, status: 'approved' });
+  });
+  const input = refundInput(cancellation, leg, 'c4-paused-before-dispatch');
+  const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
+  await beforeClaim.promise;
+  assert.equal(posts, 0);
+  const second = await app.itemCancellation.confirmCancellationRefund(db, input);
+  releaseClaim.resolve();
+  const first = await firstPromise;
+  db.hook = null;
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  assert.equal(posts, 1);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.deepEqual(await refundCapacity(db), { paid: 2000, refunded: 500, reserved: 0, remaining: 1500 });
 });
 
 test('in_process permanece sem efeito financeiro e GET oportunista conclui depois', async t => {
@@ -190,6 +419,36 @@ test('in_process permanece sem efeito financeiro e GET oportunista conclui depoi
   assert.deepEqual(methods, ['POST', 'GET']);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
   assert.equal((await db.prepare(`SELECT status FROM pedido_item_cancelamentos WHERE id=?`).bind(cancellation.id).first()).status, 'CONCLUIDO');
+});
+
+test('GET de refund conhecido aplica recusa terminal somente pelo estado remoto', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const methods = [];
+  t.mock.method(globalThis, 'fetch', async (_url, init = {}) => {
+    const method = init.method ?? 'GET';
+    methods.push(method);
+    if (method === 'POST') {
+      return Response.json({ id: 7007, payment_id: 9001, amount: 5, status: 'in_process' });
+    }
+    return Response.json({ id: 7007, payment_id: 9001, amount: 5, status: 'rejected' });
+  });
+  const input = refundInput(cancellation, leg, 'known-refund-rejected-by-get');
+  const pending = await app.itemCancellation.confirmCancellationRefund(db, input);
+  assert.equal(pending.refundStatus, 'PROCESSANDO');
+
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(
+    db, 'TEST_TOKEN', { cancellationId: cancellation.id }, { force: true });
+  assert.deepEqual(methods, ['POST', 'GET']);
+  assert.deepEqual(await db.prepare(`SELECT status,mp_refund_id,mp_status
+    FROM pedido_reembolso_pix_mp_intencoes`).first(), {
+    status: 'RECUSADO', mp_refund_id: '7007', mp_status: 'rejected',
+  });
+  assert.equal((await db.prepare(`SELECT fase FROM pedido_operacoes
+    WHERE operation_key=?`).bind(input.operationKey).first()).fase, 'RECUSADA');
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 0);
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000, refunded: 0, reserved: 0, remaining: 2000,
+  });
 });
 
 test('408, 429, 5xx e resposta ilegível são ambíguos; 400 inequívoco é recusa', async t => {
@@ -218,7 +477,14 @@ test('recusa inequívoca é terminal para a key e uma nova intenção pode tenta
     refundInput(cancellation, leg, 'refund-definitive-refusal'));
   assert.equal(refused.ok, true);
   assert.equal(refused.refundStatus, 'RECUSADO');
+  assert.deepEqual(await db.prepare(`SELECT status,tentativas,mp_refund_id
+    FROM pedido_reembolso_pix_mp_intencoes`).first(), {
+    status: 'RECUSADO', tentativas: 1, mp_refund_id: null,
+  });
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 0);
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000, refunded: 0, reserved: 0, remaining: 2000,
+  });
   const recovered = await app.itemCancellation.confirmCancellationRefund(db,
     refundInput(cancellation, leg, 'refund-after-refusal'));
   assert.equal(recovered.refundStatus, 'CONFIRMADO');
@@ -454,6 +720,179 @@ test("queda após persistir intenção PENDENTE e antes da rede é retomada no r
     "CONFIRMADO"
   );
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+});
+
+test('lease PROCESSANDO expirada sem refund remoto nao reenvia POST cegamente', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  db.hook = async statements => {
+    if (statements.some(statement => statement.sql.includes("SET status='PROCESSANDO'"))) {
+      throw new Error('crash before claim execution');
+    }
+    return statements;
+  };
+  await assert.rejects(() => app.itemCancellation.confirmCancellationRefund(
+    db, refundInput(cancellation, leg, 'expired-dispatch-lease-01')));
+  db.hook = null;
+  await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
+    SET status='PROCESSANDO',tentativas=1,ultima_tentativa_em='2000-01-01 00:00:00',
+        atualizado_em='2000-01-01 00:00:00'`).run();
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    posts++;
+    return Response.json({ id: 7310, payment_id: 9001, amount: 5, status: 'approved' });
+  });
+
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(
+    db, 'TEST_TOKEN', { cancellationId: cancellation.id });
+  const ambiguous = await db.prepare(`SELECT status,ultimo_erro FROM pedido_reembolso_pix_mp_intencoes`).first();
+  assert.equal(posts, 0);
+  assert.deepEqual(ambiguous, {
+    status: 'INCONCLUSIVO', ultimo_erro: 'DISPATCH_LEASE_EXPIRADA_RECONCILIACAO_NECESSARIA',
+  });
+
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(
+    db, 'TEST_TOKEN', { cancellationId: cancellation.id });
+  assert.equal(posts, 1, 'somente a reconciliacao explicita posterior reenvia a chave estavel');
+  assert.equal((await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    'CONFIRMADO');
+});
+
+test('S4: force=true nao rompe lease nem redispara POST sem identidade remota', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const firstArrived = deferred();
+  const releaseFirst = deferred();
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    posts++;
+    firstArrived.resolve();
+    await releaseFirst.promise;
+    return Response.json({ id: 7313, payment_id: 9001, amount: 5, status: 'approved' });
+  });
+  const input = refundInput(cancellation, leg, 'force-does-not-bypass-claim');
+  const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
+  await firstArrived.promise;
+
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(
+    db, 'TEST_TOKEN', { cancellationId: cancellation.id }, { force: true });
+  assert.equal(posts, 1);
+  assert.equal((await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    'PROCESSANDO');
+
+  await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
+    SET ultima_tentativa_em='2000-01-01 00:00:00',atualizado_em='2000-01-01 00:00:00'`).run();
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(
+    db, 'TEST_TOKEN', { cancellationId: cancellation.id }, { force: true });
+  assert.equal(posts, 1, 'force pode reconciliar selecao, mas nao criar um segundo dispatch');
+  assert.equal((await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    'INCONCLUSIVO');
+
+  releaseFirst.resolve();
+  await firstPromise;
+  assert.equal(posts, 1);
+  assert.equal((await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    'CONFIRMADO');
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000, refunded: 500, reserved: 0, remaining: 1500,
+  });
+});
+
+test('resposta ambigua antiga nao revoga claim de uma tentativa mais nova', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const firstArrived = deferred();
+  const secondArrived = deferred();
+  const releaseFirst = deferred();
+  const releaseSecond = deferred();
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    posts++;
+    if (posts === 1) {
+      firstArrived.resolve();
+      await releaseFirst.promise;
+      throw new Error('late timeout from attempt one');
+    }
+    secondArrived.resolve();
+    await releaseSecond.promise;
+    return Response.json({ id: 7311, payment_id: 9001, amount: 5, status: 'approved' });
+  });
+  const input = refundInput(cancellation, leg, 'fenced-dispatch-attempt-01');
+  const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
+  await firstArrived.promise;
+  await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
+    SET status='INCONCLUSIVO',ultimo_erro='LEASE_EXPIRADA',atualizado_em=CURRENT_TIMESTAMP`).run();
+  const secondPromise = app.itemCancellation.confirmCancellationRefund(db, input);
+  await secondArrived.promise;
+  releaseFirst.resolve();
+  await firstPromise;
+  const statusAfterFirst = (await db.prepare(
+    `SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status;
+  releaseSecond.resolve();
+  await secondPromise;
+  assert.equal(statusAfterFirst, 'PROCESSANDO',
+    'a falha da tentativa 1 nao pode sobrescrever a claim da tentativa 2');
+  assert.equal(posts, 2);
+  assert.equal((await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    'CONFIRMADO');
+});
+
+test('B1: HTTP 400 tardio nao recusa refund remoto conhecido por tentativa mais nova', async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const firstArrived = deferred();
+  const releaseFirst = deferred();
+  const calls = [];
+  let posts = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
+    const method = init.method ?? 'GET';
+    calls.push({ method, url: String(url), key: init.headers?.['X-Idempotency-Key'] });
+    if (method === 'POST') {
+      posts++;
+      if (posts === 1) {
+        firstArrived.resolve();
+        await releaseFirst.promise;
+        return Response.json({ message: 'late refusal from attempt one' }, { status: 400 });
+      }
+      return Response.json({ id: 7312, payment_id: 9001, amount: 5, status: 'in_process' });
+    }
+    return Response.json({ id: 7312, payment_id: 9001, amount: 5, status: 'approved' });
+  });
+  const input = refundInput(cancellation, leg, 'b1-late-post-refusal');
+  const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
+  await firstArrived.promise;
+  await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
+    SET ultima_tentativa_em='2000-01-01 00:00:00',atualizado_em='2000-01-01 00:00:00'`).run();
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(
+    db, 'TEST_TOKEN', { cancellationId: cancellation.id });
+  assert.equal(posts, 1, 'lease expirada exige reconciliacao antes de qualquer novo POST');
+
+  const second = await app.itemCancellation.confirmCancellationRefund(db, input);
+  assert.equal(second.refundStatus, 'PROCESSANDO');
+  assert.equal(posts, 2);
+  assert.deepEqual(await db.prepare(`SELECT status,tentativas,mp_refund_id
+    FROM pedido_reembolso_pix_mp_intencoes`).first(), {
+    status: 'PROCESSANDO', tentativas: 2, mp_refund_id: '7312',
+  });
+
+  releaseFirst.resolve();
+  await firstPromise;
+  assert.deepEqual(await db.prepare(`SELECT status,tentativas,mp_refund_id
+    FROM pedido_reembolso_pix_mp_intencoes`).first(), {
+    status: 'PROCESSANDO', tentativas: 2, mp_refund_id: '7312',
+  });
+  assert.equal((await db.prepare(`SELECT fase FROM pedido_operacoes
+    WHERE operation_key=?`).bind(input.operationKey).first()).fase, 'REMOTO_CONHECIDO');
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000, refunded: 0, reserved: 500, remaining: 1500,
+  });
+
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(
+    db, 'TEST_TOKEN', { cancellationId: cancellation.id }, { force: true });
+  await app.itemCancellation.reconcileCancellationFinalization(db, cancellation.id);
+  assert.deepEqual(calls.map(call => call.method), ['POST', 'POST', 'GET']);
+  assert.equal(calls[0].key, calls[1].key, 'as duas tentativas preservam a chave remota');
+  assert.equal((await db.prepare(`SELECT status FROM pedido_reembolso_pix_mp_intencoes`).first()).status,
+    'CONFIRMADO');
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000, refunded: 500, reserved: 0, remaining: 1500,
+  });
 });
 
 test("ledger confirmado com finalização local interrompida converge no detalhe sem nova rede", async t => {

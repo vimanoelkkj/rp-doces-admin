@@ -31,6 +31,7 @@ interface IntentRow {
   mp_request: string; mp_refund_id: string | null; mp_status: string | null;
   pedido_reembolso_id: number | null; tentativas: number; ultimo_erro: string | null;
   operation_key: string; ator_usuario_id: number | null; atualizado_em: string;
+  ultima_tentativa_em: string | null;
 }
 
 export type PixMpRefundIntentResult =
@@ -57,7 +58,7 @@ export interface PixMpRefundIntentParams {
 const columns = `i.id,i.operacao_id,i.pedido_id,i.pagamento_id,i.pagamento_alocacao_id,
   i.pedido_item_cancelamento_id,i.pedido_item_troca_id,i.valor_centavos,i.status,
   i.mp_payment_id,i.mp_idempotency_key,i.mp_request,i.mp_refund_id,i.mp_status,
-  i.pedido_reembolso_id,i.tentativas,i.ultimo_erro,i.atualizado_em,
+  i.pedido_reembolso_id,i.tentativas,i.ultimo_erro,i.atualizado_em,i.ultima_tentativa_em,
   o.operation_key,o.ator_usuario_id`;
 
 export const PIX_MP_REFUND_RECOVERY_AFTER_SECONDS = 60;
@@ -65,6 +66,11 @@ export const PIX_MP_REFUND_RECOVERY_AFTER_SECONDS = 60;
 function sqliteUtcMs(value: string): number {
   const iso = value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
   return Date.parse(iso);
+}
+
+function dispatchLeaseExpired(row: IntentRow): boolean {
+  const startedAt = row.ultima_tentativa_em ?? row.atualizado_em;
+  return Date.now() - sqliteUtcMs(startedAt) >= PIX_MP_REFUND_RECOVERY_AFTER_SECONDS * 1000;
 }
 
 function view(row: IntentRow): PixMpRefundIntentView {
@@ -85,8 +91,12 @@ async function remoteKey(operationKey: string): Promise<string> {
 }
 
 async function byOperation(db: D1Database, operationKey: string): Promise<IntentRow | null> {
-  return db.prepare(`SELECT ${columns} FROM pedido_reembolso_pix_mp_intencoes i
-    JOIN pedido_operacoes o ON o.id=i.operacao_id WHERE o.operation_key=? LIMIT 1`)
+  return db.prepare(`SELECT ${columns} FROM pedido_operacoes requested
+    JOIN pedido_reembolso_pix_mp_intencoes i
+      ON i.operacao_id=requested.id OR i.mp_idempotency_key=requested.mp_idempotency_key
+    JOIN pedido_operacoes o ON o.id=i.operacao_id
+    WHERE requested.operation_key=?
+    ORDER BY CASE WHEN i.operacao_id=requested.id THEN 0 ELSE 1 END LIMIT 1`)
     .bind(operationKey).first<IntentRow>();
 }
 
@@ -110,6 +120,41 @@ async function activeByLeg(db: D1Database, params: PixMpRefundIntentParams): Pro
     JOIN pedido_operacoes o ON o.id=i.operacao_id
     WHERE i.${parentColumn}=? AND i.pagamento_alocacao_id=? AND i.status<>'RECUSADO'
     ORDER BY i.id DESC LIMIT 1`).bind(parentId, params.pagamentoAlocacaoId).first<IntentRow>();
+}
+
+async function registerOperationAlias(
+  db: D1Database,
+  params: PixMpRefundIntentParams,
+  identity: IdentidadeEsperada,
+  winner: IntentRow,
+): Promise<PixMpRefundIntentResult | null> {
+  try {
+    await db.prepare(`INSERT INTO pedido_operacoes(
+        operation_key,tipo,escopo,ator_usuario_id,fingerprint_versao,fingerprint,fase,
+        pedido_id,pagamento_id,reembolso_id,pedido_item_cancelamento_id,pedido_item_troca_id,
+        resultado,erro,mp_idempotency_key,mp_request,mp_payment_id)
+      SELECT ?,'REFUND_ADMIN','ADMIN',?,?,?,
+        CASE WHEN i.status='CONFIRMADO' THEN 'CONCLUIDA'
+             WHEN i.status='RECUSADO' THEN 'RECUSADA'
+             WHEN i.status='INCONCLUSIVO' THEN 'ENVIO_INCONCLUSIVO'
+             WHEN i.mp_refund_id IS NOT NULL THEN 'REMOTO_CONHECIDO'
+             ELSE 'LOCAL_CRIADA' END,
+        i.pedido_id,i.pagamento_id,i.pedido_reembolso_id,
+        i.pedido_item_cancelamento_id,i.pedido_item_troca_id,
+        ?,i.ultimo_erro,i.mp_idempotency_key,i.mp_request,i.mp_payment_id
+      FROM pedido_reembolso_pix_mp_intencoes i WHERE i.id=?`)
+      .bind(params.operationKey, params.usuarioId, FINGERPRINT_VERSAO, params.fingerprint,
+        JSON.stringify({ intentOperationKey: winner.operation_key }), winner.id).run();
+  } catch (error) {
+    const existing = await buscarOperacao(db, params.operationKey);
+    if (!existing) throw error;
+    const conflict = conflitoOperacao(existing, identity);
+    if (conflict) return { ok: false, erro: conflict };
+    if (existing.mp_idempotency_key !== winner.mp_idempotency_key) {
+      return { ok: false, erro: "REFUND_REMOTO_EM_ANDAMENTO" };
+    }
+  }
+  return null;
 }
 
 async function ensureIntent(
@@ -161,6 +206,8 @@ async function ensureIntent(
           || Number(winnerForLeg.valor_centavos) !== params.valorCentavos) {
         return { ok: false, erro: "REFUND_REMOTO_EM_ANDAMENTO" };
       }
+      const aliasError = await registerOperationAlias(db, params, identity, winnerForLeg);
+      if (aliasError) return aliasError;
       return winnerForLeg;
     }
     // M3 (migration 0031): o valor calculado ficou obsoleto (outro refund
@@ -177,13 +224,36 @@ async function ensureIntent(
 }
 
 async function markInconclusive(db: D1Database, row: IntentRow, error: string): Promise<IntentRow> {
+  const message = error.slice(0, 500);
   await db.batch([
     db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
       SET status='INCONCLUSIVO',ultimo_erro=?,atualizado_em=CURRENT_TIMESTAMP
-      WHERE id=? AND status NOT IN ('CONFIRMADO','RECUSADO')`).bind(error.slice(0, 500), row.id),
+      WHERE id=? AND tentativas=? AND status NOT IN ('CONFIRMADO','RECUSADO')`)
+      .bind(message, row.id, row.tentativas),
     db.prepare(`UPDATE pedido_operacoes SET fase='ENVIO_INCONCLUSIVO',erro=?,atualizado_em=CURRENT_TIMESTAMP
-      WHERE id=? AND fase NOT IN ('CONCLUIDA','RECUSADA')`).bind(error.slice(0, 500), row.operacao_id),
+      WHERE mp_idempotency_key=? AND fase NOT IN ('CONCLUIDA','RECUSADA')
+        AND EXISTS(SELECT 1 FROM pedido_reembolso_pix_mp_intencoes i
+          WHERE i.id=? AND i.status='INCONCLUSIVO' AND i.ultimo_erro=? AND i.tentativas=?)`)
+      .bind(message, row.mp_idempotency_key, row.id, message, row.tentativas),
   ]).catch(() => undefined);
+  return (await byOperation(db, row.operation_key)) ?? row;
+}
+
+async function expireDispatchLease(db: D1Database, row: IntentRow): Promise<IntentRow> {
+  const error = "DISPATCH_LEASE_EXPIRADA_RECONCILIACAO_NECESSARIA";
+  await db.batch([
+    db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
+      SET status='INCONCLUSIVO',ultimo_erro=?,atualizado_em=CURRENT_TIMESTAMP
+      WHERE id=? AND status='PROCESSANDO' AND mp_refund_id IS NULL AND tentativas=?
+        AND datetime(COALESCE(ultima_tentativa_em,atualizado_em))
+          <=datetime('now','-' || ? || ' seconds')`)
+      .bind(error, row.id, row.tentativas, PIX_MP_REFUND_RECOVERY_AFTER_SECONDS),
+    db.prepare(`UPDATE pedido_operacoes SET fase='ENVIO_INCONCLUSIVO',erro=?,atualizado_em=CURRENT_TIMESTAMP
+      WHERE mp_idempotency_key=? AND fase NOT IN ('CONCLUIDA','RECUSADA')
+        AND EXISTS(SELECT 1 FROM pedido_reembolso_pix_mp_intencoes i
+          WHERE i.id=? AND i.status='INCONCLUSIVO' AND i.ultimo_erro=? AND i.tentativas=?)`)
+      .bind(error, row.mp_idempotency_key, row.id, error, row.tentativas),
+  ]);
   return (await byOperation(db, row.operation_key)) ?? row;
 }
 
@@ -228,8 +298,8 @@ async function materialize(
   statements.push(
     db.prepare(`UPDATE pedido_operacoes SET fase='CONCLUIDA',reembolso_id=(
         SELECT id FROM pedido_reembolsos WHERE idempotency_key=?),resultado=?,erro=NULL,
-        atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND fase<>'RECUSADA'`)
-      .bind(localKey, JSON.stringify({ refundId, status: refund.status }), row.operacao_id),
+        atualizado_em=CURRENT_TIMESTAMP WHERE mp_idempotency_key=? AND fase<>'RECUSADA'`)
+      .bind(localKey, JSON.stringify({ refundId, status: refund.status }), row.mp_idempotency_key),
     db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes SET status='CONFIRMADO',
         mp_refund_id=?,mp_status=?,pedido_reembolso_id=(
           SELECT id FROM pedido_reembolsos WHERE idempotency_key=?),ultimo_erro=NULL,
@@ -248,6 +318,50 @@ function refused(status: string): boolean {
   return ["rejected", "cancelled", "canceled", "failed"].includes(status.toLowerCase());
 }
 
+async function refusePostAttempt(
+  db: D1Database, row: IntentRow, result: Extract<MpRefundResultado, { resultado: "RECUSA_DEFINITIVA" }>,
+): Promise<IntentRow> {
+  if (row.tentativas > 1) {
+    return markInconclusive(db, row, `RECUSA_APOS_ENVIO_AMBIGUO:HTTP_${result.httpStatus}`);
+  }
+  const error = `HTTP_${result.httpStatus}:${result.mensagem ?? "RECUSADO"}`.slice(0, 500);
+  const [intent] = await db.batch([
+    db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes SET status='RECUSADO',
+      ultimo_erro=?,recusado_em=COALESCE(recusado_em,CURRENT_TIMESTAMP),atualizado_em=CURRENT_TIMESTAMP
+      WHERE id=? AND tentativas=? AND mp_refund_id IS NULL
+        AND status NOT IN ('CONFIRMADO','RECUSADO')`).bind(error, row.id, row.tentativas),
+    db.prepare(`UPDATE pedido_operacoes SET fase='RECUSADA',erro=?,atualizado_em=CURRENT_TIMESTAMP
+      WHERE mp_idempotency_key=? AND fase<>'CONCLUIDA' AND EXISTS(
+        SELECT 1 FROM pedido_reembolso_pix_mp_intencoes i
+        WHERE i.id=? AND i.status='RECUSADO' AND i.tentativas=?
+          AND i.mp_refund_id IS NULL AND i.ultimo_erro=?)`)
+      .bind(result.mensagem ?? `HTTP_${result.httpStatus}`, row.mp_idempotency_key,
+        row.id, row.tentativas, error),
+  ]);
+  if (!intent.meta.changes) return (await byOperation(db, row.operation_key)) ?? row;
+  return (await byOperation(db, row.operation_key)) ?? row;
+}
+
+async function refuseKnownRefund(
+  db: D1Database, row: IntentRow, refund: MpRefundCriado,
+): Promise<IntentRow> {
+  const refundId = String(refund.id);
+  const [intent] = await db.batch([
+    db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes SET status='RECUSADO',
+      mp_status=?,ultimo_erro='PROVEDOR_RECUSOU',
+      recusado_em=COALESCE(recusado_em,CURRENT_TIMESTAMP),atualizado_em=CURRENT_TIMESTAMP
+      WHERE id=? AND mp_refund_id=? AND status<>'CONFIRMADO'`)
+      .bind(refund.status, row.id, refundId),
+    db.prepare(`UPDATE pedido_operacoes SET fase='RECUSADA',erro='PROVEDOR_RECUSOU',
+      atualizado_em=CURRENT_TIMESTAMP WHERE mp_idempotency_key=? AND fase<>'CONCLUIDA'
+        AND EXISTS(SELECT 1 FROM pedido_reembolso_pix_mp_intencoes i
+          WHERE i.id=? AND i.status='RECUSADO' AND i.mp_refund_id=?)`)
+      .bind(row.mp_idempotency_key, row.id, refundId),
+  ]);
+  if (!intent.meta.changes) return (await byOperation(db, row.operation_key)) ?? row;
+  return (await byOperation(db, row.operation_key)) ?? row;
+}
+
 async function consumeRemoteResult(
   db: D1Database, row: IntentRow, result: MpRefundResultado, usuarioId: number | null,
   cameFromGet: boolean,
@@ -257,15 +371,7 @@ async function consumeRemoteResult(
   }
   if (result.resultado === "RECUSA_DEFINITIVA") {
     if (cameFromGet) return markInconclusive(db, row, `GET_HTTP_${result.httpStatus}`);
-    await db.batch([
-      db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes SET status='RECUSADO',
-        ultimo_erro=?,recusado_em=COALESCE(recusado_em,CURRENT_TIMESTAMP),atualizado_em=CURRENT_TIMESTAMP
-        WHERE id=? AND status<>'CONFIRMADO'`)
-        .bind(`HTTP_${result.httpStatus}:${result.mensagem ?? "RECUSADO"}`.slice(0, 500), row.id),
-      db.prepare(`UPDATE pedido_operacoes SET fase='RECUSADA',erro=?,atualizado_em=CURRENT_TIMESTAMP
-        WHERE id=? AND fase<>'CONCLUIDA'`).bind(result.mensagem ?? `HTTP_${result.httpStatus}`, row.operacao_id),
-    ]);
-    return (await byOperation(db, row.operation_key)) ?? row;
+    return refusePostAttempt(db, row, result);
   }
   const refund = result.refund;
   try {
@@ -275,8 +381,8 @@ async function consumeRemoteResult(
         WHERE id=? AND status NOT IN ('CONFIRMADO','RECUSADO')`)
         .bind(String(refund.id), refund.status, row.id),
       db.prepare(`UPDATE pedido_operacoes SET fase='REMOTO_CONHECIDO',erro=NULL,
-        atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND fase NOT IN ('CONCLUIDA','RECUSADA')`)
-        .bind(row.operacao_id),
+        atualizado_em=CURRENT_TIMESTAMP WHERE mp_idempotency_key=?
+          AND fase NOT IN ('CONCLUIDA','RECUSADA')`).bind(row.mp_idempotency_key),
     ]);
   } catch (error) {
     console.error("Refund MP conhecido; falha ao persistir identidade remota", row.id, error);
@@ -291,14 +397,7 @@ async function consumeRemoteResult(
     }
   }
   if (refused(refund.status)) {
-    await db.batch([
-      db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes SET status='RECUSADO',
-        mp_status=?,ultimo_erro='PROVEDOR_RECUSOU',recusado_em=COALESCE(recusado_em,CURRENT_TIMESTAMP),
-        atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND status<>'CONFIRMADO'`).bind(refund.status, row.id),
-      db.prepare(`UPDATE pedido_operacoes SET fase='RECUSADA',erro='PROVEDOR_RECUSOU',
-        atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND fase<>'CONCLUIDA'`).bind(row.operacao_id),
-    ]);
-    return (await byOperation(db, row.operation_key)) ?? row;
+    return refuseKnownRefund(db, known, refund);
   }
   if (refund.status.toLowerCase() === "in_process" || refund.status.toLowerCase() === "pending") return known;
   return markInconclusive(db, known, `STATUS_DESCONHECIDO:${refund.status}`);
@@ -321,15 +420,27 @@ export async function reconcilePixMpRefundIntent(
 }
 
 async function processIntent(db: D1Database, initial: IntentRow, accessToken: string): Promise<IntentRow> {
-  let row = initial;
-  await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes SET status='PROCESSANDO',
+  let row = (await byOperation(db, initial.operation_key)) ?? initial;
+  if (row.status === "CONFIRMADO" || row.status === "RECUSADO") return row;
+  if (row.mp_refund_id) {
+    const refundId = row.mp_refund_id;
+    await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes
+      SET tentativas=tentativas+1,ultima_tentativa_em=CURRENT_TIMESTAMP,atualizado_em=CURRENT_TIMESTAMP
+      WHERE id=? AND status NOT IN ('CONFIRMADO','RECUSADO')`).bind(row.id).run();
+    row = (await byOperation(db, row.operation_key)) ?? row;
+    const remote = await getRefundMp(accessToken, row.mp_payment_id, refundId, row.valor_centavos);
+    return consumeRemoteResult(db, row, remote, row.ator_usuario_id, true);
+  }
+  if (row.status === "PROCESSANDO") {
+    return dispatchLeaseExpired(row) ? expireDispatchLease(db, row) : row;
+  }
+  const claim = await db.prepare(`UPDATE pedido_reembolso_pix_mp_intencoes SET status='PROCESSANDO',
       tentativas=tentativas+1,ultima_tentativa_em=CURRENT_TIMESTAMP,atualizado_em=CURRENT_TIMESTAMP
-    WHERE id=? AND status NOT IN ('CONFIRMADO','RECUSADO')`).bind(row.id).run();
+    WHERE id=? AND mp_refund_id IS NULL AND status IN ('PENDENTE','INCONCLUSIVO')`).bind(row.id).run();
+  if (!claim.meta.changes) return (await byOperation(db, row.operation_key)) ?? row;
   row = (await byOperation(db, row.operation_key)) ?? row;
-  const remote = row.mp_refund_id
-    ? await getRefundMp(accessToken, row.mp_payment_id, row.mp_refund_id, row.valor_centavos)
-    : await postRefundMp(accessToken, row.mp_payment_id, row.mp_idempotency_key,
-      { amountCentavos: row.valor_centavos, renderInProcess: true });
+  const remote = await postRefundMp(accessToken, row.mp_payment_id, row.mp_idempotency_key,
+    { amountCentavos: row.valor_centavos, renderInProcess: true });
   return consumeRemoteResult(db, row, remote, row.ator_usuario_id, row.mp_refund_id !== null);
 }
 
