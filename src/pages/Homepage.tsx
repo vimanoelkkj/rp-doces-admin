@@ -208,7 +208,7 @@ export default function Homepage() {
             {/* Card 1 — Ingredientes Premium */}
             <div className="trust-card">
               <div className="trust-card-icon">
-                <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                <svg aria-hidden="true" width="64" height="64" viewBox="0 0 64 64" fill="none">
                   {/* Morango */}
                   <g>
                     <animateTransform
@@ -289,7 +289,7 @@ export default function Homepage() {
             {/* Card 2 — Feito com Carinho */}
             <div className="trust-card">
               <div className="trust-card-icon">
-                <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                <svg aria-hidden="true" width="64" height="64" viewBox="0 0 64 64" fill="none">
                   {/* Coração esquerda */}
                   <g>
                     <animateTransform
@@ -435,7 +435,7 @@ export default function Homepage() {
             ref={step1Ref}
           >
             <div className="journey-step__marker">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <rect
                   x="5"
                   y="2"
@@ -490,7 +490,7 @@ export default function Homepage() {
             ref={step2Ref}
           >
             <div className="journey-step__marker">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none">
                 {/* Pote — corpo com fundo arredondado */}
                 <path
                   d="M5 8.5C5 8.5 5 18 5.5 19C6 20 7 20.5 12 20.5C17 20.5 18 20 18.5 19C19 18 19 8.5 19 8.5"
@@ -594,7 +594,7 @@ export default function Homepage() {
             ref={step3Ref}
           >
             <div className="journey-step__marker">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <g>
                   <animateTransform
                     attributeName="transform"

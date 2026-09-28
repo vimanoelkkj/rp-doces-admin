@@ -153,7 +153,7 @@ export default function PedidoConfirmado() {
           <div className="confirmado-timeline">
             <div className="tl-step tl-step--done">
               <div className="tl-dot">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path
                     d="M5 13L9 17L19 7"
                     stroke="#fff"
@@ -164,11 +164,12 @@ export default function PedidoConfirmado() {
                 </svg>
               </div>
               <span>Pedido recebido</span>
+              <span className="tl-status-label">: concluída</span>
             </div>
             <div className="tl-line tl-line--done" />
             <div className="tl-step tl-step--done">
               <div className="tl-dot">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path
                     d="M5 13L9 17L19 7"
                     stroke="#fff"
@@ -179,6 +180,7 @@ export default function PedidoConfirmado() {
                 </svg>
               </div>
               <span>Pagamento confirmado</span>
+              <span className="tl-status-label">: concluída</span>
             </div>
             <div
               className={`tl-line ${
@@ -193,10 +195,15 @@ export default function PedidoConfirmado() {
                   ? "tl-step--done"
                   : "tl-step--current"
               }`}
+              aria-current={
+                statusPedido === "PRONTO" || statusPedido === "ENTREGUE"
+                  ? undefined
+                  : "step"
+              }
             >
               <div className="tl-dot">
                 {statusPedido === "PRONTO" || statusPedido === "ENTREGUE" ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <path
                       d="M5 13L9 17L19 7"
                       stroke="#fff"
@@ -214,6 +221,9 @@ export default function PedidoConfirmado() {
                 )}
               </div>
               <span>Em preparação</span>
+              {(statusPedido === "PRONTO" || statusPedido === "ENTREGUE") && (
+                <span className="tl-status-label">: concluída</span>
+              )}
             </div>
             <div
               className={`tl-line ${
@@ -232,10 +242,11 @@ export default function PedidoConfirmado() {
                     ? "tl-step--current"
                     : ""
               }`}
+              aria-current={statusPedido === "PRONTO" ? "step" : undefined}
             >
               <div className="tl-dot">
                 {statusPedido === "ENTREGUE" ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <path
                       d="M5 13L9 17L19 7"
                       stroke="#fff"
@@ -253,6 +264,11 @@ export default function PedidoConfirmado() {
                 ) : null}
               </div>
               <span>{statusPedido === "ENTREGUE" ? "Retirado" : "Pronto para retirada"}</span>
+              {statusPedido === "ENTREGUE" ? (
+                <span className="tl-status-label">: concluída</span>
+              ) : statusPedido === "PRONTO" ? null : (
+                <span className="tl-status-label">: pendente</span>
+              )}
             </div>
           </div>
 

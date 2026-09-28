@@ -220,10 +220,11 @@ export default function AcompanharPedido() {
                                 ? "tl-step--current"
                                 : ""
                           }`}
+                          aria-current={i === currentIndex ? "step" : undefined}
                         >
                           <div className="tl-dot">
                             {i < currentIndex ? (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none">
                                 <path
                                   d="M5 13L9 17L19 7"
                                   stroke="#fff"
@@ -241,6 +242,11 @@ export default function AcompanharPedido() {
                             ) : null}
                           </div>
                           <span>{step.label}</span>
+                          {i < currentIndex ? (
+                            <span className="tl-status-label">: concluída</span>
+                          ) : i > currentIndex ? (
+                            <span className="tl-status-label">: pendente</span>
+                          ) : null}
                         </div>
                         {i < STEPS.length - 1 && (
                           <div
