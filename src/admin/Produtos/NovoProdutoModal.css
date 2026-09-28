@@ -331,6 +331,10 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: border-color 0.15s;
+  /* button reset */
+  padding: 0;
+  font: inherit;
+  color: inherit;
 }
 
 .np-photo-preview:hover {

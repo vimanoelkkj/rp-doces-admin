@@ -227,6 +227,13 @@
   border-bottom: 1px solid #eadfd3;
   transition: background 0.1s;
   cursor: pointer;
+  /* button reset */
+  width: 100%;
+  background: transparent;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 
 .ped-table-row:hover {

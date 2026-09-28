@@ -335,7 +335,8 @@ export default function AdminPedidos() {
 
           {/* Table rows */}
           {pedidos.map((pedido, i) => (
-            <div
+            <button
+              type="button"
               key={pedido.id}
               className={`ped-table-row${i === pedidos.length - 1 ? " ped-table-row--last" : ""}`}
               onClick={() => setSelectedOrderId(pedido.id)}
@@ -359,7 +360,7 @@ export default function AdminPedidos() {
               <span className="ped-td ped-td-total">
                 {formatarPreco(pedido.valor_total_centavos)}
               </span>
-            </div>
+            </button>
           ))}
 
           {/* Pagination */}

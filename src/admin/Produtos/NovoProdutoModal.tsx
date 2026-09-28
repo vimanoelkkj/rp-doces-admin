@@ -559,9 +559,11 @@ export default function NovoProdutoModal({
           <div className="np-field np-field--full">
             <label htmlFor={`${fieldId}-foto`}>FOTO DO PRODUTO</label>
             <div className="np-photo-row">
-              <div
+              <button
+                type="button"
                 className="np-photo-preview"
                 onClick={() => fileRef.current?.click()}
+                aria-label="Escolher foto do produto"
               >
                 {imagePreview ? (
                   <img src={imagePreview} alt="Preview" />
@@ -570,7 +572,7 @@ export default function NovoProdutoModal({
                     {uploadingImage ? "Enviando…" : "Sem foto"}
                   </span>
                 )}
-              </div>
+              </button>
               <div className="np-photo-info">
                 <button
                   type="button"

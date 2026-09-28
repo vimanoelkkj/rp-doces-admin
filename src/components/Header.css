@@ -380,6 +380,12 @@ html[data-admin-theme="dark"] .header-admin-badge {
   transition:
     opacity 0.3s ease,
     visibility 0.3s ease;
+  /* button reset */
+  border: none;
+  padding: 0;
+  cursor: default;
+  /* hide focus ring — keyboard users use the close button inside the drawer */
+  outline: none;
 }
 
 .mobile-menu-overlay--open {

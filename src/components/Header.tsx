@@ -478,9 +478,14 @@ export default function Header({ variant }: HeaderProps) {
       {!isAdmin &&
         createPortal(
           <>
-            <div
+            <button
+              type="button"
               className={`mobile-menu-overlay ${menuOpen ? "mobile-menu-overlay--open" : ""}`}
-              onClick={closeMenu}
+              onClick={() => {
+                closeMenu();
+                menuButtonRef.current?.focus();
+              }}
+              aria-label="Fechar menu"
             />
             <nav
               ref={menuRef}

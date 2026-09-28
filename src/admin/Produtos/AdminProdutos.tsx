@@ -238,7 +238,8 @@ export default function AdminProdutos() {
           {filtered.map((product) => {
             const badge = stockBadge(product);
             return (
-              <div
+              <button
+                type="button"
                 className="prod-card"
                 key={product.id}
                 onClick={() => setEditingProduto(product)}
@@ -288,7 +289,7 @@ export default function AdminProdutos() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
