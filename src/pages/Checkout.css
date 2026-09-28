@@ -21,7 +21,10 @@
   border-radius: 24px;
   overflow: hidden;
   box-shadow: var(--store-shadow-card);
-  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 /* Coluna esquerda */
@@ -51,7 +54,10 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--store-text);
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
 }
 
 .checkout-items {
@@ -127,6 +133,12 @@
   color: var(--store-text-muted);
   cursor: pointer;
   transition: color 0.2s;
+  /* button reset */
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline;
+  text-align: left;
 }
 .checkout-back-link:hover {
   color: var(--store-accent);
@@ -170,7 +182,10 @@
   font-size: 14px;
   color: var(--store-text);
   outline: none;
-  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s,
+    color 0.2s;
 }
 .form-input::placeholder {
   color: var(--store-text-subtle);
@@ -186,6 +201,19 @@
 }
 
 /* Pagamento */
+.payment-radio-input {
+  /* visually hidden but accessible */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .payment-option {
   display: flex;
   align-items: center;
@@ -246,7 +274,9 @@
   font-weight: 600;
   letter-spacing: 0.3px;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.15s ease;
+  transition:
+    background-color 0.2s,
+    transform 0.15s ease;
   margin-top: 8px;
 }
 .checkout-submit-btn:hover {
@@ -290,6 +320,11 @@
 }
 .back-to-menu-btn:hover {
   background-color: var(--store-btn-primary-hover);
+}
+
+.payment-option:focus-within {
+  outline: 2px solid var(--store-accent);
+  outline-offset: 3px;
 }
 
 /* ===== MOBILE ===== */

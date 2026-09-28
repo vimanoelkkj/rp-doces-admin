@@ -127,12 +127,13 @@ export default function Checkout() {
                 R$ {totalPrice.toFixed(2).replace(".", ",")}
               </span>
             </div>
-            <p
+            <button
+              type="button"
               className="checkout-back-link"
               onClick={() => navigate("/cardapio")}
             >
               Volte a qualquer momento para alterar seu carrinho.
-            </p>
+            </button>
           </div>
 
           {/* Coluna direita — Formulário */}
@@ -196,15 +197,22 @@ export default function Checkout() {
                 <span className="form-label">
                   FORMA DE PAGAMENTO
                 </span>
-                <div
+                <label
                   className={`payment-option ${pagamento === "pix" ? "active" : ""}`}
-                  onClick={() => setPagamento("pix")}
                 >
-                  <div className="payment-radio">
+                  <input
+                    type="radio"
+                    name="pagamento"
+                    value="pix"
+                    checked={pagamento === "pix"}
+                    onChange={() => setPagamento("pix")}
+                    className="payment-radio-input"
+                  />
+                  <div className="payment-radio" aria-hidden="true">
                     <div className="payment-radio-dot" />
                   </div>
                   <span>Pix (Pagamento instantâneo)</span>
-                </div>
+                </label>
               </div>
 
               <button type="submit" className="checkout-submit-btn">
