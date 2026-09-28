@@ -108,6 +108,11 @@ function assertNativeRadioGroup(selector, initiallySelected) {
     assert.ok(radio.id);
     assert.equal(radio.labels.length, 1);
     assert.ok(radio.labels[0].textContent.trim(), "cada opção precisa de nome acessível");
+    assert.equal(
+      radio.labels[0].querySelector("svg")?.getAttribute("aria-hidden"),
+      "true",
+      "a ilustração não deve repetir o nome textual da opção",
+    );
   }
 
   radios[0].focus();

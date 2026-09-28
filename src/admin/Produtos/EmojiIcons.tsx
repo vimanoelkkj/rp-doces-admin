@@ -6,6 +6,7 @@
 /* 🎂 Bolo — bolo com cobertura ondulada e velinhas */
 export const EmojiCake = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -30,6 +31,7 @@ export const EmojiCake = () => (
 /* 🧁 Cupcake — base canelada com cobertura swirl */
 export const EmojiCupcake = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -51,6 +53,7 @@ export const EmojiCupcake = () => (
 /* 🍮 Pudim — flan com calda escorrendo */
 export const EmojiPudding = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -71,6 +74,7 @@ export const EmojiPudding = () => (
 /* 🎉 Bolo de festa — bolo de 2 andares com topo decorado */
 export const EmojiPartyCake = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -95,6 +99,7 @@ export const EmojiPartyCake = () => (
 /* 🍓 Morango — formato coração invertido com sementes e folha */
 export const EmojiStrawberry = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -120,6 +125,7 @@ export const EmojiStrawberry = () => (
 /* 🍫 Chocolate — barra com quadrados quebrada */
 export const EmojiChocolate = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -140,6 +146,7 @@ export const EmojiChocolate = () => (
 /* 🥥 Coco — metade do coco com textura */
 export const EmojiCoconut = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -160,6 +167,7 @@ export const EmojiCoconut = () => (
 /* 🍋 Limão — formato oval com folha e talo */
 export const EmojiLemon = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -179,6 +187,7 @@ export const EmojiLemon = () => (
 /* 🍯 Mel — pote de mel com dipper */
 export const EmojiHoney = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -201,6 +210,7 @@ export const EmojiHoney = () => (
 /* 🍪 Biscoito — cookie redondo com gotas de chocolate */
 export const EmojiCookie = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"

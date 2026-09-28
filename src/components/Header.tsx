@@ -388,6 +388,7 @@ export default function Header({ variant }: HeaderProps) {
                   aria-label="Sair do painel"
                 >
                   <svg
+                    aria-hidden="true"
                     width="16"
                     height="16"
                     viewBox="0 0 24 24"
@@ -420,6 +421,7 @@ export default function Header({ variant }: HeaderProps) {
           >
             {theme === "light" ? (
               <svg
+                aria-hidden="true"
                 className="theme-toggle-icon"
                 width="18"
                 height="18"
@@ -434,6 +436,7 @@ export default function Header({ variant }: HeaderProps) {
               </svg>
             ) : (
               <svg
+                aria-hidden="true"
                 className="theme-toggle-icon"
                 width="18"
                 height="18"
@@ -534,6 +537,7 @@ export default function Header({ variant }: HeaderProps) {
                   <span className="mobile-menu-link-content">
                     <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
                       <svg
+                        aria-hidden="true"
                         className="mobile-menu-link-icon"
                         width="18"
                         height="18"
@@ -579,6 +583,7 @@ export default function Header({ variant }: HeaderProps) {
                   <span className="mobile-menu-link-content">
                     <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
                       <svg
+                        aria-hidden="true"
                         className="mobile-menu-link-icon"
                         width="18"
                         height="18"
@@ -621,6 +626,7 @@ export default function Header({ variant }: HeaderProps) {
                   <span className="mobile-menu-link-content">
                     <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
                       <svg
+                        aria-hidden="true"
                         className="mobile-menu-link-icon"
                         width="18"
                         height="18"
@@ -664,6 +670,7 @@ export default function Header({ variant }: HeaderProps) {
                   <span className="mobile-menu-link-content">
                     <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
                       <svg
+                        aria-hidden="true"
                         className="mobile-menu-link-icon"
                         width="18"
                         height="18"

@@ -249,7 +249,13 @@ export default function CartWidget({
                 : fabSpring
             }
           >
-            <svg width="20" height="18" viewBox="0 0 14 12" fill="none">
+            <svg
+              aria-hidden="true"
+              width="20"
+              height="18"
+              viewBox="0 0 14 12"
+              fill="none"
+            >
               <path
                 d="M1.26841 5.9508L-0.00036931 -2.38419e-05H13.5479L12.2305 5.95881C12.1524 6.31533 11.9555 6.6344 11.6724 6.86334C11.3894 7.09227 11.037 7.21736 10.6736 7.21795H2.86522C2.49388 7.22625 2.13129 7.10426 1.83984 6.87298C1.54839 6.6417 1.34632 6.31559 1.26841 5.9508Z"
                 fill="#FFFFFF"
@@ -312,7 +318,13 @@ export default function CartWidget({
                   }}
                   aria-label="Fechar"
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <svg
+                    aria-hidden="true"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                  >
                     <path
                       d="M1 1L13 13M13 1L1 13"
                       stroke="#634738"
@@ -455,6 +467,7 @@ export default function CartWidget({
                               aria-label="Remover"
                             >
                               <svg
+                                aria-hidden="true"
                                 width="14"
                                 height="14"
                                 viewBox="0 0 14 16"

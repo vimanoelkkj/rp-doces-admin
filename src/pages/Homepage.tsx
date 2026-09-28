@@ -132,6 +132,7 @@ export default function Homepage() {
       {/* ===== WAVE DECORATION ===== */}
       <div className="wave-container" aria-hidden="true">
         <svg
+          aria-hidden="true"
           viewBox="0 0 1440 434"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -691,6 +692,7 @@ export default function Homepage() {
             <div className="contact-location-header contact-info-item">
               <div className="contact-icon-wrap" aria-hidden="true">
                 <svg
+                  aria-hidden="true"
                   width="18"
                   height="18"
                   viewBox="0 0 24 24"
@@ -716,6 +718,7 @@ export default function Homepage() {
               <div className="contact-info-item">
                 <div className="contact-icon-wrap" aria-hidden="true">
                   <svg
+                    aria-hidden="true"
                     width="18"
                     height="18"
                     viewBox="0 0 24 24"
@@ -749,6 +752,7 @@ export default function Homepage() {
               <div className="contact-info-item">
                 <div className="contact-icon-wrap" aria-hidden="true">
                   <svg
+                    aria-hidden="true"
                     width="18"
                     height="18"
                     viewBox="0 0 24 24"
@@ -772,6 +776,7 @@ export default function Homepage() {
               <div className="contact-info-item">
                 <div className="contact-icon-wrap" aria-hidden="true">
                   <svg
+                    aria-hidden="true"
                     width="18"
                     height="18"
                     viewBox="0 0 24 24"
@@ -801,6 +806,7 @@ export default function Homepage() {
               >
                 <div className="contact-icon-wrap" aria-hidden="true">
                   <svg
+                    aria-hidden="true"
                     width="18"
                     height="18"
                     viewBox="0 0 24 24"

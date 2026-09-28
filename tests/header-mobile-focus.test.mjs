@@ -129,6 +129,9 @@ test("Header: overlay fecha menu por Enter ou Espaço e restaura foco no botão 
     });
     await flush();
     assert.equal(menuButton.getAttribute("aria-expanded"), "true");
+    for (const svg of document.querySelectorAll("svg")) {
+      assert.equal(svg.getAttribute("aria-hidden"), "true", "ícones do Header são decorativos");
+    }
 
     overlay.focus();
     assert.equal(document.activeElement, overlay);

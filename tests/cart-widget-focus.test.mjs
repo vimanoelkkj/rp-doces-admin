@@ -161,6 +161,7 @@ test('foco: abrir pelo CartFAB -> dialog recebe foco -> fechar via Escape -> foc
   const initialFab = document.querySelector('.cart-fab');
   assert.ok(initialFab, 'CartFAB inicial deve estar presente no DOM');
   assert.ok(document.contains(initialFab), 'CartFAB inicial deve estar conectado ao document');
+  assert.strictEqual(initialFab.querySelector('svg')?.getAttribute('aria-hidden'), 'true');
 
   // 2. Focar no CartFAB inicial
   initialFab.focus();
@@ -180,6 +181,9 @@ test('foco: abrir pelo CartFAB -> dialog recebe foco -> fechar via Escape -> foc
   assert.ok(closeButton, 'Botão fechar deve estar montado');
   assert.ok(document.activeElement === closeButton, 'Foco inicial deve ir para o botão Fechar do dialog');
   assert.ok(dialog.contains(document.activeElement), 'Foco deve estar contido dentro do dialog');
+  for (const svg of dialog.querySelectorAll('svg')) {
+    assert.strictEqual(svg.getAttribute('aria-hidden'), 'true');
+  }
 
   // Aguarda até a animação de saída do AnimatePresence desanexar o CartFAB inicial
   for (let i = 0; i < 60; i++) {

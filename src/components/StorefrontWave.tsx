@@ -23,6 +23,7 @@ export default function StorefrontWave() {
   return (
     <div className="storefront-frame__wave" aria-hidden="true">
       <svg
+        aria-hidden="true"
         viewBox="0 0 1440 434"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
