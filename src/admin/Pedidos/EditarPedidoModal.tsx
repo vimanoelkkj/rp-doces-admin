@@ -8,6 +8,7 @@ import "./NovoPedidoModal.css";
 /* ── Icons ── */
 const IconClose = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 18 18"
@@ -22,6 +23,7 @@ const IconClose = () => (
 
 const IconPlus = () => (
   <svg
+    aria-hidden="true"
     width="14"
     height="14"
     viewBox="0 0 14 14"
@@ -37,6 +39,7 @@ const IconPlus = () => (
 
 const IconChevron = ({ open }: { open: boolean }) => (
   <svg
+    aria-hidden="true"
     width="12"
     height="8"
     viewBox="0 0 12 8"
@@ -58,6 +61,7 @@ const IconChevron = ({ open }: { open: boolean }) => (
 
 const IconRemove = () => (
   <svg
+    aria-hidden="true"
     width="14"
     height="14"
     viewBox="0 0 14 14"
@@ -202,7 +206,7 @@ export default function EditarPedidoModal({
               Adicione ou remova produtos desta comanda.
             </p>
           </div>
-          <button type="button" className="nped-close" onClick={onClose}>
+          <button type="button" className="nped-close" aria-label="Fechar edição do pedido" onClick={onClose}>
             <IconClose />
           </button>
         </div>
@@ -359,6 +363,7 @@ function ProductItemRow({
         <button
           type="button"
           className="nped-btn-remove"
+          aria-label="Remover item do pedido"
           onClick={onRemove}
           disabled={disabled || !canRemove}
         >

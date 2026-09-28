@@ -374,10 +374,12 @@ export default function AdminPedidos() {
               <button
                 type="button"
                 className="ped-page-btn ped-page-arrow"
+                aria-label="Página anterior"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
               >
                 <svg
+                  aria-hidden="true"
                   width="14"
                   height="14"
                   viewBox="0 0 14 14"
@@ -405,12 +407,14 @@ export default function AdminPedidos() {
               <button
                 type="button"
                 className="ped-page-btn ped-page-arrow"
+                aria-label="Próxima página"
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
                 }
                 disabled={currentPage === totalPages}
               >
                 <svg
+                  aria-hidden="true"
                   width="14"
                   height="14"
                   viewBox="0 0 14 14"

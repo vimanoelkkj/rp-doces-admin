@@ -157,6 +157,7 @@ test('HUMAN-01: dropdown compartilhado é portal fixo fora do fluxo do modal', a
 
 test('HUMAN-03: editor de itens comunica B1 e não oferece controles mutantes', async t => {
   const calls = [];
+  let closes = 0;
   t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
     calls.push([url, options.method ?? 'GET']);
     if (String(url).includes('/api/admin/pedidos/')) {
@@ -173,8 +174,22 @@ test('HUMAN-03: editor de itens comunica B1 e não oferece controles mutantes', 
   });
 
   let root;
-  await ui.act(async () => { root = ui.mountEdit(container, () => {}); });
+  await ui.act(async () => { root = ui.mountEdit(container, () => { closes++; }); });
   await flush();
+  const close = document.querySelector('.nped-close');
+  assert.equal(close.getAttribute('aria-label'), 'Fechar edição do pedido');
+  assert.equal(close.querySelector('svg').getAttribute('aria-hidden'), 'true');
+  const add = [...document.querySelectorAll('button')]
+    .find(button => /Adicionar item/.test(button.textContent));
+  assert.equal(add.querySelector('svg').getAttribute('aria-hidden'), 'true');
+  const dropdown = document.querySelector('.nped-dropdown-trigger');
+  assert.ok(dropdown.textContent.trim());
+  assert.equal(dropdown.querySelector('svg').getAttribute('aria-hidden'), 'true');
+  const remove = document.querySelector('.nped-btn-remove');
+  assert.equal(remove.getAttribute('aria-label'), 'Remover item do pedido');
+  assert.equal(remove.querySelector('svg').getAttribute('aria-hidden'), 'true');
+  await ui.act(async () => close.click());
+  assert.equal(closes, 1);
   assert.match(document.body.textContent, /edição de itens está temporariamente indisponível/i);
   assert.equal([...document.querySelectorAll('button')]
     .find(button => /Adicionar item/.test(button.textContent)).disabled, true);

@@ -7,6 +7,7 @@ import "./CategoriasModal.css";
 /* ── Icons ── */
 const IconClose = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 18 18"
@@ -112,7 +113,7 @@ export default function CategoriasModal({
               Crie categorias e use-as imediatamente nos produtos do cardápio.
             </p>
           </div>
-          <button type="button" className="catm-close" onClick={onClose}>
+          <button type="button" className="catm-close" aria-label="Fechar categorias" onClick={onClose}>
             <IconClose />
           </button>
         </div>

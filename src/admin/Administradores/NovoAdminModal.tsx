@@ -6,6 +6,7 @@ import "./NovoAdminModal.css";
 /* ── Icons ── */
 const IconClose = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 18 18"
@@ -20,6 +21,7 @@ const IconClose = () => (
 
 const IconEye = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 20 20"
@@ -36,6 +38,7 @@ const IconEye = () => (
 
 const IconEyeOff = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 20 20"
@@ -170,7 +173,7 @@ export default function NovoAdminModal({
               Crie uma conta para um novo membro da equipe.
             </p>
           </div>
-          <button type="button" className="nadm-close" onClick={onClose}>
+          <button type="button" className="nadm-close" aria-label="Fechar novo administrador" onClick={onClose}>
             <IconClose />
           </button>
         </div>
@@ -275,6 +278,7 @@ export default function NovoAdminModal({
                 <button
                   type="button"
                   className="nadm-eye-btn"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <IconEyeOff /> : <IconEye />}
@@ -300,6 +304,7 @@ export default function NovoAdminModal({
                 <button
                   type="button"
                   className="nadm-eye-btn"
+                  aria-label={showConfirm ? "Ocultar confirmação da senha" : "Mostrar confirmação da senha"}
                   onClick={() => setShowConfirm(!showConfirm)}
                 >
                   {showConfirm ? <IconEyeOff /> : <IconEye />}

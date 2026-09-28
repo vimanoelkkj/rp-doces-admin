@@ -14,6 +14,7 @@ import "./NovoPedidoModal.css";
 /* ── Icons ── */
 const IconClose = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 18 18"
@@ -66,6 +67,7 @@ const IconChevron = ({ open }: { open: boolean }) => (
 
 const IconRemove = () => (
   <svg
+    aria-hidden="true"
     width="14"
     height="14"
     viewBox="0 0 14 14"
@@ -323,7 +325,7 @@ export default function NovoPedidoModal({
               Balcão, WhatsApp, boca a boca ou pedido feito fora do site.
             </p>
           </div>
-          <button type="button" className="nped-close" onClick={onClose}>
+          <button type="button" className="nped-close" aria-label="Fechar novo pedido" onClick={onClose}>
             <IconClose />
           </button>
         </div>
@@ -622,6 +624,7 @@ function ProductItemRow({
         <button
           type="button"
           className="nped-btn-remove"
+          aria-label="Remover item do pedido"
           onClick={onRemove}
           disabled={!canRemove}
         >

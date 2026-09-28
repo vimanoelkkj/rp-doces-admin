@@ -164,6 +164,17 @@ test('data histórica é enviada explicitamente; "Hoje" volta ao dia da loja def
   assert.deepEqual(urls, ['/api/admin/dashboard']);
 
   await ui.act(async () => { document.querySelector('.dash-date-picker').click(); });
+  const datePicker = document.querySelector('.dash-date-picker');
+  assert.equal(datePicker.querySelector('svg').getAttribute('aria-hidden'), 'true');
+  const [previousMonth, nextMonth] = document.querySelectorAll('.dash-date-nav-btn');
+  assert.equal(previousMonth.getAttribute('aria-label'), 'Mês anterior');
+  assert.equal(nextMonth.getAttribute('aria-label'), 'Próximo mês');
+  assert.equal(previousMonth.querySelector('svg').getAttribute('aria-hidden'), 'true');
+  assert.equal(nextMonth.querySelector('svg').getAttribute('aria-hidden'), 'true');
+  await ui.act(async () => previousMonth.click());
+  assert.equal(document.querySelector('.dash-date-month-label').textContent.trim(), 'Agosto 2026');
+  await ui.act(async () => nextMonth.click());
+  assert.equal(document.querySelector('.dash-date-month-label').textContent.trim(), 'Setembro 2026');
   const dia10 = [...document.querySelectorAll('.dash-date-day:not(.dash-date-day--muted)')]
     .find(b => b.textContent.trim() === '10');
   // Futuro é relativo ao hoje da loja (25/09), não ao relógio local.

@@ -14,6 +14,7 @@ import { EMOJI_OPTIONS } from "./EmojiIcons";
 
 const IconClose = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 18 18"
@@ -28,6 +29,7 @@ const IconClose = () => (
 
 const IconMinus = () => (
   <svg
+    aria-hidden="true"
     width="16"
     height="16"
     viewBox="0 0 16 16"
@@ -42,6 +44,7 @@ const IconMinus = () => (
 
 const IconPlus = () => (
   <svg
+    aria-hidden="true"
     width="16"
     height="16"
     viewBox="0 0 16 16"
@@ -391,7 +394,7 @@ export default function NovoProdutoModal({
                 : "Cadastre um doce e ele já entra no catálogo administrativo."}
             </p>
           </div>
-          <button type="button" className="np-close" onClick={onClose}>
+          <button type="button" className="np-close" aria-label="Fechar produto" onClick={onClose}>
             <IconClose />
           </button>
         </div>
@@ -471,6 +474,7 @@ export default function NovoProdutoModal({
                 <button
                   type="button"
                   className="np-stepper-btn"
+                  aria-label="Diminuir estoque"
                   onClick={() => setStock(String(Math.max(0, Number(stock || 0) - 1)))}
                 >
                   <IconMinus />
@@ -489,6 +493,7 @@ export default function NovoProdutoModal({
                 <button
                   type="button"
                   className="np-stepper-btn"
+                  aria-label="Aumentar estoque"
                   onClick={() => setStock(String(Number(stock || 0) + 1))}
                 >
                   <IconPlus />

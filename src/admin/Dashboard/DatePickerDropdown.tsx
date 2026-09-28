@@ -60,6 +60,7 @@ function buildMonthGrid(viewYear: number, viewMonth: number): Date[] {
 
 const IconCalendar = () => (
   <svg
+    aria-hidden="true"
     width="16"
     height="16"
     viewBox="0 0 16 16"
@@ -76,6 +77,7 @@ const IconCalendar = () => (
 
 const IconChevron = ({ direction }: { direction: "left" | "right" }) => (
   <svg
+    aria-hidden="true"
     width="14"
     height="14"
     viewBox="0 0 14 14"
@@ -160,6 +162,7 @@ export default function DatePickerDropdown({
             <button
               type="button"
               className="dash-date-nav-btn"
+              aria-label="Mês anterior"
               onClick={goToPrevMonth}
             >
               <IconChevron direction="left" />
@@ -170,6 +173,7 @@ export default function DatePickerDropdown({
             <button
               type="button"
               className="dash-date-nav-btn"
+              aria-label="Próximo mês"
               onClick={goToNextMonth}
               disabled={isViewingCurrentOrFutureMonth}
             >

@@ -99,7 +99,7 @@ globalThis.fetch = async (url) => {
   if (target.includes("/admin/pedidos/reconciliar")) return Response.json({ ok: true });
   if (target.includes("/admin/pedidos")) {
     return Response.json({
-      pedidos: [], total: 0, page: 1, totalPages: 1,
+      pedidos: [], total: 0, page: 1, totalPages: 2,
       counts: {todos: 0, hoje: 0, novos: 0, em_producao: 0, prontos: 0, entregues: 0, arquivados: 0},
     });
   }
@@ -228,6 +228,97 @@ test("ícones administrativos redundantes não alteram os nomes dos controles", 
     await ui.act(async () => document.querySelector(".admin-login-form").requestSubmit());
     assertDecorativeSvgs(".admin-login-eye-toggle svg");
     assertNamedControls(".admin-login-eye-toggle");
+  } finally {
+    await unmount();
+  }
+});
+
+test("controles somente com ícone expõem ação, estado e preservam interação", async () => {
+  for (const [component, selector, expectedName] of [
+    ["alterarSenha", ".nadm-close", "Fechar alteração de senha"],
+    ["categorias", ".catm-close", "Fechar categorias"],
+  ]) {
+    const unmount = await render(component);
+    try {
+      const control = document.querySelector(selector);
+      assert.equal(control.getAttribute("aria-label"), expectedName);
+      assert.equal(control.querySelector("svg").getAttribute("aria-hidden"), "true");
+    } finally {
+      await unmount();
+    }
+  }
+
+  let unmount = await render("novoAdmin");
+  try {
+    const close = document.querySelector(".nadm-close");
+    assert.equal(close.getAttribute("aria-label"), "Fechar novo administrador");
+    assert.equal(close.querySelector("svg").getAttribute("aria-hidden"), "true");
+
+    const passwordToggles = [...document.querySelectorAll(".nadm-eye-btn")];
+    assert.deepEqual(
+      passwordToggles.map((button) => button.getAttribute("aria-label")),
+      ["Mostrar senha", "Mostrar confirmação da senha"],
+    );
+    for (const button of passwordToggles) {
+      assert.equal(button.querySelector("svg").getAttribute("aria-hidden"), "true");
+    }
+    await ui.act(async () => passwordToggles[0].click());
+    assert.equal(passwordToggles[0].getAttribute("aria-label"), "Ocultar senha");
+  } finally {
+    await unmount();
+  }
+
+  unmount = await render("novoProduto");
+  try {
+    const close = document.querySelector(".np-close");
+    assert.equal(close.getAttribute("aria-label"), "Fechar produto");
+    assert.equal(close.querySelector("svg").getAttribute("aria-hidden"), "true");
+
+    const [decrease, increase] = document.querySelectorAll(".np-stepper-btn");
+    assert.equal(decrease.getAttribute("aria-label"), "Diminuir estoque");
+    assert.equal(increase.getAttribute("aria-label"), "Aumentar estoque");
+    assert.equal(decrease.querySelector("svg").getAttribute("aria-hidden"), "true");
+    assert.equal(increase.querySelector("svg").getAttribute("aria-hidden"), "true");
+    const stock = document.querySelector(".np-stepper-value");
+    assert.equal(stock.value, "0");
+    await ui.act(async () => increase.click());
+    assert.equal(stock.value, "1");
+    await ui.act(async () => decrease.click());
+    assert.equal(stock.value, "0");
+  } finally {
+    await unmount();
+  }
+
+  unmount = await render("novoPedido");
+  try {
+    const close = document.querySelector(".nped-close");
+    assert.equal(close.getAttribute("aria-label"), "Fechar novo pedido");
+    assert.equal(close.querySelector("svg").getAttribute("aria-hidden"), "true");
+    await ui.act(async () => document.querySelector(".nped-btn-add-item").click());
+    const removeButtons = [...document.querySelectorAll(".nped-btn-remove")];
+    assert.equal(removeButtons.length, 2);
+    for (const button of removeButtons) {
+      assert.equal(button.getAttribute("aria-label"), "Remover item do pedido");
+      assert.equal(button.querySelector("svg").getAttribute("aria-hidden"), "true");
+    }
+    await ui.act(async () => removeButtons[0].click());
+    assert.equal(document.querySelectorAll(".nped-item-row").length, 1);
+  } finally {
+    await unmount();
+  }
+
+  unmount = await render("adminPedidos");
+  try {
+    const [previous, next] = document.querySelectorAll(".ped-page-arrow");
+    assert.equal(previous.getAttribute("aria-label"), "Página anterior");
+    assert.equal(next.getAttribute("aria-label"), "Próxima página");
+    assert.equal(previous.querySelector("svg").getAttribute("aria-hidden"), "true");
+    assert.equal(next.querySelector("svg").getAttribute("aria-hidden"), "true");
+    assert.equal(previous.disabled, true);
+    assert.equal(next.disabled, false);
+    await ui.act(async () => next.click());
+    await ui.act(async () => new Promise(setImmediate));
+    assert.equal(previous.disabled, false);
   } finally {
     await unmount();
   }

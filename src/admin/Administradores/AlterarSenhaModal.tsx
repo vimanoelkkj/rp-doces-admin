@@ -5,6 +5,7 @@ import "./NovoAdminModal.css";
 
 const IconClose = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 18 18"
@@ -107,7 +108,7 @@ export default function AlterarSenhaModal({
                 : `Nova senha para ${adminNome}.`}
             </p>
           </div>
-          <button type="button" className="nadm-close" onClick={handleClose}>
+          <button type="button" className="nadm-close" aria-label="Fechar alteração de senha" onClick={handleClose}>
             <IconClose />
           </button>
         </div>
