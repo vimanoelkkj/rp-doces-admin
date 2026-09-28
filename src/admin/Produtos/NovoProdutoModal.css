@@ -132,7 +132,8 @@
   width: 100%;
 }
 
-.np-field label {
+.np-field > label,
+.np-field > legend {
   font-family: "Manrope", sans-serif;
   font-weight: 700;
   font-size: 11px;
@@ -274,6 +275,31 @@
   gap: 8px;
 }
 
+.np-emoji-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.np-emoji-fieldset legend {
+  padding: 0;
+}
+
+.np-emoji-choice {
+  position: relative;
+  min-width: 0;
+}
+
+.np-emoji-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .np-emoji-item {
   display: flex;
   flex-direction: column;
@@ -287,6 +313,9 @@
   transition:
     border-color 0.15s,
     background 0.15s;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
 }
 
 .np-emoji-item:hover {
@@ -297,6 +326,11 @@
 .np-emoji-item--active {
   border-color: #634738;
   background: #f5efe8;
+}
+
+.np-emoji-radio:focus-visible + .np-emoji-item {
+  outline: 2px solid #634738;
+  outline-offset: 2px;
 }
 
 .np-emoji-icon {

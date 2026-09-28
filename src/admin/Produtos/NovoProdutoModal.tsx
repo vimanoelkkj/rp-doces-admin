@@ -518,31 +518,31 @@ export default function NovoProdutoModal({
             </div>
           </div>
 
-          <div className="np-field np-field--full">
-            <label
-              id={`${fieldId}-emoji-label`}
-              htmlFor={`${fieldId}-emoji-${selectedEmoji ?? 0}`}
-            >
-              EMOJI
-            </label>
+          <fieldset className="np-field np-field--full np-emoji-fieldset">
+            <legend>EMOJI</legend>
             <div className="np-emoji-grid">
               {EMOJI_OPTIONS.map((e, i) => (
-                <button
-                  id={`${fieldId}-emoji-${i}`}
-                  key={i}
-                  type="button"
-                  aria-labelledby={`${fieldId}-emoji-label ${fieldId}-emoji-${i}-label`}
-                  className={`np-emoji-item${selectedEmoji === i ? " np-emoji-item--active" : ""}`}
-                  onClick={() => setSelectedEmoji(i)}
-                >
-                  <span className="np-emoji-icon">{e.icon}</span>
-                  <span id={`${fieldId}-emoji-${i}-label`} className="np-emoji-label">
-                    {e.label}
-                  </span>
-                </button>
+                <div className="np-emoji-choice" key={i}>
+                  <input
+                    id={`${fieldId}-emoji-${i}`}
+                    className="np-emoji-radio"
+                    type="radio"
+                    name={`${fieldId}-emoji`}
+                    value={e.char}
+                    checked={selectedEmoji === i}
+                    onChange={() => setSelectedEmoji(i)}
+                  />
+                  <label
+                    htmlFor={`${fieldId}-emoji-${i}`}
+                    className={`np-emoji-item${selectedEmoji === i ? " np-emoji-item--active" : ""}`}
+                  >
+                    <span className="np-emoji-icon">{e.icon}</span>
+                    <span className="np-emoji-label">{e.label}</span>
+                  </label>
+                </div>
               ))}
             </div>
-          </div>
+          </fieldset>
 
           <div className="np-field np-field--full">
             <label htmlFor={`${fieldId}-preco`}>PREÇO</label>

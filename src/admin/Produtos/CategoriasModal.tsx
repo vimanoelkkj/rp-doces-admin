@@ -49,7 +49,6 @@ export default function CategoriasModal({
   const [newDescription, setNewDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const selectedEmojiIndex = EMOJI_OPTIONS.findIndex((option) => option.char === newEmoji);
 
   const carregarCategorias = () => {
     fetch("/api/admin/categorias")
@@ -143,31 +142,31 @@ export default function CategoriasModal({
 
             {/* Emoji — mesmo conjunto (e mesma UI) do modal de novo produto,
                 para não divergir em quais emojis existem em cada tela. */}
-            <div className="catm-field catm-field--full">
-              <label
-                id={`${fieldId}-emoji-label`}
-                htmlFor={`${fieldId}-emoji-${selectedEmojiIndex}`}
-              >
-                EMOJI
-              </label>
+            <fieldset className="catm-field catm-field--full catm-emoji-fieldset">
+              <legend>EMOJI</legend>
               <div className="catm-emoji-grid">
                 {EMOJI_OPTIONS.map((em, index) => (
-                  <button
-                    id={`${fieldId}-emoji-${index}`}
-                    key={em.char}
-                    type="button"
-                    aria-labelledby={`${fieldId}-emoji-label ${fieldId}-emoji-${index}-label`}
-                    className={`catm-emoji-item${newEmoji === em.char ? " catm-emoji-item--active" : ""}`}
-                    onClick={() => setNewEmoji(em.char)}
-                  >
-                    <span className="catm-emoji-icon">{em.icon}</span>
-                    <span id={`${fieldId}-emoji-${index}-label`} className="catm-emoji-label">
-                      {em.label}
-                    </span>
-                  </button>
+                  <div className="catm-emoji-choice" key={em.char}>
+                    <input
+                      id={`${fieldId}-emoji-${index}`}
+                      className="catm-emoji-radio"
+                      type="radio"
+                      name={`${fieldId}-emoji`}
+                      value={em.char}
+                      checked={newEmoji === em.char}
+                      onChange={() => setNewEmoji(em.char)}
+                    />
+                    <label
+                      htmlFor={`${fieldId}-emoji-${index}`}
+                      className={`catm-emoji-item${newEmoji === em.char ? " catm-emoji-item--active" : ""}`}
+                    >
+                      <span className="catm-emoji-icon">{em.icon}</span>
+                      <span className="catm-emoji-label">{em.label}</span>
+                    </label>
+                  </div>
                 ))}
               </div>
-            </div>
+            </fieldset>
 
             {/* Descrição */}
             <div className="catm-field catm-field--full">
