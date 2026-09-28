@@ -5,6 +5,7 @@ import "./AdminDashboard.css";
 /* ── Icon components ── */
 const IconShield = () => (
   <svg
+    aria-hidden="true"
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -21,6 +22,7 @@ const IconShield = () => (
 
 const IconAlert = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 20 20"

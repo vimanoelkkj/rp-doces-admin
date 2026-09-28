@@ -7,6 +7,7 @@ import "./AdminSidebar.css";
 /* ── SVG icons — exported directly from Figma ── */
 export const IconDashboard = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 20 20"
@@ -46,6 +47,7 @@ export const IconDashboard = () => (
 
 const IconCakeLogo = () => (
   <svg
+    aria-hidden="true"
     className="sidebar-cake"
     width="20"
     height="20"
@@ -84,6 +86,7 @@ const IconCakeLogo = () => (
 
 export const IconProdutosCake = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 20 20"
@@ -126,6 +129,7 @@ export const IconProdutosCake = () => (
 
 export const IconBag = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 20 20"
@@ -144,6 +148,7 @@ export const IconBag = () => (
 
 export const IconUsers = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 20 20"
@@ -162,6 +167,7 @@ export const IconUsers = () => (
 
 export const IconReceipt = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 20 20"
@@ -194,6 +200,7 @@ export const IconReceipt = () => (
 
 export const IconStore = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 20 20"
@@ -212,6 +219,7 @@ export const IconStore = () => (
 
 export const IconBell = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 20 20"
@@ -230,6 +238,7 @@ export const IconBell = () => (
 
 export const IconMoon = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 24 24"
@@ -245,6 +254,7 @@ export const IconMoon = () => (
 
 export const IconSun = () => (
   <svg
+    aria-hidden="true"
     width="20"
     height="20"
     viewBox="0 0 24 24"
@@ -425,10 +435,12 @@ export default function AdminSidebar() {
             <button
               type="button"
               className="sidebar-logout-btn"
+              aria-label="Sair"
               title="Sair"
               onClick={logout}
             >
               <svg
+                aria-hidden="true"
                 width="18"
                 height="18"
                 viewBox="0 0 24 24"

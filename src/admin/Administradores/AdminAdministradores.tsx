@@ -7,6 +7,7 @@ import { useAdminAuth } from "../auth/AdminAuthContext";
 /* ── Inline SVG icons ── */
 const IconPlus = () => (
   <svg
+    aria-hidden="true"
     width="16"
     height="16"
     viewBox="0 0 16 16"
@@ -21,6 +22,7 @@ const IconPlus = () => (
 
 const IconMail = () => (
   <svg
+    aria-hidden="true"
     width="15"
     height="15"
     viewBox="0 0 20 20"
@@ -37,6 +39,7 @@ const IconMail = () => (
 
 const IconShield = () => (
   <svg
+    aria-hidden="true"
     width="15"
     height="15"
     viewBox="0 0 20 20"
@@ -52,6 +55,7 @@ const IconShield = () => (
 
 const IconCalendar = () => (
   <svg
+    aria-hidden="true"
     width="15"
     height="15"
     viewBox="0 0 20 20"

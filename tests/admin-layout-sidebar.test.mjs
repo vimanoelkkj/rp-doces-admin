@@ -102,6 +102,15 @@ test('AdminLayout renderiza a sidebar do desktop com toda a navegação e os con
   assert.ok(sidebar.textContent.includes('Ana Teste'), 'identificação do administrador');
   assert.ok([...sidebar.querySelectorAll('button')].some((b) => /Tema/.test(b.textContent)), 'botão de tema');
   assert.ok([...sidebar.querySelectorAll('button')].length >= 2, 'tema e logout');
+  for (const control of sidebar.querySelectorAll('a, button')) {
+    const accessibleName = control.getAttribute('aria-label') || control.textContent.trim();
+    assert.ok(accessibleName, 'todo controle da sidebar preserva um nome acessível');
+  }
+  assert.equal(
+    sidebar.querySelectorAll('svg:not([aria-hidden="true"])').length,
+    0,
+    'ícones redundantes não entram no nome acessível dos controles',
+  );
 
   // Frame do admin: a sidebar é irmã do frame, nunca filha do scroll (que tem máscara de fade).
   const frame = container.querySelector('.storefront-frame');

@@ -205,6 +205,7 @@ export default function PushNotificationCard() {
     <div className="push-card" data-status={status}>
       <div className="push-card-icon" aria-hidden="true">
         <svg
+          aria-hidden="true"
           width="24"
           height="24"
           viewBox="0 0 24 24"

@@ -459,6 +459,7 @@ export default function AdminLoja() {
                 <span className="loj-preview-name">R&P Doces</span>
                 <div className="loj-preview-row">
                   <svg
+                    aria-hidden="true"
                     width="14"
                     height="14"
                     viewBox="0 0 14 14"
@@ -476,6 +477,7 @@ export default function AdminLoja() {
                 <span className="loj-preview-address">{address}</span>
                 <div className="loj-preview-row">
                   <svg
+                    aria-hidden="true"
                     width="14"
                     height="14"
                     viewBox="0 0 14 14"
@@ -492,6 +494,7 @@ export default function AdminLoja() {
                 </div>
                 <div className="loj-preview-row loj-preview-row--muted">
                   <svg
+                    aria-hidden="true"
                     width="14"
                     height="14"
                     viewBox="0 0 14 14"
@@ -508,6 +511,7 @@ export default function AdminLoja() {
                 </div>
                 <div className="loj-preview-row">
                   <svg
+                    aria-hidden="true"
                     width="14"
                     height="14"
                     viewBox="0 0 14 14"
