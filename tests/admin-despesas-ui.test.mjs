@@ -102,6 +102,23 @@ async function unmount(root) {
   container.innerHTML = '';
 }
 
+test('filtro de período usa agrupamento nativo sem perder a seleção por botão', async t => {
+  const root = await mountWith(t, async () => respostaVazia());
+  const periods = document.querySelector('.desp-periods');
+  const hoje = [...periods.querySelectorAll('button')].find((button) => button.textContent === 'Hoje');
+  const tagName = periods.tagName;
+  const accessibleName = periods.getAttribute('aria-label');
+
+  await ui.act(async () => hoje.click());
+  await flush();
+  const hojePressed = hoje.getAttribute('aria-pressed');
+  await unmount(root);
+
+  assert.equal(tagName, 'FIELDSET');
+  assert.equal(accessibleName, 'Período');
+  assert.equal(hojePressed, 'true');
+});
+
 // 43) criação sem F5
 test('43: registrar gasto atualiza a lista e o resumo sem reload', async t => {
   let despesasSalvas = false;

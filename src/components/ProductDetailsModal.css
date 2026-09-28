@@ -189,6 +189,9 @@
 .pdm-stepper {
   display: inline-flex;
   align-items: center;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
   border: 1px solid var(--store-border);
   border-radius: 999px;
   background: var(--store-surface-input);

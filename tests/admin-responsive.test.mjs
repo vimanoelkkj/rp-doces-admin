@@ -117,7 +117,8 @@ test('navegação mobile troca o drawer pela barra inferior acessível', async t
     .map(item => item.querySelector('.admin-mobile-nav-label').textContent);
   assert.deepEqual(mobileLabels, ['Painel', 'Produtos', 'Pedidos', 'Loja', 'Mais']);
   assert.equal(document.querySelector('.admin-mobile-bottom-nav a[aria-current="page"]').textContent.includes('Painel'), true);
-  assert.equal(document.querySelector('.admin-mobile-nav-item--pedidos .admin-mobile-nav-badge').textContent, '3');
+  const pedidosBadge = document.querySelector('.admin-mobile-nav-item--pedidos .admin-mobile-nav-badge');
+  assert.equal(pedidosBadge.textContent, '3');
 
   const trigger = document.querySelector('.admin-mobile-nav-item--mais');
   await ui.act(async () => trigger.click());
@@ -131,7 +132,13 @@ test('navegação mobile troca o drawer pela barra inferior acessível', async t
     ['Administradores', 'Despesas', 'Notificações'],
     'Despesas está no menu de "Mais" do mobile — sem isso não há como abrir a tela no celular',
   );
-  assert.equal(document.querySelector('.admin-mobile-sheet-badge').textContent, '3');
+  const maisBadge = trigger.querySelector('.admin-mobile-nav-badge');
+  const sheetBadge = document.querySelector('.admin-mobile-sheet-badge');
+  assert.equal(sheetBadge.textContent, '3');
+  const badgeSemantics = [pedidosBadge, maisBadge, sheetBadge].map(badge => ({
+    role: badge.getAttribute('role'),
+    label: badge.getAttribute('aria-label'),
+  }));
 
   await ui.act(async () => document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'})));
   assert.equal(trigger.getAttribute('aria-expanded'), 'false');
@@ -140,6 +147,12 @@ test('navegação mobile troca o drawer pela barra inferior acessível', async t
 
   await ui.act(async () => root.unmount());
   container.innerHTML = '';
+
+  assert.deepEqual(badgeSemantics, [
+    {role: 'img', label: '3 pedidos aguardando atenção'},
+    {role: 'img', label: '3 notificações não lidas'},
+    {role: 'img', label: '3 notificações não lidas'},
+  ]);
 });
 
 test('estilos estruturais cobrem páginas, barra inferior, overlays e dark mode', async () => {

@@ -135,6 +135,21 @@ const dialogo = () => document.querySelector('[role="dialog"]');
 const texto = (el) => el.textContent.replace(/\s+/g, ' ').trim();
 const clicar = (el) => ui.act(async () => { el.click(); });
 
+test('seletor de quantidade usa agrupamento nativo e preserva os controles', async () => {
+  const m = await montar(ui.modal({ product: completo, onClose: () => {}, onAddToCart: () => {} }));
+  const stepper = dialogo().querySelector('.pdm-stepper');
+  const tagName = stepper.tagName;
+  const accessibleName = stepper.getAttribute('aria-label');
+  const [, aumentar] = stepper.querySelectorAll('button');
+  await clicar(aumentar);
+  const quantidade = texto(stepper.querySelector('.pdm-stepper-value'));
+  await m.desmontar();
+
+  assert.equal(tagName, 'FIELDSET');
+  assert.equal(accessibleName, 'Quantidade');
+  assert.equal(quantidade, '2');
+});
+
 test('card mostra só a descrição (detalhes ficam no modal); foto/nome abrem o detalhe; + continua independente (F)', async () => {
   let abriu = 0;
   let adicionou = 0;

@@ -255,14 +255,14 @@ export default function AdminDespesas() {
 
       <section className="desp-history">
         <div className="desp-toolbar">
-          <div className="desp-periods" aria-label="Período">
+          <fieldset className="desp-periods" aria-label="Período">
             {PERIODOS.map((opcao) => (
               <button key={opcao.valor} type="button" aria-pressed={periodo === opcao.valor}
                 className={periodo === opcao.valor ? "is-active" : ""} onClick={() => setPeriodo(opcao.valor)}>
                 {opcao.label}
               </button>
             ))}
-          </div>
+          </fieldset>
 
           {periodo === "PERSONALIZADO" && (
             <div className="desp-custom-range">

@@ -134,7 +134,9 @@ export default function AdminNotificacoes() {
               <span className="notif-row-desc">{notificacao.descricao}</span>
               <span className="notif-row-time">{tempoRelativo(notificacao.em)}</span>
             </span>
-            {!notificacao.lida && <span className="notif-row-dot" aria-label="Não lida" />}
+            {!notificacao.lida && (
+              <span className="notif-row-dot" role="img" aria-label="Não lida" />
+            )}
           </button>
         ))}
       </section>

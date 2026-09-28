@@ -164,6 +164,7 @@ export default function AdminMobileMoreSheet({ children }: Props) {
               {naoLidas > 0 && (
                 <span
                   className="admin-mobile-sheet-badge"
+                  role="img"
                   aria-label={`${naoLidas} ${naoLidas === 1 ? "notificação não lida" : "notificações não lidas"}`}
                 >
                   {formatBadge(naoLidas)}

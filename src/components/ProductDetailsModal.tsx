@@ -201,7 +201,7 @@ export default function ProductDetailsModal({
               </span>
             </div>
             <div className="pdm-actions">
-              <div className="pdm-stepper" role="group" aria-label="Quantidade">
+              <fieldset className="pdm-stepper" aria-label="Quantidade">
                 <button
                   type="button"
                   className="pdm-stepper-btn"
@@ -221,7 +221,7 @@ export default function ProductDetailsModal({
                 >
                   +
                 </button>
-              </div>
+              </fieldset>
               <button
                 type="button"
                 className={`pdm-add${adicionado ? " pdm-add--added" : ""}`}

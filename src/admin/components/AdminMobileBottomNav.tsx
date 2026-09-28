@@ -90,6 +90,7 @@ export default function AdminMobileBottomNav() {
                   {badge > 0 && (
                     <span
                       className="admin-mobile-nav-badge"
+                      role="img"
                       aria-label={`${badge} ${badge === 1 ? "pedido aguardando atenção" : "pedidos aguardando atenção"}`}
                     >
                       {formatBadge(badge)}
@@ -119,6 +120,7 @@ export default function AdminMobileBottomNav() {
               {naoLidas > 0 && (
                 <span
                   className="admin-mobile-nav-badge"
+                  role="img"
                   aria-label={`${naoLidas} ${naoLidas === 1 ? "notificação não lida" : "notificações não lidas"}`}
                 >
                   {formatBadge(naoLidas)}
