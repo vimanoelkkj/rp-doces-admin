@@ -5,7 +5,7 @@ export default function ProcessandoPagamento() {
     <div className="processando-screen">
       <div className="processando-content">
         <div className="processando-donut">
-          <svg className="donut-spinner" width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg aria-hidden="true" className="donut-spinner" width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
             {/* Donut body */}
             <circle cx="60" cy="56" r="40" fill="#D38B80"/>
 

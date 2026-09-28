@@ -88,6 +88,7 @@ export default function PedidoDetalheModal({
               )}
               <span className="pedmodal-meta-date">
                 <svg
+                  aria-hidden="true"
                   width="16"
                   height="16"
                   viewBox="0 0 16 16"

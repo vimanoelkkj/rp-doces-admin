@@ -252,7 +252,7 @@ export default function HistoricoComandaModal({
         <div className="histmodal-header">
           <h2 className="histmodal-title">Histórico da comanda</h2>
           <button type="button" className="histmodal-btn-close" onClick={onClose} aria-label="Fechar histórico">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="3" x2="13" y2="13" />
               <line x1="13" y1="3" x2="3" y2="13" />
             </svg>

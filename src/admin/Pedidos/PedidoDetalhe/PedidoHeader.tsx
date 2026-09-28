@@ -200,8 +200,9 @@ export default function PedidoHeader({
             </button>
           </details>
         )}
-        <button type="button" className="pedmodal-btn-close" onClick={onClose}>
+        <button type="button" className="pedmodal-btn-close" onClick={onClose} aria-label="Fechar detalhes do pedido">
           <svg
+            aria-hidden="true"
             width="16"
             height="16"
             viewBox="0 0 16 16"

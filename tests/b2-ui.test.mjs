@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 
@@ -53,7 +54,7 @@ const initial={items:[{id:1,name:'Bolo',price:50,image:'',quantity:2}],cliente:{
 const LOADING_TOTAL_MIN_MS=3000;
 const RESULT_TRANSITION_MIN_MS=1500;
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
-async function mount(t,respond){
+async function mount(t,respond,checkoutResponse,onInitialRender){
   // Usa o relógio do contexto do teste; cada teste restaura mocks/timers.
   t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:Date.parse('2026-09-17T12:00:00Z')});
   // A UI sorteia a duração das duas etapas de loading e da transição
@@ -63,7 +64,7 @@ async function mount(t,respond){
   const advance=async ms=>{await ui.act(async()=>{t.mock.timers.tick(ms);});await flush();};
   const calls=[];
   t.mock.method(globalThis,'fetch',async(url,options)=>{
-    if(url==='/api/checkout') return Response.json({pedidoId:1,tokenPublico:'token',totalCentavos:10000,qrCode:'qr',qrCodeBase64:'fake',expiresAt:new Date(Date.now()+6000).toISOString()});
+    if(url==='/api/checkout') return checkoutResponse?.() ?? Response.json({pedidoId:1,tokenPublico:'token',totalCentavos:10000,qrCode:'qr',qrCodeBase64:'fake',expiresAt:new Date(Date.now()+6000).toISOString()});
     if(url==='/api/config') return Response.json({config:{
       days:[],openTime:'09:00',closeTime:'20:00',localName:'R&P Doces',
       address:'',mapsLink:'',deliveryStatus:'unavailable',whatsapp:'11999999999',defaultMessage:''
@@ -74,13 +75,18 @@ async function mount(t,respond){
   let root;
   await ui.act(async()=>{root=ui.mount(container,initial);});
   t.after(async()=>{await ui.act(async()=>root.unmount());container.innerHTML='';});
-  await flush(); await advance(LOADING_TOTAL_MIN_MS);
+  await flush();
+  onInitialRender?.();
+  await advance(LOADING_TOTAL_MIN_MS);
   return {calls,advance};
 }
 
 test('M: timer zero with approval in flight never navigates to failure; normal success animation remains',async t=>{
   const pending=deferred();
-  const {calls,advance}=await mount(t,()=>pending.promise);
+  const {calls,advance}=await mount(t,()=>pending.promise,undefined,()=>{
+    assert.match(container.textContent,/Preparando seu pedido/);
+    assert.equal(container.querySelector('.preparando-cupcake svg').getAttribute('aria-hidden'),'true');
+  });
   assert.equal(calls.length,1);
   // M7: o polling é o gatilho explícito de recuperação (POST); o GET só lê.
   assert.equal(calls[0].url,'/api/pedido-status?token=token');
@@ -93,10 +99,32 @@ test('M: timer zero with approval in flight never navigates to failure; normal s
   assert.equal(calls.length,1,'polls must not overlap a hanging request');
   pending.resolve(Response.json({statusPagamento:'PAGO'})); await flush();
   assert.match(container.textContent,/Processando pagamento/);
+  assert.equal(container.querySelector('.processando-donut svg').getAttribute('aria-hidden'),'true');
   await advance(RESULT_TRANSITION_MIN_MS-1);
   assert.equal(ui.currentPath,'/aguardando-pagamento');
   await advance(1);
   assert.equal(ui.currentPath,'/pedido-confirmado');
+});
+
+test('erro de checkout preserva mensagem e oculta somente o x redundante',async t=>{
+  await mount(
+    t,
+    ()=>Promise.resolve(Response.json({statusPagamento:'PENDENTE'})),
+    ()=>Response.json({error:'Falha simulada ao gerar o Pix'},{status:500}),
+  );
+  assert.match(container.textContent,/Não foi possível gerar o Pix/);
+  assert.match(container.textContent,/Falha simulada ao gerar o Pix/);
+  assert.equal(container.querySelector('.status-icon--error svg').getAttribute('aria-hidden'),'true');
+  assert.equal(container.querySelector('.payment-btn-primary').textContent.trim(),'Voltar ao checkout');
+});
+
+test('fallback offline mantem estado em texto e trata o desenho como redundante',async()=>{
+  const source=await readFile('public/admin-offline.html','utf8');
+  const offline=new JSDOM(source);
+  assert.match(offline.window.document.querySelector('h1').textContent,/Sem conexão com a internet/);
+  assert.equal(offline.window.document.querySelector('.offline-icon svg').getAttribute('aria-hidden'),'true');
+  assert.equal(offline.window.document.querySelector('.retry-btn').textContent.trim(),'Tentar novamente');
+  offline.window.close();
 });
 
 test('expired response remains inconclusive and polls again; 500 also cannot navigate to failure',async t=>{

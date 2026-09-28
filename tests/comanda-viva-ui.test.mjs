@@ -133,6 +133,25 @@ async function unmount(root) {
   container.innerHTML = '';
 }
 
+test('cabecalho do detalhe nomeia o fechamento e nao duplica metadados visuais', async t => {
+  let closed = 0;
+  const root = await mountWith(t, async () => Response.json(detalhe()), {
+    onClose: () => { closed += 1; },
+  });
+  try {
+    const close = document.querySelector('.pedmodal-btn-close');
+    assert.equal(close.getAttribute('aria-label'), 'Fechar detalhes do pedido');
+    assert.equal(close.querySelector('svg').getAttribute('aria-hidden'), 'true');
+
+    const date = document.querySelector('.pedmodal-meta-date');
+    assert.match(date.textContent, /Retirada/);
+    assert.equal(date.querySelector('svg').getAttribute('aria-hidden'), 'true');
+
+    await ui.act(async () => close.click());
+    assert.equal(closed, 1);
+  } finally { await unmount(root); }
+});
+
 test('divergencia financeira do MP aparece como aviso administrativo explicito e unico', async t => {
   const root = await mountWith(t, async () => Response.json(detalhe({
     operacoes: [{
@@ -421,7 +440,10 @@ test('modal lista produtos, calcula subtotal e sucesso atualiza item, total, sal
   try {
     await ui.act(async () => document.querySelector('.pedmodal-btn-add-item').click());
     await flush();
-    await ui.act(async () => document.querySelector('.additem-dropdown-trigger').click());
+    const productTrigger = document.querySelector('.additem-dropdown-trigger');
+    assert.match(productTrigger.textContent, /Selecione um produto/);
+    assert.equal(productTrigger.querySelector('svg').getAttribute('aria-hidden'), 'true');
+    await ui.act(async () => productTrigger.click());
     await flush();
     assert.match(document.querySelector('.additem-dropdown-list').textContent, /Produto C/);
     await ui.act(async () => [...document.querySelectorAll('.additem-dropdown-option')]
@@ -1081,6 +1103,11 @@ test('preview de cancelamento mostra cobertura, estoque e confirmação executá
     assert.match(modal.textContent, /R\$\s*10,00 a devolver/);
     assert.match(modal.textContent, /reposição depende da confirmação física/i);
     assert.equal([...modal.querySelectorAll('button')].some(b => /confirmar cancelamento/i.test(b.textContent)), true);
+    const stockTrigger = modal.querySelector('.cancelpreview-dropdown-trigger');
+    assert.match(stockTrigger.textContent, /Não repor no estoque/);
+    assert.equal(stockTrigger.querySelector('svg').getAttribute('aria-hidden'), 'true');
+    await ui.act(async () => stockTrigger.click());
+    assert.match(modal.querySelector('.cancelpreview-dropdown-list').textContent, /Produto devolvido/);
   } finally {
     await unmount(root);
   }
@@ -1159,6 +1186,13 @@ test('troca mostra diferença, confirma uma intenção e orienta cobrança do sa
     assert.ok(button);
     await ui.act(async () => button.click());
     await flush();
+    const exchangeTriggers = [...document.querySelectorAll('.additem-dropdown-trigger')];
+    assert.equal(exchangeTriggers.length, 2);
+    assert.match(exchangeTriggers[0].textContent, /Selecione/);
+    assert.match(exchangeTriggers[1].textContent, /Não voltou ao estoque/);
+    for (const trigger of exchangeTriggers) {
+      assert.equal(trigger.querySelector('svg').getAttribute('aria-hidden'), 'true');
+    }
     await escolherDropdown('.additem-dropdown-trigger', 'Produto C');
     assert.match(document.querySelector('.additem-card').textContent, /Novo valorR\$ 20,00/);
     const confirm = document.querySelector('.additem-confirm');
@@ -1555,6 +1589,9 @@ test("histórico mostra a troca concluída da origem e 'Ver detalhes' abre a tro
     await ui.act(async () => document.querySelector(".pedmodal-btn-historico").click());
     await flush();
     const historico = document.querySelector(".histmodal-card");
+    const closeHistory = historico.querySelector('.histmodal-btn-close');
+    assert.equal(closeHistory.getAttribute('aria-label'), 'Fechar histórico');
+    assert.equal(closeHistory.querySelector('svg').getAttribute('aria-hidden'), 'true');
     assert.match(historico.textContent, /Origem/);
     assert.match(historico.textContent, /Destino/);
     assert.match(historico.textContent, /Concluído/);

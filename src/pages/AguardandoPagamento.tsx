@@ -310,7 +310,7 @@ export default function AguardandoPagamento() {
           {status === "erro" && (
             <div className="aguardando-step">
               <div className="status-icon status-icon--error">
-                <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 14 14" fill="none">
                   <path
                     d="M1 1L13 13M13 1L1 13"
                     stroke="#D38B80"

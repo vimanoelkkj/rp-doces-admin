@@ -230,6 +230,7 @@ test('ProductCard: produto disponível chama onAddToCart uma vez, entra em justA
   // Verifica que o SVG de check mark está montado
   const checkSvg = button.querySelector('svg');
   assert.ok(checkSvg, 'SVG de confirmação (check) deve estar montado');
+  assert.strictEqual(checkSvg.getAttribute('aria-hidden'), 'true');
 
   // Segundo clique enquanto justAdded está ativo não dispara onAddToCart novamente
   await ui.act(async () => {

@@ -109,7 +109,7 @@ export default function ProductCard({
                   transition={{ duration: 0.15 }}
                   style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path
                       d="M5 13L9 17L19 7"
                       stroke="#fff"

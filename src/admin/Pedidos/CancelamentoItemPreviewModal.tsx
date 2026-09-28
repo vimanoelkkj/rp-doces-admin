@@ -328,7 +328,7 @@ export default function CancelamentoItemPreviewModal({
                     disabled={saving}
                   >
                     <span>{acao === "REPOR" ? "Produto devolvido: repor no estoque" : "Não repor no estoque"}</span>
-                    <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                    <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
                       <path d="M1 1.5L6 6.5L11 1.5" stroke="#634738" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
