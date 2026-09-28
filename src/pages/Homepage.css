@@ -3,8 +3,13 @@
   position: relative;
   z-index: 1;
   height: 100vh;
-  height: 100dvh;
   overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .homepage {
+    height: 100dvh;
+  }
 }
 
 .homepage-content {

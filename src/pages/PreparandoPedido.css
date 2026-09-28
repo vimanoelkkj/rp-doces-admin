@@ -3,7 +3,6 @@
 .preparando-screen {
   width: 100%;
   min-height: 100vh;
-  min-height: 100dvh;
   background: var(--store-bg);
   display: flex;
   flex-direction: column;
@@ -12,6 +11,12 @@
   position: relative;
   overflow: hidden;
   transition: background-color 0.3s ease;
+}
+
+@supports (min-height: 100dvh) {
+  .preparando-screen {
+    min-height: 100dvh;
+  }
 }
 
 .preparando-content {

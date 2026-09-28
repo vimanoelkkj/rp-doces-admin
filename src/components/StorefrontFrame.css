@@ -3,9 +3,14 @@
   position: relative;
   z-index: 1;
   height: 100vh;
-  height: 100dvh;
   overflow: hidden;
   background: transparent;
+}
+
+@supports (height: 100dvh) {
+  .storefront-frame {
+    height: 100dvh;
+  }
 }
 
 .storefront-frame__scroll {

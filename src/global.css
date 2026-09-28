@@ -118,11 +118,16 @@ img {
   inset: 0;
   width: 100vw;
   height: 100vh;
-  height: 100dvh;
   background-color: var(--store-bg);
   pointer-events: none;
   z-index: 0;
   transform: translate3d(0, 0, 0);
+}
+
+@supports (height: 100dvh) {
+  .store-background {
+    height: 100dvh;
+  }
 }
 
 .homepage {

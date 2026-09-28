@@ -411,8 +411,13 @@ html[data-admin-theme="dark"] .header-admin-badge {
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--store-shadow-modal);
   max-height: calc(100vh - 48px);
-  max-height: calc(100dvh - 48px);
   overflow-y: auto;
+}
+
+@supports (max-height: 100dvh) {
+  .mobile-menu {
+    max-height: calc(100dvh - 48px);
+  }
 }
 
 .mobile-menu--open {
