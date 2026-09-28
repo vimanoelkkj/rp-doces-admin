@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
@@ -19,6 +19,7 @@ import "./Checkout.css";
 export default function Checkout() {
   const navigate = useNavigate();
   const { cartItems, totalPrice, reconcileWithProducts } = useCart();
+  const fieldId = useId();
 
   const [nome, setNome] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -139,8 +140,11 @@ export default function Checkout() {
             <h2 className="checkout-section-title">Seus dados</h2>
             <form onSubmit={handleSubmit} className="checkout-form">
               <div className="form-group">
-                <label className="form-label">NOME COMPLETO</label>
+                <label className="form-label" htmlFor={`${fieldId}-nome`}>
+                  NOME COMPLETO
+                </label>
                 <input
+                  id={`${fieldId}-nome`}
                   type="text"
                   className="form-input"
                   placeholder="Seu nome"
@@ -151,8 +155,11 @@ export default function Checkout() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">WHATSAPP PARA CONTATO</label>
+                <label className="form-label" htmlFor={`${fieldId}-whatsapp`}>
+                  WHATSAPP PARA CONTATO
+                </label>
                 <input
+                  id={`${fieldId}-whatsapp`}
                   type="tel"
                   className="form-input"
                   placeholder="(31) 99999-9999"
@@ -172,8 +179,11 @@ export default function Checkout() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">ALGUM RECADO — OPCIONAL</label>
+                <label className="form-label" htmlFor={`${fieldId}-recado`}>
+                  ALGUM RECADO — OPCIONAL
+                </label>
                 <input
+                  id={`${fieldId}-recado`}
                   type="text"
                   className="form-input"
                   placeholder="Ex.: sem calda, por favor"
@@ -183,7 +193,9 @@ export default function Checkout() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">FORMA DE PAGAMENTO</label>
+                <span className="form-label">
+                  FORMA DE PAGAMENTO
+                </span>
                 <div
                   className={`payment-option ${pagamento === "pix" ? "active" : ""}`}
                   onClick={() => setPagamento("pix")}

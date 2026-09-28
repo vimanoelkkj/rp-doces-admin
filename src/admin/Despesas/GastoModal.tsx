@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import {
@@ -75,7 +75,8 @@ function useDropdown() {
   return { open, setOpen, ref, menuRef };
 }
 
-function GastoDropdown<T extends string>({ value, options, labels, disabled, onChange, ariaLabel }: {
+function GastoDropdown<T extends string>({ id, value, options, labels, disabled, onChange, ariaLabel }: {
+  id: string;
   value: T;
   options: readonly T[];
   labels: Record<T, string>;
@@ -86,7 +87,7 @@ function GastoDropdown<T extends string>({ value, options, labels, disabled, onC
   const dd = useDropdown();
   return (
     <div className={`gasto-dropdown ${dd.open ? "gasto-dropdown--open" : ""}`} ref={dd.ref}>
-      <button type="button" className="gasto-dropdown-trigger" disabled={disabled} aria-label={ariaLabel}
+      <button id={id} type="button" className="gasto-dropdown-trigger" disabled={disabled} aria-label={`${ariaLabel}: ${labels[value]}`}
         onClick={() => dd.setOpen(!dd.open)}>
         <span>{labels[value]}</span>
         <IconChevron open={dd.open} />
@@ -151,6 +152,7 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const fieldId = useId();
   const [modo, setModo] = useState<Modo>(modoInicial);
   const [carregando, setCarregando] = useState(modoInicial !== "criar");
   const [despesa, setDespesa] = useState<DespesaView | null>(null);
@@ -403,9 +405,9 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                         <input value={item.descricao} disabled={salvando} list="gasto-descricoes-conhecidas"
                           onChange={(e) => atualizarItem(item.key, "descricao", e.target.value)} maxLength={200} required />
                       </label>
-                      <label>
+                      <label htmlFor={`${fieldId}-categoria-${item.key}`}>
                         <span>Categoria</span>
-                        <GastoDropdown value={item.categoria} options={DESPESA_CATEGORIAS} labels={DESPESA_CATEGORIA_LABEL}
+                        <GastoDropdown id={`${fieldId}-categoria-${item.key}`} value={item.categoria} options={DESPESA_CATEGORIAS} labels={DESPESA_CATEGORIA_LABEL}
                           disabled={salvando} ariaLabel="Categoria"
                           onChange={(valor) => atualizarItem(item.key, "categoria", valor)} />
                       </label>
@@ -414,9 +416,9 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                         <input inputMode="decimal" value={item.quantidade} disabled={salvando}
                           onChange={(e) => atualizarItem(item.key, "quantidade", e.target.value)} required />
                       </label>
-                      <label>
+                      <label htmlFor={`${fieldId}-unidade-${item.key}`}>
                         <span>Unidade</span>
-                        <GastoDropdown value={item.unidade} options={DESPESA_UNIDADES} labels={DESPESA_UNIDADE_LABEL}
+                        <GastoDropdown id={`${fieldId}-unidade-${item.key}`} value={item.unidade} options={DESPESA_UNIDADES} labels={DESPESA_UNIDADE_LABEL}
                           disabled={salvando} ariaLabel="Unidade"
                           onChange={(valor) => atualizarItem(item.key, "unidade", valor)} />
                       </label>

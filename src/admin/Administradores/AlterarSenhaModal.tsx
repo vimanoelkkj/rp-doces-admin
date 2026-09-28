@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import "./NovoAdminModal.css";
@@ -32,6 +32,7 @@ export default function AlterarSenhaModal({
   onClose,
   onSaved,
 }: AlterarSenhaModalProps) {
+  const fieldId = useId();
   const [senhaAtual, setSenhaAtual] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
@@ -114,8 +115,9 @@ export default function AlterarSenhaModal({
         <form className="nadm-body" onSubmit={handleSubmit}>
           {isSelf && (
             <div className="nadm-field">
-              <label>SENHA ATUAL</label>
+              <label htmlFor={`${fieldId}-senha-atual`}>SENHA ATUAL</label>
               <input
+                id={`${fieldId}-senha-atual`}
                 type="password"
                 placeholder="Sua senha atual"
                 value={senhaAtual}
@@ -126,8 +128,9 @@ export default function AlterarSenhaModal({
           )}
 
           <div className="nadm-field">
-            <label>NOVA SENHA</label>
+            <label htmlFor={`${fieldId}-nova-senha`}>NOVA SENHA</label>
             <input
+              id={`${fieldId}-nova-senha`}
               type="password"
               placeholder="Mín. 8 caracteres"
               value={senha}
@@ -137,8 +140,11 @@ export default function AlterarSenhaModal({
           </div>
 
           <div className="nadm-field">
-            <label>{isSelf ? "CONFIRMAR NOVA SENHA" : "CONFIRMAR SENHA"}</label>
+            <label htmlFor={`${fieldId}-confirmar-senha`}>
+              {isSelf ? "CONFIRMAR NOVA SENHA" : "CONFIRMAR SENHA"}
+            </label>
             <input
+              id={`${fieldId}-confirmar-senha`}
               type="password"
               placeholder={isSelf ? "Repita a nova senha" : "Repita a senha"}
               value={confirmar}

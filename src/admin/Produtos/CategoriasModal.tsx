@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import { EMOJI_OPTIONS } from "./EmojiIcons";
@@ -42,12 +42,14 @@ export default function CategoriasModal({
   onClose,
 }: CategoriasModalProps) {
   const modalProps = useAdminModal(open, onClose);
+  const fieldId = useId();
   const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState(EMOJI_OPTIONS[0].char);
   const [newDescription, setNewDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const selectedEmojiIndex = EMOJI_OPTIONS.findIndex((option) => option.char === newEmoji);
 
   const carregarCategorias = () => {
     fetch("/api/admin/categorias")
@@ -129,8 +131,9 @@ export default function CategoriasModal({
 
             {/* Nome */}
             <div className="catm-field catm-field--full">
-              <label>NOME</label>
+              <label htmlFor={`${fieldId}-nome`}>NOME</label>
               <input
+                id={`${fieldId}-nome`}
                 type="text"
                 placeholder="Ex.: Brownies"
                 value={newName}
@@ -141,17 +144,26 @@ export default function CategoriasModal({
             {/* Emoji — mesmo conjunto (e mesma UI) do modal de novo produto,
                 para não divergir em quais emojis existem em cada tela. */}
             <div className="catm-field catm-field--full">
-              <label>EMOJI</label>
+              <label
+                id={`${fieldId}-emoji-label`}
+                htmlFor={`${fieldId}-emoji-${selectedEmojiIndex}`}
+              >
+                EMOJI
+              </label>
               <div className="catm-emoji-grid">
-                {EMOJI_OPTIONS.map((em) => (
+                {EMOJI_OPTIONS.map((em, index) => (
                   <button
+                    id={`${fieldId}-emoji-${index}`}
                     key={em.char}
                     type="button"
+                    aria-labelledby={`${fieldId}-emoji-label ${fieldId}-emoji-${index}-label`}
                     className={`catm-emoji-item${newEmoji === em.char ? " catm-emoji-item--active" : ""}`}
                     onClick={() => setNewEmoji(em.char)}
                   >
                     <span className="catm-emoji-icon">{em.icon}</span>
-                    <span className="catm-emoji-label">{em.label}</span>
+                    <span id={`${fieldId}-emoji-${index}-label`} className="catm-emoji-label">
+                      {em.label}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -159,8 +171,9 @@ export default function CategoriasModal({
 
             {/* Descrição */}
             <div className="catm-field catm-field--full">
-              <label>DESCRIÇÃO</label>
+              <label htmlFor={`${fieldId}-descricao`}>DESCRIÇÃO</label>
               <input
+                id={`${fieldId}-descricao`}
                 type="text"
                 placeholder="Ex.: Brownies artesanais da R&P"
                 value={newDescription}

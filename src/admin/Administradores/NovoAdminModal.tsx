@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import "./NovoAdminModal.css";
@@ -90,6 +90,7 @@ export default function NovoAdminModal({
   onSaved,
 }: NovoAdminModalProps) {
   const modalProps = useAdminModal(open, onClose);
+  const fieldId = useId();
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
@@ -178,8 +179,9 @@ export default function NovoAdminModal({
         <form className="nadm-body" onSubmit={handleSubmit}>
           {/* Nome completo */}
           <div className="nadm-field">
-            <label>NOME COMPLETO</label>
+            <label htmlFor={`${fieldId}-nome`}>NOME COMPLETO</label>
             <input
+              id={`${fieldId}-nome`}
               type="text"
               placeholder="Ex.: Maria Silva"
               value={name}
@@ -190,10 +192,11 @@ export default function NovoAdminModal({
           {/* Handle + Nível */}
           <div className="nadm-row-2">
             <div className="nadm-field">
-              <label>HANDLE</label>
+              <label htmlFor={`${fieldId}-handle`}>HANDLE</label>
               <div className="nadm-input-prefix-wrap">
                 <span className="nadm-input-prefix">@</span>
                 <input
+                  id={`${fieldId}-handle`}
                   type="text"
                   placeholder="usuario"
                   value={handle}
@@ -206,17 +209,21 @@ export default function NovoAdminModal({
             </div>
 
             <div className="nadm-field">
-              <label>NÍVEL DE ACESSO</label>
+              <label id={`${fieldId}-nivel-label`} htmlFor={`${fieldId}-nivel`}>
+                NÍVEL DE ACESSO
+              </label>
               <div
                 className={`nadm-dropdown ${levelOpen ? "nadm-dropdown--open" : ""}`}
               >
                 <button
+                  id={`${fieldId}-nivel`}
                   type="button"
                   className="nadm-dropdown-trigger"
+                  aria-labelledby={`${fieldId}-nivel-label ${fieldId}-nivel-value`}
                   onClick={() => setLevelOpen(!levelOpen)}
                   onBlur={() => setTimeout(() => setLevelOpen(false), 150)}
                 >
-                  <span>{level}</span>
+                  <span id={`${fieldId}-nivel-value`}>{level}</span>
                   <IconChevron />
                 </button>
                 {levelOpen && (
@@ -243,8 +250,9 @@ export default function NovoAdminModal({
 
           {/* E-mail */}
           <div className="nadm-field">
-            <label>E-MAIL</label>
+            <label htmlFor={`${fieldId}-email`}>E-MAIL</label>
             <input
+              id={`${fieldId}-email`}
               type="email"
               placeholder="email@exemplo.com"
               value={email}
@@ -255,9 +263,10 @@ export default function NovoAdminModal({
           {/* Senha + Confirmar senha */}
           <div className="nadm-row-2">
             <div className="nadm-field">
-              <label>SENHA</label>
+              <label htmlFor={`${fieldId}-senha`}>SENHA</label>
               <div className="nadm-input-password-wrap">
                 <input
+                  id={`${fieldId}-senha`}
                   type={showPassword ? "text" : "password"}
                   placeholder="Mín. 8 caracteres"
                   value={password}
@@ -274,9 +283,10 @@ export default function NovoAdminModal({
             </div>
 
             <div className="nadm-field">
-              <label>CONFIRMAR SENHA</label>
+              <label htmlFor={`${fieldId}-confirmar-senha`}>CONFIRMAR SENHA</label>
               <div className="nadm-input-password-wrap">
                 <input
+                  id={`${fieldId}-confirmar-senha`}
                   type={showConfirm ? "text" : "password"}
                   placeholder="Repita a senha"
                   value={confirmPassword}

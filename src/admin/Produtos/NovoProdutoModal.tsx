@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import { ALERGENICOS_MAX, INGREDIENTES_MAX, PESO_TEXTO_MAX } from "../../../shared/produtoDetalhes";
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "./AdminProdutos";
@@ -106,6 +106,7 @@ export default function NovoProdutoModal({
   produto,
 }: NovoProdutoModalProps) {
   const isEdit = produto != null;
+  const fieldId = useId();
   const [name, setName] = useState("");
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [category, setCategory] = useState("");
@@ -397,8 +398,9 @@ export default function NovoProdutoModal({
 
         <form className="np-body" onSubmit={handleSubmit}>
           <div className="np-field np-field--full">
-            <label>NOME</label>
+            <label htmlFor={`${fieldId}-nome`}>NOME</label>
             <input
+              id={`${fieldId}-nome`}
               type="text"
               placeholder="Ex.: Bolo no pote de morango"
               value={name}
@@ -408,17 +410,24 @@ export default function NovoProdutoModal({
 
           <div className="np-row-2">
             <div className="np-field">
-              <label>CATEGORIA</label>
+              <label
+                id={`${fieldId}-categoria-label`}
+                htmlFor={`${fieldId}-categoria`}
+              >
+                CATEGORIA
+              </label>
               <div
                 className={`np-dropdown ${catOpen ? "np-dropdown--open" : ""}`}
               >
                 <button
+                  id={`${fieldId}-categoria`}
                   type="button"
                   className="np-dropdown-trigger"
+                  aria-labelledby={`${fieldId}-categoria-label ${fieldId}-categoria-value`}
                   onClick={() => setCatOpen(!catOpen)}
                   onBlur={() => setTimeout(() => setCatOpen(false), 150)}
                 >
-                  <span>
+                  <span id={`${fieldId}-categoria-value`}>
                     {categorias.find((c) => c.id === category)
                       ? `${categorias.find((c) => c.id === category)!.emoji} ${categorias.find((c) => c.id === category)!.nome}`
                       : "Selecione uma categoria"}
@@ -457,7 +466,7 @@ export default function NovoProdutoModal({
             </div>
 
             <div className="np-field">
-              <label>ESTOQUE</label>
+              <label htmlFor={`${fieldId}-estoque`}>ESTOQUE</label>
               <div className="np-stepper">
                 <button
                   type="button"
@@ -467,6 +476,7 @@ export default function NovoProdutoModal({
                   <IconMinus />
                 </button>
                 <input
+                  id={`${fieldId}-estoque`}
                   type="text"
                   className="np-stepper-value"
                   value={stock}
@@ -509,25 +519,35 @@ export default function NovoProdutoModal({
           </div>
 
           <div className="np-field np-field--full">
-            <label>EMOJI</label>
+            <label
+              id={`${fieldId}-emoji-label`}
+              htmlFor={`${fieldId}-emoji-${selectedEmoji ?? 0}`}
+            >
+              EMOJI
+            </label>
             <div className="np-emoji-grid">
               {EMOJI_OPTIONS.map((e, i) => (
                 <button
+                  id={`${fieldId}-emoji-${i}`}
                   key={i}
                   type="button"
+                  aria-labelledby={`${fieldId}-emoji-label ${fieldId}-emoji-${i}-label`}
                   className={`np-emoji-item${selectedEmoji === i ? " np-emoji-item--active" : ""}`}
                   onClick={() => setSelectedEmoji(i)}
                 >
                   <span className="np-emoji-icon">{e.icon}</span>
-                  <span className="np-emoji-label">{e.label}</span>
+                  <span id={`${fieldId}-emoji-${i}-label`} className="np-emoji-label">
+                    {e.label}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
           <div className="np-field np-field--full">
-            <label>PREÇO</label>
+            <label htmlFor={`${fieldId}-preco`}>PREÇO</label>
             <input
+              id={`${fieldId}-preco`}
               type="text"
               placeholder="0,00"
               value={price}
@@ -537,7 +557,7 @@ export default function NovoProdutoModal({
           </div>
 
           <div className="np-field np-field--full">
-            <label>FOTO DO PRODUTO</label>
+            <label htmlFor={`${fieldId}-foto`}>FOTO DO PRODUTO</label>
             <div className="np-photo-row">
               <div
                 className="np-photo-preview"
@@ -577,6 +597,7 @@ export default function NovoProdutoModal({
                 </p>
               </div>
               <input
+                id={`${fieldId}-foto`}
                 ref={fileRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -587,8 +608,9 @@ export default function NovoProdutoModal({
           </div>
 
           <div className="np-field np-field--full">
-            <label>DESCRIÇÃO</label>
+            <label htmlFor={`${fieldId}-descricao`}>DESCRIÇÃO</label>
             <textarea
+              id={`${fieldId}-descricao`}
               placeholder="Uma descrição curta do produto."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -689,8 +711,11 @@ export default function NovoProdutoModal({
           {promocao && (
             <div className="np-promo-box np-field--full">
               <div className="np-field np-field--full">
-                <label>PREÇO PROMOCIONAL</label>
+                <label htmlFor={`${fieldId}-preco-promocional`}>
+                  PREÇO PROMOCIONAL
+                </label>
                 <input
+                  id={`${fieldId}-preco-promocional`}
                   type="text"
                   placeholder="0,00"
                   value={promoPrice}
@@ -701,16 +726,22 @@ export default function NovoProdutoModal({
 
               <div className="np-row-2">
                 <div className="np-field">
-                  <label>INÍCIO — OPCIONAL</label>
+                  <label htmlFor={`${fieldId}-promocao-inicio`}>
+                    INÍCIO — OPCIONAL
+                  </label>
                   <input
+                    id={`${fieldId}-promocao-inicio`}
                     type="datetime-local"
                     value={promoInicio}
                     onChange={(e) => setPromoInicio(e.target.value)}
                   />
                 </div>
                 <div className="np-field">
-                  <label>TÉRMINO — OPCIONAL</label>
+                  <label htmlFor={`${fieldId}-promocao-fim`}>
+                    TÉRMINO — OPCIONAL
+                  </label>
                   <input
+                    id={`${fieldId}-promocao-fim`}
                     type="datetime-local"
                     value={promoFim}
                     onChange={(e) => setPromoFim(e.target.value)}

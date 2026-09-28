@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import { novaOperationKey } from "../../lib/operationKey";
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
@@ -152,6 +152,7 @@ export default function NovoPedidoModal({
   onClose,
   onCreated,
 }: NovoPedidoModalProps) {
+  const fieldId = useId();
   const [clientName, setClientName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [items, setItems] = useState<OrderItem[]>([newOrderItem()]);
@@ -336,10 +337,11 @@ export default function NovoPedidoModal({
             {/* Cliente + WhatsApp */}
             <div className="nped-row-2">
               <div className="nped-field">
-                <label>
+                <label htmlFor={`${fieldId}-cliente`}>
                   Cliente <span className="nped-optional">opcional</span>
                 </label>
                 <input
+                  id={`${fieldId}-cliente`}
                   type="text"
                   placeholder="Nome do cliente"
                   value={clientName}
@@ -347,10 +349,11 @@ export default function NovoPedidoModal({
                 />
               </div>
               <div className="nped-field">
-                <label>
+                <label htmlFor={`${fieldId}-whatsapp`}>
                   WhatsApp <span className="nped-optional">opcional</span>
                 </label>
                 <input
+                  id={`${fieldId}-whatsapp`}
                   type="tel"
                   placeholder="(31) 99999-9999"
                   value={whatsapp}
@@ -396,17 +399,24 @@ export default function NovoPedidoModal({
             {/* Pagamento */}
             <div className="nped-row-2">
               <div className="nped-field">
-                <label>Forma de pagamento</label>
+                <label
+                  id={`${fieldId}-metodo-label`}
+                  htmlFor={`${fieldId}-metodo`}
+                >
+                  Forma de pagamento
+                </label>
                 <div
                   className={`nped-dropdown ${payMethodDd.open ? "nped-dropdown--open" : ""}`}
                   ref={payMethodDd.ref}
                 >
                   <button
+                    id={`${fieldId}-metodo`}
                     type="button"
                     className="nped-dropdown-trigger"
+                    aria-labelledby={`${fieldId}-metodo-label ${fieldId}-metodo-value`}
                     onClick={() => payMethodDd.setOpen(!payMethodDd.open)}
                   >
-                    <span>
+                    <span id={`${fieldId}-metodo-value`}>
                       {METODO_OPTIONS.find((m) => m.value === metodoPagamento)?.label}
                     </span>
                     <IconChevron open={payMethodDd.open} />
@@ -435,17 +445,24 @@ export default function NovoPedidoModal({
               </div>
 
               <div className="nped-field">
-                <label>Situação do pagamento</label>
+                <label
+                  id={`${fieldId}-status-label`}
+                  htmlFor={`${fieldId}-status`}
+                >
+                  Situação do pagamento
+                </label>
                 <div
                   className={`nped-dropdown ${payStatusDd.open ? "nped-dropdown--open" : ""}`}
                   ref={payStatusDd.ref}
                 >
                   <button
+                    id={`${fieldId}-status`}
                     type="button"
                     className="nped-dropdown-trigger"
+                    aria-labelledby={`${fieldId}-status-label ${fieldId}-status-value`}
                     onClick={() => payStatusDd.setOpen(!payStatusDd.open)}
                   >
-                    <span>
+                    <span id={`${fieldId}-status-value`}>
                       {STATUS_OPTIONS.find((s) => s.value === statusPagamento)?.label}
                     </span>
                     <IconChevron open={payStatusDd.open} />
@@ -476,10 +493,11 @@ export default function NovoPedidoModal({
 
             {/* Observação */}
             <div className="nped-field">
-              <label>
+              <label htmlFor={`${fieldId}-observacao`}>
                 Observação <span className="nped-optional">opcional</span>
               </label>
               <textarea
+                id={`${fieldId}-observacao`}
                 placeholder="Ex.: buscar amanhã às 15h"
                 value={observation}
                 onChange={(e) => setObservation(e.target.value)}
