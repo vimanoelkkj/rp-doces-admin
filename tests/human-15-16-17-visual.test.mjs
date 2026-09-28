@@ -167,8 +167,21 @@ test('HUMAN-17: o campo WhatsApp preserva integralmente o HUMAN-04', async () =>
 test('HUMAN-12/17: o agendamento da promoção não repete o descasamento', async () => {
   const desmontar = await montar(ui.mountProduto, true);
   try {
-    const tipos = tiposDeInputEm('np-field');
+    const tipos = new Set(
+      [...document.querySelectorAll('.np-promo-box .np-field input')].map(input => input.type),
+    );
     assert.ok(tipos.has('datetime-local'), 'campos de agendamento aparecem com a promoção ligada');
+    const radiosEmoji = [...document.querySelectorAll('.np-emoji-fieldset input[type="radio"]')];
+    assert.ok(radiosEmoji.length > 0, 'seletor de emoji continua usando radios nativos');
+    assert.ok(
+      radiosEmoji.every(input => input.classList.contains('np-emoji-radio')),
+      'radios do emoji mantêm seu tratamento visual específico',
+    );
+    assert.equal(
+      document.querySelector('.np-promo-box input[type="radio"]'),
+      null,
+      'agendamento não contém radios do seletor de emoji',
+    );
     exigirCobertura(
       tipos, 'np-field',
       await ler('src/admin/Produtos/NovoProdutoModal.css'),
