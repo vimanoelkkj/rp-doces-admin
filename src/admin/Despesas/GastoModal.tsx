@@ -51,7 +51,7 @@ interface ItemForm {
 
 function IconChevron({ open }: { open: boolean }) {
   return (
-    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="gasto-dropdown-chevron"
+    <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none" className="gasto-dropdown-chevron"
       style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>
       <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -290,7 +290,7 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
             <h2 id="gasto-modal-title" className="gasto-title">{titulo}</h2>
           </div>
           <button type="button" className="gasto-close" onClick={onClose} aria-label="Fechar" disabled={salvando}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               <path d="m4 4 10 10M14 4 4 14" />
             </svg>
           </button>
@@ -394,7 +394,7 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                       <strong>Item {index + 1}</strong>
                       <button type="button" onClick={() => removerItem(item.key)}
                         disabled={salvando || itens.length <= 1} aria-label={`Remover item ${index + 1}`}>
-                        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
                           <path d="M2 4h11M6 4V2.5h3V4M3.5 4l.6 8.5h6.8l.6-8.5" />
                         </svg>
                       </button>
@@ -441,7 +441,7 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
             </div>
 
             <button type="button" className="gasto-btn-add-item" onClick={adicionarItem} disabled={salvando}>
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M7.5 2v11M2 7.5h11" />
               </svg>
               Adicionar item

@@ -119,6 +119,31 @@ test('filtro de período usa agrupamento nativo sem perder a seleção por botã
   assert.equal(hojePressed, 'true');
 });
 
+test('ícones redundantes de despesas ficam ocultos sem apagar nomes dos controles', async t => {
+  const root = await mountWith(t, async () => respostaVazia());
+  try {
+    const pageSvgs = [...document.querySelectorAll(
+      '.desp-status-dropdown-chevron, .desp-btn-primary svg, .desp-search svg',
+    )];
+    assert.equal(pageSvgs.length, 3, 'os três ícones da tela devem estar renderizados');
+    for (const svg of pageSvgs) assert.equal(svg.getAttribute('aria-hidden'), 'true');
+    assert.match(document.querySelector('.desp-btn-primary').textContent, /Registrar gasto/);
+    assert.equal(document.querySelector('.desp-search input').getAttribute('aria-label'), 'Buscar despesas');
+
+    await ui.act(async () => document.querySelector('.desp-btn-primary').click());
+    await flush();
+    const modal = document.querySelector('.gasto-modal');
+    const modalSvgs = [...modal.querySelectorAll('svg')];
+    assert.ok(modalSvgs.length > 0, 'o modal deve renderizar seus ícones');
+    for (const svg of modalSvgs) assert.equal(svg.getAttribute('aria-hidden'), 'true');
+    for (const control of modal.querySelectorAll('button')) {
+      assert.ok(control.getAttribute('aria-label') || control.textContent.trim());
+    }
+  } finally {
+    await unmount(root);
+  }
+});
+
 // 43) criação sem F5
 test('43: registrar gasto atualiza a lista e o resumo sem reload', async t => {
   let despesasSalvas = false;

@@ -256,6 +256,7 @@ export default function AdminPedidos() {
               onClick={() => setNovoPedidoOpen(true)}
             >
               <svg
+                aria-hidden="true"
                 width="16"
                 height="16"
                 viewBox="0 0 16 16"
@@ -277,6 +278,7 @@ export default function AdminPedidos() {
           <div className="ped-filter-row">
             <div className="ped-search">
               <svg
+                aria-hidden="true"
                 width="16"
                 height="16"
                 viewBox="0 0 16 16"

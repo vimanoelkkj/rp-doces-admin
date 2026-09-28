@@ -7,6 +7,7 @@ import "./AdminLogin.css";
 
 const IconMoon = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 24 24"
@@ -22,6 +23,7 @@ const IconMoon = () => (
 
 const IconSun = () => (
   <svg
+    aria-hidden="true"
     width="18"
     height="18"
     viewBox="0 0 24 24"
@@ -139,6 +141,7 @@ export default function AdminLogin() {
           <div className="admin-login-logo-group">
             <div className="admin-login-logo-circle">
               <svg
+                aria-hidden="true"
                 className="admin-login-cake"
                 width="20"
                 height="20"
@@ -192,6 +195,7 @@ export default function AdminLogin() {
               <button type="button" className="admin-login-biometry">
                 <div className="admin-login-biometry-icon">
                   <svg
+                    aria-hidden="true"
                     width="18"
                     height="18"
                     viewBox="0 0 24 24"
@@ -293,6 +297,7 @@ export default function AdminLogin() {
                   >
                     {showPassword ? (
                       <svg
+                        aria-hidden="true"
                         width="18"
                         height="18"
                         viewBox="0 0 24 24"
@@ -307,6 +312,7 @@ export default function AdminLogin() {
                       </svg>
                     ) : (
                       <svg
+                        aria-hidden="true"
                         width="18"
                         height="18"
                         viewBox="0 0 24 24"

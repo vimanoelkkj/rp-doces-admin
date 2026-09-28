@@ -53,7 +53,7 @@ const STATUS_OPCOES: { valor: "TODOS" | "ATIVA" | "CANCELADA"; label: string }[]
 
 function IconChevron({ open }: { open: boolean }) {
   return (
-    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="desp-status-dropdown-chevron"
+    <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none" className="desp-status-dropdown-chevron"
       style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>
       <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -181,7 +181,7 @@ export default function AdminDespesas() {
           <p className="desp-subtitle">Acompanhe os gastos da operação e o impacto no resultado.</p>
         </div>
         <button type="button" className="desp-btn-primary" onClick={() => setModal({ modo: "criar" })}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <line x1="8" y1="3" x2="8" y2="13" /><line x1="3" y1="8" x2="13" y2="8" />
           </svg>
           Registrar gasto
@@ -275,7 +275,7 @@ export default function AdminDespesas() {
           )}
 
           <label className="desp-search">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="7" cy="7" r="5" /><path d="m14 14-3-3" />
             </svg>
             <input value={busca} onChange={(e) => setBusca(e.target.value)}

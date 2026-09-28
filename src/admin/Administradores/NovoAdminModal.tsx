@@ -52,7 +52,7 @@ const IconEyeOff = () => (
 );
 
 const IconChevron = () => (
-  <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+  <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
     <path
       d="M1 1.5L6 6.5L11 1.5"
       stroke="#634738"
@@ -314,6 +314,7 @@ export default function NovoAdminModal({
           {/* Info box */}
           <div className="nadm-info-box">
             <svg
+              aria-hidden="true"
               width="16"
               height="16"
               viewBox="0 0 20 20"

@@ -6,6 +6,7 @@ import "./AdminProdutos.css";
 /* ── Icons ── */
 const IconSearch = () => (
   <svg
+    aria-hidden="true"
     width="16"
     height="16"
     viewBox="0 0 16 16"
@@ -22,6 +23,7 @@ const IconSearch = () => (
 
 const IconPlus = () => (
   <svg
+    aria-hidden="true"
     width="16"
     height="16"
     viewBox="0 0 16 16"

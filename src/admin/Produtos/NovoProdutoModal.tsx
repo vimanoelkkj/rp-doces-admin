@@ -432,7 +432,7 @@ export default function NovoProdutoModal({
                       ? `${categorias.find((c) => c.id === category)!.emoji} ${categorias.find((c) => c.id === category)!.nome}`
                       : "Selecione uma categoria"}
                   </span>
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                  <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
                     <path
                       d="M1 1.5L6 6.5L11 1.5"
                       stroke="#634738"

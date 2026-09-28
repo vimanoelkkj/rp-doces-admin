@@ -22,6 +22,7 @@ for (const name of [
   "Node",
   "Event",
   "MouseEvent",
+  "MutationObserver",
   "localStorage",
 ]) {
   Object.defineProperty(globalThis, name, { configurable: true, value: dom.window[name] });
@@ -50,8 +51,12 @@ const bundle = await build({
       import NovoPedidoModal from "./src/admin/Pedidos/NovoPedidoModal";
       import CategoriasModal from "./src/admin/Produtos/CategoriasModal";
       import NovoProdutoModal from "./src/admin/Produtos/NovoProdutoModal";
+      import AdminLogin from "./src/admin/Login/AdminLogin";
+      import AdminPedidos from "./src/admin/Pedidos/AdminPedidos";
+      import AdminProdutos from "./src/admin/Produtos/AdminProdutos";
       import Checkout from "./src/pages/Checkout";
       import {CartProvider} from "./src/context/CartContext";
+      import {StoreThemeProvider} from "./src/context/StoreThemeContext";
       import {MemoryRouter} from "react-router-dom";
       export {act} from "react";
 
@@ -65,6 +70,9 @@ const bundle = await build({
           novoPedido: <NovoPedidoModal open onClose={noop} />,
           categorias: <CategoriasModal open onClose={noop} />,
           novoProduto: <NovoProdutoModal open onClose={noop} />,
+          adminLogin: <StoreThemeProvider><MemoryRouter><AdminLogin /></MemoryRouter></StoreThemeProvider>,
+          adminPedidos: <MemoryRouter><AdminPedidos /></MemoryRouter>,
+          adminProdutos: <AdminProdutos />,
           checkout: <MemoryRouter><CartProvider><Checkout /></CartProvider></MemoryRouter>,
         }[component];
         root.render(element);
@@ -88,6 +96,13 @@ globalThis.fetch = async (url) => {
   const target = String(url);
   if (target.includes("/categorias")) return Response.json({ categorias: [] });
   if (target.includes("/admin/produtos")) return Response.json({ produtos: [] });
+  if (target.includes("/admin/pedidos/reconciliar")) return Response.json({ ok: true });
+  if (target.includes("/admin/pedidos")) {
+    return Response.json({
+      pedidos: [], total: 0, page: 1, totalPages: 1,
+      counts: {todos: 0, hoje: 0, novos: 0, em_producao: 0, prontos: 0, entregues: 0, arquivados: 0},
+    });
+  }
   if (target.endsWith("/api/produtos")) {
     return Response.json({
       produtos: [{
@@ -132,6 +147,21 @@ async function render(component) {
   };
 }
 
+function assertDecorativeSvgs(selector) {
+  const svgs = [...document.querySelectorAll(selector)];
+  assert.ok(svgs.length > 0, `seletor sem SVG renderizado: ${selector}`);
+  for (const svg of svgs) assert.equal(svg.getAttribute("aria-hidden"), "true");
+}
+
+function assertNamedControls(selector) {
+  const controls = [...document.querySelectorAll(selector)];
+  assert.ok(controls.length > 0, `seletor sem controle renderizado: ${selector}`);
+  for (const control of controls) {
+    const name = control.getAttribute("aria-label") || control.textContent.trim();
+    assert.ok(name, `controle sem nome acessível: ${selector}`);
+  }
+}
+
 for (const component of [
   "alterarSenha",
   "novoAdmin",
@@ -163,3 +193,42 @@ for (const component of [
     }
   });
 }
+
+test("ícones administrativos redundantes não alteram os nomes dos controles", async () => {
+  for (const [component, svgSelector, controlSelector] of [
+    ["novoAdmin", ".nadm-dropdown-trigger svg, .nadm-info-box svg", ".nadm-dropdown-trigger"],
+    ["gasto", ".gasto-modal svg", ".gasto-modal button"],
+    ["novoPedido", ".nped-btn-add-item svg, .nped-dropdown-trigger svg", ".nped-btn-add-item, .nped-dropdown-trigger"],
+    ["novoProduto", ".np-dropdown-trigger svg", ".np-dropdown-trigger"],
+    ["adminProdutos", ".prod-btn-primary svg, .prod-search svg", ".prod-btn-primary"],
+    ["adminPedidos", ".ped-btn-primary svg, .ped-search svg", ".ped-btn-primary"],
+  ]) {
+    const unmount = await render(component);
+    try {
+      assertDecorativeSvgs(svgSelector);
+      assertNamedControls(controlSelector);
+    } finally {
+      await unmount();
+    }
+  }
+
+  const unmount = await render("adminLogin");
+  try {
+    assertDecorativeSvgs(
+      ".admin-login-theme-toggle svg, .admin-login-logo-circle svg, .admin-login-biometry svg",
+    );
+    assertNamedControls(".admin-login-theme-toggle, .admin-login-biometry");
+
+    const username = document.querySelector("#admin-username");
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    await ui.act(async () => {
+      setter.call(username, "ana");
+      username.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await ui.act(async () => document.querySelector(".admin-login-form").requestSubmit());
+    assertDecorativeSvgs(".admin-login-eye-toggle svg");
+    assertNamedControls(".admin-login-eye-toggle");
+  } finally {
+    await unmount();
+  }
+});
