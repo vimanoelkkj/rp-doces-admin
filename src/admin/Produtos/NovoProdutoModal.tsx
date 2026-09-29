@@ -135,6 +135,7 @@ export default function NovoProdutoModal({
   const estoqueAtual = /^\d+$/.test(stock) ? Number(stock) : 0;
   const estoqueLivre = Math.max(0, estoqueAtual - estoqueReservado);
   const estoqueAbaixoDaReserva = isEdit && estoqueAtual < estoqueReservado;
+  const categoriaSelecionada = categorias.find(c => c.id === category);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -419,8 +420,8 @@ export default function NovoProdutoModal({
                   onBlur={() => setTimeout(() => setCatOpen(false), 150)}
                 >
                   <span id={`${fieldId}-categoria-value`}>
-                    {categorias.find(c => c.id === category)
-                      ? `${categorias.find(c => c.id === category)!.emoji} ${categorias.find(c => c.id === category)!.nome}`
+                    {categoriaSelecionada
+                      ? `${categoriaSelecionada.emoji} ${categoriaSelecionada.nome}`
                       : "Selecione uma categoria"}
                   </span>
                   <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">

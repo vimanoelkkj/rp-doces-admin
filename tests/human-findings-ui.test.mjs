@@ -147,6 +147,11 @@ const bundle = await build({
         root.render(<NovoProdutoModal open onClose={onClose} produto={produto}/>);
         return root;
       }
+      export function mountProductWith(container, produto) {
+        const root = createRoot(container);
+        root.render(<NovoProdutoModal open onClose={() => {}} produto={produto}/>);
+        return root;
+      }
       export function mountCatalog(container) {
         function Harness() {
           const {products, loading} = useCatalogProducts();
@@ -459,6 +464,145 @@ test("HUMAN-07/09: produto mascara preço e aceita estoque inteiro pelo teclado"
   assert.equal(writes[0].estoque, 42);
   assert.equal(writes[0].precoCentavos, 125050);
   await unmount(root);
+});
+
+const categoriasSeletor = [
+  { id: "bolo", nome: "Bolos", emoji: "🍰", ativo: 1 },
+  { id: "doce", nome: "Doces", emoji: "🍬", ativo: 1 },
+  { id: "antiga", nome: "Antigas", emoji: "📦", ativo: 0 }
+];
+const produtoSeletor = {
+  id: 1,
+  nome: "Bolo",
+  categoria: "bolo",
+  descricao: "Doce",
+  preco_centavos: 2000,
+  disponivel: 1,
+  ativo: 1,
+  destaque: 0,
+  promocao_ativa: 0,
+  estoque: 20,
+  estoque_reservado: 0,
+  emoji: "",
+  image_key: null
+};
+
+// Monta o modal com a carga de categorias sob controle (`liberar`) e registra as requisições.
+async function montarSeletorCategoria(t, produto, categorias = categoriasSeletor) {
+  const chamadas = [];
+  let liberar;
+  const carga = new Promise(resolve => {
+    liberar = resolve;
+  });
+  t.mock.method(globalThis, "fetch", async url => {
+    chamadas.push(String(url));
+    if (url === "/api/admin/categorias") {
+      await carga;
+      return Response.json({ categorias });
+    }
+    throw new Error(`request inesperado: ${url}`);
+  });
+  let root;
+  await ui.act(async () => {
+    root = ui.mountProductWith(container, produto);
+  });
+  return {
+    root,
+    chamadas,
+    async liberar() {
+      liberar();
+      await flush();
+      await flush();
+    }
+  };
+}
+const gatilhoCategoria = () => document.querySelector('button[id$="-categoria"]');
+const valorCategoria = () => gatilhoCategoria().querySelector("span").textContent;
+const opcoesCategoria = () =>
+  [...document.querySelectorAll(".np-dropdown-option")].map(opcao => opcao.textContent);
+
+test("QUALITY-8I: seletor de categoria mostra o placeholder, a preseleção e a troca de categoria", async t => {
+  const { root, chamadas, liberar } = await montarSeletorCategoria(t, null);
+  try {
+    assert.equal(valorCategoria(), "Selecione uma categoria", "antes da lista chegar");
+    await liberar();
+    assert.equal(valorCategoria(), "🍰 Bolos", "criação: a primeira categoria vem selecionada");
+
+    await ui.act(async () => gatilhoCategoria().click());
+    assert.deepEqual(opcoesCategoria(), ["🍰 Bolos", "🍬 Doces"], "categoria inativa fica de fora");
+    await ui.act(async () =>
+      [...document.querySelectorAll(".np-dropdown-option")]
+        .find(opcao => opcao.textContent === "🍬 Doces")
+        .click()
+    );
+    assert.equal(valorCategoria(), "🍬 Doces", "o gatilho acompanha a troca");
+    assert.deepEqual(opcoesCategoria(), [], "a lista fecha ao escolher");
+    assert.deepEqual(
+      chamadas,
+      ["/api/admin/categorias"],
+      "abrir, trocar e re-renderizar não consultam"
+    );
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("QUALITY-8I: seletor de categoria em edição mostra emoji e nome da categoria do produto", async t => {
+  const { root, chamadas, liberar } = await montarSeletorCategoria(t, {
+    ...produtoSeletor,
+    categoria: "doce"
+  });
+  try {
+    await liberar();
+    assert.equal(valorCategoria(), "🍬 Doces");
+    await ui.act(async () => gatilhoCategoria().click());
+    assert.deepEqual(opcoesCategoria(), ["🍰 Bolos", "🍬 Doces"]);
+    assert.equal(
+      document.getElementById(gatilhoCategoria().getAttribute("aria-labelledby").split(" ")[1])
+        .textContent,
+      "🍬 Doces",
+      "o nome acessível continua apontando para o valor exibido"
+    );
+    assert.deepEqual(chamadas, ["/api/admin/categorias"]);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("QUALITY-8I: seletor de categoria preserva o comportamento para arquivada, desconhecida e lista vazia", async t => {
+  const casos = [
+    ["categoria arquivada ainda aparece pelo nome", { categoria: "antiga" }, "📦 Antigas"],
+    [
+      "categoria desconhecida cai no placeholder",
+      { categoria: "inexistente" },
+      "Selecione uma categoria"
+    ]
+  ];
+  for (const [nome, parcial, esperado] of casos) {
+    const { root, chamadas, liberar } = await montarSeletorCategoria(t, {
+      ...produtoSeletor,
+      ...parcial
+    });
+    try {
+      await liberar();
+      assert.equal(valorCategoria(), esperado, nome);
+      assert.deepEqual(chamadas, ["/api/admin/categorias"], nome);
+    } finally {
+      await unmount(root);
+    }
+  }
+
+  const vazio = await montarSeletorCategoria(t, null, []);
+  try {
+    await vazio.liberar();
+    assert.equal(
+      valorCategoria(),
+      "Selecione uma categoria",
+      "sem categorias não há o que mostrar"
+    );
+  } finally {
+    await unmount(vazio.root);
+  }
 });
 
 test("HUMAN-11: catálogo revalida no foco sem polling e evita requests duplicados", async t => {
