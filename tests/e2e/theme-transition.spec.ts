@@ -115,9 +115,9 @@ async function installSampler(page: Page) {
         for (const a of document.getAnimations()) {
           const eff = a.effect as KeyframeEffect | null;
           const pseudo = eff?.pseudoElement ?? null;
-          if (pseudo?.includes("view-transition")) {
+          if (eff && pseudo?.includes("view-transition")) {
             const known = w.__anims.some((i: AnimInfo) => i.pseudo === pseudo);
-            const kfs = eff!.getKeyframes() as Keyframe[];
+            const kfs = eff.getKeyframes() as Keyframe[];
             if (!known) {
               const props = new Set<string>();
               kfs.forEach(k => {
@@ -134,7 +134,7 @@ async function installSampler(page: Page) {
               });
             }
             if (pseudo.includes("new") && (kfs[0] as any)?.clipPath) {
-              progress = eff!.getComputedTiming().progress ?? null;
+              progress = eff.getComputedTiming().progress ?? null;
               clip = String((kfs[0] as any).clipPath);
             }
           }
@@ -254,9 +254,14 @@ async function runTransition(
   // --- Radial reveal presente: clip-path circle() em ::view-transition-new(root) ---
   const reveal = anims.find(a => a.pseudo?.includes("view-transition-new") && a.clipStart);
   expect(reveal, `${label}: animação clip-path do reveal não encontrada`).toBeTruthy();
-  expect(reveal!.clipStart).toMatch(/^circle\(0px at /);
-  expect(reveal!.clipEnd).toMatch(/^circle\([\d.]+px at /);
-  const endRadius = parseFloat(reveal!.clipEnd!.match(/circle\(([\d.]+)px/)![1]);
+  if (!reveal) throw new Error(`${label}: animação clip-path do reveal não encontrada`);
+  expect(reveal?.clipStart).toMatch(/^circle\(0px at /);
+  expect(reveal?.clipEnd).toMatch(/^circle\([\d.]+px at /);
+  const clipEnd = reveal.clipEnd;
+  if (clipEnd === null) throw new Error(`${label}: reveal sem clipEnd`);
+  const endRadiusMatch = clipEnd.match(/circle\(([\d.]+)px/);
+  if (!endRadiusMatch) throw new Error(`${label}: clipEnd do reveal sem raio`);
+  const endRadius = parseFloat(endRadiusMatch[1]);
   const cornerDist = Math.hypot(1440, 900);
   expect(endRadius, `${label}: raio final não cobre a tela`).toBeGreaterThan(900);
   expect(endRadius).toBeLessThanOrEqual(cornerDist + 1);
