@@ -51,25 +51,62 @@ function mp(t, status, extra = {}) {
     );
   });
 }
-async function hook(db, id = 101, payloadStatus = "approved", signatureValid = true) {
+// Onda 9C: assinatura HMAC calculada com o mesmo protocolo do handler
+// (manifest `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`).
+async function assinarWebhook(secret, { id, requestId = "b2", ts = "1" }) {
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode("b2-local-only"),
+    new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
   );
-  const sig = Buffer.from(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`id:${id};request-id:b2;ts:1;`))
+  const manifest = `id:${id};request-id:${requestId};ts:${ts};`;
+  return Buffer.from(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest))
   ).toString("hex");
+}
+// `signature: null` omite o cabeçalho x-signature; o restante do contrato
+// (URL, corpo, x-request-id) é idêntico ao de uma entrega real do MP.
+async function postWebhook(
+  db,
+  { dataId = 101, payloadStatus = "approved", signature = "ts=1,v1=bad", webhookEnv = env(db) } = {}
+) {
   return app.webhook.onRequestPost({
-    request: new Request(`https://local.test/api/webhooks/mercadopago?data.id=${id}&type=payment`, {
-      method: "POST",
-      headers: { "x-signature": `ts=1,v1=${signatureValid ? sig : "bad"}`, "x-request-id": "b2" },
-      body: JSON.stringify({ data: { id }, status: payloadStatus })
-    }),
-    env: env(db)
+    request: new Request(
+      `https://local.test/api/webhooks/mercadopago?data.id=${dataId}&type=payment`,
+      {
+        method: "POST",
+        headers:
+          signature === null
+            ? { "x-request-id": "b2" }
+            : { "x-signature": signature, "x-request-id": "b2" },
+        body: JSON.stringify({ data: { id: dataId }, status: payloadStatus })
+      }
+    ),
+    env: webhookEnv
   });
+}
+async function hook(db, id = 101, payloadStatus = "approved", signatureValid = true, webhookEnv) {
+  const sig = await assinarWebhook("b2-local-only", { id });
+  return postWebhook(db, {
+    dataId: id,
+    payloadStatus,
+    signature: `ts=1,v1=${signatureValid ? sig : "bad"}`,
+    webhookEnv: webhookEnv ?? env(db)
+  });
+}
+// Prova negativa: nenhum statement SQL e nenhuma chamada de rede.
+function isolar(db, t) {
+  const statements = [];
+  db.hook = wire => {
+    statements.push(...wire.map(s => s.sql));
+    return wire;
+  };
+  const fetch = t.mock.method(globalThis, "fetch", async url => {
+    throw new Error(`requisição externa inesperada: ${url}`);
+  });
+  return { statements, fetch };
 }
 // A manutenção global do admin (sweep Pix, reconciliação, reservas vencidas)
 // é o POST explícito /api/admin/pedidos/reconciliar — sessão + mesma origem.
@@ -572,4 +609,80 @@ test("polling: GET failure before deadline keeps PENDENTE and active reservation
   const s = await state(db);
   assert.equal(s.pedido.reserva_status, "ATIVA");
   assert.equal(s.pagamentos[0].cancelado_em, null);
+});
+
+// ─────────────────────────── Onda 9C · ETAPA 1 ───────────────────────────
+// Provas negativas do webhook: toda entrega não autenticada é recusada ANTES
+// de qualquer acesso ao banco ou ao Mercado Pago, e o estado financeiro fica
+// byte a byte igual. O cenário é o mesmo em que uma entrega aprovada baixa
+// estoque e promove o pagamento — o controle no final do primeiro teste mostra
+// que a recusa vem da assinatura, e não de um pedido já liquidado.
+
+const SECRET_INVALIDO = "segredo-do-atacante";
+
+async function variantesAssinaturaInvalida() {
+  const valida = await assinarWebhook("b2-local-only", { id: 101 });
+  const outroSecret = await assinarWebhook(SECRET_INVALIDO, { id: 101 });
+  const outroId = await assinarWebhook("b2-local-only", { id: 999 });
+  const corrompida = `${valida.slice(0, -1)}${valida.endsWith("0") ? "1" : "0"}`;
+  return [
+    ["digest corrompido", `ts=1,v1=${corrompida}`],
+    ["assinatura ausente", null],
+    ["v1 ausente", "ts=1"],
+    ["ts ausente", `v1=${valida}`],
+    ["HMAC de secret desconhecido", `ts=1,v1=${outroSecret}`],
+    ["assinatura válida de outro data.id", `ts=1,v1=${outroId}`],
+    ["assinatura válida com ts adulterado", `ts=2,v1=${valida}`]
+  ];
+}
+
+test("9C: webhook com assinatura inválida responde 401 sem tocar banco, rede ou estado financeiro", async t => {
+  const db = await fixture(t);
+  const antes = await state(db);
+  const { statements, fetch } = isolar(db, t);
+
+  for (const [caso, signature] of await variantesAssinaturaInvalida()) {
+    const response = await postWebhook(db, { signature });
+    assert.equal(response.status, 401, caso);
+    assert.deepEqual(await response.json(), { erro: "Assinatura inválida." }, caso);
+  }
+
+  db.hook = null;
+  assert.deepEqual(statements, [], "nenhum statement SQL executado");
+  assert.equal(fetch.mock.callCount(), 0, "nenhuma consulta ao Mercado Pago");
+  assert.deepEqual(await state(db), antes, "pedidos, pagamentos, estoque e refunds intactos");
+
+  // Controle: o MESMO pedido, a MESMA entrega aprovada e a MESMA URL são
+  // aceitos quando a assinatura é válida — a recusa acima não é um cenário
+  // inerte. A consulta ao MP volta a ser permitida a partir daqui.
+  mp(t, "approved");
+  assert.equal((await hook(db)).status, 200);
+  const depois = await state(db);
+  paid(depois);
+  assert.notDeepEqual(depois, antes);
+});
+
+test("9C: webhook sem MP_WEBHOOK_SECRET responde 503 mesmo com assinatura válida", async t => {
+  const db = await fixture(t);
+  const antes = await state(db);
+  const { statements, fetch } = isolar(db, t);
+  const valida = await assinarWebhook("b2-local-only", { id: 101 });
+
+  for (const secret of [undefined, "", "   "]) {
+    const response = await postWebhook(db, {
+      signature: `ts=1,v1=${valida}`,
+      webhookEnv: { ...env(db), MP_WEBHOOK_SECRET: secret }
+    });
+    assert.equal(response.status, 503, `secret=${JSON.stringify(secret)}`);
+    assert.deepEqual(
+      await response.json(),
+      { erro: "Webhook não configurado." },
+      `secret=${JSON.stringify(secret)}`
+    );
+  }
+
+  db.hook = null;
+  assert.deepEqual(statements, [], "nenhum statement SQL executado");
+  assert.equal(fetch.mock.callCount(), 0, "nenhuma consulta ao Mercado Pago");
+  assert.deepEqual(await state(db), antes, "estado financeiro intacto");
 });
