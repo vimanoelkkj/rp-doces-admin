@@ -15,18 +15,21 @@ export default function PageTransition({ children }: PageTransitionProps) {
   const nextChildren = useRef(children);
   const nextPath = useRef(location.pathname);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: só pathname e children disparam a transição; currentPath e phase nas deps reexecutariam a decisão de animar a cada etapa
   useEffect(() => {
-    // Só anima em mudança de PATHNAME (não hash)
-    if (location.pathname !== currentPath && phase === "idle") {
-      nextChildren.current = children;
-      nextPath.current = location.pathname;
-      setPhase("out");
-    } else if (location.pathname === currentPath) {
+    // O destino pendente acompanha sempre a navegação mais recente, mesmo com a animação em curso
+    nextChildren.current = children;
+    nextPath.current = location.pathname;
+    if (location.pathname === currentPath) {
       // Mesma rota (ex: mudança de hash) — atualiza direto sem animação
       setCurrentChildren(children);
     }
-  }, [location.pathname, children]);
+  }, [location.pathname, children, currentPath]);
+
+  useEffect(() => {
+    // Só anima em mudança de PATHNAME (não hash). Ao fim de cada animação (phase volta a "idle")
+    // a URL é reavaliada: se mudou no meio dela, inicia nova saída até o conteúdo alcançá-la.
+    if (phase === "idle" && location.pathname !== currentPath) setPhase("out");
+  }, [phase, location.pathname, currentPath]);
 
   useEffect(() => {
     if (phase === "out") {
