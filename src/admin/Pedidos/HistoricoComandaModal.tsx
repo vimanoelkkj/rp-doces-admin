@@ -128,6 +128,7 @@ function EventoCard({
   onVerCancelamento: (itemId: number) => void;
   onVerTroca: (itemId: number) => void;
 }) {
+  const referenciaId = evento.referenciaId;
   return (
     <div className="histmodal-evento">
       <div className="histmodal-evento-head">
@@ -169,8 +170,8 @@ function EventoCard({
             {evento.itemDestino?.estoqueEstado &&
               ` · Estado destino: ${ESTOQUE_ESTADO_LABEL[evento.itemDestino.estoqueEstado] ?? evento.itemDestino.estoqueEstado}`}
           </div>
-          {!readOnly && evento.referenciaId != null && (
-            <VerDetalhesButton onClick={() => onVerTroca(evento.referenciaId!)} />
+          {!readOnly && referenciaId != null && (
+            <VerDetalhesButton onClick={() => onVerTroca(referenciaId)} />
           )}
         </>
       )}
@@ -192,8 +193,8 @@ function EventoCard({
               {evento.item.estoqueEstado &&
                 ` · Estado final: ${ESTOQUE_ESTADO_LABEL[evento.item.estoqueEstado] ?? evento.item.estoqueEstado}`}
             </div>
-            {!readOnly && evento.referenciaId != null && (
-              <VerDetalhesButton onClick={() => onVerCancelamento(evento.referenciaId!)} />
+            {!readOnly && referenciaId != null && (
+              <VerDetalhesButton onClick={() => onVerCancelamento(referenciaId)} />
             )}
           </>
         )}

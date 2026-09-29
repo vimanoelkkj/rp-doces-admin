@@ -110,7 +110,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       return jsonError("O conteúdo do arquivo não corresponde ao tipo de imagem informado", 415);
     }
 
-    const extension = ALLOWED_TYPES.get(detectedType)!;
+    const extension = ALLOWED_TYPES.get(detectedType);
+    if (!extension) {
+      return jsonError("Use JPG, PNG ou WebP", 415);
+    }
     const key = imageKey(id, extension);
 
     await env.PRODUCT_IMAGES.put(key, bytes, {
