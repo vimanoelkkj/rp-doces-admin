@@ -69,7 +69,10 @@ export default function AguardandoPagamento() {
   const location = useLocation();
   const navigate = useNavigate();
   const { clearCart, reconcileWithProducts } = useCart();
-  const state = location.state as CheckoutState | null;
+  // Tentativa de checkout fixada na montagem. `location.state` pode ser substituído ou virar null
+  // com a página montada (navegação para a mesma rota), mas o Pix criado, a tela e o destino final
+  // pertencem sempre à tentativa que o gerou.
+  const [tentativa] = useState(() => location.state as CheckoutState | null);
 
   // A1: a MESMA identidade durante todo o ciclo de vida desta finalização.
   // `useRef` a resolve UMA vez por montagem e o `sessionStorage` a preserva
@@ -79,7 +82,8 @@ export default function AguardandoPagamento() {
   // recurso (mantém a página funcional mesmo sem storage disponível).
   const operationKeyRef = useRef<string | null>(null);
   if (operationKeyRef.current === null) {
-    const resolvida = state?.operationKey ?? lerOperationKey(SLOT_CHECKOUT) ?? novaOperationKey();
+    const resolvida =
+      tentativa?.operationKey ?? lerOperationKey(SLOT_CHECKOUT) ?? novaOperationKey();
     gravarOperationKey(SLOT_CHECKOUT, resolvida);
     operationKeyRef.current = resolvida;
   }
@@ -95,9 +99,9 @@ export default function AguardandoPagamento() {
   const [expiradoNoServidor, setExpiradoNoServidor] = useState(false);
   const prazoEncerrado = timeLeft === 0 || expiradoNoServidor;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: o checkout usa de propósito o state recebido na montagem (A1: uma operação por visita); mudanças posteriores de identidade de state, navigate ou reconcileWithProducts não devem recriar uma operação financeira
+  // biome-ignore lint/correctness/useExhaustiveDependencies: o checkout usa de propósito a tentativa fixada na montagem (A1: uma operação por visita); mudanças posteriores de navigate ou reconcileWithProducts não devem recriar uma operação financeira
   useEffect(() => {
-    if (!state || state.items.length === 0) {
+    if (!tentativa || tentativa.items.length === 0) {
       navigate("/cardapio");
       return;
     }
@@ -119,12 +123,12 @@ export default function AguardandoPagamento() {
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        items: state.items.map(item => ({
+        items: tentativa.items.map(item => ({
           id: item.id,
           quantity: item.quantity
         })),
-        cliente: state.cliente,
-        recado: state.recado,
+        cliente: tentativa.cliente,
+        recado: tentativa.recado,
         // A1: mesma finalização, mesma key — em toda tentativa.
         operationKey: operationKeyRef.current
       })
@@ -257,7 +261,7 @@ export default function AguardandoPagamento() {
   }, [status, payment]);
 
   useEffect(() => {
-    if (status !== "processando" || !resultadoPendente || !payment) return;
+    if (status !== "processando" || !resultadoPendente || !payment || !tentativa) return;
 
     const timer = setTimeout(() => {
       if (resultadoPendente === "PAGO") {
@@ -266,19 +270,19 @@ export default function AguardandoPagamento() {
           state: {
             pedidoId: payment.pedidoId,
             tokenPublico: payment.tokenPublico,
-            items: state!.items,
+            items: tentativa.items,
             totalCentavos: payment.totalCentavos
           }
         });
       } else {
         navigate("/pagamento-nao-aprovado", {
-          state: { items: state!.items, totalCentavos: payment.totalCentavos }
+          state: { items: tentativa.items, totalCentavos: payment.totalCentavos }
         });
       }
     }, duracaoAleatoria());
 
     return () => clearTimeout(timer);
-  }, [status, resultadoPendente, payment, navigate, clearCart, state]);
+  }, [status, resultadoPendente, payment, navigate, clearCart, tentativa]);
 
   const handleCopy = () => {
     if (!payment?.qrCode || prazoEncerrado) return;
@@ -287,7 +291,7 @@ export default function AguardandoPagamento() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!state) return null;
+  if (!tentativa) return null;
 
   // Telas de loading tomam a tela inteira (mesmo tratamento visual do
   // Figma) — sem Header/Footer/onda do storefront por trás.
@@ -392,7 +396,7 @@ export default function AguardandoPagamento() {
               )}
 
               <div className="payment-divider" />
-              {state.items.map(item => (
+              {tentativa.items.map(item => (
                 <div key={item.id} className="payment-order-item">
                   <span>
                     {item.name} ×{item.quantity}

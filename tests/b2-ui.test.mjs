@@ -41,9 +41,21 @@ const bundle = await build({
     export {act} from 'react';
     export let navigate;
     export let currentPath;
+    export let currentState;
     export let cart;
-    function Probe(){navigate=useNavigate();currentPath=useLocation().pathname;cart=useCart();return null;}
+    export const historico=[];
+    function Probe(){
+      const location=useLocation();
+      navigate=useNavigate();
+      currentPath=location.pathname;
+      currentState=location.state;
+      cart=useCart();
+      // Uma entrada por navegação real. Identidade do objeto, não a key: com Math.random=0 toda key gerada pelo router é "".
+      if(historico.at(-1)?.location!==location)historico.push({pathname:location.pathname,state:location.state,location});
+      return null;
+    }
     export function mount(container,state){
+      historico.length=0;
       const root=createRoot(container);
       root.render(<MemoryRouter future={{v7_startTransition:true,v7_relativeSplatPath:true}} initialEntries={[{pathname:'/aguardando-pagamento',state}]}>
         <CartProvider><Probe/><Routes>
@@ -86,7 +98,13 @@ function deferred() {
   });
   return { promise, resolve };
 }
-async function mount(t, respond, checkoutResponse, onInitialRender) {
+async function mount(
+  t,
+  respond,
+  checkoutResponse,
+  onInitialRender,
+  { state = initial, carrinho = [] } = {}
+) {
   // Usa o relógio do contexto do teste; cada teste restaura mocks/timers.
   t.mock.timers.enable({
     apis: ["Date", "setTimeout", "setInterval"],
@@ -136,9 +154,11 @@ async function mount(t, respond, checkoutResponse, onInitialRender) {
     calls.push({ url, options });
     return respond(calls.length);
   });
+  // O CartProvider lê o carrinho salvo ao montar: cada teste começa com o carrinho combinado.
+  localStorage.setItem("rp-doces:cart", JSON.stringify(carrinho));
   let root;
   await ui.act(async () => {
-    root = ui.mount(container, initial);
+    root = ui.mount(container, state);
   });
   t.after(async () => {
     await ui.act(async () => root.unmount());
@@ -512,4 +532,114 @@ test("contador do Pix: renders do CartProvider não o recriam; sair da página l
     limpos.length === 1 && limpos[0] === espiao.armados[0],
     "desmontar limpa exatamente o intervalo do contador"
   );
+});
+
+// A tentativa original do checkout vale durante toda a montagem. `location.state` pode ser
+// substituído ou virar null com a página montada (navegação para a mesma rota); a tela, o POST e o
+// destino final seguem sendo os da tentativa que criou o Pix.
+const estadoTrocado = {
+  items: [{ id: 2, name: "Pudim", price: 20, image: "", quantity: 1 }],
+  cliente: { nome: "Outra", whatsapp: "11988888888" }
+};
+const pixLongo = pixCriado(expiraApos(600));
+const aprovaNaSegunda = n =>
+  Promise.resolve(Response.json({ statusPagamento: n === 1 ? "PENDENTE" : "PAGO" }));
+const recusaNaSegunda = n =>
+  Promise.resolve(Response.json({ statusPagamento: n === 1 ? "PENDENTE" : "CANCELADO" }));
+const itensNaTela = () =>
+  [...container.querySelectorAll(".payment-order-item")].map(
+    linha => linha.querySelector("span").textContent
+  );
+const navegacoesPara = caminho => ui.historico.filter(l => l.pathname === caminho).length;
+// Com timers simulados, uma exceção no callback de um timer sobe por tick(): captura para asserir "sem TypeError".
+async function avancarCapturando(advance, ms) {
+  try {
+    await advance(ms);
+    return null;
+  } catch (erro) {
+    await flush();
+    return erro;
+  }
+}
+
+test("state substituído na mesma montagem: a confirmação usa os itens da tentativa original, sem novo POST", async t => {
+  const { advance, checkouts } = await mount(t, aprovaNaSegunda, pixLongo, undefined, {
+    carrinho: initial.items
+  });
+  assert.equal(checkouts.length, 1);
+
+  await ui.act(async () => ui.navigate("/aguardando-pagamento", { state: estadoTrocado }));
+  await flush();
+  const telaAposTroca = itensNaTela();
+
+  await advance(POLL_INTERVAL_MS);
+  await advance(RESULT_TRANSITION_MIN_MS);
+  assert.equal(ui.currentPath, "/pedido-confirmado");
+  assert.deepEqual(ui.currentState, {
+    pedidoId: 1,
+    tokenPublico: "token",
+    items: initial.items,
+    totalCentavos: 10000
+  });
+  assert.equal(navegacoesPara("/pedido-confirmado"), 1, "uma única navegação para a confirmação");
+  assert.equal(checkouts.length, 1, "nenhum POST adicional");
+  assert.equal(ui.cart.cartItems.length, 0);
+  assert.deepEqual(telaAposTroca, ["Bolo ×2"], "a tela segue na tentativa original");
+});
+
+test("state null com o Pix ativo: a tela mantém o QR e os itens da tentativa original", async t => {
+  await mount(t, semPolling, pixLongo, undefined, { carrinho: initial.items });
+  await ui.act(async () => ui.navigate("/aguardando-pagamento"));
+  await flush();
+  assert.ok(container.querySelector(".qr-code img"), "QR segue visível");
+  assert.equal(container.querySelector(".pix-code-box").textContent, "qr");
+  assert.deepEqual(itensNaTela(), ["Bolo ×2"]);
+});
+
+test("state null com o Pix ativo: a aprovação navega com os itens originais, sem lançar, e limpa o carrinho", async t => {
+  const { advance, checkouts } = await mount(t, aprovaNaSegunda, pixLongo, undefined, {
+    carrinho: initial.items
+  });
+  await ui.act(async () => ui.navigate("/aguardando-pagamento"));
+  await flush();
+  await advance(POLL_INTERVAL_MS);
+  const erro = await avancarCapturando(advance, RESULT_TRANSITION_MIN_MS);
+  assert.equal(erro, null, "a aprovação não pode lançar");
+  assert.equal(ui.currentPath, "/pedido-confirmado");
+  assert.deepEqual(ui.currentState.items, initial.items);
+  assert.equal(navegacoesPara("/pedido-confirmado"), 1, "uma única navegação para a confirmação");
+  assert.equal(ui.cart.cartItems.length, 0);
+  assert.equal(checkouts.length, 1, "nenhum POST adicional");
+});
+
+for (const [rotulo, navegacao] of [
+  ["substituído", { state: estadoTrocado }],
+  ["null", undefined]
+]) {
+  test(`recusa com state ${rotulo}: o destino recebe os itens da tentativa original e o carrinho é preservado`, async t => {
+    const { advance, checkouts } = await mount(t, recusaNaSegunda, pixLongo, undefined, {
+      carrinho: initial.items
+    });
+    await ui.act(async () => ui.navigate("/aguardando-pagamento", navegacao));
+    await flush();
+    await advance(POLL_INTERVAL_MS);
+    const erro = await avancarCapturando(advance, RESULT_TRANSITION_MIN_MS);
+    assert.equal(erro, null, "a recusa não pode lançar");
+    assert.equal(ui.currentPath, "/pagamento-nao-aprovado");
+    assert.deepEqual(ui.currentState, { items: initial.items, totalCentavos: 10000 });
+    assert.equal(navegacoesPara("/pagamento-nao-aprovado"), 1, "uma única navegação para a recusa");
+    assert.equal(ui.cart.cartItems.length, 1, "recusa não limpa o carrinho");
+    assert.equal(checkouts.length, 1, "nenhum POST adicional");
+  });
+}
+
+test("sem state na chegada: volta ao cardápio sem criar checkout nem consultar o pagamento", async t => {
+  const { calls, checkouts } = await mount(t, semPolling, undefined, undefined, { state: null });
+  assert.deepEqual(
+    ui.historico.map(l => l.pathname),
+    ["/aguardando-pagamento", "/cardapio"]
+  );
+  assert.equal(ui.currentPath, "/cardapio");
+  assert.equal(checkouts.length, 0);
+  assert.equal(calls.length, 0);
 });
