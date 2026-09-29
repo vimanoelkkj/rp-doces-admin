@@ -265,6 +265,7 @@ export default function PedidoPagamento({
       )}
 
       {pixAdminPendentes.map(pix => {
+        const codigo = pix.qrCode;
         const expiraEmMs = pix.expiresAt ? Date.parse(pix.expiresAt) : null;
         const vencido = expiraEmMs !== null && expiraEmMs <= agora;
         const restanteS =
@@ -285,19 +286,19 @@ export default function PedidoPagamento({
               </div>
             )}
 
-            {pix.qrCode && (
+            {codigo && (
               <>
                 <div className="pedmodal-pix-copy-row">
                   <span className="pedmodal-pix-copy-label">PIX COPIA E COLA</span>
                   <button
                     type="button"
                     className="pedmodal-pix-copy-btn"
-                    onClick={() => onCopiarCodigo(pix.id, pix.qrCode!)}
+                    onClick={() => onCopiarCodigo(pix.id, codigo)}
                   >
                     {copiedId === pix.id ? "Copiado!" : "Copiar código"}
                   </button>
                 </div>
-                <div className="pedmodal-pix-code-box">{pix.qrCode}</div>
+                <div className="pedmodal-pix-code-box">{codigo}</div>
               </>
             )}
 

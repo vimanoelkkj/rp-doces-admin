@@ -2271,6 +2271,105 @@ test("cancelar o modal de arquivamento nao envia PATCH", async t => {
   }
 });
 
+const pixPendente = (id, qrCode, extra = {}) => ({
+  id,
+  valorCentavos: 500,
+  qrCode,
+  qrCodeBase64: null,
+  ticketUrl: null,
+  expiresAt: "2099-01-01T00:00:00Z",
+  ...extra
+});
+
+test("Pix pendente: copiar envia exatamente o qrCode do cartão clicado e confirma com Copiado!", async t => {
+  // Timers simulados: sem polling real e com o retorno do rótulo em 2 s sob controle.
+  t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] });
+  const escritas = [];
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      writeText: async texto => {
+        escritas.push(texto);
+      }
+    }
+  });
+  t.after(() => {
+    delete navigator.clipboard;
+  });
+  const root = await mountWith(t, async () =>
+    Response.json(
+      detalhe({
+        total: 3000,
+        pago: 1000,
+        status: "PARCIAL",
+        capacidade: 0,
+        pix: [pixPendente(8, "000201-codigo-A"), pixPendente(9, "000201-codigo-B")]
+      })
+    )
+  );
+  const botoes = () => [...document.querySelectorAll(".pedmodal-pix-copy-btn")];
+  const rotulos = () => botoes().map(botao => botao.textContent);
+  try {
+    assert.deepEqual(
+      [...document.querySelectorAll(".pedmodal-pix-code-box")].map(caixa => caixa.textContent),
+      ["000201-codigo-A", "000201-codigo-B"]
+    );
+    assert.deepEqual(rotulos(), ["Copiar código", "Copiar código"]);
+
+    await ui.act(async () => botoes()[1].click());
+    assert.deepEqual(escritas, ["000201-codigo-B"], "copia o código do cartão clicado");
+    assert.deepEqual(rotulos(), ["Copiar código", "Copiado!"]);
+
+    await ui.act(async () => botoes()[0].click());
+    assert.deepEqual(escritas, ["000201-codigo-B", "000201-codigo-A"]);
+    assert.deepEqual(rotulos(), ["Copiado!", "Copiar código"], "só o último copiado confirma");
+
+    await ui.act(async () => t.mock.timers.tick(2000));
+    assert.deepEqual(rotulos(), ["Copiar código", "Copiar código"], "a confirmação some em 2 s");
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("Pix pendente sem qrCode (nulo ou vazio): não oferece cópia e mantém o QR em imagem", async t => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  const root = await mountWith(t, async () =>
+    Response.json(
+      detalhe({
+        total: 3000,
+        pago: 1000,
+        status: "PARCIAL",
+        capacidade: 0,
+        pix: [pixPendente(8, null, { qrCodeBase64: "cXI=" }), pixPendente(9, "")]
+      })
+    )
+  );
+  try {
+    assert.equal(document.querySelectorAll(".pedmodal-pix-card").length, 2);
+    assert.equal(
+      document.querySelectorAll(".pedmodal-pix-copy-btn").length,
+      0,
+      "sem botão de copiar"
+    );
+    assert.equal(
+      document.querySelectorAll(".pedmodal-pix-code-box").length,
+      0,
+      "sem caixa do código"
+    );
+    assert.ok(
+      !document.body.textContent.includes("PIX COPIA E COLA"),
+      "sem o rótulo de copia e cola"
+    );
+    assert.equal(
+      document.querySelectorAll(".pedmodal-pix-qr img").length,
+      1,
+      "o QR em imagem segue"
+    );
+  } finally {
+    await unmount(root);
+  }
+});
+
 test("pedido arquivado fica em modo historico e pode ser restaurado", async t => {
   const current = detalhe({
     statusPedido: "ENTREGUE",
