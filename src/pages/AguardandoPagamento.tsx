@@ -197,8 +197,9 @@ export default function AguardandoPagamento() {
 
   useEffect(() => {
     if (!payment?.expiresAt) return;
+    const expiresAt = payment.expiresAt;
     const update = () => {
-      const diff = Math.max(0, Math.floor((Date.parse(payment.expiresAt!) - Date.now()) / 1000));
+      const diff = Math.max(0, Math.floor((Date.parse(expiresAt) - Date.now()) / 1000));
       setTimeLeft(diff);
     };
     update();

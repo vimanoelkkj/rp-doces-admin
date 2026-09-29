@@ -381,3 +381,135 @@ test("known rejection keeps the existing result transition without claiming no m
   assert.match(container.textContent, /Valor do pedido/);
   assert.doesNotMatch(container.textContent, /Nenhum valor foi cobrado|Valor não cobrado/);
 });
+
+// Contador do Pix (effect de expiresAt). O prazo é relativo ao relógio simulado do mount() e medido
+// a partir do instante em que a tela do QR aparece (fim das duas etapas de loading).
+const pixCriado = campos => () =>
+  Response.json({
+    pedidoId: 1,
+    tokenPublico: "token",
+    totalCentavos: 10000,
+    qrCode: "qr",
+    qrCodeBase64: "fake",
+    ...campos()
+  });
+const expiraApos = segundos => () => ({
+  expiresAt: new Date(Date.now() + LOADING_TOTAL_MIN_MS + segundos * 1000).toISOString()
+});
+const semPolling = () => Promise.resolve(Response.json({ statusPagamento: "PENDENTE" }));
+const tempoRestante = () => container.querySelector(".pix-timer strong")?.textContent ?? null;
+// Espia só os intervalos de 1 s (o contador); o polling usa 4 s e não entra na conta.
+function espiarContador(t) {
+  const armados = [];
+  const limpos = [];
+  const setReal = globalThis.setInterval;
+  const clearReal = globalThis.clearInterval;
+  t.mock.method(globalThis, "setInterval", (handler, delay, ...args) => {
+    const id = setReal(handler, delay, ...args);
+    if (delay === 1000) armados.push(id);
+    return id;
+  });
+  t.mock.method(globalThis, "clearInterval", id => {
+    limpos.push(id);
+    return clearReal(id);
+  });
+  return { armados, limpos: () => limpos.filter(id => armados.includes(id)) };
+}
+
+test("contador do Pix: mostra o prazo, avança com o relógio e encerra em zero", async t => {
+  // 125,6 s: a fração acima de 0,5 distingue o arredondamento para baixo de round/ceil.
+  const { advance } = await mount(t, semPolling, pixCriado(expiraApos(125.6)));
+  assert.equal(tempoRestante(), "02:05");
+  assert.match(container.querySelector(".pix-timer").textContent, /Expira em/);
+
+  // O contador relê o relógio a cada 1 s: meio segundo depois nada muda.
+  await advance(500);
+  assert.equal(tempoRestante(), "02:05");
+  await advance(500);
+  assert.equal(tempoRestante(), "02:04");
+  await advance(4000);
+  assert.equal(tempoRestante(), "02:00");
+  await advance(1000);
+  assert.equal(tempoRestante(), "01:59", "minutos e segundos viram juntos");
+
+  await advance(118_000);
+  assert.equal(tempoRestante(), "00:01");
+  assert.equal(container.querySelector(".pix-copy-btn").disabled, false, "dentro do prazo");
+  assert.ok(container.querySelector(".qr-code img"), "QR visível dentro do prazo");
+  assert.equal(container.querySelector(".pix-code-box").textContent, "qr");
+
+  await advance(1000);
+  assert.equal(tempoRestante(), "00:00");
+  assert.match(container.querySelector(".pix-timer").textContent, /Prazo encerrado/);
+  assert.match(container.textContent, /Prazo do QR encerrado/);
+  assert.equal(container.querySelector(".pix-copy-btn").disabled, true);
+  assert.ok(!container.querySelector(".qr-code img"), "sem QR depois do prazo");
+  assert.equal(
+    container.querySelector(".pix-code-box").textContent,
+    "Código Pix com prazo encerrado"
+  );
+
+  await advance(5000);
+  assert.equal(tempoRestante(), "00:00", "nunca fica negativo");
+});
+
+test("Pix já vencido ao chegar na tela: encerra o prazo de imediato, sem contagem negativa", async t => {
+  await mount(t, semPolling, pixCriado(expiraApos(-10)));
+  assert.equal(tempoRestante(), "00:00");
+  assert.match(container.querySelector(".pix-timer").textContent, /Prazo encerrado/);
+  assert.match(container.textContent, /Prazo do QR encerrado/);
+  assert.equal(container.querySelector(".pix-copy-btn").disabled, true);
+  assert.ok(!container.querySelector(".qr-code img"), "sem QR depois do prazo");
+});
+
+for (const [rotulo, campos] of [
+  ["nulo", () => ({ expiresAt: null })],
+  ["omitido", () => ({})],
+  ["vazio", () => ({ expiresAt: "" })]
+]) {
+  test(`Pix sem expiresAt (${rotulo}): sem contador nem prazo encerrado, com QR e cópia ativos`, async t => {
+    let espiao;
+    const { advance } = await mount(t, semPolling, pixCriado(campos), () => {
+      espiao = espiarContador(t);
+    });
+    assert.equal(espiao.armados.length, 0, "sem prazo não há intervalo de contagem");
+    assert.ok(!container.querySelector(".pix-timer"), "sem bloco do contador");
+    assert.doesNotMatch(container.textContent, /Expira em|Prazo|NaN/);
+    assert.equal(container.querySelector(".pix-copy-btn").disabled, false);
+    assert.ok(container.querySelector(".qr-code img"), "QR visível");
+    assert.equal(container.querySelector(".pix-code-box").textContent, "qr");
+
+    await advance(60_000);
+    assert.ok(!container.querySelector(".pix-timer"), "segue sem contador com o passar do tempo");
+    assert.equal(container.querySelector(".pix-copy-btn").disabled, false, "não expira sozinho");
+    assert.equal(espiao.armados.length, 0);
+  });
+}
+
+test("contador do Pix: renders do CartProvider não o recriam; sair da página limpa exatamente esse intervalo", async t => {
+  let espiao;
+  const { advance } = await mount(t, semPolling, pixCriado(expiraApos(600)), () => {
+    espiao = espiarContador(t);
+  });
+  assert.equal(tempoRestante(), "10:00");
+  assert.equal(espiao.armados.length, 1, "um único intervalo de 1 s é armado");
+
+  // clearCart é recriado a cada render do CartProvider: três renders reais do provider.
+  for (const aberto of [true, false, true]) {
+    await ui.act(async () => ui.cart.setCartOpen(aberto));
+    await flush();
+  }
+  assert.equal(espiao.armados.length, 1, "re-render do provider não recria o contador");
+  assert.equal(espiao.limpos().length, 0, "o intervalo original segue ativo");
+
+  await advance(2000);
+  assert.equal(tempoRestante(), "09:58", "a contagem segue no mesmo intervalo");
+
+  // Sair da página desmonta o componente: o intervalo precisa ser limpo, não só ignorado.
+  await ui.act(async () => ui.navigate("/pedido/token"));
+  const limpos = espiao.limpos();
+  assert.ok(
+    limpos.length === 1 && limpos[0] === espiao.armados[0],
+    "desmontar limpa exatamente o intervalo do contador"
+  );
+});
