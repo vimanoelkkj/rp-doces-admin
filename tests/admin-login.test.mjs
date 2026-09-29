@@ -3,19 +3,23 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { app, fixture, barrier } from "./helpers/b3.mjs";
 
-function postLogin(db, body, { origin = "https://local.test", ip = "192.168.1.50" } = {}) {
-  return app.login.onRequestPost({
-    env: { DB: db },
-    request: new Request("https://local.test/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Origin: origin,
-        "CF-Connecting-IP": ip
-      },
-      body: JSON.stringify(body)
-    })
+function loginRequest(
+  body,
+  { origin = "https://local.test", ip = "192.168.1.50", xForwardedFor } = {}
+) {
+  const headers = new Headers({ "Content-Type": "application/json", Origin: origin });
+  if (ip !== null) headers.set("CF-Connecting-IP", ip);
+  if (xForwardedFor !== undefined) headers.set("X-Forwarded-For", xForwardedFor);
+
+  return new Request("https://local.test/api/auth/login", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body)
   });
+}
+
+function postLogin(db, body, options) {
+  return app.login.onRequestPost({ env: { DB: db }, request: loginRequest(body, options) });
 }
 
 async function setupUsers(db) {
@@ -127,6 +131,107 @@ test("rate limit bloqueia tentativas repetidas com 429", async t => {
   assert.ok(blockedRes.headers.get("retry-after"));
   const body = await blockedRes.json();
   assert.match(body.error, /Muitas tentativas/);
+});
+
+test("ACH-02B: CF fixo ignora XFF variÃ¡vel no contador de login", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  await setupUsers(db);
+  const ip = "203.0.113.10";
+
+  for (const xForwardedFor of [
+    "198.51.100.1",
+    "198.51.100.2, 10.0.0.1",
+    "198.51.100.3",
+    "198.51.100.4, 10.0.0.2",
+    "198.51.100.5"
+  ]) {
+    const response = await postLogin(
+      db,
+      { username: "admin_ativo", senha: "senha-errada" },
+      { ip, xForwardedFor }
+    );
+    assert.equal(response.status, 401);
+  }
+
+  const blocked = await postLogin(
+    db,
+    { username: "admin_ativo", senha: "senha-errada" },
+    { ip, xForwardedFor: "198.51.100.6" }
+  );
+  assert.equal(blocked.status, 429);
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM auth_rate_limits").first()).n, 1);
+});
+
+test("ACH-02B: sem CF, XFF variÃ¡vel ou mÃºltiplo compartilha o bucket unknown", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  await setupUsers(db);
+
+  for (const xForwardedFor of [
+    "198.51.100.1",
+    "198.51.100.2, 10.0.0.1",
+    "198.51.100.3",
+    "198.51.100.4, 10.0.0.2",
+    "198.51.100.5"
+  ]) {
+    const response = await postLogin(
+      db,
+      { username: "admin_ativo", senha: "senha-errada" },
+      { ip: null, xForwardedFor }
+    );
+    assert.equal(response.status, 401);
+  }
+
+  const blocked = await postLogin(
+    db,
+    { username: "admin_ativo", senha: "senha-errada" },
+    { ip: null, xForwardedFor: "198.51.100.6, 10.0.0.3" }
+  );
+  assert.equal(blocked.status, 429);
+
+  const withXff = await app.rateLimit.checkLoginRateLimit(
+    db,
+    loginRequest({}, { ip: null, xForwardedFor: "198.51.100.7" }),
+    "admin_ativo"
+  );
+  const withoutIpHeaders = await app.rateLimit.checkLoginRateLimit(
+    db,
+    loginRequest({}, { ip: null }),
+    "admin_ativo"
+  );
+  assert.equal(withXff.key, withoutIpHeaders.key);
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM auth_rate_limits").first()).n, 1);
+});
+
+test("ACH-02B: CF vazio equivale Ã  ausÃªncia, e CFs vÃ¡lidos distintos isolam contadores", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  const username = "admin_ativo";
+
+  const withoutCf = await app.rateLimit.checkLoginRateLimit(
+    db,
+    loginRequest({}, { ip: null }),
+    username
+  );
+  const emptyCf = await app.rateLimit.checkLoginRateLimit(
+    db,
+    loginRequest({}, { ip: "", xForwardedFor: "198.51.100.1, 10.0.0.1" }),
+    username
+  );
+  const firstIp = await app.rateLimit.checkLoginRateLimit(
+    db,
+    loginRequest({}, { ip: "203.0.113.11" }),
+    username
+  );
+  const secondIp = await app.rateLimit.checkLoginRateLimit(
+    db,
+    loginRequest({}, { ip: "203.0.113.12" }),
+    username
+  );
+
+  assert.equal(emptyCf.key, withoutCf.key);
+  assert.notEqual(firstIp.key, secondIp.key);
+  await app.rateLimit.recordLoginFailure(db, firstIp.key);
+  await app.rateLimit.recordLoginFailure(db, secondIp.key);
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM auth_rate_limits").first()).n, 2);
 });
 
 test("regressão: usuário inexistente e inativo executam derivação PBKDF2 dummy com parâmetros equivalentes", async t => {

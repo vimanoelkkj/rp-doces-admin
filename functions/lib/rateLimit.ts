@@ -13,11 +13,7 @@ interface RateLimitRow {
 }
 
 function clientIp(request: Request): string {
-  return (
-    request.headers.get("CF-Connecting-IP") ??
-    request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ??
-    "unknown"
-  );
+  return request.headers.get("CF-Connecting-IP")?.trim() || "unknown";
 }
 
 async function keyFor(request: Request, username: string): Promise<string> {
