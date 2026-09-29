@@ -447,6 +447,86 @@ test("C6: falha de persistencia apos MP usa GET e materializa uma vez", async t 
   });
 });
 
+test("C6b: falha ao persistir mp_refund_id mantém reserva e recupera pela mesma chave", async t => {
+  const { db, cancellation, leg } = await cancellationScenario(t);
+  const remoteByKey = new Map();
+  const keys = [];
+  let posts = 0;
+  let effects = 0;
+  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+    if ((init.method ?? "GET") !== "POST") throw new Error("GET sem refund remoto identificado");
+    posts++;
+    const key = init.headers["X-Idempotency-Key"];
+    keys.push(key);
+    if (!remoteByKey.has(key)) {
+      remoteByKey.set(key, { id: 7005, payment_id: 9001, amount: 5, status: "approved" });
+      effects++;
+    }
+    return Response.json(remoteByKey.get(key), { status: 201 });
+  });
+  let failRemoteIdentity = true;
+  db.hook = async statements => {
+    if (
+      failRemoteIdentity &&
+      statements.some(statement =>
+        statement.sql.includes("SET status='PROCESSANDO',\n        mp_refund_id=?,mp_status=?")
+      )
+    ) {
+      failRemoteIdentity = false;
+      throw new Error("D1 transient before remote refund identity");
+    }
+    return statements;
+  };
+  const input = refundInput(cancellation, leg, "refund-d1-remote-id-lost-01");
+
+  const first = await app.itemCancellation.confirmCancellationRefund(db, input);
+  assert.equal(first.ok, true);
+  assert.equal(first.refundStatus, "PROCESSANDO");
+  assert.equal(posts, 1);
+  assert.equal(effects, 1);
+  assert.deepEqual(
+    await db.prepare(`SELECT status,mp_refund_id FROM pedido_reembolso_pix_mp_intencoes`).first(),
+    { status: "PROCESSANDO", mp_refund_id: null }
+  );
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000,
+    refunded: 0,
+    reserved: 500,
+    remaining: 1500
+  });
+
+  db.hook = null;
+  await db
+    .prepare(
+      `UPDATE pedido_reembolso_pix_mp_intencoes
+       SET ultima_tentativa_em='2000-01-01 00:00:00',atualizado_em='2000-01-01 00:00:00'`
+    )
+    .run();
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(db, "TEST_TOKEN", {
+    cancellationId: cancellation.id
+  });
+  assert.equal(posts, 1, "lease expirada só marca a intenção como inconclusiva");
+
+  await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(db, "TEST_TOKEN", {
+    cancellationId: cancellation.id
+  });
+  assert.equal(posts, 2, "a recuperação reenvia a intenção persistida");
+  assert.deepEqual(keys, [keys[0], keys[0]], "a recuperação não cria uma chave remota nova");
+  assert.equal(remoteByKey.size, 1);
+  assert.equal(effects, 1, "duas requisições representam um único efeito financeiro remoto");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.deepEqual(
+    await db.prepare(`SELECT status,mp_refund_id FROM pedido_reembolso_pix_mp_intencoes`).first(),
+    { status: "CONFIRMADO", mp_refund_id: "7005" }
+  );
+  assert.deepEqual(await refundCapacity(db), {
+    paid: 2000,
+    refunded: 500,
+    reserved: 0,
+    remaining: 1500
+  });
+});
+
 test("C2: keys distintas concorrentes compartilham claim e deixam aliases auditaveis", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   const firstArrived = deferred();
