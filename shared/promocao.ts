@@ -73,7 +73,12 @@ export function estadoPromocao(produto: PromocaoCampos, now: number = Date.now()
   return "VIGENTE";
 }
 
-export function promocaoVigente(produto: PromocaoCampos, now?: number): boolean {
+// VIGENTE já exige preço promocional finito e positivo em estadoPromocao:
+// o predicate expõe a invariante ao compilador sem checagem redundante.
+export function promocaoVigente(
+  produto: PromocaoCampos,
+  now?: number
+): produto is PromocaoCampos & { preco_promocional_centavos: number } {
   return estadoPromocao(produto, now) === "VIGENTE";
 }
 
@@ -84,6 +89,6 @@ export function promocaoVigente(produto: PromocaoCampos, now?: number): boolean 
  */
 export function precoVigenteCentavos(produto: PromocaoCampos, now?: number): number {
   return promocaoVigente(produto, now)
-    ? produto.preco_promocional_centavos!
+    ? produto.preco_promocional_centavos
     : produto.preco_centavos;
 }

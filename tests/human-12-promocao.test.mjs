@@ -11,7 +11,8 @@ import { app, fixture } from "./helpers/b3.mjs";
 // Nenhuma migration: as colunas existem desde 0001/0005.
 
 const cookieDe = session => session.cookie.split(";")[0];
-const { estadoPromocao, precoVigenteCentavos, parseInstantePromocao } = app.promocao;
+const { estadoPromocao, promocaoVigente, precoVigenteCentavos, parseInstantePromocao } =
+  app.promocao;
 
 const AGORA = Date.parse("2026-09-18T12:00:00Z");
 const base = {
@@ -62,6 +63,17 @@ test("preço vigente segue o estado — expiração é consequência do dado, se
   assert.equal(precoVigenteCentavos(agendada, Date.parse("2026-09-18T09:00:00Z")), 5000, "antes");
   assert.equal(precoVigenteCentavos(agendada, Date.parse("2026-09-18T12:00:00Z")), 4000, "durante");
   assert.equal(precoVigenteCentavos(agendada, Date.parse("2026-09-18T15:00:00Z")), 5000, "depois");
+});
+
+test("preço promocional zero, negativo ou não-finito é SEM_PRECO e cobra o preço cheio", () => {
+  const invalidos = [0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+  for (const promocional of invalidos) {
+    const produto = { ...base, preco_promocional_centavos: promocional };
+    const rotulo = `promocional=${String(promocional)}`;
+    assert.equal(promocaoVigente(produto, AGORA), false, rotulo);
+    assert.equal(estadoPromocao(produto, AGORA), "SEM_PRECO", rotulo);
+    assert.equal(precoVigenteCentavos(produto, AGORA), 5000, rotulo);
+  }
 });
 
 test("datas são inequívocas: ISO com Z e formato SQLite legado valem o mesmo instante", () => {
