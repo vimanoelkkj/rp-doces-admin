@@ -21,6 +21,18 @@ interface ConfigInput {
   defaultMessage?: string;
 }
 
+interface ValidConfig {
+  days: { label: string; active: boolean }[];
+  openTime: string;
+  closeTime: string;
+  localName: string;
+  address: string;
+  mapsLink?: string;
+  deliveryStatus: DeliveryStatus;
+  whatsapp: string;
+  defaultMessage?: string;
+}
+
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"] as const;
 const DAY_KEYS = [
   "dia_seg",
@@ -142,6 +154,10 @@ function validate(body: ConfigInput) {
   return null;
 }
 
+function isValidConfig(body: ConfigInput): body is ValidConfig {
+  return validate(body) === null;
+}
+
 function upsertConfig(db: D1Database, chave: string, valor: string) {
   return db
     .prepare(
@@ -180,27 +196,28 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const error = validate(body);
-  if (error) return Response.json({ error }, { status: 400 });
+  // isValidConfig chama validate; a segunda chamada (pura) só recupera a mensagem original.
+  if (!isValidConfig(body)) {
+    return Response.json({ error: validate(body) }, { status: 400 });
+  }
 
   try {
-    const whatsappLocal = normalizeWhatsappBr(body.whatsapp!);
-    const scheduleText = `${body
-      .days!.filter(day => day.active)
+    const days = body.days;
+    const whatsappLocal = normalizeWhatsappBr(body.whatsapp);
+    const scheduleText = `${days
+      .filter(day => day.active)
       .map(day => day.label)
       .join(", ")}: ${body.openTime} às ${body.closeTime}`;
 
     await env.DB.batch([
-      ...DAY_KEYS.map((key, index) =>
-        upsertConfig(env.DB, key, body.days![index].active ? "1" : "0")
-      ),
-      upsertConfig(env.DB, "horario_abre", body.openTime!),
-      upsertConfig(env.DB, "horario_fecha", body.closeTime!),
+      ...DAY_KEYS.map((key, index) => upsertConfig(env.DB, key, days[index].active ? "1" : "0")),
+      upsertConfig(env.DB, "horario_abre", body.openTime),
+      upsertConfig(env.DB, "horario_fecha", body.closeTime),
       upsertConfig(env.DB, "horario_atendimento", scheduleText),
-      upsertConfig(env.DB, "local_retirada", body.localName!.trim()),
-      upsertConfig(env.DB, "endereco", body.address!.trim()),
+      upsertConfig(env.DB, "local_retirada", body.localName.trim()),
+      upsertConfig(env.DB, "endereco", body.address.trim()),
       upsertConfig(env.DB, "maps_link", body.mapsLink?.trim() ?? ""),
-      upsertConfig(env.DB, "entregas_status", deliveryToDb(body.deliveryStatus!)),
+      upsertConfig(env.DB, "entregas_status", deliveryToDb(body.deliveryStatus)),
       upsertConfig(env.DB, "whatsapp", `55${whatsappLocal}`),
       upsertConfig(env.DB, "mensagem_whatsapp", body.defaultMessage?.trim() ?? "")
     ]);
