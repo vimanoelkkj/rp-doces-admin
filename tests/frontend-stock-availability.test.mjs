@@ -251,6 +251,96 @@ test("reconcileCartWithCatalog não altera itens quando estoque é suficiente e 
   assert.equal(reconciled[0].quantity, 2);
 });
 
+test("reconcileCartWithCatalog mantém sem ajuste os itens ausentes do catálogo ou sem disponibilidade numérica", () => {
+  const ausente = {
+    id: 10,
+    name: "Fora do catálogo",
+    price: 9,
+    image: "",
+    quantity: 3,
+    disponibilidade: 7
+  };
+  const semCampo = {
+    id: 11,
+    name: "Sem campo",
+    price: 9,
+    image: "",
+    quantity: 2,
+    disponibilidade: 4
+  };
+  const nula = { id: 12, name: "Nula", price: 9, image: "", quantity: 1 };
+  const texto = { id: 13, name: "Texto", price: 9, image: "", quantity: 1, disponibilidade: 2 };
+  const carrinho = [ausente, semCampo, nula, texto];
+  // Só valores numéricos entram no mapa do catálogo: os demais equivalem a "não consta".
+  const catalogo = [
+    { id: 11 },
+    { id: 12, disponibilidade: null },
+    { id: 13, disponibilidade: "5" }
+  ];
+
+  const { reconciled, adjusted } = reconcileCartWithCatalog(carrinho, catalogo);
+
+  assert.equal(adjusted, false, "manter um item não é um ajuste");
+  assert.equal(reconciled.length, 4);
+  for (const [i, item] of carrinho.entries()) {
+    assert.ok(reconciled[i] === item, `item ${item.id} mantido, na ordem, sem cópia nem alteração`);
+  }
+});
+
+test("reconcileCartWithCatalog combina itens presentes, esgotados e ausentes sem tocar nos ausentes", () => {
+  const item = (id, quantity, disponibilidade) => ({
+    id,
+    name: `Item ${id}`,
+    price: 10,
+    image: "",
+    quantity,
+    disponibilidade
+  });
+  const estavel = item(20, 2, 5); // catálogo: 5 => só reescreve a mesma disponibilidade
+  const esgotado = item(21, 1, 3); // catálogo: 0 => removido
+  const ausente = item(22, 4, 9); // fora do catálogo => mantido como está
+  const excedido = item(23, 6, 8); // catálogo: 3 => quantidade limitada a 3
+  const negativo = item(24, 1, 2); // catálogo: -2 => tratado como 0 => removido
+  const invalido = item(25, 2, 6); // catálogo com texto => não consta => mantido como está
+  const catalogo = [
+    { id: 20, disponibilidade: 5 },
+    { id: 21, disponibilidade: 0 },
+    { id: 23, disponibilidade: 3 },
+    { id: 24, disponibilidade: -2 },
+    { id: 25, disponibilidade: "muitos" }
+  ];
+
+  const { reconciled, adjusted } = reconcileCartWithCatalog(
+    [estavel, esgotado, ausente, excedido, negativo, invalido],
+    catalogo
+  );
+
+  assert.equal(adjusted, true, "a remoção e a limitação de quantidade contam como ajuste");
+  assert.deepEqual(
+    reconciled.map(i => i.id),
+    [20, 22, 23, 25],
+    "esgotados saem; ausentes e inválidos ficam; a ordem original é preservada"
+  );
+  assert.ok(reconciled[1] === ausente, "ausente do catálogo: mesma referência, sem cópia");
+  assert.ok(reconciled[3] === invalido, "disponibilidade inválida no catálogo: mesma referência");
+  assert.deepEqual(reconciled[0], { ...estavel, disponibilidade: 5 });
+  assert.deepEqual(reconciled[2], { ...excedido, quantity: 3, disponibilidade: 3 });
+});
+
+test("reconcileCartWithCatalog: carrinho vazio, catálogo vazio ou ausente não alteram nada", () => {
+  assert.deepEqual(reconcileCartWithCatalog([], [{ id: 1, disponibilidade: 3 }]), {
+    reconciled: [],
+    adjusted: false
+  });
+
+  const carrinho = [{ id: 1, name: "Bolo", price: 20, image: "", quantity: 2, disponibilidade: 5 }];
+  for (const catalogo of [[], undefined, null]) {
+    const { reconciled, adjusted } = reconcileCartWithCatalog(carrinho, catalogo);
+    assert.deepEqual(reconciled, carrinho);
+    assert.equal(adjusted, false);
+  }
+});
+
 test("remainingAvailability calcula estoque restante considerando itens no carrinho", () => {
   // disponibilidade 1, carrinho 0 -> restante 1
   assert.equal(remainingAvailability(1, 0), 1);

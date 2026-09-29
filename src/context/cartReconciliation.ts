@@ -99,13 +99,12 @@ export function reconcileCartWithCatalog<T extends ReconcilableCartItem>(
   const reconciled: T[] = [];
 
   for (const item of cartItems) {
-    if (!catalogMap.has(item.id)) {
+    const disp = catalogMap.get(item.id);
+    if (disp === undefined) {
       // Produto não consta no catálogo ativo (pode estar inativo ou mantido com disponibilidade anterior)
       reconciled.push(item);
       continue;
     }
-
-    const disp = catalogMap.get(item.id)!;
 
     if (disp <= 0) {
       // Sem estoque restante -> item removido do carrinho
