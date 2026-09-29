@@ -11,10 +11,6 @@
   padding: 40px 80px;
 }
 
-.footer--watermark-only .footer-branding {
-  margin-bottom: 0;
-}
-
 @media (max-width: 768px) {
   .footer--watermark-only {
     padding: 24px 16px;
@@ -77,9 +73,9 @@
   color: var(--store-accent);
 }
 
-.footer-phone {
-  font-weight: 600 !important;
-  color: var(--store-text-heading) !important;
+.footer-col .footer-phone {
+  font-weight: 600;
+  color: var(--store-text-heading);
 }
 
 .footer-branding {
@@ -93,6 +89,10 @@
   line-height: 1.2;
   margin-bottom: 64px;
   user-select: none;
+}
+
+.footer--watermark-only .footer-branding {
+  margin-bottom: 0;
 }
 
 .footer-bottom {

@@ -18,10 +18,6 @@ html[data-theme-transitioning] .header {
   transition: none !important;
 }
 
-html[data-theme-transitioning] .theme-toggle-btn {
-  transition-property: transform !important;
-}
-
 .logo {
   display: flex;
   align-items: center;
@@ -213,6 +209,11 @@ html[data-admin-theme="dark"] .header-admin-badge {
     transform 0.15s,
     color 0.2s;
   flex-shrink: 0;
+}
+
+/* Durante a troca de tema o botão só anima o transform. Fica depois da regra base, de menor especificidade. */
+html[data-theme-transitioning] .theme-toggle-btn {
+  transition-property: transform !important;
 }
 
 @media (hover: hover) {
@@ -511,10 +512,10 @@ html[data-admin-theme="dark"] .header-admin-badge {
   will-change: transform;
 }
 
+.mobile-menu-link--active .mobile-menu-link-content,
 .mobile-menu-link:hover .mobile-menu-link-content,
 .mobile-menu-link:focus-visible .mobile-menu-link-content,
-.mobile-menu-link:active .mobile-menu-link-content,
-.mobile-menu-link--active .mobile-menu-link-content {
+.mobile-menu-link:active .mobile-menu-link-content {
   transform: translateX(2px);
   color: var(--store-accent);
 }
@@ -542,9 +543,9 @@ html[data-admin-theme="dark"] .header-admin-badge {
     transition: opacity 150ms ease;
   }
 
+  .mobile-menu-link--active .mobile-menu-link-icon-wrap,
   .mobile-menu-link:active .mobile-menu-link-icon-wrap,
-  .mobile-menu-link:focus-visible .mobile-menu-link-icon-wrap,
-  .mobile-menu-link--active .mobile-menu-link-icon-wrap {
+  .mobile-menu-link:focus-visible .mobile-menu-link-icon-wrap {
     opacity: 1;
   }
 }
@@ -559,9 +560,9 @@ html[data-admin-theme="dark"] .header-admin-badge {
       transform 150ms ease;
   }
 
+  .mobile-menu-link--active .mobile-menu-link-icon-wrap,
   .mobile-menu-link:hover .mobile-menu-link-icon-wrap,
-  .mobile-menu-link:focus-visible .mobile-menu-link-icon-wrap,
-  .mobile-menu-link--active .mobile-menu-link-icon-wrap {
+  .mobile-menu-link:focus-visible .mobile-menu-link-icon-wrap {
     opacity: 1;
     transform: translateX(0);
   }
@@ -589,10 +590,10 @@ html[data-admin-theme="dark"] .header-admin-badge {
     opacity 150ms ease;
 }
 
+.mobile-menu-link--active .mobile-menu-underline,
 .mobile-menu-link:hover .mobile-menu-underline,
 .mobile-menu-link:focus-visible .mobile-menu-underline,
-.mobile-menu-link:active .mobile-menu-underline,
-.mobile-menu-link--active .mobile-menu-underline {
+.mobile-menu-link:active .mobile-menu-underline {
   transform: scaleX(1);
   opacity: 1;
 }
@@ -652,10 +653,10 @@ html[data-admin-theme="dark"] .header-admin-badge {
     transition: none !important;
   }
 
+  .mobile-menu-link--active .mobile-menu-underline,
   .mobile-menu-link:hover .mobile-menu-underline,
   .mobile-menu-link:focus-visible .mobile-menu-underline,
-  .mobile-menu-link:active .mobile-menu-underline,
-  .mobile-menu-link--active .mobile-menu-underline {
+  .mobile-menu-link:active .mobile-menu-underline {
     transform: none !important;
   }
 }

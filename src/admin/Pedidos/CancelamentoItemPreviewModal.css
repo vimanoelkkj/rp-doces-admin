@@ -455,11 +455,11 @@ html[data-admin-theme="dark"] .cancelpreview-refund-leg {
 html[data-admin-theme="dark"] .cancelpreview-refund-leg strong {
   color: #f8eee8;
 }
-html[data-admin-theme="dark"] .cancelpreview-refund-leg > div span {
-  color: #c9b8af;
-}
 html[data-admin-theme="dark"] .cancelpreview-refund-leg > span,
 html[data-admin-theme="dark"] .cancelpreview-success span {
+  color: #c9b8af;
+}
+html[data-admin-theme="dark"] .cancelpreview-refund-leg > div span {
   color: #c9b8af;
 }
 html[data-admin-theme="dark"] .cancelpreview-stock {

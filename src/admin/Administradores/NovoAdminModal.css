@@ -199,8 +199,8 @@
   z-index: 1;
 }
 
-.nadm-input-with-prefix {
-  padding-left: 30px !important;
+.nadm-field input.nadm-input-with-prefix {
+  padding-left: 30px;
 }
 
 /* ── Password toggle ── */
@@ -210,8 +210,8 @@
   align-items: center;
 }
 
-.nadm-input-password-wrap input {
-  padding-right: 44px !important;
+.nadm-field .nadm-input-password-wrap input {
+  padding-right: 44px;
 }
 
 .nadm-eye-btn {
@@ -263,6 +263,12 @@
 .nadm-dropdown-trigger:hover,
 .nadm-dropdown--open .nadm-dropdown-trigger {
   border-color: #634738;
+}
+
+/* Antes das regras `svg` do dropdown, de maior especificidade (ordem crescente). */
+.nadm-info-box svg {
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .nadm-dropdown-trigger svg {
@@ -323,11 +329,6 @@
   padding: 14px 16px;
   background: #f5efe8;
   border-radius: 12px;
-}
-
-.nadm-info-box svg {
-  flex-shrink: 0;
-  margin-top: 1px;
 }
 
 .nadm-info-box p {
