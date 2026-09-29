@@ -45,6 +45,8 @@ const bundle = await build({
       export * as produtos from './functions/api/produtos';
       export * as adminProdutos from './functions/api/admin/produtos';
       export * as adminProdutoId from './functions/api/admin/produtos/[id]';
+      export * as adminProdutoImagem from './functions/api/admin/produtos/[id]/imagem';
+      export * as publicImage from './functions/api/images/[key]';
       export * as notificacoes from './functions/lib/notificacoes';
       export * as adminNotificacoes from './functions/api/admin/notificacoes';
       export * as diagnosticoPix from './functions/api/admin/diagnosticos/pix';
