@@ -141,6 +141,7 @@ export default function AdminPedidos() {
   }, [search]);
 
   // Volta pra página 1 quando o filtro muda
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeTab e debouncedSearch são gatilhos: trocar filtro ou busca volta à página 1
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, debouncedSearch]);
@@ -148,11 +149,13 @@ export default function AdminPedidos() {
   // O cache vale somente para o filtro/busca/versão atual da listagem.
   // Assim a paginação pode ser instantânea sem manter dados antigos depois
   // de criar/alterar um pedido.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeTab, debouncedSearch e refreshKey são gatilhos: qualquer um invalida o cache de páginas
   useEffect(() => {
     pageCacheRef.current.clear();
     inFlightRef.current.clear();
   }, [activeTab, debouncedSearch, refreshKey]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey é gatilho manual: criar, alterar ou anular pedido o incrementa para refazer o fetch
   useEffect(() => {
     let cancelled = false;
     const requestVersion = requestVersionRef.current;

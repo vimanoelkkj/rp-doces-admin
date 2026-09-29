@@ -180,6 +180,7 @@ export default function AdminDespesas() {
     [periodo, personalizado]
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey é gatilho manual: onSaved do GastoModal o incrementa para refazer o fetch
   useEffect(() => {
     let cancelado = false;
     setCarregando(true);

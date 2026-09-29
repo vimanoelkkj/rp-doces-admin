@@ -62,6 +62,7 @@ export default function ProductDetailsModal({
   // marcada pronta antes do primeiro paint; senão, entra com fade quando
   // carregar. A decodificação fica assíncrona para não travar a pintura do
   // modal esperando a foto.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: product.image é gatilho: imagem nova exige reler img.complete
   useLayoutEffect(() => {
     const img = imagemRef.current;
     setImagemPronta(Boolean(img?.complete && img.naturalWidth > 0));

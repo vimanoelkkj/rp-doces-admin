@@ -90,11 +90,11 @@ export default function Cardapio() {
   // transição (containerHeight travado em número pelo handleFilterChange
   // acima) — no carregamento inicial containerHeight continua "auto" e
   // nada é animado aqui.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: displayFilter é gatilho: remede a altura só quando o conteúdo troca; containerHeight é apenas lido
   useLayoutEffect(() => {
     if (typeof containerHeight === "number" && productsAreaRef.current) {
       setContainerHeight(productsAreaRef.current.scrollHeight);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayFilter]);
 
   // Se uma revalidação remover a categoria selecionada, volta para a visão

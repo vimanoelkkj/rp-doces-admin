@@ -125,6 +125,7 @@ export default function AdminProdutos() {
 
   useEffect(carregarProdutos, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: categoriasOpen é gatilho: abrir ou fechar o modal de categorias recarrega a lista
   useEffect(() => {
     fetch("/api/admin/categorias")
       .then(async response => {

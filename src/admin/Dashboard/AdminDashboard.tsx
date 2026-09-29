@@ -158,6 +158,7 @@ export default function AdminDashboard() {
     return () => window.removeEventListener("pedido-anulado", atualizar);
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey é gatilho manual: "pedido-anulado" o incrementa para refazer o fetch
   useEffect(() => {
     setLoading(true);
     fetch(selectedDate ? `/api/admin/dashboard?date=${selectedDate}` : "/api/admin/dashboard")
