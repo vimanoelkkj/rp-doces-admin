@@ -1086,7 +1086,10 @@ export async function createItemExchange(
       };
     throw error;
   }
-  const row = await exchangeById(db, (await buscarOperacao(db, parsed.key))!.pedido_item_troca_id!);
+  const operacao = await buscarOperacao(db, parsed.key);
+  if (!operacao) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
+  if (!operacao.pedido_item_troca_id) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
+  const row = await exchangeById(db, operacao.pedido_item_troca_id);
   if (!row) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
   return { ok: true, troca: await exchangeView(db, row) };
 }
@@ -1128,9 +1131,11 @@ export async function confirmExchangeRefund(
     if (!row) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
     if (existing.reembolso_id) {
       await tryFinalizeExchange(db, row);
+      const updated = await exchangeById(db, row.id);
+      if (!updated) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
       return {
         ok: true,
-        troca: await exchangeView(db, (await exchangeById(db, row.id))!),
+        troca: await exchangeView(db, updated),
         replay: true,
         reembolsoId: existing.reembolso_id
       };
@@ -1170,7 +1175,8 @@ export async function confirmExchangeRefund(
         console.error("Refund MP persistido; finalizacao de troca pendente", row.id, error);
       }
     }
-    const updated = (await exchangeById(db, row.id))!;
+    const updated = await exchangeById(db, row.id);
+    if (!updated) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
     return {
       ok: true,
       troca: await exchangeView(db, updated),
@@ -1240,7 +1246,8 @@ export async function confirmExchangeRefund(
       .run()
       .catch(() => undefined);
   }
-  const updated = (await exchangeById(db, row.id))!;
+  const updated = await exchangeById(db, row.id);
+  if (!updated) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
   const op = await buscarOperacao(db, parsed.key);
   if (!op?.reembolso_id) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
   return { ok: true, troca: await exchangeView(db, updated), reembolsoId: op.reembolso_id };

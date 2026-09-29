@@ -478,6 +478,223 @@ test("troca 1500→1200 propõe e registra somente 300, concluindo atomicamente"
   );
 });
 
+test("releitura pós-batch suprimida retorna OPERACAO_INCOMPLETA e retry é replay", async t => {
+  const db = await setup(t, { paid: 1500 });
+  await addB(db, 2000);
+  let leiturasOperacao = 0;
+  db.hook = async statements =>
+    statements.map(statement => {
+      if (statement.sql.includes("FROM pedido_operacoes WHERE operation_key = ?")) {
+        leiturasOperacao++;
+        if (leiturasOperacao === 2)
+          return { sql: "SELECT * FROM pedido_operacoes WHERE 0", args: [] };
+      }
+      return statement;
+    });
+  const { preview, result } = await exchange(db);
+  db.hook = null;
+  assert.equal(result.ok, false);
+  assert.equal(result.erro, "OPERACAO_INCOMPLETA");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_item_trocas`).first()).n, 1);
+  const troca = await db.prepare(`SELECT * FROM pedido_item_trocas`).first();
+  assert.equal(troca.status, "AGUARDANDO_COBRANCA");
+  assert.equal(
+    (await db.prepare(`SELECT COUNT(*) n FROM pedido_itens WHERE produto_id=2`).first()).n,
+    1
+  );
+  assert.equal(
+    (await db.prepare(`SELECT estoque_reservado FROM produtos WHERE id=2`).first())
+      .estoque_reservado,
+    1
+  );
+  const operacao = await db
+    .prepare(`SELECT fase,pedido_item_troca_id FROM pedido_operacoes WHERE operation_key=?`)
+    .bind("exchange-operation-01")
+    .first();
+  assert.equal(operacao.fase, "CONCLUIDA");
+  assert.equal(operacao.pedido_item_troca_id, troca.id);
+  const operacoesAntes = (await db.prepare(`SELECT * FROM pedido_operacoes ORDER BY id`).all())
+    .results;
+  const retry = await app.itemExchange.createItemExchange(db, {
+    pedidoId: 1,
+    itemId: 1,
+    produtoDestinoId: 2,
+    quantidadeDestino: 1,
+    precoEsperadoCentavos: 2000,
+    estoqueAcaoOrigem: "LIBERAR_RESERVA",
+    usuarioId: 1,
+    operationKey: "exchange-operation-01",
+    motivo: "troca",
+    previewFingerprint: preview.previewFingerprint
+  });
+  assert.equal(retry.ok, true);
+  assert.equal(retry.replay, true);
+  assert.equal(retry.troca.id, troca.id);
+  assert.equal(retry.troca.status, "AGUARDANDO_COBRANCA");
+  assert.deepEqual(await db.prepare(`SELECT * FROM pedido_item_trocas`).first(), troca);
+  assert.deepEqual(
+    (await db.prepare(`SELECT * FROM pedido_operacoes ORDER BY id`).all()).results,
+    operacoesAntes
+  );
+  assert.equal(
+    (await db.prepare(`SELECT COUNT(*) n FROM pedido_pagamentos`).first()).n,
+    1,
+    "nenhum pagamento novo"
+  );
+});
+
+test("confirmExchangeRefund replay com a mesma key não duplica reembolso", async t => {
+  const db = await setup(t, { paid: 1500 });
+  await addB(db, 1200);
+  const { result } = await exchange(db, { price: 1200 });
+  const leg = result.troca.refundsPendentes[0];
+  const input = {
+    pedidoId: 1,
+    exchangeId: result.troca.id,
+    usuarioId: 1,
+    operationKey: "exchange-refund-replay-01",
+    pagamentoId: leg.pagamentoId,
+    pagamentoAlocacaoId: leg.pagamentoAlocacaoId,
+    valorCentavos: leg.valorCentavos,
+    confirmacao: true
+  };
+  const first = await app.itemExchange.confirmExchangeRefund(db, input);
+  assert.equal(first.ok, true);
+  assert.equal(first.troca.status, "CONCLUIDA");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  const reembolsoId = (await db.prepare(`SELECT id FROM pedido_reembolsos LIMIT 1`).first()).id;
+  const replay = await app.itemExchange.confirmExchangeRefund(db, input);
+  assert.equal(replay.ok, true);
+  assert.equal(replay.replay, true);
+  assert.equal(replay.reembolsoId, reembolsoId);
+  assert.equal(replay.troca.status, "CONCLUIDA");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.equal(
+    (
+      await db
+        .prepare(
+          `SELECT SUM(valor_centavos) total FROM pedido_reembolsos WHERE status='REEMBOLSADO'`
+        )
+        .first()
+    ).total,
+    300
+  );
+  assert.deepEqual(
+    await db
+      .prepare(`SELECT valor_total_centavos,status_pagamento FROM pedidos WHERE id=1`)
+      .first(),
+    { valor_total_centavos: 1200, status_pagamento: "PAGO" }
+  );
+});
+
+test("releitura do replay suprimida retorna OPERACAO_INCOMPLETA sem duplicar reembolso", async t => {
+  const db = await setup(t, { paid: 1500 });
+  await addB(db, 1200);
+  const { result } = await exchange(db, { price: 1200 });
+  const leg = result.troca.refundsPendentes[0];
+  const input = {
+    pedidoId: 1,
+    exchangeId: result.troca.id,
+    usuarioId: 1,
+    operationKey: "exchange-refund-replay-guard-01",
+    pagamentoId: leg.pagamentoId,
+    pagamentoAlocacaoId: leg.pagamentoAlocacaoId,
+    valorCentavos: leg.valorCentavos,
+    confirmacao: true
+  };
+  const first = await app.itemExchange.confirmExchangeRefund(db, input);
+  assert.equal(first.ok, true);
+  let leiturasTroca = 0;
+  db.hook = async statements =>
+    statements.map(statement => {
+      if (statement.sql.includes("FROM pedido_item_trocas WHERE id=? LIMIT 1")) {
+        leiturasTroca++;
+        if (leiturasTroca === 2)
+          return { sql: "SELECT * FROM pedido_item_trocas WHERE 0", args: [] };
+      }
+      return statement;
+    });
+  const replay = await app.itemExchange.confirmExchangeRefund(db, input);
+  db.hook = null;
+  assert.equal(replay.ok, false);
+  assert.equal(replay.erro, "OPERACAO_INCOMPLETA");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.equal(
+    (
+      await db
+        .prepare(
+          `SELECT SUM(valor_centavos) total FROM pedido_reembolsos WHERE status='REEMBOLSADO'`
+        )
+        .first()
+    ).total,
+    300
+  );
+  assert.equal(
+    (
+      await db
+        .prepare(`SELECT status FROM pedido_item_trocas WHERE id=?`)
+        .bind(result.troca.id)
+        .first()
+    ).status,
+    "CONCLUIDA"
+  );
+  const retry = await app.itemExchange.confirmExchangeRefund(db, input);
+  assert.equal(retry.ok, true);
+  assert.equal(retry.replay, true);
+  assert.equal(retry.troca.status, "CONCLUIDA");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+});
+
+test("releitura após reembolso manual suprimida preserva o reembolso e retry converge", async t => {
+  const db = await setup(t, { paid: 1500 });
+  await addB(db, 1200);
+  const { result } = await exchange(db, { price: 1200 });
+  const leg = result.troca.refundsPendentes[0];
+  const input = {
+    pedidoId: 1,
+    exchangeId: result.troca.id,
+    usuarioId: 1,
+    operationKey: "exchange-refund-manual-guard-01",
+    pagamentoId: leg.pagamentoId,
+    pagamentoAlocacaoId: leg.pagamentoAlocacaoId,
+    valorCentavos: leg.valorCentavos,
+    confirmacao: true
+  };
+  let leiturasTroca = 0;
+  db.hook = async statements =>
+    statements.map(statement => {
+      if (statement.sql.includes("FROM pedido_item_trocas WHERE id=? LIMIT 1")) {
+        leiturasTroca++;
+        if (leiturasTroca === 2)
+          return { sql: "SELECT * FROM pedido_item_trocas WHERE 0", args: [] };
+      }
+      return statement;
+    });
+  const first = await app.itemExchange.confirmExchangeRefund(db, input);
+  db.hook = null;
+  assert.equal(first.ok, false);
+  assert.equal(first.erro, "OPERACAO_INCOMPLETA");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  assert.equal(
+    (await db.prepare(`SELECT COUNT(*) n FROM pedido_item_troca_reembolso_alocacoes`).first()).n,
+    1
+  );
+  assert.equal(
+    (
+      await db
+        .prepare(`SELECT status FROM pedido_item_trocas WHERE id=?`)
+        .bind(result.troca.id)
+        .first()
+    ).status,
+    "CONCLUIDA"
+  );
+  const retry = await app.itemExchange.confirmExchangeRefund(db, input);
+  assert.equal(retry.ok, true);
+  assert.equal(retry.replay, true);
+  assert.equal(retry.troca.status, "CONCLUIDA");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+});
+
 test("LIFO usa Dinheiro recente antes de Pix MP e deixa perna remota pendente", async t => {
   const db = await setup(t, { paid: 0 });
   await db.batch([

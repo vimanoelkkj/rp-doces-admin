@@ -887,6 +887,55 @@ test("caso 2: troca 1500 por 1200 envia refund PIX_MP de exatamente 300", async 
   );
 });
 
+test("releitura pós-refund PIX_MP suprimida retorna OPERACAO_INCOMPLETA sem reenvio ao provedor", async t => {
+  const { db, exchange } = await exchangeScenario(t);
+  const leg = exchange.refundsPendentes[0];
+  assert.equal(leg.metodo, "PIX_MP");
+  let posts = 0;
+  t.mock.method(globalThis, "fetch", async (_url, init) => {
+    if (init?.method === "POST") posts++;
+    return Response.json({ id: 7100, payment_id: 9002, amount: 3, status: "approved" });
+  });
+  const input = {
+    pedidoId: 1,
+    exchangeId: exchange.id,
+    usuarioId: 1,
+    operationKey: "exchange-pix-refund-guard-01",
+    pagamentoId: leg.pagamentoId,
+    pagamentoAlocacaoId: leg.pagamentoAlocacaoId,
+    valorCentavos: leg.valorCentavos,
+    confirmacao: true,
+    mpAccessToken: "TEST_TOKEN"
+  };
+  let leiturasTroca = 0;
+  db.hook = async statements =>
+    statements.map(statement => {
+      if (statement.sql.includes("FROM pedido_item_trocas WHERE id=? LIMIT 1")) {
+        leiturasTroca++;
+        if (leiturasTroca === 2)
+          return { sql: "SELECT * FROM pedido_item_trocas WHERE 0", args: [] };
+      }
+      return statement;
+    });
+  const first = await app.itemExchange.confirmExchangeRefund(db, input);
+  db.hook = null;
+  assert.equal(first.ok, false);
+  assert.equal(first.erro, "OPERACAO_INCOMPLETA");
+  assert.equal(posts, 1);
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+  const troca = await db
+    .prepare(`SELECT status FROM pedido_item_trocas WHERE id=?`)
+    .bind(exchange.id)
+    .first();
+  assert.equal(troca.status, "CONCLUIDA");
+  const retry = await app.itemExchange.confirmExchangeRefund(db, input);
+  assert.equal(retry.ok, true);
+  assert.equal(retry.replay, true);
+  assert.equal(retry.troca.status, "CONCLUIDA");
+  assert.equal(posts, 1, "o replay não reenvia o refund ao provedor");
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
+});
+
 test("caso 3: LIFO devolve 500 em dinheiro e envia somente 200 ao Mercado Pago", async t => {
   const { db, exchange } = await exchangeScenario(t, { destination: 800, mixed: true });
   assert.deepEqual(
