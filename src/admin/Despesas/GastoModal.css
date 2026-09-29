@@ -269,15 +269,6 @@
   margin-bottom: 10px;
 }
 
-.gasto-item-card > header strong {
-  font-family: "Manrope", sans-serif;
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  color: #8c7a76;
-}
-
 .gasto-item-card > header button {
   width: 30px;
   height: 30px;
@@ -335,10 +326,10 @@
   color: #8c7a76;
 }
 
-.gasto-money-input input {
-  border: none !important;
-  background: transparent !important;
-  padding: 10px 0 !important;
+.gasto-item-grid .gasto-money-input input {
+  border: none;
+  background: transparent;
+  padding: 10px 0;
 }
 
 .gasto-money-input:focus-within {
@@ -505,7 +496,10 @@
   align-self: flex-start;
   padding: 4px 10px;
   border-radius: 100px;
-  font-size: 12px !important;
+}
+
+.gasto-detalhe-grid .gasto-status-pill {
+  font-size: 12px;
 }
 
 .gasto-status-pill--ativa {
@@ -548,6 +542,15 @@
 .gasto-detalhe-item strong {
   font-size: 14px;
   color: #2b1d1a;
+}
+
+.gasto-item-card > header strong {
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #8c7a76;
 }
 
 .gasto-detalhe-item span {
