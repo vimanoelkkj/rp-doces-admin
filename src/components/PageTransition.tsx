@@ -15,6 +15,7 @@ export default function PageTransition({ children }: PageTransitionProps) {
   const nextChildren = useRef(children);
   const nextPath = useRef(location.pathname);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só pathname e children disparam a transição; currentPath e phase nas deps reexecutariam a decisão de animar a cada etapa
   useEffect(() => {
     // Só anima em mudança de PATHNAME (não hash)
     if (location.pathname !== currentPath && phase === "idle") {

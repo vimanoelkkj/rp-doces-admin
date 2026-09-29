@@ -228,6 +228,7 @@ export default function NovoProdutoModal({
       .catch(() => setCategorias([]));
   }, [open]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: o efeito só roda ao abrir ou trocar de produto; resetForm (novo a cada render) nas deps apagaria o formulário digitado
   useEffect(() => {
     if (!open) return;
     if (!produto) {
@@ -257,7 +258,6 @@ export default function NovoProdutoModal({
     setPromoInicio(isoParaDatetimeLocal(produto.promocao_inicio));
     setPromoFim(isoParaDatetimeLocal(produto.promocao_fim));
     setError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, produto]);
 
   const handleSubmit = async (e: React.FormEvent) => {
