@@ -49,11 +49,15 @@ interface DespesasResponse {
   resultadoFinanceiro: ResultadoFinanceiro;
 }
 
-const STATUS_OPCOES: { valor: "TODOS" | "ATIVA" | "CANCELADA"; label: string }[] = [
-  { valor: "TODOS", label: "Todos" },
-  { valor: "ATIVA", label: "Ativa" },
-  { valor: "CANCELADA", label: "Cancelada" }
-];
+type StatusFiltro = "TODOS" | "ATIVA" | "CANCELADA";
+
+// Record exaustivo: se a união ganhar um status, o compilador exige o rótulo dele aqui.
+const STATUS_LABEL: Record<StatusFiltro, string> = {
+  TODOS: "Todos",
+  ATIVA: "Ativa",
+  CANCELADA: "Cancelada"
+};
+const STATUS_OPCOES: StatusFiltro[] = ["TODOS", "ATIVA", "CANCELADA"];
 
 function IconChevron({ open }: { open: boolean }) {
   return (
@@ -102,11 +106,10 @@ function StatusDropdown({
   value,
   onChange
 }: {
-  value: "TODOS" | "ATIVA" | "CANCELADA";
-  onChange: (valor: "TODOS" | "ATIVA" | "CANCELADA") => void;
+  value: StatusFiltro;
+  onChange: (valor: StatusFiltro) => void;
 }) {
   const dd = useDropdown();
-  const atual = STATUS_OPCOES.find(o => o.valor === value)!;
   return (
     <div
       className={`desp-status-dropdown ${dd.open ? "desp-status-dropdown--open" : ""}`}
@@ -118,22 +121,22 @@ function StatusDropdown({
         aria-label="Filtrar por status"
         onClick={() => dd.setOpen(!dd.open)}
       >
-        <span>{atual.label}</span>
+        <span>{STATUS_LABEL[value]}</span>
         <IconChevron open={dd.open} />
       </button>
       {dd.open && (
         <ul className="desp-status-dropdown-list" ref={dd.menuRef}>
-          {STATUS_OPCOES.map(opcao => (
-            <li key={opcao.valor}>
+          {STATUS_OPCOES.map(valor => (
+            <li key={valor}>
               <button
                 type="button"
-                className={`desp-status-dropdown-option ${value === opcao.valor ? "desp-status-dropdown-option--active" : ""}`}
+                className={`desp-status-dropdown-option ${value === valor ? "desp-status-dropdown-option--active" : ""}`}
                 onClick={() => {
-                  onChange(opcao.valor);
+                  onChange(valor);
                   dd.setOpen(false);
                 }}
               >
-                {opcao.label}
+                {STATUS_LABEL[valor]}
               </button>
             </li>
           ))}
@@ -160,7 +163,7 @@ export default function AdminDespesas() {
     const hoje = paraISODate(new Date());
     return { desde: hoje, ate: hoje };
   });
-  const [statusFiltro, setStatusFiltro] = useState<"TODOS" | "ATIVA" | "CANCELADA">("TODOS");
+  const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("TODOS");
   const [busca, setBusca] = useState("");
   const [buscaDebounced, setBuscaDebounced] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);

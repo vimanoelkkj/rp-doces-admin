@@ -150,6 +150,59 @@ test("filtro de período usa agrupamento nativo sem perder a seleção por botã
   assert.equal(hojePressed, "true");
 });
 
+test("filtro de status: rótulo inicial Todos, seleciona Cancelada e consulta com status=CANCELADA", async t => {
+  const urls = [];
+  const root = await mountWith(t, async url => {
+    urls.push(String(url));
+    return respostaVazia();
+  });
+  const trigger = () => document.querySelector(".desp-status-dropdown-trigger");
+  const opcoes = () => [...document.querySelectorAll(".desp-status-dropdown-option")];
+  const rotulos = () => opcoes().map(opcao => opcao.textContent.trim());
+  const ativas = () =>
+    opcoes().map(opcao => opcao.classList.contains("desp-status-dropdown-option--active"));
+  const statusConsultados = () =>
+    urls
+      .filter(url => url.startsWith("/api/admin/despesas?"))
+      .map(url => new URL(url, "https://local.test").searchParams.get("status"));
+  try {
+    // Estado inicial: rótulo de TODOS, lista fechada e uma única consulta.
+    assert.equal(trigger().textContent.trim(), "Todos");
+    assert.ok(document.querySelector(".desp-status-dropdown-list") === null, "lista fechada");
+    assert.deepEqual(statusConsultados(), ["TODOS"]);
+
+    // Abrir mostra as três opções, na ordem, com a atual marcada, sem nova consulta.
+    await ui.act(async () => trigger().click());
+    assert.deepEqual(rotulos(), ["Todos", "Ativa", "Cancelada"]);
+    assert.deepEqual(ativas(), [true, false, false]);
+    assert.deepEqual(statusConsultados(), ["TODOS"], "abrir o dropdown não consulta");
+
+    // Selecionar Cancelada: rótulo, lista fechada e uma consulta nova com status=CANCELADA.
+    await ui.act(async () =>
+      opcoes()
+        .find(opcao => opcao.textContent.trim() === "Cancelada")
+        .click()
+    );
+    await flush();
+    assert.equal(trigger().textContent.trim(), "Cancelada");
+    assert.ok(document.querySelector(".desp-status-dropdown-list") === null, "lista fecha");
+    assert.deepEqual(statusConsultados(), ["TODOS", "CANCELADA"]);
+
+    // Uma renderização posterior (outro filtro) preserva a seleção de status.
+    const hoje = [...document.querySelectorAll(".desp-periods button")].find(
+      button => button.textContent === "Hoje"
+    );
+    await ui.act(async () => hoje.click());
+    await flush();
+    assert.equal(trigger().textContent.trim(), "Cancelada");
+    assert.deepEqual(statusConsultados(), ["TODOS", "CANCELADA", "CANCELADA"]);
+    await ui.act(async () => trigger().click());
+    assert.deepEqual(ativas(), [false, false, true], "Cancelada segue como a opção ativa");
+  } finally {
+    await unmount(root);
+  }
+});
+
 test("ícones redundantes de despesas ficam ocultos sem apagar nomes dos controles", async t => {
   const root = await mountWith(t, async () => respostaVazia());
   try {
