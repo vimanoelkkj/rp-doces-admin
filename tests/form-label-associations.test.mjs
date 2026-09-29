@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { JSDOM } from "jsdom";
 
 const dom = new JSDOM('<!doctype html><body><div id="root"></div></body>', {
-  url: "https://local.test/admin",
+  url: "https://local.test/admin"
 });
 const channels = [];
 const NativeMessageChannel = globalThis.MessageChannel;
@@ -23,7 +23,7 @@ for (const name of [
   "Event",
   "MouseEvent",
   "MutationObserver",
-  "localStorage",
+  "localStorage"
 ]) {
   Object.defineProperty(globalThis, name, { configurable: true, value: dom.window[name] });
 }
@@ -78,7 +78,7 @@ const bundle = await build({
         root.render(element);
         return root;
       }
-    `,
+    `
   },
   bundle: true,
   write: false,
@@ -86,42 +86,55 @@ const bundle = await build({
   platform: "browser",
   jsx: "automatic",
   define: { "process.env.NODE_ENV": '"development"' },
-  loader: { ".css": "empty", ".png": "dataurl" },
+  loader: { ".css": "empty", ".png": "dataurl" }
 });
 const ui = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
 );
 
-globalThis.fetch = async (url) => {
+globalThis.fetch = async url => {
   const target = String(url);
   if (target.includes("/categorias")) return Response.json({ categorias: [] });
   if (target.includes("/admin/produtos")) return Response.json({ produtos: [] });
   if (target.includes("/admin/pedidos/reconciliar")) return Response.json({ ok: true });
   if (target.includes("/admin/pedidos")) {
     return Response.json({
-      pedidos: [], total: 0, page: 1, totalPages: 2,
-      counts: {todos: 0, hoje: 0, novos: 0, em_producao: 0, prontos: 0, entregues: 0, arquivados: 0},
+      pedidos: [],
+      total: 0,
+      page: 1,
+      totalPages: 2,
+      counts: {
+        todos: 0,
+        hoje: 0,
+        novos: 0,
+        em_producao: 0,
+        prontos: 0,
+        entregues: 0,
+        arquivados: 0
+      }
     });
   }
   if (target.endsWith("/api/produtos")) {
     return Response.json({
-      produtos: [{
-        id: 1,
-        nome: "Bolo",
-        categoria: "BOLO",
-        categoria_nome: "Bolo",
-        descricao: "Doce",
-        destaque: 0,
-        ordem: 1,
-        estoque: 10,
-        estoque_reservado: 0,
-        image_key: null,
-        preco_centavos: 1000,
-        preco_promocional_centavos: null,
-        promocao_ativa: 0,
-        promocao_inicio: null,
-        promocao_fim: null,
-      }],
+      produtos: [
+        {
+          id: 1,
+          nome: "Bolo",
+          categoria: "BOLO",
+          categoria_nome: "Bolo",
+          descricao: "Doce",
+          destaque: 0,
+          ordem: 1,
+          estoque: 10,
+          estoque_reservado: 0,
+          image_key: null,
+          preco_centavos: 1000,
+          preco_promocional_centavos: null,
+          promocao_ativa: 0,
+          promocao_inicio: null,
+          promocao_fim: null
+        }
+      ]
     });
   }
   return Response.json({});
@@ -133,7 +146,7 @@ async function render(component) {
   if (component === "checkout") {
     localStorage.setItem(
       "rp-doces:cart",
-      JSON.stringify([{ id: 1, name: "Bolo", price: 10, image: "", quantity: 1 }]),
+      JSON.stringify([{ id: 1, name: "Bolo", price: 10, image: "", quantity: 1 }])
     );
   }
   let root;
@@ -169,7 +182,7 @@ for (const component of [
   "novoPedido",
   "categorias",
   "novoProduto",
-  "checkout",
+  "checkout"
 ]) {
   test(`${component}: labels apontam para controles e IDs não se repetem`, async () => {
     const unmount = await render(component);
@@ -180,7 +193,7 @@ for (const component of [
         assert.ok(label.control, `label sem controle: ${label.textContent.trim()}`);
       }
 
-      const ids = [...document.querySelectorAll("[id]")].map((element) => element.id);
+      const ids = [...document.querySelectorAll("[id]")].map(element => element.id);
       assert.equal(new Set(ids).size, ids.length, "IDs do modal devem ser únicos");
 
       for (const element of document.querySelectorAll("[aria-labelledby]")) {
@@ -198,10 +211,14 @@ test("ícones administrativos redundantes não alteram os nomes dos controles", 
   for (const [component, svgSelector, controlSelector] of [
     ["novoAdmin", ".nadm-dropdown-trigger svg, .nadm-info-box svg", ".nadm-dropdown-trigger"],
     ["gasto", ".gasto-modal svg", ".gasto-modal button"],
-    ["novoPedido", ".nped-btn-add-item svg, .nped-dropdown-trigger svg", ".nped-btn-add-item, .nped-dropdown-trigger"],
+    [
+      "novoPedido",
+      ".nped-btn-add-item svg, .nped-dropdown-trigger svg",
+      ".nped-btn-add-item, .nped-dropdown-trigger"
+    ],
     ["novoProduto", ".np-dropdown-trigger svg", ".np-dropdown-trigger"],
     ["adminProdutos", ".prod-btn-primary svg, .prod-search svg", ".prod-btn-primary"],
-    ["adminPedidos", ".ped-btn-primary svg, .ped-search svg", ".ped-btn-primary"],
+    ["adminPedidos", ".ped-btn-primary svg, .ped-search svg", ".ped-btn-primary"]
   ]) {
     const unmount = await render(component);
     try {
@@ -215,7 +232,7 @@ test("ícones administrativos redundantes não alteram os nomes dos controles", 
   const unmount = await render("adminLogin");
   try {
     assertDecorativeSvgs(
-      ".admin-login-theme-toggle svg, .admin-login-logo-circle svg, .admin-login-biometry svg",
+      ".admin-login-theme-toggle svg, .admin-login-logo-circle svg, .admin-login-biometry svg"
     );
     assertNamedControls(".admin-login-theme-toggle, .admin-login-biometry");
 
@@ -233,10 +250,61 @@ test("ícones administrativos redundantes não alteram os nomes dos controles", 
   }
 });
 
+test("AdminLogin preserva foco durante a navegacao entre etapas", async () => {
+  const unmount = await render("adminLogin");
+
+  try {
+    // 1. Foco inicial no usuario.
+    const username = document.querySelector("#admin-username");
+
+    assert.ok(username, "campo de usuario deve existir");
+    assert.equal(document.activeElement, username, "foco inicial deve estar no usuario");
+
+    // 2. Preencher usuario e avancar para senha.
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+
+    await ui.act(async () => {
+      setter.call(username, "ana");
+      username.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    await ui.act(async () => {
+      document.querySelector(".admin-login-form").requestSubmit();
+    });
+
+    const password = document.querySelector("#admin-password");
+
+    assert.ok(password, "campo de senha deve existir");
+    assert.equal(document.activeElement, password, "foco deve migrar para senha ao avancar");
+
+    // 3. Mostrar/ocultar senha nao deve roubar o foco do input.
+    const toggle = document.querySelector(".admin-login-eye-toggle");
+
+    await ui.act(async () => {
+      toggle.click();
+    });
+
+    assert.equal(password.type, "text");
+    assert.equal(document.activeElement, password, "alternar visibilidade nao deve roubar o foco");
+
+    // 4. Voltar para usuario restaura o foco corretamente.
+    await ui.act(async () => {
+      document.querySelector(".admin-login-change-user").click();
+    });
+
+    const restoredUsername = document.querySelector("#admin-username");
+
+    assert.ok(restoredUsername, "campo de usuario deve voltar a existir");
+    assert.equal(document.activeElement, restoredUsername, "foco deve retornar ao usuario");
+  } finally {
+    await unmount();
+  }
+});
+
 test("controles somente com ícone expõem ação, estado e preservam interação", async () => {
   for (const [component, selector, expectedName] of [
     ["alterarSenha", ".nadm-close", "Fechar alteração de senha"],
-    ["categorias", ".catm-close", "Fechar categorias"],
+    ["categorias", ".catm-close", "Fechar categorias"]
   ]) {
     const unmount = await render(component);
     try {
@@ -256,8 +324,8 @@ test("controles somente com ícone expõem ação, estado e preservam interaçã
 
     const passwordToggles = [...document.querySelectorAll(".nadm-eye-btn")];
     assert.deepEqual(
-      passwordToggles.map((button) => button.getAttribute("aria-label")),
-      ["Mostrar senha", "Mostrar confirmação da senha"],
+      passwordToggles.map(button => button.getAttribute("aria-label")),
+      ["Mostrar senha", "Mostrar confirmação da senha"]
     );
     for (const button of passwordToggles) {
       assert.equal(button.querySelector("svg").getAttribute("aria-hidden"), "true");

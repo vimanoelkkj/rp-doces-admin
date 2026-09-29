@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  type MouseEventHandler,
-  type PointerEventHandler,
-} from "react";
+import { useEffect, useRef, type MouseEventHandler, type PointerEventHandler } from "react";
 
 interface SavedBodyState {
   cssText: string;
@@ -64,8 +59,8 @@ const modalStack: ModalStackEntry[] = [];
 function focaveis(container: HTMLElement): HTMLElement[] {
   return Array.from(
     container.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ),
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
   );
 }
 
@@ -94,7 +89,7 @@ function onKeyDown(event: KeyboardEvent) {
   }
 }
 
-export function useAdminModal(active: boolean, onClose: () => void) {
+export function useAdminModal(active: boolean, onClose: () => void, initialFocusSelector?: string) {
   const startedOnBackdrop = useRef(false);
   const endedOnBackdrop = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -113,7 +108,7 @@ export function useAdminModal(active: boolean, onClose: () => void) {
     const returnFocusTo = document.activeElement as HTMLElement | null;
     const entry: ModalStackEntry = {
       close: () => onCloseRef.current(),
-      container: containerRef.current,
+      container: containerRef.current
     };
     modalStack.push(entry);
     if (modalStack.length === 1) {
@@ -123,8 +118,13 @@ export function useAdminModal(active: boolean, onClose: () => void) {
     // Move o foco pra dentro do modal recém-aberto (primeiro elemento
     // focável), senão o Tab continuaria a partir de onde o clique que abriu
     // o modal deixou o foco, fora da pilha.
+    const focoInicial = initialFocusSelector
+      ? containerRef.current?.querySelector<HTMLElement>(initialFocusSelector)
+      : null;
+
     const primeiroFocavel = containerRef.current ? focaveis(containerRef.current)[0] : null;
-    primeiroFocavel?.focus();
+
+    (focoInicial ?? primeiroFocavel)?.focus();
 
     return () => {
       const index = modalStack.indexOf(entry);
@@ -138,14 +138,14 @@ export function useAdminModal(active: boolean, onClose: () => void) {
         returnFocusTo.focus();
       }
     };
-  }, [active]);
+  }, [active, initialFocusSelector]);
 
-  const onPointerDown: PointerEventHandler<HTMLDivElement> = (event) => {
+  const onPointerDown: PointerEventHandler<HTMLDivElement> = event => {
     startedOnBackdrop.current = event.target === event.currentTarget;
     endedOnBackdrop.current = false;
   };
 
-  const onPointerUp: PointerEventHandler<HTMLDivElement> = (event) => {
+  const onPointerUp: PointerEventHandler<HTMLDivElement> = event => {
     endedOnBackdrop.current = event.target === event.currentTarget;
   };
 
@@ -154,11 +154,9 @@ export function useAdminModal(active: boolean, onClose: () => void) {
     endedOnBackdrop.current = false;
   };
 
-  const onClick: MouseEventHandler<HTMLDivElement> = (event) => {
+  const onClick: MouseEventHandler<HTMLDivElement> = event => {
     const genuineBackdropClick =
-      startedOnBackdrop.current &&
-      endedOnBackdrop.current &&
-      event.target === event.currentTarget;
+      startedOnBackdrop.current && endedOnBackdrop.current && event.target === event.currentTarget;
     startedOnBackdrop.current = false;
     endedOnBackdrop.current = false;
     if (genuineBackdropClick) onClose();

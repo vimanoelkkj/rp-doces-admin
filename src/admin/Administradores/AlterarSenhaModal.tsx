@@ -31,7 +31,7 @@ export default function AlterarSenhaModal({
   adminNome,
   isSelf,
   onClose,
-  onSaved,
+  onSaved
 }: AlterarSenhaModalProps) {
   const fieldId = useId();
   const [senhaAtual, setSenhaAtual] = useState("");
@@ -48,7 +48,7 @@ export default function AlterarSenhaModal({
     onClose();
   };
 
-  const modalProps = useAdminModal(adminId != null, handleClose);
+  const modalProps = useAdminModal(adminId != null, handleClose, 'input[type="password"]');
 
   const senhasIguais = senha === confirmar;
   const canSubmit = isSelf
@@ -64,7 +64,7 @@ export default function AlterarSenhaModal({
 
     const payload: { acao: string; senha: string; senhaAtual?: string } = {
       acao: "resetar_senha",
-      senha,
+      senha
     };
     if (isSelf) {
       payload.senhaAtual = senhaAtual;
@@ -73,9 +73,9 @@ export default function AlterarSenhaModal({
     fetch(`/api/admin/administradores/${adminId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error ?? "Falha ao alterar senha");
@@ -87,7 +87,7 @@ export default function AlterarSenhaModal({
         onSaved();
         onClose();
       })
-      .catch((err) => {
+      .catch(err => {
         setError(err instanceof Error ? err.message : "Falha ao alterar senha");
       })
       .finally(() => setSaving(false));
@@ -103,12 +103,15 @@ export default function AlterarSenhaModal({
             <span className="nadm-kicker">EQUIPE</span>
             <h2 className="nadm-title">Alterar senha</h2>
             <p className="nadm-subtitle">
-              {isSelf
-                ? "Altere a senha da sua conta."
-                : `Nova senha para ${adminNome}.`}
+              {isSelf ? "Altere a senha da sua conta." : `Nova senha para ${adminNome}.`}
             </p>
           </div>
-          <button type="button" className="nadm-close" aria-label="Fechar alteração de senha" onClick={handleClose}>
+          <button
+            type="button"
+            className="nadm-close"
+            aria-label="Fechar alteração de senha"
+            onClick={handleClose}
+          >
             <IconClose />
           </button>
         </div>
@@ -122,8 +125,7 @@ export default function AlterarSenhaModal({
                 type="password"
                 placeholder="Sua senha atual"
                 value={senhaAtual}
-                onChange={(e) => setSenhaAtual(e.target.value)}
-                autoFocus
+                onChange={e => setSenhaAtual(e.target.value)}
               />
             </div>
           )}
@@ -135,8 +137,7 @@ export default function AlterarSenhaModal({
               type="password"
               placeholder="Mín. 8 caracteres"
               value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              autoFocus={!isSelf}
+              onChange={e => setSenha(e.target.value)}
             />
           </div>
 
@@ -149,7 +150,7 @@ export default function AlterarSenhaModal({
               type="password"
               placeholder={isSelf ? "Repita a nova senha" : "Repita a senha"}
               value={confirmar}
-              onChange={(e) => setConfirmar(e.target.value)}
+              onChange={e => setConfirmar(e.target.value)}
               className={confirmar && !senhasIguais ? "nadm-input--error" : ""}
             />
             {confirmar && !senhasIguais && (
@@ -160,24 +161,16 @@ export default function AlterarSenhaModal({
           {error && <p className="nadm-error-text">{error}</p>}
 
           <div className="nadm-footer">
-            <button
-              type="button"
-              className="nadm-btn-cancel"
-              onClick={handleClose}
-            >
+            <button type="button" className="nadm-btn-cancel" onClick={handleClose}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="nadm-btn-save"
-              disabled={!canSubmit || saving}
-            >
+            <button type="submit" className="nadm-btn-save" disabled={!canSubmit || saving}>
               {saving ? "Salvando…" : "Salvar nova senha"}
             </button>
           </div>
         </form>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

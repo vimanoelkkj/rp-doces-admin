@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminTheme } from "../theme/AdminThemeContext";
 import { useAdminPwa } from "../pwa/useAdminPwa";
@@ -58,6 +58,14 @@ export default function AdminLogin() {
   const [initials, setInitials] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const usernameInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const target = step === "username" ? usernameInputRef.current : passwordInputRef.current;
+
+    target?.focus();
+  }, [step]);
 
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,12 +76,10 @@ export default function AdminLogin() {
       ? username
           .split("@")[0]
           .replace(/[._]/g, " ")
-          .replace(/\b\w/g, (c) => c.toUpperCase())
-      : username.replace(/\b\w/g, (c) => c.toUpperCase());
+          .replace(/\b\w/g, c => c.toUpperCase())
+      : username.replace(/\b\w/g, c => c.toUpperCase());
 
-    const handle = username.startsWith("@")
-      ? username
-      : `@${username.split("@")[0]}`;
+    const handle = username.startsWith("@") ? username : `@${username.split("@")[0]}`;
 
     const parts = name.split(" ");
     const ini =
@@ -97,7 +103,7 @@ export default function AdminLogin() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, senha: password }),
+        body: JSON.stringify({ username, senha: password })
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -129,9 +135,7 @@ export default function AdminLogin() {
           type="button"
           className="admin-login-theme-toggle"
           onClick={toggleTheme}
-          aria-label={
-            theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"
-          }
+          aria-label={theme === "light" ? "Ativar tema escuro" : "Ativar tema claro"}
         >
           {theme === "light" ? <IconMoon /> : <IconSun />}
         </button>
@@ -154,27 +158,9 @@ export default function AdminLogin() {
                   strokeWidth="2"
                   strokeLinecap="round"
                 />
-                <circle
-                  className="flame flame-1"
-                  cx="5.833"
-                  cy="3.334"
-                  r="1.2"
-                  fill="#d38b80"
-                />
-                <circle
-                  className="flame flame-2"
-                  cx="10"
-                  cy="3.334"
-                  r="1.2"
-                  fill="#d38b80"
-                />
-                <circle
-                  className="flame flame-3"
-                  cx="14.167"
-                  cy="3.334"
-                  r="1.2"
-                  fill="#d38b80"
-                />
+                <circle className="flame flame-1" cx="5.833" cy="3.334" r="1.2" fill="#d38b80" />
+                <circle className="flame flame-2" cx="10" cy="3.334" r="1.2" fill="#d38b80" />
+                <circle className="flame flame-3" cx="14.167" cy="3.334" r="1.2" fill="#d38b80" />
               </svg>
             </div>
             <span className="admin-login-logo-text">R&amp;P Doces</span>
@@ -217,9 +203,7 @@ export default function AdminLogin() {
               {/* Divider */}
               <div className="admin-login-divider">
                 <span className="admin-login-divider-line" />
-                <span className="admin-login-divider-text">
-                  ou use seu usuário
-                </span>
+                <span className="admin-login-divider-text">ou use seu usuário</span>
                 <span className="admin-login-divider-line" />
               </div>
 
@@ -230,12 +214,12 @@ export default function AdminLogin() {
                 </label>
                 <div className="admin-login-input-box">
                   <input
+                    ref={usernameInputRef}
                     id="admin-username"
                     type="text"
                     placeholder="Insira seu e-mail ou @usuario"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    autoFocus
+                    onChange={e => setUsername(e.target.value)}
                   />
                 </div>
               </div>
@@ -247,8 +231,8 @@ export default function AdminLogin() {
             </div>
 
             <p className="admin-login-footer-text">
-              A autenticação biométrica precisa estar habilitada no seu
-              dispositivo e integrada ao painel da R&amp;P Doces.
+              A autenticação biométrica precisa estar habilitada no seu dispositivo e integrada ao
+              painel da R&amp;P Doces.
             </p>
           </form>
         )}
@@ -263,11 +247,7 @@ export default function AdminLogin() {
                 <strong>{displayName}</strong>
                 <span>{displayHandle}</span>
               </div>
-              <button
-                type="button"
-                className="admin-login-change-user"
-                onClick={handleChangeUser}
-              >
+              <button type="button" className="admin-login-change-user" onClick={handleChangeUser}>
                 Alterar
               </button>
             </div>
@@ -280,20 +260,18 @@ export default function AdminLogin() {
                 </label>
                 <div className="admin-login-input-box">
                   <input
+                    ref={passwordInputRef}
                     id="admin-password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••••"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoFocus
+                    onChange={e => setPassword(e.target.value)}
                   />
                   <button
                     type="button"
                     className="admin-login-eye-toggle"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={
-                      showPassword ? "Esconder senha" : "Mostrar senha"
-                    }
+                    aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
                   >
                     {showPassword ? (
                       <svg
@@ -335,11 +313,7 @@ export default function AdminLogin() {
               {error && <p className="admin-login-error">{error}</p>}
 
               {/* Submit */}
-              <button
-                type="submit"
-                className="admin-login-submit"
-                disabled={loading}
-              >
+              <button type="submit" className="admin-login-submit" disabled={loading}>
                 {loading ? "Entrando…" : "Entrar"}
               </button>
 
@@ -352,8 +326,8 @@ export default function AdminLogin() {
             </div>
 
             <p className="admin-login-footer-text">
-              Sua conta está protegida por criptografia de ponta a ponta. Nunca
-              compartilhe suas credenciais.
+              Sua conta está protegida por criptografia de ponta a ponta. Nunca compartilhe suas
+              credenciais.
             </p>
           </form>
         )}

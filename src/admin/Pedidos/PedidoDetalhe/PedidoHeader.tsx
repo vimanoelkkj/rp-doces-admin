@@ -39,19 +39,23 @@ export default function PedidoHeader({
   onAlterarStatus,
   onArquivar,
   onExcluir,
-  onClose,
+  onClose
 }: PedidoHeaderProps) {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  const clienteNomeInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editandoNome) {
+      clienteNomeInputRef.current?.focus();
+    }
+  }, [editandoNome]);
 
   useEffect(() => {
     if (!statusMenuOpen) return;
     const handleClick = (e: MouseEvent) => {
-      if (
-        statusMenuRef.current &&
-        !statusMenuRef.current.contains(e.target as Node)
-      ) {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
         setStatusMenuOpen(false);
       }
     };
@@ -77,7 +81,7 @@ export default function PedidoHeader({
         {editandoNome && pedido && !anulado ? (
           <form
             className="pedmodal-name-form"
-            onSubmit={(event) => {
+            onSubmit={event => {
               event.preventDefault();
               onSalvarNome();
             }}
@@ -85,18 +89,14 @@ export default function PedidoHeader({
             <div className="pedmodal-name-controls">
               <span className="pedmodal-name-prefix">Pedido #{orderId} -</span>
               <input
+                ref={clienteNomeInputRef}
                 aria-label="Nome da cliente"
                 value={clienteNome}
-                onChange={(event) => onClienteNomeChange(event.target.value)}
+                onChange={event => onClienteNomeChange(event.target.value)}
                 maxLength={200}
-                autoFocus
                 disabled={salvandoNome}
               />
-              <button
-                type="submit"
-                className="pedmodal-btn-name-save"
-                disabled={salvandoNome}
-              >
+              <button type="submit" className="pedmodal-btn-name-save" disabled={salvandoNome}>
                 {salvandoNome ? "Salvando..." : "Salvar"}
               </button>
               <button
@@ -135,21 +135,19 @@ export default function PedidoHeader({
             <button
               type="button"
               className="pedmodal-btn-advance"
-              onClick={() => setStatusMenuOpen((open) => !open)}
+              onClick={() => setStatusMenuOpen(open => !open)}
               disabled={alterando}
             >
               Alterar status
             </button>
             {statusMenuOpen && (
               <ul className="pedmodal-status-menu">
-                {STATUS_PEDIDO_OPCOES.map((status) => (
+                {STATUS_PEDIDO_OPCOES.map(status => (
                   <li key={status}>
                     <button
                       type="button"
                       className={`pedmodal-status-option${
-                        status === pedido.status_pedido
-                          ? " pedmodal-status-option--current"
-                          : ""
+                        status === pedido.status_pedido ? " pedmodal-status-option--current" : ""
                       }${status === "CANCELADO" ? " pedmodal-status-option--danger" : ""}`}
                       onClick={() => {
                         setStatusMenuOpen(false);
@@ -171,11 +169,7 @@ export default function PedidoHeader({
             pedido.status_pedido === "CANCELADO") && (
             <button
               type="button"
-              className={
-                pedido.arquivado === 1
-                  ? "pedmodal-btn-edit"
-                  : "pedmodal-btn-archive"
-              }
+              className={pedido.arquivado === 1 ? "pedmodal-btn-edit" : "pedmodal-btn-archive"}
               onClick={onArquivar}
               disabled={arquivando}
             >
@@ -191,7 +185,7 @@ export default function PedidoHeader({
             <summary aria-label="Mais ações do pedido">⋮</summary>
             <button
               type="button"
-              onClick={(event) => {
+              onClick={event => {
                 event.currentTarget.closest("details")?.removeAttribute("open");
                 onExcluir();
               }}
@@ -200,7 +194,12 @@ export default function PedidoHeader({
             </button>
           </details>
         )}
-        <button type="button" className="pedmodal-btn-close" onClick={onClose} aria-label="Fechar detalhes do pedido">
+        <button
+          type="button"
+          className="pedmodal-btn-close"
+          onClick={onClose}
+          aria-label="Fechar detalhes do pedido"
+        >
           <svg
             aria-hidden="true"
             width="16"

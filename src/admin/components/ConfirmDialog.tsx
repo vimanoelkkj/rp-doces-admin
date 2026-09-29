@@ -21,14 +21,21 @@ export default function ConfirmDialog({
   cancelLabel = "Cancelar",
   variant = "default",
   onConfirm,
-  onCancel,
+  onCancel
 }: ConfirmDialogProps) {
   const modalProps = useAdminModal(true, onCancel);
 
   return createPortal(
     <div className="confirmdlg-overlay" {...modalProps}>
-      <div className="confirmdlg-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmdlg-title">
-        <h2 id="confirmdlg-title" className="confirmdlg-title">{title}</h2>
+      <div
+        className="confirmdlg-card"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirmdlg-title"
+      >
+        <h2 id="confirmdlg-title" className="confirmdlg-title">
+          {title}
+        </h2>
         <p className="confirmdlg-message">{message}</p>
         <div className="confirmdlg-actions">
           <button type="button" className="confirmdlg-btn-cancel" onClick={onCancel}>
@@ -38,13 +45,12 @@ export default function ConfirmDialog({
             type="button"
             className={variant === "danger" ? "confirmdlg-btn-danger" : "confirmdlg-btn-confirm"}
             onClick={onConfirm}
-            autoFocus
           >
             {confirmLabel}
           </button>
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }
