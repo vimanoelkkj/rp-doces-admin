@@ -153,7 +153,7 @@ export default function NovoProdutoModal({
     setError(null);
     const formData = new FormData();
     formData.append("image", file);
-    fetch(`/api/admin/produtos/${produto!.id}/imagem`, {
+    fetch(`/api/admin/produtos/${produto.id}/imagem`, {
       method: "POST",
       body: formData
     })
@@ -178,7 +178,7 @@ export default function NovoProdutoModal({
     if (!isEdit || uploadingImage) return;
     setUploadingImage(true);
     setError(null);
-    fetch(`/api/admin/produtos/${produto!.id}/imagem`, { method: "DELETE" })
+    fetch(`/api/admin/produtos/${produto.id}/imagem`, { method: "DELETE" })
       .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
@@ -310,7 +310,7 @@ export default function NovoProdutoModal({
     setSaving(true);
     setError(null);
     try {
-      const url = isEdit ? `/api/admin/produtos/${produto!.id}` : "/api/admin/produtos";
+      const url = isEdit ? `/api/admin/produtos/${produto.id}` : "/api/admin/produtos";
       const response = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
