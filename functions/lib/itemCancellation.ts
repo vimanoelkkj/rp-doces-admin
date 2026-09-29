@@ -294,19 +294,20 @@ function snapshotGuard(preview: ItemCancellationPreview): { sql: string; args: u
   };
 }
 
+type FinalizationOwner = { cancellationId: number } | { operationKey: string };
+
 function finalizationStatements(
   db: D1Database,
   pedidoId: number,
   itemId: number,
-  cancellationId: number | null,
-  operationKey: string | null,
+  owner: FinalizationOwner,
   action: AcaoEstoqueCancelamento | "REPOR"
 ): D1PreparedStatement[] {
-  const owner =
-    cancellationId !== null
-      ? `c.id = ${Number(cancellationId)}`
+  const ownerSql =
+    "cancellationId" in owner
+      ? `c.id = ${Number(owner.cancellationId)}`
       : `EXISTS (SELECT 1 FROM pedido_operacoes o
-               WHERE o.operation_key = '${operationKey!.replace(/'/g, "''")}'
+               WHERE o.operation_key = '${owner.operationKey.replace(/'/g, "''")}'
                  AND o.pedido_item_cancelamento_id = c.id)`;
   const noCoverage = `NOT EXISTS (
     SELECT 1 FROM pedido_pagamento_alocacoes a
@@ -318,7 +319,7 @@ function finalizationStatements(
   const eligible = `EXISTS (
     SELECT 1 FROM pedido_item_cancelamentos c
     JOIN pedido_itens pi ON pi.id=c.pedido_item_id
-    WHERE ${owner} AND c.pedido_id=${pedidoId} AND pi.id=${itemId}
+    WHERE ${ownerSql} AND c.pedido_id=${pedidoId} AND pi.id=${itemId}
       AND c.status IN ('SOLICITADO','AGUARDANDO_REEMBOLSO','INCONCLUSIVO')
       AND pi.status_item='ATIVO' AND ${noCoverage}
       AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos px
@@ -494,8 +495,7 @@ export async function createItemCancellation(
         db,
         params.pedidoId,
         params.itemId,
-        null,
-        parsed.key,
+        { operationKey: parsed.key },
         params.estoqueAcao
       )
     );
@@ -718,8 +718,7 @@ async function tryFinalizeCancellation(db: D1Database, row: CancellationRow): Pr
       db,
       Number(row.pedido_id),
       Number(row.pedido_item_id),
-      Number(row.id),
-      null,
+      { cancellationId: Number(row.id) },
       row.estoque_acao
     )
   );

@@ -113,6 +113,12 @@ test("cancelamento não pago conclui, libera reserva uma vez e retry é replay",
   });
   assert.equal(again.ok, true);
   assert.equal(again.replay, true);
+  const operacao = await db
+    .prepare(`SELECT fase,pedido_item_cancelamento_id FROM pedido_operacoes WHERE operation_key=?`)
+    .bind("cancel-operation-01")
+    .first();
+  assert.equal(operacao.fase, "CONCLUIDA");
+  assert.equal(operacao.pedido_item_cancelamento_id, first.cancelamento.id);
   const item = await db
     .prepare(`SELECT status_item,estoque_estado FROM pedido_itens WHERE id=1`)
     .first();
