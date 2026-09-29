@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type ReactNode
+} from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAdminAuth } from "../auth/AdminAuthContext";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
@@ -35,12 +42,13 @@ export default function AdminMobileMoreSheet({ children }: Props) {
   const sheetRef = useRef<HTMLElement>(null);
   const firstItemRef = useRef<HTMLAnchorElement>(null);
   const wasOpen = useRef(false);
-  const close = () => setOpen(false);
+  const close = useCallback(() => setOpen(false), []);
   const backdropProps = useAdminModal(open, close);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: location.pathname e location.search são gatilhos: qualquer navegação fecha a folha
   useEffect(() => {
     close();
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, close]);
 
   useEffect(() => {
     if (!open) {
@@ -89,7 +97,7 @@ export default function AdminMobileMoreSheet({ children }: Props) {
       document.removeEventListener("keydown", onKeyDown);
       desktopQuery.removeEventListener("change", onBreakpointChange);
     };
-  }, [open]);
+  }, [open, close]);
 
   const initials = user.nome
     .split(" ")

@@ -232,6 +232,78 @@ test("navegação mobile troca o drawer pela barra inferior acessível", async t
   ]);
 });
 
+const abrirFolhaMais = async trigger => {
+  await ui.act(async () => trigger.click());
+  await ui.act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 60));
+  });
+};
+
+test("folha Mais fecha ao navegar e devolve o foco ao botão de abertura", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({ notificacoes: [], naoLidas: 0 }));
+  let root;
+  await ui.act(async () => {
+    root = ui.mount(container);
+  });
+  await flush();
+  try {
+    const trigger = document.querySelector(".admin-mobile-nav-item--mais");
+    await abrirFolhaMais(trigger);
+    assert.equal(trigger.getAttribute("aria-expanded"), "true");
+
+    // O link fica fora da folha: só o efeito de mudança de rota consegue fechá-la.
+    const pedidos = document.querySelector(".admin-mobile-nav-item--pedidos");
+    await ui.act(async () => pedidos.click());
+    await flush();
+
+    assert.equal(pedidos.getAttribute("aria-current"), "page");
+    assert.equal(trigger.getAttribute("aria-expanded"), "false");
+    assert.equal(
+      document.querySelector(".admin-mobile-sheet-backdrop").getAttribute("aria-hidden"),
+      "true"
+    );
+    assert.equal(document.body.style.position, "");
+    // assert.ok em vez de equal: uma falha com nó DOM travaria o runner ao formatar o diff.
+    assert.ok(document.activeElement === trigger, "o foco volta ao botão Mais");
+  } finally {
+    await ui.act(async () => root.unmount());
+    container.innerHTML = "";
+  }
+});
+
+test("folha Mais não devolve o foco ao primeiro item quando re-renderiza sem mudar de rota", async t => {
+  const fetchMock = t.mock.method(globalThis, "fetch", async () =>
+    Response.json({ notificacoes: [], naoLidas: 0 })
+  );
+  let root;
+  await ui.act(async () => {
+    root = ui.mount(container);
+  });
+  await flush();
+  try {
+    const trigger = document.querySelector(".admin-mobile-nav-item--mais");
+    await abrirFolhaMais(trigger);
+    const [primeiro, segundo] = document.querySelectorAll(".admin-mobile-sheet-links a");
+    assert.ok(document.activeElement === primeiro, "a abertura foca o primeiro item");
+
+    segundo.focus();
+    const leiturasAntes = fetchMock.mock.callCount();
+    // "pedido-anulado" faz o NotificacoesProvider recarregar e re-renderizar a folha, sem trocar de rota.
+    await ui.act(async () => window.dispatchEvent(new Event("pedido-anulado")));
+    await flush();
+    await ui.act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 120));
+    });
+
+    assert.ok(fetchMock.mock.callCount() > leiturasAntes, "o provider re-renderizou a folha");
+    assert.equal(trigger.getAttribute("aria-expanded"), "true");
+    assert.ok(document.activeElement === segundo, "o foco do usuário não volta ao primeiro item");
+  } finally {
+    await ui.act(async () => root.unmount());
+    container.innerHTML = "";
+  }
+});
+
 test("estilos estruturais cobrem páginas, barra inferior, overlays e dark mode", async () => {
   const files = await Promise.all(
     [

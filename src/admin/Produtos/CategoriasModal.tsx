@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import { EMOJI_OPTIONS } from "./EmojiIcons";
@@ -48,7 +48,7 @@ export default function CategoriasModal({ open, onClose }: CategoriasModalProps)
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const carregarCategorias = () => {
+  const carregarCategorias = useCallback(() => {
     fetch("/api/admin/categorias")
       .then(async response => {
         if (!response.ok) throw new Error("Falha ao carregar categorias");
@@ -59,11 +59,11 @@ export default function CategoriasModal({ open, onClose }: CategoriasModalProps)
         setError(null);
       })
       .catch(err => setError(err.message));
-  };
+  }, []);
 
   useEffect(() => {
     if (open) carregarCategorias();
-  }, [open]);
+  }, [open, carregarCategorias]);
 
   const handleCreate = () => {
     if (!newName.trim() || saving) return;

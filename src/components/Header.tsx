@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -53,14 +53,14 @@ export default function Header({ variant }: HeaderProps) {
   const suppressHandleClickRef = useRef(false);
   const pendingHashRef = useRef<string | null>(null);
 
-  const closeMenu = () => {
+  const closeMenu = useCallback(() => {
     dragOffsetRef.current = 0;
     dragPointerIdRef.current = null;
     dragMovedRef.current = false;
     setDragOffset(0);
     setIsDragging(false);
     setMenuOpen(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -76,7 +76,7 @@ export default function Header({ variant }: HeaderProps) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [menuOpen]);
+  }, [menuOpen, closeMenu]);
 
   useEffect(() => {
     if (!menuOpen) return;

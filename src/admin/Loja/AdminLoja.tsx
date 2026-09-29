@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./AdminLoja.css";
 import { formatScheduleText } from "./scheduleText";
 import { novaOperationKey } from "../../lib/operationKey";
@@ -77,7 +77,7 @@ export default function AdminLoja() {
   const [configError, setConfigError] = useState<string | null>(null);
   const [configSaved, setConfigSaved] = useState(false);
 
-  const aplicarConfiguracao = (config: StoreConfig) => {
+  const aplicarConfiguracao = useCallback((config: StoreConfig) => {
     setDays(config.days.map(day => ({ ...day })));
     setOpenTime(config.openTime);
     setCloseTime(config.closeTime);
@@ -87,7 +87,7 @@ export default function AdminLoja() {
     setDeliveryStatus(config.deliveryStatus);
     setWhatsapp(config.whatsapp);
     setDefaultMessage(config.defaultMessage);
-  };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -111,7 +111,7 @@ export default function AdminLoja() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [aplicarConfiguracao]);
 
   const salvarConfiguracoes = async () => {
     if (configSaving || configLoading) return;

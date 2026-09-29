@@ -270,6 +270,90 @@ test("AcompanharPedido comunica etapas concluidas, atual e pendentes durante as 
   }
 });
 
+test("AcompanharPedido mantém o intervalo de polling quando o pedido muda sem trocar de status", async t => {
+  let remoteStatus = "PREPARANDO";
+  let leiturasDoPedido = 0;
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url === "/api/config") return Response.json({ config: storeConfig });
+    if (String(url).startsWith("/api/pedido-status")) {
+      return Response.json({
+        statusPagamento: "PAGO",
+        statusPedido: remoteStatus,
+        estoquePendente: false
+      });
+    }
+    if (String(url).startsWith("/api/pedido")) {
+      leiturasDoPedido += 1;
+      return Response.json({
+        pedidoId: 7,
+        clienteNome: "Cliente",
+        valorTotalCentavos: 1500,
+        criadoEm: "2026-09-28T10:00:00Z",
+        itens: [
+          {
+            produto_nome: "Bolo",
+            quantidade: 1,
+            valor_unitario_centavos: 1500,
+            valor_total_centavos: 1500
+          }
+        ],
+        statusPagamento: "PAGO",
+        statusPedido: remoteStatus,
+        estoquePendente: false
+      });
+    }
+    return Response.json({ ok: true });
+  });
+
+  const realSetInterval = window.setInterval;
+  const realClearInterval = window.clearInterval;
+  const armados = [];
+  const limpos = [];
+  t.mock.method(window, "setInterval", (handler, delay, ...args) => {
+    const id = realSetInterval.call(window, handler, delay, ...args);
+    if (delay === 10_000) armados.push(id);
+    return id;
+  });
+  t.mock.method(window, "clearInterval", id => {
+    limpos.push(id);
+    return realClearInterval.call(window, id);
+  });
+
+  let root;
+  await ui.act(async () => {
+    root = ui.mountTracking(container);
+  });
+  await flush();
+  try {
+    assert.equal(leiturasDoPedido, 1);
+    assert.equal(armados.length, 1, "o polling é armado uma vez ao carregar o pedido");
+
+    // Cada leitura troca o objeto `pedido`; com o mesmo status o intervalo deve permanecer.
+    await ui.act(async () => window.dispatchEvent(new Event("focus")));
+    await flush();
+    assert.equal(leiturasDoPedido, 2, "o foco releu o pedido");
+    assert.equal(armados.length, 1, "mesmo status não recria o intervalo");
+    assert.deepEqual(
+      limpos.filter(id => armados.includes(id)),
+      [],
+      "o intervalo original continua ativo"
+    );
+
+    // Contraprova: status novo é o único gatilho que reinicia o polling.
+    remoteStatus = "PRONTO";
+    await ui.act(async () => window.dispatchEvent(new Event("focus")));
+    await flush();
+    assert.equal(leiturasDoPedido, 3);
+    assert.equal(armados.length, 2, "status novo recria o intervalo uma única vez");
+    assert.deepEqual(
+      limpos.filter(id => armados.includes(id)),
+      [armados[0]]
+    );
+  } finally {
+    await unmount(root);
+  }
+});
+
 test("PedidoConfirmado move a etapa atual ate concluir toda a timeline", async t => {
   let remoteStatus = "PREPARANDO";
   t.mock.method(globalThis, "fetch", async url => {

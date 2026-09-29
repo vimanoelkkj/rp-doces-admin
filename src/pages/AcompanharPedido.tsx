@@ -115,9 +115,13 @@ export default function AcompanharPedido() {
     void carregarPedido(true);
   }, [carregarPedido]);
 
+  // Só o status reinicia o polling: cada resposta troca o objeto `pedido`, mas
+  // não pode recriar o intervalo.
+  const statusPedido = pedido?.statusPedido;
+
   useEffect(() => {
-    if (!pedido) return;
-    if (pedido.statusPedido === "ENTREGUE" || pedido.statusPedido === "CANCELADO") {
+    if (!statusPedido) return;
+    if (statusPedido === "ENTREGUE" || statusPedido === "CANCELADO") {
       return;
     }
 
@@ -138,7 +142,7 @@ export default function AcompanharPedido() {
       window.removeEventListener("focus", aoFocar);
       document.removeEventListener("visibilitychange", aoFicarVisivel);
     };
-  }, [pedido?.statusPedido, carregarPedido]);
+  }, [statusPedido, carregarPedido]);
 
   const currentIndex = pedido ? STEPS.findIndex(s => s.key === pedido.statusPedido) : -1;
 
