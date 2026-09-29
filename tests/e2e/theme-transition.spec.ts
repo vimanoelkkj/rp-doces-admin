@@ -51,6 +51,13 @@ type AnimInfo = {
   clipEnd: string | null;
 };
 
+type SamplerWindow = Window &
+  typeof globalThis & {
+    __frames: Frame[];
+    __anims: AnimInfo[];
+    __samplerRunning: boolean;
+  };
+
 async function readRects(page: Page): Promise<Rects> {
   return page.evaluate(selectors => {
     const out = {} as Record<string, Rect>;
@@ -93,10 +100,14 @@ async function readScroller(page: Page): Promise<ScrollerMetrics> {
 async function installSampler(page: Page) {
   await page.evaluate(
     ({ selectors, scrollerSel }) => {
-      const w = window as any;
+      const w = window as SamplerWindow;
       w.__frames = [] as Frame[];
       w.__anims = [] as AnimInfo[];
       w.__samplerRunning = true;
+      const clipOf = (frame: Keyframe | undefined): string | null => {
+        const value = frame?.clipPath;
+        return typeof value === "string" ? value : null;
+      };
       const start = performance.now();
 
       const tick = () => {
@@ -118,6 +129,7 @@ async function installSampler(page: Page) {
           if (eff && pseudo?.includes("view-transition")) {
             const known = w.__anims.some((i: AnimInfo) => i.pseudo === pseudo);
             const kfs = eff.getKeyframes() as Keyframe[];
+            const firstClip = clipOf(kfs[0]);
             if (!known) {
               const props = new Set<string>();
               kfs.forEach(k => {
@@ -129,13 +141,13 @@ async function installSampler(page: Page) {
               w.__anims.push({
                 pseudo,
                 properties: [...props],
-                clipStart: (kfs[0] as any)?.clipPath ?? null,
-                clipEnd: (kfs[kfs.length - 1] as any)?.clipPath ?? null
+                clipStart: firstClip,
+                clipEnd: clipOf(kfs[kfs.length - 1])
               });
             }
-            if (pseudo.includes("new") && (kfs[0] as any)?.clipPath) {
+            if (pseudo.includes("new") && firstClip) {
               progress = eff.getComputedTiming().progress ?? null;
-              clip = String((kfs[0] as any).clipPath);
+              clip = firstClip;
             }
           }
         }
@@ -168,7 +180,7 @@ async function installSampler(page: Page) {
 
 async function stopSampler(page: Page) {
   return page.evaluate(() => {
-    const w = window as any;
+    const w = window as SamplerWindow;
     w.__samplerRunning = false;
     return { frames: w.__frames as Frame[], anims: w.__anims as AnimInfo[] };
   });
@@ -307,9 +319,7 @@ test.describe("transição de tema (desktop)", () => {
   test("light -> dark e dark -> light sem deslocar elementos, com radial reveal", async ({
     page
   }, testInfo) => {
-    const supported = await page.evaluate(
-      () => typeof (document as any).startViewTransition === "function"
-    );
+    const supported = await page.evaluate(() => typeof document.startViewTransition === "function");
     expect(supported, "Chrome sem View Transitions API").toBe(true);
 
     await runTransition(page, testInfo, "light", "dark");
