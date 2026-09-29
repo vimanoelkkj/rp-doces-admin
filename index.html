@@ -9,15 +9,15 @@
     <script>
       (() => {
         try {
-          var saved = localStorage.getItem("store-theme");
-          var theme =
+          const saved = localStorage.getItem("store-theme");
+          const theme =
             saved === "dark" || saved === "light"
               ? saved
               : window.matchMedia?.("(prefers-color-scheme: dark)").matches
                 ? "dark"
                 : "light";
           document.documentElement.setAttribute("data-theme", theme);
-          var meta = document.querySelector('meta[name="theme-color"]');
+          const meta = document.querySelector('meta[name="theme-color"]');
           if (meta) {
             meta.setAttribute("content", theme === "dark" ? "#271f1b" : "#eddcc6");
           }
