@@ -229,3 +229,71 @@ test("edição não reduz estoque abaixo do reservado; igualdade é permitida", 
   assert.equal(depois.estoque, 4, "estoque igual ao reservado é permitido");
   assert.equal(depois.estoque_reservado, 4, "reserva preservada");
 });
+
+// Onda 8F: regressão do narrowing da rota POST (produtos.ts) — as mesmas
+// guardas do PUT: preço/estoque inválidos e categoria inexistente/inativa
+// recusam sem criar produto.
+
+test("criação recusa preço e estoque inválidos com 400 sem criar produto", async t => {
+  const casos = [
+    { campo: "precoCentavos", nome: "ausente", valor: undefined, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: "null", valor: null, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: "0", valor: 0, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: "-500", valor: -500, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: "10.5", valor: 10.5, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: '"1500"', valor: "1500", mensagem: "Preço inválido" },
+    { campo: "estoque", nome: "ausente", valor: undefined, mensagem: "Estoque inválido" },
+    { campo: "estoque", nome: "null", valor: null, mensagem: "Estoque inválido" },
+    { campo: "estoque", nome: "-1", valor: -1, mensagem: "Estoque inválido" },
+    { campo: "estoque", nome: "10.5", valor: 10.5, mensagem: "Estoque inválido" },
+    { campo: "estoque", nome: '"20"', valor: "20", mensagem: "Estoque inválido" }
+  ];
+  for (const caso of casos) {
+    await t.test(`${caso.campo} ${caso.nome}`, async t => {
+      const { db, session } = await catalogo(t);
+      const antes = await db.prepare("SELECT COUNT(*) n FROM produtos").first("n");
+      const r = await salvar(db, session, { [caso.campo]: caso.valor });
+      assert.equal(r.status, 400);
+      assert.deepEqual(await r.json(), { error: caso.mensagem });
+      assert.equal(
+        await db.prepare("SELECT COUNT(*) n FROM produtos").first("n"),
+        antes,
+        "rejeição não pode criar produto"
+      );
+    });
+  }
+});
+
+test("estoque zero é válido na criação (controle)", async t => {
+  const { db, session } = await catalogo(t);
+  const r = await salvar(db, session, { estoque: 0 });
+  assert.equal(r.status, 201);
+  const { id } = await r.json();
+  assert.equal(
+    (await db.prepare("SELECT estoque FROM produtos WHERE id=?").bind(id).first()).estoque,
+    0,
+    "produto criado com estoque zero persistido"
+  );
+});
+
+test("criação recusa categoria inexistente ou inativa com 400 sem criar produto", async t => {
+  await t.test("categoria inexistente", async t => {
+    const { db, session } = await catalogo(t);
+    const antes = await db.prepare("SELECT COUNT(*) n FROM produtos").first("n");
+    const r = await salvar(db, session, { categoria: "NAO_EXISTE" });
+    assert.equal(r.status, 400);
+    assert.deepEqual(await r.json(), { error: "Categoria inválida ou inativa" });
+    assert.equal(await db.prepare("SELECT COUNT(*) n FROM produtos").first("n"), antes);
+  });
+
+  await t.test("categoria existente desativada", async t => {
+    const { db, session } = await catalogo(t);
+    const desativacao = await db.prepare("UPDATE categorias SET ativo=0 WHERE id='BOLO'").run();
+    assert.equal(desativacao.meta.changes, 1, "BOLO precisa existir para o cenário");
+    const antes = await db.prepare("SELECT COUNT(*) n FROM produtos").first("n");
+    const r = await salvar(db, session, { categoria: "BOLO" });
+    assert.equal(r.status, 400);
+    assert.deepEqual(await r.json(), { error: "Categoria inválida ou inativa" });
+    assert.equal(await db.prepare("SELECT COUNT(*) n FROM produtos").first("n"), antes);
+  });
+});
