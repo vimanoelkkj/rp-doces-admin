@@ -290,3 +290,47 @@ test("método OUTRO continua fora do estorno manual", async t => {
   assert.equal(r.body.code, "METODO_NAO_REEMBOLSAVEL_MANUALMENTE");
   assert.equal((await state(db)).refunds.length, 0);
 });
+
+test("pagamentoId e valorCentavos inválidos são recusados sem efeito financeiro", async t => {
+  const casos = [
+    { campo: "pagamentoId", nome: "ausente", valor: undefined },
+    { campo: "pagamentoId", nome: "null", valor: null },
+    { campo: "pagamentoId", nome: "0", valor: 0 },
+    { campo: "pagamentoId", nome: "-1", valor: -1 },
+    { campo: "pagamentoId", nome: "1.5", valor: 1.5 },
+    { campo: "pagamentoId", nome: '"1"', valor: "1" },
+    { campo: "valorCentavos", nome: "ausente", valor: undefined },
+    { campo: "valorCentavos", nome: "null", valor: null },
+    { campo: "valorCentavos", nome: "0", valor: 0 },
+    { campo: "valorCentavos", nome: "-500", valor: -500 },
+    { campo: "valorCentavos", nome: "10.5", valor: 10.5 },
+    { campo: "valorCentavos", nome: '"3000"', valor: "3000" }
+  ];
+  const MENSAGEM = {
+    pagamentoId: "Pagamento inválido",
+    valorCentavos: "Valor inválido"
+  };
+
+  for (const [i, { campo, nome, valor }] of casos.entries()) {
+    await t.test(`${campo} ${nome}`, async t => {
+      // Fixture novo por caso: pedido SITE com PIX_MP pago, elegível ao
+      // estorno manual; o outro campo permanece com valor válido.
+      const { db, session } = await pixPago(t);
+      const antes = await state(db);
+      const { status, body } = await corpo(
+        await estornar(db, session, {
+          [campo]: valor,
+          operationKey: `invalid-refund-${i + 1}`
+        })
+      );
+
+      assert.equal(status, 400);
+      assert.deepEqual(body, { error: MENSAGEM[campo] });
+
+      const depois = await state(db);
+      assert.deepEqual(depois, antes, "estado integralmente inalterado");
+      assert.equal(depois.refunds.length, antes.refunds.length, "nenhum reembolso novo");
+      assert.equal(depois.operacoes.length, antes.operacoes.length, "nenhuma operacao nova");
+    });
+  }
+});

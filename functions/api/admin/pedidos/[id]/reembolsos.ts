@@ -60,10 +60,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     return jsonError("JSON inválido", 400);
   }
 
-  if (!Number.isInteger(body.pagamentoId) || body.pagamentoId! <= 0) {
+  const pagamentoId = body.pagamentoId;
+  if (typeof pagamentoId !== "number" || !Number.isInteger(pagamentoId) || pagamentoId <= 0) {
     return jsonError("Pagamento inválido", 400);
   }
-  if (!Number.isInteger(body.valorCentavos) || body.valorCentavos! <= 0) {
+  const valorCentavos = body.valorCentavos;
+  if (typeof valorCentavos !== "number" || !Number.isInteger(valorCentavos) || valorCentavos <= 0) {
     return jsonError("Valor inválido", 400);
   }
 
@@ -77,8 +79,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   try {
     const resultado = await registerManualRefund(env.DB, {
       pedidoId: id,
-      pagamentoId: body.pagamentoId!,
-      valorCentavos: body.valorCentavos!,
+      pagamentoId,
+      valorCentavos,
       usuarioId: auth.user.id,
       motivo: body.motivo,
       operationKey: chave.key
