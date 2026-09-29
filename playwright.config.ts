@@ -21,7 +21,7 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
     reducedMotion: "no-preference",
     trace: "retain-on-failure",
-    ...(CHROME_PATH ? { launchOptions: { executablePath: CHROME_PATH } } : {}),
+    ...(CHROME_PATH ? { launchOptions: { executablePath: CHROME_PATH } } : {})
   },
 
   // Sobe o Vite sozinho e espera responder antes dos testes. Localmente pode
@@ -30,6 +30,6 @@ export default defineConfig({
     command: "npm run dev -- --host 127.0.0.1",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+    timeout: 60_000
+  }
 });

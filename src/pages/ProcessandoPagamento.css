@@ -59,7 +59,7 @@
 
 /* ── Typography ── */
 .processando-title {
-  font-family: 'Manrope', sans-serif;
+  font-family: "Manrope", sans-serif;
   font-weight: 600;
   font-size: 16px;
   color: var(--store-text-heading);
@@ -68,7 +68,7 @@
 }
 
 .processando-subtitle {
-  font-family: 'Manrope', sans-serif;
+  font-family: "Manrope", sans-serif;
   font-weight: 400;
   font-size: 13px;
   color: var(--store-text-muted);
@@ -80,7 +80,7 @@
 .processando-footer {
   position: absolute;
   bottom: 40px;
-  font-family: 'Fraunces', serif;
+  font-family: "Fraunces", serif;
   font-weight: 600;
   font-size: 14px;
   color: var(--store-text-muted);
@@ -102,7 +102,8 @@
 
 /* Dot pulse */
 @keyframes dot-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.3;
     transform: scale(1);
   }

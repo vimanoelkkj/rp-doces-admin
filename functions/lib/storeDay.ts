@@ -28,6 +28,6 @@ export function storeToday(now: Date = new Date()): string {
     timeZone: STORE_TIMEZONE,
     year: "numeric",
     month: "2-digit",
-    day: "2-digit",
+    day: "2-digit"
   }).format(now);
 }

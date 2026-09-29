@@ -9,7 +9,7 @@ import {
   chavePedido,
   fontePedidoComPagamento,
   prepareClaimOperacao,
-  type IdentidadeEsperada,
+  type IdentidadeEsperada
 } from "../operacoes";
 import { replayPedidoManual } from "./manualReplay";
 import type { ItemManualInput } from "./manualValidation";
@@ -37,7 +37,7 @@ function jsonError(message: string, status: number, code?: string) {
 
 export async function createManualPedido(
   env: Env,
-  params: CreateManualPedidoParams,
+  params: CreateManualPedidoParams
 ): Promise<Response> {
   const {
     usuarioId,
@@ -48,23 +48,23 @@ export async function createManualPedido(
     metodoPagamento,
     statusPagamento,
     operationKey,
-    identidade,
+    identidade
   } = params;
   const nascePago = statusPagamento === "PAGO";
 
   try {
-    const ids = [...new Set(itens.map((i) => i.produtoId))];
+    const ids = [...new Set(itens.map(i => i.produtoId))];
     const placeholders = ids.map(() => "?").join(",");
     const { results } = await env.DB.prepare(
       `SELECT id, nome, preco_centavos, preco_promocional_centavos,
               promocao_ativa, promocao_inicio, promocao_fim,
               disponivel, ativo, estoque, estoque_reservado
-       FROM produtos WHERE id IN (${placeholders})`,
+       FROM produtos WHERE id IN (${placeholders})`
     )
       .bind(...ids)
       .all<ProdutoManualRow>();
 
-    const produtosPorId = new Map(results.map((p) => [p.id, p]));
+    const produtosPorId = new Map(results.map(p => [p.id, p]));
 
     let totalCentavos = 0;
     const itensParaPersistir: {
@@ -95,7 +95,7 @@ export async function createManualPedido(
         produtoNome: produto.nome,
         quantidade: item.quantidade,
         valorUnitarioCentavos,
-        valorTotalCentavos: valorTotalItemCentavos,
+        valorTotalCentavos: valorTotalItemCentavos
       });
     }
 
@@ -148,7 +148,7 @@ export async function createManualPedido(
             idempotency_key, origem_pedido, reserva_status, status_pagamento, status_pedido, pago_em,
             cliente_email, produto_nome, quantidade, valor_unitario_centavos)
          VALUES (?, ?, ?, ?, ?, ?, 'MANUAL', 'ATIVA', ?, 'NOVO', CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
-                 '', '', 1, 0)`,
+                 '', '', 1, 0)`
       ).bind(
         tokenPublico,
         clienteNome,
@@ -157,9 +157,9 @@ export async function createManualPedido(
         totalCentavos,
         idempotencyKeyPedido,
         statusPagamento,
-        nascePago ? 1 : 0,
+        nascePago ? 1 : 0
       ),
-      ...itensParaPersistir.map((item) =>
+      ...itensParaPersistir.map(item =>
         env.DB.prepare(
           `INSERT INTO pedido_itens
              (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos,
@@ -167,7 +167,7 @@ export async function createManualPedido(
               status_item, estoque_estado, estoque_reservado_em)
            SELECT id, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
                   'ATIVO', 'RESERVADO', CURRENT_TIMESTAMP
-           FROM pedidos WHERE token_publico = ?`,
+           FROM pedidos WHERE token_publico = ?`
         ).bind(
           item.produtoId,
           item.produtoNome,
@@ -175,15 +175,15 @@ export async function createManualPedido(
           item.valorUnitarioCentavos,
           item.valorTotalCentavos,
           usuarioId,
-          tokenPublico,
-        ),
+          tokenPublico
+        )
       ),
       env.DB.prepare(
         `INSERT INTO pedido_pagamentos
            (pedido_id, metodo, origem, valor_centavos, status, registrado_por_usuario_id,
             observacao, idempotency_key, pago_em)
          SELECT id, ?, 'ADMIN', ?, ?, ?, ?, ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END
-         FROM pedidos WHERE token_publico = ?`,
+         FROM pedidos WHERE token_publico = ?`
       ).bind(
         metodoPagamento,
         totalCentavos,
@@ -192,20 +192,20 @@ export async function createManualPedido(
         observacao,
         idempotencyKey,
         nascePago ? 1 : 0,
-        tokenPublico,
+        tokenPublico
       ),
       env.DB.prepare(
         `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
          SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), pi.id, pi.valor_total_centavos
          FROM pedido_itens pi
          JOIN pedidos p ON p.id = pi.pedido_id
-         WHERE p.token_publico = ? AND pi.valor_total_centavos > 0`,
+         WHERE p.token_publico = ? AND pi.valor_total_centavos > 0`
       ).bind(idempotencyKey, tokenPublico),
-      ...itensParaPersistir.map((item) =>
+      ...itensParaPersistir.map(item =>
         env.DB.prepare(
           `UPDATE produtos SET estoque_reservado = estoque_reservado + ?, atualizado_em = CURRENT_TIMESTAMP
-           WHERE id = ?`,
-        ).bind(item.quantidade, item.produtoId),
+           WHERE id = ?`
+        ).bind(item.quantidade, item.produtoId)
       ),
       // Claim A1 por último e condicionado à existência do pedido E do
       // pagamento recém-criados. Tudo no mesmo batch: ou a intenção fica
@@ -215,8 +215,8 @@ export async function createManualPedido(
         key: operationKey,
         ...identidade,
         fase: "CONCLUIDA",
-        fonte: fontePedidoComPagamento(idempotencyKeyPedido, idempotencyKey),
-      }),
+        fonte: fontePedidoComPagamento(idempotencyKeyPedido, idempotencyKey)
+      })
     ];
 
     let batchResults: D1Result[];
@@ -254,14 +254,14 @@ export async function createManualPedido(
           console.error(
             "Pedido manual criado como PAGO sem baixa imediata de estoque",
             pedidoId,
-            baixa.erro,
+            baixa.erro
           );
         }
       } catch (err) {
         console.error("Falha ao baixar estoque do pedido manual recém-criado", pedidoId, err);
       }
       await notificarNovoPedidoPagoSafe(env.DB, env, pedidoId, {
-        excludeUsuarioId: usuarioId,
+        excludeUsuarioId: usuarioId
       });
     }
 
@@ -273,9 +273,9 @@ export async function createManualPedido(
         tokenPublico,
         valorTotalCentavos: totalCentavos,
         statusPagamento,
-        estoqueBaixado,
+        estoqueBaixado
       },
-      { status: 201 },
+      { status: 201 }
     );
   } catch (err) {
     console.error("Erro ao criar pedido manual (admin)", err);

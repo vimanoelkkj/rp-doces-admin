@@ -36,8 +36,12 @@ function algumaPernaEmAndamento(estado: EstadoEstorno | null): boolean {
   // `intencao === null` significa saldo reembolsável cujo estorno ainda NÃO
   // foi disparado (mostra o botão "Estornar"), não um estorno em andamento —
   // só PENDENTE/PROCESSANDO justificam "Estornando...".
-  return !!estado && estado.pernas.some(p =>
-    p.intencao?.status === "PENDENTE" || p.intencao?.status === "PROCESSANDO");
+  return (
+    !!estado &&
+    estado.pernas.some(
+      p => p.intencao?.status === "PENDENTE" || p.intencao?.status === "PROCESSANDO"
+    )
+  );
 }
 
 function algumaPernaRecusada(estado: EstadoEstorno | null): boolean {
@@ -45,19 +49,33 @@ function algumaPernaRecusada(estado: EstadoEstorno | null): boolean {
 }
 
 function algumaPernaBloqueada(estado: EstadoEstorno | null): boolean {
-  return !!estado && estado.pernas.some(p =>
-    p.intencao?.status === "RECUSADO" || p.intencao?.status === "INCONCLUSIVO");
+  return (
+    !!estado &&
+    estado.pernas.some(
+      p => p.intencao?.status === "RECUSADO" || p.intencao?.status === "INCONCLUSIVO"
+    )
+  );
 }
 
-export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, onDeleted }: {
-  orderId: number; liquidoCentavos: number; onClose: () => void; onDeleted: () => void;
+export default function ExcluirPedidoModal({
+  orderId,
+  liquidoCentavos,
+  onClose,
+  onDeleted
+}: {
+  orderId: number;
+  liquidoCentavos: number;
+  onClose: () => void;
+  onDeleted: () => void;
 }) {
   const [devolver, setDevolver] = useState<boolean | null>(null);
   const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const savingRef = useRef(false);
-  const modalProps = useAdminModal(true, () => { if (!savingRef.current) onClose(); });
+  const modalProps = useAdminModal(true, () => {
+    if (!savingRef.current) onClose();
+  });
 
   // Estado do estorno Mercado Pago que pode ainda bloquear a exclusão
   // (migration 0023). Enquanto a leitura inicial não resolve, `estorno`
@@ -96,7 +114,9 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
   useEffect(() => {
     montadoRef.current = true;
     carregarEstorno();
-    return () => { montadoRef.current = false; };
+    return () => {
+      montadoRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
@@ -120,8 +140,9 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
     setErroEstorno(null);
     try {
       const response = await fetch(`/api/admin/pedidos/${orderId}/anulacao/estorno`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operationKey: operationKeyRef.current }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationKey: operationKeyRef.current })
       });
       const body = await response.json();
       if (!response.ok) {
@@ -145,12 +166,15 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
     setError(null);
     try {
       const response = await fetch(`/api/admin/pedidos/${orderId}/anulacao`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ devolverEstoque: devolver, motivo }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ devolverEstoque: devolver, motivo })
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Não foi possível excluir o pedido.");
-      window.dispatchEvent(new window.CustomEvent("pedido-anulado", { detail: { pedidoId: orderId } }));
+      window.dispatchEvent(
+        new window.CustomEvent("pedido-anulado", { detail: { pedidoId: orderId } })
+      );
       onDeleted();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao excluir pedido. Tente novamente.");
@@ -166,18 +190,25 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
   const bloqueadoDefinitivo = algumaPernaBloqueada(estorno);
 
   return createPortal(
-    <div className="excluir-pedido-overlay" {...modalProps} role="dialog" aria-modal="true" aria-labelledby="excluir-pedido-title">
+    <div
+      className="excluir-pedido-overlay"
+      {...modalProps}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="excluir-pedido-title"
+    >
       <form className="excluir-pedido-card" onSubmit={excluir}>
-        <h2 id="excluir-pedido-title" className="excluir-pedido-title">Excluir Pedido #{orderId}?</h2>
+        <h2 id="excluir-pedido-title" className="excluir-pedido-title">
+          Excluir Pedido #{orderId}?
+        </h2>
         <p className="excluir-pedido-text">
-          Este pedido será removido das telas e dos totais atuais. O histórico financeiro continuará registrado.
+          Este pedido será removido das telas e dos totais atuais. O histórico financeiro continuará
+          registrado.
         </p>
 
         <div className="excluir-pedido-stat">
           <span className="excluir-pedido-stat-label">Valor que deixará de contar nos totais</span>
-          <strong className="excluir-pedido-stat-value">
-            {formatarCentavos(liquidoCentavos)}
-          </strong>
+          <strong className="excluir-pedido-stat-value">{formatarCentavos(liquidoCentavos)}</strong>
         </div>
 
         {bloqueadoPorEstorno && (
@@ -191,11 +222,17 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
                 Estornando {formatarCentavos(restantePendenteCentavos)}...
               </p>
             ) : (
-              <button type="button" className="excluir-pedido-estorno-botao"
-                onClick={estornarMp} disabled={estornando}>
-                {estornando ? "Estornando..." : bloqueadoDefinitivo
-                  ? `Tentar novamente: estornar ${formatarCentavos(restantePendenteCentavos)} no Mercado Pago`
-                  : `Estornar ${formatarCentavos(restantePendenteCentavos)} no Mercado Pago`}
+              <button
+                type="button"
+                className="excluir-pedido-estorno-botao"
+                onClick={estornarMp}
+                disabled={estornando}
+              >
+                {estornando
+                  ? "Estornando..."
+                  : bloqueadoDefinitivo
+                    ? `Tentar novamente: estornar ${formatarCentavos(restantePendenteCentavos)} no Mercado Pago`
+                    : `Estornar ${formatarCentavos(restantePendenteCentavos)} no Mercado Pago`}
               </button>
             )}
             {bloqueadoDefinitivo && !emAndamento && (
@@ -205,7 +242,11 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
                   : "Não foi possível confirmar o estorno junto ao Mercado Pago. Tente novamente antes de excluir."}
               </p>
             )}
-            {erroEstorno && <p className="excluir-pedido-estorno-erro" role="alert">{erroEstorno}</p>}
+            {erroEstorno && (
+              <p className="excluir-pedido-estorno-erro" role="alert">
+                {erroEstorno}
+              </p>
+            )}
           </div>
         )}
         {!bloqueadoPorEstorno && valorMaximoPendenteRef.current > 0 && (
@@ -217,13 +258,23 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
         <fieldset className="excluir-pedido-fieldset" disabled={saving || bloqueadoPorEstorno}>
           <legend className="excluir-pedido-legend">Devolver produtos ao estoque?</legend>
           <label className="excluir-pedido-radio">
-            <input type="radio" name="devolverEstoque" checked={devolver === true}
-              onChange={() => setDevolver(true)} required />
+            <input
+              type="radio"
+              name="devolverEstoque"
+              checked={devolver === true}
+              onChange={() => setDevolver(true)}
+              required
+            />
             Sim, devolver ao estoque
           </label>
           <label className="excluir-pedido-radio">
-            <input type="radio" name="devolverEstoque" checked={devolver === false}
-              onChange={() => setDevolver(false)} required />
+            <input
+              type="radio"
+              name="devolverEstoque"
+              checked={devolver === false}
+              onChange={() => setDevolver(false)}
+              required
+            />
             Não, manter estoque como está
           </label>
         </fieldset>
@@ -239,18 +290,31 @@ export default function ExcluirPedidoModal({ orderId, liquidoCentavos, onClose, 
           />
         </label>
 
-        {error && <p role="alert" className="excluir-pedido-error">{error}</p>}
+        {error && (
+          <p role="alert" className="excluir-pedido-error">
+            {error}
+          </p>
+        )}
 
         <div className="excluir-pedido-actions">
-          <button type="button" className="excluir-pedido-cancel" onClick={onClose} disabled={saving}>
+          <button
+            type="button"
+            className="excluir-pedido-cancel"
+            onClick={onClose}
+            disabled={saving}
+          >
             Cancelar
           </button>
-          <button type="submit" className="excluir-pedido-danger"
-            disabled={saving || devolver === null || bloqueadoPorEstorno}>
+          <button
+            type="submit"
+            className="excluir-pedido-danger"
+            disabled={saving || devolver === null || bloqueadoPorEstorno}
+          >
             {saving ? "Excluindo..." : "Excluir pedido"}
           </button>
         </div>
       </form>
-    </div>, document.body,
+    </div>,
+    document.body
   );
 }

@@ -8,9 +8,7 @@ export const valorPagamentoInicial = (centavos: number) =>
 
 export const parseValorPagamento = (valor: string) => {
   const limpo = valor.trim().replace(/\s/g, "");
-  const normalizado = limpo.includes(",")
-    ? limpo.replace(/\./g, "").replace(",", ".")
-    : limpo;
+  const normalizado = limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
   if (!/^\d+(?:\.\d{1,2})?$/.test(normalizado)) return null;
   const centavos = Math.round(Number(normalizado) * 100);
   return Number.isSafeInteger(centavos) && centavos > 0 ? centavos : null;
@@ -27,7 +25,7 @@ export const formatarData = (isoLike: string) => {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
-    minute: "2-digit",
+    minute: "2-digit"
   });
 };
 
@@ -38,7 +36,7 @@ export const STATUS_PEDIDO_OPCOES: StatusPedido[] = [
   "PREPARANDO",
   "PRONTO",
   "ENTREGUE",
-  "CANCELADO",
+  "CANCELADO"
 ];
 
 export const STATUS_LABEL: Record<StatusPedido, string> = {
@@ -46,7 +44,7 @@ export const STATUS_LABEL: Record<StatusPedido, string> = {
   PREPARANDO: "Em produção",
   PRONTO: "Pronto",
   ENTREGUE: "Entregue",
-  CANCELADO: "Cancelado",
+  CANCELADO: "Cancelado"
 };
 
 export const STATUS_TYPE: Record<StatusPedido, "green" | "orange" | "blue" | "red"> = {
@@ -54,20 +52,20 @@ export const STATUS_TYPE: Record<StatusPedido, "green" | "orange" | "blue" | "re
   PREPARANDO: "orange",
   PRONTO: "blue",
   ENTREGUE: "green",
-  CANCELADO: "red",
+  CANCELADO: "red"
 };
 
 export const ITEM_STATUS_LABEL: Record<string, string> = {
   ATIVO: "Ativo",
   CANCELADO: "Cancelado",
-  TROCA_PENDENTE: "Destino da troca · aguardando conclusão",
+  TROCA_PENDENTE: "Destino da troca · aguardando conclusão"
 };
 
 export const STOCK_STATUS_LABEL: Record<string, string> = {
   RESERVADO: "Estoque reservado",
   BAIXADO: "Estoque baixado",
   LIBERADO: "Reserva liberada",
-  REPOSTO: "Estoque reposto",
+  REPOSTO: "Estoque reposto"
 };
 
 export const FLOW_STATUS_LABEL: Record<string, string> = {
@@ -76,5 +74,5 @@ export const FLOW_STATUS_LABEL: Record<string, string> = {
   INCONCLUSIVA: "Troca inconclusiva",
   AGUARDANDO_COBRANCA: "Troca aguardando pagamento",
   CONCLUIDO: "Cancelamento concluído",
-  CONCLUIDA: "Troca concluída",
+  CONCLUIDA: "Troca concluída"
 };

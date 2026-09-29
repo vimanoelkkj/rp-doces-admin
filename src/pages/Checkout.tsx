@@ -4,16 +4,8 @@ import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
 import { fetchProducts } from "../api/products";
-import {
-  formatWhatsappBr,
-  isValidWhatsappBr,
-  normalizeWhatsappBr,
-} from "../../shared/whatsapp";
-import {
-  gravarOperationKey,
-  novaOperationKey,
-  SLOT_CHECKOUT,
-} from "../lib/operationKey";
+import { formatWhatsappBr, isValidWhatsappBr, normalizeWhatsappBr } from "../../shared/whatsapp";
+import { gravarOperationKey, novaOperationKey, SLOT_CHECKOUT } from "../lib/operationKey";
 import "./Checkout.css";
 
 export default function Checkout() {
@@ -31,12 +23,12 @@ export default function Checkout() {
   useEffect(() => {
     let active = true;
     fetchProducts()
-      .then((products) => {
+      .then(products => {
         if (!active) return;
         const adjusted = reconcileWithProducts(products);
         if (adjusted) {
           setEstoqueAviso(
-            "Atenção: alguns itens do seu pedido foram ajustados de acordo com a disponibilidade atual de estoque.",
+            "Atenção: alguns itens do seu pedido foram ajustados de acordo com a disponibilidade atual de estoque."
           );
         }
       })
@@ -67,8 +59,8 @@ export default function Checkout() {
         items: cartItems,
         cliente: { nome: nome.trim(), whatsapp: whatsappNormalizado },
         recado: recado.trim(),
-        operationKey,
-      },
+        operationKey
+      }
     });
   };
 
@@ -78,11 +70,7 @@ export default function Checkout() {
         <main className="checkout-empty">
           <h1>Seu carrinho está vazio</h1>
           <p>Adicione produtos antes de finalizar o pedido.</p>
-          <button
-            type="button"
-            className="back-to-menu-btn"
-            onClick={() => navigate("/cardapio")}
-          >
+          <button type="button" className="back-to-menu-btn" onClick={() => navigate("/cardapio")}>
             Ir para o cardápio
           </button>
         </main>
@@ -104,18 +92,13 @@ export default function Checkout() {
               </div>
             )}
             <div className="checkout-items">
-              {cartItems.map((item) => (
+              {cartItems.map(item => (
                 <div key={item.id} className="checkout-item">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="checkout-item-img"
-                  />
+                  <img src={item.image} alt={item.name} className="checkout-item-img" />
                   <div className="checkout-item-info">
                     <span className="checkout-item-name">{item.name}</span>
                     <span className="checkout-item-detail">
-                      Qtd {item.quantity} • R${" "}
-                      {item.price.toFixed(2).replace(".", ",")}
+                      Qtd {item.quantity} • R$ {item.price.toFixed(2).replace(".", ",")}
                     </span>
                   </div>
                 </div>
@@ -150,7 +133,7 @@ export default function Checkout() {
                   className="form-input"
                   placeholder="Seu nome"
                   value={nome}
-                  onChange={(e) => setNome(e.target.value)}
+                  onChange={e => setNome(e.target.value)}
                   required
                 />
               </div>
@@ -165,7 +148,7 @@ export default function Checkout() {
                   className="form-input"
                   placeholder="(31) 99999-9999"
                   value={whatsapp}
-                  onChange={(e) => {
+                  onChange={e => {
                     setWhatsapp(formatWhatsappBr(e.target.value));
                     setWhatsappError(null);
                   }}
@@ -174,9 +157,7 @@ export default function Checkout() {
                   aria-invalid={whatsappError ? true : undefined}
                   required
                 />
-                {whatsappError && (
-                  <span className="checkout-field-error">{whatsappError}</span>
-                )}
+                {whatsappError && <span className="checkout-field-error">{whatsappError}</span>}
               </div>
 
               <div className="form-group">
@@ -189,17 +170,13 @@ export default function Checkout() {
                   className="form-input"
                   placeholder="Ex.: sem calda, por favor"
                   value={recado}
-                  onChange={(e) => setRecado(e.target.value)}
+                  onChange={e => setRecado(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
-                <span className="form-label">
-                  FORMA DE PAGAMENTO
-                </span>
-                <label
-                  className={`payment-option ${pagamento === "pix" ? "active" : ""}`}
-                >
+                <span className="form-label">FORMA DE PAGAMENTO</span>
+                <label className={`payment-option ${pagamento === "pix" ? "active" : ""}`}>
                   <input
                     type="radio"
                     name="pagamento"

@@ -7,12 +7,7 @@ import CancelamentoItemPreviewModal from "./CancelamentoItemPreviewModal";
 import TrocarItemModal from "./TrocarItemModal";
 import HistoricoComandaModal from "./HistoricoComandaModal";
 import ExcluirPedidoModal from "./ExcluirPedidoModal";
-import {
-  STATUS_LABEL,
-  STATUS_TYPE,
-  formatarData,
-  formatarPreco,
-} from "./PedidoDetalhe/helpers";
+import { STATUS_LABEL, STATUS_TYPE, formatarData, formatarPreco } from "./PedidoDetalhe/helpers";
 import PedidoItens from "./PedidoDetalhe/PedidoItens";
 import PedidoHeader from "./PedidoDetalhe/PedidoHeader";
 import PedidoPagamento from "./PedidoDetalhe/PedidoPagamento";
@@ -28,7 +23,7 @@ interface PedidoDetalheModalProps {
 export default function PedidoDetalheModal({
   orderId,
   onClose,
-  onStatusChanged,
+  onStatusChanged
 }: PedidoDetalheModalProps) {
   const modalProps = useAdminModal(true, onClose);
   const detalhe = usePedidoDetalhe({ orderId, onClose, onStatusChanged });
@@ -64,9 +59,7 @@ export default function PedidoDetalheModal({
         {detalhe.error && <div className="pedmodal-body">{detalhe.error}</div>}
         {detalhe.data && (
           <div className="pedmodal-body">
-            {detalhe.statusError && (
-              <p className="pedmodal-status-error">{detalhe.statusError}</p>
-            )}
+            {detalhe.statusError && <p className="pedmodal-status-error">{detalhe.statusError}</p>}
             {detalhe.arquivamentoError && (
               <p className="pedmodal-status-error">{detalhe.arquivamentoError}</p>
             )}
@@ -80,11 +73,11 @@ export default function PedidoDetalheModal({
               >
                 {STATUS_LABEL[detalhe.data.pedido.status_pedido]}
               </span>
-              {detalhe.anulado && <span className="pedmodal-badge pedmodal-badge--red">Anulado</span>}
+              {detalhe.anulado && (
+                <span className="pedmodal-badge pedmodal-badge--red">Anulado</span>
+              )}
               {detalhe.data.pedido.arquivado === 1 && (
-                <span className="pedmodal-badge pedmodal-badge--archived">
-                  Arquivado
-                </span>
+                <span className="pedmodal-badge pedmodal-badge--archived">Arquivado</span>
               )}
               <span className="pedmodal-meta-date">
                 <svg
@@ -110,12 +103,20 @@ export default function PedidoDetalheModal({
             {detalhe.data.anulacao && (
               <section className="pedmodal-anulacao" aria-label="Anulação">
                 <h3>Anulação</h3>
-                <p>{formatarData(detalhe.data.anulacao.criado_em)} · {detalhe.data.anulacao.usuario_nome}</p>
+                <p>
+                  {formatarData(detalhe.data.anulacao.criado_em)} ·{" "}
+                  {detalhe.data.anulacao.usuario_nome}
+                </p>
                 <p>Motivo: {detalhe.data.anulacao.motivo || "Não informado"}</p>
-                <p>{detalhe.data.anulacao.estoque_acao === "DEVOLVER"
-                  ? "Produtos baixados repostos e reservas liberadas, quando aplicável."
-                  : "Estoque mantido como estava."}</p>
-                <p>Impacto nos totais: -{formatarPreco(detalhe.data.anulacao.liquido_original_centavos)}</p>
+                <p>
+                  {detalhe.data.anulacao.estoque_acao === "DEVOLVER"
+                    ? "Produtos baixados repostos e reservas liberadas, quando aplicável."
+                    : "Estoque mantido como estava."}
+                </p>
+                <p>
+                  Impacto nos totais: -
+                  {formatarPreco(detalhe.data.anulacao.liquido_original_centavos)}
+                </p>
                 <p>Os valores abaixo preservam o histórico original.</p>
               </section>
             )}
@@ -129,8 +130,8 @@ export default function PedidoDetalheModal({
               statusPedido={detalhe.data.pedido.status_pedido}
               onAbrirHistorico={() => detalhe.setHistoricoAberto(true)}
               onAdicionarItem={() => detalhe.setAdicionandoItem(true)}
-              onVerCancelamento={(itemId) => detalhe.setItemCancelamentoPreviewId(itemId)}
-              onTrocarItem={(item) => detalhe.setItemTroca(item)}
+              onVerCancelamento={itemId => detalhe.setItemCancelamentoPreviewId(itemId)}
+              onTrocarItem={item => detalhe.setItemTroca(item)}
             />
 
             <div className="pedmodal-divider" />
@@ -156,7 +157,7 @@ export default function PedidoDetalheModal({
               copiedId={detalhe.copiedId}
               onAbrirRegistroPagamento={detalhe.abrirRegistroPagamento}
               onMetodoPagamentoChange={detalhe.selecionarMetodoPagamento}
-              onValorPagamentoChange={(valor) => {
+              onValorPagamentoChange={valor => {
                 detalhe.setValorPagamento(valor);
                 detalhe.setPagamentoError(null);
                 detalhe.pagamentoKeyRef.current = null;
@@ -179,12 +180,16 @@ export default function PedidoDetalheModal({
         )}
       </div>
       {detalhe.confirmarExclusao && detalhe.data && !detalhe.anulado && (
-        <ExcluirPedidoModal orderId={orderId} liquidoCentavos={detalhe.data.financeiro.liquidoCentavos}
-          onClose={() => detalhe.setConfirmarExclusao(false)} onDeleted={() => {
+        <ExcluirPedidoModal
+          orderId={orderId}
+          liquidoCentavos={detalhe.data.financeiro.liquidoCentavos}
+          onClose={() => detalhe.setConfirmarExclusao(false)}
+          onDeleted={() => {
             detalhe.setConfirmarExclusao(false);
             onStatusChanged?.();
             onClose();
-          }} />
+          }}
+        />
       )}
       {detalhe.confirmarArquivamento && (
         <ConfirmDialog
@@ -222,8 +227,14 @@ export default function PedidoDetalheModal({
           orderId={orderId}
           itemId={detalhe.itemCancelamentoPreviewId}
           onClose={() => detalhe.setItemCancelamentoPreviewId(null)}
-          existingCancellationId={detalhe.data?.itens.find((item) => item.id === detalhe.itemCancelamentoPreviewId)?.cancelamento_id}
-          onChanged={async () => { await detalhe.carregarPedido(true); onStatusChanged?.(); }}
+          existingCancellationId={
+            detalhe.data?.itens.find(item => item.id === detalhe.itemCancelamentoPreviewId)
+              ?.cancelamento_id
+          }
+          onChanged={async () => {
+            await detalhe.carregarPedido(true);
+            onStatusChanged?.();
+          }}
         />
       )}
       {!detalhe.anulado && detalhe.itemTroca && (
@@ -244,6 +255,6 @@ export default function PedidoDetalheModal({
         />
       )}
     </div>,
-    document.body,
+    document.body
   );
 }

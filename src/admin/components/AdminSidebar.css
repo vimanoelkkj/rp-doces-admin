@@ -36,9 +36,9 @@
 .admin-main,
 .adm-main,
 .loj-main,
-.admin-main>*,
-.adm-main>*,
-.loj-main>* {
+.admin-main > *,
+.adm-main > *,
+.loj-main > * {
   min-width: 0;
 }
 
@@ -280,7 +280,6 @@
 }
 
 @keyframes flicker {
-
   0%,
   100% {
     opacity: 1;
@@ -327,7 +326,6 @@
 }
 
 @keyframes iconBounce {
-
   0%,
   100% {
     transform: translateY(0);
@@ -349,7 +347,6 @@
 }
 
 @keyframes iconSwingBag {
-
   0%,
   100% {
     transform: rotate(0deg);
@@ -374,7 +371,6 @@
 }
 
 @keyframes iconWave {
-
   0%,
   100% {
     transform: rotate(0deg);
@@ -420,7 +416,6 @@
 }
 
 @keyframes iconSwing {
-
   0%,
   100% {
     transform: rotate(0deg);
@@ -446,7 +441,6 @@
 }
 
 @keyframes iconRing {
-
   0%,
   100% {
     transform: rotate(0deg);
@@ -479,7 +473,6 @@
 }
 
 @keyframes iconPulse {
-
   0%,
   100% {
     transform: scale(1);
@@ -499,7 +492,9 @@
   .admin-layout {
     --admin-mobile-nav-height: 70px;
     --admin-mobile-nav-offset: 12px;
-    --admin-mobile-nav-space: calc(var(--admin-mobile-nav-height) + var(--admin-mobile-nav-offset) + env(safe-area-inset-bottom));
+    --admin-mobile-nav-space: calc(
+      var(--admin-mobile-nav-height) + var(--admin-mobile-nav-offset) + env(safe-area-inset-bottom)
+    );
     display: block;
     min-width: 0;
   }
@@ -515,8 +510,7 @@
     max-width: none;
     min-width: 0;
     margin-left: 0;
-    padding: 32px clamp(20px, 4vw, 40px)
-      calc(56px + var(--admin-mobile-nav-space));
+    padding: 32px clamp(20px, 4vw, 40px) calc(56px + var(--admin-mobile-nav-space));
   }
 }
 

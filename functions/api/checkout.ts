@@ -21,7 +21,7 @@ import {
   prepareRegistrarFase,
   registrarFase,
   type IdentidadeEsperada,
-  type OperacaoRow,
+  type OperacaoRow
 } from "../lib/operacoes";
 import { isValidWhatsappBr, normalizeWhatsappBr } from "../../shared/whatsapp";
 
@@ -66,11 +66,11 @@ function jsonError(
   message: string,
   status: number,
   code?: string,
-  extra?: Record<string, unknown>,
+  extra?: Record<string, unknown>
 ) {
   return Response.json(
     { ...(code ? { error: message, code } : { error: message }), ...extra },
-    { status },
+    { status }
   );
 }
 
@@ -105,11 +105,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   if (body.items.length > MAX_ITEMS_PER_PEDIDO) {
     return jsonError("Carrinho com itens demais", 400);
   }
-  if (
-    !body.items.every(
-      (i) => i && typeof i === "object" && Number.isInteger(i.id) && i.id > 0,
-    )
-  ) {
+  if (!body.items.every(i => i && typeof i === "object" && Number.isInteger(i.id) && i.id > 0)) {
     return jsonError("Item de carrinho inválido", 400);
   }
   const nome = body.cliente?.nome?.trim();
@@ -137,12 +133,12 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     // resolvidos pelo servidor e congelados no pedido, não na identidade.
     fingerprint: fingerprint({
       itens: [...body.items]
-        .map((i) => [i.id, i.quantity] as [number, number])
+        .map(i => [i.id, i.quantity] as [number, number])
         .sort((a, b) => a[0] - b[0] || a[1] - b[1]),
       nome,
       whatsapp,
-      recado,
-    }),
+      recado
+    })
   };
 
   // Lookup ANTES dos guards de catálogo/estoque: retry, abort, remontagem,
@@ -161,12 +157,12 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     return Response.json(
       {
         error: "Muitas tentativas de pedido em pouco tempo. Aguarde alguns instantes.",
-        code: "CHECKOUT_RATE_LIMIT",
+        code: "CHECKOUT_RATE_LIMIT"
       },
       {
         status: 429,
-        headers: { "Retry-After": String(rateLimit.retryAfter) },
-      },
+        headers: { "Retry-After": String(rateLimit.retryAfter) }
+      }
     );
   }
 
@@ -180,18 +176,18 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     console.error("Falha ao liberar reservas vencidas antes do checkout", err);
   }
 
-  const ids = [...new Set(body.items.map((i) => i.id))];
+  const ids = [...new Set(body.items.map(i => i.id))];
   const placeholders = ids.map(() => "?").join(",");
   const { results } = await env.DB.prepare(
     `SELECT id, nome, preco_centavos, preco_promocional_centavos,
             promocao_ativa, promocao_inicio, promocao_fim,
             disponivel, estoque, estoque_reservado
-     FROM produtos WHERE id IN (${placeholders})`,
+     FROM produtos WHERE id IN (${placeholders})`
   )
     .bind(...ids)
     .all<ProdutoRow>();
 
-  const produtosPorId = new Map(results.map((p) => [p.id, p]));
+  const produtosPorId = new Map(results.map(p => [p.id, p]));
 
   let totalCentavos = 0;
   const itensParaPersistir: {
@@ -222,7 +218,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       produtoNome: produto.nome,
       quantidade: item.quantity,
       valorUnitarioCentavos,
-      valorTotalCentavos: valorTotalItemCentavos,
+      valorTotalCentavos: valorTotalItemCentavos
     });
   }
 
@@ -241,9 +237,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const idempotencyKey = chavePagamento(operationKey);
   const mpIdempotencyKey = chaveMp(operationKey);
   const tokenPublico = crypto.randomUUID();
-  const expiresAt = new Date(
-    Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000,
-  ).toISOString();
+  const expiresAt = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000).toISOString();
 
   // Conteúdo original do POST, persistido ANTES do envio. É o que permite
   // que a mesma operação seja reconhecida/retomada com segurança depois de
@@ -255,7 +249,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     payment_method_id: "pix",
     date_of_expiration: expiresAt,
     external_reference: tokenPublico,
-    payer: { email: payerEmail, first_name: nome },
+    payer: { email: payerEmail, first_name: nome }
   };
 
   // Persiste pedido + itens + pagamento PENDENTE + alocações + reserva de
@@ -290,47 +284,40 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
            (token_publico, cliente_nome, cliente_whatsapp, observacao, valor_total_centavos,
             idempotency_key, reserva_status, reserva_expira_em, status_pedido,
             cliente_email, produto_nome, quantidade, valor_unitario_centavos)
-         VALUES (?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'), 'NOVO', '', '', 1, 0)`,
-      ).bind(
-        tokenPublico,
-        nome,
-        whatsapp,
-        recado,
-        totalCentavos,
-        idempotencyKeyPedido,
-      ),
-      ...itensParaPersistir.map((item) =>
+         VALUES (?, ?, ?, ?, ?, ?, 'ATIVA', datetime('now', '+31 minutes'), 'NOVO', '', '', 1, 0)`
+      ).bind(tokenPublico, nome, whatsapp, recado, totalCentavos, idempotencyKeyPedido),
+      ...itensParaPersistir.map(item =>
         env.DB.prepare(
           `INSERT INTO pedido_itens
              (pedido_id, produto_id, produto_nome, quantidade, valor_unitario_centavos,
               valor_total_centavos, status_item, estoque_estado, estoque_reservado_em)
            SELECT id, ?, ?, ?, ?, ?, 'ATIVO', 'RESERVADO', CURRENT_TIMESTAMP
-           FROM pedidos WHERE token_publico = ?`,
+           FROM pedidos WHERE token_publico = ?`
         ).bind(
           item.produtoId,
           item.produtoNome,
           item.quantidade,
           item.valorUnitarioCentavos,
           item.valorTotalCentavos,
-          tokenPublico,
-        ),
+          tokenPublico
+        )
       ),
       env.DB.prepare(
         `INSERT INTO pedido_pagamentos (pedido_id, metodo, origem, valor_centavos, status, idempotency_key)
-         SELECT id, 'PIX_MP', 'SITE', ?, 'PENDENTE', ? FROM pedidos WHERE token_publico = ?`,
+         SELECT id, 'PIX_MP', 'SITE', ?, 'PENDENTE', ? FROM pedidos WHERE token_publico = ?`
       ).bind(totalCentavos, idempotencyKey, tokenPublico),
       env.DB.prepare(
         `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
          SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), pi.id, pi.valor_total_centavos
          FROM pedido_itens pi
          JOIN pedidos p ON p.id = pi.pedido_id
-         WHERE p.token_publico = ? AND pi.valor_total_centavos > 0`,
+         WHERE p.token_publico = ? AND pi.valor_total_centavos > 0`
       ).bind(idempotencyKey, tokenPublico),
-      ...itensParaPersistir.map((item) =>
+      ...itensParaPersistir.map(item =>
         env.DB.prepare(
           `UPDATE produtos SET estoque_reservado = estoque_reservado + ?, atualizado_em = CURRENT_TIMESTAMP
-           WHERE id = ?`,
-        ).bind(item.quantidade, item.produtoId),
+           WHERE id = ?`
+        ).bind(item.quantidade, item.produtoId)
       ),
       // Claim A1 por último e condicionado ao pedido E ao pagamento
       // recém-criados: tudo numa única transação. `fase='LOCAL_CRIADA'`
@@ -342,8 +329,8 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
         fase: "LOCAL_CRIADA",
         mpIdempotencyKey,
         mpRequest: JSON.stringify(mpRequest),
-        fonte: fontePedidoComPagamento(idempotencyKeyPedido, idempotencyKey),
-      }),
+        fonte: fontePedidoComPagamento(idempotencyKeyPedido, idempotencyKey)
+      })
     ]);
   } catch (err) {
     // Disputa da mesma operation key (UNIQUE de `pedidos.idempotency_key` ou
@@ -373,18 +360,18 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     console.error("Resultado ambíguo ao criar pagamento Pix (checkout)", {
       pedidoId,
       motivo: envio.motivo,
-      httpStatus: envio.httpStatus,
+      httpStatus: envio.httpStatus
     });
     await registrarFase(env.DB, operationKey, {
       fase: "ENVIO_INCONCLUSIVO",
-      erro: `AMBIGUO:${envio.motivo}`,
+      erro: `AMBIGUO:${envio.motivo}`
     });
     // O pedido já existe: devolve a identidade pública dele para o cliente
     // acompanhar, em vez de induzir uma nova finalização (nova key, novo
     // pedido, nova reserva). Continua 502: nada foi provado.
     return jsonError(MENSAGEM_MP_INDISPONIVEL, 502, "MERCADO_PAGO_INDISPONIVEL", {
       pedidoId,
-      tokenPublico,
+      tokenPublico
     });
   }
 
@@ -398,7 +385,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       `UPDATE pedido_pagamentos
        SET status = 'FALHOU', mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND status = 'PENDENTE'
-         AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`,
+         AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`
     )
       .bind(envio.mensagem, envio.detalhe, pagamentoId)
       .run();
@@ -412,7 +399,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     // POST e sem nenhuma escrita adicional.
     await registrarFase(env.DB, operationKey, {
       fase: "RECUSADA",
-      erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`,
+      erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`
     });
 
     return jsonError(MENSAGEM_MP_RECUSOU, 502, "MERCADO_PAGO_RECUSOU");
@@ -438,7 +425,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     qrCodeBase64: txData?.qr_code_base64 ?? null,
     ticketUrl: txData?.ticket_url ?? null,
     expiresAt: payment.date_of_expiration,
-    totalCentavos,
+    totalCentavos
   };
 
   // Identidade remota e resultado gravados no MESMO batch dos detalhes
@@ -454,7 +441,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
            mp_ticket_url = ?, pix_expira_em = ?,
            reserva_expira_em = COALESCE(?, reserva_expira_em),
            atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+       WHERE id = ?`
     ).bind(
       String(payment.id),
       payment.status,
@@ -463,7 +450,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       txData?.ticket_url ?? null,
       payment.date_of_expiration,
       reservaExpiraEm,
-      pedidoId,
+      pedidoId
     ),
     env.DB.prepare(
       `UPDATE pedido_pagamentos
@@ -475,7 +462,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
            END,
            mp_qr_code = ?, mp_qr_code_base64 = ?,
            mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+       WHERE id = ?`
     ).bind(
       String(payment.id),
       payment.status,
@@ -483,13 +470,13 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
       txData?.qr_code_base64 ?? null,
       txData?.ticket_url ?? null,
       payment.date_of_expiration,
-      pagamentoId,
+      pagamentoId
     ),
     prepareRegistrarFase(env.DB, operationKey, {
       fase: "REMOTO_CONHECIDO",
       mpPaymentId: String(payment.id),
-      resultado: JSON.stringify(sucesso),
-    }),
+      resultado: JSON.stringify(sucesso)
+    })
   ]);
 
   await registrarFase(env.DB, operationKey, { fase: "CONCLUIDA" });
@@ -503,7 +490,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
 async function replayCheckout(
   env: Env,
   operacao: OperacaoRow,
-  identidade: IdentidadeEsperada,
+  identidade: IdentidadeEsperada
 ): Promise<Response> {
   const conflito = conflitoOperacao(operacao, identidade);
   if (conflito) {
@@ -527,7 +514,7 @@ async function replayCheckout(
                 pp.mp_ticket_url, pp.pix_expira_em
          FROM pedidos p
          JOIN pedido_pagamentos pp ON pp.id = ?
-         WHERE p.id = ? LIMIT 1`,
+         WHERE p.id = ? LIMIT 1`
       )
         .bind(operacao.pagamento_id, operacao.pedido_id)
         .first<{
@@ -547,7 +534,7 @@ async function replayCheckout(
     return jsonError(
       OPERACAO_MENSAGENS.OPERACAO_INCOMPLETA,
       OPERACAO_HTTP_STATUS.OPERACAO_INCOMPLETA,
-      "OPERACAO_INCOMPLETA",
+      "OPERACAO_INCOMPLETA"
     );
   }
 
@@ -561,7 +548,7 @@ async function replayCheckout(
       qrCodeBase64: linha.mp_qr_code_base64,
       ticketUrl: linha.mp_ticket_url,
       expiresAt: linha.pix_expira_em,
-      totalCentavos: linha.valor_total_centavos,
+      totalCentavos: linha.valor_total_centavos
     } satisfies CheckoutSucesso);
   }
 
@@ -576,8 +563,8 @@ async function replayCheckout(
       error: OPERACAO_MENSAGENS.OPERACAO_EM_PROCESSAMENTO,
       code: "OPERACAO_EM_PROCESSAMENTO",
       pedidoId: linha.pedido_id,
-      tokenPublico: linha.token_publico,
+      tokenPublico: linha.token_publico
     },
-    { status: OPERACAO_HTTP_STATUS.OPERACAO_EM_PROCESSAMENTO },
+    { status: OPERACAO_HTTP_STATUS.OPERACAO_EM_PROCESSAMENTO }
   );
 }

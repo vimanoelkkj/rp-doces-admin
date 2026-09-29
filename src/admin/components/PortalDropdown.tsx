@@ -22,7 +22,7 @@ export default function PortalDropdown({
   anchorRef,
   menuRef,
   className,
-  children,
+  children
 }: PortalDropdownProps) {
   const [position, setPosition] = useState<MenuPosition | null>(null);
 
@@ -57,7 +57,7 @@ export default function PortalDropdown({
           left,
           bottom: Math.max(8, viewportHeight - rect.top + 4),
           width,
-          maxHeight,
+          maxHeight
         });
       } else {
         const top = rect.bottom + 4;
@@ -66,7 +66,7 @@ export default function PortalDropdown({
           left,
           top,
           width,
-          maxHeight,
+          maxHeight
         });
       }
     };
@@ -90,11 +90,11 @@ export default function PortalDropdown({
         top: position.top !== undefined ? position.top : undefined,
         bottom: position.bottom !== undefined ? position.bottom : undefined,
         width: position.width,
-        maxHeight: position.maxHeight,
+        maxHeight: position.maxHeight
       }}
     >
       {children}
     </ul>,
-    document.body,
+    document.body
   );
 }

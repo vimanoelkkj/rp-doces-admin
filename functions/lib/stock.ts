@@ -7,12 +7,7 @@ import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 // Estado fisico autoritativo por item. Os marcadores de `pedidos` continuam
 // existindo somente como projecao de compatibilidade para leitores antigos.
 export type EstoqueEstado =
-  | "NAO_APLICAVEL"
-  | "SEM_RESERVA"
-  | "RESERVADO"
-  | "LIBERADO"
-  | "BAIXADO"
-  | "REPOSTO";
+  "NAO_APLICAVEL" | "SEM_RESERVA" | "RESERVADO" | "LIBERADO" | "BAIXADO" | "REPOSTO";
 
 export type BaixaResultado =
   | { ok: true; baixado: boolean }
@@ -49,11 +44,13 @@ export function itemEstoquePendenteSql(alias: string): string {
 // Somente leitura; a convergência continua em `baixarEstoquePedido`.
 export async function pedidoTemEstoquePendente(db: D1Database, pedidoId: number): Promise<boolean> {
   const row = await db
-    .prepare(`SELECT EXISTS (
+    .prepare(
+      `SELECT EXISTS (
                 SELECT 1 FROM pedido_itens pi
                 WHERE pi.pedido_id = p.id AND ${itemEstoquePendenteSql("pi")}
               ) AS pendente
-              FROM pedidos p WHERE p.id = ? AND p.status_pagamento = 'PAGO'`)
+              FROM pedidos p WHERE p.id = ? AND p.status_pagamento = 'PAGO'`
+    )
     .bind(pedidoId)
     .first<{ pendente: number }>();
   return Boolean(row?.pendente);
@@ -66,7 +63,7 @@ export async function pedidoTemEstoquePendente(db: D1Database, pedidoId: number)
 export function preparePedidoPhysicalProjection(
   db: D1Database,
   pedidoId: number,
-  operationKey?: string,
+  operationKey?: string
 ): D1PreparedStatement {
   const ativoControlado = `pi.pedido_id = pedidos.id
     AND pi.status_item IN ('ATIVO', 'TROCA_PENDENTE') AND pi.produto_id IS NOT NULL`;
@@ -75,7 +72,9 @@ export function preparePedidoPhysicalProjection(
                    WHERE o.operation_key = ? AND o.pedido_id = pedidos.id
                      AND o.pedido_item_id IS NOT NULL)`
     : "";
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     UPDATE pedidos
     SET reserva_status = CASE
           WHEN EXISTS (SELECT 1 FROM pedido_itens pi
@@ -112,19 +111,30 @@ export function preparePedidoPhysicalProjection(
         atualizado_em = CURRENT_TIMESTAMP
     WHERE id = ?
       ${operationGuard}
-  `).bind(pedidoId, ...(operationKey ? [operationKey] : []));
+  `
+    )
+    .bind(pedidoId, ...(operationKey ? [operationKey] : []));
 }
 
 // Converte somente itens ATIVOS que ainda precisam de baixa. A decisao sobre
 // quanto remover de estoque_reservado le `pedido_itens.estoque_estado` dentro
 // da propria transacao: se uma liberacao vencer a corrida, LIBERADO ->
 // BAIXADO desconta apenas estoque; se a baixa vencer, a liberacao vira no-op.
-export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Promise<BaixaResultado> {
+export async function baixarEstoquePedido(
+  db: D1Database,
+  pedidoId: number
+): Promise<BaixaResultado> {
   const pedido = await db
-    .prepare(`SELECT status_pagamento, reserva_status, estoque_baixado_em
-              FROM pedidos WHERE ${pedidoValidoSql('pedidos.id')} AND id = ? LIMIT 1`)
+    .prepare(
+      `SELECT status_pagamento, reserva_status, estoque_baixado_em
+              FROM pedidos WHERE ${pedidoValidoSql("pedidos.id")} AND id = ? LIMIT 1`
+    )
     .bind(pedidoId)
-    .first<{ status_pagamento: string; reserva_status: string; estoque_baixado_em: string | null }>();
+    .first<{
+      status_pagamento: string;
+      reserva_status: string;
+      estoque_baixado_em: string | null;
+    }>();
 
   if (pedido?.status_pagamento !== "PAGO") {
     return { ok: true, baixado: false };
@@ -142,11 +152,11 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
     .prepare(
       `SELECT id, produto_id, quantidade
        FROM pedido_itens
-       WHERE pedido_id = ? AND ${pedidoValidoSql('pedido_itens.pedido_id')}
+       WHERE pedido_id = ? AND ${pedidoValidoSql("pedido_itens.pedido_id")}
          AND status_item = 'ATIVO'
          AND produto_id IS NOT NULL
          AND estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
-       ORDER BY id`,
+       ORDER BY id`
     )
     .bind(pedidoId)
     .all<ItemPedidoRow>();
@@ -161,7 +171,7 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
     // uma projecao interrompida depois da ultima baixa.
     await db.batch([
       preparePedidoFinancialProjection(db, pedidoId),
-      preparePedidoPhysicalProjection(db, pedidoId),
+      preparePedidoPhysicalProjection(db, pedidoId)
     ]);
     return { ok: true, baixado: false };
   }
@@ -174,7 +184,9 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
 
   for (const item of itens) {
     statements.push(
-      db.prepare(`
+      db
+        .prepare(
+          `
         UPDATE produtos
         SET estoque = estoque - ?,
             estoque_reservado = estoque_reservado - CASE
@@ -205,26 +217,30 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
               AND pi.quantidade = ?
               AND pi.status_item = 'ATIVO'
               AND pi.estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
-              AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql('p.id')}
+              AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql("p.id")}
           )
-      `).bind(
-        item.quantidade,
-        item.id,
-        pedidoId,
-        item.quantidade,
-        item.quantidade,
-        item.id,
-        pedidoId,
-        item.quantidade,
-        item.produto_id,
-        item.id,
-        pedidoId,
-        item.quantidade,
-      ),
+      `
+        )
+        .bind(
+          item.quantidade,
+          item.id,
+          pedidoId,
+          item.quantidade,
+          item.quantidade,
+          item.id,
+          pedidoId,
+          item.quantidade,
+          item.produto_id,
+          item.id,
+          pedidoId,
+          item.quantidade
+        )
     );
 
     statements.push(
-      db.prepare(`
+      db
+        .prepare(
+          `
         UPDATE pedido_itens
         SET estoque_estado = 'BAIXADO',
             estoque_baixado_em = COALESCE(estoque_baixado_em, CURRENT_TIMESTAMP)
@@ -232,9 +248,11 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
           AND status_item = 'ATIVO'
           AND estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
           AND EXISTS (SELECT 1 FROM pedidos p
-                      WHERE p.id = pedido_itens.pedido_id AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql('p.id')})
+                      WHERE p.id = pedido_itens.pedido_id AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql("p.id")})
           AND EXISTS (SELECT 1 FROM produtos pr WHERE pr.id = pedido_itens.produto_id)
-      `).bind(item.id, pedidoId, item.produto_id, item.quantidade),
+      `
+        )
+        .bind(item.id, pedidoId, item.produto_id, item.quantidade)
     );
     itemResultIndexes.push(statements.length - 1);
   }
@@ -243,7 +261,9 @@ export async function baixarEstoquePedido(db: D1Database, pedidoId: number): Pro
 
   try {
     const resultados = await db.batch(statements);
-    const baixado = itemResultIndexes.some((index) => Number(resultados[index]?.meta?.changes || 0) === 1);
+    const baixado = itemResultIndexes.some(
+      index => Number(resultados[index]?.meta?.changes || 0) === 1
+    );
     return { ok: true, baixado };
   } catch (err) {
     console.error("Falha ao converter reserva em baixa de estoque", pedidoId, err);
@@ -273,22 +293,25 @@ export const REGENERACAO_PIX_ATIVA_SQL = `EXISTS (
     AND o.expirado_em IS NULL
 )`;
 
-const RESERVA_LIBERAVEL_SQL = `${pedidoValidoSql('pedidos.id')} AND status_pagamento = 'PENDENTE'
+const RESERVA_LIBERAVEL_SQL = `${pedidoValidoSql("pedidos.id")} AND status_pagamento = 'PENDENTE'
   AND NOT ${PIX_MP_PENDENTE_NO_PEDIDO_SQL}
   AND NOT ${REGENERACAO_PIX_ATIVA_SQL}`;
 
 // Libera somente itens que ainda estao RESERVADOS. As guards B4 continuam
 // dentro da mesma transacao: liquido zero projetado e nenhum PIX_MP pendente.
-export async function liberarReservaPedido(db: D1Database, pedidoId: number): Promise<LiberacaoResultado> {
+export async function liberarReservaPedido(
+  db: D1Database,
+  pedidoId: number
+): Promise<LiberacaoResultado> {
   const { results } = await db
     .prepare(
       `SELECT id, produto_id, quantidade
        FROM pedido_itens
-       WHERE pedido_id = ? AND ${pedidoValidoSql('pedido_itens.pedido_id')}
+       WHERE pedido_id = ? AND ${pedidoValidoSql("pedido_itens.pedido_id")}
          AND status_item = 'ATIVO'
          AND produto_id IS NOT NULL
          AND estoque_estado = 'RESERVADO'
-       ORDER BY id`,
+       ORDER BY id`
     )
     .bind(pedidoId)
     .all<ItemPedidoRow>();
@@ -301,7 +324,9 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
 
   for (const item of itens) {
     statements.push(
-      db.prepare(`
+      db
+        .prepare(
+          `
         UPDATE produtos
         SET estoque_reservado = estoque_reservado - ?,
             atualizado_em = CURRENT_TIMESTAMP
@@ -317,11 +342,15 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
               AND pi.estoque_estado = 'RESERVADO'
               AND ${RESERVA_LIBERAVEL_SQL}
           )
-      `).bind(item.quantidade, item.produto_id, item.id, pedidoId, item.quantidade),
+      `
+        )
+        .bind(item.quantidade, item.produto_id, item.id, pedidoId, item.quantidade)
     );
 
     statements.push(
-      db.prepare(`
+      db
+        .prepare(
+          `
         UPDATE pedido_itens
         SET estoque_estado = 'LIBERADO',
             estoque_liberado_em = COALESCE(estoque_liberado_em, CURRENT_TIMESTAMP)
@@ -334,7 +363,9 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
               AND ${RESERVA_LIBERAVEL_SQL}
           )
           AND EXISTS (SELECT 1 FROM produtos pr WHERE pr.id = pedido_itens.produto_id)
-      `).bind(item.id, pedidoId, item.produto_id, item.quantidade),
+      `
+        )
+        .bind(item.id, pedidoId, item.produto_id, item.quantidade)
     );
     itemResultIndexes.push(statements.length - 1);
   }
@@ -343,7 +374,9 @@ export async function liberarReservaPedido(db: D1Database, pedidoId: number): Pr
 
   try {
     const resultados = await db.batch(statements);
-    const liberado = itemResultIndexes.some((index) => Number(resultados[index]?.meta?.changes || 0) === 1);
+    const liberado = itemResultIndexes.some(
+      index => Number(resultados[index]?.meta?.changes || 0) === 1
+    );
     return { ok: true, liberado };
   } catch (err) {
     console.error("Falha ao liberar reserva de estoque", pedidoId, err);

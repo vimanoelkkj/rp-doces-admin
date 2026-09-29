@@ -12,7 +12,6 @@ import { catalogCategories } from "./catalogCategories";
 import StorefrontFrame from "../components/StorefrontFrame";
 import "./Cardapio.css";
 
-
 // `null` = "Todos", opção sintética da interface (nunca uma categoria
 // persistida). Qualquer outro valor é o SLUG canônico da categoria
 // (`categorias.id`), nunca o nome de exibição.
@@ -41,7 +40,7 @@ export default function Cardapio() {
     addToCart,
     updateQuantity,
     removeItem,
-    reconcileWithProducts,
+    reconcileWithProducts
   } = useCart();
 
   const cartQuantities = useMemo(() => {
@@ -59,7 +58,7 @@ export default function Cardapio() {
   }, [products, reconcileWithProducts]);
 
   const produtoDetalhe =
-    detalheId === null ? null : products.find((p) => p.id === detalheId) ?? null;
+    detalheId === null ? null : (products.find(p => p.id === detalheId) ?? null);
   const fecharDetalhe = useCallback(() => setDetalheId(null), []);
 
   const headingRef = useScrollReveal<HTMLDivElement>(0.15);
@@ -101,7 +100,7 @@ export default function Cardapio() {
   // Se uma revalidação remover a categoria selecionada, volta para a visão
   // completa em vez de manter uma aba órfã e um catálogo aparentemente vazio.
   useEffect(() => {
-    if (activeFilter !== null && !categories.some((c) => c.slug === activeFilter)) {
+    if (activeFilter !== null && !categories.some(c => c.slug === activeFilter)) {
       setActiveFilter(null);
       setDisplayFilter(null);
       setIsFiltering(false);
@@ -109,9 +108,7 @@ export default function Cardapio() {
     }
   }, [activeFilter, categories]);
 
-  const handleContainerTransitionEnd = (
-    event: React.TransitionEvent<HTMLDivElement>,
-  ) => {
+  const handleContainerTransitionEnd = (event: React.TransitionEvent<HTMLDivElement>) => {
     // Libera para "auto" só depois que a animação de altura (não a de
     // opacidade/transform, que rodam em paralelo) termina, pra manter o
     // layout correto em resizes futuros sem travar numa altura antiga.
@@ -123,126 +120,126 @@ export default function Cardapio() {
   const filteredProducts =
     displayFilter === null
       ? products
-      : products.filter((product) => product.categorySlug === displayFilter);
+      : products.filter(product => product.categorySlug === displayFilter);
 
   const groupedProducts = categories
     .map(({ slug, nome }) => ({
       slug,
       nome,
-      products: filteredProducts.filter((product) => product.categorySlug === slug),
+      products: filteredProducts.filter(product => product.categorySlug === slug)
     }))
-    .filter((group) => group.products.length > 0);
+    .filter(group => group.products.length > 0);
 
   return (
     <>
       <StorefrontFrame className="cardapio-page">
         <main className="cardapio-content">
-        <div className="section-heading scroll-reveal" ref={headingRef}>
-          <div className="heading-text">
-            <h1 className="cardapio-title">Cardápio</h1>
-            <p className="cardapio-subtitle">
-              Escolha e adoce o seu dia com os nossos encantos artesanais.
-            </p>
-          </div>
-          <div
-            className="filter-tabs"
-            role="tablist"
-            aria-label="Filtrar produtos"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeFilter === null}
-              className={`filter-tab ${activeFilter === null ? "active" : ""}`}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                handleFilterChange(null);
-              }}
-            >
-              Todos
-            </button>
-            {!mostrarSkeleton && categories.map(({ slug, nome }) => (
+          <div className="section-heading scroll-reveal" ref={headingRef}>
+            <div className="heading-text">
+              <h1 className="cardapio-title">Cardápio</h1>
+              <p className="cardapio-subtitle">
+                Escolha e adoce o seu dia com os nossos encantos artesanais.
+              </p>
+            </div>
+            <div className="filter-tabs" role="tablist" aria-label="Filtrar produtos">
               <button
                 type="button"
-                key={slug}
                 role="tab"
-                aria-selected={activeFilter === slug}
-                className={`filter-tab ${activeFilter === slug ? "active" : ""}`}
-                onClick={(e) => {
+                aria-selected={activeFilter === null}
+                className={`filter-tab ${activeFilter === null ? "active" : ""}`}
+                onClick={e => {
                   e.currentTarget.blur();
-                  handleFilterChange(slug);
+                  handleFilterChange(null);
                 }}
               >
-                {nome}
+                Todos
               </button>
-            ))}
-            {mostrarSkeleton &&
-              [0, 1].map((i) => (
-                <span key={i} className="filter-tab-skeleton skeleton-shimmer" aria-hidden="true" />
-              ))}
+              {!mostrarSkeleton &&
+                categories.map(({ slug, nome }) => (
+                  <button
+                    type="button"
+                    key={slug}
+                    role="tab"
+                    aria-selected={activeFilter === slug}
+                    className={`filter-tab ${activeFilter === slug ? "active" : ""}`}
+                    onClick={e => {
+                      e.currentTarget.blur();
+                      handleFilterChange(slug);
+                    }}
+                  >
+                    {nome}
+                  </button>
+                ))}
+              {mostrarSkeleton &&
+                [0, 1].map(i => (
+                  <span
+                    key={i}
+                    className="filter-tab-skeleton skeleton-shimmer"
+                    aria-hidden="true"
+                  />
+                ))}
+            </div>
           </div>
-        </div>
 
-        {error && !mostrarSkeleton && <p className="cardapio-subtitle">{error}</p>}
+          {error && !mostrarSkeleton && <p className="cardapio-subtitle">{error}</p>}
 
-        <div
-          className="products-area"
-          style={{
-            height: containerHeight === "auto" ? "auto" : `${containerHeight}px`,
-          }}
-          onTransitionEnd={handleContainerTransitionEnd}
-        >
           <div
-            ref={productsAreaRef}
-            className={`products-area-inner ${isFiltering ? "products-area--out" : "products-area--in"}`}
+            className="products-area"
+            style={{
+              height: containerHeight === "auto" ? "auto" : `${containerHeight}px`
+            }}
+            onTransitionEnd={handleContainerTransitionEnd}
           >
-            {mostrarSkeleton && (
-              <section className="category-group" role="status" aria-busy="true">
-                <span className="skeleton-sr-only">Carregando cardápio…</span>
-                <span className="skeleton-category-title skeleton-shimmer" aria-hidden="true" />
-                <div className="products-grid" aria-hidden="true">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="product-card-wrapper">
-                      <ProductCardSkeleton />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+            <div
+              ref={productsAreaRef}
+              className={`products-area-inner ${isFiltering ? "products-area--out" : "products-area--in"}`}
+            >
+              {mostrarSkeleton && (
+                <section className="category-group" role="status" aria-busy="true">
+                  <span className="skeleton-sr-only">Carregando cardápio…</span>
+                  <span className="skeleton-category-title skeleton-shimmer" aria-hidden="true" />
+                  <div className="products-grid" aria-hidden="true">
+                    {[0, 1, 2, 3].map(i => (
+                      <div key={i} className="product-card-wrapper">
+                        <ProductCardSkeleton />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-            {!loading && !mostrarSkeleton && !error && filteredProducts.length === 0 && (
-              <p className="cardapio-empty-state">
-                Nenhum produto disponível no momento.
-              </p>
-            )}
+              {!loading && !mostrarSkeleton && !error && filteredProducts.length === 0 && (
+                <p className="cardapio-empty-state">Nenhum produto disponível no momento.</p>
+              )}
 
-            {!mostrarSkeleton && groupedProducts.map(({ slug, nome, products: categoryProducts }) => (
-              <section
-                key={slug}
-                className="category-group scroll-reveal revealed"
-                aria-label={nome}
-              >
-                <h2 className="category-title">{nome}</h2>
-                <div className="products-grid">
-                  {categoryProducts.map((product, index) => (
-                    <div
-                      key={product.id}
-                      className="product-card-wrapper filter-card"
-                      style={{ animationDelay: `${index * 0.08}s` }}
-                    >
-                      <ProductCard
-                        product={product}
-                        quantityInCart={cartQuantities.get(product.id) ?? 0}
-                        onAddToCart={() => addToCart(product)}
-                        onOpenDetails={() => setDetalheId(product.id)}
-                      />
+              {!mostrarSkeleton &&
+                groupedProducts.map(({ slug, nome, products: categoryProducts }) => (
+                  <section
+                    key={slug}
+                    className="category-group scroll-reveal revealed"
+                    aria-label={nome}
+                  >
+                    <h2 className="category-title">{nome}</h2>
+                    <div className="products-grid">
+                      {categoryProducts.map((product, index) => (
+                        <div
+                          key={product.id}
+                          className="product-card-wrapper filter-card"
+                          style={{ animationDelay: `${index * 0.08}s` }}
+                        >
+                          <ProductCard
+                            product={product}
+                            quantityInCart={cartQuantities.get(product.id) ?? 0}
+                            onAddToCart={() => addToCart(product)}
+                            onOpenDetails={() => setDetalheId(product.id)}
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </section>
-            ))}
+                  </section>
+                ))}
+            </div>
           </div>
-        </div>
         </main>
         <Footer />
       </StorefrontFrame>
@@ -251,7 +248,7 @@ export default function Cardapio() {
           product={produtoDetalhe}
           quantityInCart={cartQuantities.get(produtoDetalhe.id) ?? 0}
           onClose={fecharDetalhe}
-          onAddToCart={(quantidade) => addToCart(produtoDetalhe, quantidade)}
+          onAddToCart={quantidade => addToCart(produtoDetalhe, quantidade)}
         />
       )}
       <CartWidget

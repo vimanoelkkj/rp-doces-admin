@@ -40,8 +40,13 @@
 }
 
 @keyframes cupcake-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 /* Cherry: drop + bounce, repeating */
@@ -70,7 +75,8 @@
   74% {
     transform: translateY(-2px);
   }
-  84%, 100% {
+  84%,
+  100% {
     transform: translateY(0);
     opacity: 1;
   }
@@ -99,7 +105,9 @@
 }
 
 @keyframes dot-pulse {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     opacity: 0.25;
     transform: scale(0.8);
   }
@@ -111,7 +119,7 @@
 
 /* ---- Text ---- */
 .preparando-title {
-  font-family: 'Manrope', sans-serif;
+  font-family: "Manrope", sans-serif;
   font-weight: 600;
   font-size: 16px;
   color: var(--store-text-heading);
@@ -121,7 +129,7 @@
 }
 
 .preparando-subtitle {
-  font-family: 'Manrope', sans-serif;
+  font-family: "Manrope", sans-serif;
   font-weight: 400;
   font-size: 13px;
   color: var(--store-text-muted);
@@ -134,7 +142,7 @@
 .preparando-footer {
   position: absolute;
   bottom: 40px;
-  font-family: 'Fraunces', serif;
+  font-family: "Fraunces", serif;
   font-weight: 600;
   font-size: 14px;
   color: var(--store-text-muted);

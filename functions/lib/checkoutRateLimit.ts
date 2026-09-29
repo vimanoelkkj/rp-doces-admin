@@ -20,7 +20,7 @@ function clientIp(request: Request): string {
 export async function checkCheckoutRateLimit(
   db: D1Database,
   request: Request,
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): Promise<{ allowed: boolean; retryAfter: number; count: number }> {
   const nowSec = Math.floor(nowMs / 1000);
   const bucket = Math.floor(nowSec / WINDOW_SECONDS);
@@ -36,7 +36,7 @@ export async function checkCheckoutRateLimit(
        ON CONFLICT(chave) DO UPDATE SET
          tentativas = checkout_rate_limits.tentativas + 1,
          atualizado_em = CURRENT_TIMESTAMP
-       RETURNING tentativas`,
+       RETURNING tentativas`
     )
     .bind(key, expiresAt)
     .first<RateLimitRow>();
@@ -47,10 +47,7 @@ export async function checkCheckoutRateLimit(
   // A decisão do rate limit acima não depende desta limpeza.
   if (crypto.getRandomValues(new Uint8Array(1))[0] < 13) {
     try {
-      await db
-        .prepare(`DELETE FROM checkout_rate_limits WHERE expira_em < ?`)
-        .bind(nowSec)
-        .run();
+      await db.prepare(`DELETE FROM checkout_rate_limits WHERE expira_em < ?`).bind(nowSec).run();
     } catch (err) {
       console.warn("Falha ao limpar rate limit do checkout", err);
     }
@@ -59,6 +56,6 @@ export async function checkCheckoutRateLimit(
   return {
     allowed: count <= MAX_ATTEMPTS,
     retryAfter,
-    count,
+    count
   };
 }

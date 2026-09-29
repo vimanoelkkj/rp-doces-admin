@@ -11,18 +11,13 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
-  ["image/webp", "webp"],
+  ["image/webp", "webp"]
 ]);
 
 function detectImageType(bytes: ArrayBuffer): string | null {
   const data = new Uint8Array(bytes);
 
-  if (
-    data.length >= 3 &&
-    data[0] === 0xff &&
-    data[1] === 0xd8 &&
-    data[2] === 0xff
-  ) {
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) {
     return "image/jpeg";
   }
 
@@ -65,11 +60,7 @@ function imageKey(id: number, extension: string): string {
   return `product-${id}-${crypto.randomUUID()}.${extension}`;
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({
-  request,
-  env,
-  params,
-}) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
 
   const auth = await requireUser(env.DB, request);
@@ -84,9 +75,7 @@ export const onRequestPost: PagesFunction<Env> = async ({
   }
 
   try {
-    const produto = await env.DB.prepare(
-      `SELECT id, image_key FROM produtos WHERE id = ?`,
-    )
+    const produto = await env.DB.prepare(`SELECT id, image_key FROM produtos WHERE id = ?`)
       .bind(id)
       .first<{ id: number; image_key: string | null }>();
 
@@ -118,10 +107,7 @@ export const onRequestPost: PagesFunction<Env> = async ({
     const bytes = await file.arrayBuffer();
     const detectedType = detectImageType(bytes);
     if (!detectedType || detectedType !== file.type) {
-      return jsonError(
-        "O conteúdo do arquivo não corresponde ao tipo de imagem informado",
-        415,
-      );
+      return jsonError("O conteúdo do arquivo não corresponde ao tipo de imagem informado", 415);
     }
 
     const extension = ALLOWED_TYPES.get(detectedType)!;
@@ -130,14 +116,14 @@ export const onRequestPost: PagesFunction<Env> = async ({
     await env.PRODUCT_IMAGES.put(key, bytes, {
       httpMetadata: {
         contentType: detectedType,
-        cacheControl: "public, max-age=31536000, immutable",
+        cacheControl: "public, max-age=31536000, immutable"
       },
-      customMetadata: { productId: String(id) },
+      customMetadata: { productId: String(id) }
     });
 
     try {
       await env.DB.prepare(
-        `UPDATE produtos SET image_key = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE produtos SET image_key = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
       )
         .bind(key, id)
         .run();
@@ -153,7 +139,7 @@ export const onRequestPost: PagesFunction<Env> = async ({
     return Response.json({
       ok: true,
       imageKey: key,
-      imageUrl: `/api/images/${encodeURIComponent(key)}`,
+      imageUrl: `/api/images/${encodeURIComponent(key)}`
     });
   } catch (err) {
     console.error("Erro ao enviar imagem do produto (admin)", err);
@@ -161,11 +147,7 @@ export const onRequestPost: PagesFunction<Env> = async ({
   }
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({
-  request,
-  env,
-  params,
-}) => {
+export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params }) => {
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
 
   const auth = await requireUser(env.DB, request);
@@ -180,9 +162,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({
   }
 
   try {
-    const produto = await env.DB.prepare(
-      `SELECT image_key FROM produtos WHERE id = ?`,
-    )
+    const produto = await env.DB.prepare(`SELECT image_key FROM produtos WHERE id = ?`)
       .bind(id)
       .first<{ image_key: string | null }>();
 
@@ -191,7 +171,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({
     }
 
     await env.DB.prepare(
-      `UPDATE produtos SET image_key = NULL, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE produtos SET image_key = NULL, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
     )
       .bind(id)
       .run();

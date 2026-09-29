@@ -6,17 +6,20 @@ import { listarPagamentosMpReembolsaveis } from "../../../../../lib/pedidoAnulac
 import {
   getPixMpRefundIntentForPagamento,
   reconcilePixMpRefundIntent,
-  type PixMpRefundIntentView,
+  type PixMpRefundIntentView
 } from "../../../../../lib/mpRefundIntent";
 import {
   chaveAnulacaoRefund,
   fingerprint,
   OPERACAO_MENSAGENS,
   parseOperationKey,
-  type IdentidadeEsperada,
+  type IdentidadeEsperada
 } from "../../../../../lib/operacoes";
 
-interface Env { DB: D1Database; MP_ACCESS_TOKEN?: string }
+interface Env {
+  DB: D1Database;
+  MP_ACCESS_TOKEN?: string;
+}
 
 interface PernaEstorno {
   pagamentoId: number;
@@ -28,7 +31,7 @@ interface PernaEstorno {
 const MESSAGES: Record<string, string> = {
   MERCADO_PAGO_NAO_CONFIGURADO: "Mercado Pago não está configurado neste ambiente.",
   REFUND_REMOTO_EM_ANDAMENTO: "Já existe um estorno remoto em andamento para este pagamento.",
-  ...OPERACAO_MENSAGENS,
+  ...OPERACAO_MENSAGENS
 };
 
 const fail = (message: string, status: number, code?: string) =>
@@ -36,10 +39,12 @@ const fail = (message: string, status: number, code?: string) =>
 
 async function montarPernas(db: D1Database, pedidoId: number): Promise<PernaEstorno[]> {
   const pendentes = await listarPagamentosMpReembolsaveis(db, pedidoId);
-  return Promise.all(pendentes.map(async (p) => ({
-    ...p,
-    intencao: await getPixMpRefundIntentForPagamento(db, { pedidoId, pagamentoId: p.pagamentoId }),
-  })));
+  return Promise.all(
+    pendentes.map(async p => ({
+      ...p,
+      intencao: await getPixMpRefundIntentForPagamento(db, { pedidoId, pagamentoId: p.pagamentoId })
+    }))
+  );
 }
 
 // GET: estado atual, somente leitura, dos pagamentos PIX_MP ainda
@@ -72,11 +77,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   const pedidoId = Number(params.id);
   if (!Number.isSafeInteger(pedidoId) || pedidoId <= 0) return fail("Id inválido", 400);
   if (await getPedidoAnulacao(env.DB, pedidoId)) {
-    return fail("Pedido anulado. O histórico está disponível somente para consulta.", 409, "PEDIDO_ANULADO");
+    return fail(
+      "Pedido anulado. O histórico está disponível somente para consulta.",
+      409,
+      "PEDIDO_ANULADO"
+    );
   }
 
   let body: Record<string, unknown>;
-  try { body = await request.json(); } catch { return fail("JSON inválido", 400); }
+  try {
+    body = await request.json();
+  } catch {
+    return fail("JSON inválido", 400);
+  }
   const parsed = parseOperationKey(body.operationKey);
   if (!parsed.ok) return fail(MESSAGES.OPERATION_KEY_INVALIDA, 400, parsed.erro);
 
@@ -91,22 +104,34 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     for (const pendente of pendentes) {
       const legOperationKey = chaveAnulacaoRefund(parsed.key, pendente.pagamentoId);
       const identity: IdentidadeEsperada = {
-        tipo: "REFUND_ADMIN", escopo: "ADMIN", atorUsuarioId: auth.user.id,
+        tipo: "REFUND_ADMIN",
+        escopo: "ADMIN",
+        atorUsuarioId: auth.user.id,
         fingerprint: fingerprint({
-          pedidoId, pagamentoId: pendente.pagamentoId, valorCentavos: pendente.restanteCentavos,
-        }),
+          pedidoId,
+          pagamentoId: pendente.pagamentoId,
+          valorCentavos: pendente.restanteCentavos
+        })
       };
       const resultado = await reconcilePixMpRefundIntent(env.DB, {
-        pedidoId, pagamentoId: pendente.pagamentoId, usuarioId: auth.user.id,
-        operationKey: legOperationKey, fingerprint: identity.fingerprint,
-        valorCentavos: pendente.restanteCentavos, accessToken: env.MP_ACCESS_TOKEN,
+        pedidoId,
+        pagamentoId: pendente.pagamentoId,
+        usuarioId: auth.user.id,
+        operationKey: legOperationKey,
+        fingerprint: identity.fingerprint,
+        valorCentavos: pendente.restanteCentavos,
+        accessToken: env.MP_ACCESS_TOKEN
       });
       // Conflito de uma perna — reutilização incompatível da sub-key derivada
       // ou SALDO_REEMBOLSAVEL_INSUFICIENTE (M3: outro refund consumiu a
       // capacidade entre o cálculo e a criação da intenção; nada foi enviado
       // ao MP). Segue para as demais pernas; o estado é recomputado abaixo.
       if (resultado.ok === false) {
-        console.error("Conflito ao reconciliar estorno de anulacao", { pedidoId, pendente }, resultado.erro);
+        console.error(
+          "Conflito ao reconciliar estorno de anulacao",
+          { pedidoId, pendente },
+          resultado.erro
+        );
       }
     }
   } catch (error) {
@@ -116,6 +141,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
 
   const pernas = await montarPernas(env.DB, pedidoId);
   const restanteTotalCentavos = pernas.reduce((soma, p) => soma + p.restanteCentavos, 0);
-  return Response.json({ pedidoId, restanteTotalCentavos, pernas },
-    { status: restanteTotalCentavos > 0 ? 202 : 200 });
+  return Response.json(
+    { pedidoId, restanteTotalCentavos, pernas },
+    { status: restanteTotalCentavos > 0 ? 202 : 200 }
+  );
 };

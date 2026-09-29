@@ -26,7 +26,9 @@
   justify-content: center;
   box-shadow: var(--store-shadow);
   z-index: 1000;
-  transition: transform 0.2s, background-color 0.2s;
+  transition:
+    transform 0.2s,
+    background-color 0.2s;
 }
 
 @media (hover: hover) {
@@ -148,7 +150,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 @media (hover: hover) {
   .cart-close-btn:hover,
@@ -242,7 +246,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.15s, background-color 0.15s, border-color 0.15s;
+  transition:
+    opacity 0.15s,
+    background-color 0.15s,
+    border-color 0.15s;
 }
 .cart-qty-controls button:focus:not(:focus-visible) {
   outline: none;
@@ -277,7 +284,9 @@
   padding: 4px;
   color: var(--store-text-subtle);
   opacity: 0.7;
-  transition: opacity 0.2s, color 0.2s;
+  transition:
+    opacity 0.2s,
+    color 0.2s;
 }
 @media (hover: hover) {
   .cart-remove-btn:hover {
@@ -328,7 +337,9 @@
   font-weight: 600;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.15s;
+  transition:
+    background-color 0.2s,
+    transform 0.15s;
   margin-bottom: 8px;
 }
 @media (hover: hover) {
@@ -487,7 +498,9 @@
   font-size: 14px;
   color: var(--store-text);
   outline: none;
-  transition: border-color 0.2s, background-color 0.2s;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
 }
 .form-input::placeholder {
   color: var(--store-text-subtle);

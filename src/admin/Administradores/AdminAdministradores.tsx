@@ -98,7 +98,7 @@ function formatDesde(iso: string) {
   return new Date(iso.replace(" ", "T")).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "short",
-    year: "numeric",
+    year: "numeric"
   });
 }
 
@@ -114,46 +114,41 @@ export default function AdminAdministradores() {
   const carregarAdmins = () => {
     setLoading(true);
     fetch("/api/admin/administradores")
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) throw new Error("Falha ao carregar administradores");
         return response.json() as Promise<{ administradores: AdminRow[] }>;
       })
-      .then((data) => {
+      .then(data => {
         setAdmins(data.administradores);
         setError(null);
       })
-      .catch((err) => setError(err.message))
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   };
 
   useEffect(carregarAdmins, []);
 
-  const executarAcao = (
-    id: number,
-    body: Record<string, unknown>,
-  ) => {
+  const executarAcao = (id: number, body: Record<string, unknown>) => {
     setError(null);
     fetch(`/api/admin/administradores/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body)
     })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const respBody = await response.json().catch(() => ({}));
           throw new Error(respBody.error ?? "Falha ao executar ação");
         }
         carregarAdmins();
       })
-      .catch((err) => setError(err.message));
+      .catch(err => setError(err.message));
   };
 
   const isOwner = user.papel === "OWNER";
   const totalContas = admins.length;
-  const totalAtivas = admins.filter((a) => a.ativo === 1).length;
-  const totalMestres = admins.filter(
-    (a) => a.papel === "OWNER" && a.ativo === 1,
-  ).length;
+  const totalAtivas = admins.filter(a => a.ativo === 1).length;
+  const totalMestres = admins.filter(a => a.papel === "OWNER" && a.ativo === 1).length;
 
   return (
     <main className="adm-main">
@@ -161,16 +156,10 @@ export default function AdminAdministradores() {
       <header className="adm-header">
         <div>
           <h1 className="adm-title">Administradores</h1>
-          <p className="adm-subtitle">
-            Contas, níveis de acesso e segurança da equipe
-          </p>
+          <p className="adm-subtitle">Contas, níveis de acesso e segurança da equipe</p>
         </div>
         {isOwner && (
-          <button
-            type="button"
-            className="adm-btn-new"
-            onClick={() => setNovoAdminOpen(true)}
-          >
+          <button type="button" className="adm-btn-new" onClick={() => setNovoAdminOpen(true)}>
             <IconPlus />
             Novo administrador
           </button>
@@ -198,20 +187,14 @@ export default function AdminAdministradores() {
 
       {/* ── Admin cards ── */}
       <div className="adm-cards-grid">
-        {admins.map((admin) => {
+        {admins.map(admin => {
           const isYou = admin.id === user.id;
           return (
-            <div
-              key={admin.id}
-              className={`adm-card ${isYou ? "adm-card--full" : ""}`}
-            >
+            <div key={admin.id} className={`adm-card ${isYou ? "adm-card--full" : ""}`}>
               {/* Top row: avatar + name + status */}
               <div className="adm-card-top">
                 <div className="adm-card-identity">
-                  <div
-                    className="adm-avatar"
-                    style={{ background: avatarBg(admin.id) }}
-                  >
+                  <div className="adm-avatar" style={{ background: avatarBg(admin.id) }}>
                     <span>{initialsFor(admin.nome)}</span>
                   </div>
                   <div className="adm-card-name-group">
@@ -251,9 +234,7 @@ export default function AdminAdministradores() {
                   <span className="adm-detail-label">
                     <IconCalendar /> DESDE
                   </span>
-                  <span className="adm-detail-value">
-                    {formatDesde(admin.criado_em)}
-                  </span>
+                  <span className="adm-detail-value">{formatDesde(admin.criado_em)}</span>
                 </div>
               </div>
 
@@ -279,13 +260,11 @@ export default function AdminAdministradores() {
                       onClick={() =>
                         executarAcao(admin.id, {
                           acao: "alterar_papel",
-                          papel: admin.papel === "OWNER" ? "ADMIN" : "OWNER",
+                          papel: admin.papel === "OWNER" ? "ADMIN" : "OWNER"
                         })
                       }
                     >
-                      {admin.papel === "OWNER"
-                        ? "Tornar administrador"
-                        : "Tornar mestre"}
+                      {admin.papel === "OWNER" ? "Tornar administrador" : "Tornar mestre"}
                     </button>
                     <button
                       type="button"
@@ -293,7 +272,7 @@ export default function AdminAdministradores() {
                       onClick={() =>
                         executarAcao(admin.id, {
                           acao: "toggle_ativo",
-                          ativo: admin.ativo !== 1,
+                          ativo: admin.ativo !== 1
                         })
                       }
                     >

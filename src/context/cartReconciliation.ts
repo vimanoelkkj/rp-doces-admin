@@ -118,14 +118,14 @@ export function reconcileCartWithCatalog<T extends ReconcilableCartItem>(
       reconciled.push({
         ...item,
         quantity: disp,
-        disponibilidade: disp,
+        disponibilidade: disp
       });
       adjusted = true;
     } else {
       const dispMudou = item.disponibilidade !== disp;
       reconciled.push({
         ...item,
-        disponibilidade: disp,
+        disponibilidade: disp
       });
       if (dispMudou) {
         adjusted = true;

@@ -16,7 +16,7 @@ export type PedidoReconcileResult =
 // não libera reservas nem altera status operacional. Pode repetir sem evento MP.
 export async function reconcilePedidoAfterFinancialChange(
   db: D1Database,
-  pedidoId: number,
+  pedidoId: number
 ): Promise<PedidoReconcileResult> {
   if (await getPedidoAnulacao(db, pedidoId)) return { ok: false, motivo: "PEDIDO_ANULADO" };
   const agregado = await recalculatePedidoStatusPagamento(db, pedidoId);
@@ -25,10 +25,10 @@ export async function reconcilePedidoAfterFinancialChange(
     return { ok: false, motivo: pedido ? "LEGADO_SEM_LEDGER" : "PEDIDO_NAO_ENCONTRADO" };
   }
 
-  const estoque: BaixaResultado = agregado === "PAGO"
-    ? await baixarEstoquePedido(db, pedidoId)
-    : { ok: true, baixado: false };
-  if (!estoque.ok) console.error("Reconciliação financeira com pendência de estoque", pedidoId, estoque.erro);
+  const estoque: BaixaResultado =
+    agregado === "PAGO" ? await baixarEstoquePedido(db, pedidoId) : { ok: true, baixado: false };
+  if (!estoque.ok)
+    console.error("Reconciliação financeira com pendência de estoque", pedidoId, estoque.erro);
 
   // M2 (auditoria Comanda Viva) — mesmo gatilho de qualquer mudança
   // financeira (pagamento admin, refund admin, sync de webhook MP, ou este
@@ -44,8 +44,10 @@ export async function reconcilePedidoAfterFinancialChange(
   }
 
   // A baixa revalida no batch: um refund concorrente pode mudar a projeção.
-  const atual = await db.prepare(`SELECT status_pagamento FROM pedidos WHERE id = ?`)
-    .bind(pedidoId).first<{ status_pagamento: StatusFinanceiroAgregado }>();
+  const atual = await db
+    .prepare(`SELECT status_pagamento FROM pedidos WHERE id = ?`)
+    .bind(pedidoId)
+    .first<{ status_pagamento: StatusFinanceiroAgregado }>();
   return { ok: true, statusFinanceiro: atual?.status_pagamento ?? agregado, estoque };
 }
 
@@ -54,7 +56,9 @@ const RECONCILE_PEDIDOS_BATCH_SIZE = 4;
 // Sem dependência de mp_payment_id, método/origem ou tentativa PENDENTE.
 // Prioridade financeira impede que faltas de estoque escondam divergências.
 export async function reconcilePedidosDivergentes(db: D1Database): Promise<void> {
-  const { results } = await db.prepare(`
+  const { results } = await db
+    .prepare(
+      `
     SELECT id FROM (
       SELECT p.id, p.status_pagamento, p.reserva_status, p.estoque_baixado_em, p.atualizado_em,
              ${STATUS_FINANCEIRO_SQL} AS esperado,
@@ -65,7 +69,7 @@ export async function reconcilePedidosDivergentes(db: D1Database): Promise<void>
                  AND ${itemEstoquePendenteSql("pi")}
              ) AS estoque_pendente
       FROM pedidos p
-      WHERE ${pedidoValidoSql('p.id')} AND EXISTS (SELECT 1 FROM pedido_pagamentos pp WHERE pp.pedido_id = p.id)
+      WHERE ${pedidoValidoSql("p.id")} AND EXISTS (SELECT 1 FROM pedido_pagamentos pp WHERE pp.pedido_id = p.id)
     ) divergente
     WHERE status_pagamento IS NOT esperado
        OR (esperado = 'PAGO' AND estoque_pendente)
@@ -80,13 +84,18 @@ export async function reconcilePedidosDivergentes(db: D1Database): Promise<void>
            AND (reserva_status <> 'CONVERTIDA' OR estoque_baixado_em IS NULL))
     ORDER BY (status_pagamento IS NOT esperado) DESC, atualizado_em ASC, id ASC
     LIMIT ?
-  `).bind(RECONCILE_PEDIDOS_BATCH_SIZE).all<{ id: number }>();
+  `
+    )
+    .bind(RECONCILE_PEDIDOS_BATCH_SIZE)
+    .all<{ id: number }>();
 
-  await Promise.all(results.map(async ({ id }) => {
-    try {
-      await reconcilePedidoAfterFinancialChange(db, id);
-    } catch (err) {
-      console.error("Falha ao reconciliar pedido com ledger", id, err);
-    }
-  }));
+  await Promise.all(
+    results.map(async ({ id }) => {
+      try {
+        await reconcilePedidoAfterFinancialChange(db, id);
+      } catch (err) {
+        console.error("Falha ao reconciliar pedido com ledger", id, err);
+      }
+    })
+  );
 }

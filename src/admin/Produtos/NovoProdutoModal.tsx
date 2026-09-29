@@ -3,11 +3,7 @@ import { ALERGENICOS_MAX, INGREDIENTES_MAX, PESO_TEXTO_MAX } from "../../../shar
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "./AdminProdutos";
 import { useAdminModal } from "../components/useAdminModal";
-import {
-  formatBrlInput,
-  formatCentsAsBrlInput,
-  parseBrlInputToCents,
-} from "../../lib/brl";
+import { formatBrlInput, formatCentsAsBrlInput, parseBrlInputToCents } from "../../lib/brl";
 import { estadoPromocao } from "../../../shared/promocao";
 import "./NovoProdutoModal.css";
 import { EMOJI_OPTIONS } from "./EmojiIcons";
@@ -106,7 +102,7 @@ export default function NovoProdutoModal({
   open,
   onClose,
   onSaved,
-  produto,
+  produto
 }: NovoProdutoModalProps) {
   const isEdit = produto != null;
   const fieldId = useId();
@@ -159,20 +155,20 @@ export default function NovoProdutoModal({
     formData.append("image", file);
     fetch(`/api/admin/produtos/${produto!.id}/imagem`, {
       method: "POST",
-      body: formData,
+      body: formData
     })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error ?? "Falha ao enviar imagem");
         }
         return response.json() as Promise<{ imageUrl: string }>;
       })
-      .then((result) => {
+      .then(result => {
         setImagePreview(result.imageUrl);
         onSaved?.();
       })
-      .catch((err) => {
+      .catch(err => {
         setError(err instanceof Error ? err.message : "Falha ao enviar imagem");
       })
       .finally(() => setUploadingImage(false));
@@ -183,7 +179,7 @@ export default function NovoProdutoModal({
     setUploadingImage(true);
     setError(null);
     fetch(`/api/admin/produtos/${produto!.id}/imagem`, { method: "DELETE" })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error ?? "Falha ao remover imagem");
@@ -191,7 +187,7 @@ export default function NovoProdutoModal({
         setImagePreview(null);
         onSaved?.();
       })
-      .catch((err) => {
+      .catch(err => {
         setError(err instanceof Error ? err.message : "Falha ao remover imagem");
       })
       .finally(() => setUploadingImage(false));
@@ -221,13 +217,13 @@ export default function NovoProdutoModal({
   useEffect(() => {
     if (!open) return;
     fetch("/api/admin/categorias")
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) throw new Error("Falha ao carregar categorias");
         return response.json() as Promise<{ categorias: Categoria[] }>;
       })
-      .then((data) => {
+      .then(data => {
         setCategorias(data.categorias);
-        setCategory((current) => current || data.categorias[0]?.id || "");
+        setCategory(current => current || data.categorias[0]?.id || "");
       })
       .catch(() => setCategorias([]));
   }, [open]);
@@ -241,7 +237,7 @@ export default function NovoProdutoModal({
     setName(produto.nome);
     setCategory(produto.categoria);
     setStock(String(produto.estoque));
-    const emojiIndex = EMOJI_OPTIONS.findIndex((e) => e.char === produto.emoji);
+    const emojiIndex = EMOJI_OPTIONS.findIndex(e => e.char === produto.emoji);
     setSelectedEmoji(emojiIndex >= 0 ? emojiIndex : null);
     setPrice(formatCentsAsBrlInput(produto.preco_centavos));
     setDescription(produto.descricao);
@@ -256,7 +252,7 @@ export default function NovoProdutoModal({
     setPromoPrice(
       produto.preco_promocional_centavos != null
         ? formatCentsAsBrlInput(produto.preco_promocional_centavos)
-        : "0,00",
+        : "0,00"
     );
     setPromoInicio(isoParaDatetimeLocal(produto.promocao_inicio));
     setPromoFim(isoParaDatetimeLocal(produto.promocao_fim));
@@ -314,9 +310,7 @@ export default function NovoProdutoModal({
     setSaving(true);
     setError(null);
     try {
-      const url = isEdit
-        ? `/api/admin/produtos/${produto!.id}`
-        : "/api/admin/produtos";
+      const url = isEdit ? `/api/admin/produtos/${produto!.id}` : "/api/admin/produtos";
       const response = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -337,8 +331,8 @@ export default function NovoProdutoModal({
           promocaoAtiva: promocao,
           precoPromocionalCentavos: promoCentavos,
           promocaoInicio: promoInicioIso,
-          promocaoFim: promoFimIso,
-        }),
+          promocaoFim: promoFimIso
+        })
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -365,16 +359,17 @@ export default function NovoProdutoModal({
     preco_promocional_centavos: promoCentavosPreview,
     promocao_ativa: promocao ? 1 : 0,
     promocao_inicio: datetimeLocalParaIso(promoInicio),
-    promocao_fim: datetimeLocalParaIso(promoFim),
+    promocao_fim: datetimeLocalParaIso(promoFim)
   });
   const promoHint = {
     DESLIGADA: "Promoção desligada: o catálogo mostra o preço normal.",
     SEM_PRECO: "Informe o preço promocional para a promoção valer.",
     FUTURA: "Agendada: o preço promocional começa a valer na data de início.",
-    VIGENTE: promoInicio || promoFim
-      ? "Vigente agora: o catálogo já mostra o preço promocional."
-      : "Vigente agora e sem prazo: vale até você desligar.",
-    EXPIRADA: "Período encerrado: o catálogo voltou ao preço normal.",
+    VIGENTE:
+      promoInicio || promoFim
+        ? "Vigente agora: o catálogo já mostra o preço promocional."
+        : "Vigente agora e sem prazo: vale até você desligar.",
+    EXPIRADA: "Período encerrado: o catálogo voltou ao preço normal."
   }[promoEstado];
 
   if (!open) return null;
@@ -385,9 +380,7 @@ export default function NovoProdutoModal({
         <div className="np-header">
           <div>
             <span className="np-kicker">CATÁLOGO</span>
-            <h2 className="np-title">
-              {isEdit ? "Editar produto" : "Novo produto"}
-            </h2>
+            <h2 className="np-title">{isEdit ? "Editar produto" : "Novo produto"}</h2>
             <p className="np-subtitle">
               {isEdit
                 ? "Atualize as informações deste doce no catálogo."
@@ -407,21 +400,16 @@ export default function NovoProdutoModal({
               type="text"
               placeholder="Ex.: Bolo no pote de morango"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={e => setName(e.target.value)}
             />
           </div>
 
           <div className="np-row-2">
             <div className="np-field">
-              <label
-                id={`${fieldId}-categoria-label`}
-                htmlFor={`${fieldId}-categoria`}
-              >
+              <label id={`${fieldId}-categoria-label`} htmlFor={`${fieldId}-categoria`}>
                 CATEGORIA
               </label>
-              <div
-                className={`np-dropdown ${catOpen ? "np-dropdown--open" : ""}`}
-              >
+              <div className={`np-dropdown ${catOpen ? "np-dropdown--open" : ""}`}>
                 <button
                   id={`${fieldId}-categoria`}
                   type="button"
@@ -431,8 +419,8 @@ export default function NovoProdutoModal({
                   onBlur={() => setTimeout(() => setCatOpen(false), 150)}
                 >
                   <span id={`${fieldId}-categoria-value`}>
-                    {categorias.find((c) => c.id === category)
-                      ? `${categorias.find((c) => c.id === category)!.emoji} ${categorias.find((c) => c.id === category)!.nome}`
+                    {categorias.find(c => c.id === category)
+                      ? `${categorias.find(c => c.id === category)!.emoji} ${categorias.find(c => c.id === category)!.nome}`
                       : "Selecione uma categoria"}
                   </span>
                   <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
@@ -448,8 +436,8 @@ export default function NovoProdutoModal({
                 {catOpen && (
                   <ul className="np-dropdown-list">
                     {categorias
-                      .filter((cat) => cat.ativo === 1 || cat.id === category)
-                      .map((cat) => (
+                      .filter(cat => cat.ativo === 1 || cat.id === category)
+                      .map(cat => (
                         <li key={cat.id}>
                           <button
                             type="button"
@@ -486,7 +474,7 @@ export default function NovoProdutoModal({
                   value={stock}
                   inputMode="numeric"
                   aria-label="Estoque total"
-                  onChange={(e) => {
+                  onChange={e => {
                     if (/^\d*$/.test(e.target.value)) setStock(e.target.value);
                   }}
                 />
@@ -514,9 +502,7 @@ export default function NovoProdutoModal({
                     {estoqueLivre === 1 ? "disponível" : "disponíveis"} para venda
                   </span>
                   {estoqueAbaixoDaReserva && (
-                    <small>
-                      O estoque total ficou abaixo da quantidade já reservada.
-                    </small>
+                    <small>O estoque total ficou abaixo da quantidade já reservada.</small>
                   )}
                 </div>
               )}
@@ -556,7 +542,7 @@ export default function NovoProdutoModal({
               type="text"
               placeholder="0,00"
               value={price}
-              onChange={(e) => setPrice(formatBrlInput(e.target.value))}
+              onChange={e => setPrice(formatBrlInput(e.target.value))}
               inputMode="decimal"
             />
           </div>
@@ -620,7 +606,7 @@ export default function NovoProdutoModal({
               id={`${fieldId}-descricao`}
               placeholder="Uma descrição curta do produto."
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={e => setDescription(e.target.value)}
               rows={4}
             />
           </div>
@@ -632,7 +618,7 @@ export default function NovoProdutoModal({
               type="text"
               placeholder="Ex.: 220 g"
               value={pesoTexto}
-              onChange={(e) => setPesoTexto(e.target.value)}
+              onChange={e => setPesoTexto(e.target.value)}
               maxLength={PESO_TEXTO_MAX}
             />
           </div>
@@ -643,7 +629,7 @@ export default function NovoProdutoModal({
               id="np-ingredientes"
               placeholder="Ex.: leite condensado, creme de leite, frutas vermelhas…"
               value={ingredientes}
-              onChange={(e) => setIngredientes(e.target.value)}
+              onChange={e => setIngredientes(e.target.value)}
               maxLength={INGREDIENTES_MAX}
               rows={3}
             />
@@ -655,7 +641,7 @@ export default function NovoProdutoModal({
               id="np-alergenicos"
               placeholder="Ex.: contém leite e derivados. Pode conter traços de glúten."
               value={alergenicos}
-              onChange={(e) => setAlergenicos(e.target.value)}
+              onChange={e => setAlergenicos(e.target.value)}
               maxLength={ALERGENICOS_MAX}
               rows={2}
             />
@@ -666,7 +652,7 @@ export default function NovoProdutoModal({
               <input
                 type="checkbox"
                 checked={produtoAtivo}
-                onChange={(e) => setProdutoAtivo(e.target.checked)}
+                onChange={e => setProdutoAtivo(e.target.checked)}
               />
               <span className="np-check-box" />
               <div>
@@ -678,7 +664,7 @@ export default function NovoProdutoModal({
               <input
                 type="checkbox"
                 checked={destaque}
-                onChange={(e) => setDestaque(e.target.checked)}
+                onChange={e => setDestaque(e.target.checked)}
               />
               <span className="np-check-box" />
               <div>
@@ -690,7 +676,7 @@ export default function NovoProdutoModal({
               <input
                 type="checkbox"
                 checked={disponivelVenda}
-                onChange={(e) => setDisponivelVenda(e.target.checked)}
+                onChange={e => setDisponivelVenda(e.target.checked)}
               />
               <span className="np-check-box" />
               <div>
@@ -702,7 +688,7 @@ export default function NovoProdutoModal({
               <input
                 type="checkbox"
                 checked={promocao}
-                onChange={(e) => setPromocao(e.target.checked)}
+                onChange={e => setPromocao(e.target.checked)}
               />
               <span className="np-check-box" />
               <div>
@@ -718,40 +704,34 @@ export default function NovoProdutoModal({
           {promocao && (
             <div className="np-promo-box np-field--full">
               <div className="np-field np-field--full">
-                <label htmlFor={`${fieldId}-preco-promocional`}>
-                  PREÇO PROMOCIONAL
-                </label>
+                <label htmlFor={`${fieldId}-preco-promocional`}>PREÇO PROMOCIONAL</label>
                 <input
                   id={`${fieldId}-preco-promocional`}
                   type="text"
                   placeholder="0,00"
                   value={promoPrice}
-                  onChange={(e) => setPromoPrice(formatBrlInput(e.target.value))}
+                  onChange={e => setPromoPrice(formatBrlInput(e.target.value))}
                   inputMode="decimal"
                 />
               </div>
 
               <div className="np-row-2">
                 <div className="np-field">
-                  <label htmlFor={`${fieldId}-promocao-inicio`}>
-                    INÍCIO — OPCIONAL
-                  </label>
+                  <label htmlFor={`${fieldId}-promocao-inicio`}>INÍCIO — OPCIONAL</label>
                   <input
                     id={`${fieldId}-promocao-inicio`}
                     type="datetime-local"
                     value={promoInicio}
-                    onChange={(e) => setPromoInicio(e.target.value)}
+                    onChange={e => setPromoInicio(e.target.value)}
                   />
                 </div>
                 <div className="np-field">
-                  <label htmlFor={`${fieldId}-promocao-fim`}>
-                    TÉRMINO — OPCIONAL
-                  </label>
+                  <label htmlFor={`${fieldId}-promocao-fim`}>TÉRMINO — OPCIONAL</label>
                   <input
                     id={`${fieldId}-promocao-fim`}
                     type="datetime-local"
                     value={promoFim}
-                    onChange={(e) => setPromoFim(e.target.value)}
+                    onChange={e => setPromoFim(e.target.value)}
                   />
                 </div>
               </div>
@@ -767,16 +747,12 @@ export default function NovoProdutoModal({
               Cancelar
             </button>
             <button type="submit" className="np-btn-save" disabled={saving}>
-              {saving
-                ? "Salvando…"
-                : isEdit
-                  ? "Salvar alterações"
-                  : "Salvar produto"}
+              {saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Salvar produto"}
             </button>
           </div>
         </form>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

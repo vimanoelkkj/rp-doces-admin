@@ -9,13 +9,7 @@ import { formatarFinanceiroTexto, type FinanceiroPedido } from "./formatarFinanc
 type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
 
 type TabFilter =
-  | "todos"
-  | "hoje"
-  | "novos"
-  | "em_producao"
-  | "prontos"
-  | "entregues"
-  | "arquivados";
+  "todos" | "hoje" | "novos" | "em_producao" | "prontos" | "entregues" | "arquivados";
 
 interface PedidoListItem {
   id: number;
@@ -51,19 +45,18 @@ const TABS: { key: TabFilter; label: string }[] = [
   { key: "em_producao", label: "Em produção" },
   { key: "prontos", label: "Prontos" },
   { key: "entregues", label: "Entregues" },
-  { key: "arquivados", label: "Arquivados" },
+  { key: "arquivados", label: "Arquivados" }
 ];
 
 /* ── Helpers ── */
-const formatarPreco = (centavos: number) =>
-  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+const formatarPreco = (centavos: number) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
 const STATUS_LABEL: Record<StatusPedido, string> = {
   NOVO: "Novo",
   PREPARANDO: "Em produção",
   PRONTO: "Pronto",
   ENTREGUE: "Entregue",
-  CANCELADO: "Cancelado",
+  CANCELADO: "Cancelado"
 };
 
 export const statusLabel = (status: StatusPedido) => STATUS_LABEL[status];
@@ -73,7 +66,7 @@ const STATUS_CLASS: Record<StatusPedido, string> = {
   PREPARANDO: "ped-badge--orange",
   PRONTO: "ped-badge--blue",
   ENTREGUE: "ped-badge--green",
-  CANCELADO: "ped-badge--red",
+  CANCELADO: "ped-badge--red"
 };
 
 const statusClass = (status: StatusPedido) => STATUS_CLASS[status];
@@ -98,7 +91,7 @@ export default function AdminPedidos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const pedidoNaUrl = Number(searchParams.get("pedido"));
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(
-    Number.isInteger(pedidoNaUrl) && pedidoNaUrl > 0 ? pedidoNaUrl : null,
+    Number.isInteger(pedidoNaUrl) && pedidoNaUrl > 0 ? pedidoNaUrl : null
   );
 
   useEffect(() => {
@@ -124,7 +117,9 @@ export default function AdminPedidos() {
       requestVersionRef.current++;
       pageCacheRef.current.clear();
       inFlightRef.current.clear();
-      setData(atual => atual ? { ...atual, pedidos: atual.pedidos.filter(pedido => pedido.id !== id) } : atual);
+      setData(atual =>
+        atual ? { ...atual, pedidos: atual.pedidos.filter(pedido => pedido.id !== id) } : atual
+      );
       setRefreshKey(key => key + 1);
     };
     window.addEventListener("pedido-anulado", aoAnular);
@@ -134,7 +129,7 @@ export default function AdminPedidos() {
   // Reconciliação global disparada explicitamente uma vez na abertura da tela.
   // Não reexecuta em paginação, busca ou troca de abas; falhas não bloqueiam a tela.
   useEffect(() => {
-    fetch("/api/admin/pedidos/reconciliar", { method: "POST" }).catch((err) => {
+    fetch("/api/admin/pedidos/reconciliar", { method: "POST" }).catch(err => {
       console.warn("Falha na reconciliação inicial de pedidos", err);
     });
   }, []);
@@ -172,16 +167,16 @@ export default function AdminPedidos() {
 
       const params = new URLSearchParams({
         status: activeTab,
-        page: String(page),
+        page: String(page)
       });
       if (debouncedSearch) params.set("search", debouncedSearch);
 
       const requisicao = fetch(`/api/admin/pedidos?${params.toString()}`)
-        .then(async (response) => {
+        .then(async response => {
           if (!response.ok) throw new Error("Falha ao carregar pedidos");
           return response.json() as Promise<PedidosResponse>;
         })
-        .then((result) => {
+        .then(result => {
           if (!obsoleto()) pageCacheRef.current.set(page, result);
           return result;
         })
@@ -203,7 +198,7 @@ export default function AdminPedidos() {
     }
 
     carregarPagina(currentPage)
-      .then((result) => {
+      .then(result => {
         if (obsoleto()) return;
         if (currentPage > result.totalPages) setCurrentPage(result.totalPages);
         setData(result);
@@ -221,7 +216,7 @@ export default function AdminPedidos() {
           });
         }
       })
-      .catch((err) => {
+      .catch(err => {
         if (obsoleto()) return;
         setError(err.message);
         setLoading(false);
@@ -241,207 +236,195 @@ export default function AdminPedidos() {
 
   return (
     <main className="admin-main">
-        {/* Header */}
-        <div className="ped-header-row">
-          <div className="ped-title-group">
-            <h1 className="ped-title">Pedidos</h1>
-            <p className="ped-subtitle">
-              Gerenciamento de comandas e entregas em tempo real
-            </p>
+      {/* Header */}
+      <div className="ped-header-row">
+        <div className="ped-title-group">
+          <h1 className="ped-title">Pedidos</h1>
+          <p className="ped-subtitle">Gerenciamento de comandas e entregas em tempo real</p>
+        </div>
+        <div className="ped-header-actions">
+          <button type="button" className="ped-btn-primary" onClick={() => setNovoPedidoOpen(true)}>
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <line x1="8" y1="3" x2="8" y2="13" />
+              <line x1="3" y1="8" x2="13" y2="8" />
+            </svg>
+            Novo pedido
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="ped-filters">
+        <div className="ped-filter-row">
+          <div className="ped-search">
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="#8c7a76"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            >
+              <circle cx="7" cy="7" r="4.5" />
+              <line x1="10.5" y1="10.5" x2="14" y2="14" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Buscar pedido, cliente ou comanda..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            <span className="ped-shortcut">⌘K</span>
           </div>
-          <div className="ped-header-actions">
+
+          <div className="ped-tabs">
+            {TABS.map(tab => (
+              <button
+                type="button"
+                key={tab.key}
+                className={`ped-tab${activeTab === tab.key ? " ped-tab--active" : ""}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.label}
+                <span
+                  className={`ped-tab-count${activeTab === tab.key ? " ped-tab-count--active" : ""}`}
+                >
+                  {counts ? counts[tab.key] : 0}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Orders table */}
+      <div className="ped-table-panel">
+        {/* Table header */}
+        <div className="ped-table-header">
+          <span className="ped-th ped-th-id">Pedido</span>
+          <span className="ped-th ped-th-client">Cliente</span>
+          <span className="ped-th ped-th-status">Status</span>
+          <span className="ped-th ped-th-payment">Pagamento</span>
+          <span className="ped-th ped-th-total">Total</span>
+        </div>
+
+        {error && <div className="ped-empty-message">{error}</div>}
+        {!error && !loading && pedidos.length === 0 && (
+          <div className="ped-empty-message">Nenhum pedido encontrado.</div>
+        )}
+
+        {/* Table rows */}
+        {pedidos.map((pedido, i) => (
+          <button
+            type="button"
+            key={pedido.id}
+            className={`ped-table-row${i === pedidos.length - 1 ? " ped-table-row--last" : ""}`}
+            onClick={() => setSelectedOrderId(pedido.id)}
+          >
+            <span className="ped-td ped-td-id">RP-{pedido.id}</span>
+            <span className="ped-td ped-td-client">{pedido.cliente_nome}</span>
+            <span className="ped-td ped-td-status">
+              <span className={`ped-badge ${statusClass(pedido.status_pedido)}`}>
+                {statusLabel(pedido.status_pedido)}
+              </span>
+            </span>
+            <span className="ped-td ped-td-payment">
+              <span
+                className={`ped-badge ped-badge--${formatarFinanceiroTexto(pedido.financeiro).cor}`}
+              >
+                {formatarFinanceiroTexto(pedido.financeiro).texto}
+              </span>
+            </span>
+            <span className="ped-td ped-td-total">
+              {formatarPreco(pedido.valor_total_centavos)}
+            </span>
+          </button>
+        ))}
+
+        {/* Pagination */}
+        <div className="ped-pagination">
+          <span className="ped-pagination-info">
+            Mostrando {startItem}-{endItem} de {total} pedidos
+          </span>
+          <div className="ped-pagination-controls">
             <button
               type="button"
-              className="ped-btn-primary"
-              onClick={() => setNovoPedidoOpen(true)}
+              className="ped-page-btn ped-page-arrow"
+              aria-label="Página anterior"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
             >
               <svg
                 aria-hidden="true"
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <line x1="8" y1="3" x2="8" y2="13" />
-                <line x1="3" y1="8" x2="13" y2="8" />
-              </svg>
-              Novo pedido
-            </button>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="ped-filters">
-          <div className="ped-filter-row">
-            <div className="ped-search">
-              <svg
-                aria-hidden="true"
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="#8c7a76"
                 strokeWidth="1.5"
                 strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <circle cx="7" cy="7" r="4.5" />
-                <line x1="10.5" y1="10.5" x2="14" y2="14" />
+                <polyline points="9,2 4,7 9,12" />
               </svg>
-              <input
-                type="text"
-                placeholder="Buscar pedido, cliente ou comanda..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <span className="ped-shortcut">⌘K</span>
-            </div>
-
-            <div className="ped-tabs">
-              {TABS.map((tab) => (
-                <button
-                  type="button"
-                  key={tab.key}
-                  className={`ped-tab${activeTab === tab.key ? " ped-tab--active" : ""}`}
-                  onClick={() => setActiveTab(tab.key)}
-                >
-                  {tab.label}
-                  <span
-                    className={`ped-tab-count${activeTab === tab.key ? " ped-tab-count--active" : ""}`}
-                  >
-                    {counts ? counts[tab.key] : 0}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Orders table */}
-        <div className="ped-table-panel">
-          {/* Table header */}
-          <div className="ped-table-header">
-            <span className="ped-th ped-th-id">Pedido</span>
-            <span className="ped-th ped-th-client">Cliente</span>
-            <span className="ped-th ped-th-status">Status</span>
-            <span className="ped-th ped-th-payment">Pagamento</span>
-            <span className="ped-th ped-th-total">Total</span>
-          </div>
-
-          {error && <div className="ped-empty-message">{error}</div>}
-          {!error && !loading && pedidos.length === 0 && (
-            <div className="ped-empty-message">Nenhum pedido encontrado.</div>
-          )}
-
-          {/* Table rows */}
-          {pedidos.map((pedido, i) => (
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <button
+                type="button"
+                key={page}
+                className={`ped-page-btn ped-page-num${currentPage === page ? " ped-page-num--active" : ""}`}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </button>
+            ))}
             <button
               type="button"
-              key={pedido.id}
-              className={`ped-table-row${i === pedidos.length - 1 ? " ped-table-row--last" : ""}`}
-              onClick={() => setSelectedOrderId(pedido.id)}
+              className="ped-page-btn ped-page-arrow"
+              aria-label="Próxima página"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
             >
-              <span className="ped-td ped-td-id">RP-{pedido.id}</span>
-              <span className="ped-td ped-td-client">
-                {pedido.cliente_nome}
-              </span>
-              <span className="ped-td ped-td-status">
-                <span
-                  className={`ped-badge ${statusClass(pedido.status_pedido)}`}
-                >
-                  {statusLabel(pedido.status_pedido)}
-                </span>
-              </span>
-              <span className="ped-td ped-td-payment">
-                <span className={`ped-badge ped-badge--${formatarFinanceiroTexto(pedido.financeiro).cor}`}>
-                  {formatarFinanceiroTexto(pedido.financeiro).texto}
-                </span>
-              </span>
-              <span className="ped-td ped-td-total">
-                {formatarPreco(pedido.valor_total_centavos)}
-              </span>
+              <svg
+                aria-hidden="true"
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="5,2 10,7 5,12" />
+              </svg>
             </button>
-          ))}
-
-          {/* Pagination */}
-          <div className="ped-pagination">
-            <span className="ped-pagination-info">
-              Mostrando {startItem}-{endItem} de {total} pedidos
-            </span>
-            <div className="ped-pagination-controls">
-              <button
-                type="button"
-                className="ped-page-btn ped-page-arrow"
-                aria-label="Página anterior"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <svg
-                  aria-hidden="true"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="9,2 4,7 9,12" />
-                </svg>
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
-                  <button
-                    type="button"
-                    key={page}
-                    className={`ped-page-btn ped-page-num${currentPage === page ? " ped-page-num--active" : ""}`}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </button>
-                ),
-              )}
-              <button
-                type="button"
-                className="ped-page-btn ped-page-arrow"
-                aria-label="Próxima página"
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-              >
-                <svg
-                  aria-hidden="true"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="5,2 10,7 5,12" />
-                </svg>
-              </button>
-            </div>
           </div>
         </div>
-        {selectedOrderId !== null && (
-          <PedidoDetalheModal
-            orderId={selectedOrderId}
-            onClose={fecharDetalhe}
-            onStatusChanged={() => setRefreshKey((k) => k + 1)}
-          />
-        )}
-        <NovoPedidoModal
-          open={novoPedidoOpen}
-          onClose={() => setNovoPedidoOpen(false)}
-          onCreated={() => setRefreshKey((k) => k + 1)}
+      </div>
+      {selectedOrderId !== null && (
+        <PedidoDetalheModal
+          orderId={selectedOrderId}
+          onClose={fecharDetalhe}
+          onStatusChanged={() => setRefreshKey(k => k + 1)}
         />
-      </main>
+      )}
+      <NovoPedidoModal
+        open={novoPedidoOpen}
+        onClose={() => setNovoPedidoOpen(false)}
+        onCreated={() => setRefreshKey(k => k + 1)}
+      />
+    </main>
   );
 }

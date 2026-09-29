@@ -27,7 +27,7 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
     { label: "Qui", active: true },
     { label: "Sex", active: true },
     { label: "Sáb", active: true },
-    { label: "Dom", active: false },
+    { label: "Dom", active: false }
   ],
   openTime: "09:00",
   closeTime: "20:00",
@@ -36,15 +36,15 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
   mapsLink: "https://maps.google.com/?q=Temponi+Concept",
   deliveryStatus: "unavailable",
   whatsapp: "(33) 99128-5907",
-  defaultMessage: "Olá! Gostaria de fazer um pedido de bolo.",
+  defaultMessage: "Olá! Gostaria de fazer um pedido de bolo."
 };
 
 export function formatStoreSchedule(
   days: StoreScheduleDay[],
   openTime: string,
-  closeTime: string,
+  closeTime: string
 ): string {
-  const activeDays = days.filter((day) => day.active);
+  const activeDays = days.filter(day => day.active);
   if (activeDays.length === 0) return "Fechado";
   const label =
     activeDays.length === 7
@@ -65,10 +65,7 @@ export function formatStoreWhatsapp(value: string): string {
   return formatWhatsappBr(value);
 }
 
-export function storeWhatsappHref(
-  whatsapp: string,
-  defaultMessage = "",
-): string {
+export function storeWhatsappHref(whatsapp: string, defaultMessage = ""): string {
   const digits = normalizeWhatsappBr(whatsapp);
   const base = `https://wa.me/55${digits}`;
   const message = defaultMessage.trim();
@@ -91,7 +88,7 @@ export async function saveStoreConfig(config: StoreConfig): Promise<StoreConfig>
   const response = await fetch("/api/config", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(config),
+    body: JSON.stringify(config)
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {

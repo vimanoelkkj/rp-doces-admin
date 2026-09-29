@@ -16,45 +16,90 @@ import "./AdminNotificacoes.css";
 
 const ICONES: Record<Notificacao["tipo"], React.ReactNode> = {
   PEDIDO: (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M3 5h10l-1 8H4L3 5z" />
       <path d="M6 5V3.5a2 2 0 014 0V5" />
     </svg>
   ),
   PAGAMENTO: (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="8" cy="8" r="6" />
       <path d="M5.5 8.2l1.8 1.8L10.8 6.4" />
     </svg>
   ),
   ESTOQUE: (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M8 2.2l6 10.6H2L8 2.2z" />
       <path d="M8 6.6v3M8 11.4v.2" />
     </svg>
   ),
   OPERACAO: (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="8" cy="8" r="6" />
       <path d="M8 5v3.4M8 10.8v.2" />
     </svg>
   ),
   TESTE: (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M6 2h4M8 2v3.5l3.2 6a1.6 1.6 0 01-1.4 2.5H6.2a1.6 1.6 0 01-1.4-2.5L8 5.5" />
     </svg>
-  ),
+  )
 };
 
 // Tempo relativo simples e honesto: nunca inventa precisão que não temos.
 function tempoRelativo(iso: string): string {
   const instante = Date.parse(
-    /[TZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${String(iso).replace(" ", "T")}Z`,
+    /[TZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${String(iso).replace(" ", "T")}Z`
   );
   if (!Number.isFinite(instante)) return "";
   const segundos = Math.max(0, Math.round((Date.now() - instante) / 1000));
@@ -108,8 +153,17 @@ export default function AdminNotificacoes() {
         {!error && !loading && notificacoes.length === 0 && (
           <div className="notif-empty">
             <div className="notif-empty-icon" aria-hidden="true">
-              <svg aria-hidden="true" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                aria-hidden="true"
+                width="40"
+                height="40"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M18 8A6 6 0 106 8c0 6-3 7-3 7h18s-3-1-3-7" />
                 <path d="M13.7 21a2 2 0 01-3.4 0" />
               </svg>
@@ -119,7 +173,7 @@ export default function AdminNotificacoes() {
           </div>
         )}
 
-        {notificacoes.map((notificacao) => (
+        {notificacoes.map(notificacao => (
           <button
             key={notificacao.chave}
             type="button"

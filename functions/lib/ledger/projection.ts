@@ -17,7 +17,7 @@ export async function getPaidCentavos(db: D1Database, pedidoId: number): Promise
   const row = await db
     .prepare(
       `SELECT COALESCE(SUM(valor_centavos), 0) AS total
-       FROM pedido_pagamentos WHERE pedido_id = ? AND status = 'PAGO'`,
+       FROM pedido_pagamentos WHERE pedido_id = ? AND status = 'PAGO'`
     )
     .bind(pedidoId)
     .first<{ total: number }>();
@@ -30,7 +30,7 @@ export async function getRefundedCentavos(db: D1Database, pedidoId: number): Pro
   const row = await db
     .prepare(
       `SELECT COALESCE(SUM(valor_centavos), 0) AS total
-       FROM pedido_reembolsos WHERE pedido_id = ? AND status = 'REEMBOLSADO'`,
+       FROM pedido_reembolsos WHERE pedido_id = ? AND status = 'REEMBOLSADO'`
     )
     .bind(pedidoId)
     .first<{ total: number }>();
@@ -53,12 +53,13 @@ export async function getNetPaidCentavos(db: D1Database, pedidoId: number): Prom
 // senão um pedido totalmente reembolsado continuaria marcado PAGO.
 export async function recalculatePedidoStatusPagamento(
   db: D1Database,
-  pedidoId: number,
+  pedidoId: number
 ): Promise<StatusFinanceiroAgregado | null> {
   // Calculado no instante da escrita, nunca sobre um snapshot carregado em JS.
   // null significa pedido ausente ou legado sem ledger; não materializa aqui.
-  const row = await preparePedidoFinancialProjection(db, pedidoId)
-    .first<{ status_pagamento: StatusFinanceiroAgregado }>();
+  const row = await preparePedidoFinancialProjection(db, pedidoId).first<{
+    status_pagamento: StatusFinanceiroAgregado;
+  }>();
   return row?.status_pagamento ?? null;
 }
 
@@ -105,12 +106,12 @@ const ORDEM_METODOS_EXIBICAO: LedgerMetodo[] = [
   "PIX_EXTERNO",
   "CARTAO",
   "DINHEIRO",
-  "A_COMBINAR",
+  "A_COMBINAR"
 ];
 
 function ordenarMetodos(metodos: Iterable<string>): LedgerMetodo[] {
   const presentes = new Set(metodos);
-  return ORDEM_METODOS_EXIBICAO.filter((m) => presentes.has(m));
+  return ORDEM_METODOS_EXIBICAO.filter(m => presentes.has(m));
 }
 
 const METODOS_CONFIRMADOS_QUERY = `
@@ -122,7 +123,10 @@ const METODOS_CONFIRMADOS_QUERY = `
        WHERE r.pagamento_id = pp.id AND r.status = 'REEMBOLSADO'), 0)
 `;
 
-export async function getFinanceiroPedido(db: D1Database, pedidoId: number): Promise<FinanceiroPedido> {
+export async function getFinanceiroPedido(
+  db: D1Database,
+  pedidoId: number
+): Promise<FinanceiroPedido> {
   const [pedido, brutoPagoCentavos, reembolsadoCentavos, metodos] = await Promise.all([
     db
       .prepare(`SELECT valor_total_centavos, status_pagamento FROM pedidos WHERE id = ?`)
@@ -133,7 +137,7 @@ export async function getFinanceiroPedido(db: D1Database, pedidoId: number): Pro
     db
       .prepare(`${METODOS_CONFIRMADOS_QUERY} AND pp.pedido_id = ?`)
       .bind(pedidoId)
-      .all<{ metodo: string }>(),
+      .all<{ metodo: string }>()
   ]);
   const totalCentavos = Number(pedido?.valor_total_centavos || 0);
   const liquidoCentavos = Math.max(0, brutoPagoCentavos - reembolsadoCentavos);
@@ -150,7 +154,7 @@ export async function getFinanceiroPedido(db: D1Database, pedidoId: number): Pro
     totalCentavos,
     excessoCentavos,
     temExcesso,
-    metodosConfirmados: ordenarMetodos(metodos.results.map((r) => r.metodo)),
+    metodosConfirmados: ordenarMetodos(metodos.results.map(r => r.metodo))
   };
 }
 
@@ -159,12 +163,12 @@ export async function getFinanceiroPedido(db: D1Database, pedidoId: number): Pro
 // líquida), nunca uma consulta por linha.
 export async function getFinanceirosPorPedidos(
   db: D1Database,
-  pedidos: { id: number; valorTotalCentavos: number; statusPagamento: string }[],
+  pedidos: { id: number; valorTotalCentavos: number; statusPagamento: string }[]
 ): Promise<Map<number, FinanceiroPedido>> {
   const resultado = new Map<number, FinanceiroPedido>();
   if (pedidos.length === 0) return resultado;
 
-  const ids = pedidos.map((p) => p.id);
+  const ids = pedidos.map(p => p.id);
   const placeholders = ids.map(() => "?").join(",");
 
   const [brutoRows, reembolsoRows, metodoRows] = await Promise.all([
@@ -172,7 +176,7 @@ export async function getFinanceirosPorPedidos(
       .prepare(
         `SELECT pedido_id, COALESCE(SUM(valor_centavos), 0) AS total
          FROM pedido_pagamentos WHERE pedido_id IN (${placeholders}) AND status = 'PAGO'
-         GROUP BY pedido_id`,
+         GROUP BY pedido_id`
       )
       .bind(...ids)
       .all<{ pedido_id: number; total: number }>(),
@@ -180,18 +184,20 @@ export async function getFinanceirosPorPedidos(
       .prepare(
         `SELECT pedido_id, COALESCE(SUM(valor_centavos), 0) AS total
          FROM pedido_reembolsos WHERE pedido_id IN (${placeholders}) AND status = 'REEMBOLSADO'
-         GROUP BY pedido_id`,
+         GROUP BY pedido_id`
       )
       .bind(...ids)
       .all<{ pedido_id: number; total: number }>(),
     db
       .prepare(`${METODOS_CONFIRMADOS_QUERY} AND pp.pedido_id IN (${placeholders})`)
       .bind(...ids)
-      .all<{ pedido_id: number; metodo: string }>(),
+      .all<{ pedido_id: number; metodo: string }>()
   ]);
 
-  const brutoPorPedido = new Map(brutoRows.results.map((r) => [r.pedido_id, Number(r.total)]));
-  const reembolsoPorPedido = new Map(reembolsoRows.results.map((r) => [r.pedido_id, Number(r.total)]));
+  const brutoPorPedido = new Map(brutoRows.results.map(r => [r.pedido_id, Number(r.total)]));
+  const reembolsoPorPedido = new Map(
+    reembolsoRows.results.map(r => [r.pedido_id, Number(r.total)])
+  );
   const metodosPorPedido = new Map<number, Set<string>>();
   for (const row of metodoRows.results) {
     const set = metodosPorPedido.get(row.pedido_id) ?? new Set<string>();
@@ -215,7 +221,7 @@ export async function getFinanceirosPorPedidos(
       totalCentavos: p.valorTotalCentavos,
       excessoCentavos,
       temExcesso,
-      metodosConfirmados: ordenarMetodos(metodosPorPedido.get(p.id) ?? []),
+      metodosConfirmados: ordenarMetodos(metodosPorPedido.get(p.id) ?? [])
     });
   }
 
@@ -231,7 +237,7 @@ export async function getFinanceirosPorPedidos(
 // mesmo tempo.
 export async function getComandaSaldo(
   db: D1Database,
-  pedidoId: number,
+  pedidoId: number
 ): Promise<{ total: number; pago: number; saldo: number }> {
   const pedido = await db
     .prepare(`SELECT valor_total_centavos FROM pedidos WHERE id = ?`)

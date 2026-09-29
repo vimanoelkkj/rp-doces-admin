@@ -20,14 +20,9 @@ export type {
   GerarPixAdminSucesso,
   GerarPixAdminFalha,
   GerarPixAdminResult,
-  PixAdminPendente,
+  PixAdminPendente
 } from "./pix/types";
 
-export {
-  getCapacidadeCobravel,
-  getPixAdminPendentesAtivos,
-} from "./pix/queries";
+export { getCapacidadeCobravel, getPixAdminPendentesAtivos } from "./pix/queries";
 
-export {
-  createAdminPixCharge,
-} from "./pix/adminCharge";
+export { createAdminPixCharge } from "./pix/adminCharge";

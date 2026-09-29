@@ -10,7 +10,7 @@ import {
   parseOperationKey,
   prepareClaimOperacao,
   type ConflitoOperacao,
-  type IdentidadeEsperada,
+  type IdentidadeEsperada
 } from "../operacoes";
 import { chargeableCapacitySql } from "../financialCoverage";
 import { temEstornoAnulacaoAtivo } from "../pedidoAnulacao";
@@ -65,7 +65,7 @@ export async function registerAdminPayment(
      * repetível do operador.
      */
     operationKey?: string | null;
-  },
+  }
 ): Promise<RegisterAdminPaymentResult> {
   const observacao = (params.observacao ?? "").slice(0, 300);
 
@@ -86,8 +86,8 @@ export async function registerAdminPayment(
         pedidoId: params.pedidoId,
         metodo: params.metodo,
         valorCentavos: params.valorCentavos,
-        observacao,
-      }),
+        observacao
+      })
     };
 
     // Lookup ANTES dos guards dependentes do estado atual: se a resposta
@@ -103,7 +103,7 @@ export async function registerAdminPayment(
             pagamentoId: replay.id,
             replay: true,
             statusFinanceiro: replay.statusFinanceiro,
-            saldoCentavos: replay.saldoCentavos,
+            saldoCentavos: replay.saldoCentavos
           }
         : { ok: false, erro: replay.erro };
     }
@@ -118,10 +118,7 @@ export async function registerAdminPayment(
   // estado operacional: o recebimento ainda pode acontecer depois da
   // entrega. A exceção é deliberadamente estreita; CANCELADO e qualquer
   // outro pedido com comanda encerrada continuam bloqueados.
-  if (
-    pedido.status_comanda !== "ABERTA" &&
-    pedido.status_pedido !== "ENTREGUE"
-  ) {
+  if (pedido.status_comanda !== "ABERTA" && pedido.status_pedido !== "ENTREGUE") {
     return { ok: false, erro: "COMANDA_ENCERRADA" };
   }
   if (await temEstornoAnulacaoAtivo(db, params.pedidoId)) {
@@ -147,7 +144,7 @@ export async function registerAdminPayment(
     .prepare(
       `SELECT id FROM pedido_pagamentos
        WHERE pedido_id = ? AND status = 'PENDENTE' AND origem = 'ADMIN' AND metodo != 'PIX_MP'
-       ORDER BY id ASC`,
+       ORDER BY id ASC`
     )
     .bind(params.pedidoId)
     .all<{ id: number }>();
@@ -173,7 +170,7 @@ export async function registerAdminPayment(
            substitui_pagamento_id
          )
          SELECT ?, ?, 'ADMIN', ?, 'PAGO', ?, ?, ?, CURRENT_TIMESTAMP, ?
-         WHERE ? <= ${chargeableCapacitySql()}`,
+         WHERE ? <= ${chargeableCapacitySql()}`
       )
       .bind(
         params.pedidoId,
@@ -184,15 +181,15 @@ export async function registerAdminPayment(
         idempotencyKey,
         primeiroPlaceholderLocal,
         params.valorCentavos,
-        params.pedidoId,
+        params.pedidoId
       ),
-    ...waterfall.alocacoes.map((a) =>
+    ...waterfall.alocacoes.map(a =>
       db
         .prepare(
           `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
-           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`,
+           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`
         )
-        .bind(idempotencyKey, a.itemId, a.valorCentavos),
+        .bind(idempotencyKey, a.itemId, a.valorCentavos)
     ),
     ...(placeholdersLocais.results.length > 0
       ? [
@@ -200,9 +197,9 @@ export async function registerAdminPayment(
             .prepare(
               `UPDATE pedido_pagamentos SET status = 'CANCELADO', cancelado_em = CURRENT_TIMESTAMP
                WHERE pedido_id = ? AND status = 'PENDENTE' AND origem = 'ADMIN' AND metodo != 'PIX_MP'
-                 AND EXISTS (SELECT 1 FROM pedido_pagamentos WHERE idempotency_key = ?)`,
+                 AND EXISTS (SELECT 1 FROM pedido_pagamentos WHERE idempotency_key = ?)`
             )
-            .bind(params.pedidoId, idempotencyKey),
+            .bind(params.pedidoId, idempotencyKey)
         ]
       : []),
     // Claim A1 por último e CONDICIONADO ao fato: se o guard de saldo
@@ -216,10 +213,10 @@ export async function registerAdminPayment(
             key: operationKey,
             ...identidade,
             fase: "CONCLUIDA",
-            fonte: fontePagamento(idempotencyKey),
-          }),
+            fonte: fontePagamento(idempotencyKey)
+          })
         ]
-      : []),
+      : [])
   ];
 
   // A1 — recuperação da operação vencedora numa disputa pela mesma key.
@@ -238,7 +235,7 @@ export async function registerAdminPayment(
           pagamentoId: replay.id,
           replay: true,
           statusFinanceiro: replay.statusFinanceiro,
-          saldoCentavos: replay.saldoCentavos,
+          saldoCentavos: replay.saldoCentavos
         }
       : { ok: false, erro: replay.erro };
   };
@@ -263,6 +260,11 @@ export async function registerAdminPayment(
     return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
   }
 
-  const derivados = await reconcilePersistedAdminFact(db, params.pedidoId, "PAGAMENTO", pagamentoId);
+  const derivados = await reconcilePersistedAdminFact(
+    db,
+    params.pedidoId,
+    "PAGAMENTO",
+    pagamentoId
+  );
   return { ok: true, pagamentoId, ...derivados };
 }

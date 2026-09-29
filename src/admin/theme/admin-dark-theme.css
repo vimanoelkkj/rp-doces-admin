@@ -24,7 +24,6 @@ html[data-admin-theme="dark"] .loj-layout {
   background: #1a1412;
 }
 
-
 /* ═══════════════════════════════════════════
    Sidebar
    ═══════════════════════════════════════════ */
@@ -1657,7 +1656,9 @@ html[data-admin-theme="dark"] .gasto-item-card > header button:hover:not(:disabl
 }
 /* Ícone do seletor nativo de data (Data da compra): o SVG do navegador é
    preto fixo — sem inverter, fica invisível sobre o input escuro. */
-html[data-admin-theme="dark"] .gasto-form-grid input[type="date"]::-webkit-calendar-picker-indicator,
+html[data-admin-theme="dark"]
+  .gasto-form-grid
+  input[type="date"]::-webkit-calendar-picker-indicator,
 html[data-admin-theme="dark"] .desp-custom-range input::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }

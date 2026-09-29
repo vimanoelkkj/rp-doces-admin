@@ -3,7 +3,7 @@
 import {
   reconcilePendingPixPayments,
   liberarReservasVencidasLocalmente,
-  recuperarOperacoesInconclusivas,
+  recuperarOperacoesInconclusivas
 } from "../paymentSync";
 import { reconcilePedidosDivergentes } from "../pedidoReconcile";
 import type { Env } from "./types";
@@ -13,14 +13,14 @@ export async function reconcilePedidosEmBackground(env: Env): Promise<void> {
     reconcilePendingPixPayments(env),
     reconcilePedidosDivergentes(env.DB),
     recuperarOperacoesInconclusivas(env),
-    liberarReservasVencidasLocalmente(env),
+    liberarReservasVencidasLocalmente(env)
   ]);
 
   const rotulos = [
     "reconciliação oportunista de pagamentos PIX_MP",
     "reconciliação de pedidos com ledger",
     "recuperação de operações inconclusivas",
-    "liberação local de reservas vencidas",
+    "liberação local de reservas vencidas"
   ];
 
   resultados.forEach((resultado, indice) => {

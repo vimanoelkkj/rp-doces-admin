@@ -560,7 +560,10 @@
   transition: all 0.15s;
 }
 
-.pedmodal-btn-cancel-item:hover { background: #f5dcda; border-color: #c0392b; }
+.pedmodal-btn-cancel-item:hover {
+  background: #f5dcda;
+  border-color: #c0392b;
+}
 
 .pedmodal-btn-cancel-item--neutral {
   border-color: #d8c8b8;
@@ -568,7 +571,10 @@
   color: #634738;
 }
 
-.pedmodal-btn-cancel-item--neutral:hover { background: #f5efe8; border-color: #634738; }
+.pedmodal-btn-cancel-item--neutral:hover {
+  background: #f5efe8;
+  border-color: #634738;
+}
 
 .pedmodal-financial-grid {
   display: grid;
@@ -789,7 +795,9 @@
     gap: 12px;
   }
 
-  .pedmodal-item-actions { flex-shrink: 0; }
+  .pedmodal-item-actions {
+    flex-shrink: 0;
+  }
 
   .pedmodal-items-header {
     align-items: flex-start;
@@ -847,7 +855,10 @@
   font-weight: 700;
 }
 
-.pedmodal-item-note { background: #fff6dc; color: #795a00; }
+.pedmodal-item-note {
+  background: #fff6dc;
+  color: #795a00;
+}
 
 .pedmodal-charge-action {
   display: flex;

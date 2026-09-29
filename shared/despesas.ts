@@ -12,7 +12,7 @@ export const DESPESA_CATEGORIAS = [
   "EQUIPAMENTOS",
   "MANUTENCAO",
   "SERVICOS",
-  "OUTROS",
+  "OUTROS"
 ] as const;
 
 export type DespesaCategoria = (typeof DESPESA_CATEGORIAS)[number];
@@ -26,7 +26,7 @@ export const DESPESA_CATEGORIA_LABEL: Record<DespesaCategoria, string> = {
   EQUIPAMENTOS: "Equipamentos",
   MANUTENCAO: "Manutenção",
   SERVICOS: "Serviços",
-  OUTROS: "Outros",
+  OUTROS: "Outros"
 };
 
 export function isDespesaCategoria(value: unknown): value is DespesaCategoria {
@@ -42,7 +42,7 @@ export const DESPESA_UNIDADES = [
   "PACOTE",
   "CAIXA",
   "BANDEJA",
-  "OUTRO",
+  "OUTRO"
 ] as const;
 
 export type DespesaUnidade = (typeof DESPESA_UNIDADES)[number];
@@ -56,7 +56,7 @@ export const DESPESA_UNIDADE_LABEL: Record<DespesaUnidade, string> = {
   PACOTE: "pacote",
   CAIXA: "caixa",
   BANDEJA: "bandeja",
-  OUTRO: "outro",
+  OUTRO: "outro"
 };
 
 export function isDespesaUnidade(value: unknown): value is DespesaUnidade {
@@ -68,7 +68,7 @@ export type DespesaStatus = (typeof DESPESA_STATUS)[number];
 
 export const DESPESA_STATUS_LABEL: Record<DespesaStatus, string> = {
   ATIVA: "Ativa",
-  CANCELADA: "Cancelada",
+  CANCELADA: "Cancelada"
 };
 
 // Quantidade nunca em float: 1 unidade = 1000 "milésimos", permitindo até 3
@@ -98,7 +98,7 @@ export function deMilesimos(quantidadeMilesimos: number): number {
 // BigInt evita perda de precisão intermediária em quantidades/valores altos.
 export function calcularValorTotalCentavos(
   quantidadeMilesimos: number,
-  valorUnitarioCentavos: number,
+  valorUnitarioCentavos: number
 ): number {
   const valorUnitarioMilicentavos = Math.round(valorUnitarioCentavos * MILICENTAVOS_POR_CENTAVO);
   const divisor = BigInt(QUANTIDADE_MILESIMOS_POR_UNIDADE * MILICENTAVOS_POR_CENTAVO);

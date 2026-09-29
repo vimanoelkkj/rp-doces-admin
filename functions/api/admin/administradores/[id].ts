@@ -5,12 +5,12 @@ import {
   hashPassword,
   validatePassword,
   verifyPassword,
-  sameOrigin,
+  sameOrigin
 } from "../../../lib/auth";
 import {
   checkLoginRateLimit,
   recordLoginFailure,
-  clearLoginFailures,
+  clearLoginFailures
 } from "../../../lib/rateLimit";
 
 interface Env {
@@ -30,11 +30,7 @@ interface TargetRow {
   papel: string;
 }
 
-function jsonError(
-  message: string,
-  status: number,
-  headers?: Record<string, string>,
-) {
+function jsonError(message: string, status: number, headers?: Record<string, string>) {
   return Response.json({ error: message }, { status, headers });
 }
 
@@ -63,7 +59,7 @@ async function getTarget(db: D1Database, id: number) {
 async function handlePut({
   request,
   env,
-  params,
+  params
 }: {
   request: Request;
   env: Env;
@@ -98,38 +94,26 @@ async function handlePut({
     }
 
     if (isSelf) {
-      const senhaAtual =
-        typeof body.senhaAtual === "string" ? body.senhaAtual : "";
+      const senhaAtual = typeof body.senhaAtual === "string" ? body.senhaAtual : "";
       if (!senhaAtual) {
         return jsonError("Senha atual obrigatória", 400);
       }
 
-      const rate = await checkLoginRateLimit(
-        env.DB,
-        request,
-        auth.user.username,
-      );
+      const rate = await checkLoginRateLimit(env.DB, request, auth.user.username);
       if (!rate.allowed) {
-        return jsonError(
-          "Muitas tentativas. Tente novamente em alguns minutos",
-          429,
-          { "retry-after": String(rate.retryAfter) },
-        );
+        return jsonError("Muitas tentativas. Tente novamente em alguns minutos", 429, {
+          "retry-after": String(rate.retryAfter)
+        });
       }
 
-      const usuario = await env.DB.prepare(
-        `SELECT senha_hash FROM usuarios_admin WHERE id = ?`,
-      )
+      const usuario = await env.DB.prepare(`SELECT senha_hash FROM usuarios_admin WHERE id = ?`)
         .bind(id)
         .first<{ senha_hash: string }>();
       if (!usuario?.senha_hash) {
         return jsonError("Administrador não encontrado", 404);
       }
 
-      const senhaAtualCorreta = await verifyPassword(
-        senhaAtual,
-        usuario.senha_hash,
-      );
+      const senhaAtualCorreta = await verifyPassword(senhaAtual, usuario.senha_hash);
       if (!senhaAtualCorreta) {
         await recordLoginFailure(env.DB, rate.key);
         return jsonError("Senha atual incorreta", 400);
@@ -144,21 +128,16 @@ async function handlePut({
 
     await env.DB.batch([
       env.DB.prepare(
-        `UPDATE usuarios_admin SET senha_hash = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE usuarios_admin SET senha_hash = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
       ).bind(await hashPassword(senha), id),
-      env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(
-        id,
-      ),
+      env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(id)
     ]);
     return Response.json({ ok: true });
   }
 
   if (body.acao === "toggle_ativo") {
     if (!isOwner(auth.user.papel)) {
-      return jsonError(
-        "Apenas um administrador mestre pode alterar o estado de contas",
-        403,
-      );
+      return jsonError("Apenas um administrador mestre pode alterar o estado de contas", 403);
     }
     if (typeof body.ativo !== "boolean") {
       return jsonError("Estado da conta inválido", 400);
@@ -169,46 +148,35 @@ async function handlePut({
 
     if (!body.ativo && target.papel === "OWNER") {
       const owners = await env.DB.prepare(
-        `SELECT COUNT(*) AS total FROM usuarios_admin WHERE papel = 'OWNER' AND ativo = 1`,
+        `SELECT COUNT(*) AS total FROM usuarios_admin WHERE papel = 'OWNER' AND ativo = 1`
       ).first<{ total: number }>();
       if ((owners?.total ?? 0) <= 1) {
-        return jsonError(
-          "A loja precisa manter pelo menos um administrador mestre ativo",
-          409,
-        );
+        return jsonError("A loja precisa manter pelo menos um administrador mestre ativo", 409);
       }
     }
 
     try {
       await env.DB.prepare(
-        `UPDATE usuarios_admin SET ativo = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE usuarios_admin SET ativo = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
       )
         .bind(body.ativo ? 1 : 0, id)
         .run();
     } catch (err: unknown) {
       if (isLastActiveOwnerError(err)) {
-        return jsonError(
-          "A loja precisa manter pelo menos um administrador mestre ativo",
-          409,
-        );
+        return jsonError("A loja precisa manter pelo menos um administrador mestre ativo", 409);
       }
       throw err;
     }
 
     if (!body.ativo) {
-      await env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`)
-        .bind(id)
-        .run();
+      await env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(id).run();
     }
     return Response.json({ ok: true });
   }
 
   if (body.acao === "alterar_papel") {
     if (!isOwner(auth.user.papel)) {
-      return jsonError(
-        "Apenas um administrador mestre pode alterar níveis de acesso",
-        403,
-      );
+      return jsonError("Apenas um administrador mestre pode alterar níveis de acesso", 403);
     }
     if (!body.papel || !["OWNER", "ADMIN"].includes(body.papel)) {
       return jsonError("Nível de acesso inválido", 400);
@@ -216,37 +184,29 @@ async function handlePut({
     if (id === auth.user.id) {
       return jsonError(
         "Altere o nível da sua própria conta somente por outro administrador mestre",
-        403,
+        403
       );
     }
 
     if (target.papel === "OWNER" && body.papel === "ADMIN" && target.ativo) {
       const owners = await env.DB.prepare(
-        `SELECT COUNT(*) AS total FROM usuarios_admin WHERE papel = 'OWNER' AND ativo = 1`,
+        `SELECT COUNT(*) AS total FROM usuarios_admin WHERE papel = 'OWNER' AND ativo = 1`
       ).first<{ total: number }>();
       if ((owners?.total ?? 0) <= 1) {
-        return jsonError(
-          "A loja precisa manter pelo menos um administrador mestre ativo",
-          409,
-        );
+        return jsonError("A loja precisa manter pelo menos um administrador mestre ativo", 409);
       }
     }
 
     try {
       await env.DB.batch([
         env.DB.prepare(
-          `UPDATE usuarios_admin SET papel = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`,
+          `UPDATE usuarios_admin SET papel = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
         ).bind(body.papel, id),
-        env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(
-          id,
-        ),
+        env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(id)
       ]);
     } catch (err: unknown) {
       if (isLastActiveOwnerError(err)) {
-        return jsonError(
-          "A loja precisa manter pelo menos um administrador mestre ativo",
-          409,
-        );
+        return jsonError("A loja precisa manter pelo menos um administrador mestre ativo", 409);
       }
       throw err;
     }
@@ -258,7 +218,7 @@ async function handlePut({
 
 // Sem esse dispatcher, um método não suportado nesta rota pode cair no
 // fallback HTML do Cloudflare Pages e responder 200 com o index.html.
-export const onRequest: PagesFunction<Env> = async (context) => {
+export const onRequest: PagesFunction<Env> = async context => {
   if (context.request.method === "PUT") return handlePut(context);
   return jsonError("Rota não encontrada", 404);
 };

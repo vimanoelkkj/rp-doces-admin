@@ -4,8 +4,7 @@ import type { LedgerStatus, LedgerMetodo } from "./types";
 import { allocateFullValueAcrossItems } from "./allocations";
 
 export type LegacyStatusResult =
-  | { ok: true; status: LedgerStatus }
-  | { ok: false; motivo: "STATUS_AMBIGUO" };
+  { ok: true; status: LedgerStatus } | { ok: false; motivo: "STATUS_AMBIGUO" };
 
 interface PedidoLegadoRow {
   id: number;
@@ -65,7 +64,7 @@ function ledgerPaymentMethod(pedido: PedidoLegadoRow): LedgerMetodo {
 
 export async function ensureLegacyPaymentMaterialized(
   db: D1Database,
-  pedidoId: number,
+  pedidoId: number
 ): Promise<MaterializeResult> {
   const existing = await db
     .prepare(`SELECT id FROM pedido_pagamentos WHERE pedido_id = ? LIMIT 1`)
@@ -82,7 +81,7 @@ export async function ensureLegacyPaymentMaterialized(
               mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64,
               mp_ticket_url, pix_expira_em, idempotency_key,
               criado_em, atualizado_em, pago_em
-       FROM pedidos WHERE id = ? LIMIT 1`,
+       FROM pedidos WHERE id = ? LIMIT 1`
     )
     .bind(pedidoId)
     .first<PedidoLegadoRow>();
@@ -106,7 +105,7 @@ export async function ensureLegacyPaymentMaterialized(
          mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url,
          pix_expira_em, idempotency_key, criado_em, atualizado_em, pago_em, cancelado_em
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-         COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP), ?, ?)`,
+         COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP), ?, ?)`
     )
     .bind(
       pedidoId,
@@ -124,7 +123,7 @@ export async function ensureLegacyPaymentMaterialized(
       pedido.criado_em,
       pedido.atualizado_em,
       status === "PAGO" ? pedido.pago_em || pedido.atualizado_em || null : null,
-      status === "CANCELADO" ? pedido.atualizado_em || null : null,
+      status === "CANCELADO" ? pedido.atualizado_em || null : null
     )
     .run();
 
@@ -150,7 +149,7 @@ export async function ensureLegacyPaymentMaterialized(
 export async function resolveLedgerPaymentId(
   db: D1Database,
   pedidoId: number,
-  mpPaymentId: string | null = null,
+  mpPaymentId: string | null = null
 ): Promise<number | null> {
   const anyLedger = await db
     .prepare(`SELECT id FROM pedido_pagamentos WHERE pedido_id = ? LIMIT 1`)
@@ -159,10 +158,13 @@ export async function resolveLedgerPaymentId(
   if (!anyLedger) await ensureLegacyPaymentMaterialized(db, pedidoId);
   // Este resolver pertence ao polling do checkout. Nunca seleciona um Pix
   // ADMIN ou outro pagamento do pedido só por ter sido o primeiro inserido.
-  const { results } = await db.prepare(
-    `SELECT id FROM pedido_pagamentos WHERE pedido_id = ? AND origem = 'SITE' AND metodo = 'PIX_MP'
-       AND (? IS NULL OR mp_payment_id = ? OR mp_payment_id IS NULL) LIMIT 2`,
-  ).bind(pedidoId, mpPaymentId, mpPaymentId).all<{ id: number }>();
+  const { results } = await db
+    .prepare(
+      `SELECT id FROM pedido_pagamentos WHERE pedido_id = ? AND origem = 'SITE' AND metodo = 'PIX_MP'
+       AND (? IS NULL OR mp_payment_id = ? OR mp_payment_id IS NULL) LIMIT 2`
+    )
+    .bind(pedidoId, mpPaymentId, mpPaymentId)
+    .all<{ id: number }>();
   if (results.length > 1) throw new Error("TENTATIVA_SITE_AMBIGUA");
   return results[0]?.id ?? null;
 }

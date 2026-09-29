@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 // HUMAN-14 — estado compartilhado das notificações do admin.
 //
@@ -70,7 +63,7 @@ export function NotificacoesProvider({ children }: { children: React.ReactNode }
       if (inicial) setLoading(true);
 
       fetch("/api/admin/notificacoes")
-        .then(async (response) => {
+        .then(async response => {
           if (!response.ok) throw new Error("Falha ao carregar notificações");
           return response.json() as Promise<{ notificacoes: Notificacao[]; naoLidas: number }>;
         })
@@ -84,7 +77,7 @@ export function NotificacoesProvider({ children }: { children: React.ReactNode }
           if (ativo.current) setLoading(false);
         });
     },
-    [aplicar],
+    [aplicar]
   );
 
   useEffect(() => {
@@ -115,7 +108,7 @@ export function NotificacoesProvider({ children }: { children: React.ReactNode }
         const response = await fetch("/api/admin/notificacoes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(corpo),
+          body: JSON.stringify(corpo)
         });
         if (!response.ok) throw new Error("Falha ao marcar notificações");
         aplicar(await response.json());
@@ -124,7 +117,7 @@ export function NotificacoesProvider({ children }: { children: React.ReactNode }
         setError(motivo instanceof Error ? motivo.message : "Falha ao marcar notificações");
       }
     },
-    [aplicar],
+    [aplicar]
   );
 
   return (
@@ -135,8 +128,8 @@ export function NotificacoesProvider({ children }: { children: React.ReactNode }
         loading,
         error,
         revalidar: () => carregar(),
-        marcarComoLidas: (chaves) => marcar({ chaves }),
-        marcarTodasComoLidas: () => marcar({ todas: true }),
+        marcarComoLidas: chaves => marcar({ chaves }),
+        marcarTodasComoLidas: () => marcar({ todas: true })
       }}
     >
       {children}

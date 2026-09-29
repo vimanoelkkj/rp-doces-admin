@@ -9,12 +9,12 @@ interface Env {
 import {
   normalizarPromocao,
   type ProdutoInput,
-  validarProdutoPromocao,
+  validarProdutoPromocao
 } from "../../../lib/produtoPromocao";
 import {
   normalizarDetalhesProduto,
   type ProdutoDetalhesInput,
-  validarDetalhesProduto,
+  validarDetalhesProduto
 } from "../../../lib/produtoDetalhes";
 
 const MAX_TEXT_LENGTH = 1000;
@@ -47,11 +47,7 @@ function validarProduto(body: ProdutoInput & ProdutoDetalhesInput) {
   return validarDetalhesProduto(body) ?? validarProdutoPromocao(body);
 }
 
-export const onRequestPut: PagesFunction<Env> = async ({
-  request,
-  env,
-  params,
-}) => {
+export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
 
   const auth = await requireUser(env.DB, request);
@@ -78,16 +74,14 @@ export const onRequestPut: PagesFunction<Env> = async ({
   }
 
   try {
-    const atual = await env.DB.prepare(
-      `SELECT estoque_reservado FROM produtos WHERE id = ?`,
-    )
+    const atual = await env.DB.prepare(`SELECT estoque_reservado FROM produtos WHERE id = ?`)
       .bind(id)
       .first<{ estoque_reservado: number }>();
 
     if (atual && body.estoque! < atual.estoque_reservado) {
       return jsonError(
         `Não é possível reduzir o estoque para ${body.estoque}, pois existem ${atual.estoque_reservado} unidade(s) reservada(s) em pedidos pendentes`,
-        409,
+        409
       );
     }
 
@@ -104,7 +98,7 @@ export const onRequestPut: PagesFunction<Env> = async ({
            ingredientes = COALESCE(?, ingredientes),
            alergenicos = COALESCE(?, alergenicos),
            atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+       WHERE id = ?`
     )
       .bind(
         body.nome!.trim(),
@@ -123,7 +117,7 @@ export const onRequestPut: PagesFunction<Env> = async ({
         detalhes.pesoTexto,
         detalhes.ingredientes,
         detalhes.alergenicos,
-        id,
+        id
       )
       .run();
 

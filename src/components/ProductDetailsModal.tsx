@@ -24,7 +24,7 @@ export default function ProductDetailsModal({
   product,
   quantityInCart = 0,
   onClose,
-  onAddToCart,
+  onAddToCart
 }: ProductDetailsModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -140,7 +140,12 @@ export default function ProductDetailsModal({
           aria-label="Fechar detalhes"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
 
@@ -167,11 +172,11 @@ export default function ProductDetailsModal({
               <PromoBadge product={product} />
               <StockBadge restante={restante} />
             </div>
-            <h2 id={titleId} className="pdm-title">{product.name}</h2>
+            <h2 id={titleId} className="pdm-title">
+              {product.name}
+            </h2>
 
-            {product.description && (
-              <p className="pdm-description">{product.description}</p>
-            )}
+            {product.description && <p className="pdm-description">{product.description}</p>}
 
             {product.weightText && (
               <section className="pdm-section">
@@ -211,7 +216,9 @@ export default function ProductDetailsModal({
                 >
                   −
                 </button>
-                <span className="pdm-stepper-value" aria-live="polite">{quantidade}</span>
+                <span className="pdm-stepper-value" aria-live="polite">
+                  {quantidade}
+                </span>
                 <button
                   type="button"
                   className="pdm-stepper-btn"
@@ -235,6 +242,6 @@ export default function ProductDetailsModal({
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

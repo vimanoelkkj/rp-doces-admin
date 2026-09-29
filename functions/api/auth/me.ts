@@ -13,14 +13,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       { authenticated: false },
       {
         status: 401,
-        headers: { "Cache-Control": "no-store" },
-      },
+        headers: { "Cache-Control": "no-store" }
+      }
     );
   }
   return Response.json(
     { authenticated: true, usuario: user },
     {
-      headers: { "Cache-Control": "no-store" },
-    },
+      headers: { "Cache-Control": "no-store" }
+    }
   );
 };

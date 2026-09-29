@@ -6,19 +6,22 @@ import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../../../lib/pedidoAnu
 import { requireUser, sameOrigin } from "../../../../../../lib/auth";
 import {
   createItemCancellation,
-  getCancellationView,
+  getCancellationView
 } from "../../../../../../lib/itemCancellation";
 import { ItemCancellationPreviewError } from "../../../../../../lib/itemCancellationPreview";
 import { OPERACAO_HTTP_STATUS, OPERACAO_MENSAGENS } from "../../../../../../lib/operacoes";
 
-interface Env { DB: D1Database; MP_ACCESS_TOKEN?: string }
+interface Env {
+  DB: D1Database;
+  MP_ACCESS_TOKEN?: string;
+}
 
 const MESSAGES: Record<string, string> = {
   PREVIEW_OBSOLETO: "O pedido mudou. Revise o impacto atualizado antes de confirmar novamente.",
   ESTOQUE_ACAO_INVALIDA: "A ação de estoque não corresponde ao estado atual do item.",
   PIX_PENDENTE: "Há um Pix pendente. Aguarde sua resolução antes de cancelar o item.",
   ESTORNO_ANULACAO_ATIVO: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
-  ...OPERACAO_MENSAGENS,
+  ...OPERACAO_MENSAGENS
 };
 
 const errorJson = (message: string, status: number, code?: string, extra: object = {}) =>
@@ -51,12 +54,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (anulado) return anulado;
 
   const value = ids(params);
-  if (!Number.isInteger(value.pedidoId) || value.pedidoId <= 0
-      || !Number.isInteger(value.itemId) || value.itemId <= 0) {
+  if (
+    !Number.isInteger(value.pedidoId) ||
+    value.pedidoId <= 0 ||
+    !Number.isInteger(value.itemId) ||
+    value.itemId <= 0
+  ) {
     return errorJson("Identificador inválido", 400, "ID_INVALIDO");
   }
   let body: Record<string, unknown>;
-  try { body = await request.json(); } catch { return errorJson("JSON inválido", 400); }
+  try {
+    body = await request.json();
+  } catch {
+    return errorJson("JSON inválido", 400);
+  }
   try {
     const result = await createItemCancellation(env.DB, {
       ...value,
@@ -64,13 +75,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       operationKey: body.operationKey,
       motivo: typeof body.motivo === "string" ? body.motivo : "",
       estoqueAcao: String(body.estoqueAcao ?? ""),
-      previewFingerprint: String(body.previewFingerprint ?? ""),
+      previewFingerprint: String(body.previewFingerprint ?? "")
     });
     if (result.ok === false) {
-      const status = result.erro === "OPERATION_KEY_INVALIDA" ? 400
-        : OPERACAO_HTTP_STATUS[result.erro] ?? 409;
-      return errorJson(MESSAGES[result.erro] ?? "Não foi possível cancelar o item", status,
-        result.erro, result.preview ? { preview: result.preview } : {});
+      const status =
+        result.erro === "OPERATION_KEY_INVALIDA" ? 400 : (OPERACAO_HTTP_STATUS[result.erro] ?? 409);
+      return errorJson(
+        MESSAGES[result.erro] ?? "Não foi possível cancelar o item",
+        status,
+        result.erro,
+        result.preview ? { preview: result.preview } : {}
+      );
     }
     return Response.json(result, { status: result.replay ? 200 : 201 });
   } catch (error) {

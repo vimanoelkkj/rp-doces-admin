@@ -10,8 +10,7 @@ function valorUnitarioParaTexto(centavos: number): string {
   return `${inteiro},${decimaisNecessarios}`;
 }
 
-export const formatarValorUnitario = (centavos: number) =>
-  `R$ ${valorUnitarioParaTexto(centavos)}`;
+export const formatarValorUnitario = (centavos: number) => `R$ ${valorUnitarioParaTexto(centavos)}`;
 
 export const formatarPrecoComSinal = (centavos: number) =>
   `${centavos < 0 ? "-" : ""}R$ ${(Math.abs(centavos) / 100).toFixed(2).replace(".", ",")}`;
@@ -68,7 +67,7 @@ export type Periodo = "HOJE" | "7DIAS" | "ESTE_MES" | "MES_PASSADO" | "PERSONALI
 
 export function intervaloDoPeriodo(
   periodo: Periodo,
-  personalizado: { desde: string; ate: string },
+  personalizado: { desde: string; ate: string }
 ): { desde: string; ate: string } {
   const hoje = hojeLocal();
   if (periodo === "HOJE") {

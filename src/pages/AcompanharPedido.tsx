@@ -29,7 +29,7 @@ const STEPS: { key: PedidoDetalhe["statusPedido"]; label: string }[] = [
   { key: "NOVO", label: "Pedido recebido" },
   { key: "PREPARANDO", label: "Em preparação" },
   { key: "PRONTO", label: "Pronto para retirada" },
-  { key: "ENTREGUE", label: "Retirado" },
+  { key: "ENTREGUE", label: "Retirado" }
 ];
 
 const STATUS_PAGAMENTO_LABEL: Record<PedidoDetalhe["statusPagamento"], string> = {
@@ -37,7 +37,7 @@ const STATUS_PAGAMENTO_LABEL: Record<PedidoDetalhe["statusPagamento"], string> =
   PAGO: "✓ Confirmado",
   CANCELADO: "Pagamento não aprovado",
   EXPIRADO: "Pix expirado",
-  REEMBOLSADO: "Reembolsado",
+  REEMBOLSADO: "Reembolsado"
 };
 
 export default function AcompanharPedido() {
@@ -62,22 +62,21 @@ export default function AcompanharPedido() {
     if (!token || reconciliandoRef.current) return;
     reconciliandoRef.current = true;
     try {
-      const response = await fetch(
-        `/api/pedido-status?token=${encodeURIComponent(token)}`,
-        { method: "POST" },
-      );
+      const response = await fetch(`/api/pedido-status?token=${encodeURIComponent(token)}`, {
+        method: "POST"
+      });
       if (!response.ok) return;
       const atual = (await response.json()) as StatusPublico;
       if (!montadoRef.current) return;
-      setPedido((anterior) =>
+      setPedido(anterior =>
         anterior
           ? {
               ...anterior,
               statusPagamento: atual.statusPagamento,
               statusPedido: atual.statusPedido,
-              estoquePendente: atual.estoquePendente,
+              estoquePendente: atual.estoquePendente
             }
-          : anterior,
+          : anterior
       );
     } catch {
       // ignora: o próximo ciclo tenta de novo
@@ -92,10 +91,9 @@ export default function AcompanharPedido() {
       if (mostrarLoading) setLoading(true);
 
       try {
-        const response = await fetch(
-          `/api/pedido?token=${encodeURIComponent(token)}`,
-          { cache: "no-store" },
-        );
+        const response = await fetch(`/api/pedido?token=${encodeURIComponent(token)}`, {
+          cache: "no-store"
+        });
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error || "Pedido não encontrado");
@@ -110,7 +108,7 @@ export default function AcompanharPedido() {
         if (mostrarLoading) setLoading(false);
       }
     },
-    [token, reconciliarStatus],
+    [token, reconciliarStatus]
   );
 
   useEffect(() => {
@@ -142,9 +140,7 @@ export default function AcompanharPedido() {
     };
   }, [pedido?.statusPedido, carregarPedido]);
 
-  const currentIndex = pedido
-    ? STEPS.findIndex((s) => s.key === pedido.statusPedido)
-    : -1;
+  const currentIndex = pedido ? STEPS.findIndex(s => s.key === pedido.statusPedido) : -1;
 
   return (
     <StorefrontFrame className="confirmado-page">
@@ -172,15 +168,13 @@ export default function AcompanharPedido() {
             <div className="confirmado-card">
               <div className="confirmado-header">
                 <div>
-                  <h2 className="confirmado-order-id">
-                    Pedido #{pedido.pedidoId}
-                  </h2>
+                  <h2 className="confirmado-order-id">Pedido #{pedido.pedidoId}</h2>
                   <span className="confirmado-date">
                     Realizado em{" "}
                     {new Date(pedido.criadoEm).toLocaleDateString("pt-BR", {
                       day: "2-digit",
                       month: "long",
-                      year: "numeric",
+                      year: "numeric"
                     })}
                   </span>
                 </div>
@@ -193,12 +187,10 @@ export default function AcompanharPedido() {
 
               {pedido.statusPagamento === "PAGO" && pedido.estoquePendente && (
                 <>
-                  <div className="confirmado-label">
-                    ACOMPANHAMENTO DE PREPARO
-                  </div>
+                  <div className="confirmado-label">ACOMPANHAMENTO DE PREPARO</div>
                   <p className="confirmado-item-detail" role="status">
-                    Pagamento confirmado. Estamos verificando a disponibilidade
-                    dos itens antes de iniciar o preparo. Acompanhe por aqui.
+                    Pagamento confirmado. Estamos verificando a disponibilidade dos itens antes de
+                    iniciar o preparo. Acompanhe por aqui.
                   </p>
                   <div className="confirmado-divider" />
                 </>
@@ -206,9 +198,7 @@ export default function AcompanharPedido() {
 
               {pedido.statusPagamento === "PAGO" && !pedido.estoquePendente && (
                 <>
-                  <div className="confirmado-label">
-                    ACOMPANHAMENTO DE PREPARO
-                  </div>
+                  <div className="confirmado-label">ACOMPANHAMENTO DE PREPARO</div>
                   <div className="confirmado-timeline">
                     {STEPS.map((step, i) => (
                       <Fragment key={step.key}>
@@ -224,7 +214,13 @@ export default function AcompanharPedido() {
                         >
                           <div className="tl-dot">
                             {i < currentIndex ? (
-                              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <svg
+                                aria-hidden="true"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                              >
                                 <path
                                   d="M5 13L9 17L19 7"
                                   stroke="#fff"
@@ -270,18 +266,11 @@ export default function AcompanharPedido() {
               {pedido.itens.map((item, i) => (
                 <div key={i} className="confirmado-item">
                   <div className="confirmado-item-info">
-                    <span className="confirmado-item-name">
-                      {item.produto_nome}
-                    </span>
-                    <span className="confirmado-item-detail">
-                      Quantidade: {item.quantidade}
-                    </span>
+                    <span className="confirmado-item-name">{item.produto_nome}</span>
+                    <span className="confirmado-item-detail">Quantidade: {item.quantidade}</span>
                   </div>
                   <span className="confirmado-item-price">
-                    R${" "}
-                    {(item.valor_total_centavos / 100)
-                      .toFixed(2)
-                      .replace(".", ",")}
+                    R$ {(item.valor_total_centavos / 100).toFixed(2).replace(".", ",")}
                   </span>
                 </div>
               ))}
@@ -293,10 +282,7 @@ export default function AcompanharPedido() {
                 <div className="confirmado-summary-row confirmado-summary-total">
                   <span>Total</span>
                   <span className="confirmado-total-value">
-                    R${" "}
-                    {(pedido.valorTotalCentavos / 100)
-                      .toFixed(2)
-                      .replace(".", ",")}
+                    R$ {(pedido.valorTotalCentavos / 100).toFixed(2).replace(".", ",")}
                   </span>
                 </div>
               </div>

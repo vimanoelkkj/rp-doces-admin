@@ -1,11 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { requireUser, sameOrigin } from "../lib/auth";
-import {
-  formatWhatsappBr,
-  isValidWhatsappBr,
-  normalizeWhatsappBr,
-} from "../../shared/whatsapp";
+import { formatWhatsappBr, isValidWhatsappBr, normalizeWhatsappBr } from "../../shared/whatsapp";
 
 interface Env {
   DB: D1Database;
@@ -26,7 +22,15 @@ interface ConfigInput {
 }
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"] as const;
-const DAY_KEYS = ["dia_seg", "dia_ter", "dia_qua", "dia_qui", "dia_sex", "dia_sab", "dia_dom"] as const;
+const DAY_KEYS = [
+  "dia_seg",
+  "dia_ter",
+  "dia_qua",
+  "dia_qui",
+  "dia_sex",
+  "dia_sab",
+  "dia_dom"
+] as const;
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const DELIVERY = new Set<DeliveryStatus>(["soon", "available", "unavailable"]);
 
@@ -39,7 +43,7 @@ const DEFAULTS = {
   mapsLink: "https://maps.google.com/?q=Temponi+Concept",
   deliveryStatus: "unavailable" as DeliveryStatus,
   whatsapp: "(33) 99128-5907",
-  defaultMessage: "Olá! Gostaria de fazer um pedido de bolo.",
+  defaultMessage: "Olá! Gostaria de fazer um pedido de bolo."
 };
 
 function deliveryFromDb(value: string | undefined): DeliveryStatus {
@@ -68,9 +72,10 @@ async function readConfig(db: D1Database) {
     .prepare("SELECT chave, valor FROM configuracoes_loja")
     .all<{ chave: string; valor: string }>();
 
-  const values = Object.fromEntries(
-    results.map((row) => [row.chave, row.valor]),
-  ) as Record<string, string>;
+  const values = Object.fromEntries(results.map(row => [row.chave, row.valor])) as Record<
+    string,
+    string
+  >;
 
   return {
     days: DAY_LABELS.map((label, index) => ({
@@ -78,7 +83,7 @@ async function readConfig(db: D1Database) {
       active:
         values[DAY_KEYS[index]] === undefined
           ? DEFAULTS.days[index]
-          : values[DAY_KEYS[index]] === "1",
+          : values[DAY_KEYS[index]] === "1"
     })),
     openTime: values.horario_abre || DEFAULTS.openTime,
     closeTime: values.horario_fecha || DEFAULTS.closeTime,
@@ -87,7 +92,7 @@ async function readConfig(db: D1Database) {
     mapsLink: values.maps_link ?? DEFAULTS.mapsLink,
     deliveryStatus: deliveryFromDb(values.entregas_status),
     whatsapp: whatsappFromDb(values.whatsapp),
-    defaultMessage: values.mensagem_whatsapp ?? DEFAULTS.defaultMessage,
+    defaultMessage: values.mensagem_whatsapp ?? DEFAULTS.defaultMessage
   };
 }
 
@@ -96,10 +101,7 @@ function validate(body: ConfigInput) {
     return "Dias de funcionamento inválidos";
   }
   for (let i = 0; i < DAY_LABELS.length; i += 1) {
-    if (
-      body.days[i]?.label !== DAY_LABELS[i] ||
-      typeof body.days[i]?.active !== "boolean"
-    ) {
+    if (body.days[i]?.label !== DAY_LABELS[i] || typeof body.days[i]?.active !== "boolean") {
       return "Dias de funcionamento inválidos";
     }
   }
@@ -146,7 +148,7 @@ function upsertConfig(db: D1Database, chave: string, valor: string) {
       `INSERT INTO configuracoes_loja (chave, valor, atualizado_em)
        VALUES (?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(chave) DO UPDATE
-       SET valor = excluded.valor, atualizado_em = CURRENT_TIMESTAMP`,
+       SET valor = excluded.valor, atualizado_em = CURRENT_TIMESTAMP`
     )
     .bind(chave, valor);
 }
@@ -155,14 +157,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   try {
     return Response.json(
       { config: await readConfig(env.DB) },
-      { headers: { "Cache-Control": "no-store" } },
+      { headers: { "Cache-Control": "no-store" } }
     );
   } catch (err) {
     console.error("Erro ao carregar configurações públicas da loja", err);
-    return Response.json(
-      { error: "Erro interno ao carregar configurações" },
-      { status: 500 },
-    );
+    return Response.json({ error: "Erro interno ao carregar configurações" }, { status: 500 });
   }
 };
 
@@ -186,11 +185,14 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
     const whatsappLocal = normalizeWhatsappBr(body.whatsapp!);
-    const scheduleText = `${body.days!.filter((day) => day.active).map((day) => day.label).join(", ")}: ${body.openTime} às ${body.closeTime}`;
+    const scheduleText = `${body
+      .days!.filter(day => day.active)
+      .map(day => day.label)
+      .join(", ")}: ${body.openTime} às ${body.closeTime}`;
 
     await env.DB.batch([
       ...DAY_KEYS.map((key, index) =>
-        upsertConfig(env.DB, key, body.days![index].active ? "1" : "0"),
+        upsertConfig(env.DB, key, body.days![index].active ? "1" : "0")
       ),
       upsertConfig(env.DB, "horario_abre", body.openTime!),
       upsertConfig(env.DB, "horario_fecha", body.closeTime!),
@@ -200,15 +202,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
       upsertConfig(env.DB, "maps_link", body.mapsLink?.trim() ?? ""),
       upsertConfig(env.DB, "entregas_status", deliveryToDb(body.deliveryStatus!)),
       upsertConfig(env.DB, "whatsapp", `55${whatsappLocal}`),
-      upsertConfig(env.DB, "mensagem_whatsapp", body.defaultMessage?.trim() ?? ""),
+      upsertConfig(env.DB, "mensagem_whatsapp", body.defaultMessage?.trim() ?? "")
     ]);
 
     return Response.json({ config: await readConfig(env.DB) });
   } catch (err) {
     console.error("Erro ao salvar configurações da loja", err);
-    return Response.json(
-      { error: "Erro interno ao salvar configurações" },
-      { status: 500 },
-    );
+    return Response.json({ error: "Erro interno ao salvar configurações" }, { status: 500 });
   }
 };

@@ -78,7 +78,7 @@ WITH candidatos AS (
       WHERE r.pedido_id = p.id AND r.status = 'REEMBOLSADO'
     ), 0) AS reembolsado_centavos
   FROM pedidos p
-  WHERE ${pedidoValidoSql('p.id')} AND p.status_pedido <> 'CANCELADO'
+  WHERE ${pedidoValidoSql("p.id")} AND p.status_pedido <> 'CANCELADO'
     AND (
       p.origem_pedido = 'MANUAL'
       OR EXISTS (
@@ -134,7 +134,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       catalogo,
       analytics,
       pedidosRecentes,
-      resultadoFinanceiro,
+      resultadoFinanceiro
     ] = await Promise.all([
       // "Quanto dinheiro confirmado entrou hoje" é pergunta do livro-caixa,
       // não do agregado do pedido — um pedido PARCIAL contribui só a fração
@@ -142,7 +142,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // UI, "pagamento(s) confirmado(s)"), não pedidos.
       env.DB.prepare(
         `SELECT COUNT(*) AS count, COALESCE(SUM(valor_centavos), 0) AS total
-         FROM pedido_pagamentos WHERE ${pedidoValidoSql('pedido_pagamentos.pedido_id')} AND status = 'PAGO' AND ${PAGO_EM_DIA} = ?`,
+         FROM pedido_pagamentos WHERE ${pedidoValidoSql("pedido_pagamentos.pedido_id")} AND status = 'PAGO' AND ${PAGO_EM_DIA} = ?`
       )
         .bind(data)
         .first<ValorContagem>(),
@@ -157,7 +157,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
            COALESCE(SUM(saldo_centavos), 0) AS total,
            COALESCE(SUM(CASE WHEN ${CRIADO_EM_DIA} < ? THEN 1 ELSE 0 END), 0) AS anteriores
          FROM pendencias
-         WHERE saldo_centavos > 0`,
+         WHERE saldo_centavos > 0`
       )
         .bind(hoje)
         .first<AReceberResumo>(),
@@ -180,7 +180,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
            CASE WHEN ${CRIADO_EM_DIA} < ? THEN 0 ELSE 1 END,
            criado_em ASC,
            id ASC
-         LIMIT 4`,
+         LIMIT 4`
       )
         .bind(hoje, hoje, hoje)
         .all<PendenciaPagamentoRow>(),
@@ -189,7 +189,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // participa por definição.
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE ${pedidoValidoSql('pedidos.id')} AND status_pagamento IN ('PARCIAL', 'PAGO') AND status_comanda = 'ABERTA' AND ${CRIADO_EM_DIA} = ?`,
+         WHERE ${pedidoValidoSql("pedidos.id")} AND status_pagamento IN ('PARCIAL', 'PAGO') AND status_comanda = 'ABERTA' AND ${CRIADO_EM_DIA} = ?`
       )
         .bind(data)
         .first<{ count: number }>(),
@@ -198,23 +198,23 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // até virar decisão de negócio explícita incluir parcial aqui.
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE ${pedidoValidoSql('pedidos.id')} AND status_pagamento = 'PAGO' AND status_pedido = 'NOVO' AND ${CRIADO_EM_DIA} = ?`,
+         WHERE ${pedidoValidoSql("pedidos.id")} AND status_pagamento = 'PAGO' AND status_pedido = 'NOVO' AND ${CRIADO_EM_DIA} = ?`
       )
         .bind(data)
         .first<{ count: number }>(),
       env.DB.prepare(
         `SELECT COUNT(*) AS total,
                 SUM(CASE WHEN (estoque - estoque_reservado) <= 2 THEN 1 ELSE 0 END) AS baixo
-         FROM produtos WHERE ativo = 1`,
+         FROM produtos WHERE ativo = 1`
       ).first<CatalogoRow>(),
       getStoreAnalytics(env.DB),
       env.DB.prepare(
         `SELECT p.id, p.cliente_nome, p.valor_total_centavos, p.status_pedido,
                 (SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = p.id) AS itens_count
          FROM pedidos p
-         WHERE ${pedidoValidoSql('p.id')} AND p.status_pagamento IN ('PARCIAL', 'PAGO') AND ${P_CRIADO_EM_DIA} = ?
+         WHERE ${pedidoValidoSql("p.id")} AND p.status_pagamento IN ('PARCIAL', 'PAGO') AND ${P_CRIADO_EM_DIA} = ?
          ORDER BY p.criado_em DESC
-         LIMIT 8`,
+         LIMIT 8`
       )
         .bind(data)
         .all<PedidoRecenteRow>(),
@@ -222,7 +222,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // mesma definição de "Caixa total" (getStoreAnalytics) — despesas
       // ATIVAS descontadas do faturamento líquido de TODOS os tempos, não
       // só do dia, senão destoa do card de caixa logo acima.
-      getResultadoFinanceiro(env.DB),
+      getResultadoFinanceiro(env.DB)
     ]);
 
     return Response.json({
@@ -235,12 +235,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       aguardandoPreparo: aguardandoPreparo?.count ?? 0,
       catalogo: {
         total: catalogo?.total ?? 0,
-        estoqueBaixo: catalogo?.baixo ?? 0,
+        estoqueBaixo: catalogo?.baixo ?? 0
       },
       financeiro: analytics.financeiro,
       maisVendidos: analytics.maisVendidos,
       pedidosRecentes: pedidosRecentes.results,
-      resultadoFinanceiro,
+      resultadoFinanceiro
     });
   } catch (err) {
     console.error("Erro ao carregar dashboard (admin)", err);

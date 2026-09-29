@@ -84,18 +84,14 @@ function stockBadge(p: ProdutoAdmin): {
     return {
       availableText: "Esgotado",
       reservedText: reservado > 0 ? `${reservado} reservado${reservado === 1 ? "" : "s"}` : null,
-      type: "critical",
+      type: "critical"
     };
   }
 
   return {
-    availableText:
-      livre <= 2
-        ? `Estoque crítico (${livre} disp)`
-        : `${livre} disponíveis`,
-    reservedText:
-      reservado > 0 ? `${reservado} reservado${reservado === 1 ? "" : "s"}` : null,
-    type: livre <= 2 ? "critical" : "available",
+    availableText: livre <= 2 ? `Estoque crítico (${livre} disp)` : `${livre} disponíveis`,
+    reservedText: reservado > 0 ? `${reservado} reservado${reservado === 1 ? "" : "s"}` : null,
+    type: livre <= 2 ? "critical" : "available"
   };
 }
 
@@ -110,22 +106,20 @@ export default function AdminProdutos() {
 
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [categoriasOpen, setCategoriasOpen] = useState(false);
-  const [editingProduto, setEditingProduto] = useState<ProdutoAdmin | null>(
-    null,
-  );
+  const [editingProduto, setEditingProduto] = useState<ProdutoAdmin | null>(null);
 
   const carregarProdutos = () => {
     setLoading(true);
     fetch("/api/admin/produtos")
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) throw new Error("Falha ao carregar produtos");
         return response.json() as Promise<{ produtos: ProdutoAdmin[] }>;
       })
-      .then((data) => {
+      .then(data => {
         setProdutos(data.produtos);
         setError(null);
       })
-      .catch((err) => setError(err.message))
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   };
 
@@ -133,183 +127,160 @@ export default function AdminProdutos() {
 
   useEffect(() => {
     fetch("/api/admin/categorias")
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) throw new Error("Falha ao carregar categorias");
         return response.json() as Promise<{ categorias: CategoriaResumo[] }>;
       })
-      .then((data) => setCategorias(data.categorias))
+      .then(data => setCategorias(data.categorias))
       .catch(() => setCategorias([]));
   }, [categoriasOpen]);
 
-  const nomeCategoria = (id: string) =>
-    categorias.find((c) => c.id === id)?.nome ?? id;
+  const nomeCategoria = (id: string) => categorias.find(c => c.id === id)?.nome ?? id;
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "todos", label: "Todos" },
     { key: "ativos", label: "Ativos" },
     { key: "esgotados", label: "Esgotados" },
-    { key: "arquivados", label: "Arquivados" },
+    { key: "arquivados", label: "Arquivados" }
   ];
 
-  const porTab = produtos.filter((p) => {
+  const porTab = produtos.filter(p => {
     if (activeTab === "arquivados") return p.ativo === 0;
     if (activeTab === "ativos") return p.ativo === 1;
     if (activeTab === "esgotados") return estoqueLivre(p) <= 0;
     return true;
   });
 
-  const filtered = porTab.filter((p) =>
-    p.nome.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filtered = porTab.filter(p => p.nome.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const totalActive = produtos.filter((p) => p.ativo === 1).length;
-  const totalOutOfStock = produtos.filter((p) => estoqueLivre(p) <= 0).length;
+  const totalActive = produtos.filter(p => p.ativo === 1).length;
+  const totalOutOfStock = produtos.filter(p => estoqueLivre(p) <= 0).length;
 
   return (
     <main className="admin-main">
-        {/* ── Header row ── */}
-        <div className="prod-header-row">
-          <div className="prod-title-group">
-            <h1 className="prod-title">Produtos</h1>
-            <p className="prod-subtitle">
-              Catálogo, categorias, estoque e promoções
-            </p>
-          </div>
-          <div className="prod-header-actions">
-            <button
-              type="button"
-              className="prod-btn-outline"
-              onClick={() => setCategoriasOpen(true)}
-            >
-              Gerenciar categorias
-            </button>
-            <button
-              type="button"
-              className="prod-btn-primary"
-              onClick={() => setShowNewProduct(true)}
-            >
-              <IconPlus />
-              <span>Novo produto</span>
-            </button>
-          </div>
+      {/* ── Header row ── */}
+      <div className="prod-header-row">
+        <div className="prod-title-group">
+          <h1 className="prod-title">Produtos</h1>
+          <p className="prod-subtitle">Catálogo, categorias, estoque e promoções</p>
         </div>
-
-        {/* ── Filters & stats ── */}
-        <div className="prod-filters">
-          <div className="prod-filter-row">
-            <div className="prod-search">
-              <IconSearch />
-              <input
-                type="text"
-                placeholder="Buscar produto"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="prod-tabs">
-              {tabs.map((tab) => (
-                <button
-                  type="button"
-                  key={tab.key}
-                  className={`prod-tab${
-                    activeTab === tab.key ? " prod-tab--active" : ""
-                  }`}
-                  onClick={() => setActiveTab(tab.key)}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="prod-stats-line">
-            <span className="prod-stats-bold">{filtered.length} produtos</span>
-            <span className="prod-stats-dot" />
-            <span className="prod-stats-light">{totalActive} ativos</span>
-            <span className="prod-stats-dot" />
-            <span className="prod-stats-light">
-              {totalOutOfStock} esgotados
-            </span>
-          </div>
+        <div className="prod-header-actions">
+          <button
+            type="button"
+            className="prod-btn-outline"
+            onClick={() => setCategoriasOpen(true)}
+          >
+            Gerenciar categorias
+          </button>
+          <button
+            type="button"
+            className="prod-btn-primary"
+            onClick={() => setShowNewProduct(true)}
+          >
+            <IconPlus />
+            <span>Novo produto</span>
+          </button>
         </div>
+      </div>
 
-        {loading && <p>Carregando produtos…</p>}
-        {error && <p>{error}</p>}
-
-        {/* ── Product grid ── */}
-        <div className="prod-grid">
-          {filtered.map((product) => {
-            const badge = stockBadge(product);
-            return (
+      {/* ── Filters & stats ── */}
+      <div className="prod-filters">
+        <div className="prod-filter-row">
+          <div className="prod-search">
+            <IconSearch />
+            <input
+              type="text"
+              placeholder="Buscar produto"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="prod-tabs">
+            {tabs.map(tab => (
               <button
                 type="button"
-                className="prod-card"
-                key={product.id}
-                onClick={() => setEditingProduto(product)}
+                key={tab.key}
+                className={`prod-tab${activeTab === tab.key ? " prod-tab--active" : ""}`}
+                onClick={() => setActiveTab(tab.key)}
               >
-                <div
-                  className="prod-card-image"
-                  style={{
-                    backgroundImage: product.image_key
-                      ? `url(${imageUrlFor(product.image_key)})`
-                      : undefined,
-                    backgroundColor: "#f0e8e0",
-                  }}
-                >
-                  {!product.image_key && (
-                    <span className="prod-card-emoji">
-                      {product.emoji || "🍰"}
-                    </span>
-                  )}
-                </div>
-                <div className="prod-card-content">
-                  <div className="prod-card-badge-row">
-                    <span className="prod-category-badge">
-                      {nomeCategoria(product.categoria)}
-                    </span>
-                  </div>
-                  <h3 className="prod-card-title">{product.nome}</h3>
-                  <p className="prod-card-desc">{product.descricao}</p>
-                  <div className="prod-card-divider" />
-                  <div className="prod-card-footer">
-                    <span className="prod-card-price">
-                      R${" "}
-                      {(product.preco_centavos / 100)
-                        .toFixed(2)
-                        .replace(".", ",")}
-                    </span>
-                    <div className="prod-stock-summary">
-                      <span
-                        className={`prod-stock-badge prod-stock-badge--${badge.type}`}
-                      >
-                        {badge.availableText}
-                      </span>
-                      {badge.reservedText && (
-                        <span className="prod-stock-reserved">
-                          {badge.reservedText}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                {tab.label}
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
-        <CategoriasModal
-          open={categoriasOpen}
-          onClose={() => setCategoriasOpen(false)}
-        />
-        <NovoProdutoModal
-          open={showNewProduct}
-          onClose={() => setShowNewProduct(false)}
-          onSaved={carregarProdutos}
-        />
-        <NovoProdutoModal
-          open={editingProduto !== null}
-          produto={editingProduto}
-          onClose={() => setEditingProduto(null)}
-          onSaved={carregarProdutos}
-        />
-      </main>
+        <div className="prod-stats-line">
+          <span className="prod-stats-bold">{filtered.length} produtos</span>
+          <span className="prod-stats-dot" />
+          <span className="prod-stats-light">{totalActive} ativos</span>
+          <span className="prod-stats-dot" />
+          <span className="prod-stats-light">{totalOutOfStock} esgotados</span>
+        </div>
+      </div>
+
+      {loading && <p>Carregando produtos…</p>}
+      {error && <p>{error}</p>}
+
+      {/* ── Product grid ── */}
+      <div className="prod-grid">
+        {filtered.map(product => {
+          const badge = stockBadge(product);
+          return (
+            <button
+              type="button"
+              className="prod-card"
+              key={product.id}
+              onClick={() => setEditingProduto(product)}
+            >
+              <div
+                className="prod-card-image"
+                style={{
+                  backgroundImage: product.image_key
+                    ? `url(${imageUrlFor(product.image_key)})`
+                    : undefined,
+                  backgroundColor: "#f0e8e0"
+                }}
+              >
+                {!product.image_key && (
+                  <span className="prod-card-emoji">{product.emoji || "🍰"}</span>
+                )}
+              </div>
+              <div className="prod-card-content">
+                <div className="prod-card-badge-row">
+                  <span className="prod-category-badge">{nomeCategoria(product.categoria)}</span>
+                </div>
+                <h3 className="prod-card-title">{product.nome}</h3>
+                <p className="prod-card-desc">{product.descricao}</p>
+                <div className="prod-card-divider" />
+                <div className="prod-card-footer">
+                  <span className="prod-card-price">
+                    R$ {(product.preco_centavos / 100).toFixed(2).replace(".", ",")}
+                  </span>
+                  <div className="prod-stock-summary">
+                    <span className={`prod-stock-badge prod-stock-badge--${badge.type}`}>
+                      {badge.availableText}
+                    </span>
+                    {badge.reservedText && (
+                      <span className="prod-stock-reserved">{badge.reservedText}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <CategoriasModal open={categoriasOpen} onClose={() => setCategoriasOpen(false)} />
+      <NovoProdutoModal
+        open={showNewProduct}
+        onClose={() => setShowNewProduct(false)}
+        onSaved={carregarProdutos}
+      />
+      <NovoProdutoModal
+        open={editingProduto !== null}
+        produto={editingProduto}
+        onClose={() => setEditingProduto(null)}
+        onSaved={carregarProdutos}
+      />
+    </main>
   );
 }

@@ -18,17 +18,13 @@ const AdminAuthContext = createContext<AdminAuthContextType | null>(null);
 export function AdminAuthProvider({
   user,
   logout,
-  children,
+  children
 }: {
   user: AdminUser;
   logout: () => void;
   children: ReactNode;
 }) {
-  return (
-    <AdminAuthContext.Provider value={{ user, logout }}>
-      {children}
-    </AdminAuthContext.Provider>
-  );
+  return <AdminAuthContext.Provider value={{ user, logout }}>{children}</AdminAuthContext.Provider>;
 }
 
 export function useAdminAuth() {

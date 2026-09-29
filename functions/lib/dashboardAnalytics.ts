@@ -5,7 +5,7 @@ import { pedidoValidoSql } from "./pedidoValido";
 import {
   CONFIRMED_REFUNDS_BY_ALLOCATION_CTE,
   EXCHANGE_COVERAGE_STATUSES,
-  REFUND_ALLOCATIONS_UNION_SQL,
+  REFUND_ALLOCATIONS_UNION_SQL
 } from "./financialCoverage";
 
 export interface StoreFinancialSummary {
@@ -35,17 +35,17 @@ interface BestSellerRow {
 const STORE_FINANCIAL_SQL = `SELECT
   COALESCE((SELECT SUM(valor_centavos)
             FROM pedido_pagamentos
-            WHERE status='PAGO' AND ${pedidoValidoSql('pedido_pagamentos.pedido_id')}),0) AS bruto_centavos,
+            WHERE status='PAGO' AND ${pedidoValidoSql("pedido_pagamentos.pedido_id")}),0) AS bruto_centavos,
   COALESCE((SELECT SUM(valor_centavos)
             FROM pedido_reembolsos
-            WHERE status='REEMBOLSADO' AND ${pedidoValidoSql('pedido_reembolsos.pedido_id')}),0) AS reembolsado_centavos,
+            WHERE status='REEMBOLSADO' AND ${pedidoValidoSql("pedido_reembolsos.pedido_id")}),0) AS reembolsado_centavos,
   MAX(0,
     COALESCE((SELECT SUM(valor_centavos)
               FROM pedido_pagamentos
-              WHERE status='PAGO' AND ${pedidoValidoSql('pedido_pagamentos.pedido_id')}),0)
+              WHERE status='PAGO' AND ${pedidoValidoSql("pedido_pagamentos.pedido_id")}),0)
     - COALESCE((SELECT SUM(valor_centavos)
                 FROM pedido_reembolsos
-                WHERE status='REEMBOLSADO' AND ${pedidoValidoSql('pedido_reembolsos.pedido_id')}),0)
+                WHERE status='REEMBOLSADO' AND ${pedidoValidoSql("pedido_reembolsos.pedido_id")}),0)
   ) AS liquido_centavos`;
 
 // Cada item ATIVO e uma venda candidata. A recursao leva junto a identidade
@@ -60,7 +60,7 @@ const BEST_SELLERS_SQL = `WITH RECURSIVE
       CASE WHEN pi.produto_id IS NOT NULL THEN 'produto:' || pi.produto_id
            ELSE 'historico:' || lower(trim(pi.produto_nome)) END AS identidade
     FROM pedido_itens pi
-    WHERE ${pedidoValidoSql('pi.pedido_id')} AND pi.status_item='ATIVO' AND pi.valor_total_centavos>0
+    WHERE ${pedidoValidoSql("pi.pedido_id")} AND pi.status_item='ATIVO' AND pi.valor_total_centavos>0
   ),
   linhagem_financeira(item_vendido_id,item_id) AS (
     SELECT id,id FROM itens_ativos
@@ -120,19 +120,19 @@ export async function getStoreAnalytics(db: D1Database): Promise<{
 }> {
   const [financial, bestSellers] = await Promise.all([
     db.prepare(STORE_FINANCIAL_SQL).first<FinancialRow>(),
-    db.prepare(BEST_SELLERS_SQL).all<BestSellerRow>(),
+    db.prepare(BEST_SELLERS_SQL).all<BestSellerRow>()
   ]);
 
   return {
     financeiro: {
       brutoCentavos: Number(financial?.bruto_centavos ?? 0),
       reembolsadoCentavos: Number(financial?.reembolsado_centavos ?? 0),
-      liquidoCentavos: Number(financial?.liquido_centavos ?? 0),
+      liquidoCentavos: Number(financial?.liquido_centavos ?? 0)
     },
-    maisVendidos: bestSellers.results.map((row) => ({
+    maisVendidos: bestSellers.results.map(row => ({
       produtoId: row.produto_id === null ? null : Number(row.produto_id),
       nome: row.nome,
-      quantidade: Number(row.quantidade),
-    })),
+      quantidade: Number(row.quantidade)
+    }))
   };
 }

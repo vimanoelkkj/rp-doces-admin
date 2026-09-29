@@ -37,7 +37,7 @@ test("StoreTheme: global.css defines complete semantic store tokens for :root an
     "--store-wave-primary",
     "--store-wave-secondary",
     "--store-overlay",
-    "--store-shadow",
+    "--store-shadow"
   ];
 
   for (const token of requiredTokens) {
@@ -64,12 +64,15 @@ test("StoreTheme: No CSS image filters (brightness, contrast, invert) applied to
     "src/pages/Checkout.css",
     "src/pages/AguardandoPagamento.css",
     "src/pages/PedidoConfirmado.css",
-    "src/pages/PagamentoNaoAprovado.css",
+    "src/pages/PagamentoNaoAprovado.css"
   ];
 
   for (const relPath of cssFiles) {
     const content = fs.readFileSync(path.resolve(relPath), "utf-8");
-    assert.ok(!content.includes("filter: brightness"), `${relPath} must not use filter: brightness`);
+    assert.ok(
+      !content.includes("filter: brightness"),
+      `${relPath} must not use filter: brightness`
+    );
     assert.ok(!content.includes("filter: contrast"), `${relPath} must not use filter: contrast`);
     assert.ok(!content.includes("filter: invert"), `${relPath} must not use filter: invert`);
   }
@@ -112,21 +115,33 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
   assert.match(contextCode, /opacity:\s*\[0,\s*1\]/);
 
   // 4. O caminho mobile NÃO usa transform scale (evita deslocamento espacial e piscada branca nos cantos/cards)
-  const mobileBlockMatch = contextCode.match(/if\s*\(\s*isMobile\s*\)\s*\{([\s\S]*?)\n\s*return;\s*\}/);
+  const mobileBlockMatch = contextCode.match(
+    /if\s*\(\s*isMobile\s*\)\s*\{([\s\S]*?)\n\s*return;\s*\}/
+  );
   assert.ok(mobileBlockMatch, "bloco condicional mobile deve existir");
-  assert.doesNotMatch(mobileBlockMatch[1], /scale\(/i, "caminho mobile não deve usar scale para evitar ghosting");
+  assert.doesNotMatch(
+    mobileBlockMatch[1],
+    /scale\(/i,
+    "caminho mobile não deve usar scale para evitar ghosting"
+  );
   assert.doesNotMatch(mobileBlockMatch[1], /clipPath/i, "caminho mobile não deve usar clipPath");
 
   // 5. Nenhuma transformação scale no desktop ou no context
   assert.doesNotMatch(contextCode, /scale\(/i, "nenhum scale deve ser introduzido no context");
-  assert.doesNotMatch(contextCode, /transform:/i, "nenhum transform manual deve ser aplicado no context");
+  assert.doesNotMatch(
+    contextCode,
+    /transform:/i,
+    "nenhum transform manual deve ser aplicado no context"
+  );
 
   // 6. prefers-reduced-motion continua preservado
   assert.match(contextCode, /matchMedia\(\s*["']\(prefers-reduced-motion:\s*reduce\)["']\s*\)/);
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
 
   // 7. Duração mobile está abaixo da duração desktop
-  const desktopDurationMatch = contextCode.match(/const\s*\{\s*x,\s*y\s*\}[\s\S]*?duration:\s*(\d+)/);
+  const desktopDurationMatch = contextCode.match(
+    /const\s*\{\s*x,\s*y\s*\}[\s\S]*?duration:\s*(\d+)/
+  );
   const mobileDurationMatch = contextCode.match(/if\s*\(\s*isMobile\s*\)[\s\S]*?duration:\s*(\d+)/);
   assert.ok(desktopDurationMatch, "deve ter duração no caminho desktop");
   assert.ok(mobileDurationMatch, "deve ter duração no caminho mobile");
@@ -135,18 +150,18 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
   assert.equal(desktopDuration, 480, "duração desktop deve ser 480ms");
   assert.ok(
     mobileDuration < desktopDuration,
-    `duração mobile (${mobileDuration}ms) deve ser menor que duração desktop (${desktopDuration}ms)`,
+    `duração mobile (${mobileDuration}ms) deve ser menor que duração desktop (${desktopDuration}ms)`
   );
   assert.ok(
     mobileDuration >= 240 && mobileDuration <= 300,
-    `duração mobile (${mobileDuration}ms) deve estar entre 240ms e 300ms`,
+    `duração mobile (${mobileDuration}ms) deve estar entre 240ms e 300ms`
   );
 
   // 8. ::view-transition-group(root) com animation: none (sem animação geométrica implícita)
   assert.match(
     css,
     /::view-transition-group\(root\)\s*\{\s*animation:\s*none;\s*\}/,
-    "::view-transition-group(root) deve ter animation: none para evitar deslocamento espacial",
+    "::view-transition-group(root) deve ter animation: none para evitar deslocamento espacial"
   );
 
   // 9. new(root) continua sendo o único pseudo-elemento animado manualmente no desktop e mobile
@@ -154,5 +169,3 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
   assert.doesNotMatch(contextCode, /::view-transition-old\(root\)/);
   assert.doesNotMatch(contextCode, /::view-transition-group\(root\)/);
 });
-
-

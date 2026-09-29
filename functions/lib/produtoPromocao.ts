@@ -97,6 +97,6 @@ export function normalizarPromocao(body: ProdutoInput): PromocaoNormalizada {
         ? (body.precoPromocionalCentavos as number)
         : null,
     promocaoInicio: textoOuNulo(body.promocaoInicio),
-    promocaoFim: textoOuNulo(body.promocaoFim),
+    promocaoFim: textoOuNulo(body.promocaoFim)
   };
 }

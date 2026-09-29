@@ -27,14 +27,12 @@ async function keyFor(request: Request, username: string): Promise<string> {
 export async function checkLoginRateLimit(
   db: D1Database,
   request: Request,
-  username: string,
+  username: string
 ): Promise<{ allowed: boolean; key: string; retryAfter?: number }> {
   const key = await keyFor(request, username);
   const now = Date.now();
   const row = await db
-    .prepare(
-      `SELECT falhas, janela_inicio, bloqueado_ate FROM auth_rate_limits WHERE chave = ?`,
-    )
+    .prepare(`SELECT falhas, janela_inicio, bloqueado_ate FROM auth_rate_limits WHERE chave = ?`)
     .bind(key)
     .first<RateLimitRow>();
 
@@ -45,7 +43,7 @@ export async function checkLoginRateLimit(
     return {
       allowed: false,
       key,
-      retryAfter: Math.max(1, Math.ceil((blockedUntil - now) / 1000)),
+      retryAfter: Math.max(1, Math.ceil((blockedUntil - now) / 1000))
     };
   }
 
@@ -56,7 +54,7 @@ export const CLEANUP_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 export async function cleanupStaleLoginRateLimits(
   db: D1Database,
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): Promise<number> {
   const cutoffIso = new Date(nowMs - CLEANUP_RETENTION_MS).toISOString();
   const nowIso = new Date(nowMs).toISOString();
@@ -68,7 +66,7 @@ export async function cleanupStaleLoginRateLimits(
          AND (
            bloqueado_ate IS NULL
            OR julianday(bloqueado_ate) <= julianday(?)
-         )`,
+         )`
     )
     .bind(cutoffIso, nowIso)
     .run();
@@ -85,10 +83,7 @@ export async function cleanupStaleLoginRateLimits(
 // data ilegível vira NULL no julianday e reinicia a janela). No UPDATE do
 // SQLite, todas as expressões do SET leem os valores ANTERIORES da linha, então
 // o bloqueio é calculado a partir da mesma contagem que está sendo gravada.
-export async function recordLoginFailure(
-  db: D1Database,
-  key: string,
-): Promise<void> {
+export async function recordLoginFailure(db: D1Database, key: string): Promise<void> {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
   const windowCutoffIso = new Date(nowMs - WINDOW_MS).toISOString();
@@ -118,7 +113,7 @@ export async function recordLoginFailure(
                THEN ?3
            ELSE NULL
          END,
-         atualizado_em = CURRENT_TIMESTAMP`,
+         atualizado_em = CURRENT_TIMESTAMP`
     )
     .bind(key, nowIso, blockedUntilIso, MAX_FAILURES, windowCutoffIso)
     .run();
@@ -132,9 +127,6 @@ export async function recordLoginFailure(
   }
 }
 
-export async function clearLoginFailures(
-  db: D1Database,
-  key: string,
-): Promise<void> {
+export async function clearLoginFailures(db: D1Database, key: string): Promise<void> {
   await db.prepare(`DELETE FROM auth_rate_limits WHERE chave = ?`).bind(key).run();
 }

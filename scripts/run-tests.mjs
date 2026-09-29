@@ -16,15 +16,15 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const testsDir = path.join(root, "tests");
 
 const args = process.argv.slice(2);
-const option = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
-const flag = (name) => args.includes(`--${name}`);
+const option = name => args.find(a => a.startsWith(`--${name}=`))?.split("=")[1];
+const flag = name => args.includes(`--${name}`);
 
 const files = readdirSync(testsDir)
-  .filter((file) => file.endsWith(".test.mjs"))
+  .filter(file => file.endsWith(".test.mjs"))
   .sort()
-  .map((file) => path.join(testsDir, file));
+  .map(file => path.join(testsDir, file));
 
-const rel = (file) => path.relative(root, file).split(path.sep).join("/");
+const rel = file => path.relative(root, file).split(path.sep).join("/");
 
 // Marcas de tempo para correlacionar o log do GitHub (carimbado quando o
 // RUNNER processa a linha) com o que o processo Node fez de fato: instante
@@ -44,7 +44,10 @@ const MAX_LINE_LENGTH = 4000;
 const DATA_URL = /data:[\w/+.-]+;base64,[A-Za-z0-9+/=]{200,}/g;
 
 function sanitizeLine(line) {
-  let out = line.replace(DATA_URL, (match) => `data:<bundle base64 omitido: ${match.length} caracteres>`);
+  let out = line.replace(
+    DATA_URL,
+    match => `data:<bundle base64 omitido: ${match.length} caracteres>`
+  );
   if (out.length > MAX_LINE_LENGTH) {
     out = `${out.slice(0, MAX_LINE_LENGTH)} ...[linha truncada: ${out.length} caracteres]`;
   }
@@ -54,7 +57,7 @@ function sanitizeLine(line) {
 function forwardLines(stream, target) {
   let pending = "";
   stream.setEncoding("utf8");
-  stream.on("data", (chunk) => {
+  stream.on("data", chunk => {
     pending += chunk;
     while (true) {
       const newline = pending.indexOf("\n");
@@ -75,12 +78,12 @@ function runTestFile(file) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["--test", file], {
       cwd: root,
-      stdio: ["inherit", "pipe", "pipe"],
+      stdio: ["inherit", "pipe", "pipe"]
     });
     forwardLines(child.stdout, process.stdout);
     forwardLines(child.stderr, process.stderr);
     child.on("error", reject);
-    child.on("close", (status) => resolve({ status }));
+    child.on("close", status => resolve({ status }));
   });
 }
 
@@ -99,18 +102,19 @@ function weightOf(file) {
 function partition(allFiles, total) {
   const bins = Array.from({ length: total }, () => ({ weight: 0, files: [] }));
   const ordered = allFiles
-    .map((file) => ({ file, weight: weightOf(file) }))
+    .map(file => ({ file, weight: weightOf(file) }))
     .sort((a, b) => b.weight - a.weight || a.file.localeCompare(b.file));
   for (const { file, weight } of ordered) {
     const bin = bins.reduce((lightest, candidate) =>
       candidate.weight < lightest.weight ||
       (candidate.weight === lightest.weight && candidate.files.length < lightest.files.length)
         ? candidate
-        : lightest);
+        : lightest
+    );
     bin.weight += weight;
     bin.files.push(file);
   }
-  return bins.map((bin) => ({ ...bin, files: bin.files.sort() }));
+  return bins.map(bin => ({ ...bin, files: bin.files.sort() }));
 }
 
 function parsePositiveInt(value, label) {
@@ -126,11 +130,12 @@ function parsePositiveInt(value, label) {
 // da suíte em silêncio: a verificação falha se existirem.
 function orphanTestFiles() {
   const found = [];
-  const walk = (dir) => {
+  const walk = dir => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (/\.test\.(mjs|cjs|js|ts|mts)$/.test(entry.name) && !files.includes(full)) found.push(full);
+      else if (/\.test\.(mjs|cjs|js|ts|mts)$/.test(entry.name) && !files.includes(full))
+        found.push(full);
     }
   };
   walk(testsDir);
@@ -141,17 +146,22 @@ const verifyTotal = option("verify-shards");
 if (verifyTotal !== undefined) {
   const total = parsePositiveInt(verifyTotal, "--verify-shards");
   const bins = partition(files, total);
-  const seen = bins.flatMap((bin) => bin.files);
+  const seen = bins.flatMap(bin => bin.files);
   const problems = [];
-  if (seen.length !== files.length) problems.push(`${seen.length} arquivos nas fatias, ${files.length} descobertos`);
+  if (seen.length !== files.length)
+    problems.push(`${seen.length} arquivos nas fatias, ${files.length} descobertos`);
   if (new Set(seen).size !== seen.length) problems.push("há arquivo repetido entre fatias");
-  for (const file of files) if (!seen.includes(file)) problems.push(`fora de todas as fatias: ${rel(file)}`);
-  for (const orphan of orphanTestFiles()) problems.push(`teste fora do runner (não seria executado): ${rel(orphan)}`);
+  for (const file of files)
+    if (!seen.includes(file)) problems.push(`fora de todas as fatias: ${rel(file)}`);
+  for (const orphan of orphanTestFiles())
+    problems.push(`teste fora do runner (não seria executado): ${rel(orphan)}`);
   bins.forEach((bin, i) => {
-    console.log(`fatia ${i + 1}/${total}: ${bin.files.length} arquivos, peso ${bin.weight.toFixed(1)}`);
+    console.log(
+      `fatia ${i + 1}/${total}: ${bin.files.length} arquivos, peso ${bin.weight.toFixed(1)}`
+    );
   });
   if (problems.length) {
-    problems.forEach((p) => {
+    problems.forEach(p => {
       console.error(`ERRO: ${p}`);
     });
     process.exit(1);
@@ -164,7 +174,7 @@ let selected = files;
 let label = "";
 const shard = option("shard");
 if (shard !== undefined) {
-  const [index, total] = shard.split("/").map((v) => parsePositiveInt(v, "--shard"));
+  const [index, total] = shard.split("/").map(v => parsePositiveInt(v, "--shard"));
   if (!total || index > total) {
     console.error(`--shard inválido: ${shard} (esperado i/n com 1 <= i <= n)`);
     process.exit(2);
@@ -175,7 +185,7 @@ if (shard !== undefined) {
 }
 
 if (flag("list")) {
-  selected.forEach((file) => {
+  selected.forEach(file => {
     console.log(rel(file));
   });
   process.exit(0);
@@ -185,7 +195,9 @@ const keepGoing = flag("keep-going");
 const results = [];
 
 console.log(`[tempo] script iniciado ${utc()}`);
-process.on("exit", (code) => console.log(`[tempo] processo Node encerrando ${utc()} (código ${code})`));
+process.on("exit", code =>
+  console.log(`[tempo] processo Node encerrando ${utc()} (código ${code})`)
+);
 
 for (const file of selected) {
   const started = process.hrtime.bigint();
@@ -196,7 +208,7 @@ for (const file of selected) {
   const ok = result.status === 0;
   results.push({ file: rel(file), seconds, ok });
   console.log(
-    `[tempo] ${rel(file)} ${seconds.toFixed(1)}s ${ok ? "ok" : "FALHOU"} (${startedAt} -> ${utc()})`,
+    `[tempo] ${rel(file)} ${seconds.toFixed(1)}s ${ok ? "ok" : "FALHOU"} (${startedAt} -> ${utc()})`
   );
 
   if (!ok && !keepGoing) {
@@ -207,10 +219,12 @@ for (const file of selected) {
 // Resumo de tempos (mais lentos primeiro), também no resumo do job do GitHub.
 console.log(`[tempo] gerando resumo ${utc()} (monotônico ${monotonic()}s)`);
 const total = results.reduce((sum, r) => sum + r.seconds, 0);
-const failed = results.filter((r) => !r.ok);
+const failed = results.filter(r => !r.ok);
 const slowest = [...results].sort((a, b) => b.seconds - a.seconds).slice(0, 10);
-console.log(`\nResumo${label ? ` (${label})` : ""}: ${results.length} arquivos em ${total.toFixed(0)}s, ${failed.length} com falha`);
-slowest.forEach((r) => {
+console.log(
+  `\nResumo${label ? ` (${label})` : ""}: ${results.length} arquivos em ${total.toFixed(0)}s, ${failed.length} com falha`
+);
+slowest.forEach(r => {
   console.log(`  ${r.seconds.toFixed(1).padStart(7)}s  ${r.file}`);
 });
 
@@ -224,8 +238,8 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     "| --- | ---: | --- |",
     ...[...results]
       .sort((a, b) => b.seconds - a.seconds)
-      .map((r) => `| ${r.file} | ${r.seconds.toFixed(1)}s | ${r.ok ? "ok" : "**FALHOU**"} |`),
-    "",
+      .map(r => `| ${r.file} | ${r.seconds.toFixed(1)}s | ${r.ok ? "ok" : "**FALHOU**"} |`),
+    ""
   ];
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"));
 }
@@ -235,6 +249,6 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 console.log(`[tempo] fim do script ${utc()} (monotônico ${monotonic()}s desde o início)`);
 
 if (failed.length) {
-  console.error(`\nArquivos com falha:\n${failed.map((r) => `  - ${r.file}`).join("\n")}`);
+  console.error(`\nArquivos com falha:\n${failed.map(r => `  - ${r.file}`).join("\n")}`);
   process.exit(1);
 }

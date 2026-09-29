@@ -6,9 +6,9 @@ interface ScheduleDay {
 export function formatScheduleText(
   days: ScheduleDay[],
   openTime: string,
-  closeTime: string,
+  closeTime: string
 ): string {
-  const activeDays = days.filter((day) => day.active);
+  const activeDays = days.filter(day => day.active);
   if (activeDays.length === 0) return "Fechado";
   const dayLabel =
     activeDays.length === 7

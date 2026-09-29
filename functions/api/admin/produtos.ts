@@ -9,12 +9,12 @@ interface Env {
 import {
   normalizarPromocao,
   type ProdutoInput,
-  validarProdutoPromocao,
+  validarProdutoPromocao
 } from "../../lib/produtoPromocao";
 import {
   normalizarDetalhesProduto,
   type ProdutoDetalhesInput,
-  validarDetalhesProduto,
+  validarDetalhesProduto
 } from "../../lib/produtoDetalhes";
 
 const MAX_TEXT_LENGTH = 1000;
@@ -57,7 +57,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
               promocao_inicio, promocao_fim, promocao_ativa, disponivel, ativo, destaque, ordem,
               estoque, estoque_reservado, emoji, image_key,
               peso_texto, ingredientes, alergenicos
-       FROM produtos ORDER BY categoria, ordem, nome`,
+       FROM produtos ORDER BY categoria, ordem, nome`
     ).all();
     return Response.json({ produtos: results });
   } catch (err) {
@@ -95,7 +95,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       `INSERT INTO produtos (nome, categoria, descricao, preco_centavos, estoque, emoji, ativo, disponivel, destaque,
                              promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim,
                              peso_texto, ingredientes, alergenicos)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         body.nome!.trim(),
@@ -113,7 +113,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         promocao.promocaoFim,
         detalhes.pesoTexto ?? "",
         detalhes.ingredientes ?? "",
-        detalhes.alergenicos ?? "",
+        detalhes.alergenicos ?? ""
       )
       .run();
 

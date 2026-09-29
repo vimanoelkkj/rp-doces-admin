@@ -12,7 +12,7 @@ import {
   IconReceipt,
   IconStore,
   IconUsers,
-  IconBell,
+  IconBell
 } from "../admin/components/AdminSidebar";
 import "./Header.css";
 
@@ -35,9 +35,7 @@ export default function Header({ variant }: HeaderProps) {
   const notificacoesApi = useOptionalNotificacoes();
 
   const isAdmin =
-    variant !== undefined
-      ? variant === "admin"
-      : location.pathname.startsWith("/admin");
+    variant !== undefined ? variant === "admin" : location.pathname.startsWith("/admin");
 
   const adminUser = adminAuth?.user ?? null;
   const adminLogout = adminAuth?.logout;
@@ -213,17 +211,13 @@ export default function Header({ variant }: HeaderProps) {
     setDragOffset(offset);
   };
 
-  const finishDrag = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    cancelled = false,
-  ) => {
+  const finishDrag = (event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
     if (dragPointerIdRef.current !== event.pointerId) return;
 
     const moved = dragMovedRef.current;
     const menuHeight = menuRef.current?.getBoundingClientRect().height ?? 320;
     const closeThreshold = Math.max(72, Math.min(120, menuHeight * 0.25));
-    const shouldClose =
-      !cancelled && moved && dragOffsetRef.current >= closeThreshold;
+    const shouldClose = !cancelled && moved && dragOffsetRef.current >= closeThreshold;
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -263,14 +257,14 @@ export default function Header({ variant }: HeaderProps) {
       to: "/admin/notificacoes",
       label: "Notificações",
       icon: <IconBell />,
-      badge: naoLidas,
-    },
+      badge: naoLidas
+    }
   ];
 
   const adminUserInitials = adminUser?.nome
     ? adminUser.nome
         .split(" ")
-        .map((n) => n[0])
+        .map(n => n[0])
         .join("")
         .toUpperCase()
         .slice(0, 2)
@@ -295,27 +289,9 @@ export default function Header({ variant }: HeaderProps) {
                 strokeWidth="2"
                 strokeLinecap="round"
               />
-              <circle
-                className="flame flame-1"
-                cx="5.833"
-                cy="3.334"
-                r="1.2"
-                fill="#d38b80"
-              />
-              <circle
-                className="flame flame-2"
-                cx="10"
-                cy="3.334"
-                r="1.2"
-                fill="#d38b80"
-              />
-              <circle
-                className="flame flame-3"
-                cx="14.167"
-                cy="3.334"
-                r="1.2"
-                fill="#d38b80"
-              />
+              <circle className="flame flame-1" cx="5.833" cy="3.334" r="1.2" fill="#d38b80" />
+              <circle className="flame flame-2" cx="10" cy="3.334" r="1.2" fill="#d38b80" />
+              <circle className="flame flame-3" cx="14.167" cy="3.334" r="1.2" fill="#d38b80" />
             </svg>
           </div>
           <span className="logo-text">R&amp;P Doces</span>
@@ -324,7 +300,7 @@ export default function Header({ variant }: HeaderProps) {
 
         {isAdmin ? (
           <nav className="main-nav main-nav--admin" aria-label="Navegação administrativa">
-            {adminNavItems.map((item) => (
+            {adminNavItems.map(item => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -335,9 +311,7 @@ export default function Header({ variant }: HeaderProps) {
               >
                 <span>{item.label}</span>
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className="header-nav-badge">
-                    {item.badge > 9 ? "9+" : item.badge}
-                  </span>
+                  <span className="header-nav-badge">{item.badge > 9 ? "9+" : item.badge}</span>
                 )}
               </NavLink>
             ))}
@@ -347,28 +321,28 @@ export default function Header({ variant }: HeaderProps) {
             <a
               href={location.pathname === "/" ? "#cardapio" : "/#cardapio"}
               className="nav-link"
-              onClick={(e) => handleStorefrontNav("#cardapio", e)}
+              onClick={e => handleStorefrontNav("#cardapio", e)}
             >
               Cardápio
             </a>
             <a
               href={location.pathname === "/" ? "#sobre" : "/#sobre"}
               className="nav-link"
-              onClick={(e) => handleStorefrontNav("#sobre", e)}
+              onClick={e => handleStorefrontNav("#sobre", e)}
             >
               Sobre
             </a>
             <a
               href={location.pathname === "/" ? "#onde-estamos" : "/#onde-estamos"}
               className="nav-link"
-              onClick={(e) => handleStorefrontNav("#onde-estamos", e)}
+              onClick={e => handleStorefrontNav("#onde-estamos", e)}
             >
               Onde estamos
             </a>
             <a
               href={location.pathname === "/" ? "#contato" : "/#contato"}
               className="nav-link"
-              onClick={(e) => handleStorefrontNav("#contato", e)}
+              onClick={e => handleStorefrontNav("#contato", e)}
             >
               Contato
             </a>
@@ -410,13 +384,11 @@ export default function Header({ variant }: HeaderProps) {
           <button
             type="button"
             className="theme-toggle-btn"
-            onClick={(e) => {
+            onClick={e => {
               e.currentTarget.blur();
               toggleTheme(e);
             }}
-            aria-label={
-              theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"
-            }
+            aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"}
             title={theme === "light" ? "Modo escuro" : "Modo claro"}
           >
             {theme === "light" ? (
@@ -506,19 +478,13 @@ export default function Header({ variant }: HeaderProps) {
                 className="mobile-menu-close"
                 onPointerDown={handleDragStart}
                 onPointerMove={handleDragMove}
-                onPointerUp={(event) => finishDrag(event)}
-                onPointerCancel={(event) => finishDrag(event, true)}
+                onPointerUp={event => finishDrag(event)}
+                onPointerCancel={event => finishDrag(event, true)}
                 onClick={handleDragHandleClick}
                 aria-label="Fechar menu"
                 title="Arraste para baixo para fechar"
               >
-                <svg
-                  width="56"
-                  height="6"
-                  viewBox="0 0 56 6"
-                  fill="none"
-                  aria-hidden="true"
-                >
+                <svg width="56" height="6" viewBox="0 0 56 6" fill="none" aria-hidden="true">
                   <path
                     d="M1 3C9 1 18 5 28 3C38 1 47 5 55 3"
                     stroke="currentColor"
@@ -707,7 +673,7 @@ export default function Header({ variant }: HeaderProps) {
               </div>
             </nav>
           </>,
-          document.body,
+          document.body
         )}
     </>
   );

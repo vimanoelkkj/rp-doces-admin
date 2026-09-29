@@ -15,39 +15,28 @@
  */
 
 // 1. Tipos fundamentais (ledger/types.ts)
-export type {
-  LedgerStatus,
-  LedgerMetodo,
-  StatusFinanceiroAgregado,
-} from "./ledger/types";
+export type { LedgerStatus, LedgerMetodo, StatusFinanceiroAgregado } from "./ledger/types";
 
 // 2. Domínio Legado (ledger/legacy.ts)
-export type {
-  LegacyStatusResult,
-  MaterializeResult,
-} from "./ledger/legacy";
+export type { LegacyStatusResult, MaterializeResult } from "./ledger/legacy";
 
 export {
   ledgerPaymentStatus,
   ensureLegacyPaymentMaterialized,
-  resolveLedgerPaymentId,
+  resolveLedgerPaymentId
 } from "./ledger/legacy";
 
 // 3. Domínio de Alocações (ledger/allocations.ts)
-export type {
-  ItemComSaldo,
-} from "./ledger/allocations";
+export type { ItemComSaldo } from "./ledger/allocations";
 
 export {
   allocateFullValueAcrossItems,
   getItensComSaldo,
-  computeWaterfallAllocations,
+  computeWaterfallAllocations
 } from "./ledger/allocations";
 
 // 4. Domínio de Projeção / Consulta (ledger/projection.ts)
-export type {
-  FinanceiroPedido,
-} from "./ledger/projection";
+export type { FinanceiroPedido } from "./ledger/projection";
 
 export {
   getPaidCentavos,
@@ -57,24 +46,15 @@ export {
   hasNetConfirmedPayment,
   getFinanceiroPedido,
   getFinanceirosPorPedidos,
-  getComandaSaldo,
+  getComandaSaldo
 } from "./ledger/projection";
 
 // 5. Pagamentos Administrativos (ledger/adminPayments.ts)
-export type {
-  MetodoManual,
-  RegisterAdminPaymentResult,
-} from "./ledger/adminPayments";
+export type { MetodoManual, RegisterAdminPaymentResult } from "./ledger/adminPayments";
 
-export {
-  registerAdminPayment,
-} from "./ledger/adminPayments";
+export { registerAdminPayment } from "./ledger/adminPayments";
 
 // 6. Reembolsos Administrativos (ledger/adminRefunds.ts)
-export type {
-  RegisterRefundResult,
-} from "./ledger/adminRefunds";
+export type { RegisterRefundResult } from "./ledger/adminRefunds";
 
-export {
-  registerManualRefund,
-} from "./ledger/adminRefunds";
+export { registerManualRefund } from "./ledger/adminRefunds";

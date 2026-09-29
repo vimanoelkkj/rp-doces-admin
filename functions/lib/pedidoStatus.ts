@@ -7,7 +7,7 @@ import {
   syncPaymentFromMp,
   expireLocalPayment,
   fetchMpPayment,
-  resolveWebhookPayment,
+  resolveWebhookPayment
 } from "./paymentSync";
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 import { pedidoTemEstoquePendente } from "./stock";
@@ -30,7 +30,10 @@ export interface StatusAtual {
   estoquePendente: boolean;
 }
 
-async function statusDoPagamento(db: D1Database, pagamentoId: number | null): Promise<string | null> {
+async function statusDoPagamento(
+  db: D1Database,
+  pagamentoId: number | null
+): Promise<string | null> {
   if (!pagamentoId) return null;
   const row = await db
     .prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
@@ -48,18 +51,21 @@ async function statusDoPagamento(db: D1Database, pagamentoId: number | null): Pr
 // expiração, reconciliação) acontece só em `refreshPedidoStatus`, via POST.
 export async function readPedidoStatus(
   db: D1Database,
-  pedido: PedidoStatusRow,
+  pedido: PedidoStatusRow
 ): Promise<StatusAtual> {
-  const { results } = await db.prepare(
-    `SELECT id, status FROM pedido_pagamentos
+  const { results } = await db
+    .prepare(
+      `SELECT id, status FROM pedido_pagamentos
      WHERE pedido_id = ? AND origem = 'SITE' AND metodo = 'PIX_MP'
-       AND (? IS NULL OR mp_payment_id = ? OR mp_payment_id IS NULL) LIMIT 2`,
-  ).bind(pedido.id, pedido.mp_payment_id, pedido.mp_payment_id).all<{ id: number; status: string }>();
+       AND (? IS NULL OR mp_payment_id = ? OR mp_payment_id IS NULL) LIMIT 2`
+    )
+    .bind(pedido.id, pedido.mp_payment_id, pedido.mp_payment_id)
+    .all<{ id: number; status: string }>();
   if (results.length > 1) throw new Error("TENTATIVA_SITE_AMBIGUA");
   return {
     statusPagamento: results[0]?.status ?? pedido.status_pagamento,
     statusPedido: pedido.status_pedido,
-    estoquePendente: await pedidoTemEstoquePendente(db, pedido.id),
+    estoquePendente: await pedidoTemEstoquePendente(db, pedido.id)
   };
 }
 
@@ -76,7 +82,7 @@ export async function refreshPedidoStatus(
   db: D1Database,
   mpAccessToken: string,
   pedido: PedidoStatusRow,
-  env?: PushEnv,
+  env?: PushEnv
 ): Promise<StatusAtual> {
   // Verificação explícita antes de decidir: se já existe ledger, usa a
   // linha existente; só materializa o legado se genuinamente não existir
@@ -87,13 +93,19 @@ export async function refreshPedidoStatus(
   // Antes de qualquer retorno por agregado/prazo, recupera efeitos locais
   // incompletos. Não precisa consultar o MP para reconhecer ledger já PAGO.
   const reconciliacao = await reconcilePedidoAfterFinancialChange(db, pedido.id);
-  const statusAgregado = reconciliacao.ok ? reconciliacao.statusFinanceiro : pedido.status_pagamento;
+  const statusAgregado = reconciliacao.ok
+    ? reconciliacao.statusFinanceiro
+    : pedido.status_pagamento;
 
-  if (statusEspecificoAtual && statusEspecificoAtual !== "PENDENTE" && statusEspecificoAtual !== "EXPIRADO") {
+  if (
+    statusEspecificoAtual &&
+    statusEspecificoAtual !== "PENDENTE" &&
+    statusEspecificoAtual !== "EXPIRADO"
+  ) {
     return {
       statusPagamento: statusEspecificoAtual ?? statusAgregado,
       statusPedido: pedido.status_pedido,
-      estoquePendente: await pedidoTemEstoquePendente(db, pedido.id),
+      estoquePendente: await pedidoTemEstoquePendente(db, pedido.id)
     };
   }
 
@@ -103,18 +115,20 @@ export async function refreshPedidoStatus(
     return {
       statusPagamento: statusEspecificoAtual ?? statusAgregado,
       statusPedido: pedido.status_pedido,
-      estoquePendente: await pedidoTemEstoquePendente(db, pedido.id),
+      estoquePendente: await pedidoTemEstoquePendente(db, pedido.id)
     };
   }
 
-  const tentativa = await db.prepare(`SELECT mp_payment_id, pix_expira_em FROM pedido_pagamentos WHERE id = ?`)
-    .bind(pagamentoId).first<{ mp_payment_id: string | null; pix_expira_em: string | null }>();
+  const tentativa = await db
+    .prepare(`SELECT mp_payment_id, pix_expira_em FROM pedido_pagamentos WHERE id = ?`)
+    .bind(pagamentoId)
+    .first<{ mp_payment_id: string | null; pix_expira_em: string | null }>();
   const mpId = tentativa?.mp_payment_id ?? pedido.mp_payment_id;
   let payment: MpPaymentResponse | undefined;
   // M7: no máximo uma consulta ao MP por tentativa a cada 15s, qualquer que
   // seja o ritmo do polling. Sem o claim, segue só com o estado local (a
   // expiração abaixo continua valendo).
-  if (mpId && mpAccessToken && await claimPendingPixPaymentReconciliation(db, pagamentoId)) {
+  if (mpId && mpAccessToken && (await claimPendingPixPaymentReconciliation(db, pagamentoId))) {
     try {
       payment = await fetchMpPayment(mpAccessToken, mpId);
     } catch (err) {
@@ -139,7 +153,7 @@ export async function refreshPedidoStatus(
     // Guard atômico preserva PAGO concorrente. Não devolve EXPIRADO literal.
     await expireLocalPayment(db, pagamentoId);
   }
-  const statusPagamento = await statusDoPagamento(db, pagamentoId) ?? statusAgregado;
+  const statusPagamento = (await statusDoPagamento(db, pagamentoId)) ?? statusAgregado;
   // Lido depois de sync/expiração: reflete a baixa já tentada neste request.
   const estoquePendente = await pedidoTemEstoquePendente(db, pedido.id);
   // Pagamento confirmado com baixa física pendente (Pix tardio após reserva
@@ -147,7 +161,10 @@ export async function refreshPedidoStatus(
   // continua PAGO, mas o preparo não começa sem os itens. Nunca rebaixa um
   // status já mais avançado.
   const novoStatusPedido =
-    transicionou && statusPagamento === "PAGO" && !estoquePendente && pedido.status_pedido === "NOVO"
+    transicionou &&
+    statusPagamento === "PAGO" &&
+    !estoquePendente &&
+    pedido.status_pedido === "NOVO"
       ? "PREPARANDO"
       : pedido.status_pedido;
 

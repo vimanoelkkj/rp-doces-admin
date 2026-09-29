@@ -2,7 +2,9 @@
 :root {
   --admin-mobile-nav-height: 70px;
   --admin-mobile-nav-offset: 12px;
-  --admin-mobile-nav-space: calc(var(--admin-mobile-nav-height) + var(--admin-mobile-nav-offset) + env(safe-area-inset-bottom));
+  --admin-mobile-nav-space: calc(
+    var(--admin-mobile-nav-height) + var(--admin-mobile-nav-offset) + env(safe-area-inset-bottom)
+  );
 }
 
 .admin-mobile-bottom-nav,

@@ -41,7 +41,7 @@ const TAB_FILTERS: Record<string, string> = {
   novos: "AND status_pedido = 'NOVO'",
   em_producao: "AND status_pedido = 'PREPARANDO'",
   prontos: "AND status_pedido = 'PRONTO'",
-  entregues: "AND status_pedido = 'ENTREGUE'",
+  entregues: "AND status_pedido = 'ENTREGUE'"
 };
 
 // B-1 — quais pedidos pertencem à operação do balcão.
@@ -69,9 +69,7 @@ const TAB_FILTERS: Record<string, string> = {
 const PEDIDOS_OPERACIONAIS_SQL =
   "(status_pagamento IN ('PARCIAL', 'PAGO') OR origem_pedido = 'MANUAL')";
 
-export async function listPedidos(
-  context: Parameters<PagesFunction<Env>>[0],
-): Promise<Response> {
+export async function listPedidos(context: Parameters<PagesFunction<Env>>[0]): Promise<Response> {
   const { request, env } = context;
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
@@ -83,20 +81,18 @@ export async function listPedidos(
     const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
 
     const hoje = storeToday();
-    const tabFilter = tab === "hoje" ? `AND ${HOJE_SQL}` : TAB_FILTERS[tab] ?? "";
+    const tabFilter = tab === "hoje" ? `AND ${HOJE_SQL}` : (TAB_FILTERS[tab] ?? "");
     // Ordem dos binds = ordem dos placeholders no SQL:
     // tabFilter, searchFilter e, na página, LIMIT/OFFSET.
     const tabParams: string[] = tab === "hoje" ? [hoje] : [];
-    const listScope = tab === "arquivados"
-      ? "arquivado = 1"
-      : `arquivado = 0 AND ${PEDIDOS_OPERACIONAIS_SQL}`;
+    const listScope =
+      tab === "arquivados" ? "arquivado = 1" : `arquivado = 0 AND ${PEDIDOS_OPERACIONAIS_SQL}`;
 
     let searchFilter = "";
     const searchParams: string[] = [];
     if (search) {
       const idPart = search.replace(/^RP-/i, "");
-      searchFilter =
-        "AND (CAST(id AS TEXT) LIKE ? OR cliente_nome LIKE ?)";
+      searchFilter = "AND (CAST(id AS TEXT) LIKE ? OR cliente_nome LIKE ?)";
       searchParams.push(`%${idPart}%`, `%${search}%`);
     }
 
@@ -109,16 +105,16 @@ export async function listPedidos(
     const [countRow, pedidosResult, counts] = await Promise.all([
       env.DB.prepare(
         `SELECT COUNT(*) AS count FROM pedidos
-         WHERE ${pedidoValidoSql('pedidos.id')} AND ${listScope} ${tabFilter} ${searchFilter}`,
+         WHERE ${pedidoValidoSql("pedidos.id")} AND ${listScope} ${tabFilter} ${searchFilter}`
       )
         .bind(...tabParams, ...searchParams)
         .first<{ count: number }>(),
       env.DB.prepare(
         `SELECT id, cliente_nome, valor_total_centavos, status_pagamento, status_pedido, criado_em
          FROM pedidos
-         WHERE ${pedidoValidoSql('pedidos.id')} AND ${listScope} ${tabFilter} ${searchFilter}
+         WHERE ${pedidoValidoSql("pedidos.id")} AND ${listScope} ${tabFilter} ${searchFilter}
          ORDER BY criado_em DESC
-         LIMIT ? OFFSET ?`,
+         LIMIT ? OFFSET ?`
       )
         .bind(...tabParams, ...searchParams, ITEMS_PER_PAGE, offset)
         .all<PedidoListRow>(),
@@ -136,10 +132,10 @@ export async function listPedidos(
            COALESCE(SUM(CASE WHEN arquivado=0 AND ${PEDIDOS_OPERACIONAIS_SQL}
                      AND status_pedido='ENTREGUE' THEN 1 ELSE 0 END),0) AS entregues,
            COALESCE(SUM(CASE WHEN arquivado=1 THEN 1 ELSE 0 END),0) AS arquivados
-         FROM pedidos WHERE ${pedidoValidoSql('pedidos.id')}`,
+         FROM pedidos WHERE ${pedidoValidoSql("pedidos.id")}`
       )
         .bind(hoje)
-        .first<CountsRow>(),
+        .first<CountsRow>()
     ]);
 
     const count = Number(countRow?.count ?? 0);
@@ -150,13 +146,13 @@ export async function listPedidos(
     // nunca uma consulta financeira por linha.
     const financeiroPorPedido = await getFinanceirosPorPedidos(
       env.DB,
-      pedidos.map((p) => ({
+      pedidos.map(p => ({
         id: p.id,
         valorTotalCentavos: p.valor_total_centavos,
-        statusPagamento: p.status_pagamento,
-      })),
+        statusPagamento: p.status_pagamento
+      }))
     );
-    const pedidosComFinanceiro: PedidoListItem[] = pedidos.map((p) => ({
+    const pedidosComFinanceiro: PedidoListItem[] = pedidos.map(p => ({
       ...p,
       financeiro: financeiroPorPedido.get(p.id) ?? {
         status: p.status_pagamento as FinanceiroPedido["status"],
@@ -168,8 +164,8 @@ export async function listPedidos(
         totalCentavos: p.valor_total_centavos,
         excessoCentavos: 0,
         temExcesso: false,
-        metodosConfirmados: [],
-      },
+        metodosConfirmados: []
+      }
     }));
 
     return Response.json({
@@ -184,8 +180,8 @@ export async function listPedidos(
         em_producao: 0,
         prontos: 0,
         entregues: 0,
-        arquivados: 0,
-      },
+        arquivados: 0
+      }
     });
   } catch (err) {
     console.error("Erro ao listar pedidos (admin)", err);

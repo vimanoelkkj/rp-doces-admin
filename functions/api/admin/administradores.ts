@@ -43,7 +43,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     if (!isOwner(auth.user.papel)) {
       const self = await env.DB.prepare(
         `SELECT id, nome, username, email, ativo, papel, criado_em
-         FROM usuarios_admin WHERE id = ?`,
+         FROM usuarios_admin WHERE id = ?`
       )
         .bind(auth.user.id)
         .first<UsuarioRow>();
@@ -52,7 +52,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
     const { results } = await env.DB.prepare(
       `SELECT id, nome, username, email, ativo, papel, criado_em
-       FROM usuarios_admin ORDER BY nome`,
+       FROM usuarios_admin ORDER BY nome`
     ).all<UsuarioRow>();
 
     return Response.json({ administradores: results });
@@ -68,10 +68,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
   if (!isOwner(auth.user.papel)) {
-    return jsonError(
-      "Apenas um administrador mestre pode criar administradores",
-      403,
-    );
+    return jsonError("Apenas um administrador mestre pode criar administradores", 403);
   }
 
   let body: AdminInput;
@@ -103,7 +100,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     const result = await env.DB.prepare(
       `INSERT INTO usuarios_admin (nome, username, email, senha_hash, ativo, papel)
-       VALUES (?, ?, ?, ?, 1, ?)`,
+       VALUES (?, ?, ?, ?, 1, ?)`
     )
       .bind(nome, username, email, await hashPassword(senha), papel)
       .run();
@@ -111,9 +108,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({ id: result.meta.last_row_id }, { status: 201 });
   } catch (err) {
     console.error("Erro ao criar administrador", err);
-    return jsonError(
-      "Esse nome de usuário ou e-mail já está cadastrado",
-      409,
-    );
+    return jsonError("Esse nome de usuário ou e-mail já está cadastrado", 409);
   }
 };

@@ -60,27 +60,9 @@ const IconCakeLogo = () => (
       strokeWidth="2"
       strokeLinecap="round"
     />
-    <circle
-      className="flame flame-1"
-      cx="5.833"
-      cy="3.334"
-      r="1.2"
-      fill="#d38b80"
-    />
-    <circle
-      className="flame flame-2"
-      cx="10"
-      cy="3.334"
-      r="1.2"
-      fill="#d38b80"
-    />
-    <circle
-      className="flame flame-3"
-      cx="14.167"
-      cy="3.334"
-      r="1.2"
-      fill="#d38b80"
-    />
+    <circle className="flame flame-1" cx="5.833" cy="3.334" r="1.2" fill="#d38b80" />
+    <circle className="flame flame-2" cx="10" cy="3.334" r="1.2" fill="#d38b80" />
+    <circle className="flame flame-3" cx="14.167" cy="3.334" r="1.2" fill="#d38b80" />
   </svg>
 );
 
@@ -100,30 +82,9 @@ export const IconProdutosCake = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    <circle
-      cx="5.833"
-      cy="4.5"
-      r="1.5"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      fill="none"
-    />
-    <circle
-      cx="10"
-      cy="4.5"
-      r="1.5"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      fill="none"
-    />
-    <circle
-      cx="14.167"
-      cy="4.5"
-      r="1.5"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      fill="none"
-    />
+    <circle cx="5.833" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
+    <circle cx="10" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
+    <circle cx="14.167" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
   </svg>
 );
 
@@ -289,38 +250,38 @@ const mainNav: NavItem[] = [
     to: "/admin",
     label: "Dashboard",
     icon: <IconDashboard />,
-    animClass: "sidebar-anim-dashboard",
+    animClass: "sidebar-anim-dashboard"
   },
   {
     to: "/admin/produtos",
     label: "Produtos",
     icon: <IconProdutosCake />,
-    animClass: "sidebar-anim-produtos",
+    animClass: "sidebar-anim-produtos"
   },
   {
     to: "/admin/pedidos",
     label: "Pedidos",
     icon: <IconBag />,
-    animClass: "sidebar-anim-pedidos",
+    animClass: "sidebar-anim-pedidos"
   },
   {
     to: "/admin/administradores",
     label: "Administradores",
     icon: <IconUsers />,
-    animClass: "sidebar-anim-admins",
+    animClass: "sidebar-anim-admins"
   },
   {
     to: "/admin/despesas",
     label: "Despesas",
     icon: <IconReceipt />,
-    animClass: "sidebar-anim-despesas",
+    animClass: "sidebar-anim-despesas"
   },
   {
     to: "/admin/loja",
     label: "Loja",
     icon: <IconStore />,
-    animClass: "sidebar-anim-loja",
-  },
+    animClass: "sidebar-anim-loja"
+  }
 ];
 
 const systemNav: NavItem[] = [
@@ -328,14 +289,14 @@ const systemNav: NavItem[] = [
     to: "/admin/notificacoes",
     label: "Notificações",
     icon: <IconBell />,
-    animClass: "sidebar-anim-notif",
-  },
+    animClass: "sidebar-anim-notif"
+  }
 ];
 
 /* ── Component ── */
 const PAPEL_LABEL: Record<string, string> = {
   OWNER: "Owner",
-  ADMIN: "Admin",
+  ADMIN: "Admin"
 };
 
 export default function AdminSidebar() {
@@ -344,7 +305,7 @@ export default function AdminSidebar() {
   const userRole = PAPEL_LABEL[user.papel] ?? user.papel;
   const initials = userName
     .split(" ")
-    .map((n) => n[0])
+    .map(n => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
@@ -385,11 +346,7 @@ export default function AdminSidebar() {
         </div>
       </header>
 
-      <aside
-        id="admin-navigation"
-        className="admin-sidebar"
-        aria-label="Navegação administrativa"
-      >
+      <aside id="admin-navigation" className="admin-sidebar" aria-label="Navegação administrativa">
         <div className="sidebar-top">
           {/* Logo */}
           <div className="sidebar-logo">

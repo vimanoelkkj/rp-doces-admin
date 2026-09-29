@@ -9,11 +9,7 @@
 // fato do domínio observado de outro ângulo.
 
 import { requireUser, sameOrigin } from "../../lib/auth";
-import {
-  listarNotificacoes,
-  marcarComoLidas,
-  marcarTodasComoLidas,
-} from "../../lib/notificacoes";
+import { listarNotificacoes, marcarComoLidas, marcarTodasComoLidas } from "../../lib/notificacoes";
 
 interface Env {
   DB: D1Database;
@@ -66,7 +62,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return Response.json({
         ok: true,
         marcadas,
-        ...(await listarNotificacoes(env.DB, auth.user.id)),
+        ...(await listarNotificacoes(env.DB, auth.user.id))
       });
     }
 
@@ -75,7 +71,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       !Array.isArray(chaves) ||
       chaves.length === 0 ||
       chaves.length > MAX_CHAVES_POR_REQUISICAO ||
-      !chaves.every((c) => typeof c === "string" && c.length > 0 && c.length <= 200)
+      !chaves.every(c => typeof c === "string" && c.length > 0 && c.length <= 200)
     ) {
       return jsonError("Chaves inválidas", 400);
     }
@@ -84,7 +80,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({
       ok: true,
       marcadas,
-      ...(await listarNotificacoes(env.DB, auth.user.id)),
+      ...(await listarNotificacoes(env.DB, auth.user.id))
     });
   } catch (err) {
     console.error("Erro ao marcar notificações como lidas (admin)", err);

@@ -1,7 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
-import { ESTORNO_ANULACAO_ATIVO_MENSAGEM, temEstornoAnulacaoAtivo } from "../../../../lib/pedidoAnulacao";
+import {
+  ESTORNO_ANULACAO_ATIVO_MENSAGEM,
+  temEstornoAnulacaoAtivo
+} from "../../../../lib/pedidoAnulacao";
 
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { precoAtualCentavos, type ProdutoRow } from "../../../../lib/pricing";
@@ -10,7 +13,7 @@ import {
   LIQUIDO_SQL,
   REEMBOLSADO_SQL,
   STATUS_FINANCEIRO_SQL,
-  preparePedidoFinancialProjectionForItemOperation,
+  preparePedidoFinancialProjectionForItemOperation
 } from "../../../../lib/pedidoFinanceiroSql";
 import { preparePedidoPhysicalProjection } from "../../../../lib/stock";
 import {
@@ -24,7 +27,7 @@ import {
   parseResultado,
   prepareClaimOperacao,
   type IdentidadeEsperada,
-  type OperacaoRow,
+  type OperacaoRow
 } from "../../../../lib/operacoes";
 
 interface Env {
@@ -83,41 +86,54 @@ function precoAlterado(precoAtual: number): Response {
     {
       error: "O preço do produto mudou. Atualize os dados antes de adicionar o item.",
       code: "PRECO_ALTERADO",
-      precoAtualCentavos: precoAtual,
+      precoAtualCentavos: precoAtual
     },
-    { status: 409 },
+    { status: 409 }
   );
 }
 
 function pedidoPermiteAdicao(pedido: PedidoAdicaoRow): boolean {
-  return pedido.origem_pedido === "MANUAL"
-    && pedido.status_comanda === "ABERTA"
-    && ["NOVO", "PREPARANDO"].includes(pedido.status_pedido)
-    && ["PENDENTE", "PARCIAL", "PAGO"].includes(pedido.status_pagamento);
+  return (
+    pedido.origem_pedido === "MANUAL" &&
+    pedido.status_comanda === "ABERTA" &&
+    ["NOVO", "PREPARANDO"].includes(pedido.status_pedido) &&
+    ["PENDENTE", "PARCIAL", "PAGO"].includes(pedido.status_pagamento)
+  );
 }
 
 async function carregarPedido(db: D1Database, pedidoId: number): Promise<PedidoAdicaoRow | null> {
-  return await db.prepare(
-    `SELECT id, origem_pedido, status_comanda, status_pedido, status_pagamento
-     FROM pedidos WHERE id = ?`,
-  ).bind(pedidoId).first<PedidoAdicaoRow>();
+  return await db
+    .prepare(
+      `SELECT id, origem_pedido, status_comanda, status_pedido, status_pagamento
+     FROM pedidos WHERE id = ?`
+    )
+    .bind(pedidoId)
+    .first<PedidoAdicaoRow>();
 }
 
-async function carregarProduto(db: D1Database, produtoId: number): Promise<ProdutoAdicaoRow | null> {
-  return await db.prepare(
-    `SELECT id, nome, preco_centavos, preco_promocional_centavos,
+async function carregarProduto(
+  db: D1Database,
+  produtoId: number
+): Promise<ProdutoAdicaoRow | null> {
+  return await db
+    .prepare(
+      `SELECT id, nome, preco_centavos, preco_promocional_centavos,
             promocao_ativa, promocao_inicio, promocao_fim,
             disponivel, ativo, estoque, estoque_reservado
-     FROM produtos WHERE id = ?`,
-  ).bind(produtoId).first<ProdutoAdicaoRow>();
+     FROM produtos WHERE id = ?`
+    )
+    .bind(produtoId)
+    .first<ProdutoAdicaoRow>();
 }
 
 async function reconstruirResposta(
   db: D1Database,
-  operacao: OperacaoRow,
+  operacao: OperacaoRow
 ): Promise<ItemAdicionadoResponse | null> {
   if (!operacao.pedido_item_id || !operacao.pedido_id) return null;
-  const row = await db.prepare(`
+  const row = await db
+    .prepare(
+      `
     SELECT p.id AS pedido_id, p.valor_total_centavos AS pedido_total_centavos,
            p.status_pagamento,
            pi.id AS item_id, pi.produto_id, pi.produto_nome, pi.quantidade,
@@ -131,22 +147,25 @@ async function reconstruirResposta(
     JOIN pedido_itens pi ON pi.id = o.pedido_item_id
     JOIN pedidos p ON p.id = pi.pedido_id
     WHERE o.id = ? AND o.pedido_id = p.id
-  `).bind(operacao.id).first<{
-    pedido_id: number;
-    pedido_total_centavos: number;
-    status_pagamento: string;
-    item_id: number;
-    produto_id: number;
-    produto_nome: string;
-    quantidade: number;
-    valor_unitario_centavos: number;
-    item_total_centavos: number;
-    status_item: string;
-    estoque_estado: string;
-    bruto_pago_centavos: number;
-    reembolsado_centavos: number;
-    liquido_centavos: number;
-  }>();
+  `
+    )
+    .bind(operacao.id)
+    .first<{
+      pedido_id: number;
+      pedido_total_centavos: number;
+      status_pagamento: string;
+      item_id: number;
+      produto_id: number;
+      produto_nome: string;
+      quantidade: number;
+      valor_unitario_centavos: number;
+      item_total_centavos: number;
+      status_item: string;
+      estoque_estado: string;
+      bruto_pago_centavos: number;
+      reembolsado_centavos: number;
+      liquido_centavos: number;
+    }>();
   if (!row) return null;
   const liquido = Number(row.liquido_centavos || 0);
   return {
@@ -159,7 +178,7 @@ async function reconstruirResposta(
       precoUnitarioCentavos: row.valor_unitario_centavos,
       valorTotalCentavos: row.item_total_centavos,
       statusItem: row.status_item,
-      estoqueEstado: row.estoque_estado,
+      estoqueEstado: row.estoque_estado
     },
     financeiro: {
       totalCentavos: row.pedido_total_centavos,
@@ -167,15 +186,15 @@ async function reconstruirResposta(
       reembolsadoCentavos: Number(row.reembolsado_centavos || 0),
       liquidoCentavos: liquido,
       saldoCentavos: Math.max(0, row.pedido_total_centavos - liquido),
-      statusPagamento: row.status_pagamento,
-    },
+      statusPagamento: row.status_pagamento
+    }
   };
 }
 
 async function replayAdicionarItem(
   db: D1Database,
   operacao: OperacaoRow,
-  identidade: IdentidadeEsperada,
+  identidade: IdentidadeEsperada
 ): Promise<Response> {
   const conflito = conflitoOperacao(operacao, identidade);
   if (conflito) {
@@ -185,16 +204,16 @@ async function replayAdicionarItem(
     return jsonError(
       OPERACAO_MENSAGENS.OPERACAO_EM_PROCESSAMENTO,
       OPERACAO_HTTP_STATUS.OPERACAO_EM_PROCESSAMENTO,
-      "OPERACAO_EM_PROCESSAMENTO",
+      "OPERACAO_EM_PROCESSAMENTO"
     );
   }
   const snapshot = parseResultado<ItemAdicionadoResponse>(operacao);
-  const resultado = snapshot ?? await reconstruirResposta(db, operacao);
+  const resultado = snapshot ?? (await reconstruirResposta(db, operacao));
   if (!resultado) {
     return jsonError(
       OPERACAO_MENSAGENS.OPERACAO_INCOMPLETA,
       OPERACAO_HTTP_STATUS.OPERACAO_INCOMPLETA,
-      "OPERACAO_INCOMPLETA",
+      "OPERACAO_INCOMPLETA"
     );
   }
   return Response.json(resultado, { status: 201 });
@@ -205,15 +224,19 @@ async function erroGuardAtual(
   pedidoId: number,
   produtoId: number,
   quantidade: number,
-  precoEsperadoCentavos: number,
+  precoEsperadoCentavos: number
 ): Promise<Response> {
   const [pedido, produto] = await Promise.all([
     carregarPedido(db, pedidoId),
-    carregarProduto(db, produtoId),
+    carregarProduto(db, produtoId)
   ]);
   if (!pedido) return jsonError("Pedido não encontrado", 404);
   if (!pedidoPermiteAdicao(pedido)) {
-    return jsonError("Este pedido não permite adicionar itens no estado atual.", 409, "PEDIDO_NAO_EDITAVEL");
+    return jsonError(
+      "Este pedido não permite adicionar itens no estado atual.",
+      409,
+      "PEDIDO_NAO_EDITAVEL"
+    );
   }
   if (!produto) return jsonError("Produto não encontrado", 404);
   if (!produto.ativo || !produto.disponivel) {
@@ -224,7 +247,11 @@ async function erroGuardAtual(
   if (quantidade > produto.estoque - produto.estoque_reservado) {
     return jsonError(`Estoque insuficiente para "${produto.nome}"`, 409, "ESTOQUE_INSUFICIENTE");
   }
-  return jsonError("O pedido mudou durante a operação. Atualize e tente novamente.", 409, "ESTADO_ALTERADO");
+  return jsonError(
+    "O pedido mudou durante a operação. Atualize e tente novamente.",
+    409,
+    "ESTADO_ALTERADO"
+  );
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -234,7 +261,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if ("error" in auth) return auth.error;
   const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
   if (anulado) return anulado;
-
 
   const pedidoId = Number(params.id);
   if (!Number.isInteger(pedidoId) || pedidoId <= 0) return jsonError("Id inválido", 400);
@@ -251,9 +277,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   const produtoId = body.produtoId;
   const quantidade = body.quantidade;
   const precoEsperadoCentavos = body.precoEsperadoCentavos;
-  if (!Number.isInteger(produtoId) || Number(produtoId) <= 0
-      || !Number.isInteger(quantidade) || Number(quantidade) < 1 || Number(quantidade) > 50
-      || !Number.isSafeInteger(precoEsperadoCentavos) || Number(precoEsperadoCentavos) < 1) {
+  if (
+    !Number.isInteger(produtoId) ||
+    Number(produtoId) <= 0 ||
+    !Number.isInteger(quantidade) ||
+    Number(quantidade) < 1 ||
+    Number(quantidade) > 50 ||
+    !Number.isSafeInteger(precoEsperadoCentavos) ||
+    Number(precoEsperadoCentavos) < 1
+  ) {
     return jsonError("Dados do item inválidos", 400);
   }
 
@@ -271,8 +303,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       pedidoId,
       produtoId: produtoIdNumero,
       quantidade: quantidadeNumero,
-      precoEsperadoCentavos: precoEsperadoNumero,
-    }),
+      precoEsperadoCentavos: precoEsperadoNumero
+    })
   };
 
   try {
@@ -286,11 +318,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
 
     const [pedido, produto] = await Promise.all([
       carregarPedido(env.DB, pedidoId),
-      carregarProduto(env.DB, produtoIdNumero),
+      carregarProduto(env.DB, produtoIdNumero)
     ]);
     if (!pedido) return jsonError("Pedido não encontrado", 404);
     if (!pedidoPermiteAdicao(pedido)) {
-      return jsonError("Este pedido não permite adicionar itens no estado atual.", 409, "PEDIDO_NAO_EDITAVEL");
+      return jsonError(
+        "Este pedido não permite adicionar itens no estado atual.",
+        409,
+        "PEDIDO_NAO_EDITAVEL"
+      );
     }
     if (!produto) return jsonError("Produto não encontrado", 404);
     if (!produto.ativo || !produto.disponivel) {
@@ -302,7 +338,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       return jsonError(`Estoque insuficiente para "${produto.nome}"`, 409, "ESTOQUE_INSUFICIENTE");
     }
 
-    const insertItem = env.DB.prepare(`
+    const insertItem = env.DB.prepare(
+      `
       INSERT INTO pedido_itens (
         pedido_id, produto_id, produto_nome, quantidade,
         valor_unitario_centavos, valor_total_centavos,
@@ -325,7 +362,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         AND pr.promocao_ativa = ?
         AND pr.promocao_inicio IS ?
         AND pr.promocao_fim IS ?
-    `).bind(
+    `
+    ).bind(
       quantidadeNumero,
       precoAtual,
       precoAtual * quantidadeNumero,
@@ -337,7 +375,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       produto.preco_promocional_centavos,
       produto.promocao_ativa,
       produto.promocao_inicio,
-      produto.promocao_fim,
+      produto.promocao_fim
     );
 
     const claim = prepareClaimOperacao(env.DB, {
@@ -349,11 +387,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         produtoId: produtoIdNumero,
         quantidade: quantidadeNumero,
         valorUnitarioCentavos: precoAtual,
-        atorUsuarioId: auth.user.id,
-      }),
+        atorUsuarioId: auth.user.id
+      })
     });
 
-    const reserveNewItem = env.DB.prepare(`
+    const reserveNewItem = env.DB.prepare(
+      `
       UPDATE produtos
       SET estoque_reservado = estoque_reservado + ?,
           atualizado_em = CURRENT_TIMESTAMP
@@ -367,9 +406,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
             AND pi.status_item = 'ATIVO'
             AND pi.estoque_estado = 'RESERVADO'
         )
-    `).bind(quantidadeNumero, produtoIdNumero, operationKey, pedidoId, quantidadeNumero);
+    `
+    ).bind(quantidadeNumero, produtoIdNumero, operationKey, pedidoId, quantidadeNumero);
 
-    const projectTotal = env.DB.prepare(`
+    const projectTotal = env.DB.prepare(
+      `
       UPDATE pedidos
       SET valor_total_centavos = (
             SELECT COALESCE(SUM(pi.valor_total_centavos), 0)
@@ -381,9 +422,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         AND EXISTS (SELECT 1 FROM pedido_operacoes o
                     WHERE o.operation_key = ? AND o.pedido_id = pedidos.id
                       AND o.pedido_item_id IS NOT NULL)
-    `).bind(pedidoId, operationKey);
+    `
+    ).bind(pedidoId, operationKey);
 
-    const finalizeOperation = env.DB.prepare(`
+    const finalizeOperation = env.DB.prepare(
+      `
       UPDATE pedido_operacoes AS o
       SET fase = 'CONCLUIDA',
           resultado = (
@@ -415,13 +458,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
           atualizado_em = CURRENT_TIMESTAMP
       WHERE o.operation_key = ? AND o.tipo = 'ITEM_ADICAO_ADMIN'
         AND o.fase = 'LOCAL_CRIADA' AND o.pedido_item_id IS NOT NULL
-    `).bind(operationKey);
+    `
+    ).bind(operationKey);
 
     // D1 so reverte o batch quando um statement falha; changes=0, por si
     // so, confirmaria a transacao. Esta sentinela tenta gravar um total
     // proibido se qualquer parte do resultado atomico nao estiver provada.
     // O CHECK de pedidos.valor_total_centavos entao aborta e reverte tudo.
-    const assertAtomicOutcome = env.DB.prepare(`
+    const assertAtomicOutcome = env.DB.prepare(
+      `
       UPDATE pedidos AS p
       SET valor_total_centavos = -1
       WHERE p.id = ?
@@ -451,7 +496,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
                 AND reservado.estoque_estado = 'RESERVADO'
             )
         )
-    `).bind(pedidoId, operationKey);
+    `
+    ).bind(pedidoId, operationKey);
 
     let results: D1Result[];
     try {
@@ -463,23 +509,29 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         preparePedidoFinancialProjectionForItemOperation(env.DB, pedidoId, operationKey),
         preparePedidoPhysicalProjection(env.DB, pedidoId, operationKey),
         finalizeOperation,
-        assertAtomicOutcome,
+        assertAtomicOutcome
       ]);
     } catch (err) {
       const vencedora = await buscarOperacao(env.DB, operationKey);
       if (vencedora) return await replayAdicionarItem(env.DB, vencedora, identidade);
       const mensagem = String((err as Error)?.message || "");
       if (mensagem.includes("CHECK constraint failed: estoque")) {
-        return jsonError(`Estoque insuficiente para "${produto.nome}"`, 409, "ESTOQUE_INSUFICIENTE");
+        return jsonError(
+          `Estoque insuficiente para "${produto.nome}"`,
+          409,
+          "ESTOQUE_INSUFICIENTE"
+        );
       }
-      if (mensagem.includes("FOREIGN KEY constraint failed")
-          || mensagem.includes("valor_total_centavos")) {
+      if (
+        mensagem.includes("FOREIGN KEY constraint failed") ||
+        mensagem.includes("valor_total_centavos")
+      ) {
         return await erroGuardAtual(
           env.DB,
           pedidoId,
           produtoIdNumero,
           quantidadeNumero,
-          precoEsperadoNumero,
+          precoEsperadoNumero
         );
       }
       throw err;
@@ -491,10 +543,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         pedidoId,
         produtoIdNumero,
         quantidadeNumero,
-        precoEsperadoNumero,
+        precoEsperadoNumero
       );
     }
-    if ([1, 2, 3, 4, 5, 6].some((index) => Number(results[index]?.meta?.changes || 0) !== 1)) {
+    if ([1, 2, 3, 4, 5, 6].some(index => Number(results[index]?.meta?.changes || 0) !== 1)) {
       throw new Error("ITEM_ADICAO_ADMIN_BATCH_INCOMPLETO");
     }
     if (Number(results[7]?.meta?.changes || 0) !== 0) {
@@ -510,17 +562,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   }
 };
 
-export const onRequestPut: PagesFunction<Env> = async ({
-  request,
-  env,
-  params,
-}) => {
+export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
   const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
   if (anulado) return anulado;
-
 
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -549,7 +596,7 @@ export const onRequestPut: PagesFunction<Env> = async ({
   }
   if (
     !body.itens.every(
-      (i) =>
+      i =>
         i &&
         typeof i === "object" &&
         !Array.isArray(i) &&
@@ -557,16 +604,14 @@ export const onRequestPut: PagesFunction<Env> = async ({
         i.produtoId > 0 &&
         Number.isInteger(i.quantidade) &&
         i.quantidade >= 1 &&
-        i.quantidade <= 50,
+        i.quantidade <= 50
     )
   ) {
     return jsonError("Item inválido", 400);
   }
 
   try {
-    const pedido = await env.DB.prepare(
-      `SELECT id FROM pedidos WHERE id = ?`,
-    )
+    const pedido = await env.DB.prepare(`SELECT id FROM pedidos WHERE id = ?`)
       .bind(id)
       .first<{ id: number }>();
 
@@ -579,9 +624,9 @@ export const onRequestPut: PagesFunction<Env> = async ({
     return Response.json(
       {
         error: "A edição de itens está temporariamente indisponível. Nenhuma alteração foi salva.",
-        code: "EDICAO_ITENS_BLOQUEADA",
+        code: "EDICAO_ITENS_BLOQUEADA"
       },
-      { status: 409 },
+      { status: 409 }
     );
   } catch (err) {
     console.error("Erro ao editar itens do pedido (admin)", err);

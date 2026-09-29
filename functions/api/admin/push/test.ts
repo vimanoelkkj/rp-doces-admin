@@ -46,7 +46,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   // 5. Busca subscription pertencente OBRIGATORIAMENTE a este usuário autenticado
   const sub = await env.DB.prepare(
-    "SELECT id, endpoint, p256dh, auth FROM push_inscricoes WHERE endpoint = ? AND usuario_id = ?",
+    "SELECT id, endpoint, p256dh, auth FROM push_inscricoes WHERE endpoint = ? AND usuario_id = ?"
   )
     .bind(endpoint, auth.user.id)
     .first<{
@@ -74,7 +74,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     title: "Teste de notificação 🍰",
     body: "Se você recebeu isto, as notificações estão funcionando.",
     tag: "rp-push-test",
-    url: "/admin/notificacoes",
+    url: "/admin/notificacoes"
   };
 
   // 8. Despacho direto isolado (sem criar push_eventos, sem mexer em pedidos)
@@ -84,22 +84,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         endpoint: sub.endpoint,
         keys: {
           p256dh: sub.p256dh,
-          auth: sub.auth,
-        },
+          auth: sub.auth
+        }
       },
       payload,
       {
         publicKey,
         privateKey,
-        subject,
-      },
+        subject
+      }
     );
 
     if (!delivered) {
       // 404/410 do push service: inscrição expirada. Remove apenas esta inscrição do usuário.
-      await env.DB.prepare(
-        "DELETE FROM push_inscricoes WHERE id = ? AND usuario_id = ?",
-      )
+      await env.DB.prepare("DELETE FROM push_inscricoes WHERE id = ? AND usuario_id = ?")
         .bind(sub.id, auth.user.id)
         .run();
 
@@ -107,15 +105,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         {
           ok: false,
           stale: true,
-          error: "Inscrição expirada no serviço de push. Ative as notificações novamente.",
+          error: "Inscrição expirada no serviço de push. Ative as notificações novamente."
         },
-        { status: 410 },
+        { status: 410 }
       );
     }
 
     return Response.json({
       ok: true,
-      message: "Notificação de teste enviada com sucesso.",
+      message: "Notificação de teste enviada com sucesso."
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

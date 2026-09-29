@@ -5,7 +5,7 @@ import { build } from "esbuild";
 import { JSDOM } from "jsdom";
 
 const dom = new JSDOM('<!doctype html><body><div id="root"></div></body>', {
-  url: "https://local.test/admin",
+  url: "https://local.test/admin"
 });
 const channels = [];
 const NativeMessageChannel = globalThis.MessageChannel;
@@ -22,7 +22,7 @@ for (const name of [
   "HTMLElement",
   "Node",
   "Event",
-  "MouseEvent",
+  "MouseEvent"
 ]) {
   Object.defineProperty(globalThis, name, { configurable: true, value: dom.window[name] });
 }
@@ -59,7 +59,7 @@ const bundle = await build({
         root.render(element);
         return root;
       }
-    `,
+    `
   },
   bundle: true,
   write: false,
@@ -67,7 +67,7 @@ const bundle = await build({
   platform: "browser",
   jsx: "automatic",
   define: { "process.env.NODE_ENV": '"development"' },
-  loader: { ".css": "empty" },
+  loader: { ".css": "empty" }
 });
 const ui = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
@@ -100,9 +100,9 @@ function assertNativeRadioGroup(selector, initiallySelected) {
 
   const radios = [...fieldset.querySelectorAll('input[type="radio"]')];
   assert.equal(radios.length, 10);
-  assert.equal(new Set(radios.map((radio) => radio.name)).size, 1);
+  assert.equal(new Set(radios.map(radio => radio.name)).size, 1);
   assert.ok(radios[0].name, "o grupo precisa de um nome exclusivo");
-  assert.equal(radios.filter((radio) => radio.checked).length, initiallySelected ? 1 : 0);
+  assert.equal(radios.filter(radio => radio.checked).length, initiallySelected ? 1 : 0);
 
   for (const radio of radios) {
     assert.ok(radio.id);
@@ -111,7 +111,7 @@ function assertNativeRadioGroup(selector, initiallySelected) {
     assert.equal(
       radio.labels[0].querySelector("svg")?.getAttribute("aria-hidden"),
       "true",
-      "a ilustração não deve repetir o nome textual da opção",
+      "a ilustração não deve repetir o nome textual da opção"
     );
   }
 
@@ -137,7 +137,7 @@ test("novo produto preserva seleção inicial vazia e radio não submete o formu
   try {
     const radios = assertNativeRadioGroup(".np-emoji-fieldset", false);
     await ui.act(async () => radios[2].click());
-    assert.equal(radios.filter((radio) => radio.checked).length, 1);
+    assert.equal(radios.filter(radio => radio.checked).length, 1);
     assert.equal(radios[2].checked, true);
     assert.equal(postRequests.length, 0);
   } finally {
@@ -150,9 +150,9 @@ test("instâncias simultâneas mantêm IDs e grupos de radio independentes", asy
   try {
     const groups = [...document.querySelectorAll(".catm-emoji-fieldset")];
     assert.equal(groups.length, 2);
-    const radios = groups.flatMap((group) => [...group.querySelectorAll('input[type="radio"]')]);
-    assert.equal(new Set(radios.map((radio) => radio.id)).size, radios.length);
-    assert.equal(new Set(groups.map((group) => group.querySelector("input").name)).size, 2);
+    const radios = groups.flatMap(group => [...group.querySelectorAll('input[type="radio"]')]);
+    assert.equal(new Set(radios.map(radio => radio.id)).size, radios.length);
+    assert.equal(new Set(groups.map(group => group.querySelector("input").name)).size, 2);
   } finally {
     await unmount();
   }
@@ -162,7 +162,7 @@ test("estilos preservam a grade e tornam o foco do radio visível", async () => 
   const [categoriasCss, produtoCss, darkCss] = await Promise.all([
     readFile("src/admin/Produtos/CategoriasModal.css", "utf8"),
     readFile("src/admin/Produtos/NovoProdutoModal.css", "utf8"),
-    readFile("src/admin/theme/admin-dark-theme.css", "utf8"),
+    readFile("src/admin/theme/admin-dark-theme.css", "utf8")
   ]);
 
   assert.match(categoriasCss, /\.catm-emoji-grid\s*{[^}]*repeat\(5, 1fr\)/s);

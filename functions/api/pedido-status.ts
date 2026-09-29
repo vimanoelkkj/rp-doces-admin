@@ -52,7 +52,7 @@ async function buscarPedido(request: Request, env: Env): Promise<PedidoStatusRow
 
   const pedido = await env.DB.prepare(
     `SELECT id, token_publico, status_pagamento, status_pedido, mp_payment_id, pix_expira_em
-     FROM pedidos WHERE ${pedidoValidoSql('pedidos.id')} AND token_publico = ?`,
+     FROM pedidos WHERE ${pedidoValidoSql("pedidos.id")} AND token_publico = ?`
   )
     .bind(token)
     .first<PedidoStatusRow>();

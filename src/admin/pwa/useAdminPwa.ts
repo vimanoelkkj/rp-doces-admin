@@ -11,10 +11,8 @@ const HEADER_DARK_THEME_COLOR = "#271f1b";
 function getStorefrontThemeColor() {
   const themeAttr = document.documentElement.getAttribute("data-theme");
   const savedTheme =
-    window.localStorage.getItem("store-theme") ||
-    window.localStorage.getItem("admin-theme");
-  const isDark =
-    themeAttr === "dark" || (themeAttr === null && savedTheme === "dark");
+    window.localStorage.getItem("store-theme") || window.localStorage.getItem("admin-theme");
+  const isDark = themeAttr === "dark" || (themeAttr === null && savedTheme === "dark");
 
   return isDark ? HEADER_DARK_THEME_COLOR : HEADER_LIGHT_THEME_COLOR;
 }
@@ -24,10 +22,8 @@ function getAdminThemeColor() {
     document.documentElement.getAttribute("data-admin-theme") ||
     document.documentElement.getAttribute("data-theme");
   const savedTheme =
-    window.localStorage.getItem("admin-theme") ||
-    window.localStorage.getItem("store-theme");
-  const isDark =
-    themeAttr === "dark" || (themeAttr === null && savedTheme === "dark");
+    window.localStorage.getItem("admin-theme") || window.localStorage.getItem("store-theme");
+  const isDark = themeAttr === "dark" || (themeAttr === null && savedTheme === "dark");
 
   return isDark ? HEADER_DARK_THEME_COLOR : HEADER_LIGHT_THEME_COLOR;
 }
@@ -41,9 +37,7 @@ export function useAdminPwa() {
     if (!isAdminRoute) return;
 
     // 1. Injeta o manifesto dinamicamente no <head>
-    let manifestLink = document.querySelector<HTMLLinkElement>(
-      'link[rel="manifest"]',
-    );
+    let manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     if (!manifestLink) {
       manifestLink = document.createElement("link");
       manifestLink.rel = "manifest";
@@ -53,9 +47,7 @@ export function useAdminPwa() {
     }
 
     // 2. Injeta apple-touch-icon para dispositivos iOS
-    let appleIcon = document.querySelector<HTMLLinkElement>(
-      'link[rel="apple-touch-icon"]',
-    );
+    let appleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
     if (!appleIcon) {
       appleIcon = document.createElement("link");
       appleIcon.rel = "apple-touch-icon";
@@ -66,9 +58,7 @@ export function useAdminPwa() {
 
     // 3. Mantém a status bar do PWA sincronizada com o tema do Admin.
     // O tema claro usa exatamente a cor do header mobile.
-    let themeMeta = document.querySelector<HTMLMetaElement>(
-      'meta[name="theme-color"]',
-    );
+    let themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (!themeMeta) {
       themeMeta = document.createElement("meta");
       themeMeta.name = "theme-color";
@@ -87,30 +77,29 @@ export function useAdminPwa() {
     const themeObserver = new MutationObserver(syncThemeColor);
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-admin-theme", "data-theme"],
+      attributeFilter: ["data-admin-theme", "data-theme"]
     });
 
     // 4. Registra o Service Worker administrativo com escopo restrito a /admin
     const isSupported = "serviceWorker" in navigator;
-    const shouldRegister =
-      import.meta.env.PROD || window.location.search.includes("pwa=1");
+    const shouldRegister = import.meta.env.PROD || window.location.search.includes("pwa=1");
 
     if (isSupported && shouldRegister) {
       if (!swRegistered) {
         swRegistered = true;
         navigator.serviceWorker
           .register("/sw-admin.js", { scope: "/admin" })
-          .then((reg) => {
+          .then(reg => {
             // Força verificação ativa de atualização no primeiro registro
             reg.update().catch(() => {});
           })
-          .catch((err) => {
+          .catch(err => {
             console.warn("[Admin PWA] Falha ao registrar Service Worker:", err);
             swRegistered = false;
           });
       } else {
         // Se já registrado nesta sessão, garante verificação de update do SW
-        navigator.serviceWorker.getRegistration("/admin").then((reg) => {
+        navigator.serviceWorker.getRegistration("/admin").then(reg => {
           reg?.update().catch(() => {});
         });
       }
@@ -131,12 +120,12 @@ export function useAdminPwa() {
       }
 
       const injectedManifest = document.querySelector(
-        'link[data-admin-pwa="true"][rel="manifest"]',
+        'link[data-admin-pwa="true"][rel="manifest"]'
       );
       injectedManifest?.remove();
 
       const injectedAppleIcon = document.querySelector(
-        'link[data-admin-pwa="true"][rel="apple-touch-icon"]',
+        'link[data-admin-pwa="true"][rel="apple-touch-icon"]'
       );
       injectedAppleIcon?.remove();
     };

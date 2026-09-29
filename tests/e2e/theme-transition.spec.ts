@@ -21,7 +21,7 @@ const SELECTORS: Record<keyof Rects, string> = {
   header: ".header",
   logo: ".header .logo",
   themeButton: ".theme-toggle-btn",
-  firstCard: ".hero",
+  firstCard: ".hero"
 };
 
 type ScrollerMetrics = {
@@ -52,7 +52,7 @@ type AnimInfo = {
 };
 
 async function readRects(page: Page): Promise<Rects> {
-  return page.evaluate((selectors) => {
+  return page.evaluate(selectors => {
     const out = {} as Record<string, Rect>;
     for (const [key, sel] of Object.entries(selectors)) {
       const el = document.querySelector(sel);
@@ -70,99 +70,100 @@ function expectSameRects(actual: Rects, baseline: Rects, label: string) {
       const diff = Math.abs(actual[key][prop] - baseline[key][prop]);
       expect(
         diff,
-        `${label}: ${key}.${prop} mudou (${baseline[key][prop]} -> ${actual[key][prop]})`,
+        `${label}: ${key}.${prop} mudou (${baseline[key][prop]} -> ${actual[key][prop]})`
       ).toBeLessThanOrEqual(TOLERANCE_PX);
     }
   }
 }
 
 async function readScroller(page: Page): Promise<ScrollerMetrics> {
-  return page.evaluate((sel) => {
+  return page.evaluate(sel => {
     const el = document.querySelector<HTMLElement>(sel);
     if (!el) return null;
     return {
       rectWidth: el.getBoundingClientRect().width,
       clientWidth: el.clientWidth,
       offsetWidth: el.offsetWidth,
-      scrollWidth: el.scrollWidth,
+      scrollWidth: el.scrollWidth
     };
   }, SCROLLER_SELECTOR);
 }
 
 /** Instala um amostrador por frame (rAF) que roda dentro da página. */
 async function installSampler(page: Page) {
-  await page.evaluate(({ selectors, scrollerSel }) => {
-    const w = window as any;
-    w.__frames = [] as Frame[];
-    w.__anims = [] as AnimInfo[];
-    w.__samplerRunning = true;
-    const start = performance.now();
+  await page.evaluate(
+    ({ selectors, scrollerSel }) => {
+      const w = window as any;
+      w.__frames = [] as Frame[];
+      w.__anims = [] as AnimInfo[];
+      w.__samplerRunning = true;
+      const start = performance.now();
 
-    const tick = () => {
-      if (!w.__samplerRunning) return;
-      const rects: Record<string, unknown> = {};
-      for (const [key, sel] of Object.entries(selectors as Record<string, string>)) {
-        const el = document.querySelector(sel);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          rects[key] = { x: r.x, y: r.y, width: r.width, height: r.height };
+      const tick = () => {
+        if (!w.__samplerRunning) return;
+        const rects: Record<string, unknown> = {};
+        for (const [key, sel] of Object.entries(selectors as Record<string, string>)) {
+          const el = document.querySelector(sel);
+          if (el) {
+            const r = el.getBoundingClientRect();
+            rects[key] = { x: r.x, y: r.y, width: r.width, height: r.height };
+          }
         }
-      }
 
-      let progress: number | null = null;
-      let clip: string | null = null;
-      for (const a of document.getAnimations()) {
-        const eff = a.effect as KeyframeEffect | null;
-        const pseudo = eff?.pseudoElement ?? null;
-        if (pseudo?.includes("view-transition")) {
-          const known = w.__anims.some(
-            (i: AnimInfo) => i.pseudo === pseudo,
-          );
-          const kfs = eff!.getKeyframes() as Keyframe[];
-          if (!known) {
-            const props = new Set<string>();
-            kfs.forEach((k) => {
-              Object.keys(k).forEach((p) => {
-                if (!["offset", "easing", "composite", "computedOffset"].includes(p))
-                  props.add(p);
+        let progress: number | null = null;
+        let clip: string | null = null;
+        for (const a of document.getAnimations()) {
+          const eff = a.effect as KeyframeEffect | null;
+          const pseudo = eff?.pseudoElement ?? null;
+          if (pseudo?.includes("view-transition")) {
+            const known = w.__anims.some((i: AnimInfo) => i.pseudo === pseudo);
+            const kfs = eff!.getKeyframes() as Keyframe[];
+            if (!known) {
+              const props = new Set<string>();
+              kfs.forEach(k => {
+                Object.keys(k).forEach(p => {
+                  if (!["offset", "easing", "composite", "computedOffset"].includes(p))
+                    props.add(p);
+                });
               });
-            });
-            w.__anims.push({
-              pseudo,
-              properties: [...props],
-              clipStart: (kfs[0] as any)?.clipPath ?? null,
-              clipEnd: (kfs[kfs.length - 1] as any)?.clipPath ?? null,
-            });
-          }
-          if (pseudo.includes("new") && (kfs[0] as any)?.clipPath) {
-            progress = eff!.getComputedTiming().progress ?? null;
-            clip = String((kfs[0] as any).clipPath);
+              w.__anims.push({
+                pseudo,
+                properties: [...props],
+                clipStart: (kfs[0] as any)?.clipPath ?? null,
+                clipEnd: (kfs[kfs.length - 1] as any)?.clipPath ?? null
+              });
+            }
+            if (pseudo.includes("new") && (kfs[0] as any)?.clipPath) {
+              progress = eff!.getComputedTiming().progress ?? null;
+              clip = String((kfs[0] as any).clipPath);
+            }
           }
         }
-      }
 
-      const sc = document.querySelector<HTMLElement>(scrollerSel);
-      w.__frames.push({
-        t: performance.now() - start,
-        rects,
-        scroller: sc
-          ? {
-              rectWidth: sc.getBoundingClientRect().width,
-              clientWidth: sc.clientWidth,
-              offsetWidth: sc.offsetWidth,
-              scrollWidth: sc.scrollWidth,
-            }
-          : null,
-        progress,
-        clip,
-        rootTransform: getComputedStyle(document.documentElement).transform,
-        bodyTransform: getComputedStyle(document.body).transform,
-        visualScale: window.visualViewport?.scale ?? 1,
-      });
+        const sc = document.querySelector<HTMLElement>(scrollerSel);
+        w.__frames.push({
+          t: performance.now() - start,
+          rects,
+          scroller: sc
+            ? {
+                rectWidth: sc.getBoundingClientRect().width,
+                clientWidth: sc.clientWidth,
+                offsetWidth: sc.offsetWidth,
+                scrollWidth: sc.scrollWidth
+              }
+            : null,
+          progress,
+          clip,
+          rootTransform: getComputedStyle(document.documentElement).transform,
+          bodyTransform: getComputedStyle(document.body).transform,
+          visualScale: window.visualViewport?.scale ?? 1
+        });
+        requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, { selectors: SELECTORS, scrollerSel: SCROLLER_SELECTOR });
+    },
+    { selectors: SELECTORS, scrollerSel: SCROLLER_SELECTOR }
+  );
 }
 
 async function stopSampler(page: Page) {
@@ -173,11 +174,7 @@ async function stopSampler(page: Page) {
   });
 }
 
-async function attachShot(
-  page: Page,
-  testInfo: TestInfo,
-  name: string,
-) {
+async function attachShot(page: Page, testInfo: TestInfo, name: string) {
   const body = await page.screenshot({ animations: "allow", caret: "initial" });
   await testInfo.attach(name, { body, contentType: "image/png" });
 }
@@ -186,7 +183,7 @@ async function runTransition(
   page: Page,
   testInfo: TestInfo,
   from: "light" | "dark",
-  to: "light" | "dark",
+  to: "light" | "dark"
 ) {
   const label = `${from}-to-${to}`;
   const toggle = page.locator(SELECTORS.themeButton);
@@ -203,7 +200,7 @@ async function runTransition(
 
   await installSampler(page);
   // Clique programático (sem hover do mouse); ainda dispara o onClick real do React.
-  await toggle.evaluate((element) => {
+  await toggle.evaluate(element => {
     (element as HTMLElement).click();
   });
 
@@ -213,11 +210,9 @@ async function runTransition(
   }
 
   await expect(page.locator("html")).toHaveAttribute("data-theme", to);
-  await expect(page.locator("html")).not.toHaveAttribute(
-    "data-theme-transitioning",
-    "true",
-    { timeout: 5000 },
-  );
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme-transitioning", "true", {
+    timeout: 5000
+  });
   await page.waitForTimeout(200);
 
   const { frames, anims } = await stopSampler(page);
@@ -226,20 +221,20 @@ async function runTransition(
 
   // --- Diagnóstico do scroller real (.homepage-content) ---
   const scrollerAfter = await readScroller(page);
-  const scrollerDuring = frames.map((f) => f.scroller);
-  const distinctDuring = [
-    ...new Set(scrollerDuring.map((m) => JSON.stringify(m))),
-  ].map((m) => JSON.parse(m));
+  const scrollerDuring = frames.map(f => f.scroller);
+  const distinctDuring = [...new Set(scrollerDuring.map(m => JSON.stringify(m)))].map(m =>
+    JSON.parse(m)
+  );
   await testInfo.attach(`${label}-scroller-metrics.json`, {
     body: JSON.stringify(
       { before: scrollerBefore, during: distinctDuring, after: scrollerAfter },
       null,
-      2,
+      2
     ),
-    contentType: "application/json",
+    contentType: "application/json"
   });
   console.log(
-    `[${label}] ${SCROLLER_SELECTOR} before=${JSON.stringify(scrollerBefore)} during(distinct)=${JSON.stringify(distinctDuring)} after=${JSON.stringify(scrollerAfter)}`,
+    `[${label}] ${SCROLLER_SELECTOR} before=${JSON.stringify(scrollerBefore)} during(distinct)=${JSON.stringify(distinctDuring)} after=${JSON.stringify(scrollerAfter)}`
   );
 
   // --- Layout: nada se desloca, em nenhum frame nem no final ---
@@ -257,9 +252,7 @@ async function runTransition(
   }
 
   // --- Radial reveal presente: clip-path circle() em ::view-transition-new(root) ---
-  const reveal = anims.find(
-    (a) => a.pseudo?.includes("view-transition-new") && a.clipStart,
-  );
+  const reveal = anims.find(a => a.pseudo?.includes("view-transition-new") && a.clipStart);
   expect(reveal, `${label}: animação clip-path do reveal não encontrada`).toBeTruthy();
   expect(reveal!.clipStart).toMatch(/^circle\(0px at /);
   expect(reveal!.clipEnd).toMatch(/^circle\([\d.]+px at /);
@@ -269,26 +262,24 @@ async function runTransition(
   expect(endRadius).toBeLessThanOrEqual(cornerDist + 1);
 
   // Progresso avança de forma monotônica e passa por valores intermediários.
-  const progresses = frames
-    .map((f) => f.progress)
-    .filter((p): p is number => p !== null);
+  const progresses = frames.map(f => f.progress).filter((p): p is number => p !== null);
   expect(progresses.length, `${label}: reveal sem frames`).toBeGreaterThan(3);
   for (let i = 1; i < progresses.length; i++) {
     expect(progresses[i]).toBeGreaterThanOrEqual(progresses[i - 1] - 1e-6);
   }
-  expect(progresses.some((p) => p > 0.05 && p < 0.95)).toBe(true);
+  expect(progresses.some(p => p > 0.05 && p < 0.95)).toBe(true);
 
   // --- Sem scale/zoom/ghosting/fade: só clip-path anima; old/new sem transform/opacity ---
   for (const a of anims) {
     expect(
-      a.properties.filter((p) => /transform|scale|translate|rotate|opacity|filter/i.test(p)),
-      `${label}: ${a.pseudo} anima propriedade indevida (${a.properties.join(",")})`,
+      a.properties.filter(p => /transform|scale|translate|rotate|opacity|filter/i.test(p)),
+      `${label}: ${a.pseudo} anima propriedade indevida (${a.properties.join(",")})`
     ).toEqual([]);
   }
   // Somente a camada "new" pode ter animação (o reveal). "old" deve ficar estática.
   expect(
-    anims.filter((a) => a.pseudo?.includes("view-transition-old")),
-    `${label}: ::view-transition-old(root) animando (ghosting)`,
+    anims.filter(a => a.pseudo?.includes("view-transition-old")),
+    `${label}: ::view-transition-old(root) animando (ghosting)`
   ).toEqual([]);
 }
 
@@ -309,10 +300,10 @@ test.describe("transição de tema (desktop)", () => {
   });
 
   test("light -> dark e dark -> light sem deslocar elementos, com radial reveal", async ({
-    page,
+    page
   }, testInfo) => {
     const supported = await page.evaluate(
-      () => typeof (document as any).startViewTransition === "function",
+      () => typeof (document as any).startViewTransition === "function"
     );
     expect(supported, "Chrome sem View Transitions API").toBe(true);
 

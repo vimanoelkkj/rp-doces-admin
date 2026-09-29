@@ -24,7 +24,10 @@ const DEV_PREVIEW_ROUTES = import.meta.env.DEV
   ? [
       { path: "/dev/preparando-pedido", Page: lazy(() => import("./pages/PreparandoPedido")) },
       { path: "/dev/gerando-pagamento", Page: lazy(() => import("./pages/GerandoPagamento")) },
-      { path: "/dev/processando-pagamento", Page: lazy(() => import("./pages/ProcessandoPagamento")) },
+      {
+        path: "/dev/processando-pagamento",
+        Page: lazy(() => import("./pages/ProcessandoPagamento"))
+      }
     ]
   : [];
 
@@ -51,15 +54,9 @@ function StorefrontRoutes() {
             <Route path="/" element={<Homepage />} />
             <Route path="/cardapio" element={<Cardapio />} />
             <Route path="/checkout" element={<Checkout />} />
-            <Route
-              path="/aguardando-pagamento"
-              element={<AguardandoPagamento />}
-            />
+            <Route path="/aguardando-pagamento" element={<AguardandoPagamento />} />
             <Route path="/pedido-confirmado" element={<PedidoConfirmado />} />
-            <Route
-              path="/pagamento-nao-aprovado"
-              element={<PagamentoNaoAprovado />}
-            />
+            <Route path="/pagamento-nao-aprovado" element={<PagamentoNaoAprovado />} />
             <Route path="/pedido/:token" element={<AcompanharPedido />} />
             {DEV_PREVIEW_ROUTES.map(({ path, Page }) => (
               <Route key={path} path={path} element={<Page />} />
@@ -92,10 +89,7 @@ function AdminRoutes() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/produtos" element={<AdminProdutos />} />
           <Route path="/admin/pedidos" element={<AdminPedidos />} />
-          <Route
-            path="/admin/administradores"
-            element={<AdminAdministradores />}
-          />
+          <Route path="/admin/administradores" element={<AdminAdministradores />} />
           <Route path="/admin/loja" element={<AdminLoja />} />
           <Route path="/admin/despesas" element={<AdminDespesas />} />
           <Route path="/admin/notificacoes" element={<AdminNotificacoes />} />

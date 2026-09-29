@@ -39,7 +39,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
      FROM produtos p
      LEFT JOIN categorias c ON c.id = p.categoria
      WHERE p.disponivel = 1
-     ORDER BY p.categoria, p.ordem, p.nome`,
+     ORDER BY p.categoria, p.ordem, p.nome`
   ).all<ProdutoRow>();
 
   return Response.json({ produtos: results });

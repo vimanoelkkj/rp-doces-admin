@@ -37,7 +37,7 @@ const MENSAGENS: Record<string, string> = {
   MERCADO_PAGO_NAO_CONFIGURADO: "Mercado Pago não está configurado neste ambiente",
   MERCADO_PAGO_RECUSOU: "O Mercado Pago recusou o estorno de diagnóstico",
   MERCADO_PAGO_INDISPONIVEL:
-    "Não foi possível confirmar com o Mercado Pago se o estorno foi feito. Tente novamente em instantes.",
+    "Não foi possível confirmar com o Mercado Pago se o estorno foi feito. Tente novamente em instantes."
 };
 
 const STATUS_HTTP: Record<string, number> = {
@@ -46,7 +46,7 @@ const STATUS_HTTP: Record<string, number> = {
   PAGAMENTO_NAO_DIAGNOSTICO: 400,
   MERCADO_PAGO_NAO_CONFIGURADO: 503,
   MERCADO_PAGO_RECUSOU: 502,
-  MERCADO_PAGO_INDISPONIVEL: 502,
+  MERCADO_PAGO_INDISPONIVEL: 502
 };
 
 function jsonError(message: string, status: number, code?: string) {
@@ -84,19 +84,27 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const mpPaymentId = typeof body.mpPaymentId === "string" ? body.mpPaymentId.trim() : "";
   if (!/^\d+$/.test(mpPaymentId)) {
-    return jsonError(MENSAGENS.MP_PAYMENT_ID_INVALIDO, STATUS_HTTP.MP_PAYMENT_ID_INVALIDO, "MP_PAYMENT_ID_INVALIDO");
+    return jsonError(
+      MENSAGENS.MP_PAYMENT_ID_INVALIDO,
+      STATUS_HTTP.MP_PAYMENT_ID_INVALIDO,
+      "MP_PAYMENT_ID_INVALIDO"
+    );
   }
 
   const chave = parseOperationKey(body.operationKey);
   if (!chave.ok) {
-    return jsonError(MENSAGENS.OPERATION_KEY_INVALIDA, STATUS_HTTP.OPERATION_KEY_INVALIDA, chave.erro);
+    return jsonError(
+      MENSAGENS.OPERATION_KEY_INVALIDA,
+      STATUS_HTTP.OPERATION_KEY_INVALIDA,
+      chave.erro
+    );
   }
 
   if (!env.MP_ACCESS_TOKEN) {
     return jsonError(
       MENSAGENS.MERCADO_PAGO_NAO_CONFIGURADO,
       STATUS_HTTP.MERCADO_PAGO_NAO_CONFIGURADO,
-      "MERCADO_PAGO_NAO_CONFIGURADO",
+      "MERCADO_PAGO_NAO_CONFIGURADO"
     );
   }
 
@@ -104,18 +112,26 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     payment = await fetchMpPayment(env.MP_ACCESS_TOKEN, mpPaymentId);
   } catch (err: unknown) {
-    if (err && typeof err === "object" && "status" in err && (err as { status?: number }).status === 404) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "status" in err &&
+      (err as { status?: number }).status === 404
+    ) {
       return jsonError(
         MENSAGENS.PAGAMENTO_NAO_DIAGNOSTICO,
         STATUS_HTTP.PAGAMENTO_NAO_DIAGNOSTICO,
-        "PAGAMENTO_NAO_DIAGNOSTICO",
+        "PAGAMENTO_NAO_DIAGNOSTICO"
       );
     }
-    console.error("Falha ao consultar pagamento no Mercado Pago antes do estorno de diagnóstico", err);
+    console.error(
+      "Falha ao consultar pagamento no Mercado Pago antes do estorno de diagnóstico",
+      err
+    );
     return jsonError(
       MENSAGENS.MERCADO_PAGO_INDISPONIVEL,
       STATUS_HTTP.MERCADO_PAGO_INDISPONIVEL,
-      "MERCADO_PAGO_INDISPONIVEL",
+      "MERCADO_PAGO_INDISPONIVEL"
     );
   }
 
@@ -132,7 +148,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return jsonError(
       MENSAGENS.PAGAMENTO_NAO_DIAGNOSTICO,
       STATUS_HTTP.PAGAMENTO_NAO_DIAGNOSTICO,
-      "PAGAMENTO_NAO_DIAGNOSTICO",
+      "PAGAMENTO_NAO_DIAGNOSTICO"
     );
   }
 
@@ -142,26 +158,30 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (envio.resultado === "AMBIGUO") {
     console.error("Resultado ambíguo ao estornar o Pix de diagnóstico", {
       motivo: envio.motivo,
-      httpStatus: envio.httpStatus,
+      httpStatus: envio.httpStatus
     });
     return jsonError(
       MENSAGENS.MERCADO_PAGO_INDISPONIVEL,
       STATUS_HTTP.MERCADO_PAGO_INDISPONIVEL,
-      "MERCADO_PAGO_INDISPONIVEL",
+      "MERCADO_PAGO_INDISPONIVEL"
     );
   }
 
   if (envio.resultado === "RECUSA_DEFINITIVA") {
-    console.error("Mercado Pago recusou o estorno de diagnóstico", envio.httpStatus, envio.mensagem);
+    console.error(
+      "Mercado Pago recusou o estorno de diagnóstico",
+      envio.httpStatus,
+      envio.mensagem
+    );
     return jsonError(
       MENSAGENS.MERCADO_PAGO_RECUSOU,
       STATUS_HTTP.MERCADO_PAGO_RECUSOU,
-      "MERCADO_PAGO_RECUSOU",
+      "MERCADO_PAGO_RECUSOU"
     );
   }
 
   return Response.json(
     { ok: true, refundId: String(envio.refund.id), status: envio.refund.status },
-    { status: 201 },
+    { status: 201 }
   );
 };

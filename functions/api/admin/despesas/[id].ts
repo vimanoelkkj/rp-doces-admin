@@ -18,7 +18,7 @@ function parseId(raw: unknown): number | null {
 
 const EDITAR_MENSAGENS: Record<string, string> = {
   DESPESA_NAO_ENCONTRADA: "Despesa não encontrada",
-  DESPESA_CANCELADA: "Uma despesa cancelada não pode ser editada",
+  DESPESA_CANCELADA: "Uma despesa cancelada não pode ser editada"
 };
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -38,7 +38,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   }
 };
 
-async function editar(request: Request, env: Env, params: Record<string, string | string[] | undefined>) {
+async function editar(
+  request: Request,
+  env: Env,
+  params: Record<string, string | string[] | undefined>
+) {
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
@@ -63,7 +67,9 @@ async function editar(request: Request, env: Env, params: Record<string, string 
 
   try {
     const resultado = await editarDespesa(env.DB, {
-      id, ...cabecalho.cabecalho, itens: itens.itens,
+      id,
+      ...cabecalho.cabecalho,
+      itens: itens.itens
     });
     if (!resultado.ok) {
       const status = resultado.erro === "DESPESA_NAO_ENCONTRADA" ? 404 : 409;
@@ -76,5 +82,7 @@ async function editar(request: Request, env: Env, params: Record<string, string 
   }
 }
 
-export const onRequestPut: PagesFunction<Env> = ({ request, env, params }) => editar(request, env, params);
-export const onRequestPatch: PagesFunction<Env> = ({ request, env, params }) => editar(request, env, params);
+export const onRequestPut: PagesFunction<Env> = ({ request, env, params }) =>
+  editar(request, env, params);
+export const onRequestPatch: PagesFunction<Env> = ({ request, env, params }) =>
+  editar(request, env, params);

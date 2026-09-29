@@ -209,7 +209,9 @@
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .excluir-pedido-cancel {
@@ -348,13 +350,31 @@ html[data-admin-theme="dark"] .excluir-pedido-danger:hover {
 }
 
 /* ── "Mais ações" (⋮) ── */
-.pedmodal-more { position: relative; }
-.pedmodal-more summary { cursor: pointer; padding: 7px 12px; font-size: 24px; list-style: none; }
-.pedmodal-more summary::-webkit-details-marker { display: none; }
+.pedmodal-more {
+  position: relative;
+}
+.pedmodal-more summary {
+  cursor: pointer;
+  padding: 7px 12px;
+  font-size: 24px;
+  list-style: none;
+}
+.pedmodal-more summary::-webkit-details-marker {
+  display: none;
+}
 .pedmodal-more button {
-  position: absolute; right: 0; z-index: 2; min-width: 150px; padding: 12px;
-  background: #ffffff; color: #c0392b; border: 1px solid #eadfd3;
-  border-radius: 9px; cursor: pointer; font: inherit; box-shadow: 0 5px 15px rgba(43, 29, 26, 0.13);
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  min-width: 150px;
+  padding: 12px;
+  background: #ffffff;
+  color: #c0392b;
+  border: 1px solid #eadfd3;
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+  box-shadow: 0 5px 15px rgba(43, 29, 26, 0.13);
 }
 
 html[data-admin-theme="dark"] .pedmodal-more button {

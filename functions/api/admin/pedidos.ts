@@ -7,7 +7,7 @@ import {
   normalizeManualItems,
   validarMetodoEStatus,
   type CriarPedidoManualBody,
-  MAX_TEXT_LENGTH_MANUAL,
+  MAX_TEXT_LENGTH_MANUAL
 } from "../../lib/adminPedidos/manualValidation";
 import { replayPedidoManual } from "../../lib/adminPedidos/manualReplay";
 import { createManualPedido } from "../../lib/adminPedidos/manualCreation";
@@ -16,7 +16,7 @@ import {
   fingerprint,
   OPERACAO_MENSAGENS,
   parseOperationKey,
-  type IdentidadeEsperada,
+  type IdentidadeEsperada
 } from "../../lib/operacoes";
 import { isValidWhatsappBr, normalizeWhatsappBr } from "../../../shared/whatsapp";
 
@@ -24,8 +24,7 @@ function jsonError(message: string, status: number, code?: string) {
   return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
-export const onRequestGet: PagesFunction<Env> = (context) =>
-  listPedidos(context);
+export const onRequestGet: PagesFunction<Env> = context => listPedidos(context);
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
@@ -73,13 +72,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     fingerprint: fingerprint({
       itens: [...itensResult.itens]
         .sort((a, b) => a.produtoId - b.produtoId)
-        .map((i) => [i.produtoId, i.quantidade]),
+        .map(i => [i.produtoId, i.quantidade]),
       clienteNome,
       clienteWhatsapp,
       observacao,
       metodoPagamento,
-      statusPagamento,
-    }),
+      statusPagamento
+    })
   };
 
   try {
@@ -104,6 +103,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     metodoPagamento,
     statusPagamento,
     operationKey,
-    identidade,
+    identidade
   });
 };

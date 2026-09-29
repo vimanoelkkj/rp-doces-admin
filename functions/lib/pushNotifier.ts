@@ -53,7 +53,7 @@ async function despacharParaInscricoes(
   env: PushEnv,
   pedido: PedidoBasico,
   tentativasAtuais: number,
-  options?: NotificarPushOptions,
+  options?: NotificarPushOptions
 ): Promise<NotificarPushResult> {
   const publicKey = env.VAPID_PUBLIC_KEY;
   const privateKey = env.VAPID_PRIVATE_KEY;
@@ -93,7 +93,7 @@ async function despacharParaInscricoes(
       .prepare(
         `UPDATE push_eventos
          SET status = 'ENVIADO', tentativas = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`,
+         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
       )
       .bind(novaTentativa, pedido.id)
       .run();
@@ -106,7 +106,7 @@ async function despacharParaInscricoes(
     body: `Pedido RP-${pedido.id} · ${formatarMoedaCentavos(pedido.valor_total_centavos)}`,
     tag: `pedido-${pedido.id}`,
     url: `/admin/pedidos?pedido=${pedido.id}`,
-    pedidoId: pedido.id,
+    pedidoId: pedido.id
   };
 
   let sucessos = 0;
@@ -121,15 +121,15 @@ async function despacharParaInscricoes(
           endpoint: sub.endpoint,
           keys: {
             p256dh: sub.p256dh,
-            auth: sub.auth,
-          },
+            auth: sub.auth
+          }
         },
         payload,
         {
           publicKey,
           privateKey,
-          subject,
-        },
+          subject
+        }
       );
 
       if (!delivered) {
@@ -160,7 +160,7 @@ async function despacharParaInscricoes(
       .prepare(
         `UPDATE push_eventos
          SET status = 'ENVIADO', tentativas = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`,
+         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
       )
       .bind(novaTentativa, pedido.id)
       .run();
@@ -170,7 +170,7 @@ async function despacharParaInscricoes(
       .prepare(
         `UPDATE push_eventos
          SET status = 'FALHA', tentativas = ?, ultimo_erro = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`,
+         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
       )
       .bind(novaTentativa, ultimoErro, pedido.id)
       .run();
@@ -192,7 +192,7 @@ export async function notificarNovoPedidoPago(
   db: D1Database,
   env: PushEnv,
   pedidoId: number,
-  options?: NotificarPushOptions,
+  options?: NotificarPushOptions
 ): Promise<NotificarPushResult> {
   const pedido = await db
     .prepare("SELECT id, valor_total_centavos FROM pedidos WHERE id = ?")
@@ -208,14 +208,14 @@ export async function notificarNovoPedidoPago(
     .prepare(
       `INSERT INTO push_eventos (pedido_id, evento, status)
        VALUES (?, 'PEDIDO_PAGO', 'PENDENTE')
-       ON CONFLICT(pedido_id, evento) DO NOTHING`,
+       ON CONFLICT(pedido_id, evento) DO NOTHING`
     )
     .bind(pedidoId)
     .run();
 
   const eventoRow = await db
     .prepare(
-      `SELECT status, tentativas FROM push_eventos WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`,
+      `SELECT status, tentativas FROM push_eventos WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
     )
     .bind(pedidoId)
     .first<{ status: string; tentativas: number }>();
@@ -243,7 +243,7 @@ export async function notificarNovoPedidoPagoSafe(
   db: D1Database,
   env: PushEnv,
   pedidoId: number,
-  options?: NotificarPushOptions,
+  options?: NotificarPushOptions
 ): Promise<void> {
   try {
     await notificarNovoPedidoPago(db, env, pedidoId, options);
@@ -266,7 +266,7 @@ export async function notificarNovoPedidoPagoSafe(
 export async function reconciliarPushEventosFalhos(
   db: D1Database,
   env: PushEnv,
-  options?: { backoffSeconds?: number; batchSize?: number },
+  options?: { backoffSeconds?: number; batchSize?: number }
 ): Promise<ReconciliarPushResult> {
   const backoff = options?.backoffSeconds ?? RETRY_BACKOFF_SECONDS;
   const batchSize = options?.batchSize ?? RETRY_BATCH_SIZE;
@@ -281,7 +281,7 @@ export async function reconciliarPushEventosFalhos(
          AND tentativas < ?
          AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
        ORDER BY atualizado_em ASC
-       LIMIT ?`,
+       LIMIT ?`
     )
     .bind(RETRY_MAX_ATTEMPTS, backoff, batchSize)
     .all<{ pedido_id: number; tentativas: number }>();
@@ -303,7 +303,7 @@ export async function reconciliarPushEventosFalhos(
          WHERE pedido_id = ?
            AND evento = 'PEDIDO_PAGO'
            AND status = 'FALHA'
-           AND tentativas < ?`,
+           AND tentativas < ?`
       )
       .bind(cand.pedido_id, RETRY_MAX_ATTEMPTS)
       .run();
@@ -323,7 +323,7 @@ export async function reconciliarPushEventosFalhos(
         .prepare(
           `UPDATE push_eventos
            SET status = 'FALHA', ultimo_erro = 'PEDIDO_INEXISTENTE', atualizado_em = CURRENT_TIMESTAMP
-           WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`,
+           WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
         )
         .bind(cand.pedido_id)
         .run();
@@ -350,7 +350,7 @@ export async function reconciliarPushEventosFalhos(
 export async function reconciliarPushEventosFalhosSafe(
   db: D1Database,
   env: PushEnv,
-  options?: { backoffSeconds?: number; batchSize?: number },
+  options?: { backoffSeconds?: number; batchSize?: number }
 ): Promise<void> {
   try {
     await reconciliarPushEventosFalhos(db, env, options);

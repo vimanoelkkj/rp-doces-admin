@@ -2,7 +2,7 @@
 
 import {
   CONFIRMED_REFUNDS_BY_ALLOCATION_CTE,
-  EXCHANGE_COVERAGE_STATUSES,
+  EXCHANGE_COVERAGE_STATUSES
 } from "../financialCoverage";
 
 export interface ItemComSaldo {
@@ -18,14 +18,14 @@ export interface ItemComSaldo {
 export async function allocateFullValueAcrossItems(
   db: D1Database,
   pagamentoId: number,
-  pedidoId: number,
+  pedidoId: number
 ): Promise<void> {
   await db
     .prepare(
       `INSERT OR IGNORE INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
        SELECT ?, id, valor_total_centavos
        FROM pedido_itens
-       WHERE pedido_id = ? AND valor_total_centavos > 0`,
+       WHERE pedido_id = ? AND valor_total_centavos > 0`
     )
     .bind(pagamentoId, pedidoId)
     .run();
@@ -39,18 +39,21 @@ export async function getItensComSaldo(db: D1Database, pedidoId: number): Promis
   // Durante o cutover B5 o mesmo código ainda precisa ler a topologia
   // histórica, anterior à 0016. Depois da migration, somente ATIVO entra no
   // waterfall; TROCA_PENDENTE jamais recebe cobertura financeira.
-  const temStatusItem = await db.prepare(
-    `SELECT 1 FROM pragma_table_info('pedido_itens') WHERE name='status_item' LIMIT 1`,
-  ).first();
+  const temStatusItem = await db
+    .prepare(`SELECT 1 FROM pragma_table_info('pedido_itens') WHERE name='status_item' LIMIT 1`)
+    .first();
   if (!temStatusItem) {
-    const { results } = await db.prepare(
-      `SELECT pi.id AS itemId,pi.valor_total_centavos AS valorTotalCentavos,
+    const { results } = await db
+      .prepare(
+        `SELECT pi.id AS itemId,pi.valor_total_centavos AS valorTotalCentavos,
               COALESCE(SUM(CASE WHEN pp.status='PAGO' THEN a.valor_centavos ELSE 0 END),0) AS pagoPorOutrosCentavos
        FROM pedido_itens pi
        LEFT JOIN pedido_pagamento_alocacoes a ON a.pedido_item_id=pi.id
        LEFT JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
-       WHERE pi.pedido_id=? GROUP BY pi.id,pi.valor_total_centavos ORDER BY pi.id`,
-    ).bind(pedidoId).all<ItemComSaldo>();
+       WHERE pi.pedido_id=? GROUP BY pi.id,pi.valor_total_centavos ORDER BY pi.id`
+      )
+      .bind(pedidoId)
+      .all<ItemComSaldo>();
     return results;
   }
   const { results } = await db
@@ -74,7 +77,7 @@ export async function getItensComSaldo(db: D1Database, pedidoId: number): Promis
        LEFT JOIN refunds_confirmados rf ON rf.pagamento_alocacao_id=a.id
        WHERE pi.pedido_id=? AND pi.status_item='ATIVO'
        GROUP BY pi.id, pi.valor_total_centavos
-       ORDER BY pi.id ASC`,
+       ORDER BY pi.id ASC`
     )
     .bind(pedidoId, pedidoId)
     .all<ItemComSaldo>();
@@ -87,7 +90,7 @@ export async function getItensComSaldo(db: D1Database, pedidoId: number): Promis
 // inválida.
 export function computeWaterfallAllocations(
   itens: ItemComSaldo[],
-  valorCentavos: number,
+  valorCentavos: number
 ):
   | { ok: true; alocacoes: { itemId: number; valorCentavos: number }[] }
   | { ok: false; erro: "VALOR_ACIMA_DO_SALDO" } {

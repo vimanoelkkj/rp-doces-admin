@@ -44,11 +44,7 @@ export type OperacaoEscopo = "SITE" | "ADMIN";
 // CONCLUIDA ............ resultado lógico final, replayável.
 // RECUSADA ............. rejeição COMPROVADAMENTE definitiva do provedor.
 export type OperacaoFase =
-  | "LOCAL_CRIADA"
-  | "ENVIO_INCONCLUSIVO"
-  | "REMOTO_CONHECIDO"
-  | "CONCLUIDA"
-  | "RECUSADA";
+  "LOCAL_CRIADA" | "ENVIO_INCONCLUSIVO" | "REMOTO_CONHECIDO" | "CONCLUIDA" | "RECUSADA";
 
 // Versão do formato canônico do fingerprint. Se algum dia o conteúdo
 // vinculado a uma key mudar de forma, esta versão sobe e operações antigas
@@ -61,8 +57,7 @@ export const FINGERPRINT_VERSAO = 1;
 const OPERATION_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 
 export type OperationKeyResult =
-  | { ok: true; key: string }
-  | { ok: false; erro: "OPERATION_KEY_INVALIDA" };
+  { ok: true; key: string } | { ok: false; erro: "OPERATION_KEY_INVALIDA" };
 
 export function parseOperationKey(raw: unknown): OperationKeyResult {
   if (typeof raw !== "string") return { ok: false, erro: "OPERATION_KEY_INVALIDA" };
@@ -150,10 +145,7 @@ const COLUNAS_OPERACAO = `id, operation_key, tipo, escopo, ator_usuario_id,
 // É o que permite recuperar um sucesso anterior cujo resultado HTTP se
 // perdeu: o estado do pedido pode ter mudado no meio-tempo, e o retry não
 // pode ser reinterpretado como uma nova tentativa contra o estado novo.
-export async function buscarOperacao(
-  db: D1Database,
-  key: string,
-): Promise<OperacaoRow | null> {
+export async function buscarOperacao(db: D1Database, key: string): Promise<OperacaoRow | null> {
   try {
     return await db
       .prepare(`SELECT ${COLUNAS_OPERACAO} FROM pedido_operacoes WHERE operation_key = ? LIMIT 1`)
@@ -171,7 +163,7 @@ export async function buscarOperacao(
                 reembolso_id, pedido_item_id, pedido_item_cancelamento_id,
                 NULL AS pedido_item_troca_id, resultado, erro,
                 mp_idempotency_key, mp_request, mp_payment_id
-         FROM pedido_operacoes WHERE operation_key = ? LIMIT 1`,
+         FROM pedido_operacoes WHERE operation_key = ? LIMIT 1`
       )
       .bind(key)
       .first<OperacaoRow>();
@@ -179,9 +171,7 @@ export async function buscarOperacao(
 }
 
 export type ConflitoOperacao =
-  | "OPERACAO_CONFLITO_TIPO"
-  | "OPERACAO_CONFLITO_ESCOPO"
-  | "OPERACAO_CONFLITO_PAYLOAD";
+  "OPERACAO_CONFLITO_TIPO" | "OPERACAO_CONFLITO_ESCOPO" | "OPERACAO_CONFLITO_PAYLOAD";
 
 export interface IdentidadeEsperada {
   tipo: OperacaoTipo;
@@ -194,7 +184,7 @@ export interface IdentidadeEsperada {
 // outro contexto é conflito, não uma segunda operação.
 export function conflitoOperacao(
   operacao: OperacaoRow,
-  esperado: IdentidadeEsperada,
+  esperado: IdentidadeEsperada
 ): ConflitoOperacao | null {
   if (operacao.tipo !== esperado.tipo) return "OPERACAO_CONFLITO_TIPO";
   if (operacao.escopo !== esperado.escopo) return "OPERACAO_CONFLITO_ESCOPO";
@@ -227,7 +217,7 @@ export function fontePagamento(chave: string): ClaimFonte {
                  NULL AS pedido_item_id, NULL AS pedido_item_cancelamento_id,
                  NULL AS pedido_item_troca_id
           FROM pedido_pagamentos WHERE idempotency_key = ?`,
-    args: [chave],
+    args: [chave]
   };
 }
 
@@ -237,13 +227,13 @@ export function fonteReembolso(chave: string): ClaimFonte {
                  NULL AS pedido_item_id, NULL AS pedido_item_cancelamento_id,
                  NULL AS pedido_item_troca_id
           FROM pedido_reembolsos WHERE idempotency_key = ?`,
-    args: [chave],
+    args: [chave]
   };
 }
 
 export function fontePedidoComPagamento(
   chaveDoPedido: string,
-  chaveDoPagamento: string,
+  chaveDoPagamento: string
 ): ClaimFonte {
   return {
     sql: `SELECT p.id AS pedido_id, pp.id AS pagamento_id, NULL AS reembolso_id,
@@ -252,7 +242,7 @@ export function fontePedidoComPagamento(
           FROM pedidos p
           JOIN pedido_pagamentos pp ON pp.pedido_id = p.id AND pp.idempotency_key = ?
           WHERE p.idempotency_key = ?`,
-    args: [chaveDoPagamento, chaveDoPedido],
+    args: [chaveDoPagamento, chaveDoPedido]
   };
 }
 
@@ -294,8 +284,8 @@ export function fonteItemAdicionado(params: {
       params.produtoId,
       params.quantidade,
       params.valorUnitarioCentavos,
-      params.atorUsuarioId,
-    ],
+      params.atorUsuarioId
+    ]
   };
 }
 
@@ -311,7 +301,7 @@ export function fonteCancelamentoCriado(pedidoId: number, itemId: number): Claim
                              AND c.pedido_id = ? AND c.pedido_item_id = ?), -1)
                    AS pedido_item_cancelamento_id,
                  NULL AS pedido_item_troca_id`,
-    args: [pedidoId, itemId, pedidoId, itemId],
+    args: [pedidoId, itemId, pedidoId, itemId]
   };
 }
 
@@ -323,7 +313,7 @@ export function fonteTrocaCriada(pedidoId: number, itemId: number): ClaimFonte {
                            WHERE changes() = 1 AND t.id = last_insert_rowid()
                              AND t.pedido_id = ? AND t.item_origem_id = ?), -1)
                    AS pedido_item_troca_id`,
-    args: [pedidoId, itemId, pedidoId, itemId],
+    args: [pedidoId, itemId, pedidoId, itemId]
   };
 }
 
@@ -339,10 +329,7 @@ export interface ClaimParams extends IdentidadeEsperada {
 // INSERT comum (nunca `INSERT OR IGNORE`): a violação do UNIQUE de
 // `operation_key` precisa DERRUBAR o batch inteiro do perdedor, não ser
 // silenciosamente ignorada enquanto os demais efeitos seguem executando.
-export function prepareClaimOperacao(
-  db: D1Database,
-  params: ClaimParams,
-): D1PreparedStatement {
+export function prepareClaimOperacao(db: D1Database, params: ClaimParams): D1PreparedStatement {
   if (params.tipo !== "ITEM_TROCA_ADMIN") {
     return db
       .prepare(
@@ -355,7 +342,7 @@ export function prepareClaimOperacao(
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 f.pedido_id, f.pagamento_id, f.reembolso_id, f.pedido_item_id,
                 f.pedido_item_cancelamento_id
-         FROM (${params.fonte.sql}) f`,
+         FROM (${params.fonte.sql}) f`
       )
       .bind(
         params.key,
@@ -368,7 +355,7 @@ export function prepareClaimOperacao(
         params.mpIdempotencyKey ?? null,
         params.mpRequest ?? null,
         params.resultado ?? null,
-        ...params.fonte.args,
+        ...params.fonte.args
       );
   }
 
@@ -383,7 +370,7 @@ export function prepareClaimOperacao(
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
               f.pedido_id, f.pagamento_id, f.reembolso_id, f.pedido_item_id,
               f.pedido_item_cancelamento_id, f.pedido_item_troca_id
-       FROM (${params.fonte.sql}) f`,
+       FROM (${params.fonte.sql}) f`
     )
     .bind(
       params.key,
@@ -396,7 +383,7 @@ export function prepareClaimOperacao(
       params.mpIdempotencyKey ?? null,
       params.mpRequest ?? null,
       params.resultado ?? null,
-      ...params.fonte.args,
+      ...params.fonte.args
     );
 }
 
@@ -417,7 +404,7 @@ export function prepareRegistrarFase(
     mpPaymentId?: string | null;
     resultado?: string | null;
     erro?: string | null;
-  },
+  }
 ): D1PreparedStatement {
   return db
     .prepare(
@@ -427,15 +414,9 @@ export function prepareRegistrarFase(
            resultado = COALESCE(?, resultado),
            erro = COALESCE(?, erro),
            atualizado_em = CURRENT_TIMESTAMP
-       WHERE operation_key = ? AND fase NOT IN ('CONCLUIDA', 'RECUSADA')`,
+       WHERE operation_key = ? AND fase NOT IN ('CONCLUIDA', 'RECUSADA')`
     )
-    .bind(
-      patch.fase,
-      patch.mpPaymentId ?? null,
-      patch.resultado ?? null,
-      patch.erro ?? null,
-      key,
-    );
+    .bind(patch.fase, patch.mpPaymentId ?? null, patch.resultado ?? null, patch.erro ?? null, key);
 }
 
 export async function registrarFase(
@@ -446,7 +427,7 @@ export async function registrarFase(
     mpPaymentId?: string | null;
     resultado?: string | null;
     erro?: string | null;
-  },
+  }
 ): Promise<void> {
   await prepareRegistrarFase(db, key, patch).run();
 }
@@ -459,14 +440,13 @@ export const OPERACAO_MENSAGENS: Record<string, string> = {
   OPERATION_KEY_INVALIDA: "Identificação da operação ausente ou inválida",
   OPERACAO_CONFLITO_TIPO:
     "Esta identificação de operação já foi usada para outro tipo de operação.",
-  OPERACAO_CONFLITO_ESCOPO:
-    "Esta identificação de operação pertence a outro contexto ou operador.",
+  OPERACAO_CONFLITO_ESCOPO: "Esta identificação de operação pertence a outro contexto ou operador.",
   OPERACAO_CONFLITO_PAYLOAD:
     "Esta identificação de operação já foi usada com dados diferentes. Nenhuma alteração foi feita.",
   OPERACAO_INCOMPLETA:
     "A operação anterior com esta identificação ficou incompleta. Verifique o pedido antes de repetir.",
   OPERACAO_EM_PROCESSAMENTO:
-    "Esta operação já foi iniciada e ainda não foi concluída. Atualize e verifique antes de tentar de novo.",
+    "Esta operação já foi iniciada e ainda não foi concluída. Atualize e verifique antes de tentar de novo."
 };
 
 export const OPERACAO_HTTP_STATUS: Record<string, number> = {
@@ -475,7 +455,7 @@ export const OPERACAO_HTTP_STATUS: Record<string, number> = {
   OPERACAO_CONFLITO_ESCOPO: 409,
   OPERACAO_CONFLITO_PAYLOAD: 409,
   OPERACAO_INCOMPLETA: 409,
-  OPERACAO_EM_PROCESSAMENTO: 409,
+  OPERACAO_EM_PROCESSAMENTO: 409
 };
 
 // B-3 — operações cujo envio ao provedor não produziu resultado provável.
@@ -533,14 +513,14 @@ const OPERACAO_INCONCLUSIVA_SQL = `
 // continuam fora: não devem ser reabertos por esta via.
 export async function listarOperacoesInconclusivas(
   db: D1Database,
-  limite: number,
+  limite: number
 ): Promise<OperacaoInconclusiva[]> {
   const { results } = await db
     .prepare(
       `${OPERACAO_INCONCLUSIVA_SQL}
          AND datetime(o.atualizado_em) <= datetime('now', '-' || ? || ' seconds')
        ORDER BY o.atualizado_em ASC, o.id ASC
-       LIMIT ?`,
+       LIMIT ?`
     )
     .bind(RECUPERACAO_APOS_SEGUNDOS, limite)
     .all<OperacaoInconclusiva>();
@@ -551,7 +531,7 @@ export async function listarOperacoesInconclusivas(
 // para este pedido, para o admin poder agir em vez de olhar um estado cego.
 export async function listarOperacoesInconclusivasDoPedido(
   db: D1Database,
-  pedidoId: number,
+  pedidoId: number
 ): Promise<OperacaoInconclusiva[]> {
   const { results } = await db
     .prepare(`${OPERACAO_INCONCLUSIVA_SQL} AND o.pedido_id = ? ORDER BY o.id ASC`)
@@ -566,7 +546,7 @@ export async function listarOperacoesInconclusivasDoPedido(
 // considera inconclusivo, nunca uma segunda definição paralela.
 export async function listarOperacoesInconclusivasRecentes(
   db: D1Database,
-  limite: number,
+  limite: number
 ): Promise<OperacaoInconclusiva[]> {
   const { results } = await db
     .prepare(`${OPERACAO_INCONCLUSIVA_SQL} ORDER BY o.atualizado_em DESC, o.id DESC LIMIT ?`)
@@ -583,7 +563,7 @@ export async function claimRecuperacao(db: D1Database, key: string): Promise<boo
     .prepare(
       `UPDATE pedido_operacoes SET atualizado_em = CURRENT_TIMESTAMP
        WHERE operation_key = ? AND fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')
-         AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')`,
+         AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')`
     )
     .bind(key, RECUPERACAO_APOS_SEGUNDOS)
     .run();
@@ -596,12 +576,12 @@ export async function claimRecuperacao(db: D1Database, key: string): Promise<boo
 export async function registrarObservacao(
   db: D1Database,
   key: string,
-  diagnostico: string,
+  diagnostico: string
 ): Promise<void> {
   await db
     .prepare(
       `UPDATE pedido_operacoes SET erro = ?, atualizado_em = CURRENT_TIMESTAMP
-       WHERE operation_key = ? AND fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')`,
+       WHERE operation_key = ? AND fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')`
     )
     .bind(diagnostico, key)
     .run();
@@ -660,7 +640,7 @@ export async function fecharOperacaoExpirada(db: D1Database, key: string): Promi
       `UPDATE pedido_operacoes
        SET expirado_em = COALESCE(expirado_em, CURRENT_TIMESTAMP),
            atualizado_em = CURRENT_TIMESTAMP
-       WHERE operation_key = ? AND fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')`,
+       WHERE operation_key = ? AND fase IN ('LOCAL_CRIADA', 'ENVIO_INCONCLUSIVO')`
     )
     .bind(key)
     .run();

@@ -20,9 +20,7 @@ export function StockBadge({ restante }: { restante: number }) {
   }
   if (stockBadge === "ultima_unidade") {
     return (
-      <span className="product-low-stock-badge product-low-stock-badge--last">
-        Última unidade
-      </span>
+      <span className="product-low-stock-badge product-low-stock-badge--last">Última unidade</span>
     );
   }
   if (stockBadge === "poucas_unidades") {
@@ -41,7 +39,7 @@ const totalBRL = (unitario: number, quantidade: number) =>
 export function ProductPrices({
   product,
   className = "",
-  quantity = 1,
+  quantity = 1
 }: {
   product: Product;
   className?: string;
@@ -57,9 +55,7 @@ export function ProductPrices({
           (no bottom sheet, uma linha nova empurrava o modal para cima). */}
       <span className="product-price-line">
         <span className="product-price">{totalBRL(product.price, q)}</span>
-        {q > 1 && (
-          <span className="product-price-unit">{formatBRL(product.price)} cada</span>
-        )}
+        {q > 1 && <span className="product-price-unit">{formatBRL(product.price)} cada</span>}
       </span>
     </span>
   );

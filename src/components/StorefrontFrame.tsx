@@ -3,7 +3,6 @@ import Header from "./Header";
 import StorefrontWave from "./StorefrontWave";
 import "./StorefrontFrame.css";
 
-
 interface StorefrontFrameProps {
   children: ReactNode;
   className?: string;
@@ -13,7 +12,7 @@ interface StorefrontFrameProps {
 export default function StorefrontFrame({
   children,
   className = "",
-  headerVariant = "storefront",
+  headerVariant = "storefront"
 }: StorefrontFrameProps) {
   return (
     <div className={`storefront-frame ${className}`.trim()}>

@@ -8,7 +8,7 @@ import {
   gravarOperationKey,
   lerOperationKey,
   novaOperationKey,
-  SLOT_CHECKOUT,
+  SLOT_CHECKOUT
 } from "../lib/operationKey";
 import PreparandoPedido from "./PreparandoPedido";
 import GerandoPagamento from "./GerandoPagamento";
@@ -79,8 +79,7 @@ export default function AguardandoPagamento() {
   // recurso (mantém a página funcional mesmo sem storage disponível).
   const operationKeyRef = useRef<string | null>(null);
   if (operationKeyRef.current === null) {
-    const resolvida =
-      state?.operationKey ?? lerOperationKey(SLOT_CHECKOUT) ?? novaOperationKey();
+    const resolvida = state?.operationKey ?? lerOperationKey(SLOT_CHECKOUT) ?? novaOperationKey();
     gravarOperationKey(SLOT_CHECKOUT, resolvida);
     operationKeyRef.current = resolvida;
   }
@@ -119,17 +118,17 @@ export default function AguardandoPagamento() {
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        items: state.items.map((item) => ({
+        items: state.items.map(item => ({
           id: item.id,
-          quantity: item.quantity,
+          quantity: item.quantity
         })),
         cliente: state.cliente,
         recado: state.recado,
         // A1: mesma finalização, mesma key — em toda tentativa.
-        operationKey: operationKeyRef.current,
-      }),
+        operationKey: operationKeyRef.current
+      })
     })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           // A1: a operação já foi iniciada e o resultado remoto ainda não é
@@ -138,8 +137,7 @@ export default function AguardandoPagamento() {
           // nunca disparar outro checkout (isso criaria outro pedido, outra
           // reserva e outra cobrança). Segue para o acompanhamento dele.
           const acompanhavel =
-            body.code === "OPERACAO_EM_PROCESSAMENTO" ||
-            body.code === "MERCADO_PAGO_INDISPONIVEL";
+            body.code === "OPERACAO_EM_PROCESSAMENTO" || body.code === "MERCADO_PAGO_INDISPONIVEL";
           if (acompanhavel && typeof body.tokenPublico === "string" && body.tokenPublico) {
             if (!cancelled) {
               navigate(`/pedido/${encodeURIComponent(body.tokenPublico)}`);
@@ -149,21 +147,21 @@ export default function AguardandoPagamento() {
 
           const isEstoque =
             response.status === 409 &&
-            (body.code === "ESTOQUE_INSUFICIENTE" ||
-              /estoque/i.test(body.error || ""));
+            (body.code === "ESTOQUE_INSUFICIENTE" || /estoque/i.test(body.error || ""));
 
           if (isEstoque) {
             // Reconcilia o carrinho com os dados mais recentes do estoque
             fetchProducts()
-              .then((products) => {
+              .then(products => {
                 reconcileWithProducts(products);
               })
               .catch(() => {});
           }
 
           const msg = isEstoque
-            ? (body.error || "O estoque de um ou mais itens selecionados não está mais disponível. Por favor, revise seu carrinho.")
-            : (body.error || "Falha ao criar pagamento Pix");
+            ? body.error ||
+              "O estoque de um ou mais itens selecionados não está mais disponível. Por favor, revise seu carrinho."
+            : body.error || "Falha ao criar pagamento Pix";
 
           const erro = new Error(msg);
           (erro as unknown as { isEstoque: boolean }).isEstoque = isEstoque;
@@ -171,7 +169,7 @@ export default function AguardandoPagamento() {
         }
         return response.json() as Promise<CheckoutResponse>;
       })
-      .then((data) => {
+      .then(data => {
         if (cancelled || !data) return;
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, duracaoPasso1 + duracaoPasso2 - elapsed);
@@ -181,7 +179,7 @@ export default function AguardandoPagamento() {
           setStatus("pronto");
         }, remaining);
       })
-      .catch((err) => {
+      .catch(err => {
         if (controller.signal.aborted || cancelled) return;
         setErrorMessage(err.message);
         setIsEstoqueError(Boolean((err as unknown as { isEstoque?: boolean })?.isEstoque));
@@ -199,10 +197,7 @@ export default function AguardandoPagamento() {
   useEffect(() => {
     if (!payment?.expiresAt) return;
     const update = () => {
-      const diff = Math.max(
-        0,
-        Math.floor((Date.parse(payment.expiresAt!) - Date.now()) / 1000),
-      );
+      const diff = Math.max(0, Math.floor((Date.parse(payment.expiresAt!) - Date.now()) / 1000));
       setTimeLeft(diff);
     };
     update();
@@ -234,7 +229,7 @@ export default function AguardandoPagamento() {
         // explícita e o servidor limita a consulta ao MP a uma por 15s.
         const response = await fetch(
           `/api/pedido-status?token=${encodeURIComponent(payment.tokenPublico)}`,
-          { method: "POST", signal: controller.signal },
+          { method: "POST", signal: controller.signal }
         );
         if (cancelled || !response.ok) return;
         const data = (await response.json()) as PedidoStatusResponse;
@@ -270,12 +265,12 @@ export default function AguardandoPagamento() {
             pedidoId: payment.pedidoId,
             tokenPublico: payment.tokenPublico,
             items: state!.items,
-            totalCentavos: payment.totalCentavos,
-          },
+            totalCentavos: payment.totalCentavos
+          }
         });
       } else {
         navigate("/pagamento-nao-aprovado", {
-          state: { items: state!.items, totalCentavos: payment.totalCentavos },
+          state: { items: state!.items, totalCentavos: payment.totalCentavos }
         });
       }
     }, duracaoAleatoria());
@@ -299,9 +294,12 @@ export default function AguardandoPagamento() {
   if (status === "processando") return <ProcessandoPagamento />;
 
   const minutes =
-    timeLeft != null ? Math.floor(timeLeft / 60).toString().padStart(2, "0") : "--";
-  const seconds =
-    timeLeft != null ? (timeLeft % 60).toString().padStart(2, "0") : "--";
+    timeLeft != null
+      ? Math.floor(timeLeft / 60)
+          .toString()
+          .padStart(2, "0")
+      : "--";
+  const seconds = timeLeft != null ? (timeLeft % 60).toString().padStart(2, "0") : "--";
 
   return (
     <StorefrontFrame className="aguardando-page">
@@ -323,7 +321,17 @@ export default function AguardandoPagamento() {
                 {isEstoqueError ? "Estoque indisponível" : "Não foi possível gerar o Pix"}
               </h1>
               <p className="payment-subtitle">{errorMessage}</p>
-              <div className="aguardando-error-actions" style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%", maxWidth: "300px", margin: "20px auto 0" }}>
+              <div
+                className="aguardando-error-actions"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                  width: "100%",
+                  maxWidth: "300px",
+                  margin: "20px auto 0"
+                }}
+              >
                 <button
                   type="button"
                   className="payment-btn-primary"
@@ -355,40 +363,39 @@ export default function AguardandoPagamento() {
 
               <div className="qr-code">
                 {!prazoEncerrado && payment.qrCodeBase64 ? (
-                  <img
-                    src={`data:image/png;base64,${payment.qrCodeBase64}`}
-                    alt="QR Code Pix"
-                  />
+                  <img src={`data:image/png;base64,${payment.qrCodeBase64}`} alt="QR Code Pix" />
                 ) : null}
               </div>
 
               <div className="pix-copy-row">
                 <span className="pix-copy-label">PIX COPIA E COLA</span>
-                <button type="button" className="pix-copy-btn" onClick={handleCopy} disabled={prazoEncerrado}>
+                <button
+                  type="button"
+                  className="pix-copy-btn"
+                  onClick={handleCopy}
+                  disabled={prazoEncerrado}
+                >
                   {copied ? "Copiado!" : "Copiar código"}
                 </button>
               </div>
-              <div className="pix-code-box">{prazoEncerrado ? "Código Pix com prazo encerrado" : payment.qrCode}</div>
+              <div className="pix-code-box">
+                {prazoEncerrado ? "Código Pix com prazo encerrado" : payment.qrCode}
+              </div>
 
               {timeLeft != null && (
                 <div className="pix-timer">
                   ⏱ {prazoEncerrado ? "Prazo encerrado" : "Expira em"}{" "}
-                  <strong>
-                    {prazoEncerrado ? "00:00" : `${minutes}:${seconds}`}
-                  </strong>
+                  <strong>{prazoEncerrado ? "00:00" : `${minutes}:${seconds}`}</strong>
                 </div>
               )}
 
               <div className="payment-divider" />
-              {state.items.map((item) => (
+              {state.items.map(item => (
                 <div key={item.id} className="payment-order-item">
                   <span>
                     {item.name} ×{item.quantity}
                   </span>
-                  <span>
-                    R${" "}
-                    {(item.price * item.quantity).toFixed(2).replace(".", ",")}
-                  </span>
+                  <span>R$ {(item.price * item.quantity).toFixed(2).replace(".", ",")}</span>
                 </div>
               ))}
               <div className="payment-total-row">
@@ -398,9 +405,15 @@ export default function AguardandoPagamento() {
                 </span>
               </div>
               <p className="payment-notice">
-                O pedido será confirmado automaticamente assim que o pagamento
-                for recebido.
-                {prazoEncerrado && <> <Link to={`/pedido/${encodeURIComponent(payment.tokenPublico)}`}>Acompanhar pedido</Link></>}
+                O pedido será confirmado automaticamente assim que o pagamento for recebido.
+                {prazoEncerrado && (
+                  <>
+                    {" "}
+                    <Link to={`/pedido/${encodeURIComponent(payment.tokenPublico)}`}>
+                      Acompanhar pedido
+                    </Link>
+                  </>
+                )}
               </p>
             </div>
           )}

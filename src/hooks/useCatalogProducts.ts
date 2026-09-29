@@ -21,7 +21,7 @@ export function useCatalogProducts() {
       lastRequestAt = now;
       if (initial) setLoading(true);
       fetchProducts()
-        .then((next) => {
+        .then(next => {
           if (!active) return;
           setProducts(next);
           setError(null);

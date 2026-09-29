@@ -282,7 +282,10 @@
 .dash-kpi-card--interactive {
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    transform 0.15s,
+    box-shadow 0.15s;
 }
 
 .dash-kpi-card--interactive:hover:not(:disabled) {
@@ -590,7 +593,9 @@
   border-radius: 12px;
   color: inherit;
   text-decoration: none;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .dash-pending-row:hover {

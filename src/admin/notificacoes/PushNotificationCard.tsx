@@ -91,7 +91,7 @@ export default function PushNotificationCard() {
       if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
+          applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource
         });
       }
 
@@ -104,9 +104,9 @@ export default function PushNotificationCard() {
           endpoint: sub.endpoint,
           keys: {
             p256dh: subJson.keys?.p256dh,
-            auth: subJson.keys?.auth,
-          },
-        }),
+            auth: subJson.keys?.auth
+          }
+        })
       });
 
       if (!saveRes.ok) {
@@ -133,7 +133,7 @@ export default function PushNotificationCard() {
         await fetch("/api/admin/push/unsubscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
+          body: JSON.stringify({ endpoint: sub.endpoint })
         });
         await sub.unsubscribe();
       }
@@ -166,14 +166,16 @@ export default function PushNotificationCard() {
 
       if (!sub) {
         setStatus("PROMPT");
-        setFeedback("Nenhuma inscrição encontrada neste dispositivo. Ative as notificações primeiro.");
+        setFeedback(
+          "Nenhuma inscrição encontrada neste dispositivo. Ative as notificações primeiro."
+        );
         return;
       }
 
       const res = await fetch("/api/admin/push/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: sub.endpoint }),
+        body: JSON.stringify({ endpoint: sub.endpoint })
       });
 
       const data = await res.json().catch(() => ({}));

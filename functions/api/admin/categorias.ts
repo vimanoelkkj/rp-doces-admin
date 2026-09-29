@@ -56,7 +56,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
               (SELECT COUNT(*) FROM produtos p WHERE p.categoria = c.id AND p.ativo = 1) AS produtos_ativos,
               (SELECT COUNT(*) FROM produtos p WHERE p.categoria = c.id AND p.ativo = 0) AS produtos_arquivados
        FROM categorias c
-       ORDER BY c.ordem, c.nome`,
+       ORDER BY c.ordem, c.nome`
     ).all<CategoriaRow>();
     return Response.json({ categorias: results });
   } catch (err) {
@@ -93,7 +93,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
     await env.DB.prepare(
-      `INSERT INTO categorias (id, nome, emoji, descricao, sistema) VALUES (?, ?, ?, ?, 0)`,
+      `INSERT INTO categorias (id, nome, emoji, descricao, sistema) VALUES (?, ?, ?, ?, 0)`
     )
       .bind(id, nome, emoji, descricao)
       .run();

@@ -4,11 +4,7 @@ import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
 import PortalDropdown from "../components/PortalDropdown";
 import { useAdminModal } from "../components/useAdminModal";
-import {
-  formatWhatsappBr,
-  isValidWhatsappBr,
-  normalizeWhatsappBr,
-} from "../../../shared/whatsapp";
+import { formatWhatsappBr, isValidWhatsappBr, normalizeWhatsappBr } from "../../../shared/whatsapp";
 import "./NovoPedidoModal.css";
 
 /* ── Icons ── */
@@ -52,7 +48,7 @@ const IconChevron = ({ open }: { open: boolean }) => (
     fill="none"
     style={{
       transition: "transform 0.15s",
-      transform: open ? "rotate(180deg)" : "rotate(0)",
+      transform: open ? "rotate(180deg)" : "rotate(0)"
     }}
   >
     <path
@@ -95,7 +91,7 @@ let nextOrderItemId = 0;
 const newOrderItem = (): OrderItem => ({
   id: nextOrderItemId++,
   produtoId: null,
-  quantidade: 1,
+  quantidade: 1
 });
 
 type MetodoPagamento = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO" | "A_COMBINAR";
@@ -105,18 +101,17 @@ const METODO_OPTIONS: { value: MetodoPagamento; label: string }[] = [
   { value: "DINHEIRO", label: "Dinheiro" },
   { value: "CARTAO", label: "Cartão" },
   { value: "PIX_EXTERNO", label: "Pix externo" },
-  { value: "A_COMBINAR", label: "A combinar" },
+  { value: "A_COMBINAR", label: "A combinar" }
 ];
 
 const STATUS_OPTIONS: { value: StatusPagamento; label: string }[] = [
   { value: "PENDENTE", label: "Aguardando pagamento" },
-  { value: "PAGO", label: "Já pago" },
+  { value: "PAGO", label: "Já pago" }
 ];
 
 const MAX_ITENS_PEDIDO_MANUAL = 20;
 
-const formatarPreco = (centavos: number) =>
-  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+const formatarPreco = (centavos: number) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
 const estoqueLivre = (p: ProdutoAdmin) => Math.max(0, p.estoque - p.estoque_reservado);
 
@@ -151,11 +146,7 @@ function useDropdown() {
 }
 
 /* ── Component ── */
-export default function NovoPedidoModal({
-  open,
-  onClose,
-  onCreated,
-}: NovoPedidoModalProps) {
+export default function NovoPedidoModal({ open, onClose, onCreated }: NovoPedidoModalProps) {
   const fieldId = useId();
   const [clientName, setClientName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -203,40 +194,30 @@ export default function NovoPedidoModal({
     assinaturaRef.current = null;
 
     fetch("/api/admin/produtos")
-      .then(async (r) => {
+      .then(async r => {
         if (!r.ok) throw new Error("Falha ao carregar produtos");
         return r.json() as Promise<{ produtos: ProdutoAdmin[] }>;
       })
-      .then((catalogo) => setProdutos(catalogo.produtos))
-      .catch((err) => setError(err.message))
+      .then(catalogo => setProdutos(catalogo.produtos))
+      .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [open]);
 
   const produtosSelecionaveis = produtos.filter(
-    (p) => p.ativo === 1 && p.disponivel === 1 && estoqueLivre(p) > 0,
+    p => p.ativo === 1 && p.disponivel === 1 && estoqueLivre(p) > 0
   );
-  const produtoPorId = new Map(produtos.map((p) => [p.id, p]));
+  const produtoPorId = new Map(produtos.map(p => [p.id, p]));
 
-  const updateItem = (
-    index: number,
-    field: keyof OrderItem,
-    value: number | null,
-  ) => {
-    setItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
-    );
+  const updateItem = (index: number, field: keyof OrderItem, value: number | null) => {
+    setItems(prev => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
 
   const removeItem = (index: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== index));
+    setItems(prev => prev.filter((_, i) => i !== index));
   };
 
   const addItem = () => {
-    setItems((prev) =>
-      prev.length >= MAX_ITENS_PEDIDO_MANUAL
-        ? prev
-        : [...prev, newOrderItem()],
-    );
+    setItems(prev => (prev.length >= MAX_ITENS_PEDIDO_MANUAL ? prev : [...prev, newOrderItem()]));
   };
 
   const selecionarMetodo = (m: MetodoPagamento) => {
@@ -257,7 +238,7 @@ export default function NovoPedidoModal({
     e.preventDefault();
     if (saving) return;
 
-    if (items.length === 0 || items.some((i) => !i.produtoId)) {
+    if (items.length === 0 || items.some(i => !i.produtoId)) {
       setError("Selecione um produto em todos os itens");
       return;
     }
@@ -274,15 +255,15 @@ export default function NovoPedidoModal({
     }
 
     const payload = {
-      itens: items.map((i) => ({
+      itens: items.map(i => ({
         produtoId: i.produtoId,
-        quantidade: i.quantidade,
+        quantidade: i.quantidade
       })),
       clienteNome: clientName.trim(),
       clienteWhatsapp: normalizeWhatsappBr(whatsapp),
       observacao: observation.trim(),
       metodoPagamento,
-      statusPagamento,
+      statusPagamento
     };
 
     // Mesmo conteúdo => mesma key (retry da mesma intenção).
@@ -297,9 +278,9 @@ export default function NovoPedidoModal({
     fetch("/api/admin/pedidos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, operationKey: operationKeyRef.current }),
+      body: JSON.stringify({ ...payload, operationKey: operationKeyRef.current })
     })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error ?? "Falha ao registrar pedido");
@@ -307,7 +288,7 @@ export default function NovoPedidoModal({
         onCreated?.();
         onClose();
       })
-      .catch((err) => setError(err.message))
+      .catch(err => setError(err.message))
       .finally(() => setSaving(false));
   };
 
@@ -325,7 +306,12 @@ export default function NovoPedidoModal({
               Balcão, WhatsApp, boca a boca ou pedido feito fora do site.
             </p>
           </div>
-          <button type="button" className="nped-close" aria-label="Fechar novo pedido" onClick={onClose}>
+          <button
+            type="button"
+            className="nped-close"
+            aria-label="Fechar novo pedido"
+            onClick={onClose}
+          >
             <IconClose />
           </button>
         </div>
@@ -349,7 +335,7 @@ export default function NovoPedidoModal({
                   type="text"
                   placeholder="Nome do cliente"
                   value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
+                  onChange={e => setClientName(e.target.value)}
                 />
               </div>
               <div className="nped-field">
@@ -361,7 +347,7 @@ export default function NovoPedidoModal({
                   type="tel"
                   placeholder="(31) 99999-9999"
                   value={whatsapp}
-                  onChange={(e) => setWhatsapp(formatWhatsappBr(e.target.value))}
+                  onChange={e => setWhatsapp(formatWhatsappBr(e.target.value))}
                   inputMode="tel"
                   maxLength={15}
                 />
@@ -373,9 +359,7 @@ export default function NovoPedidoModal({
               <div className="nped-items-header">
                 <div>
                   <span className="nped-items-title">Itens</span>
-                  <span className="nped-items-hint">
-                    O estoque será reservado ao salvar.
-                  </span>
+                  <span className="nped-items-hint">O estoque será reservado ao salvar.</span>
                 </div>
                 <button
                   type="button"
@@ -392,8 +376,8 @@ export default function NovoPedidoModal({
                   key={item.id}
                   item={item}
                   produtos={produtosSelecionaveis}
-                  onChangeProduct={(id) => updateItem(i, "produtoId", id)}
-                  onChangeQty={(qty) => updateItem(i, "quantidade", qty)}
+                  onChangeProduct={id => updateItem(i, "produtoId", id)}
+                  onChangeQty={qty => updateItem(i, "quantidade", qty)}
                   onRemove={() => removeItem(i)}
                   canRemove={items.length > 1}
                 />
@@ -403,10 +387,7 @@ export default function NovoPedidoModal({
             {/* Pagamento */}
             <div className="nped-row-2">
               <div className="nped-field">
-                <label
-                  id={`${fieldId}-metodo-label`}
-                  htmlFor={`${fieldId}-metodo`}
-                >
+                <label id={`${fieldId}-metodo-label`} htmlFor={`${fieldId}-metodo`}>
                   Forma de pagamento
                 </label>
                 <div
@@ -421,15 +402,15 @@ export default function NovoPedidoModal({
                     onClick={() => payMethodDd.setOpen(!payMethodDd.open)}
                   >
                     <span id={`${fieldId}-metodo-value`}>
-                      {METODO_OPTIONS.find((m) => m.value === metodoPagamento)?.label}
+                      {METODO_OPTIONS.find(m => m.value === metodoPagamento)?.label}
                     </span>
                     <IconChevron open={payMethodDd.open} />
                   </button>
                   {payMethodDd.open && (
                     <ul className="nped-dropdown-list">
                       {METODO_OPTIONS.filter(
-                        (m) => statusPagamento !== "PAGO" || m.value !== "A_COMBINAR",
-                      ).map((m) => (
+                        m => statusPagamento !== "PAGO" || m.value !== "A_COMBINAR"
+                      ).map(m => (
                         <li key={m.value}>
                           <button
                             type="button"
@@ -449,10 +430,7 @@ export default function NovoPedidoModal({
               </div>
 
               <div className="nped-field">
-                <label
-                  id={`${fieldId}-status-label`}
-                  htmlFor={`${fieldId}-status`}
-                >
+                <label id={`${fieldId}-status-label`} htmlFor={`${fieldId}-status`}>
                   Situação do pagamento
                 </label>
                 <div
@@ -467,15 +445,15 @@ export default function NovoPedidoModal({
                     onClick={() => payStatusDd.setOpen(!payStatusDd.open)}
                   >
                     <span id={`${fieldId}-status-value`}>
-                      {STATUS_OPTIONS.find((s) => s.value === statusPagamento)?.label}
+                      {STATUS_OPTIONS.find(s => s.value === statusPagamento)?.label}
                     </span>
                     <IconChevron open={payStatusDd.open} />
                   </button>
                   {payStatusDd.open && (
                     <ul className="nped-dropdown-list">
                       {STATUS_OPTIONS.filter(
-                        (s) => metodoPagamento !== "A_COMBINAR" || s.value !== "PAGO",
-                      ).map((s) => (
+                        s => metodoPagamento !== "A_COMBINAR" || s.value !== "PAGO"
+                      ).map(s => (
                         <li key={s.value}>
                           <button
                             type="button"
@@ -504,7 +482,7 @@ export default function NovoPedidoModal({
                 id={`${fieldId}-observacao`}
                 placeholder="Ex.: buscar amanhã às 15h"
                 value={observation}
-                onChange={(e) => setObservation(e.target.value)}
+                onChange={e => setObservation(e.target.value)}
                 rows={3}
               />
             </div>
@@ -522,7 +500,7 @@ export default function NovoPedidoModal({
         )}
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }
 
@@ -542,12 +520,10 @@ function ProductItemRow({
   onChangeProduct,
   onChangeQty,
   onRemove,
-  canRemove,
+  canRemove
 }: ProductItemRowProps) {
   const dd = useDropdown();
-  const selected = item.produtoId
-    ? produtos.find((p) => p.id === item.produtoId)
-    : null;
+  const selected = item.produtoId ? produtos.find(p => p.id === item.produtoId) : null;
 
   const formatProduct = (p: ProdutoAdmin) =>
     `${p.nome} ${p.emoji} · ${formatarPreco(p.preco_centavos)} · ${estoqueLivre(p)} disp.`;
@@ -555,9 +531,7 @@ function ProductItemRow({
   return (
     <div className="nped-item-row">
       <div className="nped-item-row-labels">
-        <span className="nped-item-label nped-item-label--product">
-          Produto
-        </span>
+        <span className="nped-item-label nped-item-label--product">Produto</span>
         <span className="nped-item-label nped-item-label--qty">Qtd.</span>
       </div>
       <div className="nped-item-row-fields">
@@ -582,27 +556,27 @@ function ProductItemRow({
             menuRef={dd.menuRef}
             className="nped-dropdown-list nped-dropdown-list--products"
           >
-              {produtos.length === 0 && (
-                <li>
-                  <div className="nped-dropdown-option nped-placeholder">
-                    Nenhum produto disponível
-                  </div>
-                </li>
-              )}
-              {produtos.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    className={`nped-dropdown-option ${item.produtoId === p.id ? "nped-dropdown-option--active" : ""}`}
-                    onClick={() => {
-                      onChangeProduct(p.id);
-                      dd.setOpen(false);
-                    }}
-                  >
-                    {formatProduct(p)}
-                  </button>
-                </li>
-              ))}
+            {produtos.length === 0 && (
+              <li>
+                <div className="nped-dropdown-option nped-placeholder">
+                  Nenhum produto disponível
+                </div>
+              </li>
+            )}
+            {produtos.map(p => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className={`nped-dropdown-option ${item.produtoId === p.id ? "nped-dropdown-option--active" : ""}`}
+                  onClick={() => {
+                    onChangeProduct(p.id);
+                    dd.setOpen(false);
+                  }}
+                >
+                  {formatProduct(p)}
+                </button>
+              </li>
+            ))}
           </PortalDropdown>
         </div>
 
@@ -613,7 +587,7 @@ function ProductItemRow({
           min={1}
           max={selected ? estoqueLivre(selected) : undefined}
           value={item.quantidade}
-          onChange={(e) => {
+          onChange={e => {
             const parsed = Math.max(1, parseInt(e.target.value, 10) || 1);
             const limite = selected ? estoqueLivre(selected) : parsed;
             onChangeQty(Math.min(parsed, limite || 1));

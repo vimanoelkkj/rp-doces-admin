@@ -1,13 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import {
-  getItensComSaldo,
-  computeWaterfallAllocations,
-  type LedgerMetodo,
-} from "../comandaLedger";
+import { getItensComSaldo, computeWaterfallAllocations, type LedgerMetodo } from "../comandaLedger";
 import { liberarReservaPedido, preparePedidoPhysicalProjection } from "../stock";
 import { postPagamentoMp } from "../mpPost";
-import { chargeableCapacitySql, financialChargeSlotKey, liveAdminPixPredicate } from "../financialCoverage";
+import {
+  chargeableCapacitySql,
+  financialChargeSlotKey,
+  liveAdminPixPredicate
+} from "../financialCoverage";
 import {
   buscarOperacao,
   chaveMp,
@@ -19,16 +19,12 @@ import {
   prepareRegistrarFase,
   registrarFase,
   FINGERPRINT_VERSAO,
-  type IdentidadeEsperada,
+  type IdentidadeEsperada
 } from "../operacoes";
 import { temEstornoAnulacaoAtivo } from "../pedidoAnulacao";
 import { replayPixAdmin } from "./replay";
 import { regenerateAdminPix } from "./adminRegenerate";
-import type {
-  GerarPixAdminParams,
-  GerarPixAdminSucesso,
-  GerarPixAdminResult,
-} from "./types";
+import type { GerarPixAdminParams, GerarPixAdminSucesso, GerarPixAdminResult } from "./types";
 import { getCapacidadeCobravel } from "./queries";
 
 interface Env {
@@ -83,7 +79,7 @@ const CAPACIDADE_COBRAVEL_SQL = chargeableCapacitySql("?");
 
 export async function createAdminPixCharge(
   env: Env,
-  params: GerarPixAdminParams,
+  params: GerarPixAdminParams
 ): Promise<GerarPixAdminResult> {
   const db = env.DB;
 
@@ -108,8 +104,8 @@ export async function createAdminPixCharge(
       fingerprint: fingerprint({
         pedidoId: params.pedidoId,
         valorCentavos: params.valorCentavos ?? null,
-        substituiId: params.substituiId ?? null,
-      }),
+        substituiId: params.substituiId ?? null
+      })
     };
 
     const existente = await buscarOperacao(db, operationKey);
@@ -123,15 +119,15 @@ export async function createAdminPixCharge(
       fingerprint: fingerprint({
         pedidoId: params.pedidoId,
         valorCentavos: params.valorCentavos ?? null,
-        substituiId: params.substituiId ?? null,
-      }),
+        substituiId: params.substituiId ?? null
+      })
     };
   }
 
   const pedido = await db
     .prepare(
       `SELECT id, valor_total_centavos, status_comanda, status_pedido, reserva_status, cliente_nome, cliente_whatsapp
-       FROM pedidos WHERE id = ?`,
+       FROM pedidos WHERE id = ?`
     )
     .bind(params.pedidoId)
     .first<PedidoParaPix>();
@@ -161,7 +157,7 @@ export async function createAdminPixCharge(
       .prepare(
         `SELECT 1 FROM pedido_pagamentos a
          WHERE a.id = ? AND a.pedido_id = ? AND a.metodo = 'PIX_MP' AND a.origem = 'ADMIN' AND a.status = 'PENDENTE'
-           AND ${liveAdminPixPredicate("a")}`,
+           AND ${liveAdminPixPredicate("a")}`
       )
       .bind(substituiId, params.pedidoId)
       .first();
@@ -187,12 +183,14 @@ export async function createAdminPixCharge(
   // reserva. Em uma comanda viva, o pedido pode legitimamente misturar
   // BAIXADO (compra anterior) e RESERVADO (item recém-adicionado).
   const { results: itensReserva } = await db
-    .prepare(`SELECT id, produto_id, quantidade, status_item, estoque_estado
-              FROM pedido_itens WHERE pedido_id = ?`)
+    .prepare(
+      `SELECT id, produto_id, quantidade, status_item, estoque_estado
+              FROM pedido_itens WHERE pedido_id = ?`
+    )
     .bind(params.pedidoId)
     .all<PedidoItemParaReserva>();
   const itensControlados = (itensReserva || []).filter(
-    (i) => i.produto_id !== null && i.status_item === "ATIVO",
+    i => i.produto_id !== null && i.status_item === "ATIVO"
   );
   // Preparamos o CAS também para itens que a leitura viu RESERVADOS. Se uma
   // expiração liberar a reserva entre esta leitura e o batch, a mesma
@@ -204,7 +202,7 @@ export async function createAdminPixCharge(
   // baixa física quando o provedor confirmar o pagamento.
   const itensParaReserva = liquidacaoAposEntrega
     ? []
-    : itensControlados.filter((i) => i.estoque_estado !== "BAIXADO");
+    : itensControlados.filter(i => i.estoque_estado !== "BAIXADO");
 
   // A1: derivada da operation key quando existe — o UNIQUE parcial de
   // `pedido_pagamentos.idempotency_key` garante at-most-once da tentativa.
@@ -215,7 +213,9 @@ export async function createAdminPixCharge(
   const disputaCapacidade = valorCentavos * 2 > capacidadePrevia;
   const idempotencyKey = disputaCapacidade
     ? await financialChargeSlotKey(db, params.pedidoId, "pix")
-    : operationKey ? chavePagamento(operationKey) : crypto.randomUUID();
+    : operationKey
+      ? chavePagamento(operationKey)
+      : crypto.randomUUID();
   const externalReference = idempotencyKey; // trava 2: identidade inequívoca por tentativa, nunca token_publico
   // Key MP estável por operação lógica: timeout, 5xx ou resposta local
   // perdida NUNCA geram uma key nova (era a causa de um segundo POST lógico
@@ -236,7 +236,7 @@ export async function createAdminPixCharge(
     payment_method_id: "pix",
     date_of_expiration: expiresAtEstimado,
     external_reference: externalReference,
-    payer: { email: payerEmail, first_name: pedido.cliente_nome.slice(0, MAX_TEXT_LENGTH) },
+    payer: { email: payerEmail, first_name: pedido.cliente_nome.slice(0, MAX_TEXT_LENGTH) }
   };
 
   // Ordem importa: os incrementos de estoque_reservado (se houver) e o
@@ -247,8 +247,10 @@ export async function createAdminPixCharge(
   // concorrentes no mesmo pedido órfão: a segunda a commitar já vê
   // `reserva_status='ATIVA'` (gravado pela primeira) e vira no-op, nunca
   // um segundo incremento de estoque_reservado.
-  const reservaStatements = itensParaReserva.flatMap((item) => [
-    db.prepare(`
+  const reservaStatements = itensParaReserva.flatMap(item => [
+    db
+      .prepare(
+        `
       UPDATE produtos
       SET estoque_reservado = estoque_reservado + ?, atualizado_em = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -262,8 +264,12 @@ export async function createAdminPixCharge(
             AND p.estoque_baixado_em IS NULL
             AND pi.estoque_baixado_em IS NULL
         )
-    `).bind(item.quantidade, item.produto_id, item.id, params.pedidoId),
-    db.prepare(`
+    `
+      )
+      .bind(item.quantidade, item.produto_id, item.id, params.pedidoId),
+    db
+      .prepare(
+        `
       UPDATE pedido_itens
       SET estoque_estado = 'RESERVADO',
           estoque_reservado_em = CURRENT_TIMESTAMP,
@@ -278,7 +284,9 @@ export async function createAdminPixCharge(
                       AND p.status_comanda = 'ABERTA'
                       AND p.reserva_status IN ('SEM_RESERVA', 'LIBERADA', 'ATIVA')
                       AND p.estoque_baixado_em IS NULL)
-    `).bind(item.id, params.pedidoId, item.produto_id, item.quantidade),
+    `
+      )
+      .bind(item.id, params.pedidoId, item.produto_id, item.quantidade)
   ]);
 
   // R3 — Fluxo robusto de REGENERAÇÃO administrativa com cancelamento remoto do predecessor A
@@ -297,7 +305,7 @@ export async function createAdminPixCharge(
              operation_key, tipo, escopo, ator_usuario_id, fingerprint_versao, fingerprint,
              fase, mp_idempotency_key, mp_request, pedido_id, pagamento_id
            )
-           VALUES (?, ?, ?, ?, ?, ?, 'LOCAL_CRIADA', ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, 'LOCAL_CRIADA', ?, ?, ?, ?)`
         )
         .bind(
           operationKey,
@@ -309,7 +317,7 @@ export async function createAdminPixCharge(
           mpIdempotencyKey,
           JSON.stringify(mpRequest),
           params.pedidoId,
-          substituiId,
+          substituiId
         )
         .run();
     } catch {
@@ -329,7 +337,7 @@ export async function createAdminPixCharge(
       mpIdempotencyKey,
       mpRequest,
       reservaStatements,
-      waterfall,
+      waterfall
     });
   }
 
@@ -371,7 +379,7 @@ export async function createAdminPixCharge(
                  WHERE suc.substitui_pagamento_id = ? AND suc.status IN ('PENDENTE', 'PAGO')
                )
              )
-           )`,
+           )`
       )
       .bind(
         params.pedidoId,
@@ -387,15 +395,15 @@ export async function createAdminPixCharge(
         substituiId,
         substituiId,
         params.pedidoId,
-        substituiId,
+        substituiId
       ),
-    ...waterfall.alocacoes.map((a) =>
+    ...waterfall.alocacoes.map(a =>
       db
         .prepare(
           `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
-           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`,
+           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`
         )
-        .bind(idempotencyKey, a.itemId, a.valorCentavos),
+        .bind(idempotencyKey, a.itemId, a.valorCentavos)
     ),
     // Claim A1 por último e condicionado à tentativa recém-criada: se o CAS
     // de capacidade/substituição recusou, nada é registrado. Mesmo batch,
@@ -408,10 +416,10 @@ export async function createAdminPixCharge(
             fase: "LOCAL_CRIADA",
             mpIdempotencyKey,
             mpRequest: JSON.stringify(mpRequest),
-            fonte: fontePagamento(idempotencyKey),
-          }),
+            fonte: fontePagamento(idempotencyKey)
+          })
         ]
-      : []),
+      : [])
   ];
 
   let batchResults: D1Result[];
@@ -426,8 +434,13 @@ export async function createAdminPixCharge(
       if (vencedora) return await replayPixAdmin(db, vencedora, identidade);
     }
     if (disputaCapacidade) {
-      const slotVencedor = await db.prepare(`SELECT 1 FROM pedido_pagamentos
-        WHERE idempotency_key=? LIMIT 1`).bind(idempotencyKey).first();
+      const slotVencedor = await db
+        .prepare(
+          `SELECT 1 FROM pedido_pagamentos
+        WHERE idempotency_key=? LIMIT 1`
+        )
+        .bind(idempotencyKey)
+        .first();
       if (slotVencedor) return { ok: false, erro: "CAPACIDADE_INSUFICIENTE" };
     }
     if (String((err as Error)?.message || "").includes("CHECK")) {
@@ -447,7 +460,10 @@ export async function createAdminPixCharge(
     // um `substituiId`, essa é a causa mais provável e mais acionável pro
     // admin (a fila é "quem pediu para substituir A primeiro"), então é o
     // erro reportado nesse caso.
-    return { ok: false, erro: substituiId !== null ? "PIX_PARA_SUBSTITUIR_INVALIDO" : "CAPACIDADE_INSUFICIENTE" };
+    return {
+      ok: false,
+      erro: substituiId !== null ? "PIX_PARA_SUBSTITUIR_INVALIDO" : "CAPACIDADE_INSUFICIENTE"
+    };
   }
 
   // Só "dona" da reserva se ESTA transação genuinamente a criou (changes=1
@@ -455,10 +471,8 @@ export async function createAdminPixCharge(
   // (changes=0), esta operação não pode compensar aquela reserva numa
   // falha do MP a seguir, porque não foi ela quem a adquiriu.
   const reservaCriadaPorEstaOperacao =
-    itensParaReserva.length > 0
-    && reservaStatements.every(
-      (_, index) => Number(batchResults[index]?.meta?.changes || 0) === 1,
-    );
+    itensParaReserva.length > 0 &&
+    reservaStatements.every((_, index) => Number(batchResults[index]?.meta?.changes || 0) === 1);
 
   const envio = await postPagamentoMp(env.MP_ACCESS_TOKEN, mpIdempotencyKey, mpRequest);
 
@@ -472,12 +486,12 @@ export async function createAdminPixCharge(
     console.error("Resultado ambíguo ao criar Pix administrativo", {
       pedidoId: params.pedidoId,
       motivo: envio.motivo,
-      httpStatus: envio.httpStatus,
+      httpStatus: envio.httpStatus
     });
     if (operationKey) {
       await registrarFase(db, operationKey, {
         fase: "ENVIO_INCONCLUSIVO",
-        erro: `AMBIGUO:${envio.motivo}`,
+        erro: `AMBIGUO:${envio.motivo}`
       });
     }
     return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
@@ -491,7 +505,7 @@ export async function createAdminPixCharge(
       .prepare(
         `UPDATE pedido_pagamentos SET status = 'FALHOU', atualizado_em = CURRENT_TIMESTAMP
          WHERE id = ? AND status = 'PENDENTE'
-           AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`,
+           AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`
       )
       .bind(pagamentoId)
       .run();
@@ -506,7 +520,7 @@ export async function createAdminPixCharge(
     if (operationKey) {
       await registrarFase(db, operationKey, {
         fase: "RECUSADA",
-        erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`,
+        erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`
       });
     }
 
@@ -529,7 +543,7 @@ export async function createAdminPixCharge(
     qrCode: txData?.qr_code ?? null,
     qrCodeBase64: txData?.qr_code_base64 ?? null,
     ticketUrl: txData?.ticket_url ?? null,
-    expiresAt: payment.date_of_expiration,
+    expiresAt: payment.date_of_expiration
   };
 
   // Identidade remota e resultado gravados no MESMO batch da persistência
@@ -551,7 +565,7 @@ export async function createAdminPixCharge(
              END,
              mp_qr_code = ?, mp_qr_code_base64 = ?,
              mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE id = ?`,
+         WHERE id = ?`
       )
       .bind(
         String(payment.id),
@@ -560,17 +574,17 @@ export async function createAdminPixCharge(
         txData?.qr_code_base64 ?? null,
         txData?.ticket_url ?? null,
         payment.date_of_expiration,
-        pagamentoId,
+        pagamentoId
       ),
     ...(operationKey
       ? [
           prepareRegistrarFase(db, operationKey, {
             fase: "REMOTO_CONHECIDO",
             mpPaymentId: String(payment.id),
-            resultado: JSON.stringify(sucesso),
-          }),
+            resultado: JSON.stringify(sucesso)
+          })
         ]
-      : []),
+      : [])
   ];
   // pedidos.mp_payment_id/mp_qr_code/etc NUNCA são gravados aqui de
   // propósito: esses campos são do modelo legado de 1-Pix-por-pedido do
@@ -582,8 +596,10 @@ export async function createAdminPixCharge(
   if (reservaCriadaPorEstaOperacao && reservaExpiraEmSincronizada) {
     statementsPosSucesso.push(
       db
-        .prepare(`UPDATE pedidos SET reserva_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(reservaExpiraEmSincronizada, params.pedidoId),
+        .prepare(
+          `UPDATE pedidos SET reserva_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
+        )
+        .bind(reservaExpiraEmSincronizada, params.pedidoId)
     );
   }
   await db.batch(statementsPosSucesso);

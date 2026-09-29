@@ -17,7 +17,7 @@ function gerarChavesClient() {
   return { p256dh, auth };
 }
 
-const cookieDe = (session) => session.cookie.split(";")[0];
+const cookieDe = session => session.cookie.split(";")[0];
 
 async function bancada(t) {
   const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
@@ -31,28 +31,28 @@ async function bancada(t) {
 
 /* ──────────────────── 1. Auth e Endpoints de VAPID ──────────────────── */
 
-test("GET /api/admin/push/vapid-key: exige sessão de admin", async (t) => {
+test("GET /api/admin/push/vapid-key: exige sessão de admin", async t => {
   const { db } = await bancada(t);
 
   const resSemAuth = await app.adminPushVapidKey.onRequestGet({
     env: { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey },
-    request: new Request("https://local.test/api/admin/push/vapid-key"),
+    request: new Request("https://local.test/api/admin/push/vapid-key")
   });
   assert.equal(resSemAuth.status, 401);
 });
 
-test("GET /api/admin/push/vapid-key: retorna apenas chave pública para usuário autenticado", async (t) => {
+test("GET /api/admin/push/vapid-key: retorna apenas chave pública para usuário autenticado", async t => {
   const { db, session } = await bancada(t);
 
   const res = await app.adminPushVapidKey.onRequestGet({
     env: {
       DB: db,
       VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
-      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey
     },
     request: new Request("https://local.test/api/admin/push/vapid-key", {
-      headers: { Cookie: cookieDe(session) },
-    }),
+      headers: { Cookie: cookieDe(session) }
+    })
   });
 
   assert.equal(res.status, 200);
@@ -64,7 +64,7 @@ test("GET /api/admin/push/vapid-key: retorna apenas chave pública para usuário
 
 /* ──────────────────── 2. Inscrição (Subscribe) e CSRF ──────────────────── */
 
-test("POST /api/admin/push/subscribe: bloqueia CSRF e requisição sem sessão", async (t) => {
+test("POST /api/admin/push/subscribe: bloqueia CSRF e requisição sem sessão", async t => {
   const { db, session } = await bancada(t);
 
   // Sem Origin válida (CSRF)
@@ -73,8 +73,8 @@ test("POST /api/admin/push/subscribe: bloqueia CSRF e requisição sem sessão",
     request: new Request("https://local.test/api/admin/push/subscribe", {
       method: "POST",
       headers: { Origin: "https://evil.attacker.com", Cookie: cookieDe(session) },
-      body: JSON.stringify({ endpoint: "https://push.example/1" }),
-    }),
+      body: JSON.stringify({ endpoint: "https://push.example/1" })
+    })
   });
   assert.equal(resCsrf.status, 403);
 
@@ -84,16 +84,16 @@ test("POST /api/admin/push/subscribe: bloqueia CSRF e requisição sem sessão",
     request: new Request("https://local.test/api/admin/push/subscribe", {
       method: "POST",
       headers: { Origin: "https://local.test" },
-      body: JSON.stringify({ endpoint: "https://push.example/1" }),
-    }),
+      body: JSON.stringify({ endpoint: "https://push.example/1" })
+    })
   });
   assert.equal(resNoAuth.status, 401);
 });
 
-test("POST /api/admin/push/subscribe: validação estrita de payload e limites", async (t) => {
+test("POST /api/admin/push/subscribe: validação estrita de payload e limites", async t => {
   const { db, session } = await bancada(t);
 
-  const req = (body) =>
+  const req = body =>
     app.adminPushSubscribe.onRequestPost({
       env: { DB: db },
       request: new Request("https://local.test/api/admin/push/subscribe", {
@@ -101,16 +101,16 @@ test("POST /api/admin/push/subscribe: validação estrita de payload e limites",
         headers: {
           Origin: "https://local.test",
           Cookie: cookieDe(session),
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(body),
-      }),
+        body: JSON.stringify(body)
+      })
     });
 
   // Endpoint inválido (não HTTPS)
   const resHttp = await req({
     endpoint: "http://insecure.example.com",
-    keys: { p256dh: "key-1234567890", auth: "auth-12345" },
+    keys: { p256dh: "key-1234567890", auth: "auth-12345" }
   });
   assert.equal(resHttp.status, 400);
 
@@ -119,16 +119,16 @@ test("POST /api/admin/push/subscribe: validação estrita de payload e limites",
   assert.equal(resSemChaves.status, 400);
 });
 
-test("POST /api/admin/push/subscribe: registra inscrição e suporta UPSERT", async (t) => {
+test("POST /api/admin/push/subscribe: registra inscrição e suporta UPSERT", async t => {
   const { db, session } = await bancada(t);
 
   const payload = {
     endpoint: "https://push.example.com/device-1",
     keys: {
       p256dh: "p256dh-sample-token-valid-length",
-      auth: "auth-secret-12345",
+      auth: "auth-secret-12345"
     },
-    userAgent: "Admin PWA Browser",
+    userAgent: "Admin PWA Browser"
   };
 
   const res = await app.adminPushSubscribe.onRequestPost({
@@ -138,10 +138,10 @@ test("POST /api/admin/push/subscribe: registra inscrição e suporta UPSERT", as
       headers: {
         Origin: "https://local.test",
         Cookie: cookieDe(session),
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload),
-    }),
+      body: JSON.stringify(payload)
+    })
   });
   assert.equal(res.status, 201);
 
@@ -158,8 +158,8 @@ test("POST /api/admin/push/subscribe: registra inscrição e suporta UPSERT", as
     endpoint: payload.endpoint,
     keys: {
       p256dh: "p256dh-renewed-token-length",
-      auth: "auth-renewed-12345",
-    },
+      auth: "auth-renewed-12345"
+    }
   };
   const res2 = await app.adminPushSubscribe.onRequestPost({
     env: { DB: db },
@@ -168,10 +168,10 @@ test("POST /api/admin/push/subscribe: registra inscrição e suporta UPSERT", as
       headers: {
         Origin: "https://local.test",
         Cookie: cookieDe(session),
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(payloadAtualizado),
-    }),
+      body: JSON.stringify(payloadAtualizado)
+    })
   });
   assert.equal(res2.status, 201);
 
@@ -185,12 +185,12 @@ test("POST /api/admin/push/subscribe: registra inscrição e suporta UPSERT", as
 
 /* ──────────────────── 3. Cancelamento (Unsubscribe) ──────────────────── */
 
-test("POST /api/admin/push/unsubscribe: remove inscrição do usuário", async (t) => {
+test("POST /api/admin/push/unsubscribe: remove inscrição do usuário", async t => {
   const { db, session } = await bancada(t);
 
   await db
     .prepare(
-      "INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (1, 'https://push.example/sub1', 'k1', 'a1')",
+      "INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (1, 'https://push.example/sub1', 'k1', 'a1')"
     )
     .run();
 
@@ -201,29 +201,31 @@ test("POST /api/admin/push/unsubscribe: remove inscrição do usuário", async (
       headers: {
         Origin: "https://local.test",
         Cookie: cookieDe(session),
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ endpoint: "https://push.example/sub1" }),
-    }),
+      body: JSON.stringify({ endpoint: "https://push.example/sub1" })
+    })
   });
   assert.equal(res.status, 200);
 
   const count = await db
-    .prepare("SELECT COUNT(*) as total FROM push_inscricoes WHERE endpoint = 'https://push.example/sub1'")
+    .prepare(
+      "SELECT COUNT(*) as total FROM push_inscricoes WHERE endpoint = 'https://push.example/sub1'"
+    )
     .first();
   assert.equal(count.total, 0);
 });
 
 /* ──────────────────── 4. Deduplicação e Despacho de Eventos ──────────────────── */
 
-test("pushNotifier: deduplica PEDIDO_PAGO e impede múltiplos disparos para o mesmo pedido", async (t) => {
+test("pushNotifier: deduplica PEDIDO_PAGO e impede múltiplos disparos para o mesmo pedido", async t => {
   const { db } = await bancada(t);
 
   // Cria pedido de teste
   await db
     .prepare(
       `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
-       VALUES (101, 'tok-101', 'Cliente Teste', '11999999999', 4200, 'idemp-101', 'SITE', 'PAGO', 'NOVO')`,
+       VALUES (101, 'tok-101', 'Cliente Teste', '11999999999', 4200, 'idemp-101', 'SITE', 'PAGO', 'NOVO')`
     )
     .run();
 
@@ -231,7 +233,7 @@ test("pushNotifier: deduplica PEDIDO_PAGO e impede múltiplos disparos para o me
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   // Sem inscrições: marca como ENVIADO (sem trabalho pendente)
@@ -251,13 +253,13 @@ test("pushNotifier: deduplica PEDIDO_PAGO e impede múltiplos disparos para o me
   assert.equal(evento.status, "ENVIADO");
 });
 
-test("pushNotifier: não bloqueia confirmação de pagamento em caso de falha de push", async (t) => {
+test("pushNotifier: não bloqueia confirmação de pagamento em caso de falha de push", async t => {
   const { db } = await bancada(t);
 
   await db
     .prepare(
       `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
-       VALUES (102, 'tok-102', 'Cliente Teste', '11999999999', 5000, 'idemp-102', 'SITE', 'PAGO', 'NOVO')`,
+       VALUES (102, 'tok-102', 'Cliente Teste', '11999999999', 5000, 'idemp-102', 'SITE', 'PAGO', 'NOVO')`
     )
     .run();
 
@@ -265,7 +267,7 @@ test("pushNotifier: não bloqueia confirmação de pagamento em caso de falha de
   await db
     .prepare(
       `INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth)
-       VALUES (1, 'https://127.0.0.1:59999/push-unreachable', 'BFyW_invalid_key_for_test_123456789012345678901234567890', 'auth_secret_12345')`,
+       VALUES (1, 'https://127.0.0.1:59999/push-unreachable', 'BFyW_invalid_key_for_test_123456789012345678901234567890', 'auth_secret_12345')`
     )
     .run();
 
@@ -273,7 +275,7 @@ test("pushNotifier: não bloqueia confirmação de pagamento em caso de falha de
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   // safe call NUNCA lança exceção
@@ -294,13 +296,13 @@ test("pushNotifier: não bloqueia confirmação de pagamento em caso de falha de
   assert.equal(pedido.status_pagamento, "PAGO");
 });
 
-test("pushNotifier: pedido manual born PAGO exclui o próprio autor", async (t) => {
+test("pushNotifier: pedido manual born PAGO exclui o próprio autor", async t => {
   const { db } = await bancada(t);
 
   await db
     .prepare(
       `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
-       VALUES (103, 'tok-103', 'Balcão', '11999999999', 3000, 'idemp-103', 'MANUAL', 'PAGO', 'NOVO')`,
+       VALUES (103, 'tok-103', 'Balcão', '11999999999', 3000, 'idemp-103', 'MANUAL', 'PAGO', 'NOVO')`
     )
     .run();
 
@@ -308,7 +310,7 @@ test("pushNotifier: pedido manual born PAGO exclui o próprio autor", async (t) 
   await db
     .prepare(
       `INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth)
-       VALUES (1, 'https://push.example/autor-device', 'k1', 'a1')`,
+       VALUES (1, 'https://push.example/autor-device', 'k1', 'a1')`
     )
     .run();
 
@@ -316,7 +318,7 @@ test("pushNotifier: pedido manual born PAGO exclui o próprio autor", async (t) 
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   // Excluindo usuário 1: encontra 0 destinatários (autor não recebe push do que acabou de criar)
@@ -327,7 +329,7 @@ test("pushNotifier: pedido manual born PAGO exclui o próprio autor", async (t) 
 
 /* ──────────────────── 5. Integração com paymentSync e Webhooks ──────────────────── */
 
-test("syncPaymentFromMp: transição para PAGO dispara pushNotifier desacoplado", async (t) => {
+test("syncPaymentFromMp: transição para PAGO dispara pushNotifier desacoplado", async t => {
   const db = await fixture(t, { ledger: true, reserve: "SEM_RESERVA" });
   await db.prepare("DELETE FROM push_eventos").run();
   await db.prepare("DELETE FROM push_inscricoes").run();
@@ -336,7 +338,7 @@ test("syncPaymentFromMp: transição para PAGO dispara pushNotifier desacoplado"
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   const payment = await app.sync.fetchMpPayment("fake", "101");
@@ -354,7 +356,7 @@ test("syncPaymentFromMp: transição para PAGO dispara pushNotifier desacoplado"
   assert.equal(evento.status, "ENVIADO");
 });
 
-test("webhook duplicado: retentativa não gera segundo push", async (t) => {
+test("webhook duplicado: retentativa não gera segundo push", async t => {
   const db = await fixture(t, { ledger: true, reserve: "SEM_RESERVA" });
   await db.prepare("DELETE FROM push_eventos").run();
   await db.prepare("DELETE FROM push_inscricoes").run();
@@ -363,7 +365,7 @@ test("webhook duplicado: retentativa não gera segundo push", async (t) => {
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   const payment = await app.sync.fetchMpPayment("fake", "101");
@@ -377,12 +379,14 @@ test("webhook duplicado: retentativa não gera segundo push", async (t) => {
   assert.equal(r2.transicionou, false);
 
   const eventos = await db
-    .prepare("SELECT COUNT(*) as total FROM push_eventos WHERE pedido_id = 1 AND evento = 'PEDIDO_PAGO'")
+    .prepare(
+      "SELECT COUNT(*) as total FROM push_eventos WHERE pedido_id = 1 AND evento = 'PEDIDO_PAGO'"
+    )
     .first();
   assert.equal(eventos.total, 1, "Exatamente um registro de evento push");
 });
 
-test("concorrência simultânea (webhook + polling): exatamente um transiciona e despacha push", async (t) => {
+test("concorrência simultânea (webhook + polling): exatamente um transiciona e despacha push", async t => {
   const db = await fixture(t, { ledger: true, reserve: "SEM_RESERVA" });
   await db.prepare("DELETE FROM push_eventos").run();
   await db.prepare("DELETE FROM push_inscricoes").run();
@@ -391,7 +395,7 @@ test("concorrência simultânea (webhook + polling): exatamente um transiciona e
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   const payment = await app.sync.fetchMpPayment("fake", "101");
@@ -399,7 +403,7 @@ test("concorrência simultânea (webhook + polling): exatamente um transiciona e
   // Disparo simultâneo
   const [res1, res2] = await Promise.all([
     app.sync.syncPaymentFromMp(db, 1, payment, env),
-    app.sync.syncPaymentFromMp(db, 1, payment, env),
+    app.sync.syncPaymentFromMp(db, 1, payment, env)
   ]);
 
   assert.equal(res1.ok, true);
@@ -409,20 +413,22 @@ test("concorrência simultânea (webhook + polling): exatamente um transiciona e
   assert.equal(transicoes, 1, "Apenas uma das chamadas concorrentes deve reportar transição");
 
   const eventos = await db
-    .prepare("SELECT COUNT(*) as total FROM push_eventos WHERE pedido_id = 1 AND evento = 'PEDIDO_PAGO'")
+    .prepare(
+      "SELECT COUNT(*) as total FROM push_eventos WHERE pedido_id = 1 AND evento = 'PEDIDO_PAGO'"
+    )
     .first();
   assert.equal(eventos.total, 1);
 });
 
 /* ──────────────────── 6. Reconciliação e Retry Real ──────────────────── */
 
-test("retry: evento em FALHA é reprocessado e transiciona para ENVIADO", async (t) => {
+test("retry: evento em FALHA é reprocessado e transiciona para ENVIADO", async t => {
   const { db } = await bancada(t);
 
   await db
     .prepare(
       `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
-       VALUES (201, 'tok-201', 'Cliente Retry', '11999999999', 4500, 'idemp-201', 'SITE', 'PAGO', 'NOVO')`,
+       VALUES (201, 'tok-201', 'Cliente Retry', '11999999999', 4500, 'idemp-201', 'SITE', 'PAGO', 'NOVO')`
     )
     .run();
 
@@ -430,7 +436,7 @@ test("retry: evento em FALHA é reprocessado e transiciona para ENVIADO", async 
   await db
     .prepare(
       `INSERT INTO push_eventos (pedido_id, evento, status, tentativas, ultimo_erro, criado_em, atualizado_em)
-       VALUES (201, 'PEDIDO_PAGO', 'FALHA', 1, 'Network timeout', datetime('now', '-50 seconds'), datetime('now', '-40 seconds'))`,
+       VALUES (201, 'PEDIDO_PAGO', 'FALHA', 1, 'Network timeout', datetime('now', '-50 seconds'), datetime('now', '-40 seconds'))`
     )
     .run();
 
@@ -438,7 +444,7 @@ test("retry: evento em FALHA é reprocessado e transiciona para ENVIADO", async 
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   // Sem inscrições, a entrega é concluída com sucesso (sem destinatários pendentes)
@@ -448,19 +454,21 @@ test("retry: evento em FALHA é reprocessado e transiciona para ENVIADO", async 
   assert.equal(res.sucessos, 1);
 
   const evento = await db
-    .prepare("SELECT status, tentativas, ultimo_erro FROM push_eventos WHERE pedido_id = 201 AND evento = 'PEDIDO_PAGO'")
+    .prepare(
+      "SELECT status, tentativas, ultimo_erro FROM push_eventos WHERE pedido_id = 201 AND evento = 'PEDIDO_PAGO'"
+    )
     .first();
   assert.equal(evento.status, "ENVIADO");
   assert.equal(evento.tentativas, 2);
 });
 
-test("retry: falha consecutiva incrementa tentativas e para no teto de 3", async (t) => {
+test("retry: falha consecutiva incrementa tentativas e para no teto de 3", async t => {
   const { db } = await bancada(t);
 
   await db
     .prepare(
       `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
-       VALUES (202, 'tok-202', 'Cliente Retry Limite', '11999999999', 4500, 'idemp-202', 'SITE', 'PAGO', 'NOVO')`,
+       VALUES (202, 'tok-202', 'Cliente Retry Limite', '11999999999', 4500, 'idemp-202', 'SITE', 'PAGO', 'NOVO')`
     )
     .run();
 
@@ -468,7 +476,7 @@ test("retry: falha consecutiva incrementa tentativas e para no teto de 3", async
   await db
     .prepare(
       `INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth)
-       VALUES (1, 'https://127.0.0.1:59998/push-fail', 'BFyW_invalid_key_for_test_123456789012345678901234567890', 'auth_secret_12345')`,
+       VALUES (1, 'https://127.0.0.1:59998/push-fail', 'BFyW_invalid_key_for_test_123456789012345678901234567890', 'auth_secret_12345')`
     )
     .run();
 
@@ -476,7 +484,7 @@ test("retry: falha consecutiva incrementa tentativas e para no teto de 3", async
   await db
     .prepare(
       `INSERT INTO push_eventos (pedido_id, evento, status, tentativas, ultimo_erro, criado_em, atualizado_em)
-       VALUES (202, 'PEDIDO_PAGO', 'FALHA', 2, 'Previous error', datetime('now', '-50 seconds'), datetime('now', '-40 seconds'))`,
+       VALUES (202, 'PEDIDO_PAGO', 'FALHA', 2, 'Previous error', datetime('now', '-50 seconds'), datetime('now', '-40 seconds'))`
     )
     .run();
 
@@ -484,7 +492,7 @@ test("retry: falha consecutiva incrementa tentativas e para no teto de 3", async
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   // 1ª reconciliação: tenta pela 3ª vez e falha -> tentativas vira 3
@@ -494,34 +502,38 @@ test("retry: falha consecutiva incrementa tentativas e para no teto de 3", async
   assert.equal(res1.falhas, 1);
 
   const ev1 = await db
-    .prepare("SELECT status, tentativas FROM push_eventos WHERE pedido_id = 202 AND evento = 'PEDIDO_PAGO'")
+    .prepare(
+      "SELECT status, tentativas FROM push_eventos WHERE pedido_id = 202 AND evento = 'PEDIDO_PAGO'"
+    )
     .first();
   assert.equal(ev1.status, "FALHA");
   assert.equal(ev1.tentativas, 3);
 
   // 2ª reconciliação: tentativas >= 3 -> NÃO processa novamente (evita retry infinito)
   await db
-    .prepare("UPDATE push_eventos SET atualizado_em = datetime('now', '-40 seconds') WHERE pedido_id = 202")
+    .prepare(
+      "UPDATE push_eventos SET atualizado_em = datetime('now', '-40 seconds') WHERE pedido_id = 202"
+    )
     .run();
   const res2 = await app.pushNotifier.reconciliarPushEventosFalhos(db, env, { backoffSeconds: 30 });
   assert.equal(res2.ok, true);
   assert.equal(res2.processados, 0, "Não deve reprocessar quando tentativas >= 3");
 });
 
-test("retry: CAS atômico impede dois workers concorrentes de reenviarem o mesmo evento", async (t) => {
+test("retry: CAS atômico impede dois workers concorrentes de reenviarem o mesmo evento", async t => {
   const { db } = await bancada(t);
 
   await db
     .prepare(
       `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
-       VALUES (203, 'tok-203', 'Cliente Concorrência', '11999999999', 5000, 'idemp-203', 'SITE', 'PAGO', 'NOVO')`,
+       VALUES (203, 'tok-203', 'Cliente Concorrência', '11999999999', 5000, 'idemp-203', 'SITE', 'PAGO', 'NOVO')`
     )
     .run();
 
   await db
     .prepare(
       `INSERT INTO push_eventos (pedido_id, evento, status, tentativas, ultimo_erro, criado_em, atualizado_em)
-       VALUES (203, 'PEDIDO_PAGO', 'FALHA', 1, 'Temporary glitch', datetime('now', '-50 seconds'), datetime('now', '-40 seconds'))`,
+       VALUES (203, 'PEDIDO_PAGO', 'FALHA', 1, 'Temporary glitch', datetime('now', '-50 seconds'), datetime('now', '-40 seconds'))`
     )
     .run();
 
@@ -529,13 +541,13 @@ test("retry: CAS atômico impede dois workers concorrentes de reenviarem o mesmo
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   // Dois reconciliadores chamados simultaneamente para o mesmo evento
   const [r1, r2] = await Promise.all([
     app.pushNotifier.reconciliarPushEventosFalhos(db, env, { backoffSeconds: 30 }),
-    app.pushNotifier.reconciliarPushEventosFalhos(db, env, { backoffSeconds: 30 }),
+    app.pushNotifier.reconciliarPushEventosFalhos(db, env, { backoffSeconds: 30 })
   ]);
 
   // Apenas um conseguiu o CAS de UPDATE push_eventos SET status='PENDENTE' WHERE status='FALHA'
@@ -543,14 +555,14 @@ test("retry: CAS atômico impede dois workers concorrentes de reenviarem o mesmo
   assert.equal(sucessosTotal, 1, "Exatamente um worker deve ter executado a reconciliação");
 });
 
-test("POST /api/admin/push/retry: endpoint autenticado dispara reconciliação", async (t) => {
+test("POST /api/admin/push/retry: endpoint autenticado dispara reconciliação", async t => {
   const { db, session } = await bancada(t);
 
   const env = {
     DB: db,
     VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
     VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-    VAPID_SUBJECT,
+    VAPID_SUBJECT
   };
 
   // Sem sessão -> 401
@@ -558,8 +570,8 @@ test("POST /api/admin/push/retry: endpoint autenticado dispara reconciliação",
     env,
     request: new Request("https://local.test/api/admin/push/retry", {
       method: "POST",
-      headers: { Origin: "https://local.test" },
-    }),
+      headers: { Origin: "https://local.test" }
+    })
   });
   assert.equal(rSemAuth.status, 401);
 
@@ -568,8 +580,8 @@ test("POST /api/admin/push/retry: endpoint autenticado dispara reconciliação",
     env,
     request: new Request("https://local.test/api/admin/push/retry", {
       method: "POST",
-      headers: { Origin: "https://evil.test", Cookie: cookieDe(session) },
-    }),
+      headers: { Origin: "https://evil.test", Cookie: cookieDe(session) }
+    })
   });
   assert.equal(rCsrf.status, 403);
 
@@ -578,8 +590,8 @@ test("POST /api/admin/push/retry: endpoint autenticado dispara reconciliação",
     env,
     request: new Request("https://local.test/api/admin/push/retry", {
       method: "POST",
-      headers: { Origin: "https://local.test", Cookie: cookieDe(session) },
-    }),
+      headers: { Origin: "https://local.test", Cookie: cookieDe(session) }
+    })
   });
   assert.equal(rOk.status, 200);
   const data = await rOk.json();
@@ -588,7 +600,7 @@ test("POST /api/admin/push/retry: endpoint autenticado dispara reconciliação",
 
 /* ──────────────────── 7. Validação de Convergência da Migration Legada ──────────────────── */
 
-test("migration 0030: converge banco com schema legado sem perder registros e cria PK composta", async (t) => {
+test("migration 0030: converge banco com schema legado sem perder registros e cria PK composta", async t => {
   const { db } = await bancada(t);
 
   // 1. Simula estado legado remoto: remove tabelas e recria push_eventos no formato legado de produção
@@ -596,18 +608,26 @@ test("migration 0030: converge banco com schema legado sem perder registros e cr
   await db.prepare("DROP TABLE IF EXISTS push_eventos__v2").run();
   await db.prepare("DROP TABLE IF EXISTS push_inscricoes").run();
 
-  await db.prepare(`
+  await db
+    .prepare(
+      `
     CREATE TABLE push_eventos (
       pedido_id INTEGER PRIMARY KEY,
       criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-  `).run();
+  `
+    )
+    .run();
 
   // Insere um registro legado
-  await db.prepare("INSERT INTO push_eventos (pedido_id, criado_em) VALUES (999, '2026-01-01 10:00:00')").run();
+  await db
+    .prepare("INSERT INTO push_eventos (pedido_id, criado_em) VALUES (999, '2026-01-01 10:00:00')")
+    .run();
 
   // 2. Executa os comandos exatos da migration 0030
-  await db.prepare(`
+  await db
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS push_inscricoes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       usuario_id INTEGER NOT NULL REFERENCES usuarios_admin(id) ON DELETE CASCADE,
@@ -618,17 +638,29 @@ test("migration 0030: converge banco com schema legado sem perder registros e cr
       criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-  `).run();
-  await db.prepare("CREATE INDEX IF NOT EXISTS idx_push_inscricoes_usuario ON push_inscricoes(usuario_id);").run();
+  `
+    )
+    .run();
+  await db
+    .prepare(
+      "CREATE INDEX IF NOT EXISTS idx_push_inscricoes_usuario ON push_inscricoes(usuario_id);"
+    )
+    .run();
 
-  await db.prepare(`
+  await db
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS push_eventos (
       pedido_id INTEGER PRIMARY KEY,
       criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-  `).run();
+  `
+    )
+    .run();
 
-  await db.prepare(`
+  await db
+    .prepare(
+      `
     CREATE TABLE IF NOT EXISTS push_eventos__v2 (
       pedido_id INTEGER NOT NULL,
       evento TEXT NOT NULL DEFAULT 'PEDIDO_PAGO',
@@ -639,31 +671,58 @@ test("migration 0030: converge banco com schema legado sem perder registros e cr
       atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (pedido_id, evento)
     );
-  `).run();
+  `
+    )
+    .run();
 
-  await db.prepare(`
+  await db
+    .prepare(
+      `
     INSERT OR IGNORE INTO push_eventos__v2 (pedido_id, evento, status, criado_em)
     SELECT pedido_id, 'PEDIDO_PAGO', 'ENVIADO', criado_em FROM push_eventos;
-  `).run();
+  `
+    )
+    .run();
 
   await db.prepare("DROP TABLE push_eventos;").run();
   await db.prepare("ALTER TABLE push_eventos__v2 RENAME TO push_eventos;").run();
-  await db.prepare("CREATE INDEX IF NOT EXISTS idx_push_eventos_status ON push_eventos(status, criado_em);").run();
+  await db
+    .prepare(
+      "CREATE INDEX IF NOT EXISTS idx_push_eventos_status ON push_eventos(status, criado_em);"
+    )
+    .run();
 
   // 3. Verifica o schema resultante via PRAGMA
   const colunas = (await db.prepare("PRAGMA table_info(push_eventos)").all()).results;
-  const nomesColunas = colunas.map((c) => c.name);
+  const nomesColunas = colunas.map(c => c.name);
   assert.deepEqual(
     nomesColunas.sort(),
-    ["atualizado_em", "criado_em", "evento", "pedido_id", "status", "tentativas", "ultimo_erro"].sort(),
-    "Todas as colunas novas devem existir no schema final",
+    [
+      "atualizado_em",
+      "criado_em",
+      "evento",
+      "pedido_id",
+      "status",
+      "tentativas",
+      "ultimo_erro"
+    ].sort(),
+    "Todas as colunas novas devem existir no schema final"
   );
 
-  const pkColunas = colunas.filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk).map((c) => c.name);
-  assert.deepEqual(pkColunas, ["pedido_id", "evento"], "A chave primária final deve ser composta (pedido_id, evento)");
+  const pkColunas = colunas
+    .filter(c => c.pk > 0)
+    .sort((a, b) => a.pk - b.pk)
+    .map(c => c.name);
+  assert.deepEqual(
+    pkColunas,
+    ["pedido_id", "evento"],
+    "A chave primária final deve ser composta (pedido_id, evento)"
+  );
 
   // 4. Verifica se o registro legado foi preservado
-  const registroLegado = await db.prepare("SELECT * FROM push_eventos WHERE pedido_id = 999").first();
+  const registroLegado = await db
+    .prepare("SELECT * FROM push_eventos WHERE pedido_id = 999")
+    .first();
   assert.ok(registroLegado, "Registro legado deve ser preservado");
   assert.equal(registroLegado.evento, "PEDIDO_PAGO");
   assert.equal(registroLegado.status, "ENVIADO");
@@ -672,44 +731,60 @@ test("migration 0030: converge banco com schema legado sem perder registros e cr
 
 /* ──────────────────── 8. Teste de Notificação Web Push (POST /api/admin/push/test) ──────────────────── */
 
-test("POST /api/admin/push/test: exige sessão de admin", async (t) => {
+test("POST /api/admin/push/test: exige sessão de admin", async t => {
   const { db } = await bancada(t);
   const res = await app.adminPushTest.onRequestPost({
-    env: { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey, VAPID_PRIVATE_KEY: TEST_VAPID.privateKey },
+    env: {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey
+    },
     request: new Request("https://local.test/api/admin/push/test", {
       method: "POST",
       headers: { Origin: "https://local.test" },
-      body: JSON.stringify({ endpoint: "https://push.example/1" }),
-    }),
+      body: JSON.stringify({ endpoint: "https://push.example/1" })
+    })
   });
   assert.equal(res.status, 401);
 });
 
-test("POST /api/admin/push/test: bloqueia same-origin/CSRF inválido", async (t) => {
+test("POST /api/admin/push/test: bloqueia same-origin/CSRF inválido", async t => {
   const { db, session } = await bancada(t);
   const res = await app.adminPushTest.onRequestPost({
-    env: { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey, VAPID_PRIVATE_KEY: TEST_VAPID.privateKey },
+    env: {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey
+    },
     request: new Request("https://local.test/api/admin/push/test", {
       method: "POST",
       headers: { Origin: "https://attacker.invalid", Cookie: cookieDe(session) },
-      body: JSON.stringify({ endpoint: "https://push.example/1" }),
-    }),
+      body: JSON.stringify({ endpoint: "https://push.example/1" })
+    })
   });
   assert.equal(res.status, 403);
 });
 
-test("POST /api/admin/push/test: rejeita payload inválido ou endpoint malformado", async (t) => {
+test("POST /api/admin/push/test: rejeita payload inválido ou endpoint malformado", async t => {
   const { db, session } = await bancada(t);
-  const env = { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey, VAPID_PRIVATE_KEY: TEST_VAPID.privateKey };
+  const env = {
+    DB: db,
+    VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+    VAPID_PRIVATE_KEY: TEST_VAPID.privateKey
+  };
 
   const testEndpoint = async (body, expectedStatus = 400) => {
     const res = await app.adminPushTest.onRequestPost({
       env,
       request: new Request("https://local.test/api/admin/push/test", {
         method: "POST",
-        headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
-        body: typeof body === "string" ? body : JSON.stringify(body),
-      }),
+        headers: {
+          Origin: "https://local.test",
+          Cookie: cookieDe(session),
+          "Content-Type": "application/json"
+        },
+        body: typeof body === "string" ? body : JSON.stringify(body)
+      })
     });
     assert.equal(res.status, expectedStatus);
   };
@@ -722,13 +797,15 @@ test("POST /api/admin/push/test: rejeita payload inválido ou endpoint malformad
   await testEndpoint({ endpoint: 12345 }, 400);
 });
 
-test("POST /api/admin/push/test: não permite usar subscription pertencente a outro usuario_id", async (t) => {
+test("POST /api/admin/push/test: não permite usar subscription pertencente a outro usuario_id", async t => {
   const { db, session } = await bancada(t);
   const keys = gerarChavesClient();
 
   // Insere um segundo admin no banco
   await db
-    .prepare("INSERT INTO usuarios_admin (id, nome, username, email, senha_hash) VALUES (2, 'Outro Admin', 'outro_admin', 'outro@example.com', 'hash_teste')")
+    .prepare(
+      "INSERT INTO usuarios_admin (id, nome, username, email, senha_hash) VALUES (2, 'Outro Admin', 'outro_admin', 'outro@example.com', 'hash_teste')"
+    )
     .run();
 
   // Insere subscription associada ao usuario_id 2 (outro usuário)
@@ -738,12 +815,20 @@ test("POST /api/admin/push/test: não permite usar subscription pertencente a ou
     .run();
 
   const res = await app.adminPushTest.onRequestPost({
-    env: { DB: db, VAPID_PUBLIC_KEY: TEST_VAPID.publicKey, VAPID_PRIVATE_KEY: TEST_VAPID.privateKey },
+    env: {
+      DB: db,
+      VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+      VAPID_PRIVATE_KEY: TEST_VAPID.privateKey
+    },
     request: new Request("https://local.test/api/admin/push/test", {
       method: "POST",
-      headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: "https://push.example/sub-user-2" }),
-    }),
+      headers: {
+        Origin: "https://local.test",
+        Cookie: cookieDe(session),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ endpoint: "https://push.example/sub-user-2" })
+    })
   });
 
   assert.equal(res.status, 404);
@@ -751,7 +836,7 @@ test("POST /api/admin/push/test: não permite usar subscription pertencente a ou
   assert.match(data.error, /não encontrada/i);
 });
 
-test("POST /api/admin/push/test: busca p256dh/auth no banco, envia para somente uma subscription, não cria push_eventos nem altera pedidos", async (t) => {
+test("POST /api/admin/push/test: busca p256dh/auth no banco, envia para somente uma subscription, não cria push_eventos nem altera pedidos", async t => {
   const { db, session } = await bancada(t);
   const keys1 = gerarChavesClient();
   const keys2 = gerarChavesClient();
@@ -771,7 +856,7 @@ test("POST /api/admin/push/test: busca p256dh/auth no banco, envia para somente 
   await db
     .prepare(
       `INSERT INTO pedidos(id, token_publico, cliente_nome, cliente_whatsapp, valor_total_centavos, idempotency_key, origem_pedido, status_pagamento, status_pedido)
-       VALUES (900, 'tok-900', 'Cliente Intacto', '11999999999', 5000, 'idemp-900', 'SITE', 'PENDENTE', 'NOVO')`,
+       VALUES (900, 'tok-900', 'Cliente Intacto', '11999999999', 5000, 'idemp-900', 'SITE', 'PENDENTE', 'NOVO')`
     )
     .run();
 
@@ -792,13 +877,17 @@ test("POST /api/admin/push/test: busca p256dh/auth no banco, envia para somente 
         DB: db,
         VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
         VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-        VAPID_SUBJECT,
+        VAPID_SUBJECT
       },
       request: new Request("https://local.test/api/admin/push/test", {
         method: "POST",
-        headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: "https://push.mock.test/sub-1" }),
-      }),
+        headers: {
+          Origin: "https://local.test",
+          Cookie: cookieDe(session),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ endpoint: "https://push.mock.test/sub-1" })
+      })
     });
 
     assert.equal(res.status, 200);
@@ -813,7 +902,9 @@ test("POST /api/admin/push/test: busca p256dh/auth no banco, envia para somente 
     assert.equal(totalEventos.total, 0, "Notificação de teste NÃO deve inserir em push_eventos");
 
     // Pedido não foi alterado
-    const pedido = await db.prepare("SELECT status_pagamento, status_pedido FROM pedidos WHERE id = 900").first();
+    const pedido = await db
+      .prepare("SELECT status_pagamento, status_pedido FROM pedidos WHERE id = 900")
+      .first();
     assert.equal(pedido.status_pagamento, "PENDENTE");
     assert.equal(pedido.status_pedido, "NOVO");
   } finally {
@@ -821,7 +912,7 @@ test("POST /api/admin/push/test: busca p256dh/auth no banco, envia para somente 
   }
 });
 
-test("POST /api/admin/push/test: subscription stale (410) remove somente ela e retorna aviso", async (t) => {
+test("POST /api/admin/push/test: subscription stale (410) remove somente ela e retorna aviso", async t => {
   const { db, session } = await bancada(t);
   const keys1 = gerarChavesClient();
   const keys2 = gerarChavesClient();
@@ -851,13 +942,17 @@ test("POST /api/admin/push/test: subscription stale (410) remove somente ela e r
         DB: db,
         VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
         VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-        VAPID_SUBJECT,
+        VAPID_SUBJECT
       },
       request: new Request("https://local.test/api/admin/push/test", {
         method: "POST",
-        headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: "https://push.mock.test/stale-sub" }),
-      }),
+        headers: {
+          Origin: "https://local.test",
+          Cookie: cookieDe(session),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ endpoint: "https://push.mock.test/stale-sub" })
+      })
     });
 
     assert.equal(res.status, 410);
@@ -866,17 +961,21 @@ test("POST /api/admin/push/test: subscription stale (410) remove somente ela e r
     assert.equal(data.stale, true);
 
     // Confirma que SOMENTE a inscrição stale foi removida
-    const subStale = await db.prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/stale-sub'").first();
+    const subStale = await db
+      .prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/stale-sub'")
+      .first();
     assert.equal(subStale, null);
 
-    const subActive = await db.prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/active-sub'").first();
+    const subActive = await db
+      .prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/active-sub'")
+      .first();
     assert.ok(subActive, "Inscrição ativa do usuário deve ser preservada");
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("POST /api/admin/push/test: erro no push service retorna 502 e não quebra o sistema", async (t) => {
+test("POST /api/admin/push/test: erro no push service retorna 502 e não quebra o sistema", async t => {
   const { db, session } = await bancada(t);
   const keys = gerarChavesClient();
 
@@ -899,13 +998,17 @@ test("POST /api/admin/push/test: erro no push service retorna 502 e não quebra 
         DB: db,
         VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
         VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-        VAPID_SUBJECT,
+        VAPID_SUBJECT
       },
       request: new Request("https://local.test/api/admin/push/test", {
         method: "POST",
-        headers: { Origin: "https://local.test", Cookie: cookieDe(session), "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: "https://push.mock.test/error-sub" }),
-      }),
+        headers: {
+          Origin: "https://local.test",
+          Cookie: cookieDe(session),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ endpoint: "https://push.mock.test/error-sub" })
+      })
     });
 
     assert.equal(res.status, 502);
@@ -913,7 +1016,9 @@ test("POST /api/admin/push/test: erro no push service retorna 502 e não quebra 
     assert.match(data.error, /Falha ao despachar/i);
 
     // Subscription permanece intacta para retry futuro
-    const sub = await db.prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/error-sub'").first();
+    const sub = await db
+      .prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/error-sub'")
+      .first();
     assert.ok(sub);
   } finally {
     globalThis.fetch = originalFetch;
@@ -922,7 +1027,7 @@ test("POST /api/admin/push/test: erro no push service retorna 502 e não quebra 
 
 /* ──────────────────── 8. Elegibilidade de Subscriptions (Apenas Usuários Ativos) ──────────────────── */
 
-test("pushNotifier: ADMIN ativo com subscription válida recebe exatamente 1 push", async (t) => {
+test("pushNotifier: ADMIN ativo com subscription válida recebe exatamente 1 push", async t => {
   const { db } = await bancada(t);
   const keys = gerarChavesClient();
 
@@ -954,7 +1059,7 @@ test("pushNotifier: ADMIN ativo com subscription válida recebe exatamente 1 pus
       DB: db,
       VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
       VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-      VAPID_SUBJECT,
+      VAPID_SUBJECT
     };
 
     const res = await app.pushNotifier.notificarNovoPedidoPago(db, env, 301);
@@ -967,7 +1072,7 @@ test("pushNotifier: ADMIN ativo com subscription válida recebe exatamente 1 pus
   }
 });
 
-test("pushNotifier: ADMIN inativo com subscription no banco tem zero chamadas e subscription é preservada", async (t) => {
+test("pushNotifier: ADMIN inativo com subscription no banco tem zero chamadas e subscription é preservada", async t => {
   const { db } = await bancada(t);
   const keys = gerarChavesClient();
 
@@ -1007,7 +1112,7 @@ test("pushNotifier: ADMIN inativo com subscription no banco tem zero chamadas e 
       DB: db,
       VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
       VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-      VAPID_SUBJECT,
+      VAPID_SUBJECT
     };
 
     const res = await app.pushNotifier.notificarNovoPedidoPago(db, env, 302);
@@ -1019,18 +1124,24 @@ test("pushNotifier: ADMIN inativo com subscription no banco tem zero chamadas e 
     assert.equal(dispatchedUrls.length, 0);
 
     // A subscription NÃO foi removida
-    const sub = await db.prepare("SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/inactive-user'").first();
+    const sub = await db
+      .prepare(
+        "SELECT * FROM push_inscricoes WHERE endpoint = 'https://push.mock.test/inactive-user'"
+      )
+      .first();
     assert.ok(sub, "Subscription de usuário inativo deve permanecer armazenada");
 
     // Evento converge para ENVIADO
-    const ev = await db.prepare("SELECT status FROM push_eventos WHERE pedido_id = 302 AND evento = 'PEDIDO_PAGO'").first();
+    const ev = await db
+      .prepare("SELECT status FROM push_eventos WHERE pedido_id = 302 AND evento = 'PEDIDO_PAGO'")
+      .first();
     assert.equal(ev.status, "ENVIADO");
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("pushNotifier: cenário misto (Admin A ativo, Admin B inativo) envia apenas para A", async (t) => {
+test("pushNotifier: cenário misto (Admin A ativo, Admin B inativo) envia apenas para A", async t => {
   const { db } = await bancada(t);
   const keysA = gerarChavesClient();
   const keysB = gerarChavesClient();
@@ -1078,7 +1189,7 @@ test("pushNotifier: cenário misto (Admin A ativo, Admin B inativo) envia apenas
       DB: db,
       VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
       VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-      VAPID_SUBJECT,
+      VAPID_SUBJECT
     };
 
     const res = await app.pushNotifier.notificarNovoPedidoPago(db, env, 303);
@@ -1097,7 +1208,7 @@ test("pushNotifier: cenário misto (Admin A ativo, Admin B inativo) envia apenas
   }
 });
 
-test("pushNotifier: reativação de admin torna a mesma subscription elegível automaticamente", async (t) => {
+test("pushNotifier: reativação de admin torna a mesma subscription elegível automaticamente", async t => {
   const { db } = await bancada(t);
   const keysB = gerarChavesClient();
 
@@ -1138,7 +1249,7 @@ test("pushNotifier: reativação de admin torna a mesma subscription elegível a
       DB: db,
       VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
       VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-      VAPID_SUBJECT,
+      VAPID_SUBJECT
     };
 
     // 1. Enquanto inativo: não recebe push para pedido 304
@@ -1161,7 +1272,7 @@ test("pushNotifier: reativação de admin torna a mesma subscription elegível a
   }
 });
 
-test("pushNotifier: excludeUsuarioId funciona junto com filtro de ativo=1", async (t) => {
+test("pushNotifier: excludeUsuarioId funciona junto com filtro de ativo=1", async t => {
   const { db } = await bancada(t);
   const keysA = gerarChavesClient();
   const keysB = gerarChavesClient();
@@ -1208,11 +1319,13 @@ test("pushNotifier: excludeUsuarioId funciona junto com filtro de ativo=1", asyn
       DB: db,
       VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
       VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-      VAPID_SUBJECT,
+      VAPID_SUBJECT
     };
 
     // Excluindo A: somente B recebe
-    const res1 = await app.pushNotifier.notificarNovoPedidoPago(db, env, 306, { excludeUsuarioId: 1 });
+    const res1 = await app.pushNotifier.notificarNovoPedidoPago(db, env, 306, {
+      excludeUsuarioId: 1
+    });
     assert.equal(res1.ok, true);
     assert.equal(res1.sucessos, 1);
     assert.deepEqual(dispatchedUrls, ["https://push.mock.test/exclude-b"]);
@@ -1222,20 +1335,24 @@ test("pushNotifier: excludeUsuarioId funciona junto com filtro de ativo=1", asyn
     dispatchedUrls.length = 0;
 
     // Excluindo A novamente: B agora está inativo, então ninguém recebe
-    const res2 = await app.pushNotifier.notificarNovoPedidoPago(db, env, 307, { excludeUsuarioId: 1 });
+    const res2 = await app.pushNotifier.notificarNovoPedidoPago(db, env, 307, {
+      excludeUsuarioId: 1
+    });
     assert.equal(res2.ok, true);
     assert.equal(res2.enviado, false);
     assert.equal(res2.destinatarios, 0);
     assert.equal(dispatchedUrls.length, 0);
 
-    const ev = await db.prepare("SELECT status FROM push_eventos WHERE pedido_id = 307 AND evento = 'PEDIDO_PAGO'").first();
+    const ev = await db
+      .prepare("SELECT status FROM push_eventos WHERE pedido_id = 307 AND evento = 'PEDIDO_PAGO'")
+      .first();
     assert.equal(ev.status, "ENVIADO");
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("pushNotifier: retry/reconciliação não reenvia para subscription de usuário inativo", async (t) => {
+test("pushNotifier: retry/reconciliação não reenvia para subscription de usuário inativo", async t => {
   const { db } = await bancada(t);
   const keysB = gerarChavesClient();
 
@@ -1283,10 +1400,12 @@ test("pushNotifier: retry/reconciliação não reenvia para subscription de usu�
       DB: db,
       VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
       VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
-      VAPID_SUBJECT,
+      VAPID_SUBJECT
     };
 
-    const res = await app.pushNotifier.reconciliarPushEventosFalhos(db, env, { backoffSeconds: 30 });
+    const res = await app.pushNotifier.reconciliarPushEventosFalhos(db, env, {
+      backoffSeconds: 30
+    });
     assert.equal(res.ok, true);
     assert.equal(res.processados, 1);
     assert.equal(res.sucessos, 1);
@@ -1295,10 +1414,11 @@ test("pushNotifier: retry/reconciliação não reenvia para subscription de usu�
     assert.equal(dispatchedUrls.length, 0);
 
     // O evento convergiu para ENVIADO porque não restavam destinatários elegíveis
-    const ev = await db.prepare("SELECT status FROM push_eventos WHERE pedido_id = 308 AND evento = 'PEDIDO_PAGO'").first();
+    const ev = await db
+      .prepare("SELECT status FROM push_eventos WHERE pedido_id = 308 AND evento = 'PEDIDO_PAGO'")
+      .first();
     assert.equal(ev.status, "ENVIADO");
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
-

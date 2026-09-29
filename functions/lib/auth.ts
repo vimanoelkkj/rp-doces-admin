@@ -14,9 +14,7 @@ export interface AdminUser {
 }
 
 function bytesToHex(bytes: ArrayBuffer | Uint8Array): string {
-  return [...new Uint8Array(bytes)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function hexToBytes(hex: string): Uint8Array {
@@ -35,10 +33,7 @@ function randomToken(bytes = 32): string {
 }
 
 export async function sha256(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(text),
-  );
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return bytesToHex(digest);
 }
 
@@ -49,30 +44,23 @@ export async function hashPassword(password: string): Promise<string> {
     new TextEncoder().encode(password),
     "PBKDF2",
     false,
-    ["deriveBits"],
+    ["deriveBits"]
   );
   const bits = await crypto.subtle.deriveBits(
     { name: "PBKDF2", hash: "SHA-256", salt, iterations: PBKDF2_ITERATIONS },
     key,
-    256,
+    256
   );
   return `pbkdf2_sha256$${PBKDF2_ITERATIONS}$${bytesToHex(salt)}$${bytesToHex(bits)}`;
 }
 
-export async function verifyPassword(
-  password: string,
-  stored: string,
-): Promise<boolean> {
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   try {
     const [algo, iterationsText, saltHex, hashHex] = stored.split("$");
     if (algo !== "pbkdf2_sha256") return false;
 
     const iterations = Number(iterationsText);
-    if (
-      !Number.isSafeInteger(iterations) ||
-      iterations < 1 ||
-      iterations > PBKDF2_ITERATIONS
-    ) {
+    if (!Number.isSafeInteger(iterations) || iterations < 1 || iterations > PBKDF2_ITERATIONS) {
       return false;
     }
 
@@ -81,12 +69,12 @@ export async function verifyPassword(
       new TextEncoder().encode(password),
       "PBKDF2",
       false,
-      ["deriveBits"],
+      ["deriveBits"]
     );
     const bits = await crypto.subtle.deriveBits(
       { name: "PBKDF2", hash: "SHA-256", salt: hexToBytes(saltHex), iterations },
       key,
-      256,
+      256
     );
     const computed = new Uint8Array(bits);
     const expected = hexToBytes(hashHex);
@@ -120,18 +108,14 @@ export function getCookie(request: Request, name = COOKIE_NAME): string | null {
 
 export async function createSession(
   db: D1Database,
-  userId: number,
+  userId: number
 ): Promise<{ token: string; cookie: string }> {
   const token = randomToken(32);
   const tokenHash = await sha256(token);
-  const expiresAt = new Date(
-    Date.now() + SESSION_DAYS * 86400000,
-  ).toISOString();
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400000).toISOString();
 
   await db
-    .prepare(
-      `INSERT INTO admin_sessoes (usuario_id, token_hash, expira_em) VALUES (?, ?, ?)`,
-    )
+    .prepare(`INSERT INTO admin_sessoes (usuario_id, token_hash, expira_em) VALUES (?, ?, ?)`)
     .bind(userId, tokenHash, expiresAt)
     .run();
 
@@ -139,10 +123,7 @@ export async function createSession(
   return { token, cookie };
 }
 
-export async function destroySession(
-  db: D1Database,
-  request: Request,
-): Promise<string> {
+export async function destroySession(db: D1Database, request: Request): Promise<string> {
   const token = getCookie(request);
   if (token) {
     await db
@@ -153,10 +134,7 @@ export async function destroySession(
   return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
-export async function currentUser(
-  db: D1Database,
-  request: Request,
-): Promise<AdminUser | null> {
+export async function currentUser(db: D1Database, request: Request): Promise<AdminUser | null> {
   const token = getCookie(request);
   if (!token) return null;
   const hash = await sha256(token);
@@ -167,7 +145,7 @@ export async function currentUser(
        FROM admin_sessoes s
        JOIN usuarios_admin u ON u.id = s.usuario_id
        WHERE s.token_hash = ? AND s.expira_em > ? AND u.ativo = 1
-       LIMIT 1`,
+       LIMIT 1`
     )
     .bind(hash, now)
     .first<AdminUser>();
@@ -176,7 +154,7 @@ export async function currentUser(
 
 export async function requireUser(
   db: D1Database,
-  request: Request,
+  request: Request
 ): Promise<{ user: AdminUser } | { error: Response }> {
   const user = await currentUser(db, request);
   if (!user) {

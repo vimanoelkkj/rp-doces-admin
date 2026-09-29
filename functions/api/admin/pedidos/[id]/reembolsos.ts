@@ -7,7 +7,7 @@ import { registerManualRefund } from "../../../../lib/comandaLedger";
 import {
   OPERACAO_HTTP_STATUS,
   OPERACAO_MENSAGENS,
-  parseOperationKey,
+  parseOperationKey
 } from "../../../../lib/operacoes";
 
 interface Env {
@@ -23,8 +23,7 @@ interface ReembolsoInput {
 
 const MENSAGENS: Record<string, string> = {
   PEDIDO_NAO_ENCONTRADO: "Pedido não encontrado",
-  STATUS_PEDIDO_NAO_REEMBOLSAVEL:
-    "Pedidos entregues ou cancelados não podem ser reembolsados",
+  STATUS_PEDIDO_NAO_REEMBOLSAVEL: "Pedidos entregues ou cancelados não podem ser reembolsados",
   REFUND_REQUER_FLUXO_COMANDA:
     "Reembolsos de uma comanda aberta devem ser feitos pelo cancelamento ou troca do item correspondente.",
   PAGAMENTO_NAO_ENCONTRADO: "Pagamento não encontrado ou não confirmado",
@@ -35,7 +34,7 @@ const MENSAGENS: Record<string, string> = {
     "O saldo reembolsável mudou antes da confirmação. Atualize e tente novamente.",
   REFUND_PIX_MP_REMOTO_EM_ANDAMENTO:
     "Existe um estorno Mercado Pago em andamento para este pagamento.",
-  ...OPERACAO_MENSAGENS,
+  ...OPERACAO_MENSAGENS
 };
 
 function jsonError(message: string, status: number, code?: string) {
@@ -48,7 +47,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if ("error" in auth) return auth.error;
   const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
   if (anulado) return anulado;
-
 
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -83,18 +81,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       valorCentavos: body.valorCentavos!,
       usuarioId: auth.user.id,
       motivo: body.motivo,
-      operationKey: chave.key,
+      operationKey: chave.key
     });
 
     if (!resultado.ok) {
       const status =
         resultado.erro === "PEDIDO_NAO_ENCONTRADO"
           ? 404
-          : OPERACAO_HTTP_STATUS[resultado.erro ?? ""] ?? 409;
+          : (OPERACAO_HTTP_STATUS[resultado.erro ?? ""] ?? 409);
       return jsonError(
         MENSAGENS[resultado.erro ?? ""] ?? "Não foi possível registrar o reembolso",
         status,
-        resultado.erro,
+        resultado.erro
       );
     }
 
@@ -104,9 +102,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         reembolsoId: resultado.reembolsoId,
         statusFinanceiro: resultado.statusFinanceiro,
         saldoCentavos: resultado.saldoCentavos,
-        ...(resultado.replay ? { replay: true } : {}),
+        ...(resultado.replay ? { replay: true } : {})
       },
-      { status: 201 },
+      { status: 201 }
     );
   } catch (err) {
     console.error("Erro ao registrar reembolso manual (admin)", err);

@@ -3,7 +3,7 @@ import {
   calculateAddQuantity,
   calculateUpdateQuantity,
   reconcileCartWithCatalog,
-  type ItemWithAvailability,
+  type ItemWithAvailability
 } from "./cartReconciliation";
 
 export interface CartItem {
@@ -61,73 +61,68 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
     if (!Number.isInteger(quantity) || quantity < 1) return;
 
-    setCartItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
+    setCartItems(prev => {
+      const existing = prev.find(i => i.id === item.id);
       if (existing) {
         const disp =
-          item.disponibilidade !== undefined
-            ? item.disponibilidade
-            : existing.disponibilidade;
+          item.disponibilidade !== undefined ? item.disponibilidade : existing.disponibilidade;
         const newQty = calculateAddQuantity(existing.quantity, disp, quantity);
         if (newQty === existing.quantity) {
           return prev;
         }
-        return prev.map((i) =>
+        return prev.map(i =>
           i.id === item.id
             ? { ...i, quantity: newQty, ...(disp !== undefined ? { disponibilidade: disp } : {}) }
-            : i,
+            : i
         );
       }
       // Um único setState funcional, já limitado: nunca N chamadas de +1.
-      return [...prev, { ...item, quantity: calculateAddQuantity(0, item.disponibilidade, quantity) }];
+      return [
+        ...prev,
+        { ...item, quantity: calculateAddQuantity(0, item.disponibilidade, quantity) }
+      ];
     });
   };
 
   const updateQuantity = (id: number, qty: number) => {
-    setCartItems((prev) => {
-      const existing = prev.find((i) => i.id === id);
+    setCartItems(prev => {
+      const existing = prev.find(i => i.id === id);
       if (!existing) return prev;
 
       const newQty = calculateUpdateQuantity(qty, existing.disponibilidade);
       if (newQty <= 0) {
-        return prev.filter((i) => i.id !== id);
+        return prev.filter(i => i.id !== id);
       }
-      return prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i));
+      return prev.map(i => (i.id === id ? { ...i, quantity: newQty } : i));
     });
   };
 
   const removeItem = (id: number) => {
-    setCartItems((prev) => prev.filter((i) => i.id !== id));
+    setCartItems(prev => prev.filter(i => i.id !== id));
   };
 
   const clearCart = () => setCartItems([]);
 
-  const reconcileWithProducts = useCallback(
-    (catalog: ItemWithAvailability[]): boolean => {
-      let wasAdjusted = false;
-      setCartItems((prev) => {
-        const { reconciled, adjusted } = reconcileCartWithCatalog(prev, catalog);
-        wasAdjusted = adjusted;
-        if (adjusted) {
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(reconciled));
-          } catch {
-            // localStorage indisponível
-          }
-          return reconciled;
+  const reconcileWithProducts = useCallback((catalog: ItemWithAvailability[]): boolean => {
+    let wasAdjusted = false;
+    setCartItems(prev => {
+      const { reconciled, adjusted } = reconcileCartWithCatalog(prev, catalog);
+      wasAdjusted = adjusted;
+      if (adjusted) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(reconciled));
+        } catch {
+          // localStorage indisponível
         }
-        return prev;
-      });
-      return wasAdjusted;
-    },
-    [],
-  );
+        return reconciled;
+      }
+      return prev;
+    });
+    return wasAdjusted;
+  }, []);
 
   const totalItems = cartItems.reduce((sum, i) => sum + i.quantity, 0);
-  const totalPrice = cartItems.reduce(
-    (sum, i) => sum + i.price * i.quantity,
-    0,
-  );
+  const totalPrice = cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   return (
     <CartContext.Provider
@@ -141,7 +136,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         reconcileWithProducts,
         totalItems,
-        totalPrice,
+        totalPrice
       }}
     >
       {children}

@@ -45,11 +45,7 @@ export interface MpPaymentCriado {
 }
 
 export type MotivoAmbiguo =
-  | "TRANSPORTE"
-  | "TIMEOUT"
-  | "HTTP_INDISPONIVEL"
-  | "HTTP_INDETERMINADO"
-  | "RESPOSTA_ILEGIVEL";
+  "TRANSPORTE" | "TIMEOUT" | "HTTP_INDISPONIVEL" | "HTTP_INDETERMINADO" | "RESPOSTA_ILEGIVEL";
 
 export type MpPostResultado =
   | { resultado: "SUCESSO"; payment: MpPaymentCriado }
@@ -64,7 +60,7 @@ export type MpPostResultado =
 export async function postPagamentoMp(
   accessToken: string,
   idempotencyKey: string,
-  body: unknown,
+  body: unknown
 ): Promise<MpPostResultado> {
   const controller = new AbortController();
   const prazo = setTimeout(() => controller.abort(), MP_PAYMENT_POST_TIMEOUT_MS);
@@ -78,17 +74,17 @@ export async function postPagamentoMp(
         Authorization: `Bearer ${accessToken}`,
         // Estável por operação lógica (A1): um retry da MESMA intenção
         // reenvia exatamente esta key, nunca uma nova.
-        "X-Idempotency-Key": idempotencyKey,
+        "X-Idempotency-Key": idempotencyKey
       },
       body: JSON.stringify(body),
-      signal: controller.signal,
+      signal: controller.signal
     });
   } catch {
     const expirou = controller.signal.aborted;
     return {
       resultado: "AMBIGUO",
       motivo: expirou ? "TIMEOUT" : "TRANSPORTE",
-      httpStatus: null,
+      httpStatus: null
     };
   } finally {
     clearTimeout(prazo);
@@ -141,7 +137,7 @@ export type MpCancelResultado =
 export async function cancelarPagamentoMp(
   accessToken: string,
   paymentId: string | number,
-  idempotencyKey?: string,
+  idempotencyKey?: string
 ): Promise<MpCancelResultado> {
   const controller = new AbortController();
   const prazo = setTimeout(() => controller.abort(), MP_PAYMENT_POST_TIMEOUT_MS);
@@ -150,7 +146,7 @@ export async function cancelarPagamentoMp(
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`
     };
     if (idempotencyKey) {
       headers["X-Idempotency-Key"] = idempotencyKey;
@@ -159,14 +155,14 @@ export async function cancelarPagamentoMp(
       method: "PUT",
       headers,
       body: JSON.stringify({ status: "cancelled" }),
-      signal: controller.signal,
+      signal: controller.signal
     });
   } catch {
     const expirou = controller.signal.aborted;
     return {
       resultado: "AMBIGUO",
       motivo: expirou ? "TIMEOUT" : "TRANSPORTE",
-      httpStatus: null,
+      httpStatus: null
     };
   } finally {
     clearTimeout(prazo);
@@ -206,6 +202,6 @@ export async function cancelarPagamentoMp(
   return {
     resultado: "SUCESSO",
     status: payment.status,
-    statusDetail: payment.status_detail ?? null,
+    statusDetail: payment.status_detail ?? null
   };
 }

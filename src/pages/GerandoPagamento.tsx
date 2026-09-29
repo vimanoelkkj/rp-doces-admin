@@ -18,9 +18,7 @@ export default function GerandoPagamento() {
 
       <h1>Gerando pagamento</h1>
 
-      <p>
-        Aguarde um momento enquanto preparamos sua cobrança
-      </p>
+      <p>Aguarde um momento enquanto preparamos sua cobrança</p>
 
       <strong className="gerando-marca">R&amp;P Doces</strong>
     </main>

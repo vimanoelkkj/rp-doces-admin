@@ -38,10 +38,7 @@ interface CategoriasModalProps {
 }
 
 /* ── Component ── */
-export default function CategoriasModal({
-  open,
-  onClose,
-}: CategoriasModalProps) {
+export default function CategoriasModal({ open, onClose }: CategoriasModalProps) {
   const modalProps = useAdminModal(open, onClose);
   const fieldId = useId();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -53,15 +50,15 @@ export default function CategoriasModal({
 
   const carregarCategorias = () => {
     fetch("/api/admin/categorias")
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) throw new Error("Falha ao carregar categorias");
         return response.json() as Promise<{ categorias: Category[] }>;
       })
-      .then((data) => {
+      .then(data => {
         setCategories(data.categorias);
         setError(null);
       })
-      .catch((err) => setError(err.message));
+      .catch(err => setError(err.message));
   };
 
   useEffect(() => {
@@ -78,10 +75,10 @@ export default function CategoriasModal({
       body: JSON.stringify({
         nome: newName.trim(),
         emoji: newEmoji,
-        descricao: newDescription.trim(),
-      }),
+        descricao: newDescription.trim()
+      })
     })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error ?? "Falha ao criar categoria");
@@ -91,10 +88,8 @@ export default function CategoriasModal({
         setNewEmoji(EMOJI_OPTIONS[0].char);
         carregarCategorias();
       })
-      .catch((err) => {
-        setError(
-          err instanceof Error ? err.message : "Falha ao criar categoria",
-        );
+      .catch(err => {
+        setError(err instanceof Error ? err.message : "Falha ao criar categoria");
       })
       .finally(() => setSaving(false));
   };
@@ -113,7 +108,12 @@ export default function CategoriasModal({
               Crie categorias e use-as imediatamente nos produtos do cardápio.
             </p>
           </div>
-          <button type="button" className="catm-close" aria-label="Fechar categorias" onClick={onClose}>
+          <button
+            type="button"
+            className="catm-close"
+            aria-label="Fechar categorias"
+            onClick={onClose}
+          >
             <IconClose />
           </button>
         </div>
@@ -137,7 +137,7 @@ export default function CategoriasModal({
                 type="text"
                 placeholder="Ex.: Brownies"
                 value={newName}
-                onChange={(e) => setNewName(e.target.value)}
+                onChange={e => setNewName(e.target.value)}
               />
             </div>
 
@@ -177,7 +177,7 @@ export default function CategoriasModal({
                 type="text"
                 placeholder="Ex.: Brownies artesanais da R&P"
                 value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
+                onChange={e => setNewDescription(e.target.value)}
               />
             </div>
 
@@ -197,7 +197,7 @@ export default function CategoriasModal({
 
           {/* Categories list */}
           <div className="catm-list">
-            {categories.map((cat) => (
+            {categories.map(cat => (
               <div className="catm-cat-card" key={cat.id}>
                 <div className="catm-cat-left">
                   <div className="catm-cat-emoji">{cat.emoji}</div>
@@ -232,15 +232,13 @@ export default function CategoriasModal({
 
         {/* ── Footer ── */}
         <div className="catm-footer">
-          <span className="catm-footer-count">
-            {categories.length} categorias no catálogo
-          </span>
+          <span className="catm-footer-count">{categories.length} categorias no catálogo</span>
           <button type="button" className="catm-btn-close" onClick={onClose}>
             Fechar
           </button>
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

@@ -1,21 +1,10 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useRef,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 export type StoreTheme = "light" | "dark";
 
 export type ThemeTransitionOrigin =
-  | { x: number; y: number }
-  | MouseEvent
-  | React.MouseEvent
-  | HTMLElement
-  | null;
+  { x: number; y: number } | MouseEvent | React.MouseEvent | HTMLElement | null;
 
 interface StoreThemeContextType {
   theme: StoreTheme;
@@ -26,7 +15,7 @@ interface StoreThemeContextType {
 const StoreThemeContext = createContext<StoreThemeContextType>({
   theme: "light",
   toggleTheme: () => {},
-  setTheme: () => {},
+  setTheme: () => {}
 });
 
 const STORAGE_KEY = "store-theme";
@@ -47,14 +36,10 @@ export function syncMetaThemeColor(targetTheme?: StoreTheme): string {
     (document.documentElement.getAttribute("data-theme") as StoreTheme) ||
     (window.localStorage.getItem(STORAGE_KEY) as StoreTheme) ||
     (window.localStorage.getItem(ADMIN_STORAGE_KEY) as StoreTheme) ||
-    (window.matchMedia?.("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light");
+    (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 
   const color = getHeaderThemeColor(resolvedTheme);
-  let metaThemeColor = document.querySelector<HTMLMetaElement>(
-    'meta[name="theme-color"]'
-  );
+  let metaThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (!metaThemeColor) {
     metaThemeColor = document.createElement("meta");
     metaThemeColor.name = "theme-color";
@@ -105,7 +90,7 @@ function getOriginCoords(origin?: ThemeTransitionOrigin): { x: number; y: number
       const rect = origin.currentTarget.getBoundingClientRect();
       return {
         x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
+        y: rect.top + rect.height / 2
       };
     }
 
@@ -113,7 +98,7 @@ function getOriginCoords(origin?: ThemeTransitionOrigin): { x: number; y: number
       const rect = origin.target.getBoundingClientRect();
       return {
         x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
+        y: rect.top + rect.height / 2
       };
     }
 
@@ -130,7 +115,7 @@ function getOriginCoords(origin?: ThemeTransitionOrigin): { x: number; y: number
       const rect = origin.getBoundingClientRect();
       return {
         x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
+        y: rect.top + rect.height / 2
       };
     }
   }
@@ -141,14 +126,14 @@ function getOriginCoords(origin?: ThemeTransitionOrigin): { x: number; y: number
       const rect = btn.getBoundingClientRect();
       return {
         x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
+        y: rect.top + rect.height / 2
       };
     }
   }
 
   return {
     x: typeof window !== "undefined" ? window.innerWidth - 48 : 0,
-    y: 28,
+    y: 28
   };
 }
 
@@ -177,14 +162,13 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
 
     const observer = new MutationObserver(() => {
       const currentTheme =
-        (document.documentElement.getAttribute("data-theme") as StoreTheme) ||
-        theme;
+        (document.documentElement.getAttribute("data-theme") as StoreTheme) || theme;
       syncMetaThemeColor(currentTheme);
     });
 
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-theme", "data-admin-theme"],
+      attributeFilter: ["data-theme", "data-admin-theme"]
     });
 
     return () => observer.disconnect();
@@ -267,14 +251,14 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
             const mobileAnimationOptions: ExtendedAnimationOptions = {
               duration: 260,
               easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
-              pseudoElement: "::view-transition-new(root)",
+              pseudoElement: "::view-transition-new(root)"
             };
 
             document.documentElement.animate(
               {
-                opacity: [0, 1],
+                opacity: [0, 1]
               },
-              mobileAnimationOptions,
+              mobileAnimationOptions
             );
             return;
           }
@@ -287,17 +271,14 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
           const animationOptions: ExtendedAnimationOptions = {
             duration: 480,
             easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-            pseudoElement: "::view-transition-new(root)",
+            pseudoElement: "::view-transition-new(root)"
           };
 
           document.documentElement.animate(
             {
-              clipPath: [
-                `circle(0px at ${x}px ${y}px)`,
-                `circle(${maxRadius}px at ${x}px ${y}px)`,
-              ],
+              clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${maxRadius}px at ${x}px ${y}px)`]
             },
-            animationOptions,
+            animationOptions
           );
         })
         .catch(() => {

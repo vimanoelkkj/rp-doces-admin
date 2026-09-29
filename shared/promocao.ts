@@ -50,17 +50,12 @@ export function parseInstantePromocao(valor: string | null): number | null {
   if (!valor) return null;
   const texto = valor.trim();
   if (!texto) return null;
-  const normalizado = /[TZ]|[+-]\d{2}:?\d{2}$/.test(texto)
-    ? texto
-    : `${texto.replace(" ", "T")}Z`;
+  const normalizado = /[TZ]|[+-]\d{2}:?\d{2}$/.test(texto) ? texto : `${texto.replace(" ", "T")}Z`;
   const instante = Date.parse(normalizado);
   return Number.isFinite(instante) ? instante : null;
 }
 
-export function estadoPromocao(
-  produto: PromocaoCampos,
-  now: number = Date.now(),
-): PromocaoEstado {
+export function estadoPromocao(produto: PromocaoCampos, now: number = Date.now()): PromocaoEstado {
   if (!produto.promocao_ativa) return "DESLIGADA";
 
   const promocional = produto.preco_promocional_centavos;
@@ -87,10 +82,7 @@ export function promocaoVigente(produto: PromocaoCampos, now?: number): boolean 
  * cada leitura — não existe cron desligando promoção, e não precisa existir:
  * o dado já responde sozinho.
  */
-export function precoVigenteCentavos(
-  produto: PromocaoCampos,
-  now?: number,
-): number {
+export function precoVigenteCentavos(produto: PromocaoCampos, now?: number): number {
   return promocaoVigente(produto, now)
     ? produto.preco_promocional_centavos!
     : produto.preco_centavos;

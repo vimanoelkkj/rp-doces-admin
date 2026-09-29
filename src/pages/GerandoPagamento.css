@@ -11,7 +11,9 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 .gerando-page h1 {
@@ -45,7 +47,12 @@
   border-radius: 50%;
   background:
     radial-gradient(circle, var(--store-accent) 0 18%, transparent 20%),
-    radial-gradient(circle, #f3e8dc 0 45%, var(--store-accent) 47% 53%, var(--store-surface-soft) 55%);
+    radial-gradient(
+      circle,
+      #f3e8dc 0 45%,
+      var(--store-accent) 47% 53%,
+      var(--store-surface-soft) 55%
+    );
   box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.5);
   animation: moeda-caindo 1.5s ease-in infinite;
 }
@@ -144,7 +151,7 @@
   left: 0;
   right: 0;
   color: var(--store-text-muted);
-  font-family: 'Fraunces', serif;
+  font-family: "Fraunces", serif;
   font-weight: 600;
   font-size: 14px;
   transition: color 0.3s ease;

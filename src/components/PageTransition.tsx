@@ -46,9 +46,5 @@ export default function PageTransition({ children }: PageTransitionProps) {
     }
   }, [phase]);
 
-  return (
-    <div className={`page-transition page-transition--${phase}`}>
-      {currentChildren}
-    </div>
-  );
+  return <div className={`page-transition page-transition--${phase}`}>{currentChildren}</div>;
 }

@@ -20,16 +20,13 @@ export default function CartWidget({
   onOpen,
   onClose,
   onUpdateQuantity,
-  onRemoveItem,
+  onRemoveItem
 }: CartWidgetProps) {
   const navigate = useNavigate();
   const shouldReduceMotion = useReducedMotion();
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
-  const totalPrice = items.reduce(
-    (sum, i) => sum + i.price * i.quantity,
-    0,
-  );
+  const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   // Detecção de mobile para transição bottom-sheet vs scale bottom-right
   const [isMobile, setIsMobile] = useState(() =>
@@ -37,7 +34,7 @@ export default function CartWidget({
       ? window.matchMedia("(max-width: 768px)").matches
       : typeof window !== "undefined"
         ? window.innerWidth <= 768
-        : false,
+        : false
   );
 
   useEffect(() => {
@@ -79,17 +76,17 @@ export default function CartWidget({
       lastFocusedElementRef.current = activeEl;
       // O clique do FAB dá blur() antes de onOpen(), então aqui o elemento
       // ativo já é o body: a origem foi registrada no onClick do FAB.
-      openedByFabRef.current = openedByFabRef.current || Boolean(
-        activeEl && (
-          activeEl === cartFabRef.current ||
-          cartFabRef.current?.contains(activeEl) ||
-          activeEl.classList.contains("cart-fab") ||
-          Boolean(activeEl.closest?.(".cart-fab"))
-        ),
-      );
+      openedByFabRef.current =
+        openedByFabRef.current ||
+        Boolean(
+          activeEl &&
+          (activeEl === cartFabRef.current ||
+            cartFabRef.current?.contains(activeEl) ||
+            activeEl.classList.contains("cart-fab") ||
+            Boolean(activeEl.closest?.(".cart-fab")))
+        );
 
-      const scrollbarWidth =
-        window.innerWidth - document.documentElement.clientWidth;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.paddingRight = `${scrollbarWidth}px`;
       document.body.style.overflow = "hidden";
 
@@ -140,7 +137,7 @@ export default function CartWidget({
 
       if (e.key === "Tab" && modalRef.current) {
         const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
         );
         if (focusableElements.length === 0) return;
 
@@ -190,7 +187,7 @@ export default function CartWidget({
       ? { opacity: 0 }
       : isMobile
         ? { opacity: 0, y: 32 }
-        : { opacity: 0, scale: 0.9 },
+        : { opacity: 0, scale: 0.9 }
   };
 
   const modalTransition = shouldReduceMotion
@@ -213,7 +210,7 @@ export default function CartWidget({
             exit={{ opacity: 0 }}
             transition={{
               duration: shouldReduceMotion ? 0.15 : 0.25,
-              ease: "easeInOut",
+              ease: "easeInOut"
             }}
           />
         )}
@@ -226,7 +223,7 @@ export default function CartWidget({
             ref={cartFabRef}
             key="cart-fab"
             className="cart-fab"
-            onClick={(e) => {
+            onClick={e => {
               openedByFabRef.current = true;
               e.currentTarget.blur();
               onOpen();
@@ -243,19 +240,9 @@ export default function CartWidget({
             exit={shouldReduceMotion ? { opacity: 0 } : { scale: 0, opacity: 0 }}
             whileHover={shouldReduceMotion ? undefined : { scale: 1.05 }}
             whileTap={shouldReduceMotion ? undefined : { scale: 0.94 }}
-            transition={
-              isBumping
-                ? { duration: 0.3, ease: "easeOut" }
-                : fabSpring
-            }
+            transition={isBumping ? { duration: 0.3, ease: "easeOut" } : fabSpring}
           >
-            <svg
-              aria-hidden="true"
-              width="20"
-              height="18"
-              viewBox="0 0 14 12"
-              fill="none"
-            >
+            <svg aria-hidden="true" width="20" height="18" viewBox="0 0 14 12" fill="none">
               <path
                 d="M1.26841 5.9508L-0.00036931 -2.38419e-05H13.5479L12.2305 5.95881C12.1524 6.31533 11.9555 6.6344 11.6724 6.86334C11.3894 7.09227 11.037 7.21736 10.6736 7.21795H2.86522C2.49388 7.22625 2.13129 7.10426 1.83984 6.87298C1.54839 6.6417 1.34632 6.31559 1.26841 5.9508Z"
                 fill="#FFFFFF"
@@ -297,7 +284,7 @@ export default function CartWidget({
             aria-labelledby="cart-modal-title"
             className="cart-modal"
             style={{
-              transformOrigin: isMobile ? "bottom center" : "bottom right",
+              transformOrigin: isMobile ? "bottom center" : "bottom right"
             }}
             variants={modalVariants}
             initial="initial"
@@ -312,19 +299,13 @@ export default function CartWidget({
                   type="button"
                   ref={closeButtonRef}
                   className="cart-close-btn"
-                  onClick={(e) => {
+                  onClick={e => {
                     e.currentTarget.blur();
                     onClose();
                   }}
                   aria-label="Fechar"
                 >
-                  <svg
-                    aria-hidden="true"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 14 14"
-                    fill="none"
-                  >
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path
                       d="M1 1L13 13M13 1L1 13"
                       stroke="#634738"
@@ -354,7 +335,7 @@ export default function CartWidget({
                       display: "flex",
                       flexDirection: "column",
                       flex: 1,
-                      minHeight: 0,
+                      minHeight: 0
                     }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -363,17 +344,13 @@ export default function CartWidget({
                   >
                     <div className="cart-modal-items">
                       <AnimatePresence mode="popLayout" initial={false}>
-                        {items.map((item) => (
+                        {items.map(item => (
                           <motion.div
                             key={item.id}
                             layout="position"
                             className="cart-item"
-                            initial={
-                              shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }
-                            }
-                            animate={
-                              shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
-                            }
+                            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
+                            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
                             exit={
                               shouldReduceMotion
                                 ? { opacity: 0 }
@@ -387,15 +364,11 @@ export default function CartWidget({
                                     opacity: { duration: 0.18 },
                                     x: { duration: 0.2, ease: "easeOut" },
                                     scale: { duration: 0.2 },
-                                    y: { duration: 0.2, ease: "easeOut" },
+                                    y: { duration: 0.2, ease: "easeOut" }
                                   }
                             }
                           >
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="cart-item-img"
-                            />
+                            <img src={item.image} alt={item.name} className="cart-item-img" />
                             <div className="cart-item-info">
                               <span className="cart-item-name">{item.name}</span>
                               <span className="cart-item-price">
@@ -404,7 +377,7 @@ export default function CartWidget({
                               <div className="cart-qty-controls">
                                 <button
                                   type="button"
-                                  onClick={(e) => {
+                                  onClick={e => {
                                     e.currentTarget.blur();
                                     onUpdateQuantity(item.id, item.quantity - 1);
                                   }}
@@ -415,14 +388,10 @@ export default function CartWidget({
                                 <motion.span
                                   key={item.quantity}
                                   initial={
-                                    shouldReduceMotion
-                                      ? { opacity: 0 }
-                                      : { opacity: 0, y: -4 }
+                                    shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }
                                   }
                                   animate={
-                                    shouldReduceMotion
-                                      ? { opacity: 1 }
-                                      : { opacity: 1, y: 0 }
+                                    shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
                                   }
                                   transition={
                                     shouldReduceMotion
@@ -434,7 +403,7 @@ export default function CartWidget({
                                 </motion.span>
                                 <button
                                   type="button"
-                                  onClick={(e) => {
+                                  onClick={e => {
                                     e.currentTarget.blur();
                                     onUpdateQuantity(item.id, item.quantity + 1);
                                   }}
@@ -495,14 +464,13 @@ export default function CartWidget({
                         </span>
                       </div>
                       <p className="cart-notice">
-                        Os pedidos do cardápio do dia devem ser retirados
-                        diretamente em nosso salão parceiro, Tempori Concept no
-                        Cambuí.
+                        Os pedidos do cardápio do dia devem ser retirados diretamente em nosso salão
+                        parceiro, Tempori Concept no Cambuí.
                       </p>
                       <button
                         type="button"
                         className="cart-checkout-btn"
-                        onClick={(e) => {
+                        onClick={e => {
                           e.currentTarget.blur();
                           handleCheckout();
                         }}
@@ -512,7 +480,7 @@ export default function CartWidget({
                       <button
                         type="button"
                         className="cart-continue-btn"
-                        onClick={(e) => {
+                        onClick={e => {
                           e.currentTarget.blur();
                           onClose();
                         }}
@@ -528,6 +496,6 @@ export default function CartWidget({
         )}
       </AnimatePresence>
     </>,
-    document.body,
+    document.body
   );
 }

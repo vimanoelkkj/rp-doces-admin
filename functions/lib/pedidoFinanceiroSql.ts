@@ -26,7 +26,7 @@ END`;
 function preparePedidoFinancialProjectionBase(
   db: D1Database,
   pedidoId: number,
-  operationKey?: string,
+  operationKey?: string
 ): D1PreparedStatement {
   const operationGuard = operationKey
     ? `AND EXISTS (SELECT 1 FROM pedido_operacoes o
@@ -36,26 +36,33 @@ function preparePedidoFinancialProjectionBase(
   const ledgerGuard = operationKey
     ? ""
     : "AND EXISTS (SELECT 1 FROM pedido_pagamentos pp WHERE pp.pedido_id = p.id)";
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     UPDATE pedidos AS p
     SET status_pagamento = ${STATUS_FINANCEIRO_SQL},
         atualizado_em = CASE WHEN p.status_pagamento IS NOT (${STATUS_FINANCEIRO_SQL})
                              THEN CURRENT_TIMESTAMP ELSE p.atualizado_em END
-    WHERE p.id = ? AND ${pedidoValidoSql('p.id')}
+    WHERE p.id = ? AND ${pedidoValidoSql("p.id")}
       ${ledgerGuard}
       ${operationGuard}
     RETURNING status_pagamento
-  `).bind(pedidoId, ...(operationKey ? [operationKey] : []));
+  `
+    )
+    .bind(pedidoId, ...(operationKey ? [operationKey] : []));
 }
 
-export function preparePedidoFinancialProjection(db: D1Database, pedidoId: number): D1PreparedStatement {
+export function preparePedidoFinancialProjection(
+  db: D1Database,
+  pedidoId: number
+): D1PreparedStatement {
   return preparePedidoFinancialProjectionBase(db, pedidoId);
 }
 
 export function preparePedidoFinancialProjectionForItemOperation(
   db: D1Database,
   pedidoId: number,
-  operationKey: string,
+  operationKey: string
 ): D1PreparedStatement {
   return preparePedidoFinancialProjectionBase(db, pedidoId, operationKey);
 }

@@ -1,6 +1,6 @@
-import { readFile, readdir } from 'node:fs/promises';
-import { build } from 'esbuild';
-import { Miniflare } from 'miniflare';
+import { readFile, readdir } from "node:fs/promises";
+import { build } from "esbuild";
+import { Miniflare } from "miniflare";
 
 // Bundle real production modules in memory; no test endpoints in functions/.
 const bundle = await build({
@@ -74,25 +74,38 @@ const bundle = await build({
       export * as adminMaintenance from './functions/lib/adminPedidos/maintenance';
       export * as reservasReconciliar from './functions/api/reservas/reconciliar';
     `,
-    resolveDir: process.cwd(), loader: 'ts',
+    resolveDir: process.cwd(),
+    loader: "ts"
   },
-  bundle: true, write: false, format: 'esm', platform: 'node',
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node"
 });
 const source = `${bundle.outputFiles[0].text}\n//# sourceURL=rp-doces-b3-bundle.mjs`;
-export const app = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+export const app = await import(
+  `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
+);
 
 export const approvedMp = (extra = {}) => ({
-  id: 101, status: 'approved', transaction_amount: 100,
-  payment_method_id: 'pix', external_reference: 'token', currency_id: 'BRL',
-  ...extra,
+  id: 101,
+  status: "approved",
+  transaction_amount: 100,
+  payment_method_id: "pix",
+  external_reference: "token",
+  currency_id: "BRL",
+  ...extra
 });
 
 const migrations = [];
-for (const file of (await readdir('migrations')).filter(f => f.endsWith('.sql')).sort()) {
-  const sql = (await readFile(`migrations/${file}`, 'utf8')).replace(/--[^\n]*/g, '');
+for (const file of (await readdir("migrations")).filter(f => f.endsWith(".sql")).sort()) {
+  const sql = (await readFile(`migrations/${file}`, "utf8")).replace(/--[^\n]*/g, "");
   // These migrations have no semicolons in literals. Preserve trigger bodies.
-  migrations.push(...(sql.match(/\s*CREATE TRIGGER\b[\s\S]*?\bEND\s*;|[^;]+;/gi) ?? [])
-    .map(s => s.trim()).filter(Boolean));
+  migrations.push(
+    ...(sql.match(/\s*CREATE TRIGGER\b[\s\S]*?\bEND\s*;|[^;]+;/gi) ?? [])
+      .map(s => s.trim())
+      .filter(Boolean)
+  );
 }
 
 // Only local HTTP dispatch: avoids Miniflare's synchronous getD1Database proxy.
@@ -105,83 +118,121 @@ const bridge = `export default { async fetch(request, env) {
   } catch (error) { return Response.json({ error: error.message }, { status: 500 }); }
 }}`;
 
-export async function fixture(t, { paid = false, reserve = 'ATIVA', ledger = true } = {}) {
+export async function fixture(t, { paid = false, reserve = "ATIVA", ledger = true } = {}) {
   // Rede MP simulada; a autoridade continua nascendo no GET de produção.
-  t.mock.method(globalThis, 'fetch', async url => {
-    if (!String(url).startsWith('https://api.mercadopago.com/v1/payments/')) throw new Error('unexpected network');
-    return Response.json(approvedMp({id: Number(String(url).split('/').at(-1))}));
+  t.mock.method(globalThis, "fetch", async url => {
+    if (!String(url).startsWith("https://api.mercadopago.com/v1/payments/"))
+      throw new Error("unexpected network");
+    return Response.json(approvedMp({ id: Number(String(url).split("/").at(-1)) }));
   });
   const mf = new Miniflare({
-    modules: true, script: bridge, cf: false,
-    d1Databases: ['DB'], d1Persist: false,
+    modules: true,
+    script: bridge,
+    cf: false,
+    d1Databases: ["DB"],
+    d1Persist: false
   });
   t.after(() => mf.dispose());
   const db = {
     hook: null,
     prepare(sql) {
       return {
-        sql, args: [],
-        bind(...args) { this.args = args; return this; },
-        async all() { return (await db.send([this], 'all'))[0]; },
-        async first(column) {
-          const row = (await db.send([this], 'first'))[0].results[0] ?? null;
-          return column ? row?.[column] ?? null : row;
+        sql,
+        args: [],
+        bind(...args) {
+          this.args = args;
+          return this;
         },
-        async run() { return (await db.send([this], 'run'))[0]; },
+        async all() {
+          return (await db.send([this], "all"))[0];
+        },
+        async first(column) {
+          const row = (await db.send([this], "first"))[0].results[0] ?? null;
+          return column ? (row?.[column] ?? null) : row;
+        },
+        async run() {
+          return (await db.send([this], "run"))[0];
+        }
       };
     },
     async send(statements, operation) {
       let wire = statements.map(({ sql, args }) => ({ sql, args }));
-      if (db.hook) wire = await db.hook(wire, operation) ?? wire;
-      const response = await mf.dispatchFetch('http://local.test/sql', {
-        method: 'POST', body: JSON.stringify({ statements: wire }),
+      if (db.hook) wire = (await db.hook(wire, operation)) ?? wire;
+      const response = await mf.dispatchFetch("http://local.test/sql", {
+        method: "POST",
+        body: JSON.stringify({ statements: wire })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       return result.results;
     },
-    batch(statements) { return db.send(statements, 'batch'); },
+    batch(statements) {
+      return db.send(statements, "batch");
+    }
   };
   // Fresh schema only; no access to .wrangler, .dev.vars or remote bindings.
   for (const sql of migrations) await db.prepare(sql).run();
-  const estoqueEstado = reserve === 'ATIVA' ? 'RESERVADO'
-    : reserve === 'LIBERADA' ? 'LIBERADO'
-      : reserve === 'CONVERTIDA' ? 'BAIXADO'
-        : 'SEM_RESERVA';
-  const baixadoEm = estoqueEstado === 'BAIXADO' ? '2026-01-01 00:00:00' : null;
+  const estoqueEstado =
+    reserve === "ATIVA"
+      ? "RESERVADO"
+      : reserve === "LIBERADA"
+        ? "LIBERADO"
+        : reserve === "CONVERTIDA"
+          ? "BAIXADO"
+          : "SEM_RESERVA";
+  const baixadoEm = estoqueEstado === "BAIXADO" ? "2026-01-01 00:00:00" : null;
   await db.batch([
     db.prepare(`INSERT INTO usuarios_admin(id,nome,username,email,senha_hash,papel)
       VALUES(1,'Teste','teste','teste@example.invalid','unused','OWNER')`),
-    db.prepare(`INSERT INTO produtos(id,nome,categoria,preco_centavos,estoque,estoque_reservado)
-      VALUES(1,'Bolo','BOLO',5000,10,?)`).bind(reserve === 'ATIVA' ? 2 : 0),
-    db.prepare(`INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,
+    db
+      .prepare(
+        `INSERT INTO produtos(id,nome,categoria,preco_centavos,estoque,estoque_reservado)
+      VALUES(1,'Bolo','BOLO',5000,10,?)`
+      )
+      .bind(reserve === "ATIVA" ? 2 : 0),
+    db
+      .prepare(
+        `INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,
       idempotency_key,reserva_status,estoque_baixado_em,mp_payment_id,pix_expira_em)
-      VALUES(1,'token','Teste','000',10000,'pedido-1',?,?,'101','2099-01-01T00:00:00Z')`).bind(reserve, baixadoEm),
-    db.prepare(`INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,
+      VALUES(1,'token','Teste','000',10000,'pedido-1',?,?,'101','2099-01-01T00:00:00Z')`
+      )
+      .bind(reserve, baixadoEm),
+    db
+      .prepare(
+        `INSERT INTO pedido_itens(id,pedido_id,produto_id,produto_nome,quantidade,
       valor_unitario_centavos,valor_total_centavos,estoque_baixado_em,status_item,
       estoque_estado,estoque_reservado_em,estoque_liberado_em)
       VALUES(1,1,1,'Bolo',2,5000,10000,?,'ATIVO',?,
         CASE WHEN ?='RESERVADO' THEN CURRENT_TIMESTAMP ELSE NULL END,
-        CASE WHEN ?='LIBERADO' THEN CURRENT_TIMESTAMP ELSE NULL END)`)
-      .bind(baixadoEm, estoqueEstado, estoqueEstado, estoqueEstado),
+        CASE WHEN ?='LIBERADO' THEN CURRENT_TIMESTAMP ELSE NULL END)`
+      )
+      .bind(baixadoEm, estoqueEstado, estoqueEstado, estoqueEstado)
   ]);
-  if (ledger) await db.batch([
-    db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-      mp_payment_id,idempotency_key) VALUES(1,1,'PIX_MP','SITE',10000,?,'101','pagamento-1')`).bind(paid ? 'PAGO' : 'PENDENTE'),
-    db.prepare(`INSERT INTO pedido_pagamento_alocacoes(pagamento_id,pedido_item_id,valor_centavos) VALUES(1,1,10000)`),
-  ]);
+  if (ledger)
+    await db.batch([
+      db
+        .prepare(
+          `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+      mp_payment_id,idempotency_key) VALUES(1,1,'PIX_MP','SITE',10000,?,'101','pagamento-1')`
+        )
+        .bind(paid ? "PAGO" : "PENDENTE"),
+      db.prepare(
+        `INSERT INTO pedido_pagamento_alocacoes(pagamento_id,pedido_item_id,valor_centavos) VALUES(1,1,10000)`
+      )
+    ]);
   return db;
 }
 
 export async function state(db) {
   return {
-    pedido: await db.prepare('SELECT * FROM pedidos WHERE id=1').first(),
-    produtos: (await db.prepare('SELECT * FROM produtos ORDER BY id').all()).results,
-    itens: (await db.prepare('SELECT * FROM pedido_itens ORDER BY id').all()).results,
-    pagamentos: (await db.prepare('SELECT * FROM pedido_pagamentos ORDER BY id').all()).results,
-    alocacoes: (await db.prepare('SELECT * FROM pedido_pagamento_alocacoes ORDER BY id').all()).results,
-    refunds: (await db.prepare('SELECT * FROM pedido_reembolsos ORDER BY id').all()).results,
-    operacoes: (await db.prepare('SELECT * FROM pedido_operacoes ORDER BY id').all()).results,
+    pedido: await db.prepare("SELECT * FROM pedidos WHERE id=1").first(),
+    produtos: (await db.prepare("SELECT * FROM produtos ORDER BY id").all()).results,
+    itens: (await db.prepare("SELECT * FROM pedido_itens ORDER BY id").all()).results,
+    pagamentos: (await db.prepare("SELECT * FROM pedido_pagamentos ORDER BY id").all()).results,
+    alocacoes: (await db.prepare("SELECT * FROM pedido_pagamento_alocacoes ORDER BY id").all())
+      .results,
+    refunds: (await db.prepare("SELECT * FROM pedido_reembolsos ORDER BY id").all()).results,
+    operacoes: (await db.prepare("SELECT * FROM pedido_operacoes ORDER BY id").all()).results
   };
 }
 
@@ -193,7 +244,7 @@ export async function state(db) {
 // non-blocking in production, same as `context.waitUntil` promises.
 export async function withWaitUntil(handler, context) {
   const tasks = [];
-  const response = await handler({ ...context, waitUntil: (p) => tasks.push(p) });
+  const response = await handler({ ...context, waitUntil: p => tasks.push(p) });
   await Promise.allSettled(tasks);
   return response;
 }
@@ -201,15 +252,24 @@ export async function withWaitUntil(handler, context) {
 export function barrier(parties) {
   let arrived = 0;
   let release;
-  const gate = new Promise(resolve => { release = resolve; });
-  return async () => { if (++arrived === parties) release(); await gate; };
+  const gate = new Promise(resolve => {
+    release = resolve;
+  });
+  return async () => {
+    if (++arrived === parties) release();
+    await gate;
+  };
 }
 
-export const isProjection = sql => sql.includes('UPDATE pedidos AS p');
-export const isPhysical = statements => statements.some(s => s.sql.includes('estoque = estoque -'));
+export const isProjection = sql => sql.includes("UPDATE pedidos AS p");
+export const isPhysical = statements => statements.some(s => s.sql.includes("estoque = estoque -"));
 
 export async function refund(db, amount) {
-  await db.prepare(`INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,
-    status,idempotency_key) VALUES(1,1,'MANUAL','DINHEIRO',?,'REEMBOLSADO',?)`)
-    .bind(amount, `refund-${amount}`).run();
+  await db
+    .prepare(
+      `INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,
+    status,idempotency_key) VALUES(1,1,'MANUAL','DINHEIRO',?,'REEMBOLSADO',?)`
+    )
+    .bind(amount, `refund-${amount}`)
+    .run();
 }

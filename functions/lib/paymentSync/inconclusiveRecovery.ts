@@ -11,7 +11,7 @@ import {
   fecharOperacaoExpirada,
   listarOperacoesInconclusivas,
   registrarFase,
-  registrarObservacao,
+  registrarObservacao
 } from "../operacoes";
 
 const RECUPERACAO_BATCH_SIZE = 4;
@@ -43,16 +43,17 @@ const RECUPERACAO_BATCH_SIZE = 4;
 //
 // Não é cron nem job: roda oportunisticamente, junto das reconciliações que
 // já existem no GET administrativo, em lote pequeno e com throttle.
-export async function recuperarOperacoesInconclusivas(
-  env: { DB: D1Database; MP_ACCESS_TOKEN?: string },
-): Promise<void> {
+export async function recuperarOperacoesInconclusivas(env: {
+  DB: D1Database;
+  MP_ACCESS_TOKEN?: string;
+}): Promise<void> {
   if (!env.MP_ACCESS_TOKEN) return;
 
   const candidatas = await listarOperacoesInconclusivas(env.DB, RECUPERACAO_BATCH_SIZE);
   if (!candidatas.length) return;
 
   await Promise.allSettled(
-    candidatas.map(async (operacao) => {
+    candidatas.map(async operacao => {
       try {
         // Throttle adquirido ANTES de qualquer chamada externa: concorrência
         // e falhas de rede não viram uma rajada de buscas.
@@ -69,7 +70,11 @@ export async function recuperarOperacoesInconclusivas(
         if (busca.resultado === "INDISPONIVEL") {
           // Não observamos nada. Isso não é rejeição, não perde identidade e
           // pode ser repetido no próximo ciclo.
-          await registrarObservacao(env.DB, operacao.operation_key, `BUSCA:INDISPONIVEL:${busca.motivo}`);
+          await registrarObservacao(
+            env.DB,
+            operacao.operation_key,
+            `BUSCA:INDISPONIVEL:${busca.motivo}`
+          );
           return;
         }
 
@@ -97,15 +102,18 @@ export async function recuperarOperacoesInconclusivas(
         if (busca.resultado === "AMBIGUO") {
           // Mais de um candidato: não escolhemos arbitrariamente e não
           // estabelecemos verdade financeira. Fica visível para intervenção.
-          console.error("Recuperação de operação inconclusiva: múltiplos candidatos no Mercado Pago", {
-            operationKey: operacao.operation_key,
-            pedidoId: operacao.pedido_id,
-            candidatos: busca.mpPaymentIds,
-          });
+          console.error(
+            "Recuperação de operação inconclusiva: múltiplos candidatos no Mercado Pago",
+            {
+              operationKey: operacao.operation_key,
+              pedidoId: operacao.pedido_id,
+              candidatos: busca.mpPaymentIds
+            }
+          );
           await registrarObservacao(
             env.DB,
             operacao.operation_key,
-            `BUSCA:AMBIGUO:${busca.quantidade}`,
+            `BUSCA:AMBIGUO:${busca.quantidade}`
           );
           return;
         }
@@ -116,7 +124,7 @@ export async function recuperarOperacoesInconclusivas(
 
         if (operacao.tipo === "PIX_ADMIN_REGENERACAO") {
           let bRow = await env.DB.prepare(
-            `SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`,
+            `SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`
           )
             .bind(referencia)
             .first<{ id: number; status: string }>();
@@ -124,8 +132,20 @@ export async function recuperarOperacoesInconclusivas(
           if (!bRow) {
             // 9-H: B criado remotamente e persistência local falhou antes do batch.
             // Executa batch atômico para persistir B sem criar outro pagamento no MP.
-            const txData = (payment as { point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }).point_of_interaction?.transaction_data;
-            const req = operacao.mp_request ? JSON.parse(operacao.mp_request) as { transaction_amount?: number } : null;
+            const txData = (
+              payment as {
+                point_of_interaction?: {
+                  transaction_data?: {
+                    qr_code?: string;
+                    qr_code_base64?: string;
+                    ticket_url?: string;
+                  };
+                };
+              }
+            ).point_of_interaction?.transaction_data;
+            const req = operacao.mp_request
+              ? (JSON.parse(operacao.mp_request) as { transaction_amount?: number })
+              : null;
             const valorCentavos = req?.transaction_amount
               ? Math.round(Number(req.transaction_amount) * 100)
               : 0;
@@ -137,7 +157,7 @@ export async function recuperarOperacoesInconclusivas(
                      cancelado_em = COALESCE(cancelado_em, CURRENT_TIMESTAMP),
                      atualizado_em = CURRENT_TIMESTAMP
                  WHERE id = ? AND status = 'PENDENTE'
-                   AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`,
+                   AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')`
               ).bind(operacao.pagamento_id),
               env.DB.prepare(
                 `INSERT INTO pedido_pagamentos (
@@ -145,7 +165,7 @@ export async function recuperarOperacoesInconclusivas(
                    registrado_por_usuario_id, idempotency_key, substitui_pagamento_id,
                    mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
                  )
-                 VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                 VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
               ).bind(
                 operacao.pedido_id,
                 valorCentavos,
@@ -157,7 +177,7 @@ export async function recuperarOperacoesInconclusivas(
                 txData?.qr_code ?? null,
                 txData?.qr_code_base64 ?? null,
                 txData?.ticket_url ?? null,
-                (payment as { date_of_expiration?: string }).date_of_expiration ?? null,
+                (payment as { date_of_expiration?: string }).date_of_expiration ?? null
               ),
               env.DB.prepare(
                 `UPDATE pedido_operacoes
@@ -165,13 +185,13 @@ export async function recuperarOperacoesInconclusivas(
                      mp_payment_id = ?,
                      pagamento_id = (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?),
                      atualizado_em = CURRENT_TIMESTAMP
-                 WHERE operation_key = ?`,
-              ).bind(String(payment.id), referencia, operacao.operation_key),
+                 WHERE operation_key = ?`
+              ).bind(String(payment.id), referencia, operacao.operation_key)
             ];
 
             await env.DB.batch(recoveryStatements);
             bRow = await env.DB.prepare(
-              `SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`,
+              `SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`
             )
               .bind(referencia)
               .first<{ id: number; status: string }>();
@@ -180,7 +200,7 @@ export async function recuperarOperacoesInconclusivas(
           if (bRow) {
             await registrarFase(env.DB, operacao.operation_key, {
               fase: "REMOTO_CONHECIDO",
-              mpPaymentId: busca.mpPaymentId,
+              mpPaymentId: busca.mpPaymentId
             });
             await syncPaymentFromMp(env.DB, bRow.id, payment, env);
           }
@@ -194,12 +214,12 @@ export async function recuperarOperacoesInconclusivas(
             operationKey: operacao.operation_key,
             pedidoId: operacao.pedido_id,
             mpPaymentId: busca.mpPaymentId,
-            kind: resolvido.kind,
+            kind: resolvido.kind
           });
           await registrarObservacao(
             env.DB,
             operacao.operation_key,
-            `BUSCA:ASSOCIACAO_${resolvido.kind.toUpperCase()}`,
+            `BUSCA:ASSOCIACAO_${resolvido.kind.toUpperCase()}`
           );
           return;
         }
@@ -219,18 +239,17 @@ export async function recuperarOperacoesInconclusivas(
         // que impede que um dado antigo decida por nós. Fail-closed de
         // propósito — `pagamento_id` ausente também diverge.
         if (resolvido.pagamentoId !== operacao.pagamento_id) {
-          console.error("Recuperação de operação inconclusiva: pagamento resolvido diverge da operação", {
-            operationKey: operacao.operation_key,
-            pedidoId: operacao.pedido_id,
-            mpPaymentId: busca.mpPaymentId,
-            pagamentoDaOperacao: operacao.pagamento_id,
-            pagamentoResolvido: resolvido.pagamentoId,
-          });
-          await registrarObservacao(
-            env.DB,
-            operacao.operation_key,
-            "BUSCA:ASSOCIACAO_DIVERGENTE",
+          console.error(
+            "Recuperação de operação inconclusiva: pagamento resolvido diverge da operação",
+            {
+              operationKey: operacao.operation_key,
+              pedidoId: operacao.pedido_id,
+              mpPaymentId: busca.mpPaymentId,
+              pagamentoDaOperacao: operacao.pagamento_id,
+              pagamentoResolvido: resolvido.pagamentoId
+            }
           );
+          await registrarObservacao(env.DB, operacao.operation_key, "BUSCA:ASSOCIACAO_DIVERGENTE");
           return;
         }
 
@@ -239,18 +258,14 @@ export async function recuperarOperacoesInconclusivas(
         // recuperar o resultado a partir das linhas persistidas.
         await registrarFase(env.DB, operacao.operation_key, {
           fase: "REMOTO_CONHECIDO",
-          mpPaymentId: busca.mpPaymentId,
+          mpPaymentId: busca.mpPaymentId
         });
 
         // Estado financeiro decidido só aqui, pelo caminho compartilhado.
         await syncPaymentFromMp(env.DB, resolvido.pagamentoId, payment, env);
       } catch (err) {
-        console.error(
-          "Falha ao recuperar operação inconclusiva",
-          operacao.operation_key,
-          err,
-        );
+        console.error("Falha ao recuperar operação inconclusiva", operacao.operation_key, err);
       }
-    }),
+    })
   );
 }

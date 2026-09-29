@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  DEFAULT_STORE_CONFIG,
-  fetchStoreConfig,
-  formatStoreWhatsapp,
-} from "../api/storeConfig";
+import { DEFAULT_STORE_CONFIG, fetchStoreConfig, formatStoreWhatsapp } from "../api/storeConfig";
 import "./Footer.css";
 
 interface FooterProps {
@@ -21,7 +17,7 @@ export default function Footer({ watermarkOnly = false }: FooterProps) {
 
     let active = true;
     void fetchStoreConfig()
-      .then((config) => {
+      .then(config => {
         if (active) setStoreConfig(config);
       })
       .catch(() => {
@@ -47,8 +43,8 @@ export default function Footer({ watermarkOnly = false }: FooterProps) {
         <div className="footer-brand">
           <div className="footer-brand-name">R&amp;P Doces</div>
           <p>
-            Artesanal e cheio de afeto. Criando momentos de puro prazer
-            açucarado para o seu ritual de autocuidado diário.
+            Artesanal e cheio de afeto. Criando momentos de puro prazer açucarado para o seu ritual
+            de autocuidado diário.
           </p>
         </div>
 
@@ -66,9 +62,7 @@ export default function Footer({ watermarkOnly = false }: FooterProps) {
             <br />
             {storeConfig.address}
           </p>
-          <p className="footer-phone">
-            {formatStoreWhatsapp(storeConfig.whatsapp)}
-          </p>
+          <p className="footer-phone">{formatStoreWhatsapp(storeConfig.whatsapp)}</p>
         </div>
       </div>
 

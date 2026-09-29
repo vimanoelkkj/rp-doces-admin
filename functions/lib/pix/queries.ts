@@ -8,7 +8,7 @@ const CAPACIDADE_COBRAVEL_SQL = chargeableCapacitySql("?");
 export async function getCapacidadeCobravel(
   db: D1Database,
   pedidoId: number,
-  substituiId: number | null = null,
+  substituiId: number | null = null
 ): Promise<number> {
   const row = await db
     .prepare(`SELECT ${CAPACIDADE_COBRAVEL_SQL} AS capacidade`)
@@ -36,7 +36,7 @@ interface PixAdminPendenteRow {
 // que o ledger diz agora, sem inventar estado.
 export async function getPixAdminPendentesAtivos(
   db: D1Database,
-  pedidoId: number,
+  pedidoId: number
 ): Promise<PixAdminPendente[]> {
   const { results } = await db
     .prepare(
@@ -44,17 +44,17 @@ export async function getPixAdminPendentesAtivos(
        FROM pedido_pagamentos pp
        WHERE pp.pedido_id = ? AND pp.metodo = 'PIX_MP' AND pp.origem = 'ADMIN' AND pp.status = 'PENDENTE'
          AND ${liveAdminPixPredicate("pp")}
-       ORDER BY id ASC`,
+       ORDER BY id ASC`
     )
     .bind(pedidoId)
     .all<PixAdminPendenteRow>();
 
-  return (results || []).map((r) => ({
+  return (results || []).map(r => ({
     id: r.id,
     valorCentavos: r.valor_centavos,
     qrCode: r.mp_qr_code,
     qrCodeBase64: r.mp_qr_code_base64,
     ticketUrl: r.mp_ticket_url,
-    expiresAt: r.pix_expira_em,
+    expiresAt: r.pix_expira_em
   }));
 }

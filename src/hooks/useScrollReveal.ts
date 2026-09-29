@@ -14,7 +14,7 @@ export function useScrollReveal<T extends HTMLElement>(threshold = 0.15) {
           observer.unobserve(el); // anima só uma vez
         }
       },
-      { threshold },
+      { threshold }
     );
 
     observer.observe(el);

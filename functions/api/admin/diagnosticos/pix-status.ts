@@ -42,7 +42,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return jsonError(
       "Mercado Pago não está configurado neste ambiente",
       503,
-      "MERCADO_PAGO_NAO_CONFIGURADO",
+      "MERCADO_PAGO_NAO_CONFIGURADO"
     );
   }
 
@@ -52,14 +52,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       ok: true,
       // "PENDENTE" cobre pending/in_process/authorized — mapMpStatus só
       // nomeia estados finais; não inventamos um vocabulário próprio aqui.
-      status: mapMpStatus(payment.status) ?? "PENDENTE",
+      status: mapMpStatus(payment.status) ?? "PENDENTE"
     });
   } catch (err) {
     console.error("Falha ao consultar status do Pix de diagnóstico", err);
     return jsonError(
       "Não foi possível confirmar o status com o Mercado Pago. Tente novamente.",
       502,
-      "MERCADO_PAGO_INDISPONIVEL",
+      "MERCADO_PAGO_INDISPONIVEL"
     );
   }
 };

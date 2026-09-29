@@ -60,9 +60,18 @@ interface Cancelamento {
   pernasPendentes: Perna[];
   estoqueEstado?: string;
   reembolsosConfirmados?: Array<{
-    id: number; metodo: string; valorCentavos: number; origem: string; mpRefundId: string | null;
+    id: number;
+    metodo: string;
+    valorCentavos: number;
+    origem: string;
+    mpRefundId: string | null;
   }>;
-  financeiro?: { status: string; totalCentavos: number; liquidoCentavos: number; saldoCentavos: number };
+  financeiro?: {
+    status: string;
+    totalCentavos: number;
+    liquidoCentavos: number;
+    saldoCentavos: number;
+  };
 }
 interface Props {
   orderId: number;
@@ -72,14 +81,12 @@ interface Props {
   onChanged: () => void | Promise<void>;
 }
 const dinheiro = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-    v / 100,
-  );
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v / 100);
 const METODOS: Record<string, string> = {
   PIX_MP: "Pix Mercado Pago",
   PIX_EXTERNO: "Pix externo",
   CARTAO: "Cartão",
-  DINHEIRO: "Dinheiro",
+  DINHEIRO: "Dinheiro"
 };
 
 export default function CancelamentoItemPreviewModal({
@@ -87,7 +94,7 @@ export default function CancelamentoItemPreviewModal({
   itemId,
   existingCancellationId,
   onClose,
-  onChanged,
+  onChanged
 }: Props) {
   const modalProps = useAdminModal(true, onClose);
   const [preview, setPreview] = useState<CancelamentoPreview | null>(null);
@@ -111,22 +118,21 @@ export default function CancelamentoItemPreviewModal({
     // preview novo não depende disso.
     (existingCancellationId ? reconciliarPedido(orderId) : Promise.resolve())
       .then(() => fetch(path))
-      .then(async (r) => {
+      .then(async r => {
         const b = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(b.error ?? "Falha ao carregar cancelamento");
         return b;
       })
-      .then((body) => {
+      .then(body => {
         if (!active) return;
-        if (existingCancellationId)
-          setCancelamento(body.cancelamento as Cancelamento);
+        if (existingCancellationId) setCancelamento(body.cancelamento as Cancelamento);
         else {
           const p = body as CancelamentoPreview;
           setPreview(p);
           setAcao(p.estoque.acaoPadrao);
         }
       })
-      .catch((e) => active && setError(e.message))
+      .catch(e => active && setError(e.message))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -137,19 +143,16 @@ export default function CancelamentoItemPreviewModal({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/admin/pedidos/${orderId}/itens/${itemId}/cancelamentos`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            operationKey: operationKey.current,
-            motivo,
-            estoqueAcao: acao,
-            previewFingerprint: preview.previewFingerprint,
-          }),
-        },
-      );
+      const response = await fetch(`/api/admin/pedidos/${orderId}/itens/${itemId}/cancelamentos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operationKey: operationKey.current,
+          motivo,
+          estoqueAcao: acao,
+          previewFingerprint: preview.previewFingerprint
+        })
+      });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         if (body.code === "PREVIEW_OBSOLETO" && body.preview) {
@@ -187,13 +190,12 @@ export default function CancelamentoItemPreviewModal({
             pagamentoId: leg.pagamentoId,
             pagamentoAlocacaoId: leg.pagamentoAlocacaoId,
             valorCentavos: leg.valorCentavos,
-            confirmacao: true,
-          }),
-        },
+            confirmacao: true
+          })
+        }
       );
       const body = await response.json().catch(() => ({}));
-      if (!response.ok)
-        throw new Error(body.error ?? "Falha ao registrar devolução");
+      if (!response.ok) throw new Error(body.error ?? "Falha ao registrar devolução");
       if (body.refundStatus === "CONFIRMADO" || !body.refundStatus)
         refundKeys.current.delete(leg.pagamentoAlocacaoId);
       setCancelamento(body.cancelamento);
@@ -210,7 +212,7 @@ export default function CancelamentoItemPreviewModal({
       AGUARDANDO_REEMBOLSO: "Aguardando reembolso",
       CONCLUIDO: "Cancelamento concluído",
       INCONCLUSIVO: "Reconciliação pendente",
-      FALHOU: "Falhou",
+      FALHOU: "Falhou"
     })[s] ?? s;
   const remoteLabel = (leg: Perna) => {
     const status = leg.refundRemoto?.status;
@@ -244,51 +246,40 @@ export default function CancelamentoItemPreviewModal({
             ×
           </button>
         </header>
-        {loading && (
-          <div className="cancelpreview-state">Calculando impacto...</div>
-        )}
+        {loading && <div className="cancelpreview-state">Calculando impacto...</div>}
         {error && <div className="cancelpreview-error">{error}</div>}
         {preview && !cancelamento && (
           <div className="cancelpreview-content">
             <div className="cancelpreview-product">
               <strong>{preview.item.nome}</strong>
               <span>
-                {preview.item.quantidade}x ·{" "}
-                {dinheiro(preview.item.valorCentavos)}
+                {preview.item.quantidade}x · {dinheiro(preview.item.valorCentavos)}
               </span>
             </div>
             <div className="cancelpreview-values">
               <div>
                 <span>Valor do item</span>
-                <strong>
-                  {dinheiro(preview.financeiro.valorItemCentavos)}
-                </strong>
+                <strong>{dinheiro(preview.financeiro.valorItemCentavos)}</strong>
               </div>
               <div>
                 <span>Valor já pago associado</span>
-                <strong>
-                  {dinheiro(preview.financeiro.coberturaConfirmadaCentavos)}
-                </strong>
+                <strong>{dinheiro(preview.financeiro.coberturaConfirmadaCentavos)}</strong>
               </div>
               <div>
                 <span>Valor ainda não pago</span>
-                <strong>
-                  {dinheiro(preview.financeiro.valorNaoPagoCentavos)}
-                </strong>
+                <strong>{dinheiro(preview.financeiro.valorNaoPagoCentavos)}</strong>
               </div>
               <div className="cancelpreview-values-refund">
                 <span>Valor a devolver</span>
-                <strong>
-                  {dinheiro(preview.financeiro.reembolsoNecessarioCentavos)}
-                </strong>
+                <strong>{dinheiro(preview.financeiro.reembolsoNecessarioCentavos)}</strong>
               </div>
             </div>
             <div className="cancelpreview-section">
               <span className="cancelpreview-label">Pagamentos envolvidos</span>
               <div className="cancelpreview-payments">
                 {preview.pagamentos
-                  .filter((p) => p.reembolsoPropostoCentavos > 0)
-                  .map((p) => (
+                  .filter(p => p.reembolsoPropostoCentavos > 0)
+                  .map(p => (
                     <div key={p.pagamentoAlocacaoId}>
                       <span>{METODOS[p.metodo] ?? p.metodo}</span>
                       <strong>
@@ -297,9 +288,7 @@ export default function CancelamentoItemPreviewModal({
                       </strong>
                     </div>
                   ))}
-                {!preview.pagamentos.some(
-                  (p) => p.reembolsoPropostoCentavos > 0,
-                ) && (
+                {!preview.pagamentos.some(p => p.reembolsoPropostoCentavos > 0) && (
                   <p className="cancelpreview-muted">
                     Nenhum pagamento confirmado cobre este item.
                   </p>
@@ -319,25 +308,37 @@ export default function CancelamentoItemPreviewModal({
             {preview.item.estoqueEstado === "BAIXADO" && (
               <label className="cancelpreview-field">
                 <span>Ação física confirmada</span>
-                <div className={`cancelpreview-dropdown${acaoDropdownOpen ? " cancelpreview-dropdown--open" : ""}`}>
+                <div
+                  className={`cancelpreview-dropdown${acaoDropdownOpen ? " cancelpreview-dropdown--open" : ""}`}
+                >
                   <button
                     type="button"
                     className="cancelpreview-dropdown-trigger"
-                    onClick={() => setAcaoDropdownOpen((open) => !open)}
+                    onClick={() => setAcaoDropdownOpen(open => !open)}
                     onBlur={() => setTimeout(() => setAcaoDropdownOpen(false), 150)}
                     disabled={saving}
                   >
-                    <span>{acao === "REPOR" ? "Produto devolvido: repor no estoque" : "Não repor no estoque"}</span>
+                    <span>
+                      {acao === "REPOR"
+                        ? "Produto devolvido: repor no estoque"
+                        : "Não repor no estoque"}
+                    </span>
                     <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
-                      <path d="M1 1.5L6 6.5L11 1.5" stroke="#634738" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M1 1.5L6 6.5L11 1.5"
+                        stroke="#634738"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </button>
                   {acaoDropdownOpen && (
                     <ul className="cancelpreview-dropdown-list">
                       {[
                         { value: "NAO_REPOR", label: "Não repor no estoque" },
-                        { value: "REPOR", label: "Produto devolvido: repor no estoque" },
-                      ].map((option) => (
+                        { value: "REPOR", label: "Produto devolvido: repor no estoque" }
+                      ].map(option => (
                         <li key={option.value}>
                           <button
                             type="button"
@@ -358,13 +359,9 @@ export default function CancelamentoItemPreviewModal({
             )}
             <label className="cancelpreview-field">
               <span>Motivo</span>
-              <textarea
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                maxLength={300}
-              />
+              <textarea value={motivo} onChange={e => setMotivo(e.target.value)} maxLength={300} />
             </label>
-            {preview.bloqueios.map((b) => (
+            {preview.bloqueios.map(b => (
               <div className="cancelpreview-block" key={b.codigo}>
                 {b.mensagem}
               </div>
@@ -389,46 +386,51 @@ export default function CancelamentoItemPreviewModal({
             <div className="cancelpreview-success">
               <strong>{statusLabel(cancelamento.status)}</strong>
               {cancelamento.status !== "CONCLUIDO" && (
-                <span>
-                  O item continua ativo até todas as devoluções serem
-                  resolvidas.
-                </span>
+                <span>O item continua ativo até todas as devoluções serem resolvidas.</span>
               )}
             </div>
             {cancelamento.financeiro && (
               <div className="cancelpreview-values">
-                <div><span>Total atual</span><strong>{dinheiro(cancelamento.financeiro.totalCentavos)}</strong></div>
-                <div><span>Pago líquido</span><strong>{dinheiro(cancelamento.financeiro.liquidoCentavos)}</strong></div>
-                <div><span>Saldo</span><strong>{dinheiro(cancelamento.financeiro.saldoCentavos)}</strong></div>
-                <div><span>Estoque do item</span><strong>{cancelamento.estoqueEstado}</strong></div>
+                <div>
+                  <span>Total atual</span>
+                  <strong>{dinheiro(cancelamento.financeiro.totalCentavos)}</strong>
+                </div>
+                <div>
+                  <span>Pago líquido</span>
+                  <strong>{dinheiro(cancelamento.financeiro.liquidoCentavos)}</strong>
+                </div>
+                <div>
+                  <span>Saldo</span>
+                  <strong>{dinheiro(cancelamento.financeiro.saldoCentavos)}</strong>
+                </div>
+                <div>
+                  <span>Estoque do item</span>
+                  <strong>{cancelamento.estoqueEstado}</strong>
+                </div>
               </div>
             )}
             {(cancelamento.reembolsosConfirmados?.length ?? 0) > 0 && (
               <div className="cancelpreview-section">
                 <span className="cancelpreview-label">Devoluções confirmadas</span>
-                {cancelamento.reembolsosConfirmados?.map((refund) => (
+                {cancelamento.reembolsosConfirmados?.map(refund => (
                   <div className="cancelpreview-refund-leg" key={refund.id}>
-                    <div><strong>{METODOS[refund.metodo] ?? refund.metodo}</strong><span>{dinheiro(refund.valorCentavos)}</span></div>
+                    <div>
+                      <strong>{METODOS[refund.metodo] ?? refund.metodo}</strong>
+                      <span>{dinheiro(refund.valorCentavos)}</span>
+                    </div>
                     <span>Confirmado</span>
                   </div>
                 ))}
               </div>
             )}
-            {cancelamento.pernasPendentes.map((leg) => (
-              <div
-                className="cancelpreview-refund-leg"
-                key={leg.pagamentoAlocacaoId}
-              >
+            {cancelamento.pernasPendentes.map(leg => (
+              <div className="cancelpreview-refund-leg" key={leg.pagamentoAlocacaoId}>
                 <div>
                   <strong>{METODOS[leg.metodo] ?? leg.metodo}</strong>
                   <span>{dinheiro(leg.valorCentavos)}</span>
                 </div>
                 {leg.confirmacaoManualPermitida ? (
-                  <button
-                    type="button"
-                    onClick={() => void refund(leg)}
-                    disabled={saving}
-                  >
+                  <button type="button" onClick={() => void refund(leg)} disabled={saving}>
                     Confirmar devolução
                   </button>
                 ) : (
@@ -437,7 +439,10 @@ export default function CancelamentoItemPreviewModal({
                       <span>Não foi possível confirmar o resultado do estorno.</span>
                     )}
                     {leg.refundRemoto?.status === "RECUSADO" && (
-                      <span>O Mercado Pago recusou esta tentativa. Revise antes de iniciar outra operação.</span>
+                      <span>
+                        O Mercado Pago recusou esta tentativa. Revise antes de iniciar outra
+                        operação.
+                      </span>
                     )}
                     {remoteCanRun(leg) ? (
                       <button type="button" onClick={() => void refund(leg)} disabled={saving}>
@@ -464,6 +469,6 @@ export default function CancelamentoItemPreviewModal({
         )}
       </section>
     </div>,
-    document.body,
+    document.body
   );
 }

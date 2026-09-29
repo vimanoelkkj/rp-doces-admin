@@ -22,13 +22,15 @@ import { type MpPaymentResponse, isVerifiedMpResponse } from "./client";
 // direto.
 export async function resolveWebhookPayment(
   db: D1Database,
-  payment: MpPaymentResponse,
+  payment: MpPaymentResponse
 ): Promise<ResolveWebhookPaymentResult> {
   if (!isVerifiedMpResponse(payment)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
   const mpPaymentId = String(payment.id);
 
   const { results: diretos } = await db
-    .prepare(`SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`)
+    .prepare(
+      `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`
+    )
     .bind(mpPaymentId)
     .all<{ id: number }>();
   if (diretos.length > 1) return { kind: "ambiguous" };
@@ -41,7 +43,7 @@ export async function resolveWebhookPayment(
     .prepare(
       `SELECT id FROM pedido_pagamentos
        WHERE metodo = 'PIX_MP' AND origem = 'ADMIN' AND status IN ('PENDENTE', 'EXPIRADO') AND idempotency_key = ?
-       LIMIT 1`,
+       LIMIT 1`
     )
     .bind(externalReference)
     .first<{ id: number }>();
@@ -61,7 +63,7 @@ export async function resolveWebhookPayment(
     .prepare(
       `SELECT id FROM pedido_pagamentos
        WHERE pedido_id = ? AND metodo = 'PIX_MP' AND origem = 'SITE' AND status IN ('PENDENTE', 'EXPIRADO')
-       LIMIT 2`,
+       LIMIT 2`
     )
     .bind(pedido.id)
     .all<{ id: number }>();
@@ -72,7 +74,11 @@ export async function resolveWebhookPayment(
   return associateWebhookPayment(db, Number(candidatos[0].id), mpPaymentId);
 }
 
-async function associateWebhookPayment(db: D1Database, pagamentoId: number, mpPaymentId: string): Promise<ResolveWebhookPaymentResult> {
+async function associateWebhookPayment(
+  db: D1Database,
+  pagamentoId: number,
+  mpPaymentId: string
+): Promise<ResolveWebhookPaymentResult> {
   await db
     .prepare(
       `UPDATE pedido_pagamentos SET mp_payment_id = ?, atualizado_em = CURRENT_TIMESTAMP
@@ -82,22 +88,25 @@ async function associateWebhookPayment(db: D1Database, pagamentoId: number, mpPa
            WHERE candidato.pedido_id = pedido_pagamentos.pedido_id AND candidato.metodo = 'PIX_MP'
              AND candidato.origem = 'SITE' AND candidato.status IN ('PENDENTE', 'EXPIRADO')
          ) = 1)
-         AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos WHERE mp_payment_id = ? AND metodo = 'PIX_MP')`,
+         AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos WHERE mp_payment_id = ? AND metodo = 'PIX_MP')`
     )
     .bind(mpPaymentId, pagamentoId, mpPaymentId)
     .run();
   // Outro evento pode ter associado outro ID ou concluído a mesma associação.
   // Nunca retorna o candidato sem verificar quem de fato ficou com o ID.
-  const { results } = await db.prepare(
-    `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`,
-  ).bind(mpPaymentId).all<{ id: number }>();
+  const { results } = await db
+    .prepare(
+      `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`
+    )
+    .bind(mpPaymentId)
+    .all<{ id: number }>();
   return results.length === 1 && results[0].id === pagamentoId
     ? { kind: "found", pagamentoId }
     : { kind: "ambiguous" };
 }
 
 function hex(buffer: ArrayBuffer): string {
-  return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -113,12 +122,12 @@ function timingSafeEqual(a: string, b: string): boolean {
 export async function validateMpWebhookSignature(
   request: Request,
   secret: string,
-  dataId: string,
+  dataId: string
 ): Promise<boolean> {
   if (!secret) return false;
   const signature = request.headers.get("x-signature") || "";
   const requestId = request.headers.get("x-request-id") || "";
-  const parts = Object.fromEntries(signature.split(",").map((p) => p.trim().split("=")));
+  const parts = Object.fromEntries(signature.split(",").map(p => p.trim().split("=")));
   const ts = parts.ts;
   const v1 = parts.v1;
   if (!ts || !v1) return false;
@@ -133,7 +142,7 @@ export async function validateMpWebhookSignature(
     new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"],
+    ["sign"]
   );
   const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
   return timingSafeEqual(hex(digest), v1.toLowerCase());

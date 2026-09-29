@@ -78,7 +78,6 @@
   fill: var(--store-wave-primary);
 }
 
-
 .wave-secondary {
   fill: var(--store-wave-secondary);
   opacity: var(--store-wave-secondary-opacity);
@@ -618,7 +617,9 @@
   border-radius: 100px;
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.2s, transform 0.15s;
+  transition:
+    background-color 0.2s,
+    transform 0.15s;
 }
 
 .btn-instagram:hover {
@@ -774,7 +775,9 @@
   border-radius: 100px;
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.2s, transform 0.15s;
+  transition:
+    background-color 0.2s,
+    transform 0.15s;
 }
 .btn-whatsapp:hover {
   background: var(--store-btn-primary-hover);

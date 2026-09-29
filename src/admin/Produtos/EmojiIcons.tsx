@@ -255,5 +255,5 @@ export const EMOJI_OPTIONS: EmojiOption[] = [
   { char: "🥥", icon: <EmojiCoconut />, label: "Coco" },
   { char: "🍋", icon: <EmojiLemon />, label: "Limão" },
   { char: "🍯", icon: <EmojiHoney />, label: "Mel" },
-  { char: "🍪", icon: <EmojiCookie />, label: "Biscoito" },
+  { char: "🍪", icon: <EmojiCookie />, label: "Biscoito" }
 ];

@@ -2,39 +2,36 @@ const CACHE_NAME = "rp-admin-offline-v2";
 const OFFLINE_URL = "/admin-offline";
 
 // Precacheia a página estática de offline fallback e assets essenciais de notificação.
-self.addEventListener("install", (event) => {
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
+    caches.open(CACHE_NAME).then(async cache => {
       // Suporta tanto /admin-offline (pretty URL Cloudflare Pages) quanto /admin-offline.html
-      const response = await fetch(OFFLINE_URL).catch(() =>
-        fetch("/admin-offline.html"),
-      );
+      const response = await fetch(OFFLINE_URL).catch(() => fetch("/admin-offline.html"));
       if (response?.ok) {
         await cache.put(OFFLINE_URL, response.clone());
         await cache.put("/admin-offline.html", response);
       }
-      await cache.addAll([
-        "/icons/admin-badge-72.png",
-        "/icons/admin-icon-192.png",
-      ]).catch(() => {});
-    }),
+      await cache
+        .addAll(["/icons/admin-badge-72.png", "/icons/admin-icon-192.png"])
+        .catch(() => {});
+    })
   );
   self.skipWaiting();
 });
 
 // Remove caches antigos e assume controle imediatamente.
-self.addEventListener("activate", (event) => {
+self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)),
-      ),
-    ),
+    caches
+      .keys()
+      .then(keys =>
+        Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
+      )
   );
   self.clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
+self.addEventListener("fetch", event => {
   // Apenas requisições GET
   if (event.request.method !== "GET") {
     return;
@@ -56,10 +53,9 @@ self.addEventListener("fetch", (event) => {
       fetch(event.request).catch(async () => {
         const cache = await caches.open(CACHE_NAME);
         const cachedResponse =
-          (await cache.match(OFFLINE_URL)) ||
-          (await cache.match("/admin-offline.html"));
+          (await cache.match(OFFLINE_URL)) || (await cache.match("/admin-offline.html"));
         return cachedResponse || Response.error();
-      }),
+      })
     );
     return;
   }
@@ -72,7 +68,7 @@ self.addEventListener("fetch", (event) => {
 // Web Push Notifications (PWA Admin V2)
 // ─────────────────────────────────────────────────────────────
 
-self.addEventListener("push", (event) => {
+self.addEventListener("push", event => {
   let data = {};
   if (event.data) {
     try {
@@ -90,21 +86,22 @@ self.addEventListener("push", (event) => {
     tag: data.tag || (data.pedidoId ? `pedido-${data.pedidoId}` : "novo-pedido"),
     renotify: true,
     data: {
-      url: data.url || (data.pedidoId ? `/admin/pedidos?pedido=${data.pedidoId}` : "/admin/pedidos"),
-      pedidoId: data.pedidoId,
-    },
+      url:
+        data.url || (data.pedidoId ? `/admin/pedidos?pedido=${data.pedidoId}` : "/admin/pedidos"),
+      pedidoId: data.pedidoId
+    }
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-self.addEventListener("notificationclick", (event) => {
+self.addEventListener("notificationclick", event => {
   event.notification.close();
 
   const targetUrl = event.notification.data?.url || "/admin/pedidos";
 
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(windowClients => {
       // Se houver uma janela/aba aberta no escopo /admin, foca e navega nela
       for (const client of windowClients) {
         if ("focus" in client && client.url.includes("/admin")) {
@@ -115,6 +112,6 @@ self.addEventListener("notificationclick", (event) => {
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
-    }),
+    })
   );
 });

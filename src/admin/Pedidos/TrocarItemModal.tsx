@@ -52,9 +52,18 @@ interface Exchange {
   estoqueOrigemEstado?: string;
   estoqueDestinoEstado?: string | null;
   reembolsosConfirmados?: Array<{
-    id: number; metodo: string; valorCentavos: number; origem: string; mpRefundId: string | null;
+    id: number;
+    metodo: string;
+    valorCentavos: number;
+    origem: string;
+    mpRefundId: string | null;
   }>;
-  financeiro?: { status: string; totalCentavos: number; liquidoCentavos: number; saldoCentavos: number };
+  financeiro?: {
+    status: string;
+    totalCentavos: number;
+    liquidoCentavos: number;
+    saldoCentavos: number;
+  };
 }
 interface Props {
   orderId: number;
@@ -70,7 +79,7 @@ const labels: Record<string, string> = {
   DINHEIRO: "Dinheiro",
   CARTAO: "Cartão",
   PIX_EXTERNO: "Pix externo",
-  PIX_MP: "Pix Mercado Pago",
+  PIX_MP: "Pix Mercado Pago"
 };
 
 export default function TrocarItemModal({
@@ -79,7 +88,7 @@ export default function TrocarItemModal({
   existingExchangeId,
   existingExchangeStatus,
   onClose,
-  onChanged,
+  onChanged
 }: Props) {
   const modalProps = useAdminModal(true, onClose);
   const [products, setProducts] = useState<ProdutoAdmin[]>([]);
@@ -90,7 +99,7 @@ export default function TrocarItemModal({
       ? "LIBERAR_RESERVA"
       : item.estoque_estado === "BAIXADO"
         ? "NAO_REPOR"
-        : "NENHUMA",
+        : "NENHUMA"
   );
   const [preview, setPreview] = useState<Preview | null>(null);
   const [exchange, setExchange] = useState<Exchange | null>(null);
@@ -109,18 +118,18 @@ export default function TrocarItemModal({
       // pedida antes, de forma explícita.
       reconciliarPedido(orderId)
         .then(() => fetch(`/api/admin/pedidos/${orderId}/itens/${item.id}/trocas`))
-        .then(async (r) => {
+        .then(async r => {
           const b = await r.json();
           if (!r.ok) throw new Error(b.error);
           return b;
         })
-        .then((b) => {
+        .then(b => {
           if (active) {
             setExchange(b.troca);
             setError(null);
           }
         })
-        .catch((e) => {
+        .catch(e => {
           if (active) setError(e.message);
         })
         .finally(() => {
@@ -131,12 +140,10 @@ export default function TrocarItemModal({
       };
     }
     fetch("/api/admin/produtos")
-      .then((r) => r.json())
+      .then(r => r.json())
       .then((b: { produtos: ProdutoAdmin[] }) => {
         if (active) {
-          setProducts(
-            b.produtos.filter((p) => p.ativo === 1 && p.disponivel === 1),
-          );
+          setProducts(b.produtos.filter(p => p.ativo === 1 && p.disponivel === 1));
         }
       })
       .catch(() => {
@@ -149,7 +156,7 @@ export default function TrocarItemModal({
       active = false;
     };
   }, [existingExchangeId, existingExchangeStatus, item.id, orderId]);
-  const product = products.find((p) => p.id === productId) ?? null;
+  const product = products.find(p => p.id === productId) ?? null;
   const price = product ? precoVigenteCentavos(product) : 0;
   useEffect(() => {
     if (!product || quantity < 1) {
@@ -161,23 +168,21 @@ export default function TrocarItemModal({
       produtoDestinoId: String(product.id),
       quantidadeDestino: String(quantity),
       precoEsperadoCentavos: String(price),
-      estoqueAcaoOrigem: action,
+      estoqueAcaoOrigem: action
     });
-    fetch(
-      `/api/admin/pedidos/${orderId}/itens/${item.id}/troca-preview?${query}`,
-    )
-      .then(async (r) => {
+    fetch(`/api/admin/pedidos/${orderId}/itens/${item.id}/troca-preview?${query}`)
+      .then(async r => {
         const b = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(b.error ?? "Falha ao calcular troca");
         return b as Preview;
       })
-      .then((p) => {
+      .then(p => {
         if (active) {
           setPreview(p);
           setError(null);
         }
       })
-      .catch((e) => active && setError(e.message));
+      .catch(e => active && setError(e.message));
     return () => {
       active = false;
     };
@@ -189,7 +194,7 @@ export default function TrocarItemModal({
       quantity,
       price,
       action,
-      preview: preview.previewFingerprint,
+      preview: preview.previewFingerprint
     });
     if (signatureRef.current !== signature) {
       keyRef.current = novaOperationKey();
@@ -198,21 +203,18 @@ export default function TrocarItemModal({
     setSaving(true);
     setError(null);
     try {
-      const r = await fetch(
-        `/api/admin/pedidos/${orderId}/itens/${item.id}/trocas`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            operationKey: keyRef.current,
-            produtoDestinoId: product.id,
-            quantidadeDestino: quantity,
-            precoEsperadoCentavos: price,
-            estoqueAcaoOrigem: action,
-            previewFingerprint: preview.previewFingerprint,
-          }),
-        },
-      );
+      const r = await fetch(`/api/admin/pedidos/${orderId}/itens/${item.id}/trocas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operationKey: keyRef.current,
+          produtoDestinoId: product.id,
+          quantidadeDestino: quantity,
+          precoEsperadoCentavos: price,
+          estoqueAcaoOrigem: action,
+          previewFingerprint: preview.previewFingerprint
+        })
+      });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(b.error ?? "Falha ao executar troca");
       setExchange(b.troca);
@@ -233,20 +235,17 @@ export default function TrocarItemModal({
     setSaving(true);
     setError(null);
     try {
-      const r = await fetch(
-        `/api/admin/pedidos/${orderId}/trocas/${exchange.id}/reembolsos`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            operationKey: key,
-            pagamentoId: leg.pagamentoId,
-            pagamentoAlocacaoId: leg.pagamentoAlocacaoId,
-            valorCentavos: leg.valorCentavos,
-            confirmacao: true,
-          }),
-        },
-      );
+      const r = await fetch(`/api/admin/pedidos/${orderId}/trocas/${exchange.id}/reembolsos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operationKey: key,
+          pagamentoId: leg.pagamentoId,
+          pagamentoAlocacaoId: leg.pagamentoAlocacaoId,
+          valorCentavos: leg.valorCentavos,
+          confirmacao: true
+        })
+      });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(b.error ?? "Falha ao registrar devolução");
       if (b.refundStatus === "CONFIRMADO" || !b.refundStatus)
@@ -295,28 +294,36 @@ export default function TrocarItemModal({
           <div className="additem-form">
             <label className="additem-field">
               <span>Novo produto</span>
-              <div className={`additem-dropdown${productDropdownOpen ? " additem-dropdown--open" : ""}`}>
+              <div
+                className={`additem-dropdown${productDropdownOpen ? " additem-dropdown--open" : ""}`}
+              >
                 <button
                   type="button"
                   className="additem-dropdown-trigger"
-                  onClick={() => setProductDropdownOpen((open) => !open)}
+                  onClick={() => setProductDropdownOpen(open => !open)}
                   onBlur={() => setTimeout(() => setProductDropdownOpen(false), 150)}
                 >
                   <span>
                     {(() => {
-                      const selected = products.find((p) => p.id === productId);
+                      const selected = products.find(p => p.id === productId);
                       return selected
                         ? `${selected.nome} · ${money(precoVigenteCentavos(selected))} · ${free(selected)} disponíveis`
                         : "Selecione";
                     })()}
                   </span>
                   <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
-                    <path d="M1 1.5L6 6.5L11 1.5" stroke="#634738" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M1 1.5L6 6.5L11 1.5"
+                      stroke="#634738"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </button>
                 {productDropdownOpen && (
                   <ul className="additem-dropdown-list">
-                    {products.map((p) => (
+                    {products.map(p => (
                       <li key={p.id}>
                         <button
                           type="button"
@@ -342,30 +349,42 @@ export default function TrocarItemModal({
                 min="1"
                 max="50"
                 value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
+                onChange={e => setQuantity(Number(e.target.value))}
               />
             </label>
             {item.estoque_estado === "BAIXADO" && (
               <label className="additem-field">
                 <span>Produto atual</span>
-                <div className={`additem-dropdown${actionDropdownOpen ? " additem-dropdown--open" : ""}`}>
+                <div
+                  className={`additem-dropdown${actionDropdownOpen ? " additem-dropdown--open" : ""}`}
+                >
                   <button
                     type="button"
                     className="additem-dropdown-trigger"
-                    onClick={() => setActionDropdownOpen((open) => !open)}
+                    onClick={() => setActionDropdownOpen(open => !open)}
                     onBlur={() => setTimeout(() => setActionDropdownOpen(false), 150)}
                   >
-                    <span>{action === "REPOR" ? "Voltou fisicamente ao estoque" : "Não voltou ao estoque"}</span>
+                    <span>
+                      {action === "REPOR"
+                        ? "Voltou fisicamente ao estoque"
+                        : "Não voltou ao estoque"}
+                    </span>
                     <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
-                      <path d="M1 1.5L6 6.5L11 1.5" stroke="#634738" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M1 1.5L6 6.5L11 1.5"
+                        stroke="#634738"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </button>
                   {actionDropdownOpen && (
                     <ul className="additem-dropdown-list">
                       {[
                         { value: "NAO_REPOR", label: "Não voltou ao estoque" },
-                        { value: "REPOR", label: "Voltou fisicamente ao estoque" },
-                      ].map((option) => (
+                        { value: "REPOR", label: "Voltou fisicamente ao estoque" }
+                      ].map(option => (
                         <li key={option.value}>
                           <button
                             type="button"
@@ -408,20 +427,16 @@ export default function TrocarItemModal({
                   </div>
                   <div>
                     <span>Saldo após troca</span>
-                    <strong>
-                      {money(preview.financeiro.saldoProjetadoCentavos)}
-                    </strong>
+                    <strong>{money(preview.financeiro.saldoProjetadoCentavos)}</strong>
                   </div>
                   {preview.financeiro.excessoProjetadoCentavos > 0 && (
                     <div>
                       <span>Será necessário devolver</span>
-                      <strong>
-                        {money(preview.financeiro.excessoProjetadoCentavos)}
-                      </strong>
+                      <strong>{money(preview.financeiro.excessoProjetadoCentavos)}</strong>
                     </div>
                   )}
                 </div>
-                {preview.bloqueios.map((b) => (
+                {preview.bloqueios.map(b => (
                   <div className="cancelpreview-block" key={b.codigo}>
                     {b.mensagem}
                   </div>
@@ -457,28 +472,40 @@ export default function TrocarItemModal({
             </div>
             {exchange.financeiro && (
               <div className="cancelpreview-values">
-                <div><span>Total atual</span><strong>{money(exchange.financeiro.totalCentavos)}</strong></div>
-                <div><span>Pago líquido</span><strong>{money(exchange.financeiro.liquidoCentavos)}</strong></div>
-                <div><span>Saldo</span><strong>{money(exchange.financeiro.saldoCentavos)}</strong></div>
-                <div><span>Estoque origem</span><strong>{exchange.estoqueOrigemEstado}</strong></div>
+                <div>
+                  <span>Total atual</span>
+                  <strong>{money(exchange.financeiro.totalCentavos)}</strong>
+                </div>
+                <div>
+                  <span>Pago líquido</span>
+                  <strong>{money(exchange.financeiro.liquidoCentavos)}</strong>
+                </div>
+                <div>
+                  <span>Saldo</span>
+                  <strong>{money(exchange.financeiro.saldoCentavos)}</strong>
+                </div>
+                <div>
+                  <span>Estoque origem</span>
+                  <strong>{exchange.estoqueOrigemEstado}</strong>
+                </div>
               </div>
             )}
             {(exchange.reembolsosConfirmados?.length ?? 0) > 0 && (
               <div className="cancelpreview-section">
                 <span className="cancelpreview-label">Devoluções confirmadas</span>
-                {exchange.reembolsosConfirmados?.map((refund) => (
+                {exchange.reembolsosConfirmados?.map(refund => (
                   <div className="cancelpreview-refund-leg" key={refund.id}>
-                    <div><strong>{labels[refund.metodo] ?? refund.metodo}</strong><span>{money(refund.valorCentavos)}</span></div>
+                    <div>
+                      <strong>{labels[refund.metodo] ?? refund.metodo}</strong>
+                      <span>{money(refund.valorCentavos)}</span>
+                    </div>
                     <span>Confirmado</span>
                   </div>
                 ))}
               </div>
             )}
-            {exchange.refundsPendentes.map((leg) => (
-              <div
-                className="cancelpreview-refund-leg"
-                key={leg.pagamentoAlocacaoId}
-              >
+            {exchange.refundsPendentes.map(leg => (
+              <div className="cancelpreview-refund-leg" key={leg.pagamentoAlocacaoId}>
                 <div>
                   <strong>{labels[leg.metodo] ?? leg.metodo}</strong>
                   <span>{money(leg.valorCentavos)}</span>
@@ -493,10 +520,15 @@ export default function TrocarItemModal({
                       <span>Não foi possível confirmar o resultado do estorno.</span>
                     )}
                     {leg.refundRemoto?.status === "RECUSADO" && (
-                      <span>O Mercado Pago recusou esta tentativa. Revise antes de iniciar outra operação.</span>
+                      <span>
+                        O Mercado Pago recusou esta tentativa. Revise antes de iniciar outra
+                        operação.
+                      </span>
                     )}
                     {remoteCanRun(leg) ? (
-                      <button type="button" onClick={() => void refund(leg)} disabled={saving}>{remoteLabel(leg)}</button>
+                      <button type="button" onClick={() => void refund(leg)} disabled={saving}>
+                        {remoteLabel(leg)}
+                      </button>
                     ) : (
                       <span>{remoteLabel(leg)}</span>
                     )}
@@ -510,12 +542,14 @@ export default function TrocarItemModal({
                   ? `Pendente: ${money(exchange.reembolsoPendenteCentavos)}`
                   : "Sem devoluções pendentes"}
               </span>
-              <button type="button" onClick={onClose}>Fechar</button>
+              <button type="button" onClick={onClose}>
+                Fechar
+              </button>
             </div>
           </div>
         )}
       </section>
     </div>,
-    document.body,
+    document.body
   );
 }

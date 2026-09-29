@@ -28,7 +28,7 @@ export function financialLineageCte(seedSql: string, name = "linhagem_financeira
 export function financialLineageMembership(
   allocationItemSql: string,
   seedSql: string,
-  name = "linhagem_financeira",
+  name = "linhagem_financeira"
 ): string {
   return `${allocationItemSql} IN (
     WITH RECURSIVE ${financialLineageCte(seedSql, name)}
@@ -64,11 +64,15 @@ export function chargeableCapacitySql(excludedPaymentSql = "NULL"): string {
 export async function financialChargeSlotKey(
   db: D1Database,
   pedidoId: number,
-  kind: "pix" | "manual",
+  kind: "pix" | "manual"
 ): Promise<string> {
-  const revision = await db.prepare(`SELECT
+  const revision = await db
+    .prepare(
+      `SELECT
       COALESCE((SELECT MAX(id) FROM pedido_pagamentos WHERE pedido_id=?),0) AS pagamento_id,
-      COALESCE((SELECT MAX(id) FROM pedido_reembolsos WHERE pedido_id=?),0) AS reembolso_id`)
-    .bind(pedidoId, pedidoId).first<{ pagamento_id: number; reembolso_id: number }>();
+      COALESCE((SELECT MAX(id) FROM pedido_reembolsos WHERE pedido_id=?),0) AS reembolso_id`
+    )
+    .bind(pedidoId, pedidoId)
+    .first<{ pagamento_id: number; reembolso_id: number }>();
   return `charge-slot:${kind}:${pedidoId}:${Number(revision?.pagamento_id || 0)}:${Number(revision?.reembolso_id || 0)}`;
 }

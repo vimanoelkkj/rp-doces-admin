@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import {
   useStoreTheme,
   type StoreTheme,
-  type ThemeTransitionOrigin,
+  type ThemeTransitionOrigin
 } from "../../context/StoreThemeContext";
 
 export type AdminTheme = StoreTheme;
@@ -13,7 +13,7 @@ export function useAdminTheme() {
   return {
     theme: theme as AdminTheme,
     toggleTheme: toggleTheme as (origin?: AdminThemeTransitionOrigin) => void,
-    setTheme: setTheme as (theme: AdminTheme, origin?: AdminThemeTransitionOrigin) => void,
+    setTheme: setTheme as (theme: AdminTheme, origin?: AdminThemeTransitionOrigin) => void
   };
 }
 

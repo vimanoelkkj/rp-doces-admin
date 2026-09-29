@@ -25,20 +25,14 @@ const METODOS_PERMITIDOS: ReadonlySet<string> = new Set([
   "DINHEIRO",
   "CARTAO",
   "PIX_EXTERNO",
-  "A_COMBINAR",
+  "A_COMBINAR"
 ]);
-const METODOS_CONFIRMAVEIS: ReadonlySet<string> = new Set([
-  "DINHEIRO",
-  "CARTAO",
-  "PIX_EXTERNO",
-]);
+const METODOS_CONFIRMAVEIS: ReadonlySet<string> = new Set(["DINHEIRO", "CARTAO", "PIX_EXTERNO"]);
 const STATUS_PAGAMENTO_VALIDOS: ReadonlySet<string> = new Set(["PENDENTE", "PAGO"]);
 
 export function normalizeManualItems(
-  raw: unknown,
-):
-  | { ok: true; itens: ItemManualInput[] }
-  | { ok: false; erro: string } {
+  raw: unknown
+): { ok: true; itens: ItemManualInput[] } | { ok: false; erro: string } {
   if (!Array.isArray(raw) || raw.length === 0) {
     return { ok: false, erro: "O pedido precisa ter ao menos um item" };
   }
@@ -75,10 +69,8 @@ export function normalizeManualItems(
 
 export function validarMetodoEStatus(
   metodo: unknown,
-  status: unknown,
-):
-  | { ok: true; metodo: LedgerMetodo; status: "PENDENTE" | "PAGO" }
-  | { ok: false; erro: string } {
+  status: unknown
+): { ok: true; metodo: LedgerMetodo; status: "PENDENTE" | "PAGO" } | { ok: false; erro: string } {
   if (typeof status !== "string" || !STATUS_PAGAMENTO_VALIDOS.has(status)) {
     return { ok: false, erro: "Situação de pagamento inválida" };
   }
@@ -86,7 +78,7 @@ export function validarMetodoEStatus(
     return { ok: false, erro: "Método de pagamento inválido" };
   }
   if (status === "PAGO" && !METODOS_CONFIRMAVEIS.has(metodo)) {
-    return { ok: false, erro: "\"A combinar\" não é válido para um pedido já pago" };
+    return { ok: false, erro: '"A combinar" não é válido para um pedido já pago' };
   }
   return { ok: true, metodo: metodo as LedgerMetodo, status: status as "PENDENTE" | "PAGO" };
 }

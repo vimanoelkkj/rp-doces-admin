@@ -28,33 +28,52 @@ export function isVerifiedMpResponse(mp: MpPaymentResponse): boolean {
 // do corpo e evita prender polling/lote administrativo por tempo indefinido.
 export const MP_PAYMENT_GET_TIMEOUT_MS = 5000;
 
-export async function fetchMpPayment(accessToken: string, paymentId: string): Promise<MpPaymentResponse> {
+export async function fetchMpPayment(
+  accessToken: string,
+  paymentId: string
+): Promise<MpPaymentResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MP_PAYMENT_GET_TIMEOUT_MS);
   try {
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
-      headers: { Authorization: `Bearer ${accessToken}` }, signal: controller.signal,
-    });
+    const response = await fetch(
+      `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: controller.signal
+      }
+    );
     if (!response.ok) {
-      const err = new Error(`Mercado Pago respondeu ${response.status}`) as Error & { status?: number };
+      const err = new Error(`Mercado Pago respondeu ${response.status}`) as Error & {
+        status?: number;
+      };
       err.status = response.status;
       throw err;
     }
-    const payment = await response.json() as Omit<MpPaymentResponse, typeof MP_GET_VERIFIED>;
-    if (!payment || String(payment.id) !== paymentId || typeof payment.status !== "string" || !payment.status) {
+    const payment = (await response.json()) as Omit<MpPaymentResponse, typeof MP_GET_VERIFIED>;
+    if (
+      !payment ||
+      String(payment.id) !== paymentId ||
+      typeof payment.status !== "string" ||
+      !payment.status
+    ) {
       throw new Error("RESPOSTA_MP_INVALIDA_OU_ID_DIVERGENTE");
     }
     const verified = Object.freeze({
-      id: payment.id, status: payment.status,
-      status_detail: payment.status_detail, date_approved: payment.date_approved,
-      external_reference: typeof payment.external_reference === "string" ? payment.external_reference : null,
+      id: payment.id,
+      status: payment.status,
+      status_detail: payment.status_detail,
+      date_approved: payment.date_approved,
+      external_reference:
+        typeof payment.external_reference === "string" ? payment.external_reference : null,
       transaction_amount:
-        typeof payment.transaction_amount === "number" || typeof payment.transaction_amount === "string"
+        typeof payment.transaction_amount === "number" ||
+        typeof payment.transaction_amount === "string"
           ? payment.transaction_amount
           : null,
-      payment_method_id: typeof payment.payment_method_id === "string" ? payment.payment_method_id : null,
+      payment_method_id:
+        typeof payment.payment_method_id === "string" ? payment.payment_method_id : null,
       currency_id: typeof payment.currency_id === "string" ? payment.currency_id : null,
-      [MP_GET_VERIFIED]: true as const,
+      [MP_GET_VERIFIED]: true as const
     });
     verifiedMpResponses.add(verified);
     return verified;

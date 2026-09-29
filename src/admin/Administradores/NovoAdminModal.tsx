@@ -76,7 +76,7 @@ interface NovoAdminModalProps {
 const LEVELS = ["Mestre", "Administrador"] as const;
 const LEVEL_TO_PAPEL: Record<string, string> = {
   Mestre: "OWNER",
-  Administrador: "ADMIN",
+  Administrador: "ADMIN"
 };
 
 function validarSenha(senha: string): string | null {
@@ -87,11 +87,7 @@ function validarSenha(senha: string): string | null {
   return null;
 }
 
-export default function NovoAdminModal({
-  open,
-  onClose,
-  onSaved,
-}: NovoAdminModalProps) {
+export default function NovoAdminModal({ open, onClose, onSaved }: NovoAdminModalProps) {
   const modalProps = useAdminModal(open, onClose);
   const fieldId = useId();
   const [name, setName] = useState("");
@@ -108,12 +104,7 @@ export default function NovoAdminModal({
 
   const passwordsMatch = password === confirmPassword;
   const senhaErro = validarSenha(password);
-  const canSubmit =
-    name.trim() &&
-    handle.trim() &&
-    email.trim() &&
-    !senhaErro &&
-    passwordsMatch;
+  const canSubmit = name.trim() && handle.trim() && email.trim() && !senhaErro && passwordsMatch;
 
   const resetForm = () => {
     setName("");
@@ -139,10 +130,10 @@ export default function NovoAdminModal({
         username: handle,
         email,
         senha: password,
-        papel: LEVEL_TO_PAPEL[level],
-      }),
+        papel: LEVEL_TO_PAPEL[level]
+      })
     })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error ?? "Falha ao criar administrador");
@@ -151,10 +142,8 @@ export default function NovoAdminModal({
         onSaved();
         onClose();
       })
-      .catch((err) => {
-        setError(
-          err instanceof Error ? err.message : "Falha ao criar administrador",
-        );
+      .catch(err => {
+        setError(err instanceof Error ? err.message : "Falha ao criar administrador");
       })
       .finally(() => setSaving(false));
   };
@@ -169,11 +158,14 @@ export default function NovoAdminModal({
           <div>
             <span className="nadm-kicker">EQUIPE</span>
             <h2 className="nadm-title">Novo administrador</h2>
-            <p className="nadm-subtitle">
-              Crie uma conta para um novo membro da equipe.
-            </p>
+            <p className="nadm-subtitle">Crie uma conta para um novo membro da equipe.</p>
           </div>
-          <button type="button" className="nadm-close" aria-label="Fechar novo administrador" onClick={onClose}>
+          <button
+            type="button"
+            className="nadm-close"
+            aria-label="Fechar novo administrador"
+            onClick={onClose}
+          >
             <IconClose />
           </button>
         </div>
@@ -188,7 +180,7 @@ export default function NovoAdminModal({
               type="text"
               placeholder="Ex.: Maria Silva"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={e => setName(e.target.value)}
             />
           </div>
 
@@ -203,9 +195,7 @@ export default function NovoAdminModal({
                   type="text"
                   placeholder="usuario"
                   value={handle}
-                  onChange={(e) =>
-                    setHandle(e.target.value.replace(/\s/g, "").toLowerCase())
-                  }
+                  onChange={e => setHandle(e.target.value.replace(/\s/g, "").toLowerCase())}
                   className="nadm-input-with-prefix"
                 />
               </div>
@@ -215,9 +205,7 @@ export default function NovoAdminModal({
               <label id={`${fieldId}-nivel-label`} htmlFor={`${fieldId}-nivel`}>
                 NÍVEL DE ACESSO
               </label>
-              <div
-                className={`nadm-dropdown ${levelOpen ? "nadm-dropdown--open" : ""}`}
-              >
+              <div className={`nadm-dropdown ${levelOpen ? "nadm-dropdown--open" : ""}`}>
                 <button
                   id={`${fieldId}-nivel`}
                   type="button"
@@ -231,7 +219,7 @@ export default function NovoAdminModal({
                 </button>
                 {levelOpen && (
                   <ul className="nadm-dropdown-list">
-                    {LEVELS.map((lv) => (
+                    {LEVELS.map(lv => (
                       <li key={lv}>
                         <button
                           type="button"
@@ -259,7 +247,7 @@ export default function NovoAdminModal({
               type="email"
               placeholder="email@exemplo.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
             />
           </div>
 
@@ -273,7 +261,7 @@ export default function NovoAdminModal({
                   type={showPassword ? "text" : "password"}
                   placeholder="Mín. 8 caracteres"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={e => setPassword(e.target.value)}
                 />
                 <button
                   type="button"
@@ -294,17 +282,15 @@ export default function NovoAdminModal({
                   type={showConfirm ? "text" : "password"}
                   placeholder="Repita a senha"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={
-                    confirmPassword && !passwordsMatch
-                      ? "nadm-input--error"
-                      : ""
-                  }
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className={confirmPassword && !passwordsMatch ? "nadm-input--error" : ""}
                 />
                 <button
                   type="button"
                   className="nadm-eye-btn"
-                  aria-label={showConfirm ? "Ocultar confirmação da senha" : "Mostrar confirmação da senha"}
+                  aria-label={
+                    showConfirm ? "Ocultar confirmação da senha" : "Mostrar confirmação da senha"
+                  }
                   onClick={() => setShowConfirm(!showConfirm)}
                 >
                   {showConfirm ? <IconEyeOff /> : <IconEye />}
@@ -333,8 +319,8 @@ export default function NovoAdminModal({
               <path d="M10 9v5M10 6.5v0" />
             </svg>
             <p>
-              Compartilhe a senha com o novo administrador por um canal
-              seguro. Recomendamos que ele a altere no primeiro login.
+              Compartilhe a senha com o novo administrador por um canal seguro. Recomendamos que ele
+              a altere no primeiro login.
             </p>
           </div>
 
@@ -345,17 +331,13 @@ export default function NovoAdminModal({
             <button type="button" className="nadm-btn-cancel" onClick={onClose}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="nadm-btn-save"
-              disabled={!canSubmit || saving}
-            >
+            <button type="submit" className="nadm-btn-save" disabled={!canSubmit || saving}>
               {saving ? "Criando…" : "Criar conta"}
             </button>
           </div>
         </form>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

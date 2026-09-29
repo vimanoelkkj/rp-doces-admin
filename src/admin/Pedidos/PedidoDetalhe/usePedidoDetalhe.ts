@@ -4,7 +4,7 @@ import type {
   MetodoPagamentoManual,
   PedidoDetalheResponse,
   PedidoItemRow,
-  StatusPedido,
+  StatusPedido
 } from "./types";
 import { parseValorPagamento, valorPagamentoInicial } from "./helpers";
 
@@ -14,11 +14,7 @@ interface UsePedidoDetalheArgs {
   onStatusChanged?: () => void;
 }
 
-export function usePedidoDetalhe({
-  orderId,
-  onClose,
-  onStatusChanged,
-}: UsePedidoDetalheArgs) {
+export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedidoDetalheArgs) {
   const [data, setData] = useState<PedidoDetalheResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +29,7 @@ export function usePedidoDetalhe({
   const [salvandoNome, setSalvandoNome] = useState(false);
   const [nomeError, setNomeError] = useState<string | null>(null);
   const [registrandoPagamento, setRegistrandoPagamento] = useState(false);
-  const [metodoPagamento, setMetodoPagamento] =
-    useState<MetodoPagamentoManual>("DINHEIRO");
+  const [metodoPagamento, setMetodoPagamento] = useState<MetodoPagamentoManual>("DINHEIRO");
   const [valorPagamento, setValorPagamento] = useState("");
   const [pagamentoEmVoo, setPagamentoEmVoo] = useState(false);
   const [pagamentoError, setPagamentoError] = useState<string | null>(null);
@@ -73,53 +68,56 @@ export function usePedidoDetalhe({
   // pode nascer como uma segunda cobrança com outra identidade no MP.
   const pixKeysRef = useRef<Map<string, string>>(new Map());
 
-  const carregarPedido = useCallback((silencioso = false) => {
-    if (!silencioso) setLoading(true);
-    return fetch(`/api/admin/pedidos/${orderId}/reconciliar`, { method: "POST" })
-      .catch((err) => {
-        console.warn("Falha na reconciliação da comanda", err);
-      })
-      .then(() => fetch(`/api/admin/pedidos/${orderId}`))
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Falha ao carregar pedido");
-        return response.json() as Promise<PedidoDetalheResponse>;
-      })
-      .then((result) => {
-        const anterior = dataRef.current;
-        const financeiroMudou = Boolean(
-          anterior &&
+  const carregarPedido = useCallback(
+    (silencioso = false) => {
+      if (!silencioso) setLoading(true);
+      return fetch(`/api/admin/pedidos/${orderId}/reconciliar`, { method: "POST" })
+        .catch(err => {
+          console.warn("Falha na reconciliação da comanda", err);
+        })
+        .then(() => fetch(`/api/admin/pedidos/${orderId}`))
+        .then(async response => {
+          if (!response.ok) throw new Error("Falha ao carregar pedido");
+          return response.json() as Promise<PedidoDetalheResponse>;
+        })
+        .then(result => {
+          const anterior = dataRef.current;
+          const financeiroMudou = Boolean(
+            anterior &&
             (anterior.financeiro.status !== result.financeiro.status ||
               anterior.financeiro.pagoCentavos !== result.financeiro.pagoCentavos ||
-              anterior.financeiro.totalCentavos !== result.financeiro.totalCentavos),
-        );
-        dataRef.current = result;
-        setData(result);
-        if (result.anulacao) {
-          setEditandoNome(false);
-          setRegistrandoPagamento(false);
-          setAdicionandoItem(false);
-          setItemCancelamentoPreviewId(null);
-          setItemTroca(null);
-          setConfirmarArquivamento(false);
-          setConfirmarExclusao(false);
-          if (anterior && !anterior.anulacao) onStatusChangedRef.current?.();
-        }
-        // O modal de troca pode permanecer aberto durante a confirmação do
-        // Pix. Mantém o item aberto ligado à fotografia mais recente do GET
-        // para que a mudança AGUARDANDO_COBRANCA -> CONCLUIDA também atualize
-        // o detalhe da troca, sem criar um segundo polling.
-        setItemTroca((aberto) => {
-          if (!aberto) return aberto;
-          return result.itens.find((item) => item.id === aberto.id) ?? aberto;
+              anterior.financeiro.totalCentavos !== result.financeiro.totalCentavos)
+          );
+          dataRef.current = result;
+          setData(result);
+          if (result.anulacao) {
+            setEditandoNome(false);
+            setRegistrandoPagamento(false);
+            setAdicionandoItem(false);
+            setItemCancelamentoPreviewId(null);
+            setItemTroca(null);
+            setConfirmarArquivamento(false);
+            setConfirmarExclusao(false);
+            if (anterior && !anterior.anulacao) onStatusChangedRef.current?.();
+          }
+          // O modal de troca pode permanecer aberto durante a confirmação do
+          // Pix. Mantém o item aberto ligado à fotografia mais recente do GET
+          // para que a mudança AGUARDANDO_COBRANCA -> CONCLUIDA também atualize
+          // o detalhe da troca, sem criar um segundo polling.
+          setItemTroca(aberto => {
+            if (!aberto) return aberto;
+            return result.itens.find(item => item.id === aberto.id) ?? aberto;
+          });
+          setError(null);
+          if (silencioso && financeiroMudou) onStatusChangedRef.current?.();
+        })
+        .catch(err => setError(err.message))
+        .finally(() => {
+          if (!silencioso) setLoading(false);
         });
-        setError(null);
-        if (silencioso && financeiroMudou) onStatusChangedRef.current?.();
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => {
-        if (!silencioso) setLoading(false);
-      });
-  }, [orderId]);
+    },
+    [orderId]
+  );
 
   useEffect(() => {
     dataRef.current = null;
@@ -173,12 +171,10 @@ export function usePedidoDetalhe({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
-        substituiId
-          ? { substituiId, operationKey }
-          : { operationKey, valorCentavos },
-      ),
+        substituiId ? { substituiId, operationKey } : { operationKey, valorCentavos }
+      )
     })
-      .then(async (response) => {
+      .then(async response => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
           // Erro ambíguo ou operação ainda em processamento (código, não
@@ -203,7 +199,7 @@ export function usePedidoDetalhe({
         pixKeysRef.current.delete(acao);
         return carregarPedido(true);
       })
-      .catch((err) => setPixError(err.message))
+      .catch(err => setPixError(err.message))
       .finally(() => {
         pixEmVooRef.current.delete(acao);
         setGerando(false);
@@ -214,7 +210,7 @@ export function usePedidoDetalhe({
   const copiarCodigo = (pixId: number, codigo: string) => {
     navigator.clipboard.writeText(codigo);
     setCopiedId(pixId);
-    setTimeout(() => setCopiedId((atual) => (atual === pixId ? null : atual)), 2000);
+    setTimeout(() => setCopiedId(atual => (atual === pixId ? null : atual)), 2000);
   };
 
   const alterarStatus = (novoStatus: StatusPedido) => {
@@ -225,21 +221,19 @@ export function usePedidoDetalhe({
     fetch(`/api/admin/pedidos/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ statusPedido: novoStatus }),
+      body: JSON.stringify({ statusPedido: novoStatus })
     })
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.error ?? "Falha ao alterar status");
         }
-        setData((prev) =>
-          prev
-            ? { ...prev, pedido: { ...prev.pedido, status_pedido: novoStatus } }
-            : prev,
+        setData(prev =>
+          prev ? { ...prev, pedido: { ...prev.pedido, status_pedido: novoStatus } } : prev
         );
         onStatusChanged?.();
       })
-      .catch((err) => setStatusError(err.message))
+      .catch(err => setStatusError(err.message))
       .finally(() => setAlterando(false));
   };
 
@@ -251,9 +245,9 @@ export function usePedidoDetalhe({
     fetch(`/api/admin/pedidos/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ arquivado: arquivar }),
+      body: JSON.stringify({ arquivado: arquivar })
     })
-      .then(async (response) => {
+      .then(async response => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(body.error ?? "Falha ao alterar arquivamento");
@@ -261,7 +255,7 @@ export function usePedidoDetalhe({
         onStatusChangedRef.current?.();
         onClose();
       })
-      .catch((err) => setArquivamentoError(err.message))
+      .catch(err => setArquivamentoError(err.message))
       .finally(() => setArquivando(false));
   };
 
@@ -302,28 +296,28 @@ export function usePedidoDetalhe({
     fetch(`/api/admin/pedidos/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clienteNome: nomeNormalizado }),
+      body: JSON.stringify({ clienteNome: nomeNormalizado })
     })
-      .then(async (response) => {
+      .then(async response => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(body.error ?? "Falha ao alterar nome da cliente");
         }
-        setData((prev) =>
+        setData(prev =>
           prev
             ? {
                 ...prev,
                 pedido: {
                   ...prev.pedido,
-                  cliente_nome: body.clienteNome ?? nomeNormalizado,
-                },
+                  cliente_nome: body.clienteNome ?? nomeNormalizado
+                }
               }
-            : prev,
+            : prev
         );
         setEditandoNome(false);
         onStatusChangedRef.current?.();
       })
-      .catch((err) => setNomeError(err.message))
+      .catch(err => setNomeError(err.message))
       .finally(() => setSalvandoNome(false));
   };
 
@@ -362,9 +356,9 @@ export function usePedidoDetalhe({
     fetch(`/api/admin/pedidos/${orderId}/pagamentos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ metodo: metodoPagamento, valorCentavos, operationKey }),
+      body: JSON.stringify({ metodo: metodoPagamento, valorCentavos, operationKey })
     })
-      .then(async (response) => {
+      .then(async response => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(body.error ?? "Falha ao registrar pagamento");
@@ -373,7 +367,7 @@ export function usePedidoDetalhe({
         setRegistrandoPagamento(false);
         return carregarPedido(true);
       })
-      .catch((err) => setPagamentoError(err.message))
+      .catch(err => setPagamentoError(err.message))
       .finally(() => {
         pagamentoEmVooRef.current = false;
         setPagamentoEmVoo(false);
@@ -382,7 +376,7 @@ export function usePedidoDetalhe({
 
   const anulado = Boolean(data?.anulacao);
   const trocaAguardandoCobranca = Boolean(
-    data?.itens.some((item) => item.troca_status === "AGUARDANDO_COBRANCA"),
+    data?.itens.some(item => item.troca_status === "AGUARDANDO_COBRANCA")
   );
 
   // "Ver detalhes" no histórico fecha o histórico e abre o modal específico
@@ -395,7 +389,7 @@ export function usePedidoDetalhe({
   };
   const verTrocaDoHistorico = (itemId: number) => {
     if (anulado) return;
-    const item = data?.itens.find((i) => i.id === itemId);
+    const item = data?.itens.find(i => i.id === itemId);
     setHistoricoAberto(false);
     if (item) setItemTroca(item);
   };
@@ -456,6 +450,6 @@ export function usePedidoDetalhe({
     abrirRegistroPagamento,
     registrarPagamento,
     verCancelamentoDoHistorico,
-    verTrocaDoHistorico,
+    verTrocaDoHistorico
   };
 }

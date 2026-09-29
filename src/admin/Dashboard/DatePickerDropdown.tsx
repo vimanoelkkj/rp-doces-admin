@@ -20,7 +20,7 @@ const MONTHS = [
   "Setembro",
   "Outubro",
   "Novembro",
-  "Dezembro",
+  "Dezembro"
 ];
 
 function isSameDay(a: Date, b: Date) {
@@ -33,11 +33,7 @@ function isSameDay(a: Date, b: Date) {
 
 function isAfterToday(d: Date, today: Date) {
   const dOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const todayOnly = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
+  const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   return dOnly.getTime() > todayOnly.getTime();
 }
 
@@ -100,7 +96,7 @@ export { formatDisplay };
 export default function DatePickerDropdown({
   value,
   onChange,
-  today: todayProp,
+  today: todayProp
 }: DatePickerDropdownProps) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(value.getFullYear());
@@ -143,15 +139,8 @@ export default function DatePickerDropdown({
     (viewYear === today.getFullYear() && viewMonth >= today.getMonth());
 
   return (
-    <div
-      className={`dash-date-dropdown${open ? " dash-date-dropdown--open" : ""}`}
-      ref={ref}
-    >
-      <button
-        type="button"
-        className="dash-date-picker"
-        onClick={() => setOpen((o) => !o)}
-      >
+    <div className={`dash-date-dropdown${open ? " dash-date-dropdown--open" : ""}`} ref={ref}>
+      <button type="button" className="dash-date-picker" onClick={() => setOpen(o => !o)}>
         <IconCalendar />
         <span>{formatDisplay(value)}</span>
       </button>
@@ -204,7 +193,7 @@ export default function DatePickerDropdown({
                     outsideMonth ? "dash-date-day--muted" : "",
                     isToday ? "dash-date-day--today" : "",
                     isSelected ? "dash-date-day--selected" : "",
-                    isFuture ? "dash-date-day--disabled" : "",
+                    isFuture ? "dash-date-day--disabled" : ""
                   ]
                     .filter(Boolean)
                     .join(" ")}

@@ -17,7 +17,7 @@ export default function ProductCard({
   product,
   quantityInCart = 0,
   onAddToCart,
-  onOpenDetails,
+  onOpenDetails
 }: ProductCardProps) {
   const [justAdded, setJustAdded] = useState(false);
   const shouldReduceMotion = useReducedMotion();
@@ -48,21 +48,13 @@ export default function ProductCard({
             onClick={onOpenDetails}
             aria-label={`Ver detalhes de ${product.name}`}
           >
-            <img
-              src={product.image}
-              alt=""
-              className="product-image"
-              loading="lazy"
-            />
-            <span className="product-image-hint" aria-hidden="true">Ver detalhes</span>
+            <img src={product.image} alt="" className="product-image" loading="lazy" />
+            <span className="product-image-hint" aria-hidden="true">
+              Ver detalhes
+            </span>
           </button>
         ) : (
-          <img
-            src={product.image}
-            alt={product.name}
-            className="product-image"
-            loading="lazy"
-          />
+          <img src={product.image} alt={product.name} className="product-image" loading="lazy" />
         )}
       </div>
       <div className="product-info">
@@ -82,15 +74,13 @@ export default function ProductCard({
             product.name
           )}
         </h3>
-        {product.description && (
-          <p className="product-description">{product.description}</p>
-        )}
+        {product.description && <p className="product-description">{product.description}</p>}
         <div className="product-footer">
           <ProductPrices product={product} />
           <motion.button
             className={`add-button${justAdded ? " add-button--added" : ""}${esgotado ? " add-button--esgotado" : ""}`}
             aria-label={esgotado ? `${product.name} esgotado` : `Adicionar ${product.name}`}
-            onClick={(e) => {
+            onClick={e => {
               e.currentTarget.blur();
               handleAdd();
             }}

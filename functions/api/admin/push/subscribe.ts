@@ -69,7 +69,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
          p256dh = excluded.p256dh,
          auth = excluded.auth,
          user_agent = excluded.user_agent,
-         atualizado_em = CURRENT_TIMESTAMP`,
+         atualizado_em = CURRENT_TIMESTAMP`
     )
       .bind(auth.user.id, endpoint, p256dh, authSecret, userAgent)
       .run();

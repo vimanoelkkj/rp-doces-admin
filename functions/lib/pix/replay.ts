@@ -4,27 +4,26 @@ import {
   conflitoOperacao,
   parseResultado,
   type IdentidadeEsperada,
-  type OperacaoRow,
+  type OperacaoRow
 } from "../operacoes";
-import type {
-  GerarPixAdminResult,
-  GerarPixAdminSucesso,
-} from "./types";
+import type { GerarPixAdminResult, GerarPixAdminSucesso } from "./types";
 
 // A1 — replay de uma operação de Pix administrativo. Nunca faz outro POST,
 // nunca cria outra tentativa, nunca mexe na reserva.
 export async function replayPixAdmin(
   db: D1Database,
   operacao: OperacaoRow,
-  identidade: IdentidadeEsperada,
+  identidade: IdentidadeEsperada
 ): Promise<GerarPixAdminResult> {
   const conflito = conflitoOperacao(operacao, identidade);
   if (conflito) return { ok: false, erro: conflito };
 
   // Recusa comprovada do Mercado Pago é terminal para esta key.
   if (operacao.fase === "RECUSADA") {
-    if (operacao.erro === "PIX_SUBSTITUTO_JA_PAGO") return { ok: false, erro: "PIX_SUBSTITUTO_JA_PAGO" };
-    if (operacao.erro === "PIX_PARA_SUBSTITUIR_INVALIDO") return { ok: false, erro: "PIX_PARA_SUBSTITUIR_INVALIDO" };
+    if (operacao.erro === "PIX_SUBSTITUTO_JA_PAGO")
+      return { ok: false, erro: "PIX_SUBSTITUTO_JA_PAGO" };
+    if (operacao.erro === "PIX_PARA_SUBSTITUIR_INVALIDO")
+      return { ok: false, erro: "PIX_PARA_SUBSTITUIR_INVALIDO" };
     return { ok: false, erro: "MERCADO_PAGO_RECUSOU" };
   }
 
@@ -43,7 +42,7 @@ export async function replayPixAdmin(
                 mp_qr_code_base64, mp_ticket_url, pix_expira_em
          FROM pedido_pagamentos
          WHERE substitui_pagamento_id = ? AND status = 'PENDENTE'
-         LIMIT 1`,
+         LIMIT 1`
       )
       .bind(operacao.pagamento_id)
       .first<{
@@ -68,7 +67,7 @@ export async function replayPixAdmin(
         qrCode: bPagamento.mp_qr_code,
         qrCodeBase64: bPagamento.mp_qr_code_base64,
         ticketUrl: bPagamento.mp_ticket_url,
-        expiresAt: bPagamento.pix_expira_em,
+        expiresAt: bPagamento.pix_expira_em
       };
     }
 
@@ -80,7 +79,7 @@ export async function replayPixAdmin(
         .prepare(
           `SELECT id, valor_centavos, mp_payment_id, mp_status, mp_qr_code,
                   mp_qr_code_base64, mp_ticket_url, pix_expira_em
-           FROM pedido_pagamentos WHERE id = ? LIMIT 1`,
+           FROM pedido_pagamentos WHERE id = ? LIMIT 1`
         )
         .bind(operacao.pagamento_id)
         .first<{
@@ -108,7 +107,7 @@ export async function replayPixAdmin(
       qrCode: pagamento.mp_qr_code,
       qrCodeBase64: pagamento.mp_qr_code_base64,
       ticketUrl: pagamento.mp_ticket_url,
-      expiresAt: pagamento.pix_expira_em,
+      expiresAt: pagamento.pix_expira_em
     };
   }
 

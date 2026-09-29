@@ -8,7 +8,7 @@ import { registerAdminPayment, type MetodoManual } from "../../../../lib/comanda
 import {
   OPERACAO_HTTP_STATUS,
   OPERACAO_MENSAGENS,
-  parseOperationKey,
+  parseOperationKey
 } from "../../../../lib/operacoes";
 
 interface Env {
@@ -31,7 +31,7 @@ const MENSAGENS: Record<string, string> = {
   SALDO_INSUFICIENTE_CONCORRENCIA:
     "O saldo mudou antes da confirmação. Atualize e tente novamente.",
   ESTORNO_ANULACAO_ATIVO: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
-  ...OPERACAO_MENSAGENS,
+  ...OPERACAO_MENSAGENS
 };
 
 function jsonError(message: string, status: number, code?: string) {
@@ -44,7 +44,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if ("error" in auth) return auth.error;
   const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
   if (anulado) return anulado;
-
 
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -81,18 +80,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       valorCentavos: body.valorCentavos!,
       usuarioId: auth.user.id,
       observacao: body.observacao,
-      operationKey: chave.key,
+      operationKey: chave.key
     });
 
     if (!resultado.ok) {
       const status =
         resultado.erro === "PEDIDO_NAO_ENCONTRADO"
           ? 404
-          : OPERACAO_HTTP_STATUS[resultado.erro ?? ""] ?? 409;
+          : (OPERACAO_HTTP_STATUS[resultado.erro ?? ""] ?? 409);
       return jsonError(
         MENSAGENS[resultado.erro ?? ""] ?? "Não foi possível registrar o pagamento",
         status,
-        resultado.erro,
+        resultado.erro
       );
     }
 
@@ -106,9 +105,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         pagamentoId: resultado.pagamentoId,
         statusFinanceiro: resultado.statusFinanceiro,
         saldoCentavos: resultado.saldoCentavos,
-        ...(resultado.replay ? { replay: true } : {}),
+        ...(resultado.replay ? { replay: true } : {})
       },
-      { status: 201 },
+      { status: 201 }
     );
   } catch (err) {
     console.error("Erro ao registrar pagamento manual (admin)", err);

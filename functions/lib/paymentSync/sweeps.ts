@@ -14,13 +14,16 @@ const RECONCILE_BATCH_SIZE = 4;
 // fatos nem timestamps históricos financeiros.
 export async function claimPendingPixPaymentReconciliation(
   db: D1Database,
-  pagamentoId: number,
+  pagamentoId: number
 ): Promise<boolean> {
-  const claim = await db.prepare(
-    `UPDATE pedido_pagamentos SET atualizado_em = CURRENT_TIMESTAMP
+  const claim = await db
+    .prepare(
+      `UPDATE pedido_pagamentos SET atualizado_em = CURRENT_TIMESTAMP
      WHERE id = ? AND metodo = 'PIX_MP' AND status IN ('PENDENTE', 'EXPIRADO')
-       AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')`,
-  ).bind(pagamentoId, RECONCILE_AFTER_SECONDS).run();
+       AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')`
+    )
+    .bind(pagamentoId, RECONCILE_AFTER_SECONDS)
+    .run();
   return Number(claim.meta.changes || 0) > 0;
 }
 
@@ -30,7 +33,10 @@ export async function claimPendingPixPaymentReconciliation(
 // agregado pode significar "nunca pago" ou "totalmente reembolsado", e só
 // o fato individual (metodo/status do pagamento) responde "existe um Pix
 // do Mercado Pago ainda pendente de confirmação" sem ambiguidade.
-export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCESS_TOKEN?: string }): Promise<void> {
+export async function reconcilePendingPixPayments(env: {
+  DB: D1Database;
+  MP_ACCESS_TOKEN?: string;
+}): Promise<void> {
   if (!env.MP_ACCESS_TOKEN) return;
 
   const { results } = await env.DB.prepare(
@@ -38,7 +44,7 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
      WHERE metodo = 'PIX_MP' AND status IN ('PENDENTE', 'EXPIRADO') AND mp_payment_id IS NOT NULL
        AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
      ORDER BY atualizado_em ASC, id ASC
-     LIMIT ?`,
+     LIMIT ?`
   )
     .bind(RECONCILE_AFTER_SECONDS, RECONCILE_BATCH_SIZE)
     .all<{ id: number; mp_payment_id: string }>();
@@ -47,7 +53,7 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
   if (!pendentes.length) return;
 
   await Promise.allSettled(
-    pendentes.map(async (row) => {
+    pendentes.map(async row => {
       try {
         // Claim por candidato: concorrência e falhas de rede também respeitam
         // o throttle. Não altera fatos nem timestamps históricos financeiros.
@@ -57,7 +63,7 @@ export async function reconcilePendingPixPayments(env: { DB: D1Database; MP_ACCE
       } catch (err) {
         console.error("Falha ao reconciliar pagamento PIX_MP pendente/expirado", row.id, err);
       }
-    }),
+    })
   );
 }
 
@@ -83,7 +89,7 @@ export async function liberarReservasVencidasLocalmente(env: { DB: D1Database })
        AND p.reserva_expira_em IS NOT NULL
        AND datetime(p.reserva_expira_em) <= datetime('now')
      ORDER BY p.reserva_expira_em ASC
-     LIMIT ?`,
+     LIMIT ?`
   )
     .bind(RESERVA_VENCIDA_BATCH_SIZE)
     .all<{ pagamento_id: number }>();
@@ -92,12 +98,12 @@ export async function liberarReservasVencidasLocalmente(env: { DB: D1Database })
   if (!pendentes.length) return;
 
   await Promise.allSettled(
-    pendentes.map(async (row) => {
+    pendentes.map(async row => {
       try {
         await expireLocalPayment(env.DB, row.pagamento_id);
       } catch (err) {
         console.error("Falha ao liberar reserva vencida localmente", row.pagamento_id, err);
       }
-    }),
+    })
   );
 }

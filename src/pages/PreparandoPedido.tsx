@@ -4,11 +4,16 @@ export default function PreparandoPedido() {
   return (
     <div className="preparando-screen">
       <div className="preparando-content">
-
         {/* Cupcake com cerejinha animada */}
         <div className="preparando-cupcake">
-          <svg aria-hidden="true" width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-
+          <svg
+            aria-hidden="true"
+            width="128"
+            height="128"
+            viewBox="0 0 128 128"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             {/* Cupcake body (estático) */}
             <g className="cupcake-body">
               {/* Frosting shadow */}
@@ -36,11 +41,35 @@ export default function PreparandoPedido() {
                 fill="#634738"
               />
               {/* Cup wrapper top edge */}
-              <path d="M47 73.5H89" stroke="#EADFD3" strokeWidth="2.5" strokeLinecap="round" opacity="0.75" />
+              <path
+                d="M47 73.5H89"
+                stroke="#EADFD3"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                opacity="0.75"
+              />
               {/* Wrapper folds */}
-              <path d="M58 79L55.8 101" stroke="#EADFD3" strokeWidth="2.6" strokeLinecap="round" opacity="0.95" />
-              <path d="M68 79V102" stroke="#EADFD3" strokeWidth="2.6" strokeLinecap="round" opacity="0.95" />
-              <path d="M78 79L80.2 101" stroke="#EADFD3" strokeWidth="2.6" strokeLinecap="round" opacity="0.95" />
+              <path
+                d="M58 79L55.8 101"
+                stroke="#EADFD3"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                opacity="0.95"
+              />
+              <path
+                d="M68 79V102"
+                stroke="#EADFD3"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                opacity="0.95"
+              />
+              <path
+                d="M78 79L80.2 101"
+                stroke="#EADFD3"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                opacity="0.95"
+              />
             </g>
 
             {/* Cerejinha animada (cai de cima) */}
@@ -51,7 +80,6 @@ export default function PreparandoPedido() {
                 fill="#D38B80"
               />
             </g>
-
           </svg>
         </div>
 

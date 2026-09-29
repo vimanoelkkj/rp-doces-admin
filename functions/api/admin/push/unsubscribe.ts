@@ -35,9 +35,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   try {
-    await env.DB.prepare(
-      "DELETE FROM push_inscricoes WHERE endpoint = ? AND usuario_id = ?",
-    )
+    await env.DB.prepare("DELETE FROM push_inscricoes WHERE endpoint = ? AND usuario_id = ?")
       .bind(endpoint, auth.user.id)
       .run();
 

@@ -6,7 +6,7 @@ import {
   conflitoOperacao,
   type ConflitoOperacao,
   type IdentidadeEsperada,
-  type OperacaoRow,
+  type OperacaoRow
 } from "../operacoes";
 
 // Somente após a confirmação da escrita financeira. Uma falha derivada não
@@ -15,7 +15,7 @@ export async function reconcilePersistedAdminFact(
   db: D1Database,
   pedidoId: number,
   operacao: "PAGAMENTO" | "REEMBOLSO",
-  fatoId: number,
+  fatoId: number
 ): Promise<{ statusFinanceiro?: StatusFinanceiroAgregado; saldoCentavos?: number }> {
   try {
     const reconciliacao = await reconcilePedidoAfterFinancialChange(db, pedidoId);
@@ -23,9 +23,15 @@ export async function reconcilePersistedAdminFact(
     const saldo = await getComandaSaldo(db, pedidoId);
     return { statusFinanceiro: reconciliacao.statusFinanceiro, saldoCentavos: saldo.saldo };
   } catch (err) {
-    console.error("Fato financeiro administrativo persistido; falha nos efeitos derivados", {
-      pedidoId, operacao, fatoId,
-    }, err);
+    console.error(
+      "Fato financeiro administrativo persistido; falha nos efeitos derivados",
+      {
+        pedidoId,
+        operacao,
+        fatoId
+      },
+      err
+    );
     // Não inventa saldo/status nem tenta uma nova leitura que pode falhar.
     // A divergência persistida continua elegível para recuperação pelo B3.
     return {};
@@ -45,7 +51,7 @@ export async function replayOperacaoLocal(
   db: D1Database,
   operacao: OperacaoRow,
   esperado: IdentidadeEsperada,
-  fato: "PAGAMENTO" | "REEMBOLSO",
+  fato: "PAGAMENTO" | "REEMBOLSO"
 ): Promise<
   | {
       ok: true;
@@ -58,9 +64,7 @@ export async function replayOperacaoLocal(
   const conflito = conflitoOperacao(operacao, esperado);
   if (conflito) return { ok: false, erro: conflito };
 
-  const id = Number(
-    (fato === "PAGAMENTO" ? operacao.pagamento_id : operacao.reembolso_id) || 0,
-  );
+  const id = Number((fato === "PAGAMENTO" ? operacao.pagamento_id : operacao.reembolso_id) || 0);
   const pedidoId = Number(operacao.pedido_id || 0);
   // Operação local só é registrada junto com o fato, no mesmo batch — um
   // claim sem fato não deveria existir. Se existir, é estado corrompido:

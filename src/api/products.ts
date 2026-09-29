@@ -35,9 +35,7 @@ function toProduct(row: ProdutoApiRow): Product {
   // promoção vigente, e serve apenas para o card mostrar o valor riscado.
   // Nada disso é enviado ao checkout — o servidor recalcula.
   const emPromocao = promocaoVigente(row);
-  const centavos = emPromocao
-    ? row.preco_promocional_centavos!
-    : row.preco_centavos;
+  const centavos = emPromocao ? row.preco_promocional_centavos! : row.preco_centavos;
 
   const estoque = typeof row.estoque === "number" ? row.estoque : 0;
   const estoqueReservado = typeof row.estoque_reservado === "number" ? row.estoque_reservado : 0;
@@ -59,7 +57,7 @@ function toProduct(row: ProdutoApiRow): Product {
     price: centavos / 100,
     originalPrice: emPromocao ? row.preco_centavos / 100 : undefined,
     image: imageUrlFor(row.image_key),
-    disponibilidade,
+    disponibilidade
   };
 }
 

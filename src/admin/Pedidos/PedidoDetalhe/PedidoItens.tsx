@@ -1,10 +1,5 @@
 import type { PedidoItemRow, StatusPedido } from "./types";
-import {
-  FLOW_STATUS_LABEL,
-  ITEM_STATUS_LABEL,
-  STOCK_STATUS_LABEL,
-  formatarPreco,
-} from "./helpers";
+import { FLOW_STATUS_LABEL, ITEM_STATUS_LABEL, STOCK_STATUS_LABEL, formatarPreco } from "./helpers";
 
 interface PedidoItensProps {
   itens: PedidoItemRow[];
@@ -31,13 +26,10 @@ export default function PedidoItens({
   onAbrirHistorico,
   onAdicionarItem,
   onVerCancelamento,
-  onTrocarItem,
+  onTrocarItem
 }: PedidoItensProps) {
   const itensAtuais = itens.filter(
-    (item) =>
-      anulado ||
-      item.status_item === "ATIVO" ||
-      item.status_item === "TROCA_PENDENTE",
+    item => anulado || item.status_item === "ATIVO" || item.status_item === "TROCA_PENDENTE"
   );
 
   return (
@@ -47,11 +39,7 @@ export default function PedidoItens({
         <div className="pedmodal-items-header">
           <span className="pedmodal-section-label">Itens do pedido</span>
           <div className="pedmodal-items-header-actions">
-            <button
-              type="button"
-              className="pedmodal-btn-historico"
-              onClick={onAbrirHistorico}
-            >
+            <button type="button" className="pedmodal-btn-historico" onClick={onAbrirHistorico}>
               Histórico
             </button>
             {!anulado &&
@@ -59,17 +47,13 @@ export default function PedidoItens({
               origemPedido === "MANUAL" &&
               statusComanda === "ABERTA" &&
               (statusPedido === "NOVO" || statusPedido === "PREPARANDO") && (
-                <button
-                  type="button"
-                  className="pedmodal-btn-add-item"
-                  onClick={onAdicionarItem}
-                >
+                <button type="button" className="pedmodal-btn-add-item" onClick={onAdicionarItem}>
                   + Adicionar produto
                 </button>
               )}
           </div>
         </div>
-        {itensAtuais.map((item) => (
+        {itensAtuais.map(item => (
           <div className="pedmodal-item-row" key={item.id}>
             <div className="pedmodal-item-info">
               <span className="pedmodal-item-name">
@@ -80,9 +64,7 @@ export default function PedidoItens({
                 {STOCK_STATUS_LABEL[item.estoque_estado] ?? item.estoque_estado}
               </span>
               {item.status_item === "TROCA_PENDENTE" && (
-                <span className="pedmodal-item-note">
-                  Fora do total até a troca ser concluída
-                </span>
+                <span className="pedmodal-item-note">Fora do total até a troca ser concluída</span>
               )}
               <span className="pedmodal-item-qty">
                 {item.quantidade}x {formatarPreco(item.valor_unitario_centavos)}
@@ -94,14 +76,12 @@ export default function PedidoItens({
               </span>
               {item.cancelamento_id && (
                 <span className="pedmodal-item-qty">
-                  {FLOW_STATUS_LABEL[item.cancelamento_status ?? ""] ??
-                    "Cancelamento em andamento"}
+                  {FLOW_STATUS_LABEL[item.cancelamento_status ?? ""] ?? "Cancelamento em andamento"}
                 </span>
               )}
               {item.troca_id && (
                 <span className="pedmodal-item-qty">
-                  {FLOW_STATUS_LABEL[item.troca_status ?? ""] ??
-                    "Troca em andamento"}
+                  {FLOW_STATUS_LABEL[item.troca_status ?? ""] ?? "Troca em andamento"}
                 </span>
               )}
               {!anulado &&
@@ -110,17 +90,14 @@ export default function PedidoItens({
                 statusPedido !== "ENTREGUE" &&
                 statusPedido !== "CANCELADO" &&
                 (!item.troca_id ||
-                  (item.troca_status === "CONCLUIDA" &&
-                    item.troca_item_origem_id !== item.id)) && (
+                  (item.troca_status === "CONCLUIDA" && item.troca_item_origem_id !== item.id)) && (
                   <>
                     <button
                       type="button"
                       className={`pedmodal-btn-cancel-item${item.cancelamento_id ? " pedmodal-btn-cancel-item--neutral" : ""}`}
                       onClick={() => onVerCancelamento(item.id)}
                     >
-                      {item.cancelamento_id
-                        ? "Ver cancelamento"
-                        : "Cancelar item"}
+                      {item.cancelamento_id ? "Ver cancelamento" : "Cancelar item"}
                     </button>
                     {!item.cancelamento_id && (
                       <button
@@ -133,28 +110,24 @@ export default function PedidoItens({
                     )}
                   </>
                 )}
-              {!anulado &&
-                item.cancelamento_id &&
-                item.status_item !== "ATIVO" && (
-                  <button
-                    type="button"
-                    className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral"
-                    onClick={() => onVerCancelamento(item.id)}
-                  >
-                    Ver cancelamento
-                  </button>
-                )}
-              {!anulado &&
-                item.troca_id &&
-                item.troca_item_origem_id === item.id && (
-                  <button
-                    type="button"
-                    className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral"
-                    onClick={() => onTrocarItem(item)}
-                  >
-                    Ver troca
-                  </button>
-                )}
+              {!anulado && item.cancelamento_id && item.status_item !== "ATIVO" && (
+                <button
+                  type="button"
+                  className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral"
+                  onClick={() => onVerCancelamento(item.id)}
+                >
+                  Ver cancelamento
+                </button>
+              )}
+              {!anulado && item.troca_id && item.troca_item_origem_id === item.id && (
+                <button
+                  type="button"
+                  className="pedmodal-btn-cancel-item pedmodal-btn-cancel-item--neutral"
+                  onClick={() => onTrocarItem(item)}
+                >
+                  Ver troca
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -164,15 +137,11 @@ export default function PedidoItens({
       <div className="pedmodal-summary">
         <div className="pedmodal-summary-row">
           <span className="pedmodal-summary-label">Subtotal</span>
-          <span className="pedmodal-summary-value">
-            {formatarPreco(valorTotalCentavos)}
-          </span>
+          <span className="pedmodal-summary-value">{formatarPreco(valorTotalCentavos)}</span>
         </div>
         <div className="pedmodal-summary-row pedmodal-summary-row--total">
           <span className="pedmodal-total-label">Total</span>
-          <span className="pedmodal-total-value">
-            {formatarPreco(valorTotalCentavos)}
-          </span>
+          <span className="pedmodal-total-value">{formatarPreco(valorTotalCentavos)}</span>
         </div>
       </div>
     </>

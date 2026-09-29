@@ -7,7 +7,7 @@ import {
   DESPESA_UNIDADES,
   DESPESA_UNIDADE_LABEL,
   type DespesaCategoria,
-  type DespesaUnidade,
+  type DespesaUnidade
 } from "../../../shared/despesas";
 import {
   formatarPreco,
@@ -16,7 +16,7 @@ import {
   parseValorReais,
   parseQuantidade,
   centavosParaValorInput,
-  paraISODate,
+  paraISODate
 } from "./formatarDespesas";
 import "./GastoModal.css";
 
@@ -51,9 +51,22 @@ interface ItemForm {
 
 function IconChevron({ open }: { open: boolean }) {
   return (
-    <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none" className="gasto-dropdown-chevron"
-      style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>
-      <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      aria-hidden="true"
+      width="12"
+      height="8"
+      viewBox="0 0 12 8"
+      fill="none"
+      className="gasto-dropdown-chevron"
+      style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}
+    >
+      <path
+        d="M1 1.5L6 6.5L11 1.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -65,7 +78,11 @@ function useDropdown() {
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -75,7 +92,15 @@ function useDropdown() {
   return { open, setOpen, ref, menuRef };
 }
 
-function GastoDropdown<T extends string>({ id, value, options, labels, disabled, onChange, ariaLabel }: {
+function GastoDropdown<T extends string>({
+  id,
+  value,
+  options,
+  labels,
+  disabled,
+  onChange,
+  ariaLabel
+}: {
   id: string;
   value: T;
   options: readonly T[];
@@ -87,18 +112,29 @@ function GastoDropdown<T extends string>({ id, value, options, labels, disabled,
   const dd = useDropdown();
   return (
     <div className={`gasto-dropdown ${dd.open ? "gasto-dropdown--open" : ""}`} ref={dd.ref}>
-      <button id={id} type="button" className="gasto-dropdown-trigger" disabled={disabled} aria-label={`${ariaLabel}: ${labels[value]}`}
-        onClick={() => dd.setOpen(!dd.open)}>
+      <button
+        id={id}
+        type="button"
+        className="gasto-dropdown-trigger"
+        disabled={disabled}
+        aria-label={`${ariaLabel}: ${labels[value]}`}
+        onClick={() => dd.setOpen(!dd.open)}
+      >
         <span>{labels[value]}</span>
         <IconChevron open={dd.open} />
       </button>
       {dd.open && (
         <ul className="gasto-dropdown-list" ref={dd.menuRef}>
-          {options.map((opt) => (
+          {options.map(opt => (
             <li key={opt}>
-              <button type="button"
+              <button
+                type="button"
                 className={`gasto-dropdown-option ${value === opt ? "gasto-dropdown-option--active" : ""}`}
-                onClick={() => { onChange(opt); dd.setOpen(false); }}>
+                onClick={() => {
+                  onChange(opt);
+                  dd.setOpen(false);
+                }}
+              >
                 {labels[opt]}
               </button>
             </li>
@@ -118,12 +154,12 @@ function novoItemVazio(): ItemForm {
     categoria: "INGREDIENTES",
     quantidade: "",
     unidade: "UN",
-    valorUnitario: "",
+    valorUnitario: ""
   };
 }
 
 function itensDaDespesa(despesa: DespesaView): ItemForm[] {
-  return despesa.itens.map((item) => {
+  return despesa.itens.map(item => {
     proximaKey += 1;
     return {
       key: `item-${item.id}-${proximaKey}`,
@@ -131,7 +167,7 @@ function itensDaDespesa(despesa: DespesaView): ItemForm[] {
       categoria: item.categoria,
       quantidade: String(item.quantidade).replace(".", ","),
       unidade: item.unidade,
-      valorUnitario: centavosParaValorInput(item.valorUnitarioCentavos),
+      valorUnitario: centavosParaValorInput(item.valorUnitarioCentavos)
     };
   });
 }
@@ -145,7 +181,13 @@ function subtotalItem(item: ItemForm): number | null {
 
 type Modo = "criar" | "ver" | "editar";
 
-export default function GastoModal({ modo: modoInicial, despesaId, descricoesConhecidas, onClose, onSaved }: {
+export default function GastoModal({
+  modo: modoInicial,
+  despesaId,
+  descricoesConhecidas,
+  onClose,
+  onSaved
+}: {
   modo: Modo;
   despesaId?: number;
   descricoesConhecidas: string[];
@@ -166,14 +208,16 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
   const [itens, setItens] = useState<ItemForm[]>([novoItemVazio()]);
 
   const savingRef = useRef(false);
-  const modalProps = useAdminModal(true, () => { if (!savingRef.current) onClose(); });
+  const modalProps = useAdminModal(true, () => {
+    if (!savingRef.current) onClose();
+  });
 
   useEffect(() => {
     if (modoInicial === "criar" || despesaId === undefined) return;
     let cancelado = false;
     setCarregando(true);
     fetch(`/api/admin/despesas/${despesaId}`)
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) throw new Error("Não foi possível carregar a despesa.");
         return response.json() as Promise<{ despesa: DespesaView }>;
       })
@@ -185,34 +229,42 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
         setObservacao(carregada.observacao);
         setItens(itensDaDespesa(carregada));
       })
-      .catch((err) => { if (!cancelado) setErro(err instanceof Error ? err.message : "Erro ao carregar despesa."); })
-      .finally(() => { if (!cancelado) setCarregando(false); });
-    return () => { cancelado = true; };
+      .catch(err => {
+        if (!cancelado) setErro(err instanceof Error ? err.message : "Erro ao carregar despesa.");
+      })
+      .finally(() => {
+        if (!cancelado) setCarregando(false);
+      });
+    return () => {
+      cancelado = true;
+    };
   }, [modoInicial, despesaId]);
 
   const somenteLeitura = modo === "ver";
   const totalCentavos = itens.reduce((soma, item) => soma + (subtotalItem(item) ?? 0), 0);
 
   function atualizarItem(key: string, campo: keyof ItemForm, valor: string) {
-    setItens((atual) => atual.map((item) => (item.key === key ? { ...item, [campo]: valor } : item)));
+    setItens(atual => atual.map(item => (item.key === key ? { ...item, [campo]: valor } : item)));
   }
 
   function removerItem(key: string) {
-    setItens((atual) => (atual.length <= 1 ? atual : atual.filter((item) => item.key !== key)));
+    setItens(atual => (atual.length <= 1 ? atual : atual.filter(item => item.key !== key)));
   }
 
   function adicionarItem() {
-    setItens((atual) => [...atual, novoItemVazio()]);
+    setItens(atual => [...atual, novoItemVazio()]);
   }
 
-  function validarFormulario(): { ok: true; payload: Record<string, unknown> } | { ok: false; erro: string } {
+  function validarFormulario():
+    { ok: true; payload: Record<string, unknown> } | { ok: false; erro: string } {
     if (!dataCompetencia) return { ok: false, erro: "Informe a data da compra." };
     if (itens.length === 0) return { ok: false, erro: "Adicione ao menos um item." };
     const itensPayload = [];
     for (const item of itens) {
       if (!item.descricao.trim()) return { ok: false, erro: "Todo item precisa de uma descrição." };
       const quantidade = parseQuantidade(item.quantidade);
-      if (quantidade === null) return { ok: false, erro: `Quantidade inválida em "${item.descricao || "item"}".` };
+      if (quantidade === null)
+        return { ok: false, erro: `Quantidade inválida em "${item.descricao || "item"}".` };
       const valorUnitarioCentavos = parseValorReais(item.valorUnitario);
       if (valorUnitarioCentavos === null) {
         return { ok: false, erro: `Valor unitário inválido em "${item.descricao || "item"}".` };
@@ -222,7 +274,7 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
         categoria: item.categoria,
         quantidade,
         unidade: item.unidade,
-        valorUnitarioCentavos,
+        valorUnitarioCentavos
       });
     }
     return {
@@ -231,8 +283,8 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
         fornecedor: fornecedor.trim(),
         dataCompetencia,
         observacao: observacao.trim(),
-        itens: itensPayload,
-      },
+        itens: itensPayload
+      }
     };
   }
 
@@ -240,7 +292,10 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
     event.preventDefault();
     if (savingRef.current) return;
     const validado = validarFormulario();
-    if (!validado.ok) { setErro(validado.erro); return; }
+    if (!validado.ok) {
+      setErro(validado.erro);
+      return;
+    }
 
     savingRef.current = true;
     setSalvando(true);
@@ -249,7 +304,9 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
       const url = modo === "editar" ? `/api/admin/despesas/${despesaId}` : "/api/admin/despesas";
       const method = modo === "editar" ? "PUT" : "POST";
       const response = await fetch(url, {
-        method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(validado.payload),
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validado.payload)
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Não foi possível salvar a despesa.");
@@ -279,18 +336,46 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
     }
   }
 
-  const titulo = modo === "criar" ? "Registrar gasto" : modo === "editar" ? "Editar despesa" : "Detalhe da despesa";
+  const titulo =
+    modo === "criar"
+      ? "Registrar gasto"
+      : modo === "editar"
+        ? "Editar despesa"
+        : "Detalhe da despesa";
 
   return createPortal(
-    <div className="gasto-overlay" {...modalProps} role="dialog" aria-modal="true" aria-labelledby="gasto-modal-title">
+    <div
+      className="gasto-overlay"
+      {...modalProps}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="gasto-modal-title"
+    >
       <div className="gasto-modal">
         <header className="gasto-header">
           <div>
             <p className="gasto-kicker">Despesas</p>
-            <h2 id="gasto-modal-title" className="gasto-title">{titulo}</h2>
+            <h2 id="gasto-modal-title" className="gasto-title">
+              {titulo}
+            </h2>
           </div>
-          <button type="button" className="gasto-close" onClick={onClose} aria-label="Fechar" disabled={salvando}>
-            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <button
+            type="button"
+            className="gasto-close"
+            onClick={onClose}
+            aria-label="Fechar"
+            disabled={salvando}
+          >
+            <svg
+              aria-hidden="true"
+              width="18"
+              height="18"
+              viewBox="0 0 18 18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            >
               <path d="m4 4 10 10M14 4 4 14" />
             </svg>
           </button>
@@ -303,7 +388,9 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
             <div className="gasto-detalhe-grid">
               <div>
                 <span>Status</span>
-                <strong className={`gasto-status-pill gasto-status-pill--${despesa.status.toLowerCase()}`}>
+                <strong
+                  className={`gasto-status-pill gasto-status-pill--${despesa.status.toLowerCase()}`}
+                >
                   {despesa.status === "ATIVA" ? "Ativa" : "Cancelada"}
                 </strong>
               </div>
@@ -325,11 +412,15 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
 
             <div className="gasto-detalhe-itens">
               <h3>Itens</h3>
-              {despesa.itens.map((item) => (
+              {despesa.itens.map(item => (
                 <div className="gasto-detalhe-item" key={item.id}>
                   <div>
                     <strong>{item.descricao}</strong>
-                    <span>{item.quantidade.toLocaleString("pt-BR")} {DESPESA_UNIDADE_LABEL[item.unidade]} × {formatarValorUnitario(item.valorUnitarioCentavos)}</span>
+                    <span>
+                      {item.quantidade.toLocaleString("pt-BR")}{" "}
+                      {DESPESA_UNIDADE_LABEL[item.unidade]} ×{" "}
+                      {formatarValorUnitario(item.valorUnitarioCentavos)}
+                    </span>
                   </div>
                   <strong>{formatarPreco(item.valorTotalCentavos)}</strong>
                 </div>
@@ -341,21 +432,36 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
               <strong>{formatarPreco(despesa.totalCentavos)}</strong>
             </div>
 
-            {erro && <p role="alert" className="gasto-error">{erro}</p>}
+            {erro && (
+              <p role="alert" className="gasto-error">
+                {erro}
+              </p>
+            )}
 
             <footer className="gasto-footer gasto-footer--detalhe">
               {despesa.status === "ATIVA" && (
                 <>
-                  <button type="button" className="gasto-btn-cancel" onClick={cancelarDespesa} disabled={cancelando}>
+                  <button
+                    type="button"
+                    className="gasto-btn-cancel"
+                    onClick={cancelarDespesa}
+                    disabled={cancelando}
+                  >
                     {cancelando ? "Excluindo…" : "Excluir despesa"}
                   </button>
-                  <button type="button" className="gasto-btn-save" onClick={() => setModo("editar")}>
+                  <button
+                    type="button"
+                    className="gasto-btn-save"
+                    onClick={() => setModo("editar")}
+                  >
                     Editar
                   </button>
                 </>
               )}
               {despesa.status === "CANCELADA" && (
-                <button type="button" className="gasto-btn-cancel" onClick={onClose}>Fechar</button>
+                <button type="button" className="gasto-btn-cancel" onClick={onClose}>
+                  Fechar
+                </button>
               )}
             </footer>
           </div>
@@ -364,27 +470,46 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
             <div className="gasto-form-grid">
               <label className="gasto-span-2">
                 <span>Fornecedor (opcional)</span>
-                <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} disabled={salvando} maxLength={200} />
+                <input
+                  value={fornecedor}
+                  onChange={e => setFornecedor(e.target.value)}
+                  disabled={salvando}
+                  maxLength={200}
+                />
               </label>
               <label>
                 <span>Data da compra</span>
-                <input type="date" required value={dataCompetencia}
-                  onChange={(e) => setDataCompetencia(e.target.value)} disabled={salvando} />
+                <input
+                  type="date"
+                  required
+                  value={dataCompetencia}
+                  onChange={e => setDataCompetencia(e.target.value)}
+                  disabled={salvando}
+                />
               </label>
               <label className="gasto-span-2">
                 <span>Observação (opcional)</span>
-                <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} disabled={salvando} maxLength={1000} />
+                <textarea
+                  value={observacao}
+                  onChange={e => setObservacao(e.target.value)}
+                  disabled={salvando}
+                  maxLength={1000}
+                />
               </label>
             </div>
 
             <div className="gasto-itens-heading">
               <h3>Itens da compra</h3>
-              <span>{itens.length} {itens.length === 1 ? "item" : "itens"}</span>
+              <span>
+                {itens.length} {itens.length === 1 ? "item" : "itens"}
+              </span>
             </div>
 
             <div className="gasto-itens-list">
               <datalist id="gasto-descricoes-conhecidas">
-                {descricoesConhecidas.map((nome) => <option value={nome} key={nome} />)}
+                {descricoesConhecidas.map(nome => (
+                  <option value={nome} key={nome} />
+                ))}
               </datalist>
               {itens.map((item, index) => {
                 const subtotal = subtotalItem(item);
@@ -392,9 +517,22 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                   <article className="gasto-item-card" key={item.key}>
                     <header>
                       <strong>Item {index + 1}</strong>
-                      <button type="button" onClick={() => removerItem(item.key)}
-                        disabled={salvando || itens.length <= 1} aria-label={`Remover item ${index + 1}`}>
-                        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                      <button
+                        type="button"
+                        onClick={() => removerItem(item.key)}
+                        disabled={salvando || itens.length <= 1}
+                        aria-label={`Remover item ${index + 1}`}
+                      >
+                        <svg
+                          aria-hidden="true"
+                          width="15"
+                          height="15"
+                          viewBox="0 0 15 15"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                        >
                           <path d="M2 4h11M6 4V2.5h3V4M3.5 4l.6 8.5h6.8l.6-8.5" />
                         </svg>
                       </button>
@@ -402,32 +540,60 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                     <div className="gasto-item-grid">
                       <label className="gasto-item-descricao">
                         <span>Descrição</span>
-                        <input value={item.descricao} disabled={salvando} list="gasto-descricoes-conhecidas"
-                          onChange={(e) => atualizarItem(item.key, "descricao", e.target.value)} maxLength={200} required />
+                        <input
+                          value={item.descricao}
+                          disabled={salvando}
+                          list="gasto-descricoes-conhecidas"
+                          onChange={e => atualizarItem(item.key, "descricao", e.target.value)}
+                          maxLength={200}
+                          required
+                        />
                       </label>
                       <label htmlFor={`${fieldId}-categoria-${item.key}`}>
                         <span>Categoria</span>
-                        <GastoDropdown id={`${fieldId}-categoria-${item.key}`} value={item.categoria} options={DESPESA_CATEGORIAS} labels={DESPESA_CATEGORIA_LABEL}
-                          disabled={salvando} ariaLabel="Categoria"
-                          onChange={(valor) => atualizarItem(item.key, "categoria", valor)} />
+                        <GastoDropdown
+                          id={`${fieldId}-categoria-${item.key}`}
+                          value={item.categoria}
+                          options={DESPESA_CATEGORIAS}
+                          labels={DESPESA_CATEGORIA_LABEL}
+                          disabled={salvando}
+                          ariaLabel="Categoria"
+                          onChange={valor => atualizarItem(item.key, "categoria", valor)}
+                        />
                       </label>
                       <label>
                         <span>Quantidade</span>
-                        <input inputMode="decimal" value={item.quantidade} disabled={salvando}
-                          onChange={(e) => atualizarItem(item.key, "quantidade", e.target.value)} required />
+                        <input
+                          inputMode="decimal"
+                          value={item.quantidade}
+                          disabled={salvando}
+                          onChange={e => atualizarItem(item.key, "quantidade", e.target.value)}
+                          required
+                        />
                       </label>
                       <label htmlFor={`${fieldId}-unidade-${item.key}`}>
                         <span>Unidade</span>
-                        <GastoDropdown id={`${fieldId}-unidade-${item.key}`} value={item.unidade} options={DESPESA_UNIDADES} labels={DESPESA_UNIDADE_LABEL}
-                          disabled={salvando} ariaLabel="Unidade"
-                          onChange={(valor) => atualizarItem(item.key, "unidade", valor)} />
+                        <GastoDropdown
+                          id={`${fieldId}-unidade-${item.key}`}
+                          value={item.unidade}
+                          options={DESPESA_UNIDADES}
+                          labels={DESPESA_UNIDADE_LABEL}
+                          disabled={salvando}
+                          ariaLabel="Unidade"
+                          onChange={valor => atualizarItem(item.key, "unidade", valor)}
+                        />
                       </label>
                       <label>
                         <span>Valor unitário</span>
                         <div className="gasto-money-input">
                           <span>R$</span>
-                          <input inputMode="decimal" value={item.valorUnitario} disabled={salvando}
-                            onChange={(e) => atualizarItem(item.key, "valorUnitario", e.target.value)} required />
+                          <input
+                            inputMode="decimal"
+                            value={item.valorUnitario}
+                            disabled={salvando}
+                            onChange={e => atualizarItem(item.key, "valorUnitario", e.target.value)}
+                            required
+                          />
                         </div>
                       </label>
                       <div className="gasto-item-subtotal">
@@ -440,14 +606,32 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
               })}
             </div>
 
-            <button type="button" className="gasto-btn-add-item" onClick={adicionarItem} disabled={salvando}>
-              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <button
+              type="button"
+              className="gasto-btn-add-item"
+              onClick={adicionarItem}
+              disabled={salvando}
+            >
+              <svg
+                aria-hidden="true"
+                width="15"
+                height="15"
+                viewBox="0 0 15 15"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              >
                 <path d="M7.5 2v11M2 7.5h11" />
               </svg>
               Adicionar item
             </button>
 
-            {erro && <p role="alert" className="gasto-error">{erro}</p>}
+            {erro && (
+              <p role="alert" className="gasto-error">
+                {erro}
+              </p>
+            )}
 
             <footer className="gasto-footer">
               <div className="gasto-total-row">
@@ -455,15 +639,27 @@ export default function GastoModal({ modo: modoInicial, despesaId, descricoesCon
                 <strong>{formatarPreco(totalCentavos)}</strong>
               </div>
               <div className="gasto-footer-actions">
-                <button type="button" className="gasto-btn-cancel" onClick={onClose} disabled={salvando}>Cancelar</button>
+                <button
+                  type="button"
+                  className="gasto-btn-cancel"
+                  onClick={onClose}
+                  disabled={salvando}
+                >
+                  Cancelar
+                </button>
                 <button type="submit" className="gasto-btn-save" disabled={salvando}>
-                  {salvando ? "Salvando…" : modo === "editar" ? "Salvar alterações" : "Registrar gasto"}
+                  {salvando
+                    ? "Salvando…"
+                    : modo === "editar"
+                      ? "Salvar alterações"
+                      : "Registrar gasto"}
                 </button>
               </div>
             </footer>
           </form>
         )}
       </div>
-    </div>, document.body,
+    </div>,
+    document.body
   );
 }

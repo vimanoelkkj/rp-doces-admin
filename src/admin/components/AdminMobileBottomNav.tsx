@@ -1,12 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
-import {
-  IconBag,
-  IconDashboard,
-  IconProdutosCake,
-  IconStore,
-} from "./AdminSidebar";
+import { IconBag, IconDashboard, IconProdutosCake, IconStore } from "./AdminSidebar";
 import AdminMobileMoreSheet from "./AdminMobileMoreSheet";
 import "./AdminMobileNavigation.css";
 
@@ -22,26 +17,26 @@ const primaryItems: PrimaryItem[] = [
     to: "/admin",
     label: "Painel",
     icon: <IconDashboard />,
-    animation: "admin-mobile-nav-item--dashboard",
+    animation: "admin-mobile-nav-item--dashboard"
   },
   {
     to: "/admin/produtos",
     label: "Produtos",
     icon: <IconProdutosCake />,
-    animation: "admin-mobile-nav-item--produtos",
+    animation: "admin-mobile-nav-item--produtos"
   },
   {
     to: "/admin/pedidos",
     label: "Pedidos",
     icon: <IconBag />,
-    animation: "admin-mobile-nav-item--pedidos",
+    animation: "admin-mobile-nav-item--pedidos"
   },
   {
     to: "/admin/loja",
     label: "Loja",
     icon: <IconStore />,
-    animation: "admin-mobile-nav-item--loja",
-  },
+    animation: "admin-mobile-nav-item--loja"
+  }
 ];
 
 const secondaryPaths = ["/admin/administradores", "/admin/despesas", "/admin/notificacoes"];
@@ -66,7 +61,7 @@ export default function AdminMobileBottomNav() {
   // Cada notificação PEDIDO é derivada de um pedido operacional ainda em
   // status NOVO. A leitura da notificação não encerra essa pendência.
   const pedidosAguardandoPreparo = notificacoes.filter(
-    (notificacao) => notificacao.tipo === "PEDIDO",
+    notificacao => notificacao.tipo === "PEDIDO"
   ).length;
   const secondaryActive = secondaryPaths.includes(location.pathname);
 
@@ -74,7 +69,7 @@ export default function AdminMobileBottomNav() {
     <AdminMobileMoreSheet>
       {({ open, setOpen, triggerRef }) => (
         <nav className="admin-mobile-bottom-nav" aria-label="Navegação principal">
-          {primaryItems.map((item) => {
+          {primaryItems.map(item => {
             const badge = item.to === "/admin/pedidos" ? pedidosAguardandoPreparo : 0;
             return (
               <NavLink

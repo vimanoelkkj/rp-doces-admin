@@ -50,8 +50,7 @@ interface Props {
   onVerTroca: (itemId: number) => void;
 }
 
-const formatarPreco = (centavos: number) =>
-  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+const formatarPreco = (centavos: number) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
 const formatarData = (isoLike: string) => {
   const iso = isoLike.replace(" ", "T");
@@ -60,7 +59,7 @@ const formatarData = (isoLike: string) => {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
-    minute: "2-digit",
+    minute: "2-digit"
   });
 };
 
@@ -69,7 +68,7 @@ const METODO_LABEL: Record<string, string> = {
   PIX_EXTERNO: "Pix externo",
   CARTAO: "Cartão",
   DINHEIRO: "Dinheiro",
-  A_COMBINAR: "A combinar",
+  A_COMBINAR: "A combinar"
 };
 const metodoLabel = (codigo: string) => METODO_LABEL[codigo] ?? codigo;
 const metodosLabel = (codigos: string[]) => codigos.map(metodoLabel).join(" + ");
@@ -78,7 +77,7 @@ const ESTOQUE_ACAO_LABEL: Record<string, string> = {
   LIBERAR_RESERVA: "Liberou reserva",
   NAO_REPOR: "Não repôs estoque",
   REPOR: "Repôs estoque",
-  NENHUMA: "Sem ação de estoque",
+  NENHUMA: "Sem ação de estoque"
 };
 
 const ESTOQUE_ESTADO_LABEL: Record<string, string> = {
@@ -86,10 +85,13 @@ const ESTOQUE_ESTADO_LABEL: Record<string, string> = {
   BAIXADO: "baixado",
   LIBERADO: "liberado",
   REPOSTO: "reposto",
-  SEM_RESERVA: "sem reserva",
+  SEM_RESERVA: "sem reserva"
 };
 
-interface Badge { label: string; cor: "green" | "orange" | "red" }
+interface Badge {
+  label: string;
+  cor: "green" | "orange" | "red";
+}
 const STATUS_BADGE: Record<string, Badge> = {
   CONCLUIDA: { label: "Concluído", cor: "green" },
   CONCLUIDO: { label: "Concluído", cor: "green" },
@@ -97,7 +99,7 @@ const STATUS_BADGE: Record<string, Badge> = {
   AGUARDANDO_REEMBOLSO: { label: "Aguardando devolução", cor: "orange" },
   INCONCLUSIVA: { label: "Inconclusivo", cor: "red" },
   INCONCLUSIVO: { label: "Inconclusivo", cor: "red" },
-  FALHOU: { label: "Cancelado", cor: "red" },
+  FALHOU: { label: "Cancelado", cor: "red" }
 };
 
 function EventoBadge({ status }: { status?: string | null }) {
@@ -119,7 +121,7 @@ function EventoCard({
   evento,
   onVerCancelamento,
   onVerTroca,
-  readOnly,
+  readOnly
 }: {
   evento: HistoricoEvento;
   readOnly?: boolean;
@@ -143,17 +145,25 @@ function EventoCard({
       {(evento.tipo === "TROCA_SOLICITADA" || evento.tipo === "TROCA_CONCLUIDA") && (
         <>
           <div className="histmodal-troca-linha">
-            <span>{evento.itemOrigem?.nome} · {formatarPreco(evento.itemOrigem?.valorCentavos ?? 0)}</span>
-            <span className="histmodal-seta" aria-hidden="true">→</span>
-            <span>{evento.itemDestino?.nome} · {formatarPreco(evento.itemDestino?.valorCentavos ?? 0)}</span>
+            <span>
+              {evento.itemOrigem?.nome} · {formatarPreco(evento.itemOrigem?.valorCentavos ?? 0)}
+            </span>
+            <span className="histmodal-seta" aria-hidden="true">
+              →
+            </span>
+            <span>
+              {evento.itemDestino?.nome} · {formatarPreco(evento.itemDestino?.valorCentavos ?? 0)}
+            </span>
           </div>
-          {evento.tipoDiferenca && evento.tipoDiferenca !== "ZERO" && evento.diferencaCentavos != null && (
-            <div className="histmodal-evento-linha">
-              {evento.tipoDiferenca === "COBRAR" ? "Diferença cobrada" : "Diferença devolvida"}:{" "}
-              {formatarPreco(Math.abs(evento.diferencaCentavos))}
-              {evento.metodosReembolso && ` · ${metodosLabel(evento.metodosReembolso)}`}
-            </div>
-          )}
+          {evento.tipoDiferenca &&
+            evento.tipoDiferenca !== "ZERO" &&
+            evento.diferencaCentavos != null && (
+              <div className="histmodal-evento-linha">
+                {evento.tipoDiferenca === "COBRAR" ? "Diferença cobrada" : "Diferença devolvida"}:{" "}
+                {formatarPreco(Math.abs(evento.diferencaCentavos))}
+                {evento.metodosReembolso && ` · ${metodosLabel(evento.metodosReembolso)}`}
+              </div>
+            )}
           <div className="histmodal-evento-linha">
             Estoque origem: {ESTOQUE_ACAO_LABEL[evento.estoqueAcao ?? ""] ?? evento.estoqueAcao}
             {evento.itemDestino?.estoqueEstado &&
@@ -165,32 +175,37 @@ function EventoCard({
         </>
       )}
 
-      {(evento.tipo === "CANCELAMENTO_SOLICITADO" || evento.tipo === "CANCELAMENTO_CONCLUIDO") && evento.item && (
-        <>
-          <div className="histmodal-evento-linha">
-            {evento.item.nome} · {formatarPreco(evento.item.valorCentavos ?? 0)}
-          </div>
-          {evento.valorReembolsoCentavos != null && (
+      {(evento.tipo === "CANCELAMENTO_SOLICITADO" || evento.tipo === "CANCELAMENTO_CONCLUIDO") &&
+        evento.item && (
+          <>
             <div className="histmodal-evento-linha">
-              Reembolso: {formatarPreco(evento.valorReembolsoCentavos)}
-              {evento.metodosReembolso && ` · ${metodosLabel(evento.metodosReembolso)}`}
+              {evento.item.nome} · {formatarPreco(evento.item.valorCentavos ?? 0)}
             </div>
-          )}
-          <div className="histmodal-evento-linha">
-            Estoque: {ESTOQUE_ACAO_LABEL[evento.estoqueAcao ?? ""] ?? evento.estoqueAcao}
-            {evento.item.estoqueEstado &&
-              ` · Estado final: ${ESTOQUE_ESTADO_LABEL[evento.item.estoqueEstado] ?? evento.item.estoqueEstado}`}
-          </div>
-          {!readOnly && evento.referenciaId != null && (
-            <VerDetalhesButton onClick={() => onVerCancelamento(evento.referenciaId!)} />
-          )}
-        </>
-      )}
+            {evento.valorReembolsoCentavos != null && (
+              <div className="histmodal-evento-linha">
+                Reembolso: {formatarPreco(evento.valorReembolsoCentavos)}
+                {evento.metodosReembolso && ` · ${metodosLabel(evento.metodosReembolso)}`}
+              </div>
+            )}
+            <div className="histmodal-evento-linha">
+              Estoque: {ESTOQUE_ACAO_LABEL[evento.estoqueAcao ?? ""] ?? evento.estoqueAcao}
+              {evento.item.estoqueEstado &&
+                ` · Estado final: ${ESTOQUE_ESTADO_LABEL[evento.item.estoqueEstado] ?? evento.item.estoqueEstado}`}
+            </div>
+            {!readOnly && evento.referenciaId != null && (
+              <VerDetalhesButton onClick={() => onVerCancelamento(evento.referenciaId!)} />
+            )}
+          </>
+        )}
 
       {evento.tipo === "PEDIDO_ANULADO" && (
         <div className="histmodal-evento-linha">
           <div>Impacto nos totais: {formatarPreco(evento.valorCentavos ?? 0)}</div>
-          <div>{evento.estoqueAcao === "DEVOLVER" ? "Devolução dos itens elegíveis ao estoque" : "Estoque mantido"}</div>
+          <div>
+            {evento.estoqueAcao === "DEVOLVER"
+              ? "Devolução dos itens elegíveis ao estoque"
+              : "Estoque mantido"}
+          </div>
           <div>{evento.usuario}</div>
           <div>{evento.motivo || "Motivo não informado"}</div>
         </div>
@@ -216,7 +231,7 @@ export default function HistoricoComandaModal({
   readOnly,
   onClose,
   onVerCancelamento,
-  onVerTroca,
+  onVerTroca
 }: Props) {
   const modalProps = useAdminModal(true, onClose);
   const [eventos, setEventos] = useState<HistoricoEvento[] | null>(null);
@@ -227,15 +242,15 @@ export default function HistoricoComandaModal({
     let active = true;
     setLoading(true);
     fetch(`/api/admin/pedidos/${orderId}/historico`)
-      .then(async (response) => {
+      .then(async response => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body.error ?? "Falha ao carregar histórico");
         return body as { eventos: HistoricoEvento[] };
       })
-      .then((body) => {
+      .then(body => {
         if (active) setEventos(body.eventos);
       })
-      .catch((err) => {
+      .catch(err => {
         if (active) setError(err.message);
       })
       .finally(() => {
@@ -251,8 +266,22 @@ export default function HistoricoComandaModal({
       <div className="histmodal-card">
         <div className="histmodal-header">
           <h2 className="histmodal-title">Histórico da comanda</h2>
-          <button type="button" className="histmodal-btn-close" onClick={onClose} aria-label="Fechar histórico">
-            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <button
+            type="button"
+            className="histmodal-btn-close"
+            onClick={onClose}
+            aria-label="Fechar histórico"
+          >
+            <svg
+              aria-hidden="true"
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
               <line x1="3" y1="3" x2="13" y2="13" />
               <line x1="13" y1="3" x2="3" y2="13" />
             </svg>
@@ -266,10 +295,11 @@ export default function HistoricoComandaModal({
           )}
           {!loading && !error && eventos && eventos.length > 0 && (
             <div className="histmodal-timeline">
-              {eventos.map((evento) => (
+              {eventos.map(evento => (
                 <EventoCard
                   key={evento.id}
-                  evento={evento} readOnly={readOnly}
+                  evento={evento}
+                  readOnly={readOnly}
                   onVerCancelamento={onVerCancelamento}
                   onVerTroca={onVerTroca}
                 />
@@ -279,6 +309,6 @@ export default function HistoricoComandaModal({
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

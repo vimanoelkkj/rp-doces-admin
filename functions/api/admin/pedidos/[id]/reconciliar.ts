@@ -12,11 +12,7 @@ function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({
-  request,
-  env,
-  params,
-}) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
@@ -32,7 +28,7 @@ export const onRequestPost: PagesFunction<Env> = async ({
     console.error(
       "Recuperacao oportunista da comanda ficou pendente",
       { pedidoId: id },
-      recoveryError,
+      recoveryError
     );
   }
 

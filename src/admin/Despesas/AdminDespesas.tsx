@@ -8,7 +8,7 @@ import {
   formatarDataBr,
   intervaloDoPeriodo,
   paraISODate,
-  type Periodo,
+  type Periodo
 } from "./formatarDespesas";
 import "./AdminDespesas.css";
 
@@ -41,21 +41,38 @@ interface ResultadoFinanceiro {
 
 interface DespesasResponse {
   despesas: DespesaListItem[];
-  resumo: { totalCentavos: number; porCategoria: CategoriaResumo[]; rankingItens: ItemRankingResumo[] };
+  resumo: {
+    totalCentavos: number;
+    porCategoria: CategoriaResumo[];
+    rankingItens: ItemRankingResumo[];
+  };
   resultadoFinanceiro: ResultadoFinanceiro;
 }
 
 const STATUS_OPCOES: { valor: "TODOS" | "ATIVA" | "CANCELADA"; label: string }[] = [
   { valor: "TODOS", label: "Todos" },
   { valor: "ATIVA", label: "Ativa" },
-  { valor: "CANCELADA", label: "Cancelada" },
+  { valor: "CANCELADA", label: "Cancelada" }
 ];
 
 function IconChevron({ open }: { open: boolean }) {
   return (
-    <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none" className="desp-status-dropdown-chevron"
-      style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>
-      <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      aria-hidden="true"
+      width="12"
+      height="8"
+      viewBox="0 0 12 8"
+      fill="none"
+      className="desp-status-dropdown-chevron"
+      style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}
+    >
+      <path
+        d="M1 1.5L6 6.5L11 1.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -67,7 +84,11 @@ function useDropdown() {
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -77,26 +98,41 @@ function useDropdown() {
   return { open, setOpen, ref, menuRef };
 }
 
-function StatusDropdown({ value, onChange }: {
+function StatusDropdown({
+  value,
+  onChange
+}: {
   value: "TODOS" | "ATIVA" | "CANCELADA";
   onChange: (valor: "TODOS" | "ATIVA" | "CANCELADA") => void;
 }) {
   const dd = useDropdown();
-  const atual = STATUS_OPCOES.find((o) => o.valor === value)!;
+  const atual = STATUS_OPCOES.find(o => o.valor === value)!;
   return (
-    <div className={`desp-status-dropdown ${dd.open ? "desp-status-dropdown--open" : ""}`} ref={dd.ref}>
-      <button type="button" className="desp-status-dropdown-trigger" aria-label="Filtrar por status"
-        onClick={() => dd.setOpen(!dd.open)}>
+    <div
+      className={`desp-status-dropdown ${dd.open ? "desp-status-dropdown--open" : ""}`}
+      ref={dd.ref}
+    >
+      <button
+        type="button"
+        className="desp-status-dropdown-trigger"
+        aria-label="Filtrar por status"
+        onClick={() => dd.setOpen(!dd.open)}
+      >
         <span>{atual.label}</span>
         <IconChevron open={dd.open} />
       </button>
       {dd.open && (
         <ul className="desp-status-dropdown-list" ref={dd.menuRef}>
-          {STATUS_OPCOES.map((opcao) => (
+          {STATUS_OPCOES.map(opcao => (
             <li key={opcao.valor}>
-              <button type="button"
+              <button
+                type="button"
                 className={`desp-status-dropdown-option ${value === opcao.valor ? "desp-status-dropdown-option--active" : ""}`}
-                onClick={() => { onChange(opcao.valor); dd.setOpen(false); }}>
+                onClick={() => {
+                  onChange(opcao.valor);
+                  dd.setOpen(false);
+                }}
+              >
                 {opcao.label}
               </button>
             </li>
@@ -112,14 +148,11 @@ const PERIODOS: { valor: Periodo; label: string }[] = [
   { valor: "7DIAS", label: "7 dias" },
   { valor: "ESTE_MES", label: "Este mês" },
   { valor: "MES_PASSADO", label: "Mês passado" },
-  { valor: "PERSONALIZADO", label: "Personalizado" },
+  { valor: "PERSONALIZADO", label: "Personalizado" }
 ];
 
 type ModalState =
-  | null
-  | { modo: "criar" }
-  | { modo: "ver"; id: number }
-  | { modo: "editar"; id: number };
+  null | { modo: "criar" } | { modo: "ver"; id: number } | { modo: "editar"; id: number };
 
 export default function AdminDespesas() {
   const [periodo, setPeriodo] = useState<Periodo>("ESTE_MES");
@@ -142,7 +175,10 @@ export default function AdminDespesas() {
     return () => window.clearTimeout(timer);
   }, [busca]);
 
-  const { desde, ate } = useMemo(() => intervaloDoPeriodo(periodo, personalizado), [periodo, personalizado]);
+  const { desde, ate } = useMemo(
+    () => intervaloDoPeriodo(periodo, personalizado),
+    [periodo, personalizado]
+  );
 
   useEffect(() => {
     let cancelado = false;
@@ -150,14 +186,25 @@ export default function AdminDespesas() {
     const params = new URLSearchParams({ desde, ate, status: statusFiltro });
     if (buscaDebounced) params.set("search", buscaDebounced);
     fetch(`/api/admin/despesas?${params.toString()}`)
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) throw new Error("Falha ao carregar despesas");
         return response.json() as Promise<DespesasResponse>;
       })
-      .then((result) => { if (!cancelado) { setData(result); setErro(null); } })
-      .catch((err) => { if (!cancelado) setErro(err instanceof Error ? err.message : "Erro ao carregar despesas"); })
-      .finally(() => { if (!cancelado) setCarregando(false); });
-    return () => { cancelado = true; };
+      .then(result => {
+        if (!cancelado) {
+          setData(result);
+          setErro(null);
+        }
+      })
+      .catch(err => {
+        if (!cancelado) setErro(err instanceof Error ? err.message : "Erro ao carregar despesas");
+      })
+      .finally(() => {
+        if (!cancelado) setCarregando(false);
+      });
+    return () => {
+      cancelado = true;
+    };
   }, [desde, ate, statusFiltro, buscaDebounced, refreshKey]);
 
   const descricoesConhecidas = useMemo(() => {
@@ -180,9 +227,23 @@ export default function AdminDespesas() {
           <h1 className="desp-title">Despesas</h1>
           <p className="desp-subtitle">Acompanhe os gastos da operação e o impacto no resultado.</p>
         </div>
-        <button type="button" className="desp-btn-primary" onClick={() => setModal({ modo: "criar" })}>
-          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="8" y1="3" x2="8" y2="13" /><line x1="3" y1="8" x2="13" y2="8" />
+        <button
+          type="button"
+          className="desp-btn-primary"
+          onClick={() => setModal({ modo: "criar" })}
+        >
+          <svg
+            aria-hidden="true"
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <line x1="8" y1="3" x2="8" y2="13" />
+            <line x1="3" y1="8" x2="13" y2="8" />
           </svg>
           Registrar gasto
         </button>
@@ -191,21 +252,29 @@ export default function AdminDespesas() {
       <section className="desp-kpi-strip" aria-label="Resultado financeiro">
         <article className="desp-kpi-card">
           <span className="desp-kpi-label">Faturamento líquido</span>
-          <strong className="desp-kpi-value">{resultado ? formatarPreco(resultado.faturamentoLiquidoCentavos) : "—"}</strong>
+          <strong className="desp-kpi-value">
+            {resultado ? formatarPreco(resultado.faturamentoLiquidoCentavos) : "—"}
+          </strong>
         </article>
         <article className="desp-kpi-card">
           <span className="desp-kpi-label">Gastos</span>
-          <strong className="desp-kpi-value">{resultado ? formatarPreco(resultado.despesasCentavos) : "—"}</strong>
+          <strong className="desp-kpi-value">
+            {resultado ? formatarPreco(resultado.despesasCentavos) : "—"}
+          </strong>
         </article>
         <article className="desp-kpi-card">
           <span className="desp-kpi-label">Lucro estimado</span>
-          <strong className={`desp-kpi-value ${resultado && resultado.lucroEstimadoCentavos < 0 ? "desp-kpi-value--negativo" : ""}`}>
+          <strong
+            className={`desp-kpi-value ${resultado && resultado.lucroEstimadoCentavos < 0 ? "desp-kpi-value--negativo" : ""}`}
+          >
             {resultado ? formatarPrecoComSinal(resultado.lucroEstimadoCentavos) : "—"}
           </strong>
         </article>
         <article className="desp-kpi-card">
           <span className="desp-kpi-label">Margem estimada</span>
-          <strong className={`desp-kpi-value ${resultado && (resultado.margemEstimada ?? 0) < 0 ? "desp-kpi-value--negativo" : ""}`}>
+          <strong
+            className={`desp-kpi-value ${resultado && (resultado.margemEstimada ?? 0) < 0 ? "desp-kpi-value--negativo" : ""}`}
+          >
             {resultado ? formatarMargem(resultado.margemEstimada) : "—"}
           </strong>
         </article>
@@ -219,10 +288,12 @@ export default function AdminDespesas() {
           </div>
           {resumo && resumo.porCategoria.length > 0 ? (
             <div className="desp-categoria-list">
-              {resumo.porCategoria.map((categoria) => (
+              {resumo.porCategoria.map(categoria => (
                 <div className="desp-categoria-row" key={categoria.categoria}>
                   <span>{DESPESA_CATEGORIA_LABEL[categoria.categoria]}</span>
-                  <div className="desp-progress"><i style={{ width: `${Math.min(100, categoria.percentual)}%` }} /></div>
+                  <div className="desp-progress">
+                    <i style={{ width: `${Math.min(100, categoria.percentual)}%` }} />
+                  </div>
                   <strong>{formatarPreco(categoria.valorCentavos)}</strong>
                   <em>{categoria.percentual.toFixed(1).replace(".", ",")}%</em>
                 </div>
@@ -256,9 +327,14 @@ export default function AdminDespesas() {
       <section className="desp-history">
         <div className="desp-toolbar">
           <fieldset className="desp-periods" aria-label="Período">
-            {PERIODOS.map((opcao) => (
-              <button key={opcao.valor} type="button" aria-pressed={periodo === opcao.valor}
-                className={periodo === opcao.valor ? "is-active" : ""} onClick={() => setPeriodo(opcao.valor)}>
+            {PERIODOS.map(opcao => (
+              <button
+                key={opcao.valor}
+                type="button"
+                aria-pressed={periodo === opcao.valor}
+                className={periodo === opcao.valor ? "is-active" : ""}
+                onClick={() => setPeriodo(opcao.valor)}
+              >
                 {opcao.label}
               </button>
             ))}
@@ -266,39 +342,80 @@ export default function AdminDespesas() {
 
           {periodo === "PERSONALIZADO" && (
             <div className="desp-custom-range">
-              <input type="date" value={personalizado.desde} max={personalizado.ate}
-                onChange={(e) => setPersonalizado((atual) => ({ ...atual, desde: e.target.value }))} />
+              <input
+                type="date"
+                value={personalizado.desde}
+                max={personalizado.ate}
+                onChange={e => setPersonalizado(atual => ({ ...atual, desde: e.target.value }))}
+              />
               <span>até</span>
-              <input type="date" value={personalizado.ate} min={personalizado.desde}
-                onChange={(e) => setPersonalizado((atual) => ({ ...atual, ate: e.target.value }))} />
+              <input
+                type="date"
+                value={personalizado.ate}
+                min={personalizado.desde}
+                onChange={e => setPersonalizado(atual => ({ ...atual, ate: e.target.value }))}
+              />
             </div>
           )}
 
           <label className="desp-search">
-            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="7" cy="7" r="5" /><path d="m14 14-3-3" />
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <circle cx="7" cy="7" r="5" />
+              <path d="m14 14-3-3" />
             </svg>
-            <input value={busca} onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por fornecedor ou item..." aria-label="Buscar despesas" />
+            <input
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar por fornecedor ou item..."
+              aria-label="Buscar despesas"
+            />
           </label>
 
           <StatusDropdown value={statusFiltro} onChange={setStatusFiltro} />
         </div>
 
-        {erro && <p role="alert" className="desp-error">{erro}</p>}
+        {erro && (
+          <p role="alert" className="desp-error">
+            {erro}
+          </p>
+        )}
 
         <div className="desp-table-panel">
           <table className="desp-table">
             <thead>
-              <tr><th>Data</th><th>Fornecedor</th><th>Itens</th><th>Total</th><th>Status</th></tr>
+              <tr>
+                <th>Data</th>
+                <th>Fornecedor</th>
+                <th>Itens</th>
+                <th>Total</th>
+                <th>Status</th>
+              </tr>
             </thead>
             <tbody>
-              {(data?.despesas ?? []).map((despesa) => (
-                <tr key={despesa.id} className="desp-table-row" onClick={() => setModal({ modo: "ver", id: despesa.id })}>
+              {(data?.despesas ?? []).map(despesa => (
+                <tr
+                  key={despesa.id}
+                  className="desp-table-row"
+                  onClick={() => setModal({ modo: "ver", id: despesa.id })}
+                >
                   <td>{formatarDataBr(despesa.dataCompetencia)}</td>
-                  <td><strong>{despesa.fornecedor || "Sem fornecedor"}</strong></td>
-                  <td>{despesa.itemCount} {despesa.itemCount === 1 ? "item" : "itens"}</td>
-                  <td><strong>{formatarPreco(despesa.totalCentavos)}</strong></td>
+                  <td>
+                    <strong>{despesa.fornecedor || "Sem fornecedor"}</strong>
+                  </td>
+                  <td>
+                    {despesa.itemCount} {despesa.itemCount === 1 ? "item" : "itens"}
+                  </td>
+                  <td>
+                    <strong>{formatarPreco(despesa.totalCentavos)}</strong>
+                  </td>
                   <td>
                     <span className={`desp-status desp-status--${despesa.status.toLowerCase()}`}>
                       {despesa.status === "ATIVA" ? "Ativa" : "Cancelada"}
@@ -310,9 +427,13 @@ export default function AdminDespesas() {
           </table>
 
           <div className="desp-cards-mobile">
-            {(data?.despesas ?? []).map((despesa) => (
-              <button type="button" key={despesa.id} className="desp-card-mobile"
-                onClick={() => setModal({ modo: "ver", id: despesa.id })}>
+            {(data?.despesas ?? []).map(despesa => (
+              <button
+                type="button"
+                key={despesa.id}
+                className="desp-card-mobile"
+                onClick={() => setModal({ modo: "ver", id: despesa.id })}
+              >
                 <div className="desp-card-mobile-row">
                   <span>{formatarDataBr(despesa.dataCompetencia)}</span>
                   <span className={`desp-status desp-status--${despesa.status.toLowerCase()}`}>
@@ -321,7 +442,9 @@ export default function AdminDespesas() {
                 </div>
                 <strong>{despesa.fornecedor || "Sem fornecedor"}</strong>
                 <div className="desp-card-mobile-row">
-                  <span>{despesa.itemCount} {despesa.itemCount === 1 ? "item" : "itens"}</span>
+                  <span>
+                    {despesa.itemCount} {despesa.itemCount === 1 ? "item" : "itens"}
+                  </span>
                   <strong>{formatarPreco(despesa.totalCentavos)}</strong>
                 </div>
               </button>
@@ -341,7 +464,7 @@ export default function AdminDespesas() {
           despesaId={modal.modo === "criar" ? undefined : modal.id}
           descricoesConhecidas={descricoesConhecidas}
           onClose={fecharModal}
-          onSaved={() => setRefreshKey((k) => k + 1)}
+          onSaved={() => setRefreshKey(k => k + 1)}
         />
       )}
     </main>

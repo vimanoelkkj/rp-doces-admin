@@ -39,7 +39,7 @@ export default function StorefrontWave() {
               : {
                   d: [SECONDARY_A, SECONDARY_B, SECONDARY_C],
                   x: [-3, 0, 3],
-                  y: [-1.5, 0, 1.5],
+                  y: [-1.5, 0, 1.5]
                 }
           }
           transition={
@@ -49,7 +49,7 @@ export default function StorefrontWave() {
                   duration: 8.5,
                   repeat: Infinity,
                   repeatType: "mirror",
-                  ease: "easeInOut",
+                  ease: "easeInOut"
                 }
           }
         />
@@ -62,7 +62,7 @@ export default function StorefrontWave() {
               ? undefined
               : {
                   d: [PRIMARY_A, PRIMARY_B, PRIMARY_C],
-                  y: [-1, 0, 1],
+                  y: [-1, 0, 1]
                 }
           }
           transition={
@@ -72,7 +72,7 @@ export default function StorefrontWave() {
                   duration: 6.5,
                   repeat: Infinity,
                   repeatType: "mirror",
-                  ease: "easeInOut",
+                  ease: "easeInOut"
                 }
           }
         />

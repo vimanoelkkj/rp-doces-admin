@@ -1,11 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { verifyPassword, createSession, sameOrigin } from "../../lib/auth";
-import {
-  checkLoginRateLimit,
-  recordLoginFailure,
-  clearLoginFailures,
-} from "../../lib/rateLimit";
+import { checkLoginRateLimit, recordLoginFailure, clearLoginFailures } from "../../lib/rateLimit";
 
 interface Env {
   DB: D1Database;
@@ -55,30 +51,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const rate = await checkLoginRateLimit(env.DB, request, username);
   if (!rate.allowed) {
-    return jsonError(
-      "Muitas tentativas. Tente novamente em alguns minutos",
-      429,
-      { "retry-after": String(rate.retryAfter) },
-    );
+    return jsonError("Muitas tentativas. Tente novamente em alguns minutos", 429, {
+      "retry-after": String(rate.retryAfter)
+    });
   }
 
   const user = await env.DB.prepare(
     `SELECT id, nome, username, email, senha_hash, ativo
-     FROM usuarios_admin WHERE username = ? LIMIT 1`,
+     FROM usuarios_admin WHERE username = ? LIMIT 1`
   )
     .bind(username)
     .first<UsuarioRow>();
 
-  const hashParaVerificar =
-    user?.ativo
-      ? user.senha_hash
-      : DUMMY_PASSWORD_HASH;
+  const hashParaVerificar = user?.ativo ? user.senha_hash : DUMMY_PASSWORD_HASH;
 
   const senhaCorreta = await verifyPassword(senha, hashParaVerificar);
 
   if (!user?.ativo || !senhaCorreta) {
     await recordLoginFailure(env.DB, rate.key);
-    await new Promise((r) => setTimeout(r, 350));
+    await new Promise(r => setTimeout(r, 350));
     return jsonError("Usuário ou senha incorretos", 401);
   }
 
@@ -97,9 +88,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         id: user.id,
         nome: user.nome,
         username: user.username,
-        email: user.email,
-      },
+        email: user.email
+      }
     },
-    { headers: { "Set-Cookie": session.cookie } },
+    { headers: { "Set-Cookie": session.cookie } }
   );
 };

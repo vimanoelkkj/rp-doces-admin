@@ -11,7 +11,7 @@ import {
   type MpPaymentResponse,
   resolveWebhookPayment,
   syncPaymentFromMp,
-  validateMpWebhookSignature,
+  validateMpWebhookSignature
 } from "../../lib/paymentSync";
 
 interface Env {
@@ -50,7 +50,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     url.searchParams.get("data.id") || url.searchParams.get("data_id") || getBodyDataId(body);
 
   const type = String(
-    url.searchParams.get("type") || url.searchParams.get("topic") || body?.type || body?.topic || "",
+    url.searchParams.get("type") || url.searchParams.get("topic") || body?.type || body?.topic || ""
   ).toLowerCase();
 
   const secret = String(env.MP_WEBHOOK_SECRET || "").trim();
@@ -84,7 +84,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     if (resolved.kind === "ambiguous") {
       console.error("Webhook do Mercado Pago: pagamento ambíguo, nenhuma linha alterada", {
         mp_payment_id: String(payment.id),
-        external_reference: payment.external_reference || null,
+        external_reference: payment.external_reference || null
       });
       return ok();
     }

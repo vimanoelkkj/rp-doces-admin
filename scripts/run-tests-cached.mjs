@@ -6,7 +6,7 @@ import {
   readFileSync,
   writeFileSync,
   readdirSync,
-  rmSync,
+  rmSync
 } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -39,7 +39,7 @@ const DIRS_TO_HASH = [
   "scripts",
   "migrations",
   "seed",
-  "public",
+  "public"
 ];
 
 const FILES_TO_HASH = [
@@ -48,7 +48,7 @@ const FILES_TO_HASH = [
   "tsconfig.json",
   "vite.config.ts",
   "wrangler.toml",
-  "index.html",
+  "index.html"
 ];
 
 const IGNORED_DIR_NAMES = new Set([
@@ -119,7 +119,7 @@ function parseTestLog(logText) {
     tests: testsMatch ? parseInt(testsMatch[1], 10) : null,
     pass: passMatch ? parseInt(passMatch[1], 10) : null,
     fail: failMatch ? parseInt(failMatch[1], 10) : null,
-    duration_ms: durationMatch ? parseFloat(durationMatch[1]) : null,
+    duration_ms: durationMatch ? parseFloat(durationMatch[1]) : null
   };
 }
 
@@ -134,7 +134,7 @@ let cacheData = {
   nodeVersion: process.version,
   platform: process.platform,
   arch: process.arch,
-  suites: {},
+  suites: {}
 };
 
 if (!force && existsSync(resultsJsonPath)) {
@@ -147,7 +147,7 @@ if (!force && existsSync(resultsJsonPath)) {
 
 const testsDir = path.join(rootDir, "tests");
 const testFiles = readdirSync(testsDir)
-  .filter((f) => f.endsWith(".test.mjs"))
+  .filter(f => f.endsWith(".test.mjs"))
   .sort();
 
 mkdirSync(logsDir, { recursive: true });
@@ -165,8 +165,7 @@ for (const suite of testFiles) {
   const logFilePath = path.join(logsDir, suiteLogName);
   const cached = cacheData.suites?.[suite];
 
-  const isCacheHit =
-    !force && cached?.status === "PASS" && existsSync(logFilePath);
+  const isCacheHit = !force && cached?.status === "PASS" && existsSync(logFilePath);
 
   if (isCacheHit) {
     cachedCount++;
@@ -186,15 +185,13 @@ for (const suite of testFiles) {
   const result = spawnSync(process.execPath, ["--test", suitePath], {
     cwd: rootDir,
     stdio: ["ignore", logFd, logFd],
-    env: process.env,
+    env: process.env
   });
 
   closeSync(logFd);
   const durationMs = Date.now() - start;
 
-  const logContent = existsSync(logFilePath)
-    ? readFileSync(logFilePath, "utf-8")
-    : "";
+  const logContent = existsSync(logFilePath) ? readFileSync(logFilePath, "utf-8") : "";
   const parsed = parseTestLog(logContent);
 
   const isSuccess = result.status === 0;
@@ -211,7 +208,7 @@ for (const suite of testFiles) {
       fail: 0,
       duration_ms: parsed.duration_ms ?? durationMs,
       timestamp: new Date().toISOString(),
-      logPath: path.relative(rootDir, logFilePath).replace(/\\/g, "/"),
+      logPath: path.relative(rootDir, logFilePath).replace(/\\/g, "/")
     };
 
     console.log(`[PASS] ${suite}`);
@@ -232,7 +229,7 @@ for (const suite of testFiles) {
       fail: fCount,
       duration_ms: parsed.duration_ms ?? durationMs,
       timestamp: new Date().toISOString(),
-      logPath: relLog,
+      logPath: relLog
     };
 
     console.log(`[FAIL] ${suite} -> ${relLog}`);

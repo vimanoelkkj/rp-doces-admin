@@ -21,12 +21,15 @@ export async function reconcileLiveTabParent(
   accessToken: string | undefined,
   parent: { cancellationId?: number; exchangeId?: number }
 ): Promise<void> {
-  const parentTable = parent.cancellationId !== undefined ? "pedido_item_cancelamentos" : "pedido_item_trocas";
+  const parentTable =
+    parent.cancellationId !== undefined ? "pedido_item_cancelamentos" : "pedido_item_trocas";
   const parentId = parent.cancellationId ?? parent.exchangeId;
   if (parentId === undefined) return;
-  const row = await db.prepare(`SELECT pedido_id FROM ${parentTable} WHERE id=?`)
-    .bind(parentId).first<{ pedido_id: number }>();
-  if (row && await getPedidoAnulacao(db, row.pedido_id)) return;
+  const row = await db
+    .prepare(`SELECT pedido_id FROM ${parentTable} WHERE id=?`)
+    .bind(parentId)
+    .first<{ pedido_id: number }>();
+  if (row && (await getPedidoAnulacao(db, row.pedido_id))) return;
   if (accessToken) await recoverPixMpRefundIntentsForParent(db, accessToken, parent);
   if (parent.cancellationId !== undefined) {
     await reconcileCancellationFinalization(db, parent.cancellationId);

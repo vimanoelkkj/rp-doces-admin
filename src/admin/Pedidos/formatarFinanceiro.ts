@@ -26,11 +26,10 @@ const METODO_LABEL: Record<LedgerMetodo, string> = {
   PIX_EXTERNO: "Pix externo",
   CARTAO: "Cartão",
   DINHEIRO: "Dinheiro",
-  A_COMBINAR: "A combinar",
+  A_COMBINAR: "A combinar"
 };
 
-const formatarPreco = (centavos: number) =>
-  `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+const formatarPreco = (centavos: number) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
 export interface FinanceiroFormatado {
   /** Rótulo curto — o texto do badge/pill. */
@@ -42,7 +41,7 @@ export interface FinanceiroFormatado {
 
 export function formatarFinanceiro(financeiro: FinanceiroPedido): FinanceiroFormatado {
   if (financeiro.status === "PAGO") {
-    const metodos = financeiro.metodosConfirmados.map((m) => METODO_LABEL[m]);
+    const metodos = financeiro.metodosConfirmados.map(m => METODO_LABEL[m]);
     return { badge: "✓ Pago", detalhe: metodos.join(" + "), cor: "green" };
   }
 
@@ -50,7 +49,7 @@ export function formatarFinanceiro(financeiro: FinanceiroPedido): FinanceiroForm
     return {
       badge: "Parcial",
       detalhe: `${formatarPreco(financeiro.pagoCentavos)} / ${formatarPreco(financeiro.totalCentavos)}`,
-      cor: "orange",
+      cor: "orange"
     };
   }
 
@@ -58,7 +57,10 @@ export function formatarFinanceiro(financeiro: FinanceiroPedido): FinanceiroForm
 }
 
 /** Junta badge+detalhe num texto só, pra layouts com um único elemento. */
-export function formatarFinanceiroTexto(financeiro: FinanceiroPedido): { texto: string; cor: BadgeCor } {
+export function formatarFinanceiroTexto(financeiro: FinanceiroPedido): {
+  texto: string;
+  cor: BadgeCor;
+} {
   const { badge, detalhe, cor } = formatarFinanceiro(financeiro);
   return { texto: detalhe ? `${badge} · ${detalhe}` : badge, cor };
 }

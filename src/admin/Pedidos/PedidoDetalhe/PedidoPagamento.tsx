@@ -2,7 +2,7 @@ import type {
   MetodoPagamentoManual,
   OperacaoInconclusiva,
   PedidoRow,
-  PixAdminPendente,
+  PixAdminPendente
 } from "./types";
 import { formatarFinanceiro, type FinanceiroPedido } from "../formatarFinanceiro";
 import { formatarPreco } from "./helpers";
@@ -64,25 +64,23 @@ export default function PedidoPagamento({
   onGerarPix,
   onCopiarCodigo,
   onAtualizarPedido,
-  onLimparPixAviso,
+  onLimparPixAviso
 }: PedidoPagamentoProps) {
   const finFormatado = formatarFinanceiro(financeiro);
   const temDivergenciaFinanceiraMp = operacoesInconclusivas.some(
-    (operacao) => operacao.tipo === "PIX_MP_INTEGRIDADE",
+    operacao => operacao.tipo === "PIX_MP_INTEGRIDADE"
   );
   const podeRegistrarPagamento = Boolean(
     !anulado &&
-      pedido.arquivado === 0 &&
-      capacidadeCobravelCentavos > 0 &&
-      (pedido.status_comanda === "ABERTA" ||
-        pedido.status_pedido === "ENTREGUE"),
+    pedido.arquivado === 0 &&
+    capacidadeCobravelCentavos > 0 &&
+    (pedido.status_comanda === "ABERTA" || pedido.status_pedido === "ENTREGUE")
   );
   const podeGerarPix = Boolean(
     !anulado &&
-      pedido.arquivado === 0 &&
-      capacidadeCobravelCentavos > 0 &&
-      (pedido.status_comanda === "ABERTA" ||
-        pedido.status_pedido === "ENTREGUE"),
+    pedido.arquivado === 0 &&
+    capacidadeCobravelCentavos > 0 &&
+    (pedido.status_comanda === "ABERTA" || pedido.status_pedido === "ENTREGUE")
   );
 
   return (
@@ -125,7 +123,10 @@ export default function PedidoPagamento({
       {financeiro.temExcesso && (
         <div className="pedmodal-pix-aviso" role="alert">
           <span>
-            ⚠ <strong>Sobrepagamento identificado:</strong> Recebido {formatarPreco(financeiro.liquidoCentavos)} de um total de {formatarPreco(financeiro.totalCentavos)} (excesso de {formatarPreco(financeiro.excessoCentavos)}).
+            ⚠ <strong>Sobrepagamento identificado:</strong> Recebido{" "}
+            {formatarPreco(financeiro.liquidoCentavos)} de um total de{" "}
+            {formatarPreco(financeiro.totalCentavos)} (excesso de{" "}
+            {formatarPreco(financeiro.excessoCentavos)}).
           </span>
         </div>
       )}
@@ -140,20 +141,20 @@ export default function PedidoPagamento({
         <div className="pedmodal-pix-aviso" role="alert">
           <span>
             {temDivergenciaFinanceiraMp ? (
-              <>⚠ <strong>Divergência financeira do Mercado Pago:</strong> pagamento ou
-                reembolso remoto não conciliado. Preserve o estoque e encaminhe para
-                intervenção humana antes de gerar outra cobrança.</>
+              <>
+                ⚠ <strong>Divergência financeira do Mercado Pago:</strong> pagamento ou reembolso
+                remoto não conciliado. Preserve o estoque e encaminhe para intervenção humana antes
+                de gerar outra cobrança.
+              </>
             ) : (
-              <>⚠ {operacoesInconclusivas.length === 1 ? "Uma cobrança" : "Cobranças"} deste
-                pedido não teve confirmação do Mercado Pago. Verificamos automaticamente; não
-                gere outra sem conferir.</>
+              <>
+                ⚠ {operacoesInconclusivas.length === 1 ? "Uma cobrança" : "Cobranças"} deste pedido
+                não teve confirmação do Mercado Pago. Verificamos automaticamente; não gere outra
+                sem conferir.
+              </>
             )}
           </span>
-          <button
-            type="button"
-            className="pedmodal-btn-edit"
-            onClick={onAtualizarPedido}
-          >
+          <button type="button" className="pedmodal-btn-edit" onClick={onAtualizarPedido}>
             Atualizar pedido
           </button>
         </div>
@@ -163,11 +164,7 @@ export default function PedidoPagamento({
       {pixAviso && (
         <div className="pedmodal-pix-aviso">
           <span>⚠ {pixAviso}</span>
-          <button
-            type="button"
-            className="pedmodal-btn-edit"
-            onClick={onLimparPixAviso}
-          >
+          <button type="button" className="pedmodal-btn-edit" onClick={onLimparPixAviso}>
             Atualizar pedido
           </button>
         </div>
@@ -182,9 +179,7 @@ export default function PedidoPagamento({
                   ? "Troca aguardando pagamento"
                   : "Saldo aguardando pagamento"}
               </strong>
-              <span>
-                Saldo: {formatarPreco(capacidadeCobravelCentavos)}.
-              </span>
+              <span>Saldo: {formatarPreco(capacidadeCobravelCentavos)}.</span>
             </div>
             <div className="pedmodal-charge-buttons">
               {podeRegistrarPagamento && (
@@ -225,7 +220,7 @@ export default function PedidoPagamento({
                     type="text"
                     inputMode="decimal"
                     value={valorPagamento}
-                    onChange={(event) => onValorPagamentoChange(event.target.value)}
+                    onChange={event => onValorPagamentoChange(event.target.value)}
                     disabled={pagamentoEmVoo}
                     aria-label="Valor recebido"
                   />
@@ -235,23 +230,17 @@ export default function PedidoPagamento({
                 Forma de pagamento
                 <select
                   value={metodoPagamento}
-                  onChange={(event) =>
-                    onMetodoPagamentoChange(
-                      event.target.value as MetodoPagamentoManual,
-                    )
+                  onChange={event =>
+                    onMetodoPagamentoChange(event.target.value as MetodoPagamentoManual)
                   }
                   disabled={pagamentoEmVoo}
                 >
                   <option value="DINHEIRO">Dinheiro</option>
                   <option value="CARTAO">Cartão</option>
-                  <option value="PIX_EXTERNO">
-                    Pix recebido fora do sistema
-                  </option>
+                  <option value="PIX_EXTERNO">Pix recebido fora do sistema</option>
                 </select>
               </label>
-              {pagamentoError && (
-                <p className="pedmodal-status-error">{pagamentoError}</p>
-              )}
+              {pagamentoError && <p className="pedmodal-status-error">{pagamentoError}</p>}
               <div className="pedmodal-manual-payment-actions">
                 <button
                   type="button"
@@ -275,7 +264,7 @@ export default function PedidoPagamento({
         </div>
       )}
 
-      {pixAdminPendentes.map((pix) => {
+      {pixAdminPendentes.map(pix => {
         const expiraEmMs = pix.expiresAt ? Date.parse(pix.expiresAt) : null;
         const vencido = expiraEmMs !== null && expiraEmMs <= agora;
         const restanteS =
@@ -292,10 +281,7 @@ export default function PedidoPagamento({
 
             {pix.qrCodeBase64 && (
               <div className="pedmodal-pix-qr">
-                <img
-                  src={`data:image/png;base64,${pix.qrCodeBase64}`}
-                  alt="QR Code Pix"
-                />
+                <img src={`data:image/png;base64,${pix.qrCodeBase64}`} alt="QR Code Pix" />
               </div>
             )}
 
@@ -318,11 +304,7 @@ export default function PedidoPagamento({
             {vencido ? (
               <div className="pedmodal-pix-vencido">
                 <span>Expiração informada pelo Mercado Pago atingida</span>
-                <button
-                  type="button"
-                  className="pedmodal-btn-edit"
-                  onClick={onAtualizarPedido}
-                >
+                <button type="button" className="pedmodal-btn-edit" onClick={onAtualizarPedido}>
                   Atualizar pedido
                 </button>
               </div>

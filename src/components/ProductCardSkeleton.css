@@ -93,8 +93,12 @@
 }
 
 @keyframes skeleton-shimmer {
-  from { background-position: 150% 0; }
-  to { background-position: -50% 0; }
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
 }
 
 /* Mobile: o card real tem gap maior, nome em 1 linha (18px) e descrição

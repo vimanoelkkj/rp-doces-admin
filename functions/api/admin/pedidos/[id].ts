@@ -56,23 +56,13 @@ const MAX_CLIENTE_NOME_LENGTH = 200;
 
 // Mesmo enum de produção (order.model.ts / OrderStatusSelect.tsx). Sem
 // CHECK no banco de propósito — produção também valida só em código.
-const STATUS_PEDIDO_VALIDOS = [
-  "NOVO",
-  "PREPARANDO",
-  "PRONTO",
-  "ENTREGUE",
-  "CANCELADO",
-];
+const STATUS_PEDIDO_VALIDOS = ["NOVO", "PREPARANDO", "PRONTO", "ENTREGUE", "CANCELADO"];
 
 function jsonError(message: string, status: number, code?: string) {
   return Response.json(code ? { error: message, code } : { error: message }, { status });
 }
 
-export const onRequestGet: PagesFunction<Env> = async ({
-  request,
-  env,
-  params,
-}) => {
+export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
 
@@ -87,7 +77,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
               status_pagamento, status_pedido, status_comanda, origem_pedido,
               arquivado, arquivado_em,
               criado_em, pago_em
-       FROM pedidos WHERE id = ?`,
+       FROM pedidos WHERE id = ?`
     )
       .bind(id)
       .first<PedidoDetalheRow>();
@@ -112,7 +102,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
                WHERE (t.item_origem_id=pi.id OR t.item_destino_id=pi.id) AND t.status<>'FALHOU' ORDER BY t.id DESC LIMIT 1) AS troca_item_origem_id
        FROM pedido_itens pi
        LEFT JOIN produtos p ON p.id = pi.produto_id
-       WHERE pi.pedido_id = ?`,
+       WHERE pi.pedido_id = ?`
     )
       .bind(id)
       .all<PedidoItemRow>();
@@ -120,7 +110,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
     const [financeiro, pixAdminPendentes, capacidadeCobravelCentavos] = await Promise.all([
       getFinanceiroPedido(env.DB, id),
       getPixAdminPendentesAtivos(env.DB, id),
-      getCapacidadeCobravel(env.DB, id),
+      getCapacidadeCobravel(env.DB, id)
     ]);
 
     // B-3: cobranças cujo envio ao Mercado Pago ficou inconclusivo. Leitura
@@ -132,12 +122,10 @@ export const onRequestGet: PagesFunction<Env> = async ({
       tipo: string;
       diagnostico: string | null;
       atualizadoEm: string;
-    }> = (
-      await listarOperacoesInconclusivasDoPedido(env.DB, id)
-    ).map((o) => ({
+    }> = (await listarOperacoesInconclusivasDoPedido(env.DB, id)).map(o => ({
       tipo: o.tipo,
       diagnostico: o.erro,
-      atualizadoEm: o.atualizado_em,
+      atualizadoEm: o.atualizado_em
     }));
     const { results: pagamentosComIntegridadePendente } = await env.DB.prepare(
       `SELECT
@@ -160,13 +148,17 @@ export const onRequestGet: PagesFunction<Env> = async ({
              AND LOWER(COALESCE(pp.mp_status, '')) = 'refunded'
              AND pp.mp_status_detail = 'INTEGRIDADE_MP:REFUNDED_RECONHECIDO')
          )
-       ORDER BY pp.atualizado_em DESC`,
-    ).bind(id).all<{ diagnostico: string; atualizado_em: string }>();
-    operacoesInconclusivas.push(...pagamentosComIntegridadePendente.map((pagamento) => ({
-      tipo: "PIX_MP_INTEGRIDADE",
-      diagnostico: pagamento.diagnostico,
-      atualizadoEm: pagamento.atualizado_em,
-    })));
+       ORDER BY pp.atualizado_em DESC`
+    )
+      .bind(id)
+      .all<{ diagnostico: string; atualizado_em: string }>();
+    operacoesInconclusivas.push(
+      ...pagamentosComIntegridadePendente.map(pagamento => ({
+        tipo: "PIX_MP_INTEGRIDADE",
+        diagnostico: pagamento.diagnostico,
+        atualizadoEm: pagamento.atualizado_em
+      }))
+    );
 
     return Response.json({
       pedido,
@@ -175,7 +167,7 @@ export const onRequestGet: PagesFunction<Env> = async ({
       financeiro,
       pixAdminPendentes,
       capacidadeCobravelCentavos,
-      operacoesInconclusivas,
+      operacoesInconclusivas
     });
   } catch (err) {
     console.error("Erro ao buscar pedido (admin)", err);
@@ -183,17 +175,12 @@ export const onRequestGet: PagesFunction<Env> = async ({
   }
 };
 
-export const onRequestPatch: PagesFunction<Env> = async ({
-  request,
-  env,
-  params,
-}) => {
+export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
   if (!sameOrigin(request)) return jsonError("Origem inválida", 403);
   const auth = await requireUser(env.DB, request);
   if ("error" in auth) return auth.error;
   const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
   if (anulado) return anulado;
-
 
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -225,13 +212,15 @@ export const onRequestPatch: PagesFunction<Env> = async ({
 
     try {
       const pedido = await env.DB.prepare(
-        `SELECT id,status_pedido,arquivado,arquivado_em FROM pedidos WHERE id=?`,
-      ).bind(id).first<{
-        id: number;
-        status_pedido: string;
-        arquivado: number;
-        arquivado_em: string | null;
-      }>();
+        `SELECT id,status_pedido,arquivado,arquivado_em FROM pedidos WHERE id=?`
+      )
+        .bind(id)
+        .first<{
+          id: number;
+          status_pedido: string;
+          arquivado: number;
+          arquivado_em: string | null;
+        }>();
       if (!pedido) return jsonError("Pedido não encontrado", 404);
 
       const arquivar = body.arquivado;
@@ -239,7 +228,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({
         return jsonError(
           "Somente pedidos entregues ou cancelados podem ser arquivados.",
           409,
-          "PEDIDO_NAO_TERMINAL",
+          "PEDIDO_NAO_TERMINAL"
         );
       }
 
@@ -248,33 +237,39 @@ export const onRequestPatch: PagesFunction<Env> = async ({
           ok: true,
           arquivado: arquivar,
           arquivadoEm: pedido.arquivado_em,
-          replay: true,
+          replay: true
         });
       }
 
       const alteracao = arquivar
         ? await env.DB.prepare(
-          `UPDATE pedidos SET arquivado=1,arquivado_em=CURRENT_TIMESTAMP,
+            `UPDATE pedidos SET arquivado=1,arquivado_em=CURRENT_TIMESTAMP,
              atualizado_em=CURRENT_TIMESTAMP
-           WHERE id=? AND arquivado=0 AND status_pedido IN ('ENTREGUE','CANCELADO')`,
-        ).bind(id).run()
+           WHERE id=? AND arquivado=0 AND status_pedido IN ('ENTREGUE','CANCELADO')`
+          )
+            .bind(id)
+            .run()
         : await env.DB.prepare(
-          `UPDATE pedidos SET arquivado=0,arquivado_em=NULL,
+            `UPDATE pedidos SET arquivado=0,arquivado_em=NULL,
              atualizado_em=CURRENT_TIMESTAMP
-           WHERE id=? AND arquivado=1`,
-        ).bind(id).run();
+           WHERE id=? AND arquivado=1`
+          )
+            .bind(id)
+            .run();
 
       if (Number(alteracao?.meta?.changes || 0) === 0) {
         return jsonError("O pedido mudou durante a operação. Atualize e tente novamente.", 409);
       }
 
       const atualizado = await env.DB.prepare(
-        `SELECT arquivado,arquivado_em FROM pedidos WHERE id=?`,
-      ).bind(id).first<{ arquivado: number; arquivado_em: string | null }>();
+        `SELECT arquivado,arquivado_em FROM pedidos WHERE id=?`
+      )
+        .bind(id)
+        .first<{ arquivado: number; arquivado_em: string | null }>();
       return Response.json({
         ok: true,
         arquivado: Boolean(atualizado?.arquivado),
-        arquivadoEm: atualizado?.arquivado_em ?? null,
+        arquivadoEm: atualizado?.arquivado_em ?? null
       });
     } catch (err) {
       console.error("Erro ao arquivar pedido (admin)", err);
@@ -282,9 +277,9 @@ export const onRequestPatch: PagesFunction<Env> = async ({
     }
   }
 
-  const estadoAtual = await env.DB.prepare(
-    `SELECT arquivado FROM pedidos WHERE id=?`,
-  ).bind(id).first<{ arquivado: number }>();
+  const estadoAtual = await env.DB.prepare(`SELECT arquivado FROM pedidos WHERE id=?`)
+    .bind(id)
+    .first<{ arquivado: number }>();
   if (!estadoAtual) return jsonError("Pedido não encontrado", 404);
   if (estadoAtual.arquivado) {
     return jsonError("Restaure o pedido antes de alterá-lo.", 409, "PEDIDO_ARQUIVADO");
@@ -303,7 +298,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({
       const alteracao = await env.DB.prepare(
         `UPDATE pedidos
          SET cliente_nome = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE id = ?`,
+         WHERE id = ?`
       )
         .bind(clienteNome, id)
         .run();
@@ -323,9 +318,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({
   }
 
   try {
-    const pedido = await env.DB.prepare(
-      `SELECT id FROM pedidos WHERE id = ?`,
-    )
+    const pedido = await env.DB.prepare(`SELECT id FROM pedidos WHERE id = ?`)
       .bind(id)
       .first<{ id: number }>();
 
@@ -338,10 +331,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({
     // totalmente reembolsado (Passo 5) tem líquido zero e pode ser
     // cancelado sem exigir um segundo estorno que já aconteceu.
     if (novoStatus === "CANCELADO" && (await hasNetConfirmedPayment(env.DB, id))) {
-      return jsonError(
-        "Pagamento confirmado. Faça o estorno antes de cancelar.",
-        409,
-      );
+      return jsonError("Pagamento confirmado. Faça o estorno antes de cancelar.", 409);
     }
 
     // Cancelar com Pix vivo terminava num estado operacional impossível de
@@ -362,7 +352,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({
     // deixa de poder mudar de estado enquanto a cobrança é inconclusiva.
     const alteracao = await env.DB.prepare(
       `UPDATE pedidos SET status_pedido = ?, atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = ? AND (? <> 'CANCELADO' OR NOT ${PIX_MP_PENDENTE_NO_PEDIDO_SQL})`,
+       WHERE id = ? AND (? <> 'CANCELADO' OR NOT ${PIX_MP_PENDENTE_NO_PEDIDO_SQL})`
     )
       .bind(novoStatus, id, novoStatus)
       .run();
@@ -372,7 +362,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({
       return jsonError(
         "Este pedido possui um Pix pendente de confirmação. Aguarde a confirmação ou o encerramento do Pix antes de cancelar.",
         409,
-        "PEDIDO_COM_PIX_PENDENTE",
+        "PEDIDO_COM_PIX_PENDENTE"
       );
     }
 

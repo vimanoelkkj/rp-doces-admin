@@ -11,6 +11,4 @@ export interface SyncPaymentResult {
 }
 
 export type ResolveWebhookPaymentResult =
-  | { kind: "found"; pagamentoId: number }
-  | { kind: "not_found" }
-  | { kind: "ambiguous" };
+  { kind: "found"; pagamentoId: number } | { kind: "not_found" } | { kind: "ambiguous" };

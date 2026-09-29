@@ -4,7 +4,7 @@ import {
   getItemCancellationPreview,
   type AcaoEstoqueCancelamento,
   type ItemCancellationPreview,
-  ItemCancellationPreviewError,
+  ItemCancellationPreviewError
 } from "./itemCancellationPreview";
 import {
   buscarOperacao,
@@ -17,7 +17,7 @@ import {
   prepareClaimOperacao,
   type ConflitoOperacao,
   type IdentidadeEsperada,
-  type OperacaoRow,
+  type OperacaoRow
 } from "./operacoes";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 import { financialLineageMembership } from "./financialCoverage";
@@ -27,15 +27,11 @@ import { temEstornoAnulacaoAtivo } from "./pedidoAnulacao";
 import {
   getPixMpRefundIntentForLeg,
   reconcilePixMpRefundIntent,
-  type PixMpRefundIntentStatus,
+  type PixMpRefundIntentStatus
 } from "./mpRefundIntent";
 
 export type CancellationStatus =
-  | "SOLICITADO"
-  | "AGUARDANDO_REEMBOLSO"
-  | "INCONCLUSIVO"
-  | "CONCLUIDO"
-  | "FALHOU";
+  "SOLICITADO" | "AGUARDANDO_REEMBOLSO" | "INCONCLUSIVO" | "CONCLUIDO" | "FALHOU";
 
 export interface CancellationLeg {
   pagamentoId: number;
@@ -44,13 +40,22 @@ export interface CancellationLeg {
   valorCentavos: number;
   confirmacaoManualPermitida: boolean;
   refundRemoto?: {
-    status: PixMpRefundIntentStatus; tentativas: number; mpRefundId: string | null;
-    ultimoErro: string | null; operationKey: string; atualizadoEm: string; podeVerificar: boolean;
+    status: PixMpRefundIntentStatus;
+    tentativas: number;
+    mpRefundId: string | null;
+    ultimoErro: string | null;
+    operationKey: string;
+    atualizadoEm: string;
+    podeVerificar: boolean;
   };
 }
 
 export interface ConfirmedRefundView {
-  id: number; metodo: string; valorCentavos: number; origem: string; mpRefundId: string | null;
+  id: number;
+  metodo: string;
+  valorCentavos: number;
+  origem: string;
+  mpRefundId: string | null;
 }
 
 export interface CancellationView {
@@ -63,7 +68,12 @@ export interface CancellationView {
   reembolsoPendenteCentavos: number;
   pernasPendentes: CancellationLeg[];
   reembolsosConfirmados: ConfirmedRefundView[];
-  financeiro: { status: string; totalCentavos: number; liquidoCentavos: number; saldoCentavos: number };
+  financeiro: {
+    status: string;
+    totalCentavos: number;
+    liquidoCentavos: number;
+    saldoCentavos: number;
+  };
 }
 
 type CancellationError =
@@ -84,7 +94,13 @@ type CancellationError =
   | ConflitoOperacao;
 
 export type CancellationResult =
-  | { ok: true; cancelamento: CancellationView; replay?: boolean; reembolsoId?: number; refundStatus?: PixMpRefundIntentStatus }
+  | {
+      ok: true;
+      cancelamento: CancellationView;
+      replay?: boolean;
+      reembolsoId?: number;
+      refundStatus?: PixMpRefundIntentStatus;
+    }
   | { ok: false; erro: CancellationError; preview?: ItemCancellationPreview };
 
 interface CancellationRow {
@@ -118,82 +134,128 @@ function refundSomadoSql(alias: string): string {
 
 async function readCancellationView(
   db: D1Database,
-  row: CancellationRow,
+  row: CancellationRow
 ): Promise<CancellationView> {
   const [item, financeiroCompleto, refunds] = await Promise.all([
-    db.prepare(`SELECT estoque_estado FROM pedido_itens WHERE id=?`).bind(row.pedido_item_id)
+    db
+      .prepare(`SELECT estoque_estado FROM pedido_itens WHERE id=?`)
+      .bind(row.pedido_item_id)
       .first<{ estoque_estado: string }>(),
     getFinanceiroPedido(db, Number(row.pedido_id)),
-    db.prepare(`SELECT r.id,r.metodo,r.valor_centavos,r.origem,r.mp_refund_id
+    db
+      .prepare(
+        `SELECT r.id,r.metodo,r.valor_centavos,r.origem,r.mp_refund_id
       FROM pedido_reembolso_alocacoes ra JOIN pedido_reembolsos r ON r.id=ra.reembolso_id
       WHERE ra.pedido_item_cancelamento_id=? AND r.status='REEMBOLSADO'
-      ORDER BY r.id`).bind(row.id).all<{
-        id: number; metodo: string; valor_centavos: number; origem: string; mp_refund_id: string | null;
-      }>(),
+      ORDER BY r.id`
+      )
+      .bind(row.id)
+      .all<{
+        id: number;
+        metodo: string;
+        valor_centavos: number;
+        origem: string;
+        mp_refund_id: string | null;
+      }>()
   ]);
   let pernasPendentes: CancellationLeg[] = [];
   if (row.status !== "CONCLUIDO" && row.status !== "FALHOU") {
     const preview = await getItemCancellationPreview(
-      db, Number(row.pedido_id), Number(row.pedido_item_id),
-      { permitirCancelamentoExistente: true },
+      db,
+      Number(row.pedido_id),
+      Number(row.pedido_item_id),
+      { permitirCancelamentoExistente: true }
     );
-    pernasPendentes = await Promise.all(preview.pagamentos
-    .filter((p) => p.reembolsoPropostoCentavos > 0)
-    .map(async (p) => {
-      const remote = p.metodo === "PIX_MP"
-        ? await getPixMpRefundIntentForLeg(db, {
-          cancellationId: Number(row.id), pagamentoAlocacaoId: p.pagamentoAlocacaoId,
-        }) : null;
-      return {
-        pagamentoId: p.pagamentoId,
-        pagamentoAlocacaoId: p.pagamentoAlocacaoId,
-        metodo: p.metodo,
-        valorCentavos: p.reembolsoPropostoCentavos,
-        confirmacaoManualPermitida: METODOS_MANUAIS.has(p.metodo),
-        ...(remote ? { refundRemoto: { status: remote.status, tentativas: remote.tentativas,
-          mpRefundId: remote.mpRefundId, ultimoErro: remote.ultimoErro,
-          operationKey: remote.operationKey, atualizadoEm: remote.atualizadoEm,
-          podeVerificar: remote.podeVerificar } } : {}),
-      };
-    }));
+    pernasPendentes = await Promise.all(
+      preview.pagamentos
+        .filter(p => p.reembolsoPropostoCentavos > 0)
+        .map(async p => {
+          const remote =
+            p.metodo === "PIX_MP"
+              ? await getPixMpRefundIntentForLeg(db, {
+                  cancellationId: Number(row.id),
+                  pagamentoAlocacaoId: p.pagamentoAlocacaoId
+                })
+              : null;
+          return {
+            pagamentoId: p.pagamentoId,
+            pagamentoAlocacaoId: p.pagamentoAlocacaoId,
+            metodo: p.metodo,
+            valorCentavos: p.reembolsoPropostoCentavos,
+            confirmacaoManualPermitida: METODOS_MANUAIS.has(p.metodo),
+            ...(remote
+              ? {
+                  refundRemoto: {
+                    status: remote.status,
+                    tentativas: remote.tentativas,
+                    mpRefundId: remote.mpRefundId,
+                    ultimoErro: remote.ultimoErro,
+                    operationKey: remote.operationKey,
+                    atualizadoEm: remote.atualizadoEm,
+                    podeVerificar: remote.podeVerificar
+                  }
+                }
+              : {})
+          };
+        })
+    );
   }
   return {
-    id: Number(row.id), pedidoId: Number(row.pedido_id), itemId: Number(row.pedido_item_id),
-    status: row.status, estoqueAcao: row.estoque_acao,
+    id: Number(row.id),
+    pedidoId: Number(row.pedido_id),
+    itemId: Number(row.pedido_item_id),
+    status: row.status,
+    estoqueAcao: row.estoque_acao,
     estoqueEstado: item?.estoque_estado ?? "DESCONHECIDO",
     reembolsoPendenteCentavos: pernasPendentes.reduce((s, p) => s + p.valorCentavos, 0),
     pernasPendentes,
-    reembolsosConfirmados: refunds.results.map((refund) => ({
-      id: Number(refund.id), metodo: refund.metodo, valorCentavos: Number(refund.valor_centavos),
-      origem: refund.origem, mpRefundId: refund.mp_refund_id,
+    reembolsosConfirmados: refunds.results.map(refund => ({
+      id: Number(refund.id),
+      metodo: refund.metodo,
+      valorCentavos: Number(refund.valor_centavos),
+      origem: refund.origem,
+      mpRefundId: refund.mp_refund_id
     })),
-    financeiro: { status: financeiroCompleto.status, totalCentavos: financeiroCompleto.totalCentavos,
+    financeiro: {
+      status: financeiroCompleto.status,
+      totalCentavos: financeiroCompleto.totalCentavos,
       liquidoCentavos: financeiroCompleto.liquidoCentavos,
-      saldoCentavos: financeiroCompleto.saldoCentavos },
+      saldoCentavos: financeiroCompleto.saldoCentavos
+    }
   };
 }
 
 async function cancellationById(db: D1Database, id: number): Promise<CancellationRow | null> {
-  return db.prepare(`SELECT id,pedido_id,pedido_item_id,status,estoque_acao
-    FROM pedido_item_cancelamentos WHERE id=? LIMIT 1`).bind(id).first<CancellationRow>();
+  return db
+    .prepare(
+      `SELECT id,pedido_id,pedido_item_id,status,estoque_acao
+    FROM pedido_item_cancelamentos WHERE id=? LIMIT 1`
+    )
+    .bind(id)
+    .first<CancellationRow>();
 }
 
 export async function getCancellationView(
   db: D1Database,
   pedidoId: number,
-  itemId: number,
+  itemId: number
 ): Promise<CancellationView | null> {
-  const row = await db.prepare(`SELECT id,pedido_id,pedido_item_id,status,estoque_acao
+  const row = await db
+    .prepare(
+      `SELECT id,pedido_id,pedido_item_id,status,estoque_acao
     FROM pedido_item_cancelamentos
     WHERE pedido_id=? AND pedido_item_id=? AND status<>'FALHOU'
-    ORDER BY id DESC LIMIT 1`).bind(pedidoId, itemId).first<CancellationRow>();
+    ORDER BY id DESC LIMIT 1`
+    )
+    .bind(pedidoId, itemId)
+    .first<CancellationRow>();
   return row ? readCancellationView(db, row) : null;
 }
 
 async function replayCancellation(
   db: D1Database,
   op: OperacaoRow,
-  identity: IdentidadeEsperada,
+  identity: IdentidadeEsperada
 ): Promise<CancellationResult> {
   const conflict = conflitoOperacao(op, identity);
   if (conflict) return { ok: false, erro: conflict };
@@ -206,10 +268,13 @@ async function replayCancellation(
 function snapshotGuard(preview: ItemCancellationPreview): { sql: string; args: unknown[] } {
   const legs = preview.pagamentos;
   const args: unknown[] = [legs.length];
-  const checks = legs.map((leg) => {
+  const checks = legs.map(leg => {
     args.push(
-      leg.pagamentoAlocacaoId, leg.pagamentoId, leg.metodo,
-      leg.valorAlocadoCentavos, leg.valorJaReembolsadoDaAlocacaoCentavos,
+      leg.pagamentoAlocacaoId,
+      leg.pagamentoId,
+      leg.metodo,
+      leg.valorAlocadoCentavos,
+      leg.valorJaReembolsadoDaAlocacaoCentavos
     );
     return `EXISTS (
       SELECT 1 FROM pedido_pagamento_alocacoes a
@@ -224,8 +289,8 @@ function snapshotGuard(preview: ItemCancellationPreview): { sql: string; args: u
            JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
            WHERE ${financialLineageMembership("a.pedido_item_id", "pi.id", "count_linhagem")}
              AND pp.pedido_id=p.id AND pp.status='PAGO')=?
-          ${checks.map((c) => `AND ${c}`).join(" ")}`,
-    args,
+          ${checks.map(c => `AND ${c}`).join(" ")}`,
+    args
   };
 }
 
@@ -235,11 +300,12 @@ function finalizationStatements(
   itemId: number,
   cancellationId: number | null,
   operationKey: string | null,
-  action: AcaoEstoqueCancelamento | "REPOR",
+  action: AcaoEstoqueCancelamento | "REPOR"
 ): D1PreparedStatement[] {
-  const owner = cancellationId !== null
-    ? `c.id = ${Number(cancellationId)}`
-    : `EXISTS (SELECT 1 FROM pedido_operacoes o
+  const owner =
+    cancellationId !== null
+      ? `c.id = ${Number(cancellationId)}`
+      : `EXISTS (SELECT 1 FROM pedido_operacoes o
                WHERE o.operation_key = '${operationKey!.replace(/'/g, "''")}'
                  AND o.pedido_item_cancelamento_id = c.id)`;
   const noCoverage = `NOT EXISTS (
@@ -260,55 +326,92 @@ function finalizationStatements(
   )`;
   const statements: D1PreparedStatement[] = [];
   if (action === "LIBERAR_RESERVA") {
-    statements.push(db.prepare(`UPDATE produtos SET estoque_reservado=estoque_reservado-(
+    statements.push(
+      db
+        .prepare(
+          `UPDATE produtos SET estoque_reservado=estoque_reservado-(
       SELECT quantidade FROM pedido_itens WHERE id=?), atualizado_em=CURRENT_TIMESTAMP
-      WHERE id=(SELECT produto_id FROM pedido_itens WHERE id=?) AND ${eligible}`)
-      .bind(itemId, itemId));
+      WHERE id=(SELECT produto_id FROM pedido_itens WHERE id=?) AND ${eligible}`
+        )
+        .bind(itemId, itemId)
+    );
   } else if (action === "REPOR") {
-    statements.push(db.prepare(`UPDATE produtos SET estoque=estoque+(
+    statements.push(
+      db
+        .prepare(
+          `UPDATE produtos SET estoque=estoque+(
       SELECT quantidade FROM pedido_itens WHERE id=?), atualizado_em=CURRENT_TIMESTAMP,
       disponivel=CASE WHEN ativo=1 THEN 1 ELSE disponivel END
-      WHERE id=(SELECT produto_id FROM pedido_itens WHERE id=?) AND ${eligible}`)
-      .bind(itemId, itemId));
+      WHERE id=(SELECT produto_id FROM pedido_itens WHERE id=?) AND ${eligible}`
+        )
+        .bind(itemId, itemId)
+    );
   }
-  statements.push(db.prepare(`UPDATE pedido_itens SET status_item='CANCELADO',
+  statements.push(
+    db
+      .prepare(
+        `UPDATE pedido_itens SET status_item='CANCELADO',
       estoque_estado=CASE WHEN ?='LIBERAR_RESERVA' THEN 'LIBERADO'
                           WHEN ?='REPOR' THEN 'REPOSTO' ELSE estoque_estado END,
       estoque_liberado_em=CASE WHEN ?='LIBERAR_RESERVA' THEN COALESCE(estoque_liberado_em,CURRENT_TIMESTAMP) ELSE estoque_liberado_em END,
       estoque_reposto_em=CASE WHEN ?='REPOR' THEN COALESCE(estoque_reposto_em,CURRENT_TIMESTAMP) ELSE estoque_reposto_em END
-    WHERE id=? AND pedido_id=? AND status_item='ATIVO' AND ${eligible}`)
-    .bind(action, action, action, action, itemId, pedidoId));
-  statements.push(db.prepare(`UPDATE pedidos SET valor_total_centavos=(
+    WHERE id=? AND pedido_id=? AND status_item='ATIVO' AND ${eligible}`
+      )
+      .bind(action, action, action, action, itemId, pedidoId)
+  );
+  statements.push(
+    db
+      .prepare(
+        `UPDATE pedidos SET valor_total_centavos=(
       SELECT COALESCE(SUM(valor_total_centavos),0) FROM pedido_itens
       WHERE pedido_id=? AND status_item='ATIVO'), atualizado_em=CURRENT_TIMESTAMP
-    WHERE id=? AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=? AND status_item='CANCELADO')`)
-    .bind(pedidoId, pedidoId, itemId));
+    WHERE id=? AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=? AND status_item='CANCELADO')`
+      )
+      .bind(pedidoId, pedidoId, itemId)
+  );
   statements.push(preparePedidoFinancialProjection(db, pedidoId));
   statements.push(preparePedidoPhysicalProjection(db, pedidoId));
-  statements.push(db.prepare(`UPDATE pedido_item_cancelamentos SET status='CONCLUIDO',
+  statements.push(
+    db
+      .prepare(
+        `UPDATE pedido_item_cancelamentos SET status='CONCLUIDO',
       concluido_em=COALESCE(concluido_em,CURRENT_TIMESTAMP)
     WHERE pedido_id=? AND pedido_item_id=? AND status<>'CONCLUIDO'
-      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=? AND status_item='CANCELADO')`)
-    .bind(pedidoId, itemId, itemId));
+      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=? AND status_item='CANCELADO')`
+      )
+      .bind(pedidoId, itemId, itemId)
+  );
   return statements;
 }
 
 export async function createItemCancellation(
   db: D1Database,
   params: {
-    pedidoId: number; itemId: number; usuarioId: number; operationKey: unknown;
-    motivo?: string; estoqueAcao: string; previewFingerprint: string;
-  },
+    pedidoId: number;
+    itemId: number;
+    usuarioId: number;
+    operationKey: unknown;
+    motivo?: string;
+    estoqueAcao: string;
+    previewFingerprint: string;
+  }
 ): Promise<CancellationResult> {
   const parsed = parseOperationKey(params.operationKey);
   if (parsed.ok === false) return { ok: false, erro: parsed.erro };
-  const motivo = String(params.motivo ?? "").trim().slice(0, 300);
+  const motivo = String(params.motivo ?? "")
+    .trim()
+    .slice(0, 300);
   const identity: IdentidadeEsperada = {
-    tipo: "ITEM_CANCELAMENTO_ADMIN", escopo: "ADMIN", atorUsuarioId: params.usuarioId,
+    tipo: "ITEM_CANCELAMENTO_ADMIN",
+    escopo: "ADMIN",
+    atorUsuarioId: params.usuarioId,
     fingerprint: fingerprint({
-      pedidoId: params.pedidoId, itemId: params.itemId, motivo,
-      estoqueAcao: params.estoqueAcao, previewFingerprint: params.previewFingerprint,
-    }),
+      pedidoId: params.pedidoId,
+      itemId: params.itemId,
+      motivo,
+      estoqueAcao: params.estoqueAcao,
+      previewFingerprint: params.previewFingerprint
+    })
   };
   const existing = await buscarOperacao(db, parsed.key);
   if (existing) return replayCancellation(db, existing, identity);
@@ -320,7 +423,10 @@ export async function createItemCancellation(
   try {
     preview = await getItemCancellationPreview(db, params.pedidoId, params.itemId);
   } catch (error) {
-    if (error instanceof ItemCancellationPreviewError && error.code === "CANCELAMENTO_JA_EXISTENTE") {
+    if (
+      error instanceof ItemCancellationPreviewError &&
+      error.code === "CANCELAMENTO_JA_EXISTENTE"
+    ) {
       return { ok: false, erro: "PREVIEW_OBSOLETO" };
     }
     throw error;
@@ -328,7 +434,7 @@ export async function createItemCancellation(
   if (preview.previewFingerprint !== params.previewFingerprint) {
     return { ok: false, erro: "PREVIEW_OBSOLETO", preview };
   }
-  if (preview.bloqueios.some((b) => b.codigo === "PIX_PENDENTE")) {
+  if (preview.bloqueios.some(b => b.codigo === "PIX_PENDENTE")) {
     return { ok: false, erro: "PIX_PENDENTE", preview };
   }
   if (!preview.cancelamentoExecutavel) return { ok: false, erro: "PREVIEW_OBSOLETO", preview };
@@ -337,10 +443,12 @@ export async function createItemCancellation(
   }
 
   const guard = snapshotGuard(preview);
-  const status: CancellationStatus = preview.financeiro.reembolsoNecessarioCentavos > 0
-    ? "AGUARDANDO_REEMBOLSO" : "SOLICITADO";
+  const status: CancellationStatus =
+    preview.financeiro.reembolsoNecessarioCentavos > 0 ? "AGUARDANDO_REEMBOLSO" : "SOLICITADO";
   const snapshot = JSON.stringify(preview);
-  const insert = db.prepare(`INSERT INTO pedido_item_cancelamentos(
+  const insert = db
+    .prepare(
+      `INSERT INTO pedido_item_cancelamentos(
       pedido_id,pedido_item_id,status,valor_item_centavos,
       valor_pago_associado_centavos,valor_reembolso_necessario_centavos,
       estoque_acao,motivo,registrado_por_usuario_id,snapshot_financeiro)
@@ -355,30 +463,49 @@ export async function createItemCancellation(
                      WHERE t.item_origem_id=pi.id AND t.status<>'FALHOU')
       AND NOT EXISTS(SELECT 1 FROM pedido_pagamentos px
                      WHERE px.pedido_id=p.id AND px.metodo='PIX_MP' AND px.status='PENDENTE')
-      AND ${guard.sql}`)
+      AND ${guard.sql}`
+    )
     .bind(
-      params.pedidoId, status, preview.item.valorCentavos,
+      params.pedidoId,
+      status,
+      preview.item.valorCentavos,
       preview.financeiro.coberturaConfirmadaCentavos,
       preview.financeiro.reembolsoNecessarioCentavos,
-      params.estoqueAcao, motivo, params.usuarioId, snapshot,
-      params.pedidoId, params.itemId, preview.item.estoqueEstado,
-      preview.item.valorCentavos, ...guard.args,
+      params.estoqueAcao,
+      motivo,
+      params.usuarioId,
+      snapshot,
+      params.pedidoId,
+      params.itemId,
+      preview.item.estoqueEstado,
+      preview.item.valorCentavos,
+      ...guard.args
     );
   const claim = prepareClaimOperacao(db, {
-    key: parsed.key, ...identity, fase: "CONCLUIDA",
-    fonte: fonteCancelamentoCriado(params.pedidoId, params.itemId),
+    key: parsed.key,
+    ...identity,
+    fase: "CONCLUIDA",
+    fonte: fonteCancelamentoCriado(params.pedidoId, params.itemId)
   });
   const statements = [insert, claim];
   if (status === "SOLICITADO") {
-    statements.push(...finalizationStatements(
-      db, params.pedidoId, params.itemId, null, parsed.key, params.estoqueAcao,
-    ));
+    statements.push(
+      ...finalizationStatements(
+        db,
+        params.pedidoId,
+        params.itemId,
+        null,
+        parsed.key,
+        params.estoqueAcao
+      )
+    );
   }
   try {
     const results = await db.batch(statements);
     if (Number(results[0]?.meta?.changes || 0) !== 1) {
-      const atual = await getItemCancellationPreview(db, params.pedidoId, params.itemId)
-        .catch(() => undefined);
+      const atual = await getItemCancellationPreview(db, params.pedidoId, params.itemId).catch(
+        () => undefined
+      );
       return { ok: false, erro: "PREVIEW_OBSOLETO", preview: atual };
     }
   } catch (error) {
@@ -387,9 +514,13 @@ export async function createItemCancellation(
     if (await getCancellationView(db, params.pedidoId, params.itemId)) {
       return { ok: false, erro: "PREVIEW_OBSOLETO" };
     }
-    const competingExchange = await db.prepare(`SELECT 1 FROM pedido_item_trocas
-      WHERE pedido_id=? AND item_origem_id=? AND status<>'FALHOU' LIMIT 1`)
-      .bind(params.pedidoId, params.itemId).first();
+    const competingExchange = await db
+      .prepare(
+        `SELECT 1 FROM pedido_item_trocas
+      WHERE pedido_id=? AND item_origem_id=? AND status<>'FALHOU' LIMIT 1`
+      )
+      .bind(params.pedidoId, params.itemId)
+      .first();
     if (competingExchange) return { ok: false, erro: "PREVIEW_OBSOLETO" };
     throw error;
   }
@@ -401,20 +532,31 @@ export async function createItemCancellation(
 export async function confirmCancellationRefund(
   db: D1Database,
   params: {
-    pedidoId: number; cancellationId: number; usuarioId: number; operationKey: unknown;
-    pagamentoId: number; pagamentoAlocacaoId: number; valorCentavos: number; confirmacao: boolean;
+    pedidoId: number;
+    cancellationId: number;
+    usuarioId: number;
+    operationKey: unknown;
+    pagamentoId: number;
+    pagamentoAlocacaoId: number;
+    valorCentavos: number;
+    confirmacao: boolean;
     mpAccessToken?: string;
-  },
+  }
 ): Promise<CancellationResult> {
   const parsed = parseOperationKey(params.operationKey);
   if (parsed.ok === false) return { ok: false, erro: parsed.erro };
   const identity: IdentidadeEsperada = {
-    tipo: "REFUND_ADMIN", escopo: "ADMIN", atorUsuarioId: params.usuarioId,
+    tipo: "REFUND_ADMIN",
+    escopo: "ADMIN",
+    atorUsuarioId: params.usuarioId,
     fingerprint: fingerprint({
-      pedidoId: params.pedidoId, cancellationId: params.cancellationId,
-      pagamentoId: params.pagamentoId, pagamentoAlocacaoId: params.pagamentoAlocacaoId,
-      valorCentavos: params.valorCentavos, confirmacao: params.confirmacao,
-    }),
+      pedidoId: params.pedidoId,
+      cancellationId: params.cancellationId,
+      pagamentoId: params.pagamentoId,
+      pagamentoAlocacaoId: params.pagamentoAlocacaoId,
+      valorCentavos: params.valorCentavos,
+      confirmacao: params.confirmacao
+    })
   };
   const existing = await buscarOperacao(db, parsed.key);
   if (existing) {
@@ -424,8 +566,12 @@ export async function confirmCancellationRefund(
     if (!cancellation) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
     if (existing.reembolso_id) {
       await tryFinalizeCancellation(db, cancellation);
-      return { ok: true, cancelamento: await readCancellationView(db, cancellation), replay: true,
-        reembolsoId: existing.reembolso_id };
+      return {
+        ok: true,
+        cancelamento: await readCancellationView(db, cancellation),
+        replay: true,
+        reembolsoId: existing.reembolso_id
+      };
     }
   }
   const cancellation = await cancellationById(db, params.cancellationId);
@@ -436,8 +582,9 @@ export async function confirmCancellationRefund(
     return { ok: false, erro: "CANCELAMENTO_NAO_AGUARDANDO" };
   }
   const view = await readCancellationView(db, cancellation);
-  const leg = view.pernasPendentes.find((p) =>
-    p.pagamentoId === params.pagamentoId && p.pagamentoAlocacaoId === params.pagamentoAlocacaoId,
+  const leg = view.pernasPendentes.find(
+    p =>
+      p.pagamentoId === params.pagamentoId && p.pagamentoAlocacaoId === params.pagamentoAlocacaoId
   );
   if (!leg) return { ok: false, erro: "PAGAMENTO_ALOCACAO_INVALIDA" };
   if (!params.confirmacao || params.valorCentavos !== leg.valorCentavos) {
@@ -446,27 +593,43 @@ export async function confirmCancellationRefund(
   if (leg.metodo === "PIX_MP") {
     if (!params.mpAccessToken) return { ok: false, erro: "MERCADO_PAGO_NAO_CONFIGURADO" };
     const remote = await reconcilePixMpRefundIntent(db, {
-      pedidoId: params.pedidoId, pagamentoId: params.pagamentoId,
-      pagamentoAlocacaoId: params.pagamentoAlocacaoId, cancellationId: params.cancellationId,
-      usuarioId: params.usuarioId, operationKey: parsed.key, fingerprint: identity.fingerprint,
-      valorCentavos: params.valorCentavos, accessToken: params.mpAccessToken,
+      pedidoId: params.pedidoId,
+      pagamentoId: params.pagamentoId,
+      pagamentoAlocacaoId: params.pagamentoAlocacaoId,
+      cancellationId: params.cancellationId,
+      usuarioId: params.usuarioId,
+      operationKey: parsed.key,
+      fingerprint: identity.fingerprint,
+      valorCentavos: params.valorCentavos,
+      accessToken: params.mpAccessToken
     });
     if (remote.ok === false) return { ok: false, erro: remote.erro };
     if (remote.reembolsoId) {
-      try { await tryFinalizeCancellation(db, cancellation); }
-      catch (error) {
-        console.error("Refund MP persistido; finalizacao de cancelamento pendente", params.cancellationId, error);
+      try {
+        await tryFinalizeCancellation(db, cancellation);
+      } catch (error) {
+        console.error(
+          "Refund MP persistido; finalizacao de cancelamento pendente",
+          params.cancellationId,
+          error
+        );
       }
     }
     const updated = await cancellationById(db, params.cancellationId);
     if (!updated) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
-    return { ok: true, cancelamento: await readCancellationView(db, updated),
-      reembolsoId: remote.reembolsoId, refundStatus: remote.intencao.status,
-      replay: remote.replay };
+    return {
+      ok: true,
+      cancelamento: await readCancellationView(db, updated),
+      reembolsoId: remote.reembolsoId,
+      refundStatus: remote.intencao.status,
+      replay: remote.replay
+    };
   }
   if (!leg.confirmacaoManualPermitida) return { ok: false, erro: "PIX_MP_REFUND_REMOTO_PENDENTE" };
   const refundKey = chaveReembolso(parsed.key);
-  const insertRefund = db.prepare(`INSERT INTO pedido_reembolsos(
+  const insertRefund = db
+    .prepare(
+      `INSERT INTO pedido_reembolsos(
       pedido_id,pagamento_id,origem,metodo,valor_centavos,status,idempotency_key,
       registrado_por_usuario_id,motivo,devolveu_estoque,concluido_em)
     SELECT ?,pp.id,'MANUAL',pp.metodo,?,'REEMBOLSADO',?,?,'Cancelamento de item',0,CURRENT_TIMESTAMP
@@ -475,23 +638,44 @@ export async function confirmCancellationRefund(
       AND ${financialLineageMembership("a.pedido_item_id", String(Number(cancellation.pedido_item_id)), "refund_linhagem")}
       AND pp.status='PAGO'
       AND pp.metodo IN ('DINHEIRO','CARTAO','PIX_EXTERNO')
-      AND a.valor_centavos-${refundSomadoSql("a") }=?`)
-    .bind(params.pedidoId, params.valorCentavos, refundKey, params.usuarioId,
-      params.pagamentoId, params.pagamentoAlocacaoId, params.valorCentavos);
+      AND a.valor_centavos-${refundSomadoSql("a")}=?`
+    )
+    .bind(
+      params.pedidoId,
+      params.valorCentavos,
+      refundKey,
+      params.usuarioId,
+      params.pagamentoId,
+      params.pagamentoAlocacaoId,
+      params.valorCentavos
+    );
   const claim = prepareClaimOperacao(db, {
-    key: parsed.key, ...identity, fase: "CONCLUIDA", fonte: fonteReembolso(refundKey),
+    key: parsed.key,
+    ...identity,
+    fase: "CONCLUIDA",
+    fonte: fonteReembolso(refundKey)
   });
-  const allocate = db.prepare(`INSERT INTO pedido_reembolso_alocacoes(
+  const allocate = db
+    .prepare(
+      `INSERT INTO pedido_reembolso_alocacoes(
       reembolso_id,pagamento_alocacao_id,pedido_item_cancelamento_id,valor_centavos)
-    SELECT r.id,?,?,? FROM pedido_reembolsos r WHERE r.idempotency_key=?`)
+    SELECT r.id,?,?,? FROM pedido_reembolsos r WHERE r.idempotency_key=?`
+    )
     .bind(params.pagamentoAlocacaoId, params.cancellationId, params.valorCentavos, refundKey);
   try {
-    await db.batch([insertRefund, claim, allocate, preparePedidoFinancialProjection(db, params.pedidoId)]);
+    await db.batch([
+      insertRefund,
+      claim,
+      allocate,
+      preparePedidoFinancialProjection(db, params.pedidoId)
+    ]);
   } catch (error) {
     const winner = await buscarOperacao(db, parsed.key);
     if (!winner) {
       const current = await readCancellationView(db, cancellation);
-      if (!current.pernasPendentes.some((p) => p.pagamentoAlocacaoId === params.pagamentoAlocacaoId)) {
+      if (
+        !current.pernasPendentes.some(p => p.pagamentoAlocacaoId === params.pagamentoAlocacaoId)
+      ) {
         return { ok: false, erro: "PAGAMENTO_ALOCACAO_INVALIDA" };
       }
       throw error;
@@ -502,25 +686,49 @@ export async function confirmCancellationRefund(
   try {
     await tryFinalizeCancellation(db, cancellation);
   } catch (error) {
-    console.error("Refund persistido; finalizacao de cancelamento pendente", params.cancellationId, error);
-    await db.prepare(`UPDATE pedido_item_cancelamentos SET status='INCONCLUSIVO'
-      WHERE id=? AND status='AGUARDANDO_REEMBOLSO'`).bind(params.cancellationId).run().catch(() => undefined);
+    console.error(
+      "Refund persistido; finalizacao de cancelamento pendente",
+      params.cancellationId,
+      error
+    );
+    await db
+      .prepare(
+        `UPDATE pedido_item_cancelamentos SET status='INCONCLUSIVO'
+      WHERE id=? AND status='AGUARDANDO_REEMBOLSO'`
+      )
+      .bind(params.cancellationId)
+      .run()
+      .catch(() => undefined);
   }
   const updated = await cancellationById(db, params.cancellationId);
   const op = await buscarOperacao(db, parsed.key);
   if (!updated || !op?.reembolso_id) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
-  return { ok: true, cancelamento: await readCancellationView(db, updated), reembolsoId: op.reembolso_id };
+  return {
+    ok: true,
+    cancelamento: await readCancellationView(db, updated),
+    reembolsoId: op.reembolso_id
+  };
 }
 
 async function tryFinalizeCancellation(db: D1Database, row: CancellationRow): Promise<void> {
   const view = await readCancellationView(db, row);
   if (view.reembolsoPendenteCentavos > 0) return;
-  await db.batch(finalizationStatements(
-    db, Number(row.pedido_id), Number(row.pedido_item_id), Number(row.id), null, row.estoque_acao,
-  ));
+  await db.batch(
+    finalizationStatements(
+      db,
+      Number(row.pedido_id),
+      Number(row.pedido_item_id),
+      Number(row.id),
+      null,
+      row.estoque_acao
+    )
+  );
 }
 
-export async function reconcileCancellationFinalization(db: D1Database, cancellationId: number): Promise<void> {
+export async function reconcileCancellationFinalization(
+  db: D1Database,
+  cancellationId: number
+): Promise<void> {
   const row = await cancellationById(db, cancellationId);
   if (row) await tryFinalizeCancellation(db, row);
 }
@@ -528,10 +736,15 @@ export async function reconcileCancellationFinalization(db: D1Database, cancella
 export async function reconcileCancellationFinalizationsForPedido(
   db: D1Database,
   pedidoId: number,
-  limit = 8,
+  limit = 8
 ): Promise<void> {
-  const { results } = await db.prepare(`SELECT id FROM pedido_item_cancelamentos
+  const { results } = await db
+    .prepare(
+      `SELECT id FROM pedido_item_cancelamentos
     WHERE pedido_id=? AND status IN ('SOLICITADO','AGUARDANDO_REEMBOLSO','INCONCLUSIVO')
-    ORDER BY id LIMIT ?`).bind(pedidoId, Math.max(1, Math.min(limit, 20))).all<{ id: number }>();
+    ORDER BY id LIMIT ?`
+    )
+    .bind(pedidoId, Math.max(1, Math.min(limit, 20)))
+    .all<{ id: number }>();
   for (const row of results) await reconcileCancellationFinalization(db, Number(row.id));
 }

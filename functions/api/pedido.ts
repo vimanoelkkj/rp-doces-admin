@@ -44,7 +44,7 @@ async function handleDetalhe(request: Request, env: Env): Promise<Response> {
   const pedido = await env.DB.prepare(
     `SELECT id, token_publico, cliente_nome, valor_total_centavos, criado_em,
             status_pagamento, status_pedido, mp_payment_id, pix_expira_em
-     FROM pedidos WHERE ${pedidoValidoSql('pedidos.id')} AND token_publico = ?`,
+     FROM pedidos WHERE ${pedidoValidoSql("pedidos.id")} AND token_publico = ?`
   )
     .bind(token)
     .first<PedidoDetalheRow>();
@@ -58,7 +58,7 @@ async function handleDetalhe(request: Request, env: Env): Promise<Response> {
 
   const { results: itens } = await env.DB.prepare(
     `SELECT produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos
-     FROM pedido_itens WHERE pedido_id = ?`,
+     FROM pedido_itens WHERE pedido_id = ?`
   )
     .bind(pedido.id)
     .all<PedidoItemRow>();
@@ -69,6 +69,6 @@ async function handleDetalhe(request: Request, env: Env): Promise<Response> {
     valorTotalCentavos: pedido.valor_total_centavos,
     criadoEm: pedido.criado_em,
     itens,
-    ...atual,
+    ...atual
   });
 }

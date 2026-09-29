@@ -48,14 +48,14 @@ const MENSAGENS: Record<string, string> = {
   MERCADO_PAGO_NAO_CONFIGURADO: "Mercado Pago não está configurado neste ambiente",
   MERCADO_PAGO_RECUSOU: "O Mercado Pago recusou o Pix de diagnóstico",
   MERCADO_PAGO_INDISPONIVEL:
-    "Não foi possível confirmar com o Mercado Pago se o Pix foi criado. Tente novamente em instantes.",
+    "Não foi possível confirmar com o Mercado Pago se o Pix foi criado. Tente novamente em instantes."
 };
 
 const STATUS_HTTP: Record<string, number> = {
   OPERATION_KEY_INVALIDA: 400,
   MERCADO_PAGO_NAO_CONFIGURADO: 503,
   MERCADO_PAGO_RECUSOU: 502,
-  MERCADO_PAGO_INDISPONIVEL: 502,
+  MERCADO_PAGO_INDISPONIVEL: 502
 };
 
 function jsonError(message: string, status: number, code?: string) {
@@ -95,14 +95,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const chave = parseOperationKey(body.operationKey);
   if (!chave.ok) {
-    return jsonError(MENSAGENS.OPERATION_KEY_INVALIDA, STATUS_HTTP.OPERATION_KEY_INVALIDA, chave.erro);
+    return jsonError(
+      MENSAGENS.OPERATION_KEY_INVALIDA,
+      STATUS_HTTP.OPERATION_KEY_INVALIDA,
+      chave.erro
+    );
   }
 
   if (!env.MP_ACCESS_TOKEN) {
     return jsonError(
       MENSAGENS.MERCADO_PAGO_NAO_CONFIGURADO,
       STATUS_HTTP.MERCADO_PAGO_NAO_CONFIGURADO,
-      "MERCADO_PAGO_NAO_CONFIGURADO",
+      "MERCADO_PAGO_NAO_CONFIGURADO"
     );
   }
 
@@ -118,7 +122,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     // de tentativas reais: nunca resolve por engano em `resolveWebhookPayment`
     // caso o evento chegue pelo webhook (cai em "not_found", sem efeito).
     external_reference: `ADMIN_DIAG_PIX:${chave.key}`,
-    payer: { email: "diagnostico@rpdoces.com.br", first_name: "Diagnostico" },
+    payer: { email: "diagnostico@rpdoces.com.br", first_name: "Diagnostico" }
   };
 
   const envio = await postPagamentoMp(env.MP_ACCESS_TOKEN, idempotencyKey, mpRequest);
@@ -127,12 +131,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     // Nunca vira sucesso nem rejeição inventados — só o erro explícito.
     console.error("Resultado ambíguo ao gerar Pix de diagnóstico", {
       motivo: envio.motivo,
-      httpStatus: envio.httpStatus,
+      httpStatus: envio.httpStatus
     });
     return jsonError(
       MENSAGENS.MERCADO_PAGO_INDISPONIVEL,
       STATUS_HTTP.MERCADO_PAGO_INDISPONIVEL,
-      "MERCADO_PAGO_INDISPONIVEL",
+      "MERCADO_PAGO_INDISPONIVEL"
     );
   }
 
@@ -143,7 +147,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return jsonError(
       MENSAGENS.MERCADO_PAGO_RECUSOU,
       STATUS_HTTP.MERCADO_PAGO_RECUSOU,
-      "MERCADO_PAGO_RECUSOU",
+      "MERCADO_PAGO_RECUSOU"
     );
   }
 
@@ -158,8 +162,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       qrCode: txData?.qr_code ?? null,
       qrCodeBase64: txData?.qr_code_base64 ?? null,
       ticketUrl: txData?.ticket_url ?? null,
-      expiresAt: payment.date_of_expiration,
+      expiresAt: payment.date_of_expiration
     },
-    { status: 201 },
+    { status: 201 }
   );
 };

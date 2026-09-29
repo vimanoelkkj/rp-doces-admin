@@ -9,7 +9,7 @@ import {
   parseOperationKey,
   prepareClaimOperacao,
   type ConflitoOperacao,
-  type IdentidadeEsperada,
+  type IdentidadeEsperada
 } from "../operacoes";
 
 // Passo 5: reembolso manual (sem falar com o Mercado Pago). Nunca muta
@@ -44,14 +44,10 @@ const METODOS_MANUAIS_REEMBOLSAVEIS: ReadonlySet<string> = new Set([
   "DINHEIRO",
   "CARTAO",
   "PIX_EXTERNO",
-  "PIX_MP",
+  "PIX_MP"
 ]);
 
-const STATUS_PEDIDO_REEMBOLSAVEIS: ReadonlySet<string> = new Set([
-  "NOVO",
-  "PREPARANDO",
-  "PRONTO",
-]);
+const STATUS_PEDIDO_REEMBOLSAVEIS: ReadonlySet<string> = new Set(["NOVO", "PREPARANDO", "PRONTO"]);
 
 export interface RegisterRefundResult {
   ok: boolean;
@@ -84,7 +80,7 @@ export async function registerManualRefund(
     motivo?: string;
     /** A1: ver nota em `registerAdminPayment`. */
     operationKey?: string | null;
-  },
+  }
 ): Promise<RegisterRefundResult> {
   const motivo = (params.motivo ?? "").slice(0, 300);
 
@@ -105,8 +101,8 @@ export async function registerManualRefund(
         pedidoId: params.pedidoId,
         pagamentoId: params.pagamentoId,
         valorCentavos: params.valorCentavos,
-        motivo,
-      }),
+        motivo
+      })
     };
 
     // Lookup antes dos guards de estado (status do pedido, método,
@@ -120,7 +116,7 @@ export async function registerManualRefund(
             reembolsoId: replay.id,
             replay: true,
             statusFinanceiro: replay.statusFinanceiro,
-            saldoCentavos: replay.saldoCentavos,
+            saldoCentavos: replay.saldoCentavos
           }
         : { ok: false, erro: replay.erro };
     }
@@ -148,7 +144,7 @@ export async function registerManualRefund(
   const pagamento = await db
     .prepare(
       `SELECT id, metodo, valor_centavos, status
-       FROM pedido_pagamentos WHERE id = ? AND pedido_id = ? LIMIT 1`,
+       FROM pedido_pagamentos WHERE id = ? AND pedido_id = ? LIMIT 1`
     )
     .bind(params.pagamentoId, params.pedidoId)
     .first<{ id: number; metodo: string; valor_centavos: number; status: string }>();
@@ -163,9 +159,13 @@ export async function registerManualRefund(
     return { ok: false, erro: "METODO_NAO_REEMBOLSAVEL_MANUALMENTE" };
   }
   if (pagamento.metodo === "PIX_MP") {
-    const intencaoAtiva = await db.prepare(`SELECT 1 FROM pedido_reembolso_pix_mp_intencoes
-      WHERE pagamento_id=? AND status IN ('PENDENTE','PROCESSANDO','INCONCLUSIVO') LIMIT 1`)
-      .bind(params.pagamentoId).first();
+    const intencaoAtiva = await db
+      .prepare(
+        `SELECT 1 FROM pedido_reembolso_pix_mp_intencoes
+      WHERE pagamento_id=? AND status IN ('PENDENTE','PROCESSANDO','INCONCLUSIVO') LIMIT 1`
+      )
+      .bind(params.pagamentoId)
+      .first();
     if (intencaoAtiva) return { ok: false, erro: "REFUND_PIX_MP_REMOTO_EM_ANDAMENTO" };
   }
   // O estorno só pode ser registrado sobre um pagamento efetivamente
@@ -192,7 +192,7 @@ export async function registerManualRefund(
          SELECT pp.valor_centavos - COALESCE(
            (SELECT SUM(valor_centavos) FROM pedido_reembolsos WHERE pagamento_id = pp.id AND status = 'REEMBOLSADO'), 0)
          FROM pedido_pagamentos pp WHERE pp.id = ?
-       )`,
+       )`
     )
     .bind(
       params.pedidoId,
@@ -203,7 +203,7 @@ export async function registerManualRefund(
       params.usuarioId,
       motivo,
       params.valorCentavos,
-      params.pagamentoId,
+      params.pagamentoId
     );
 
   const recuperarVencedora = async (): Promise<RegisterRefundResult | null> => {
@@ -217,7 +217,7 @@ export async function registerManualRefund(
           reembolsoId: replay.id,
           replay: true,
           statusFinanceiro: replay.statusFinanceiro,
-          saldoCentavos: replay.saldoCentavos,
+          saldoCentavos: replay.saldoCentavos
         }
       : { ok: false, erro: replay.erro };
   };
@@ -228,19 +228,20 @@ export async function registerManualRefund(
   // chamadores internos.
   let result: D1Result;
   try {
-    result = operationKey && identidade
-      ? (
-          await db.batch([
-            insercao,
-            prepareClaimOperacao(db, {
-              key: operationKey,
-              ...identidade,
-              fase: "CONCLUIDA",
-              fonte: fonteReembolso(idempotencyKey),
-            }),
-          ])
-        )[0]
-      : await insercao.run();
+    result =
+      operationKey && identidade
+        ? (
+            await db.batch([
+              insercao,
+              prepareClaimOperacao(db, {
+                key: operationKey,
+                ...identidade,
+                fase: "CONCLUIDA",
+                fonte: fonteReembolso(idempotencyKey)
+              })
+            ])
+          )[0]
+        : await insercao.run();
   } catch (err) {
     // Disputa da mesma key (UNIQUE de `idempotency_key` do refund ou de
     // `operation_key`): o batch do perdedor foi revertido inteiro e ele
@@ -267,6 +268,11 @@ export async function registerManualRefund(
   }
 
   const reembolsoId = Number(result.meta.last_row_id);
-  const derivados = await reconcilePersistedAdminFact(db, params.pedidoId, "REEMBOLSO", reembolsoId);
+  const derivados = await reconcilePersistedAdminFact(
+    db,
+    params.pedidoId,
+    "REEMBOLSO",
+    reembolsoId
+  );
   return { ok: true, reembolsoId, ...derivados };
 }

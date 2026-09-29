@@ -6,7 +6,7 @@ import {
   OPERACAO_HTTP_STATUS,
   OPERACAO_MENSAGENS,
   type IdentidadeEsperada,
-  type OperacaoRow,
+  type OperacaoRow
 } from "../operacoes";
 import type { Env } from "./types";
 
@@ -19,20 +19,20 @@ export async function replayPedidoManual(
   env: Env,
   operacao: OperacaoRow,
   identidade: IdentidadeEsperada,
-  statusPagamento: "PENDENTE" | "PAGO",
+  statusPagamento: "PENDENTE" | "PAGO"
 ): Promise<Response> {
   const conflito = conflitoOperacao(operacao, identidade);
   if (conflito) {
     return Response.json(
       { error: OPERACAO_MENSAGENS[conflito], code: conflito },
-      { status: OPERACAO_HTTP_STATUS[conflito] },
+      { status: OPERACAO_HTTP_STATUS[conflito] }
     );
   }
 
   const pedido = operacao.pedido_id
     ? await env.DB.prepare(
         `SELECT id, token_publico, valor_total_centavos, estoque_baixado_em
-         FROM pedidos WHERE id = ? LIMIT 1`,
+         FROM pedidos WHERE id = ? LIMIT 1`
       )
         .bind(operacao.pedido_id)
         .first<{
@@ -47,9 +47,9 @@ export async function replayPedidoManual(
     return Response.json(
       {
         error: OPERACAO_MENSAGENS.OPERACAO_INCOMPLETA,
-        code: "OPERACAO_INCOMPLETA",
+        code: "OPERACAO_INCOMPLETA"
       },
-      { status: OPERACAO_HTTP_STATUS.OPERACAO_INCOMPLETA },
+      { status: OPERACAO_HTTP_STATUS.OPERACAO_INCOMPLETA }
     );
   }
 
@@ -59,7 +59,11 @@ export async function replayPedidoManual(
       const baixa = await baixarEstoquePedido(env.DB, pedido.id);
       estoqueBaixado = baixa.ok && baixa.baixado;
     } catch (err) {
-      console.error("Falha ao retentar baixa de estoque em replay de pedido manual", pedido.id, err);
+      console.error(
+        "Falha ao retentar baixa de estoque em replay de pedido manual",
+        pedido.id,
+        err
+      );
     }
   }
 
@@ -72,8 +76,8 @@ export async function replayPedidoManual(
       valorTotalCentavos: pedido.valor_total_centavos,
       statusPagamento,
       estoqueBaixado,
-      replay: true,
+      replay: true
     },
-    { status: 201 },
+    { status: 201 }
   );
 }

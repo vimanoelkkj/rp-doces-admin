@@ -22,11 +22,7 @@ export interface MpRefundOptions {
 }
 
 export type MotivoAmbiguoRefund =
-  | "TRANSPORTE"
-  | "TIMEOUT"
-  | "HTTP_INDISPONIVEL"
-  | "HTTP_INDETERMINADO"
-  | "RESPOSTA_ILEGIVEL";
+  "TRANSPORTE" | "TIMEOUT" | "HTTP_INDISPONIVEL" | "HTTP_INDETERMINADO" | "RESPOSTA_ILEGIVEL";
 
 export type MpRefundResultado =
   | { resultado: "SUCESSO"; refund: MpRefundCriado }
@@ -42,7 +38,7 @@ export async function postRefundMp(
   accessToken: string,
   paymentId: string,
   idempotencyKey: string,
-  options: MpRefundOptions = {},
+  options: MpRefundOptions = {}
 ): Promise<MpRefundResultado> {
   const controller = new AbortController();
   const prazo = setTimeout(() => controller.abort(), MP_REFUND_TIMEOUT_MS);
@@ -59,20 +55,20 @@ export async function postRefundMp(
           // Estável por operação lógica: um retry da MESMA intenção reenvia
           // exatamente esta key, nunca uma nova (mesmo padrão de mpPost.ts).
           "X-Idempotency-Key": idempotencyKey,
-          ...(options.renderInProcess ? { "X-Render-In-Process-Refunds": "true" } : {}),
+          ...(options.renderInProcess ? { "X-Render-In-Process-Refunds": "true" } : {})
         },
         ...(options.amountCentavos === undefined
           ? {}
           : { body: JSON.stringify({ amount: options.amountCentavos / 100 }) }),
-        signal: controller.signal,
-      },
+        signal: controller.signal
+      }
     );
   } catch {
     const expirou = controller.signal.aborted;
     return {
       resultado: "AMBIGUO",
       motivo: expirou ? "TIMEOUT" : "TRANSPORTE",
-      httpStatus: null,
+      httpStatus: null
     };
   } finally {
     clearTimeout(prazo);
@@ -109,13 +105,14 @@ export async function postRefundMp(
   if (!refund || !Number.isFinite(Number(refund.id)) || Number(refund.id) <= 0) {
     return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
   }
-  if (options.amountCentavos !== undefined && (
-    String(refund.payment_id) !== paymentId
-    || !Number.isFinite(Number(refund.amount))
-    || Math.round(Number(refund.amount) * 100) !== options.amountCentavos
-    || typeof refund.status !== "string"
-    || refund.status.trim() === ""
-  )) {
+  if (
+    options.amountCentavos !== undefined &&
+    (String(refund.payment_id) !== paymentId ||
+      !Number.isFinite(Number(refund.amount)) ||
+      Math.round(Number(refund.amount) * 100) !== options.amountCentavos ||
+      typeof refund.status !== "string" ||
+      refund.status.trim() === "")
+  ) {
     return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
   }
   return { resultado: "SUCESSO", refund };
@@ -125,7 +122,7 @@ export async function getRefundMp(
   accessToken: string,
   paymentId: string,
   refundId: string,
-  amountCentavos: number,
+  amountCentavos: number
 ): Promise<MpRefundResultado> {
   const controller = new AbortController();
   const prazo = setTimeout(() => controller.abort(), MP_REFUND_TIMEOUT_MS);
@@ -133,10 +130,14 @@ export async function getRefundMp(
   try {
     response = await fetch(
       `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}/refunds/${encodeURIComponent(refundId)}`,
-      { headers: { Authorization: `Bearer ${accessToken}` }, signal: controller.signal },
+      { headers: { Authorization: `Bearer ${accessToken}` }, signal: controller.signal }
     );
   } catch {
-    return { resultado: "AMBIGUO", motivo: controller.signal.aborted ? "TIMEOUT" : "TRANSPORTE", httpStatus: null };
+    return {
+      resultado: "AMBIGUO",
+      motivo: controller.signal.aborted ? "TIMEOUT" : "TRANSPORTE",
+      httpStatus: null
+    };
   } finally {
     clearTimeout(prazo);
   }
@@ -151,15 +152,26 @@ export async function getRefundMp(
       const parsed = JSON.parse(corpo) as { message?: string; cause?: unknown };
       mensagem = parsed.message ?? null;
       detalhe = parsed.cause ? JSON.stringify(parsed.cause).slice(0, 500) : null;
-    } catch { /* resposta sem diagnostico estruturado */ }
+    } catch {
+      /* resposta sem diagnostico estruturado */
+    }
     return { resultado: "RECUSA_DEFINITIVA", httpStatus: response.status, mensagem, detalhe };
   }
   let refund: MpRefundCriado | null = null;
-  try { refund = (await response.json()) as MpRefundCriado; } catch { refund = null; }
-  if (!refund || String(refund.id) !== refundId || String(refund.payment_id) !== paymentId
-      || !Number.isFinite(Number(refund.amount))
-      || Math.round(Number(refund.amount) * 100) !== amountCentavos
-      || typeof refund.status !== "string" || refund.status.trim() === "") {
+  try {
+    refund = (await response.json()) as MpRefundCriado;
+  } catch {
+    refund = null;
+  }
+  if (
+    !refund ||
+    String(refund.id) !== refundId ||
+    String(refund.payment_id) !== paymentId ||
+    !Number.isFinite(Number(refund.amount)) ||
+    Math.round(Number(refund.amount) * 100) !== amountCentavos ||
+    typeof refund.status !== "string" ||
+    refund.status.trim() === ""
+  ) {
     return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
   }
   return { resultado: "SUCESSO", refund };

@@ -47,7 +47,7 @@ interface PagamentoBuscado {
 
 export async function buscarPagamentosPorReferenciaExterna(
   accessToken: string,
-  externalReference: string,
+  externalReference: string
 ): Promise<MpSearchResultado> {
   const referencia = String(externalReference || "").trim();
   if (!referencia) return { resultado: "INDISPONIVEL", motivo: "REFERENCIA_AUSENTE" };
@@ -65,14 +65,14 @@ export async function buscarPagamentosPorReferenciaExterna(
   try {
     response = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${accessToken}` },
-      signal: controller.signal,
+      signal: controller.signal
     });
   } catch {
     // Falha de observação NUNCA é rejeição: a operação continua inconclusiva
     // e a consulta pode ser repetida depois.
     return {
       resultado: "INDISPONIVEL",
-      motivo: controller.signal.aborted ? "TIMEOUT" : "TRANSPORTE",
+      motivo: controller.signal.aborted ? "TIMEOUT" : "TRANSPORTE"
     };
   } finally {
     clearTimeout(prazo);
@@ -99,9 +99,9 @@ export async function buscarPagamentosPorReferenciaExterna(
   // compatível é inequívoco — e mais de um é tratado como ambiguidade, nunca
   // resolvido por "o mais recente".
   const compativeis = corpo.results
-    .filter((p) => String(p?.external_reference ?? "").trim() === referencia)
-    .map((p) => String(p?.id ?? "").trim())
-    .filter((id) => id && id !== "0");
+    .filter(p => String(p?.external_reference ?? "").trim() === referencia)
+    .map(p => String(p?.id ?? "").trim())
+    .filter(id => id && id !== "0");
 
   const distintos = [...new Set(compativeis)];
   if (distintos.length === 0) return { resultado: "NENHUM" };

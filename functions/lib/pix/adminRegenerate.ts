@@ -39,7 +39,7 @@ export interface RegenerateAdminPixArgs {
 }
 
 export async function regenerateAdminPix(
-  args: RegenerateAdminPixArgs,
+  args: RegenerateAdminPixArgs
 ): Promise<GerarPixAdminResult> {
   const db = args.env.DB;
   const cancelKey = chaveCancelamento(args.operationKey);
@@ -50,7 +50,7 @@ export async function regenerateAdminPix(
     .prepare(
       `SELECT id, pedido_id, metodo, origem, status, mp_payment_id
        FROM pedido_pagamentos
-       WHERE id = ?`,
+       WHERE id = ?`
     )
     .bind(args.substituiId)
     .first<{
@@ -67,7 +67,7 @@ export async function regenerateAdminPix(
       `SELECT 1 FROM pedido_pagamentos suc
        WHERE suc.substitui_pagamento_id = ?
          AND suc.status IN ('PENDENTE', 'PAGO')
-       LIMIT 1`,
+       LIMIT 1`
     )
     .bind(args.substituiId)
     .first();
@@ -83,7 +83,7 @@ export async function regenerateAdminPix(
   ) {
     await registrarFase(db, args.operationKey, {
       fase: "RECUSADA",
-      erro: "PIX_PARA_SUBSTITUIR_INVALIDO",
+      erro: "PIX_PARA_SUBSTITUIR_INVALIDO"
     });
     return { ok: false, erro: "PIX_PARA_SUBSTITUIR_INVALIDO" };
   }
@@ -95,7 +95,7 @@ export async function regenerateAdminPix(
   } catch {
     await registrarFase(db, args.operationKey, {
       fase: "ENVIO_INCONCLUSIVO",
-      erro: "CONSULTA_PREDECESSOR_FALHOU",
+      erro: "CONSULTA_PREDECESSOR_FALHOU"
     });
     return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
   }
@@ -106,7 +106,7 @@ export async function regenerateAdminPix(
     await syncPaymentFromMp(db, aPosClaim.id, mpA);
     await registrarFase(db, args.operationKey, {
       fase: "RECUSADA",
-      erro: "PIX_SUBSTITUTO_JA_PAGO",
+      erro: "PIX_SUBSTITUTO_JA_PAGO"
     });
     return { ok: false, erro: "PIX_SUBSTITUTO_JA_PAGO" };
   }
@@ -129,7 +129,7 @@ export async function regenerateAdminPix(
     const cancelResultado = await cancelarPagamentoMp(
       args.env.MP_ACCESS_TOKEN,
       aPosClaim.mp_payment_id,
-      cancelKey,
+      cancelKey
     );
 
     if (cancelResultado.resultado === "SUCESSO" && cancelResultado.status === "cancelled") {
@@ -155,14 +155,14 @@ export async function regenerateAdminPix(
         await syncPaymentFromMp(db, aPosClaim.id, reconsulta);
         await registrarFase(db, args.operationKey, {
           fase: "RECUSADA",
-          erro: "PIX_SUBSTITUTO_JA_PAGO",
+          erro: "PIX_SUBSTITUTO_JA_PAGO"
         });
         return { ok: false, erro: "PIX_SUBSTITUTO_JA_PAGO" };
       } else {
         // Continua pending/in_process/authorized ou consulta falhou:
         await registrarFase(db, args.operationKey, {
           fase: "ENVIO_INCONCLUSIVO",
-          erro: "CANCELAMENTO_INCONCLUSIVO",
+          erro: "CANCELAMENTO_INCONCLUSIVO"
         });
         return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
       }
@@ -171,7 +171,7 @@ export async function regenerateAdminPix(
     // Estados financeiros inesperados (refunded, charged_back, in_mediation, desconhecido): FAIL CLOSED
     await registrarFase(db, args.operationKey, {
       fase: "RECUSADA",
-      erro: "PIX_PARA_SUBSTITUIR_INVALIDO",
+      erro: "PIX_PARA_SUBSTITUIR_INVALIDO"
     });
     return { ok: false, erro: "PIX_PARA_SUBSTITUIR_INVALIDO" };
   }
@@ -179,18 +179,22 @@ export async function regenerateAdminPix(
   if (!aConfirmadoNaoPagavel) {
     await registrarFase(db, args.operationKey, {
       fase: "ENVIO_INCONCLUSIVO",
-      erro: "CANCELAMENTO_INCONCLUSIVO",
+      erro: "CANCELAMENTO_INCONCLUSIVO"
     });
     return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
   }
 
   // 4. Criação remota de B
-  const envio = await postPagamentoMp(args.env.MP_ACCESS_TOKEN, args.mpIdempotencyKey, args.mpRequest);
+  const envio = await postPagamentoMp(
+    args.env.MP_ACCESS_TOKEN,
+    args.mpIdempotencyKey,
+    args.mpRequest
+  );
 
   if (envio.resultado === "AMBIGUO") {
     await registrarFase(db, args.operationKey, {
       fase: "ENVIO_INCONCLUSIVO",
-      erro: `AMBIGUO:${envio.motivo}`,
+      erro: `AMBIGUO:${envio.motivo}`
     });
     return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
   }
@@ -198,7 +202,7 @@ export async function regenerateAdminPix(
   if (envio.resultado === "RECUSA_DEFINITIVA") {
     await registrarFase(db, args.operationKey, {
       fase: "RECUSADA",
-      erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`,
+      erro: `RECUSA_DEFINITIVA:${envio.httpStatus}`
     });
     return { ok: false, erro: "MERCADO_PAGO_RECUSOU" };
   }
@@ -218,7 +222,7 @@ export async function regenerateAdminPix(
     qrCode: txData?.qr_code ?? null,
     qrCodeBase64: txData?.qr_code_base64 ?? null,
     ticketUrl: txData?.ticket_url ?? null,
-    expiresAt: payment.date_of_expiration,
+    expiresAt: payment.date_of_expiration
   };
 
   // 5. Persistência atômica após criação remota
@@ -231,7 +235,7 @@ export async function regenerateAdminPix(
          SET status = ?,
              cancelado_em = COALESCE(cancelado_em, CURRENT_TIMESTAMP),
              atualizado_em = CURRENT_TIMESTAMP
-         WHERE id = ? AND status = 'PENDENTE'`,
+         WHERE id = ? AND status = 'PENDENTE'`
       )
       .bind(aStatusCancelado, args.substituiId),
     db
@@ -241,7 +245,7 @@ export async function regenerateAdminPix(
            registrado_por_usuario_id, idempotency_key, substitui_pagamento_id,
            mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
          )
-         VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         args.pedidoId,
@@ -254,15 +258,15 @@ export async function regenerateAdminPix(
         txData?.qr_code ?? null,
         txData?.qr_code_base64 ?? null,
         txData?.ticket_url ?? null,
-        payment.date_of_expiration,
+        payment.date_of_expiration
       ),
-    ...args.waterfall.alocacoes.map((a) =>
+    ...args.waterfall.alocacoes.map(a =>
       db
         .prepare(
           `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
-           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`,
+           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`
         )
-        .bind(args.idempotencyKey, a.itemId, a.valorCentavos),
+        .bind(args.idempotencyKey, a.itemId, a.valorCentavos)
     ),
     db
       .prepare(
@@ -272,21 +276,18 @@ export async function regenerateAdminPix(
              pagamento_id = (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?),
              resultado = ?,
              atualizado_em = CURRENT_TIMESTAMP
-         WHERE operation_key = ?`,
+         WHERE operation_key = ?`
       )
-      .bind(
-        String(payment.id),
-        args.idempotencyKey,
-        JSON.stringify(sucesso),
-        args.operationKey,
-      ),
+      .bind(String(payment.id), args.idempotencyKey, JSON.stringify(sucesso), args.operationKey)
   ];
 
   if (reservaExpiraEmSincronizada) {
     finalStatements.push(
       db
-        .prepare(`UPDATE pedidos SET reserva_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(reservaExpiraEmSincronizada, args.pedidoId),
+        .prepare(
+          `UPDATE pedidos SET reserva_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
+        )
+        .bind(reservaExpiraEmSincronizada, args.pedidoId)
     );
   }
 

@@ -21,11 +21,11 @@ export default function AdminLayout() {
 
   useEffect(() => {
     fetch("/api/auth/me")
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) throw new Error("Não autenticado");
         return response.json() as Promise<{ usuario: AdminUser }>;
       })
-      .then((data) => setAuth({ status: "authenticated", user: data.usuario }))
+      .then(data => setAuth({ status: "authenticated", user: data.usuario }))
       .catch(() => setAuth({ status: "unauthenticated" }));
   }, []);
 

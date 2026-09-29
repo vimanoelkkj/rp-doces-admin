@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type MutableRefObject,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAdminAuth } from "../auth/AdminAuthContext";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
@@ -24,7 +18,7 @@ interface Props {
 
 const PAPEL_LABEL: Record<string, string> = {
   OWNER: "Owner",
-  ADMIN: "Admin",
+  ADMIN: "Admin"
 };
 
 function formatBadge(value: number) {
@@ -69,8 +63,8 @@ export default function AdminMobileMoreSheet({ children }: Props) {
 
       const focusable = Array.from(
         sheetRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
       );
       if (focusable.length === 0) return;
       const first = focusable[0];
@@ -99,7 +93,7 @@ export default function AdminMobileMoreSheet({ children }: Props) {
 
   const initials = user.nome
     .split(" ")
-    .map((name) => name[0])
+    .map(name => name[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
@@ -125,7 +119,12 @@ export default function AdminMobileMoreSheet({ children }: Props) {
             <h2 id="admin-mobile-more-title">Mais opções</h2>
             <button type="button" onClick={close} aria-label="Fechar mais opções">
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path
+                  d="M4 4L16 16M16 4L4 16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -139,7 +138,9 @@ export default function AdminMobileMoreSheet({ children }: Props) {
               }
               onClick={close}
             >
-              <span className="admin-mobile-sheet-icon"><IconUsers /></span>
+              <span className="admin-mobile-sheet-icon">
+                <IconUsers />
+              </span>
               <span>Administradores</span>
             </NavLink>
             <NavLink
@@ -149,7 +150,9 @@ export default function AdminMobileMoreSheet({ children }: Props) {
               }
               onClick={close}
             >
-              <span className="admin-mobile-sheet-icon"><IconReceipt /></span>
+              <span className="admin-mobile-sheet-icon">
+                <IconReceipt />
+              </span>
               <span>Despesas</span>
             </NavLink>
             <NavLink
@@ -159,7 +162,9 @@ export default function AdminMobileMoreSheet({ children }: Props) {
               }
               onClick={close}
             >
-              <span className="admin-mobile-sheet-icon"><IconBell /></span>
+              <span className="admin-mobile-sheet-icon">
+                <IconBell />
+              </span>
               <span>Notificações</span>
               {naoLidas > 0 && (
                 <span
@@ -174,7 +179,7 @@ export default function AdminMobileMoreSheet({ children }: Props) {
             <button
               type="button"
               className="admin-mobile-sheet-item admin-mobile-sheet-item--theme"
-              onClick={(e) => {
+              onClick={e => {
                 toggleTheme(e);
                 close();
               }}
@@ -187,13 +192,25 @@ export default function AdminMobileMoreSheet({ children }: Props) {
           </nav>
 
           <div className="admin-mobile-sheet-user">
-            <div className="sidebar-user-avatar" aria-hidden="true"><span>{initials}</span></div>
+            <div className="sidebar-user-avatar" aria-hidden="true">
+              <span>{initials}</span>
+            </div>
             <div className="sidebar-user-info">
               <span className="sidebar-user-name">{user.nome}</span>
               <span className="sidebar-user-role">{PAPEL_LABEL[user.papel] ?? user.papel}</span>
             </div>
             <button type="button" className="sidebar-logout-btn" onClick={logout} aria-label="Sair">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />

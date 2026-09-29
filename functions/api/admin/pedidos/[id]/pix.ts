@@ -8,7 +8,7 @@ import { createAdminPixCharge } from "../../../../lib/comandaPix";
 import {
   OPERACAO_HTTP_STATUS,
   OPERACAO_MENSAGENS,
-  parseOperationKey,
+  parseOperationKey
 } from "../../../../lib/operacoes";
 
 interface Env {
@@ -40,7 +40,7 @@ const MENSAGENS: Record<string, string> = {
   MERCADO_PAGO_INDISPONIVEL:
     "Não foi possível confirmar com o Mercado Pago se o Pix foi criado. Verifique novamente em instantes.",
   ESTORNO_ANULACAO_ATIVO: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
-  ...OPERACAO_MENSAGENS,
+  ...OPERACAO_MENSAGENS
 };
 
 const STATUS_HTTP: Record<string, number> = {
@@ -54,7 +54,7 @@ const STATUS_HTTP: Record<string, number> = {
   MERCADO_PAGO_RECUSOU: 502,
   MERCADO_PAGO_INDISPONIVEL: 502,
   ESTORNO_ANULACAO_ATIVO: 409,
-  ...OPERACAO_HTTP_STATUS,
+  ...OPERACAO_HTTP_STATUS
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -63,7 +63,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if ("error" in auth) return auth.error;
   const anulado = await recusarPedidoAnulado(env.DB, Number(params.id));
   if (anulado) return anulado;
-
 
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -103,14 +102,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       valorCentavos: body.valorCentavos,
       usuarioId: auth.user.id,
       substituiId: body.substituiId,
-      operationKey: chave.key,
+      operationKey: chave.key
     });
 
     if (!resultado.ok) {
       return jsonError(
         MENSAGENS[resultado.erro] ?? "Não foi possível gerar o Pix",
         STATUS_HTTP[resultado.erro] ?? 500,
-        resultado.erro,
+        resultado.erro
       );
     }
 
@@ -125,9 +124,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         qrCodeBase64: resultado.qrCodeBase64,
         ticketUrl: resultado.ticketUrl,
         expiresAt: resultado.expiresAt,
-        ...(resultado.replay ? { replay: true } : {}),
+        ...(resultado.replay ? { replay: true } : {})
       },
-      { status: 201 },
+      { status: 201 }
     );
   } catch (err) {
     console.error("Erro ao gerar Pix administrativo", err);

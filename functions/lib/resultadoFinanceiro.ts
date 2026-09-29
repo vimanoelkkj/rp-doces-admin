@@ -27,7 +27,7 @@ interface ResultadoRow {
 
 export async function getResultadoFinanceiro(
   db: D1Database,
-  params?: { desde: string; ate: string },
+  params?: { desde: string; ate: string }
 ): Promise<ResultadoFinanceiro> {
   // Sem params: acumulado geral, na mesma definição de "Caixa total"
   // (getStoreAnalytics) — bate com o que o dono vê como saldo da loja,
@@ -39,7 +39,9 @@ export async function getResultadoFinanceiro(
   const filtroPagamentos = params ? `AND ${storeDateSql("pago_em")} BETWEEN ? AND ?` : "";
   const filtroReembolsos = params ? `AND ${storeDateSql("concluido_em")} BETWEEN ? AND ?` : "";
   const filtroDespesas = params ? "AND d.data_competencia BETWEEN ? AND ?" : "";
-  const row = await db.prepare(`SELECT
+  const row = await db
+    .prepare(
+      `SELECT
       MAX(0,
         COALESCE((SELECT SUM(valor_centavos) FROM pedido_pagamentos
                   WHERE status='PAGO' ${filtroPagamentos}
@@ -52,8 +54,13 @@ export async function getResultadoFinanceiro(
                 FROM despesa_itens di
                 JOIN despesas d ON d.id = di.despesa_id
                 WHERE d.status = 'ATIVA' ${filtroDespesas}), 0) AS despesas_centavos
-    `)
-    .bind(...(params ? [params.desde, params.ate, params.desde, params.ate, params.desde, params.ate] : []))
+    `
+    )
+    .bind(
+      ...(params
+        ? [params.desde, params.ate, params.desde, params.ate, params.desde, params.ate]
+        : [])
+    )
     .first<ResultadoRow>();
 
   const faturamentoLiquidoCentavos = Number(row?.faturamento_liquido_centavos ?? 0);
@@ -61,9 +68,10 @@ export async function getResultadoFinanceiro(
   // Lucro/margem NUNCA são clampados em zero: prejuízo é um resultado
   // válido e precisa aparecer negativo, não escondido atrás de "R$ 0".
   const lucroEstimadoCentavos = faturamentoLiquidoCentavos - despesasCentavos;
-  const margemEstimada = faturamentoLiquidoCentavos === 0
-    ? null
-    : (lucroEstimadoCentavos / faturamentoLiquidoCentavos) * 100;
+  const margemEstimada =
+    faturamentoLiquidoCentavos === 0
+      ? null
+      : (lucroEstimadoCentavos / faturamentoLiquidoCentavos) * 100;
 
   return { faturamentoLiquidoCentavos, despesasCentavos, lucroEstimadoCentavos, margemEstimada };
 }

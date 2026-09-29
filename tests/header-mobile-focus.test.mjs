@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 
 const dom = new JSDOM(
   '<!doctype html><html><body><button id="sentinel">Antes</button><div id="root"></div></body></html>',
-  { url: "https://local.test" },
+  { url: "https://local.test" }
 );
 
 const channels = [];
@@ -28,17 +28,17 @@ for (const name of [
   "KeyboardEvent",
   "MouseEvent",
   "MutationObserver",
-  "getComputedStyle",
+  "getComputedStyle"
 ]) {
   Object.defineProperty(globalThis, name, { configurable: true, value: dom.window[name] });
 }
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-globalThis.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 0);
+globalThis.requestAnimationFrame = callback => setTimeout(() => callback(performance.now()), 0);
 globalThis.cancelAnimationFrame = clearTimeout;
 dom.window.requestAnimationFrame = globalThis.requestAnimationFrame;
 dom.window.cancelAnimationFrame = globalThis.cancelAnimationFrame;
-dom.window.matchMedia = (query) => ({
+dom.window.matchMedia = query => ({
   matches: false,
   media: query,
   onchange: null,
@@ -46,7 +46,7 @@ dom.window.matchMedia = (query) => ({
   removeListener: () => {},
   addEventListener: () => {},
   removeEventListener: () => {},
-  dispatchEvent: () => false,
+  dispatchEvent: () => false
 });
 dom.window.scrollTo = () => {};
 
@@ -79,7 +79,7 @@ const bundle = await build({
         );
         return root;
       }
-    `,
+    `
   },
   bundle: true,
   write: false,
@@ -87,7 +87,7 @@ const bundle = await build({
   platform: "browser",
   jsx: "automatic",
   define: { "process.env.NODE_ENV": '"development"' },
-  loader: { ".css": "empty", ".png": "dataurl" },
+  loader: { ".css": "empty", ".png": "dataurl" }
 });
 
 const ui = await import(
@@ -95,7 +95,7 @@ const ui = await import(
 );
 
 async function flush() {
-  await ui.act(async () => new Promise((resolve) => setTimeout(resolve, 25)));
+  await ui.act(async () => new Promise(resolve => setTimeout(resolve, 25)));
 }
 
 function activateWithKeyboard(button, key) {

@@ -22,7 +22,7 @@ export interface ProdutoDetalhesNormalizados {
 const CAMPOS = [
   { chave: "pesoTexto", rotulo: "Peso / porção", max: PESO_TEXTO_MAX },
   { chave: "ingredientes", rotulo: "Ingredientes", max: INGREDIENTES_MAX },
-  { chave: "alergenicos", rotulo: "Alérgenos", max: ALERGENICOS_MAX },
+  { chave: "alergenicos", rotulo: "Alérgenos", max: ALERGENICOS_MAX }
 ] as const;
 
 export function validarDetalhesProduto(body: ProdutoDetalhesInput): string | null {
@@ -41,6 +41,6 @@ export function normalizarDetalhesProduto(body: ProdutoDetalhesInput): ProdutoDe
   return {
     pesoTexto: texto(body.pesoTexto),
     ingredientes: texto(body.ingredientes),
-    alergenicos: texto(body.alergenicos),
+    alergenicos: texto(body.alergenicos)
   };
 }

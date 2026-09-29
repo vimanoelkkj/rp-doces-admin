@@ -62,21 +62,21 @@ async function pedidosNovos(db: D1Database): Promise<NotificacaoDerivada[]> {
     .prepare(
       `SELECT id, cliente_nome, valor_total_centavos, criado_em
        FROM pedidos
-       WHERE ${pedidoValidoSql('pedidos.id')} AND status_pedido = 'NOVO'
+       WHERE ${pedidoValidoSql("pedidos.id")} AND status_pedido = 'NOVO'
          AND (status_pagamento IN ('PARCIAL', 'PAGO') OR origem_pedido = 'MANUAL')
        ORDER BY criado_em DESC, id DESC
-       LIMIT ?`,
+       LIMIT ?`
     )
     .bind(LIMITE_POR_TIPO)
     .all<{ id: number; cliente_nome: string; valor_total_centavos: number; criado_em: string }>();
 
-  return (results || []).map((p) => ({
+  return (results || []).map(p => ({
     chave: `pedido:${p.id}:novo`,
     tipo: "PEDIDO" as const,
     titulo: "Pedido aguardando preparo",
     descricao: `RP-${p.id}${p.cliente_nome ? ` · ${p.cliente_nome}` : ""} · ${reais(p.valor_total_centavos)}`,
     em: p.criado_em,
-    destino: `/admin/pedidos?pedido=${p.id}`,
+    destino: `/admin/pedidos?pedido=${p.id}`
   }));
 }
 
@@ -86,28 +86,34 @@ async function pagamentosConfirmados(db: D1Database): Promise<NotificacaoDerivad
     .prepare(
       `SELECT pp.id, pp.pedido_id, pp.metodo, pp.valor_centavos, pp.pago_em
        FROM pedido_pagamentos pp
-       WHERE ${pedidoValidoSql('pp.pedido_id')} AND pp.status = 'PAGO' AND pp.pago_em IS NOT NULL
+       WHERE ${pedidoValidoSql("pp.pedido_id")} AND pp.status = 'PAGO' AND pp.pago_em IS NOT NULL
        ORDER BY pp.pago_em DESC, pp.id DESC
-       LIMIT ?`,
+       LIMIT ?`
     )
     .bind(LIMITE_POR_TIPO)
-    .all<{ id: number; pedido_id: number; metodo: string; valor_centavos: number; pago_em: string }>();
+    .all<{
+      id: number;
+      pedido_id: number;
+      metodo: string;
+      valor_centavos: number;
+      pago_em: string;
+    }>();
 
   const METODO_LABEL: Record<string, string> = {
     PIX_MP: "Pix",
     PIX_EXTERNO: "Pix externo",
     CARTAO: "Cartão",
     DINHEIRO: "Dinheiro",
-    A_COMBINAR: "A combinar",
+    A_COMBINAR: "A combinar"
   };
 
-  return (results || []).map((p) => ({
+  return (results || []).map(p => ({
     chave: `pagamento:${p.id}:pago`,
     tipo: "PAGAMENTO" as const,
     titulo: "Pagamento confirmado",
     descricao: `RP-${p.pedido_id} · ${reais(p.valor_centavos)} · ${METODO_LABEL[p.metodo] ?? p.metodo}`,
     em: p.pago_em,
-    destino: `/admin/pedidos?pedido=${p.pedido_id}`,
+    destino: `/admin/pedidos?pedido=${p.pedido_id}`
   }));
 }
 
@@ -124,12 +130,12 @@ async function estoqueNoLimite(db: D1Database): Promise<NotificacaoDerivada[]> {
        FROM produtos
        WHERE ativo = 1 AND (estoque - estoque_reservado) <= ?
        ORDER BY livre ASC, nome ASC
-       LIMIT ?`,
+       LIMIT ?`
     )
     .bind(ESTOQUE_BAIXO_LIMIAR, LIMITE_POR_TIPO)
     .all<{ id: number; nome: string; livre: number; atualizado_em: string }>();
 
-  return (results || []).map((p) => {
+  return (results || []).map(p => {
     const esgotado = Number(p.livre) <= 0;
     return {
       chave: `estoque:${p.id}:${esgotado ? "esgotado" : "baixo"}`,
@@ -139,7 +145,7 @@ async function estoqueNoLimite(db: D1Database): Promise<NotificacaoDerivada[]> {
         ? `${p.nome} está sem unidades livres`
         : `${p.nome} · ${p.livre} unidade(s) livre(s)`,
       em: p.atualizado_em,
-      destino: "/admin/produtos",
+      destino: "/admin/produtos"
     };
   });
 }
@@ -151,7 +157,7 @@ async function estoqueNoLimite(db: D1Database): Promise<NotificacaoDerivada[]> {
  */
 async function operacoesInconclusivas(db: D1Database): Promise<NotificacaoDerivada[]> {
   const operacoes = await listarOperacoesInconclusivasRecentes(db, LIMITE_POR_TIPO);
-  return operacoes.map((o) => ({
+  return operacoes.map(o => ({
     chave: `operacao:${o.operation_key}`,
     tipo: "OPERACAO" as const,
     titulo: "Cobrança sem confirmação do Mercado Pago",
@@ -159,7 +165,7 @@ async function operacoesInconclusivas(db: D1Database): Promise<NotificacaoDeriva
       ? `RP-${o.pedido_id} · verifique antes de gerar outra`
       : "Verifique antes de gerar outra",
     em: o.atualizado_em,
-    destino: o.pedido_id ? `/admin/pedidos?pedido=${o.pedido_id}` : null,
+    destino: o.pedido_id ? `/admin/pedidos?pedido=${o.pedido_id}` : null
   }));
 }
 
@@ -176,18 +182,18 @@ async function eventosDeTeste(db: D1Database): Promise<NotificacaoDerivada[]> {
       `SELECT id, criado_em FROM admin_diagnostico_eventos
        WHERE tipo = 'PEDIDO_TESTE'
        ORDER BY criado_em DESC, id DESC
-       LIMIT ?`,
+       LIMIT ?`
     )
     .bind(LIMITE_POR_TIPO)
     .all<{ id: number; criado_em: string }>();
 
-  return (results || []).map((e) => ({
+  return (results || []).map(e => ({
     chave: `teste:${e.id}:pedido`,
     tipo: "TESTE" as const,
     titulo: "Pedido de teste",
     descricao: "Simulação disparada manualmente — não é um pedido real.",
     em: e.criado_em,
-    destino: null,
+    destino: null
   }));
 }
 
@@ -198,7 +204,7 @@ export async function derivarNotificacoes(db: D1Database): Promise<NotificacaoDe
     pagamentosConfirmados(db),
     estoqueNoLimite(db),
     operacoesInconclusivas(db),
-    eventosDeTeste(db),
+    eventosDeTeste(db)
   ]);
   return grupos
     .flat()
@@ -214,7 +220,7 @@ export async function derivarNotificacoes(db: D1Database): Promise<NotificacaoDe
  */
 export async function registrarEventoPedidoTeste(
   db: D1Database,
-  usuarioId: number,
+  usuarioId: number
 ): Promise<number> {
   const result = await db
     .prepare(`INSERT INTO admin_diagnostico_eventos (tipo, usuario_id) VALUES ('PEDIDO_TESTE', ?)`)
@@ -231,7 +237,7 @@ export interface NotificacoesDoUsuario {
 /** Eventos derivados + estado de leitura do operador. */
 export async function listarNotificacoes(
   db: D1Database,
-  usuarioId: number,
+  usuarioId: number
 ): Promise<NotificacoesDoUsuario> {
   const derivadas = await derivarNotificacoes(db);
   if (derivadas.length === 0) return { notificacoes: [], naoLidas: 0 };
@@ -240,16 +246,16 @@ export async function listarNotificacoes(
   const { results } = await db
     .prepare(
       `SELECT chave FROM notificacao_leituras
-       WHERE usuario_id = ? AND chave IN (${placeholders})`,
+       WHERE usuario_id = ? AND chave IN (${placeholders})`
     )
-    .bind(usuarioId, ...derivadas.map((n) => n.chave))
+    .bind(usuarioId, ...derivadas.map(n => n.chave))
     .all<{ chave: string }>();
 
-  const lidas = new Set((results || []).map((r) => r.chave));
-  const notificacoes = derivadas.map((n) => ({ ...n, lida: lidas.has(n.chave) }));
+  const lidas = new Set((results || []).map(r => r.chave));
+  const notificacoes = derivadas.map(n => ({ ...n, lida: lidas.has(n.chave) }));
   return {
     notificacoes,
-    naoLidas: notificacoes.reduce((total, n) => total + (n.lida ? 0 : 1), 0),
+    naoLidas: notificacoes.reduce((total, n) => total + (n.lida ? 0 : 1), 0)
   };
 }
 
@@ -263,20 +269,18 @@ export async function listarNotificacoes(
 export async function marcarComoLidas(
   db: D1Database,
   usuarioId: number,
-  chaves: string[],
+  chaves: string[]
 ): Promise<number> {
-  const derivadas = new Set((await derivarNotificacoes(db)).map((n) => n.chave));
-  const validas = [...new Set(chaves)].filter((c) => derivadas.has(c));
+  const derivadas = new Set((await derivarNotificacoes(db)).map(n => n.chave));
+  const validas = [...new Set(chaves)].filter(c => derivadas.has(c));
   if (validas.length === 0) return 0;
 
   await db.batch(
-    validas.map((chave) =>
+    validas.map(chave =>
       db
-        .prepare(
-          `INSERT OR IGNORE INTO notificacao_leituras (usuario_id, chave) VALUES (?, ?)`,
-        )
-        .bind(usuarioId, chave),
-    ),
+        .prepare(`INSERT OR IGNORE INTO notificacao_leituras (usuario_id, chave) VALUES (?, ?)`)
+        .bind(usuarioId, chave)
+    )
   );
   return validas.length;
 }
@@ -286,14 +290,11 @@ export async function marcarComoLidas(
  * depende de o cliente mandar a lista que está vendo. Duas abas com listas
  * diferentes chegam ao mesmo resultado.
  */
-export async function marcarTodasComoLidas(
-  db: D1Database,
-  usuarioId: number,
-): Promise<number> {
+export async function marcarTodasComoLidas(db: D1Database, usuarioId: number): Promise<number> {
   const derivadas = await derivarNotificacoes(db);
   return marcarComoLidas(
     db,
     usuarioId,
-    derivadas.map((n) => n.chave),
+    derivadas.map(n => n.chave)
   );
 }

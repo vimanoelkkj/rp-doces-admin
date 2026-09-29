@@ -197,7 +197,6 @@
   background: var(--store-bg);
 }
 
-
 @media (max-width: 1024px) {
   .cardapio-content {
     padding: 40px 40px 80px;

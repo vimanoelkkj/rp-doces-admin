@@ -9,7 +9,7 @@ export const SKELETON_MIN_VISIBLE_MS = 400;
 export function useSkeletonVisibility(
   loading: boolean,
   delayMs = SKELETON_DELAY_MS,
-  minVisibleMs = SKELETON_MIN_VISIBLE_MS,
+  minVisibleMs = SKELETON_MIN_VISIBLE_MS
 ): boolean {
   const [visible, setVisible] = useState(false);
   const shownAtRef = useRef<number | null>(null);
