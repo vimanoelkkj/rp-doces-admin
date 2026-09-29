@@ -95,6 +95,7 @@ export default function AguardandoPagamento() {
   const [expiradoNoServidor, setExpiradoNoServidor] = useState(false);
   const prazoEncerrado = timeLeft === 0 || expiradoNoServidor;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: o checkout usa de propósito o state recebido na montagem (A1: uma operação por visita); mudanças posteriores de identidade de state, navigate ou reconcileWithProducts não devem recriar uma operação financeira
   useEffect(() => {
     if (!state || state.items.length === 0) {
       navigate("/cardapio");

@@ -103,8 +103,10 @@ async function mount(t, respond, checkoutResponse, onInitialRender) {
     await flush();
   };
   const calls = [];
+  const checkouts = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
-    if (url === "/api/checkout")
+    if (url === "/api/checkout") {
+      checkouts.push({ options });
       return (
         checkoutResponse?.() ??
         Response.json({
@@ -116,6 +118,7 @@ async function mount(t, respond, checkoutResponse, onInitialRender) {
           expiresAt: new Date(Date.now() + 6000).toISOString()
         })
       );
+    }
     if (url === "/api/config")
       return Response.json({
         config: {
@@ -142,9 +145,9 @@ async function mount(t, respond, checkoutResponse, onInitialRender) {
     container.innerHTML = "";
   });
   await flush();
-  onInitialRender?.();
+  await onInitialRender?.({ checkouts });
   await advance(LOADING_TOTAL_MIN_MS);
-  return { calls, advance };
+  return { calls, advance, checkouts };
 }
 
 test("M: timer zero with approval in flight never navigates to failure; normal success animation remains", async t => {
@@ -287,6 +290,64 @@ test("re-renders do CartProvider não recriam o intervalo do polling nem criam c
   );
   await advance(POLL_INTERVAL_MS * 3);
   assert.equal(consultas(), 3, "nenhuma consulta depois de sair");
+});
+
+test("checkout Pix: renderizações comuns em qualquer fase criam exatamente um POST /api/checkout", async t => {
+  const { calls, advance, checkouts } = await mount(
+    t,
+    () => Promise.resolve(Response.json({ statusPagamento: "PENDENTE" })),
+    undefined,
+    // Fase de criação (telas de loading): o POST já saiu uma vez e renders comuns não o repetem.
+    async ({ checkouts }) => {
+      assert.equal(checkouts.length, 1, "o POST sai ao montar");
+      assert.equal(checkouts[0].options.method, "POST");
+      for (const aberto of [true, false, true]) {
+        await ui.act(async () => ui.cart.setCartOpen(aberto));
+        await flush();
+      }
+      assert.equal(checkouts.length, 1, "renders comuns durante a criação não repetem o POST");
+    }
+  );
+  assert.equal(calls.length, 1, "Pix criado: o polling começou");
+  const corpo = JSON.parse(checkouts[0].options.body);
+  assert.deepEqual(corpo.items, [{ id: 1, quantity: 2 }]);
+  assert.deepEqual(corpo.cliente, initial.cliente);
+  assert.equal(typeof corpo.operationKey, "string");
+
+  // Pagamento pronto: renders do provider, tiques do contador e um ciclo de polling.
+  for (const aberto of [false, true, false]) {
+    await ui.act(async () => ui.cart.setCartOpen(aberto));
+    await flush();
+  }
+  await advance(POLL_INTERVAL_MS);
+  assert.equal(checkouts.length, 1, "renders comuns com o Pix pronto não criam um segundo POST");
+  assert.equal(checkouts[0].options.signal.aborted, false, "a operação segue viva na página");
+
+  // Desmontar: o cleanup aborta a requisição e nada fica pendente.
+  await ui.act(async () => ui.navigate("/pedido/token"));
+  assert.equal(checkouts[0].options.signal.aborted, true, "desmontar aborta o AbortController");
+  const consultasAoSair = calls.length;
+  await advance(10_000);
+  assert.equal(checkouts.length, 1, "nenhum POST depois de sair");
+  assert.equal(calls.length, consultasAoSair, "nenhuma consulta pendente depois de sair");
+  assert.equal(ui.currentPath, "/pedido/token");
+});
+
+test("checkout Pix usa o state da montagem: novo state na mesma rota não cria outro POST", async t => {
+  const { advance, checkouts } = await mount(t, () =>
+    Promise.resolve(Response.json({ statusPagamento: "PENDENTE" }))
+  );
+  assert.equal(checkouts.length, 1);
+  const outro = {
+    items: [{ id: 2, name: "Pudim", price: 20, image: "", quantity: 1 }],
+    cliente: { nome: "Outra", whatsapp: "11988888888" }
+  };
+  await ui.act(async () => ui.navigate("/aguardando-pagamento", { state: outro }));
+  await flush();
+  await advance(POLL_INTERVAL_MS);
+  assert.equal(checkouts.length, 1, "identidade nova de state não recria a operação financeira");
+  assert.equal(checkouts[0].options.signal.aborted, false, "a operação original não é abortada");
+  assert.equal(ui.currentPath, "/aguardando-pagamento");
 });
 
 test("late approved response after leaving waiting page cannot navigate or overwrite the new route", async t => {
