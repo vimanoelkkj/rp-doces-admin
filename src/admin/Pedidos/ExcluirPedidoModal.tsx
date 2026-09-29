@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
 import { novaOperationKey } from "../../lib/operationKey";
@@ -89,14 +89,16 @@ export default function ExcluirPedidoModal({
   const operationKeyRef = useRef<string | null>(null);
   const montadoRef = useRef(true);
 
-  function registrarEstorno(novo: EstadoEstorno) {
+  // Identidade estável: os efeitos abaixo dependem de carregarEstorno, e uma função nova a cada
+  // render os reexecutaria a cada render (uma carga de estorno por render, em laço).
+  const registrarEstorno = useCallback((novo: EstadoEstorno) => {
     if (novo.restanteTotalCentavos > valorMaximoPendenteRef.current) {
       valorMaximoPendenteRef.current = novo.restanteTotalCentavos;
     }
     setEstorno(novo);
-  }
+  }, []);
 
-  async function carregarEstorno() {
+  const carregarEstorno = useCallback(async () => {
     // O GET é somente leitura: a retomada de um estorno parado é pedida antes,
     // de forma explícita, em cada carga e em cada ciclo do polling.
     await reconciliarPedido(orderId);
@@ -109,7 +111,7 @@ export default function ExcluirPedidoModal({
       // Falha de leitura não bloqueia a exclusão indevidamente: o backend
       // continua sendo a autoridade final na hora de excluir de fato.
     }
-  }
+  }, [orderId, registrarEstorno]);
 
   useEffect(() => {
     montadoRef.current = true;
@@ -117,15 +119,13 @@ export default function ExcluirPedidoModal({
     return () => {
       montadoRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId]);
+  }, [carregarEstorno]);
 
   useEffect(() => {
     if (!algumaPernaEmAndamento(estorno)) return;
     const id = setInterval(carregarEstorno, POLL_MS);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estorno]);
+  }, [estorno, carregarEstorno]);
 
   async function estornarMp() {
     if (estornando) return;

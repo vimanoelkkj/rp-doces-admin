@@ -2467,6 +2467,120 @@ test("M2: ExcluirPedidoModal faz POST /reconciliar antes de cada GET do estorno,
   }
 });
 
+const GET_ESTORNO = "GET /api/admin/pedidos/1/anulacao/estorno";
+
+// Digita no campo "Motivo" pelo setter nativo, para o React enxergar o onChange e re-renderizar.
+async function digitarMotivo(texto) {
+  const campo = document.querySelector(".excluir-pedido-textarea");
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+  await ui.act(async () => {
+    setter.call(campo, texto);
+    campo.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await flush();
+}
+
+test("M2: re-renderizar o ExcluirPedidoModal não repete carga nem polling, e fechar limpa o intervalo", async t => {
+  const calls = [];
+  const root = await mountWith(
+    t,
+    registrarChamadas(calls, async url => {
+      if (String(url).endsWith("/anulacao/estorno"))
+        return estorno([
+          {
+            pagamentoId: 1,
+            valorCentavos: 3000,
+            restanteCentavos: 3000,
+            intencao: { status: "PROCESSANDO", ultimoErro: null, podeVerificar: true }
+          }
+        ]);
+      return Response.json(detalhe({ total: 4000, pago: 4000 }));
+    })
+  );
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  try {
+    const antes = calls.length;
+    await ui.act(async () => document.querySelector(".pedmodal-more button").click());
+    await flush();
+    await flush();
+    assert.deepEqual(
+      calls.slice(antes),
+      [RECONCILIAR, GET_ESTORNO],
+      "montar carrega uma única vez"
+    );
+
+    // Cada tecla re-renderiza o modal; nenhuma pode disparar POST /reconciliar ou GET /estorno.
+    for (const texto of ["a", "ab", "abc"]) await digitarMotivo(texto);
+    assert.equal(calls.length, antes + 2, "digitar no motivo não repete a carga nem o polling");
+
+    // Um ciclo de polling = um POST /reconciliar + um GET /estorno. Depois dele o estorno é um
+    // objeto novo e o intervalo é recriado: a cadência de 3 s precisa continuar a mesma.
+    await ui.act(async () => t.mock.timers.tick(3000));
+    await flush();
+    await flush();
+    assert.deepEqual(calls.slice(antes + 2), [RECONCILIAR, GET_ESTORNO], "1º ciclo do polling");
+    await digitarMotivo("abcd");
+    assert.equal(calls.length, antes + 4, "digitar depois do ciclo também não repete nada");
+    await ui.act(async () => t.mock.timers.tick(3000));
+    await flush();
+    await flush();
+    assert.deepEqual(calls.slice(antes + 4), [RECONCILIAR, GET_ESTORNO], "2º ciclo do polling");
+
+    // Fechar desmonta o modal: o intervalo não pode sobrar.
+    const aoFechar = calls.length;
+    await ui.act(async () => document.querySelector(".excluir-pedido-cancel").click());
+    await flush();
+    assert.ok(document.querySelector(".excluir-pedido-overlay") === null, "o modal foi fechado");
+    await ui.act(async () => t.mock.timers.tick(3000 * 3));
+    await flush();
+    assert.equal(calls.length, aoFechar, "sem intervalo órfão depois de fechar");
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("M2: trocar o rádio e digitar sem estorno em andamento não gera requisições nem polling", async t => {
+  const calls = [];
+  const root = await mountWith(
+    t,
+    registrarChamadas(calls, async url =>
+      String(url).endsWith("/anulacao/estorno")
+        ? estorno([])
+        : Response.json(detalhe({ total: 4000, pago: 4000 }))
+    )
+  );
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  try {
+    const antes = calls.length;
+    await ui.act(async () => document.querySelector(".pedmodal-more button").click());
+    await flush();
+    await flush();
+    assert.deepEqual(
+      calls.slice(antes),
+      [RECONCILIAR, GET_ESTORNO],
+      "montar carrega uma única vez"
+    );
+
+    const radios = document.querySelectorAll('.excluir-pedido-overlay input[type="radio"]');
+    await ui.act(async () => radios[0].click());
+    await flush();
+    await ui.act(async () => radios[1].click());
+    await flush();
+    await digitarMotivo("motivo");
+    assert.equal(
+      document.querySelector('.excluir-pedido-overlay button[type="submit"]').disabled,
+      false,
+      "o rádio realmente mudou e re-renderizou o modal"
+    );
+
+    await ui.act(async () => t.mock.timers.tick(3000 * 2));
+    await flush();
+    assert.equal(calls.length, antes + 2, "sem perna em andamento não há polling nem releitura");
+  } finally {
+    await unmount(root);
+  }
+});
+
 test("M2: falha no POST /reconciliar não impede o GET do estorno", async t => {
   const calls = [];
   const root = await mountWith(
