@@ -514,7 +514,7 @@ export default function NovoProdutoModal({
             <legend>EMOJI</legend>
             <div className="np-emoji-grid">
               {EMOJI_OPTIONS.map((e, i) => (
-                <div className="np-emoji-choice" key={i}>
+                <div className="np-emoji-choice" key={e.char}>
                   <input
                     id={`${fieldId}-emoji-${i}`}
                     className="np-emoji-radio"

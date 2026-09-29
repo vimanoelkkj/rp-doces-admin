@@ -7,7 +7,15 @@ interface DatePickerDropdownProps {
   today?: Date;
 }
 
-const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const WEEKDAYS = [
+  { key: "domingo", label: "D" },
+  { key: "segunda", label: "S" },
+  { key: "terca", label: "T" },
+  { key: "quarta", label: "Q" },
+  { key: "quinta", label: "Q" },
+  { key: "sexta", label: "S" },
+  { key: "sabado", label: "S" }
+];
 const MONTHS = [
   "Janeiro",
   "Fevereiro",
@@ -171,15 +179,15 @@ export default function DatePickerDropdown({
           </div>
 
           <div className="dash-date-weekdays">
-            {WEEKDAYS.map((w, i) => (
-              <span className="dash-date-weekday" key={i}>
-                {w}
+            {WEEKDAYS.map(w => (
+              <span className="dash-date-weekday" key={w.key}>
+                {w.label}
               </span>
             ))}
           </div>
 
           <div className="dash-date-grid">
-            {days.map((d, i) => {
+            {days.map(d => {
               const outsideMonth = d.getMonth() !== viewMonth;
               const isToday = isSameDay(d, today);
               const isSelected = isSameDay(d, value);
@@ -187,7 +195,7 @@ export default function DatePickerDropdown({
               return (
                 <button
                   type="button"
-                  key={i}
+                  key={d.getTime()}
                   className={[
                     "dash-date-day",
                     outsideMonth ? "dash-date-day--muted" : "",
