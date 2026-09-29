@@ -355,6 +355,49 @@ test("falha fisica reverte anulação e todo o batch", async t => {
   assert.equal((await db.prepare("SELECT COUNT(*) n FROM pedido_anulacoes").first()).n, 0);
 });
 
+test("releitura pos-commit vazia falha alto, persistencia fica e retry converge por replay", async t => {
+  const { db, session } = await manual(t);
+  t.mock.method(console, "error", () => {});
+  const alvo = "SELECT * FROM pedido_anulacoes WHERE pedido_id = ?";
+  const ocorrencias = [];
+  let batchVisto = false;
+  let suprimidas = 0;
+  db.hook = async statements => {
+    if (statements.some(statement => statement.sql.includes("INSERT INTO pedido_anulacoes")))
+      batchVisto = true;
+    return statements.map(statement => {
+      if (statement.sql !== alvo) return statement;
+      ocorrencias.push(batchVisto ? "pos-batch" : "pre-batch");
+      if (!batchVisto || suprimidas > 0) return statement;
+      suprimidas++;
+      return { sql: "SELECT * FROM pedido_anulacoes WHERE 0", args: [] };
+    });
+  };
+  const response = await anular(db, session);
+  db.hook = null;
+  assert.deepEqual(ocorrencias, ["pre-batch", "pre-batch", "pos-batch"]);
+  assert.equal(suprimidas, 1);
+  assert.equal(response.status, 500);
+  const body = await response.json();
+  assert.equal(body.anulacao, undefined);
+  assert.equal(body.error, "Não foi possível excluir o pedido. Nenhuma alteração foi aplicada.");
+  const anulacao = await db.prepare("SELECT * FROM pedido_anulacoes WHERE pedido_id=1").first();
+  assert.equal(anulacao.efetivada, 1);
+  assert.equal(anulacao.liquido_original_centavos, 4000);
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM pedido_anulacoes").first()).n, 1);
+  const after = await state(db);
+  assert.equal(after.produtos[0].estoque, 12);
+  assert.equal(after.itens[0].estoque_estado, "REPOSTO");
+  const retry = await anular(db, session);
+  assert.equal(retry.status, 200);
+  const retryBody = await retry.json();
+  assert.equal(retryBody.replay, true);
+  assert.equal(retryBody.anulacao.id, anulacao.id);
+  assert.equal(retryBody.anulacao.estoque_acao, "DEVOLVER");
+  assert.deepEqual(await state(db), after);
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM pedido_anulacoes").first()).n, 1);
+});
+
 test("sameOrigin antecede auth/db; payload estrito e autenticacao obrigatoria", async t => {
   const poison = {
     prepare() {

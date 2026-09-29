@@ -614,5 +614,7 @@ export async function anularPedido(
     if (winner) return { anulacao: winner, replay: true };
     throw error;
   }
-  return { anulacao: (await getPedidoAnulacao(db, params.pedidoId))!, replay: false };
+  const anulacao = await getPedidoAnulacao(db, params.pedidoId);
+  if (!anulacao) throw new Error("ANULACAO_PERSISTIDA_NAO_RELIDA");
+  return { anulacao, replay: false };
 }
