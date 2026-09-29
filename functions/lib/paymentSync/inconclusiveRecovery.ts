@@ -47,7 +47,9 @@ export async function recuperarOperacoesInconclusivas(env: {
   DB: D1Database;
   MP_ACCESS_TOKEN?: string;
 }): Promise<void> {
-  if (!env.MP_ACCESS_TOKEN) return;
+  // Const local: narrowing preservado dentro das closures de Promise.allSettled.
+  const token = env.MP_ACCESS_TOKEN;
+  if (!token) return;
 
   const candidatas = await listarOperacoesInconclusivas(env.DB, RECUPERACAO_BATCH_SIZE);
   if (!candidatas.length) return;
@@ -65,7 +67,7 @@ export async function recuperarOperacoesInconclusivas(env: {
           return;
         }
 
-        const busca = await buscarPagamentosPorReferenciaExterna(env.MP_ACCESS_TOKEN!, referencia);
+        const busca = await buscarPagamentosPorReferenciaExterna(token, referencia);
 
         if (busca.resultado === "INDISPONIVEL") {
           // Não observamos nada. Isso não é rejeição, não perde identidade e
@@ -120,7 +122,7 @@ export async function recuperarOperacoesInconclusivas(env: {
 
         // Exatamente um candidato. A partir daqui a busca não decide mais
         // nada: o GET verificado é que produz autoridade financeira.
-        const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN!, busca.mpPaymentId);
+        const payment = await fetchMpPayment(token, busca.mpPaymentId);
 
         if (operacao.tipo === "PIX_ADMIN_REGENERACAO") {
           let bRow = await env.DB.prepare(

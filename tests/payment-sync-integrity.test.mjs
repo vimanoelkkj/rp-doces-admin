@@ -183,6 +183,25 @@ for (const [label, expirar] of [
     assertBlocked(await state(db), "INTEGRIDADE_MP:VALOR_DIVERGENTE");
   });
 
+test("sweep de PIX_MP sem access token nao consulta o provedor nem escreve", async t => {
+  const db = await fixture(t);
+  // Elegível ao sweep: sem isto, o throttle de 15s esconderia uma consulta indevida.
+  await db
+    .prepare(
+      `UPDATE pedido_pagamentos SET atualizado_em = datetime('now', '-1 minute') WHERE id = 1`
+    )
+    .run();
+  const fetch = t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("sem access token o sweep nao pode consultar o Mercado Pago");
+  });
+  const antes = await state(db);
+
+  await app.sync.reconcilePendingPixPayments({ DB: db });
+
+  assert.equal(fetch.mock.callCount(), 0, "nenhuma consulta ao provedor sem token");
+  assert.deepEqual(await state(db), antes, "estado integral intacto, inclusive atualizado_em");
+});
+
 test("trava estruturada impede liberacao mesmo se a expiracao venceu a corrida de status", async t => {
   const db = await fixture(t);
   mercadoPago(t, { ...validPayment, transaction_amount: 0.01 });

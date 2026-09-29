@@ -148,13 +148,15 @@ async function applyLedgerTransition(
     !["PAGO", "REEMBOLSADO"].includes(atual.status) &&
     ["approved", "refunded"].includes(mpStatusAtual);
   const resolucaoSemCaptura =
+    mp !== undefined &&
     mpStatusAtual === "approved" &&
     ["cancelled", "rejected"].includes(mpStatusRecebido) &&
-    identidadeTerminalMpCompativel(atual, mp!);
+    identidadeTerminalMpCompativel(atual, mp);
   const resolucaoReembolsada =
+    mp !== undefined &&
     mpStatusRecebido === "refunded" &&
     !["PAGO", "REEMBOLSADO"].includes(atual.status) &&
-    identidadeTerminalMpCompativel(atual, mp!);
+    identidadeTerminalMpCompativel(atual, mp);
 
   if (!mp && novoStatus === "EXPIRADO" && integridadeRemotaPendente) {
     return { ok: true, status: atual.status, transicionou: false };
@@ -267,9 +269,9 @@ async function applyLedgerTransition(
       novoStatus,
       mp?.date_approved ?? null,
       novoStatus,
-      ...(resolucaoSemCaptura || resolucaoReembolsada
+      ...(mp !== undefined && (resolucaoSemCaptura || resolucaoReembolsada)
         ? [
-            mp!.status,
+            mp.status,
             resolucaoSemCaptura
               ? "INTEGRIDADE_MP:RESOLVIDA_SEM_CAPTURA"
               : "INTEGRIDADE_MP:REFUNDED_RECONHECIDO"

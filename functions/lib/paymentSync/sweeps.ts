@@ -37,7 +37,9 @@ export async function reconcilePendingPixPayments(env: {
   DB: D1Database;
   MP_ACCESS_TOKEN?: string;
 }): Promise<void> {
-  if (!env.MP_ACCESS_TOKEN) return;
+  // Const local: narrowing preservado dentro das closures de Promise.allSettled.
+  const token = env.MP_ACCESS_TOKEN;
+  if (!token) return;
 
   const { results } = await env.DB.prepare(
     `SELECT id, mp_payment_id FROM pedido_pagamentos
@@ -58,7 +60,7 @@ export async function reconcilePendingPixPayments(env: {
         // Claim por candidato: concorrência e falhas de rede também respeitam
         // o throttle. Não altera fatos nem timestamps históricos financeiros.
         if (!(await claimPendingPixPaymentReconciliation(env.DB, row.id))) return;
-        const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN!, row.mp_payment_id);
+        const payment = await fetchMpPayment(token, row.mp_payment_id);
         await syncPaymentFromMp(env.DB, row.id, payment, env);
       } catch (err) {
         console.error("Falha ao reconciliar pagamento PIX_MP pendente/expirado", row.id, err);
