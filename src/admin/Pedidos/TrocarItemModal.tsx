@@ -111,6 +111,7 @@ export default function TrocarItemModal({
   const keyRef = useRef(novaOperationKey());
   const signatureRef = useRef("");
   const refundKeys = useRef(new Map<number, string>());
+  // biome-ignore lint/correctness/useExhaustiveDependencies: existingExchangeStatus é gatilho deliberado: a mudança do status da troca (ex.: AGUARDANDO_COBRANCA para CONCLUIDA) exige nova releitura
   useEffect(() => {
     let active = true;
     if (existingExchangeId) {
