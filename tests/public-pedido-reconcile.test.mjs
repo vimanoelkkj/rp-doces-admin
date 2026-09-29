@@ -68,6 +68,7 @@ test("M7: GET /api/pedido-status é puro — sem rede e sem escrita, mesmo com P
   for (let i = 0; i < 3; i++) {
     const r = await getStatus(db);
     assert.equal(r.status, 200);
+    assert.equal(r.headers.get("Cache-Control"), "no-store");
     assert.deepEqual(await r.json(), {
       pedidoId: 1,
       statusPagamento: "PENDENTE",
@@ -92,6 +93,7 @@ test("M7: GET /api/pedido é puro e mantém o contrato de detalhes", async t => 
   const r = await getDetalhe(db);
   db.hook = null;
   assert.equal(r.status, 200);
+  assert.equal(r.headers.get("Cache-Control"), "no-store");
   const body = await r.json();
   assert.equal(body.pedidoId, 1);
   assert.equal(body.clienteNome, "Teste");
@@ -130,11 +132,13 @@ test("M7: POST exige mesma origem e, com MP approved, sincroniza normalmente", a
   const antes = await state(db);
   const cruzado = await postStatus(db, { Origin: "https://evil.test" });
   assert.equal(cruzado.status, 403);
+  assert.equal(cruzado.headers.get("Cache-Control"), "no-store");
   assert.deepEqual(chamadas, []);
   assert.deepEqual(await state(db), antes);
 
   const r = await postStatus(db);
   assert.equal(r.status, 200);
+  assert.equal(r.headers.get("Cache-Control"), "no-store");
   assert.deepEqual(await r.json(), {
     pedidoId: 1,
     statusPagamento: "PAGO",
@@ -346,4 +350,38 @@ test("estoquePendente ignora pedido sem produto controlado", async t => {
   assert.equal(body.statusPagamento, "PAGO");
   assert.equal(body.estoquePendente, false);
   assert.equal(await app.stock.pedidoTemEstoquePendente(db, 1), false);
+});
+
+// Onda 9B: respostas desses endpoints carregam dados de pedido mediante token
+// — sucesso e erros tratados (token inválido/inexistente) nunca são cacheáveis.
+test("Onda 9B: Cache-Control no-store em token inválido e inexistente (GET)", async t => {
+  const db = await fixture(t);
+
+  const semTokenStatus = await app.polling.onRequestGet({
+    env: env(db),
+    request: new Request("https://local.test/api/pedido-status")
+  });
+  assert.equal(semTokenStatus.status, 400);
+  assert.equal(semTokenStatus.headers.get("Cache-Control"), "no-store");
+
+  const semTokenDetalhe = await app.detail.onRequestGet({
+    env: env(db),
+    request: new Request("https://local.test/api/pedido")
+  });
+  assert.equal(semTokenDetalhe.status, 400);
+  assert.equal(semTokenDetalhe.headers.get("Cache-Control"), "no-store");
+
+  const inexistenteStatus = await app.polling.onRequestGet({
+    env: env(db),
+    request: new Request("https://local.test/api/pedido-status?token=inexistente")
+  });
+  assert.equal(inexistenteStatus.status, 404);
+  assert.equal(inexistenteStatus.headers.get("Cache-Control"), "no-store");
+
+  const inexistenteDetalhe = await app.detail.onRequestGet({
+    env: env(db),
+    request: new Request("https://local.test/api/pedido?token=inexistente")
+  });
+  assert.equal(inexistenteDetalhe.status, 404);
+  assert.equal(inexistenteDetalhe.headers.get("Cache-Control"), "no-store");
 });

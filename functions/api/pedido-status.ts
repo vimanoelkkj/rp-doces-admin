@@ -11,7 +11,7 @@ interface Env {
 }
 
 function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+  return Response.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 // GET: somente leitura do estado já persistido. POST: gatilho explícito da
@@ -22,7 +22,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const pedido = await buscarPedido(request, env);
     if (pedido instanceof Response) return pedido;
     const atual = await readPedidoStatus(env.DB, pedido);
-    return Response.json({ pedidoId: pedido.id, ...atual });
+    return Response.json(
+      { pedidoId: pedido.id, ...atual },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (err) {
     console.error("Erro inesperado ao consultar status do pedido", err);
     return jsonError("Erro interno ao consultar pedido", 500);
@@ -37,7 +40,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const pedido = await buscarPedido(request, env);
     if (pedido instanceof Response) return pedido;
     const atual = await refreshPedidoStatus(env.DB, env.MP_ACCESS_TOKEN, pedido, env);
-    return Response.json({ pedidoId: pedido.id, ...atual });
+    return Response.json(
+      { pedidoId: pedido.id, ...atual },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (err) {
     console.error("Erro inesperado ao reconciliar status do pedido", err);
     return jsonError("Erro interno ao consultar pedido", 500);

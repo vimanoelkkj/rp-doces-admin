@@ -23,7 +23,7 @@ interface PedidoItemRow {
 }
 
 function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+  return Response.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -63,12 +63,15 @@ async function handleDetalhe(request: Request, env: Env): Promise<Response> {
     .bind(pedido.id)
     .all<PedidoItemRow>();
 
-  return Response.json({
-    pedidoId: pedido.id,
-    clienteNome: pedido.cliente_nome,
-    valorTotalCentavos: pedido.valor_total_centavos,
-    criadoEm: pedido.criado_em,
-    itens,
-    ...atual
-  });
+  return Response.json(
+    {
+      pedidoId: pedido.id,
+      clienteNome: pedido.cliente_nome,
+      valorTotalCentavos: pedido.valor_total_centavos,
+      criadoEm: pedido.criado_em,
+      itens,
+      ...atual
+    },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
