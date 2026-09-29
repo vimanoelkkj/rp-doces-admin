@@ -252,7 +252,7 @@ export default function AguardandoPagamento() {
       controller.abort();
       clearInterval(interval);
     };
-  }, [status, payment, navigate, clearCart, state]);
+  }, [status, payment]);
 
   useEffect(() => {
     if (status !== "processando" || !resultadoPendente || !payment) return;

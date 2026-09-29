@@ -35,13 +35,14 @@ const bundle = await build({
     import React from 'react';
     import {createRoot} from 'react-dom/client';
     import {MemoryRouter,Routes,Route,useNavigate,useLocation} from 'react-router-dom';
-    import {CartProvider} from './src/context/CartContext';
+    import {CartProvider,useCart} from './src/context/CartContext';
     import Waiting from './src/pages/AguardandoPagamento';
     import Failure from './src/pages/PagamentoNaoAprovado';
     export {act} from 'react';
     export let navigate;
     export let currentPath;
-    function Probe(){navigate=useNavigate();currentPath=useLocation().pathname;return null;}
+    export let cart;
+    function Probe(){navigate=useNavigate();currentPath=useLocation().pathname;cart=useCart();return null;}
     export function mount(container,state){
       const root=createRoot(container);
       root.render(<MemoryRouter future={{v7_startTransition:true,v7_relativeSplatPath:true}} initialEntries={[{pathname:'/aguardando-pagamento',state}]}>
@@ -77,6 +78,7 @@ const initial = {
 };
 const LOADING_TOTAL_MIN_MS = 3000;
 const RESULT_TRANSITION_MIN_MS = 1500;
+const POLL_INTERVAL_MS = 4000;
 function deferred() {
   let resolve;
   const promise = new Promise(r => {
@@ -233,6 +235,58 @@ test("expired response remains inconclusive and polls again; 500 also cannot nav
   assert.equal(calls.length, 3);
   await advance(RESULT_TRANSITION_MIN_MS);
   assert.equal(ui.currentPath, "/pedido-confirmado");
+});
+
+test("re-renders do CartProvider não recriam o intervalo do polling nem criam consultas imediatas; sair limpa o intervalo", async t => {
+  const armados = [];
+  const limpos = [];
+  const { calls, advance } = await mount(
+    t,
+    () => Promise.resolve(Response.json({ statusPagamento: "PENDENTE" })),
+    undefined,
+    () => {
+      // O polling ainda não existe (status "criando"): os espiões entram antes de ele ser armado.
+      const setReal = globalThis.setInterval;
+      const clearReal = globalThis.clearInterval;
+      t.mock.method(globalThis, "setInterval", (handler, delay, ...args) => {
+        const id = setReal(handler, delay, ...args);
+        if (delay === POLL_INTERVAL_MS) armados.push(id);
+        return id;
+      });
+      t.mock.method(globalThis, "clearInterval", id => {
+        limpos.push(id);
+        return clearReal(id);
+      });
+    }
+  );
+  const consultas = () => calls.filter(c => c.url.startsWith("/api/pedido-status")).length;
+  const limposDoPolling = () => limpos.filter(id => armados.includes(id));
+  assert.equal(consultas(), 1, "o Pix ativo faz a primeira consulta ao armar o polling");
+  assert.equal(armados.length, 1, "o polling é armado uma vez");
+
+  // clearCart é recriado a cada render do CartProvider: três renders reais do provider.
+  for (const aberto of [true, false, true]) {
+    await ui.act(async () => ui.cart.setCartOpen(aberto));
+    await flush();
+  }
+  assert.equal(consultas(), 1, "re-render do provider não dispara consulta imediata");
+  assert.equal(armados.length, 1, "re-render do provider não recria o intervalo");
+  assert.deepEqual(limposDoPolling(), [], "o intervalo original segue ativo");
+
+  await advance(POLL_INTERVAL_MS);
+  assert.equal(consultas(), 2, "o ciclo regular de 4 s continua");
+  await advance(POLL_INTERVAL_MS);
+  assert.equal(consultas(), 3, "e segue com a mesma cadência");
+
+  // Sair da página desmonta o componente: o intervalo precisa ser limpo, não só ignorado.
+  await ui.act(async () => ui.navigate("/pedido/token"));
+  assert.deepEqual(
+    limposDoPolling(),
+    [armados[0]],
+    "desmontar limpa exatamente o intervalo do polling"
+  );
+  await advance(POLL_INTERVAL_MS * 3);
+  assert.equal(consultas(), 3, "nenhuma consulta depois de sair");
 });
 
 test("late approved response after leaving waiting page cannot navigate or overwrite the new route", async t => {
