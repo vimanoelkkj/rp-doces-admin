@@ -61,7 +61,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (!metodo || !METODOS_VALIDOS.has(metodo)) {
     return jsonError("Método de pagamento inválido", 400);
   }
-  if (!Number.isInteger(body.valorCentavos) || body.valorCentavos! <= 0) {
+  const valorCentavos = body.valorCentavos;
+  if (typeof valorCentavos !== "number" || !Number.isInteger(valorCentavos) || valorCentavos <= 0) {
     return jsonError("Valor inválido", 400);
   }
 
@@ -77,7 +78,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     const resultado = await registerAdminPayment(env.DB, {
       pedidoId: id,
       metodo: metodo as MetodoManual,
-      valorCentavos: body.valorCentavos!,
+      valorCentavos,
       usuarioId: auth.user.id,
       observacao: body.observacao,
       operationKey: chave.key

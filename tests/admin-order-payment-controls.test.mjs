@@ -206,3 +206,38 @@ test("pagamento parcial seguido do restante converge sem duplicar baixa", async 
     "retry nao repete a baixa"
   );
 });
+
+test("valorCentavos inválido é recusado sem fato financeiro nem operação", async t => {
+  const casos = [
+    { nome: "ausente", valor: undefined },
+    { nome: "null", valor: null },
+    { nome: "0", valor: 0 },
+    { nome: "-500", valor: -500 },
+    { nome: "10.5", valor: 10.5 },
+    { nome: '"10000"', valor: "10000" }
+  ];
+
+  for (const [i, { nome, valor }] of casos.entries()) {
+    await t.test(`valorCentavos ${nome}`, async t => {
+      // Fixture novo por caso: nenhum estado do caso anterior é reutilizado.
+      const { db, session } = await prepararPedido(t);
+      const response = await registrar(db, session, {
+        valorCentavos: valor,
+        operationKey: `invalid-value-${i + 1}`
+      });
+
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { error: "Valor inválido" });
+      assert.equal(
+        (await db.prepare("SELECT COUNT(*) AS n FROM pedido_pagamentos").first()).n,
+        0,
+        "nenhum pagamento pode nascer de um valor recusado"
+      );
+      assert.equal(
+        (await db.prepare("SELECT COUNT(*) AS n FROM pedido_operacoes").first()).n,
+        0,
+        "nenhuma operacao pode ser registrada antes do guard de valor"
+      );
+    });
+  }
+});
