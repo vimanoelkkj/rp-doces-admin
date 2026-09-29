@@ -14,6 +14,7 @@
 // continuam retendo a reserva).
 
 import { sameOrigin } from "../../lib/auth";
+import { checkReservationReconciliationRateLimit } from "../../lib/checkoutRateLimit";
 import { liberarReservasVencidasLocalmente } from "../../lib/paymentSync";
 
 interface Env {
@@ -23,6 +24,17 @@ interface Env {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!sameOrigin(request)) {
     return Response.json({ error: "Origem inválida" }, { status: 403 });
+  }
+
+  const rateLimit = await checkReservationReconciliationRateLimit(env.DB, request);
+  if (!rateLimit.allowed) {
+    return Response.json(
+      { error: "Muitas chamadas de reconciliação. Aguarde alguns instantes." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateLimit.retryAfter), "Cache-Control": "no-store" }
+      }
+    );
   }
 
   try {

@@ -3,7 +3,6 @@
 import { sha256 } from "./auth";
 
 const WINDOW_SECONDS = 60;
-const MAX_ATTEMPTS = 6;
 const CLEANUP_GRACE_SECONDS = 5 * 60;
 
 interface RateLimitRow {
@@ -17,16 +16,18 @@ function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP")?.trim() || "local";
 }
 
-export async function checkCheckoutRateLimit(
+async function checkRateLimit(
   db: D1Database,
   request: Request,
-  nowMs = Date.now()
+  nowMs: number,
+  scope: string,
+  maxAttempts: number
 ): Promise<{ allowed: boolean; retryAfter: number; count: number }> {
   const nowSec = Math.floor(nowMs / 1000);
   const bucket = Math.floor(nowSec / WINDOW_SECONDS);
   const bucketEnd = (bucket + 1) * WINDOW_SECONDS;
   const retryAfter = Math.max(1, bucketEnd - nowSec);
-  const key = await sha256(`checkout:${clientIp(request)}:${bucket}`);
+  const key = await sha256(`${scope}:${clientIp(request)}:${bucket}`);
   const expiresAt = bucketEnd + CLEANUP_GRACE_SECONDS;
 
   const row = await db
@@ -49,13 +50,26 @@ export async function checkCheckoutRateLimit(
     try {
       await db.prepare(`DELETE FROM checkout_rate_limits WHERE expira_em < ?`).bind(nowSec).run();
     } catch (err) {
-      console.warn("Falha ao limpar rate limit do checkout", err);
+      console.warn(`Falha ao limpar rate limit de ${scope}`, err);
     }
   }
 
   return {
-    allowed: count <= MAX_ATTEMPTS,
+    allowed: count <= maxAttempts,
     retryAfter,
     count
   };
+}
+
+export function checkCheckoutRateLimit(db: D1Database, request: Request, nowMs = Date.now()) {
+  return checkRateLimit(db, request, nowMs, "checkout", 6);
+}
+
+// Uma chamada por leitura do catálogo; doze recargas por minuto por IP.
+export function checkReservationReconciliationRateLimit(
+  db: D1Database,
+  request: Request,
+  nowMs = Date.now()
+) {
+  return checkRateLimit(db, request, nowMs, "reservas-reconciliar", 12);
 }

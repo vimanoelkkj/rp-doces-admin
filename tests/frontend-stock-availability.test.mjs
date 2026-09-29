@@ -148,7 +148,8 @@ test("fetchProducts carrega o catálogo mesmo se a liberação de reservas falha
     async () => {
       throw new TypeError("Failed to fetch");
     },
-    async () => Response.json({ error: "Origem inválida" }, { status: 403 })
+    async () => Response.json({ error: "Origem inválida" }, { status: 403 }),
+    async () => Response.json({ error: "Muitas chamadas" }, { status: 429 })
   ]) {
     const chamadas = [];
     t.mock.method(globalThis, "fetch", async (url, options) => {

@@ -314,6 +314,167 @@ test("M1: rota pública recusa origem cruzada sem tocar em nada", async t => {
   assert.deepEqual(await state(db), before);
 });
 
+// ACH-03B: uma abertura do catálogo faz um POST best-effort antes do GET.
+// Doze aberturas por minuto permitem recargas e abas, mas limitam o sweep.
+const LIMITE_RECONCILIACAO = 12;
+const AGORA_RECONCILIACAO = Date.parse("2026-09-29T12:00:30Z");
+const headersReconciliacao = (ip, xff) => ({
+  Origin: "https://local.test",
+  ...(ip === null ? {} : { "CF-Connecting-IP": ip }),
+  ...(xff === undefined ? {} : { "X-Forwarded-For": xff })
+});
+const contadoresReconciliacao = async db =>
+  (
+    await db.prepare("SELECT tentativas FROM checkout_rate_limits ORDER BY tentativas").all()
+  ).results.map(row => row.tentativas);
+const observarSweep = db => {
+  let sweeps = 0;
+  db.hook = (statements, operation) => {
+    if (operation === "all" && statements.some(s => s.sql.includes("SELECT pp.id AS pagamento_id")))
+      sweeps++;
+  };
+  return () => sweeps;
+};
+
+test("ACH-03B: chamada anônima de mesma origem continua liberando reserva sem rede", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: AGORA_RECONCILIACAO });
+  const db = await fixture(t);
+  const net = semRede(t);
+  await vencerReserva(db);
+  assert.equal((await reconciliarReservas(db, headersReconciliacao(" 203.0.113.10 "))).status, 200);
+  released(await state(db));
+  assert.deepEqual(await contadoresReconciliacao(db), [1]);
+  assert.equal(net.mock.callCount(), 0);
+});
+
+test("ACH-03B: origem ausente ou inválida é recusada antes de D1", async t => {
+  const db = await fixture(t);
+  let acessos = 0;
+  db.hook = () => {
+    acessos++;
+  };
+  for (const headers of [{}, { Origin: "https://evil.test" }]) {
+    assert.equal((await reconciliarReservas(db, headers)).status, 403);
+  }
+  assert.equal(acessos, 0);
+});
+
+test("ACH-03B: 12 chamadas por minuto passam; a excedente recebe 429 antes do sweep", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: AGORA_RECONCILIACAO });
+  const db = await fixture(t);
+  const net = semRede(t);
+  const sweeps = observarSweep(db);
+  const headers = headersReconciliacao("203.0.113.10");
+  for (let n = 1; n <= LIMITE_RECONCILIACAO; n++)
+    assert.equal((await reconciliarReservas(db, headers)).status, 200, `chamada ${n}`);
+  assert.equal(sweeps(), LIMITE_RECONCILIACAO);
+  const excedente = await reconciliarReservas(db, headers);
+  assert.equal(excedente.status, 429);
+  assert.equal(excedente.headers.get("Retry-After"), "30");
+  assert.equal(excedente.headers.get("Cache-Control"), "no-store");
+  assert.equal(sweeps(), LIMITE_RECONCILIACAO);
+  assert.deepEqual(await contadoresReconciliacao(db), [LIMITE_RECONCILIACAO + 1]);
+  assert.equal(net.mock.callCount(), 0);
+  t.mock.timers.setTime(AGORA_RECONCILIACAO + 60_000);
+  assert.equal((await reconciliarReservas(db, headers)).status, 200);
+  assert.equal(sweeps(), LIMITE_RECONCILIACAO + 1);
+});
+
+test("ACH-03B: CF ausente e XFF variável compartilham o mesmo orçamento", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: AGORA_RECONCILIACAO });
+  const db = await fixture(t);
+  for (let n = 0; n < LIMITE_RECONCILIACAO; n++)
+    assert.equal(
+      (await reconciliarReservas(db, headersReconciliacao(null, `198.51.100.${n}`))).status,
+      200
+    );
+  assert.equal(
+    (await reconciliarReservas(db, headersReconciliacao(null, "192.0.2.1"))).status,
+    429
+  );
+  assert.deepEqual(await contadoresReconciliacao(db), [LIMITE_RECONCILIACAO + 1]);
+});
+
+test("ACH-03B: CF fixo com XFF variável mantém um contador; outro CF tem orçamento próprio", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: AGORA_RECONCILIACAO });
+  const db = await fixture(t);
+  for (let n = 0; n < LIMITE_RECONCILIACAO; n++)
+    assert.equal(
+      (
+        await reconciliarReservas(
+          db,
+          headersReconciliacao(n ? "203.0.113.10" : " 203.0.113.10 ", `198.51.100.${n}`)
+        )
+      ).status,
+      200
+    );
+  assert.equal(
+    (await reconciliarReservas(db, headersReconciliacao("203.0.113.10", "192.0.2.1"))).status,
+    429
+  );
+  assert.equal(
+    (await reconciliarReservas(db, headersReconciliacao("203.0.113.11", "192.0.2.1"))).status,
+    200
+  );
+  assert.deepEqual(await contadoresReconciliacao(db), [1, LIMITE_RECONCILIACAO + 1]);
+});
+
+test("ACH-03B: orçamento da reconciliação não usa os contadores do checkout ou login", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: AGORA_RECONCILIACAO });
+  const db = await fixture(t);
+  const bucket = Math.floor(AGORA_RECONCILIACAO / 60_000);
+  const checkoutKey = await app.auth.sha256(`checkout:203.0.113.10:${bucket}`);
+  await db
+    .prepare("INSERT INTO checkout_rate_limits(chave,tentativas,expira_em) VALUES(?,6,?)")
+    .bind(checkoutKey, Math.floor(AGORA_RECONCILIACAO / 1000) + 360)
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO auth_rate_limits(chave,falhas,janela_inicio) VALUES('login',99,'2026-09-29')"
+    )
+    .run();
+  const headers = headersReconciliacao("203.0.113.10");
+  for (let n = 0; n < LIMITE_RECONCILIACAO; n++)
+    assert.equal((await reconciliarReservas(db, headers)).status, 200);
+  assert.equal((await reconciliarReservas(db, headers)).status, 429);
+  assert.equal(
+    (
+      await db
+        .prepare("SELECT tentativas FROM checkout_rate_limits WHERE chave=?")
+        .bind(checkoutKey)
+        .first()
+    ).tentativas,
+    6
+  );
+  assert.equal(
+    (await db.prepare("SELECT falhas FROM auth_rate_limits WHERE chave='login'").first()).falhas,
+    99
+  );
+  assert.deepEqual(await contadoresReconciliacao(db), [6, LIMITE_RECONCILIACAO + 1]);
+});
+
+test("ACH-03B: incrementos concorrentes não perdem contagem nem liberam chamada extra", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: AGORA_RECONCILIACAO });
+  const db = await fixture(t);
+  const headers = headersReconciliacao("203.0.113.10");
+  for (let n = 1; n < LIMITE_RECONCILIACAO; n++)
+    assert.equal((await reconciliarReservas(db, headers)).status, 200);
+  const gate = barrier(2);
+  db.hook = async (statements, operation) => {
+    if (
+      operation === "first" &&
+      statements.some(s => s.sql.includes("INSERT INTO checkout_rate_limits"))
+    )
+      await gate();
+  };
+  const statuses = await Promise.all([
+    reconciliarReservas(db, headers).then(r => r.status),
+    reconciliarReservas(db, headers).then(r => r.status)
+  ]);
+  assert.deepEqual(statuses.sort(), [200, 429]);
+  assert.deepEqual(await contadoresReconciliacao(db), [LIMITE_RECONCILIACAO + 1]);
+});
+
 test("creation wins before release write: new pending Pix protects existing reservation and TTL", async t => {
   const db = await fixture(t);
   remote(t);
