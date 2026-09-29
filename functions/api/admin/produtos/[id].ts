@@ -38,13 +38,26 @@ function validarProduto(body: ProdutoInput & ProdutoDetalhesInput) {
   if (nome.length > MAX_TEXT_LENGTH || categoria.length > MAX_TEXT_LENGTH) {
     return "Nome ou categoria muito longos";
   }
-  if (!Number.isInteger(body.precoCentavos) || body.precoCentavos! < 1) {
+  const precoCentavos = body.precoCentavos;
+  if (typeof precoCentavos !== "number" || !Number.isInteger(precoCentavos) || precoCentavos < 1) {
     return "Preço inválido";
   }
-  if (!Number.isInteger(body.estoque) || body.estoque! < 0) {
+  const estoque = body.estoque;
+  if (typeof estoque !== "number" || !Number.isInteger(estoque) || estoque < 0) {
     return "Estoque inválido";
   }
   return validarDetalhesProduto(body) ?? validarProdutoPromocao(body);
+}
+
+interface ProdutoValidado extends ProdutoInput, ProdutoDetalhesInput {
+  nome: string;
+  categoria: string;
+  precoCentavos: number;
+  estoque: number;
+}
+
+function produtoValido(body: ProdutoInput & ProdutoDetalhesInput): body is ProdutoValidado {
+  return validarProduto(body) === null;
 }
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -65,10 +78,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
     return jsonError("JSON inválido", 400);
   }
 
-  const erro = validarProduto(body);
-  if (erro) return jsonError(erro, 400);
+  // produtoValido chama validarProduto; a segunda chamada (pura) só recupera a mensagem original.
+  if (!produtoValido(body)) {
+    return Response.json({ error: validarProduto(body) }, { status: 400 });
+  }
 
-  const categoria = body.categoria!.trim();
+  const categoria = body.categoria.trim();
   if (!(await categoriaValida(env.DB, categoria))) {
     return jsonError("Categoria inválida ou inativa", 400);
   }
@@ -78,7 +93,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
       .bind(id)
       .first<{ estoque_reservado: number }>();
 
-    if (atual && body.estoque! < atual.estoque_reservado) {
+    if (atual && body.estoque < atual.estoque_reservado) {
       return jsonError(
         `Não é possível reduzir o estoque para ${body.estoque}, pois existem ${atual.estoque_reservado} unidade(s) reservada(s) em pedidos pendentes`,
         409
@@ -101,7 +116,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
        WHERE id = ?`
     )
       .bind(
-        body.nome!.trim(),
+        body.nome.trim(),
         categoria,
         (body.descricao ?? "").slice(0, MAX_TEXT_LENGTH),
         body.precoCentavos,

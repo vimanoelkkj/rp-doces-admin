@@ -162,3 +162,70 @@ test("backend recusa detalhes acima do limite ou de tipo inválido, sem gravar",
   assert.equal(r.status, 400);
   assert.equal((await linha(db, 1)).ingredientes, "");
 });
+
+// Onda 8F: regressão do narrowing da rota PUT (produtos/[id].ts).
+// Preço e estoque inválidos são recusados sem persistir nada; o guard de
+// estoque reservado só permite valores >= estoque_reservado.
+
+test("edição recusa preço e estoque inválidos com 400 sem alterar o produto", async t => {
+  const casos = [
+    { campo: "precoCentavos", nome: "ausente", valor: undefined, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: "null", valor: null, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: "0", valor: 0, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: "-500", valor: -500, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: "10.5", valor: 10.5, mensagem: "Preço inválido" },
+    { campo: "precoCentavos", nome: '"1500"', valor: "1500", mensagem: "Preço inválido" },
+    { campo: "estoque", nome: "ausente", valor: undefined, mensagem: "Estoque inválido" },
+    { campo: "estoque", nome: "null", valor: null, mensagem: "Estoque inválido" },
+    { campo: "estoque", nome: "-1", valor: -1, mensagem: "Estoque inválido" },
+    { campo: "estoque", nome: "10.5", valor: 10.5, mensagem: "Estoque inválido" },
+    { campo: "estoque", nome: '"20"', valor: "20", mensagem: "Estoque inválido" }
+  ];
+  for (const caso of casos) {
+    await t.test(`${caso.campo} ${caso.nome}`, async t => {
+      const { db, session } = await catalogo(t);
+      const antes = await db.prepare("SELECT * FROM produtos WHERE id=1").first();
+      const r = await salvar(db, session, { [caso.campo]: caso.valor }, 1);
+      assert.equal(r.status, 400);
+      assert.deepEqual(await r.json(), { error: caso.mensagem });
+      assert.deepEqual(
+        await db.prepare("SELECT * FROM produtos WHERE id=1").first(),
+        antes,
+        "entrada inválida não pode alterar o produto"
+      );
+    });
+  }
+});
+
+test("estoque zero é válido na edição (controle)", async t => {
+  const { db, session } = await catalogo(t);
+  const r = await salvar(db, session, { estoque: 0 }, 1);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ok: true });
+  assert.equal((await db.prepare("SELECT estoque FROM produtos WHERE id=1").first()).estoque, 0);
+});
+
+test("edição não reduz estoque abaixo do reservado; igualdade é permitida", async t => {
+  const { db, session } = await catalogo(t);
+  await db.prepare("UPDATE produtos SET estoque=10, estoque_reservado=4 WHERE id=1").run();
+  const antes = await db.prepare("SELECT * FROM produtos WHERE id=1").first();
+
+  const recusado = await salvar(db, session, { estoque: 3 }, 1);
+  assert.equal(recusado.status, 409);
+  assert.deepEqual(await recusado.json(), {
+    error:
+      "Não é possível reduzir o estoque para 3, pois existem 4 unidade(s) reservada(s) em pedidos pendentes"
+  });
+  assert.deepEqual(
+    await db.prepare("SELECT * FROM produtos WHERE id=1").first(),
+    antes,
+    "recusa por estoque reservado não pode alterar o produto"
+  );
+
+  const aceito = await salvar(db, session, { estoque: 4 }, 1);
+  assert.equal(aceito.status, 200);
+  assert.deepEqual(await aceito.json(), { ok: true });
+  const depois = await db.prepare("SELECT * FROM produtos WHERE id=1").first();
+  assert.equal(depois.estoque, 4, "estoque igual ao reservado é permitido");
+  assert.equal(depois.estoque_reservado, 4, "reserva preservada");
+});
