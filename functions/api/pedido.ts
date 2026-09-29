@@ -16,6 +16,7 @@ interface PedidoDetalheRow extends PedidoStatusRow {
 }
 
 interface PedidoItemRow {
+  id: number;
   produto_nome: string;
   quantidade: number;
   valor_unitario_centavos: number;
@@ -57,8 +58,9 @@ async function handleDetalhe(request: Request, env: Env): Promise<Response> {
   const atual = await readPedidoStatus(env.DB, pedido);
 
   const { results: itens } = await env.DB.prepare(
-    `SELECT produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos
-     FROM pedido_itens WHERE pedido_id = ?`
+    `SELECT id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos
+     FROM pedido_itens WHERE pedido_id = ?
+     ORDER BY pedido_itens.id ASC`
   )
     .bind(pedido.id)
     .all<PedidoItemRow>();

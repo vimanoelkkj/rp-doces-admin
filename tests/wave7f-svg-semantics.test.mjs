@@ -227,6 +227,7 @@ test("AcompanharPedido comunica etapas concluidas, atual e pendentes durante as 
         criadoEm: "2026-09-28T10:00:00Z",
         itens: [
           {
+            id: 1,
             produto_nome: "Bolo",
             quantidade: 1,
             valor_unitario_centavos: 1500,
@@ -291,6 +292,7 @@ test("AcompanharPedido mantém o intervalo de polling quando o pedido muda sem t
         criadoEm: "2026-09-28T10:00:00Z",
         itens: [
           {
+            id: 1,
             produto_nome: "Bolo",
             quantidade: 1,
             valor_unitario_centavos: 1500,
@@ -349,6 +351,95 @@ test("AcompanharPedido mantém o intervalo de polling quando o pedido muda sem t
       limpos.filter(id => armados.includes(id)),
       [armados[0]]
     );
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("AcompanharPedido lista os itens pelo id, na ordem recebida, e atualiza o conteúdo", async t => {
+  const source = await readFile("src/pages/AcompanharPedido.tsx", "utf8");
+  assert.match(source, /interface PedidoItem \{[^}]*\bid: number;/);
+  assert.match(
+    source,
+    /pedido\.itens\.map\(item => \([\s\S]*?<div key=\{item\.id\} className="confirmado-item">/
+  );
+  assert.doesNotMatch(source, /key=\{i\}/);
+
+  let itens = [
+    {
+      id: 2,
+      produto_nome: "Bolo",
+      quantidade: 2,
+      valor_unitario_centavos: 5000,
+      valor_total_centavos: 10000
+    },
+    {
+      id: 3,
+      produto_nome: "Bolo",
+      quantidade: 1,
+      valor_unitario_centavos: 5000,
+      valor_total_centavos: 5000
+    }
+  ];
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url === "/api/config") return Response.json({ config: storeConfig });
+    if (String(url).startsWith("/api/pedido-status")) {
+      return Response.json({
+        statusPagamento: "PAGO",
+        statusPedido: "PREPARANDO",
+        estoquePendente: false
+      });
+    }
+    if (String(url).startsWith("/api/pedido")) {
+      return Response.json({
+        pedidoId: 7,
+        clienteNome: "Cliente",
+        valorTotalCentavos: 15000,
+        criadoEm: "2026-09-28T10:00:00Z",
+        itens,
+        statusPagamento: "PAGO",
+        statusPedido: "PREPARANDO",
+        estoquePendente: false
+      });
+    }
+    return Response.json({ ok: true });
+  });
+
+  let root;
+  await ui.act(async () => {
+    root = ui.mountTracking(container);
+  });
+  await flush();
+  try {
+    const linhas = () => [...container.querySelectorAll(".confirmado-card .confirmado-item")];
+    const texto = () => linhas().map(item => item.textContent.replace(/\s+/g, " ").trim());
+    assert.deepEqual(texto(), ["BoloQuantidade: 2R$ 100,00", "BoloQuantidade: 1R$ 50,00"]);
+    for (const item of linhas()) {
+      assert.equal(item.className, "confirmado-item");
+      assert.ok(item.querySelector(".confirmado-item-name"));
+      assert.ok(item.querySelector(".confirmado-item-detail"));
+      assert.ok(item.querySelector(".confirmado-item-price"));
+    }
+
+    itens = [
+      {
+        id: 2,
+        produto_nome: "Bolo",
+        quantidade: 3,
+        valor_unitario_centavos: 5000,
+        valor_total_centavos: 15000
+      },
+      {
+        id: 3,
+        produto_nome: "Bolo",
+        quantidade: 1,
+        valor_unitario_centavos: 5000,
+        valor_total_centavos: 5000
+      }
+    ];
+    await ui.act(async () => window.dispatchEvent(new Event("focus")));
+    await flush();
+    assert.deepEqual(texto(), ["BoloQuantidade: 3R$ 150,00", "BoloQuantidade: 1R$ 50,00"]);
   } finally {
     await unmount(root);
   }

@@ -5,6 +5,7 @@ import Footer from "../components/Footer";
 import "./PedidoConfirmado.css";
 
 interface PedidoItem {
+  id: number;
   produto_nome: string;
   quantidade: number;
   valor_unitario_centavos: number;
@@ -267,8 +268,8 @@ export default function AcompanharPedido() {
               )}
 
               <div className="confirmado-label">ITENS DO SEU PEDIDO</div>
-              {pedido.itens.map((item, i) => (
-                <div key={i} className="confirmado-item">
+              {pedido.itens.map(item => (
+                <div key={item.id} className="confirmado-item">
                   <div className="confirmado-item-info">
                     <span className="confirmado-item-name">{item.produto_nome}</span>
                     <span className="confirmado-item-detail">Quantidade: {item.quantidade}</span>
