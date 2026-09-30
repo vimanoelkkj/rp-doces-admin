@@ -14,6 +14,7 @@ import {
 } from "../api/storeConfig";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "motion/react";
+import TrustCards from "../components/TrustCards";
 import "./Homepage.css";
 
 const PRIMARY_A =
@@ -193,139 +194,7 @@ export default function Homepage() {
               Saiba mais <span className="arrow-bounce">&nbsp;↓</span>
             </a>
 
-            <div className="trust-cards">
-              {/* Card 1 — Ingredientes Premium */}
-              <div className="trust-card">
-                <div className="trust-card-icon">
-                  <svg aria-hidden="true" width="64" height="64" viewBox="0 0 64 64" fill="none">
-                    {/* Morango */}
-                    <g>
-                      <animateTransform
-                        attributeName="transform"
-                        type="translate"
-                        values="0,0; 0,-3; 0,0"
-                        dur="1.5s"
-                        repeatCount="indefinite"
-                      />
-                      <path
-                        d="M16 26C16 23 19 20 22 21.5C22 21.5 24 19 27 20.5C30 22 29 26 29 26"
-                        fill="#634738"
-                      />
-                      <path
-                        d="M16 27C16 27 14.5 38 22.5 42C30.5 38 29 27 29 27C29 27 26 25.5 22.5 25.5C19 25.5 16 27 16 27Z"
-                        fill="#D38B80"
-                      />
-                      <circle cx="19.5" cy="31" r="1" fill="#FAF6F0" />
-                      <circle cx="25.5" cy="31" r="1" fill="#FAF6F0" />
-                      <circle cx="22.5" cy="34.5" r="1" fill="#FAF6F0" />
-                      <circle cx="19" cy="35" r="0.9" fill="#FAF6F0" />
-                      <circle cx="26" cy="35" r="0.9" fill="#FAF6F0" />
-                      <circle cx="21" cy="38" r="0.8" fill="#FAF6F0" />
-                      <circle cx="24" cy="38" r="0.8" fill="#FAF6F0" />
-                    </g>
-                    {/* Chocolate */}
-                    <g>
-                      <animateTransform
-                        attributeName="transform"
-                        type="translate"
-                        values="0,0; 0,-4; 0,0"
-                        dur="1.8s"
-                        repeatCount="indefinite"
-                        begin="0.4s"
-                      />
-                      <rect x="36" y="26" width="14" height="18" rx="2" fill="#634738" />
-                      <line x1="43" y1="26" x2="43" y2="44" stroke="#4e3529" strokeWidth="1" />
-                      <line x1="36" y1="35" x2="50" y2="35" stroke="#4e3529" strokeWidth="1" />
-                      <rect
-                        x="45"
-                        y="20"
-                        width="7"
-                        height="7"
-                        rx="1.2"
-                        fill="#8C7A76"
-                        transform="rotate(-12 48.5 23.5)"
-                      />
-                    </g>
-                  </svg>
-                </div>
-                <strong className="trust-card-title">Ingredientes Premium</strong>
-                <span className="trust-card-desc">Leite moça e frutas frescas</span>
-              </div>
-
-              {/* Card 2 — Feito com Carinho */}
-              <div className="trust-card">
-                <div className="trust-card-icon">
-                  <svg aria-hidden="true" width="64" height="64" viewBox="0 0 64 64" fill="none">
-                    {/* Coração esquerda */}
-                    <g>
-                      <animateTransform
-                        attributeName="transform"
-                        type="translate"
-                        values="0,0; -1,-10; -2,-20"
-                        dur="2s"
-                        repeatCount="indefinite"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="1;1;0"
-                        dur="2s"
-                        repeatCount="indefinite"
-                      />
-                      <path
-                        d="M18 40C18 40 11 33 11 29C11 26 14 23.5 17 25C17.8 25.4 18 26.5 18 26.5C18 26.5 18.2 25.4 19 25C22 23.5 25 26 25 29C25 33 18 40 18 40Z"
-                        fill="#D38B80"
-                      />
-                    </g>
-                    {/* Coração centro (maior) */}
-                    <g>
-                      <animateTransform
-                        attributeName="transform"
-                        type="translate"
-                        values="0,0; 0,-12; 0,-24"
-                        dur="2.3s"
-                        repeatCount="indefinite"
-                        begin="0.5s"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="1;1;0"
-                        dur="2.3s"
-                        repeatCount="indefinite"
-                        begin="0.5s"
-                      />
-                      <path
-                        d="M32 44C32 44 23 35.5 23 30.5C23 27.5 26 25 29.5 26.5C30.5 27 32 29 32 29C32 29 33.5 27 34.5 26.5C38 25 41 27.5 41 30.5C41 35.5 32 44 32 44Z"
-                        fill="#D38B80"
-                      />
-                    </g>
-                    {/* Coração direita (menor) */}
-                    <g>
-                      <animateTransform
-                        attributeName="transform"
-                        type="translate"
-                        values="0,0; 1,-8; 2,-16"
-                        dur="1.8s"
-                        repeatCount="indefinite"
-                        begin="1s"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="1;1;0"
-                        dur="1.8s"
-                        repeatCount="indefinite"
-                        begin="1s"
-                      />
-                      <path
-                        d="M48 41C48 41 43 36 43 33C43 31 45 29.5 47 30.5C47.5 30.7 48 31.5 48 31.5C48 31.5 48.5 30.7 49 30.5C51 29.5 53 31 53 33C53 36 48 41 48 41Z"
-                        fill="#D38B80"
-                      />
-                    </g>
-                  </svg>
-                </div>
-                <strong className="trust-card-title">Feito com Carinho</strong>
-                <span className="trust-card-desc">Sempre fresquinho e cremoso</span>
-              </div>
-            </div>
+            <TrustCards />
           </div>
 
           <div className="hero-right">
