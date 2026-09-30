@@ -236,6 +236,12 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
     isTransitioningRef.current = true;
     document.documentElement.setAttribute("data-theme-transitioning", "true");
 
+    const originCoords = getOriginCoords(origin);
+    document.documentElement.style.setProperty("--theme-origin-x", `${originCoords.x}px`);
+    document.documentElement.style.setProperty("--theme-origin-y", `${originCoords.y}px`);
+
+    let activeAnimation: Animation | null = null;
+
     try {
       const transition = document.startViewTransition(() => {
         applyThemeImmediately(next);
@@ -251,10 +257,11 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
             const mobileAnimationOptions: ExtendedAnimationOptions = {
               duration: 260,
               easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
-              pseudoElement: "::view-transition-new(root)"
+              pseudoElement: "::view-transition-new(root)",
+              fill: "both"
             };
 
-            document.documentElement.animate(
+            activeAnimation = document.documentElement.animate(
               {
                 opacity: [0, 1]
               },
@@ -271,10 +278,11 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
           const animationOptions: ExtendedAnimationOptions = {
             duration: 480,
             easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-            pseudoElement: "::view-transition-new(root)"
+            pseudoElement: "::view-transition-new(root)",
+            fill: "both"
           };
 
-          document.documentElement.animate(
+          activeAnimation = document.documentElement.animate(
             {
               clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${maxRadius}px at ${x}px ${y}px)`]
             },
@@ -286,11 +294,29 @@ export function StoreThemeProvider({ children }: { children: ReactNode }) {
         });
 
       transition.finished.finally(() => {
+        if (activeAnimation) {
+          try {
+            activeAnimation.cancel();
+          } catch {
+            // ignore
+          }
+        }
         document.documentElement.removeAttribute("data-theme-transitioning");
+        document.documentElement.style.removeProperty("--theme-origin-x");
+        document.documentElement.style.removeProperty("--theme-origin-y");
         isTransitioningRef.current = false;
       });
     } catch {
+      if (activeAnimation) {
+        try {
+          (activeAnimation as Animation).cancel();
+        } catch {
+          // ignore
+        }
+      }
       document.documentElement.removeAttribute("data-theme-transitioning");
+      document.documentElement.style.removeProperty("--theme-origin-x");
+      document.documentElement.style.removeProperty("--theme-origin-y");
       isTransitioningRef.current = false;
       applyThemeImmediately(next);
     }
