@@ -2,48 +2,79 @@
 
 import { sha256 } from "./auth";
 
-const MAX_FAILURES = 5;
-const WINDOW_MS = 15 * 60 * 1000;
-const BLOCK_MS = 15 * 60 * 1000;
+export const MAX_FAILURES = 5;
+export const MAX_IP_FAILURES = 20;
+export const WINDOW_MS = 15 * 60 * 1000;
+export const BLOCK_MS = 15 * 60 * 1000;
 
 interface RateLimitRow {
+  chave: string;
   falhas: number;
   janela_inicio: string;
   bloqueado_ate: string | null;
 }
 
-function clientIp(request: Request): string {
+export function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP")?.trim() || "unknown";
 }
 
-async function keyFor(request: Request, username: string): Promise<string> {
+export async function keyFor(request: Request, username: string): Promise<string> {
   return sha256(`${clientIp(request)}|${username.toLowerCase()}`);
+}
+
+export async function ipKeyFor(request: Request): Promise<string> {
+  return sha256(`ip:${clientIp(request)}`);
+}
+
+export interface LoginRateLimitResult {
+  allowed: boolean;
+  key: string;
+  ipKey: string;
+  retryAfter?: number;
 }
 
 export async function checkLoginRateLimit(
   db: D1Database,
   request: Request,
   username: string
-): Promise<{ allowed: boolean; key: string; retryAfter?: number }> {
+): Promise<LoginRateLimitResult> {
   const key = await keyFor(request, username);
+  const ipKey = await ipKeyFor(request);
   const now = Date.now();
-  const row = await db
-    .prepare(`SELECT falhas, janela_inicio, bloqueado_ate FROM auth_rate_limits WHERE chave = ?`)
-    .bind(key)
-    .first<RateLimitRow>();
+  const rows = await db
+    .prepare(
+      `SELECT chave, falhas, janela_inicio, bloqueado_ate
+       FROM auth_rate_limits
+       WHERE chave IN (?, ?)`
+    )
+    .bind(key, ipKey)
+    .all<RateLimitRow>();
 
-  if (!row) return { allowed: true, key };
+  const results = rows.results ?? [];
+  let allowed = true;
+  let maxRetryAfter = 0;
 
-  const blockedUntil = row.bloqueado_ate ? Date.parse(row.bloqueado_ate) : 0;
-  if (blockedUntil > now) {
+  for (const row of results) {
+    const blockedUntil = row.bloqueado_ate ? Date.parse(row.bloqueado_ate) : 0;
+    if (blockedUntil > now) {
+      allowed = false;
+      const retryAfter = Math.max(1, Math.ceil((blockedUntil - now) / 1000));
+      if (retryAfter > maxRetryAfter) {
+        maxRetryAfter = retryAfter;
+      }
+    }
+  }
+
+  if (!allowed) {
     return {
       allowed: false,
       key,
-      retryAfter: Math.max(1, Math.ceil((blockedUntil - now) / 1000))
+      ipKey,
+      retryAfter: maxRetryAfter
     };
   }
 
-  return { allowed: true, key };
+  return { allowed: true, key, ipKey };
 }
 
 export const CLEANUP_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -79,15 +110,7 @@ export async function cleanupStaleLoginRateLimits(
 // data ilegível vira NULL no julianday e reinicia a janela). No UPDATE do
 // SQLite, todas as expressões do SET leem os valores ANTERIORES da linha, então
 // o bloqueio é calculado a partir da mesma contagem que está sendo gravada.
-export async function recordLoginFailure(db: D1Database, key: string): Promise<void> {
-  const nowMs = Date.now();
-  const nowIso = new Date(nowMs).toISOString();
-  const windowCutoffIso = new Date(nowMs - WINDOW_MS).toISOString();
-  const blockedUntilIso = new Date(nowMs + BLOCK_MS).toISOString();
-
-  await db
-    .prepare(
-      `INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
+const UPSERT_RATE_LIMIT_SQL = `INSERT INTO auth_rate_limits (chave, falhas, janela_inicio, bloqueado_ate, atualizado_em)
        VALUES (?1, 1, ?2, CASE WHEN 1 >= ?4 THEN ?3 ELSE NULL END, CURRENT_TIMESTAMP)
        ON CONFLICT(chave) DO UPDATE SET
          falhas = CASE
@@ -109,10 +132,33 @@ export async function recordLoginFailure(db: D1Database, key: string): Promise<v
                THEN ?3
            ELSE NULL
          END,
-         atualizado_em = CURRENT_TIMESTAMP`
-    )
-    .bind(key, nowIso, blockedUntilIso, MAX_FAILURES, windowCutoffIso)
-    .run();
+         atualizado_em = CURRENT_TIMESTAMP`;
+
+export async function recordLoginFailure(
+  db: D1Database,
+  key: string,
+  ipKey?: string
+): Promise<void> {
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const windowCutoffIso = new Date(nowMs - WINDOW_MS).toISOString();
+  const blockedUntilIso = new Date(nowMs + BLOCK_MS).toISOString();
+
+  if (ipKey && ipKey !== key) {
+    await db.batch([
+      db
+        .prepare(UPSERT_RATE_LIMIT_SQL)
+        .bind(key, nowIso, blockedUntilIso, MAX_FAILURES, windowCutoffIso),
+      db
+        .prepare(UPSERT_RATE_LIMIT_SQL)
+        .bind(ipKey, nowIso, blockedUntilIso, MAX_IP_FAILURES, windowCutoffIso)
+    ]);
+  } else {
+    await db
+      .prepare(UPSERT_RATE_LIMIT_SQL)
+      .bind(key, nowIso, blockedUntilIso, MAX_FAILURES, windowCutoffIso)
+      .run();
+  }
 
   if (crypto.getRandomValues(new Uint8Array(1))[0] < 13) {
     try {

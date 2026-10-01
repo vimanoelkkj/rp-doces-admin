@@ -68,7 +68,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const senhaCorreta = await verifyPassword(senha, hashParaVerificar);
 
   if (!user?.ativo || !senhaCorreta) {
-    await recordLoginFailure(env.DB, rate.key);
+    await recordLoginFailure(env.DB, rate.key, rate.ipKey);
     await new Promise(r => setTimeout(r, 350));
     return jsonError("Usuário ou senha incorretos", 401);
   }

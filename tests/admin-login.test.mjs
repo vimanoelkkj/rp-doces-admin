@@ -159,7 +159,8 @@ test("ACH-02B: CF fixo ignora XFF variÃ¡vel no contador de login", async t => 
     { ip, xForwardedFor: "198.51.100.6" }
   );
   assert.equal(blocked.status, 429);
-  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM auth_rate_limits").first()).n, 1);
+  // CF fixo mantém exatamente 2 chaves (par IP|username + cumulativa de IP), sem gerar buckets extras por XFF
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM auth_rate_limits").first()).n, 2);
 });
 
 test("ACH-02B: sem CF, XFF variÃ¡vel ou mÃºltiplo compartilha o bucket unknown", async t => {
@@ -199,7 +200,8 @@ test("ACH-02B: sem CF, XFF variÃ¡vel ou mÃºltiplo compartilha o bucket unkno
     "admin_ativo"
   );
   assert.equal(withXff.key, withoutIpHeaders.key);
-  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM auth_rate_limits").first()).n, 1);
+  // Sem CF, XFF não cria buckets adicionais: exatamente 2 chaves (unknown|user e ip:unknown)
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM auth_rate_limits").first()).n, 2);
 });
 
 test("ACH-02B: CF vazio equivale Ã  ausÃªncia, e CFs vÃ¡lidos distintos isolam contadores", async t => {
@@ -357,7 +359,7 @@ function segurarEscritasAte(db, n) {
   const gate = barrier(n);
   let chegaram = 0;
   db.hook = async (statements, op) => {
-    if (op === "run" && statements.some(s => s.sql.includes(ESCRITA_RATE_LIMIT))) {
+    if ((op === "run" || op === "batch") && statements.some(s => s.sql.includes(ESCRITA_RATE_LIMIT))) {
       chegaram++;
       await gate();
     }
@@ -414,10 +416,26 @@ test("M5: falhas concorrentes pela rota de login não se perdem e a próxima ten
     "todas já tinham passado pelo check antes do bloqueio existir"
   );
 
-  const { results } = await db.prepare("SELECT falhas, bloqueado_ate FROM auth_rate_limits").all();
-  assert.equal(results.length, 1, "uma única chave IP|username");
-  assert.equal(results[0].falhas, N);
-  assert.ok(results[0].bloqueado_ate);
+  const req = loginRequest({});
+  const userKey = await app.rateLimit.keyFor(req, "admin_ativo");
+  const ipKey = await app.rateLimit.ipKeyFor(req);
+
+  const { results } = await db
+    .prepare("SELECT chave, falhas, bloqueado_ate FROM auth_rate_limits")
+    .all();
+  assert.equal(results.length, 2, "duas chaves no banco: par IP|username e cumulativa IP");
+
+  const rowUser = results.find(r => r.chave === userKey);
+  const rowIp = results.find(r => r.chave === ipKey);
+
+  assert.ok(rowUser, "bucket individual (IP, username) deve existir");
+  assert.equal(rowUser.falhas, N, "o bucket (IP, username) possui exatamente N falhas");
+  assert.ok(rowUser.bloqueado_ate, "o bucket individual está bloqueado ao atingir seu limiar");
+  assert.ok(Date.parse(rowUser.bloqueado_ate) > Date.now());
+
+  assert.ok(rowIp, "bucket cumulativo do IP deve existir");
+  assert.equal(rowIp.falhas, N, "o bucket cumulativo do IP possui exatamente N falhas");
+  assert.equal(rowIp.bloqueado_ate, null, "o bucket global ainda não está bloqueado quando N < 20");
 
   const proxima = await postLogin(db, { username: "admin_ativo", senha: "senha-errada" });
   assert.equal(proxima.status, 429);
@@ -472,12 +490,23 @@ test("M5: login válido depois de falhas remove a chave IP|username", async t =>
       401
     );
   }
-  assert.equal((await db.prepare("SELECT COUNT(*) n FROM auth_rate_limits").first()).n, 1);
+  // 2 falhas geraram 2 chaves: par IP|username e cumulativa de IP
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM auth_rate_limits").first()).n, 2);
   assert.equal(
     (await postLogin(db, { username: "admin_ativo", senha: activePassword })).status,
     200
   );
-  assert.equal((await db.prepare("SELECT COUNT(*) n FROM auth_rate_limits").first()).n, 0);
+  // Login bem-sucedido remove apenas a chave IP|username, preservando o bucket cumulativo de IP
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM auth_rate_limits").first()).n, 1);
+  const userKey = await app.rateLimit.keyFor(loginRequest({}), "admin_ativo");
+  const userRow = await db
+    .prepare("SELECT * FROM auth_rate_limits WHERE chave = ?")
+    .bind(userKey)
+    .first();
+  assert.equal(userRow, null, "chave do par IP|username deve ser removida");
+  const remaining = await db.prepare("SELECT chave FROM auth_rate_limits").first();
+  const expectedIpKey = await app.rateLimit.ipKeyFor(loginRequest({}));
+  assert.equal(remaining.chave, expectedIpKey, "chave restante deve ser a cumulativa de IP");
 });
 
 /* ───────────── Higiene Operacional: cleanupStaleLoginRateLimits ───────────── */
@@ -711,4 +740,176 @@ test("cleanupStaleLoginRateLimits: falha no cleanup (best-effort) não quebra re
   });
 
   db.hook = null;
+});
+
+/* ───────────── Hardening Cumulativo por IP ───────────── */
+
+test("Hardening IP: falhas distribuídas entre usernames diferentes atingem o limite cumulativo (20) e o próximo username recebe 429", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  await setupUsers(db);
+  const ip = "203.0.113.50";
+
+  // 20 falhas distribuídas, cada uma com um username inexistente diferente
+  for (let i = 0; i < 20; i++) {
+    const res = await postLogin(
+      db,
+      { username: `spraying_user_${i}`, senha: "senha-qualquer" },
+      { ip }
+    );
+    assert.equal(res.status, 401, `tentativa ${i + 1} deve retornar 401`);
+  }
+
+  // 21ª tentativa com um username novo nunca antes visto a partir do mesmo IP deve ser bloqueada (429)
+  const blockedRes = await postLogin(
+    db,
+    { username: "spraying_user_novo", senha: "qualquer" },
+    { ip }
+  );
+  assert.equal(blockedRes.status, 429);
+  assert.ok(blockedRes.headers.get("retry-after"));
+  const body = await blockedRes.json();
+  assert.match(body.error, /Muitas tentativas/);
+});
+
+test("Hardening IP: o limite individual de 5 por username continua funcionando antes de atingir o limite de IP", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  await setupUsers(db);
+  const ip = "203.0.113.60";
+
+  // 5 falhas no mesmo username
+  for (let i = 0; i < 5; i++) {
+    const res = await postLogin(
+      db,
+      { username: "admin_ativo", senha: `errada-${i}` },
+      { ip }
+    );
+    assert.equal(res.status, 401);
+  }
+
+  // 6ª tentativa para 'admin_ativo' é bloqueada pelo limite individual de 5
+  const blockedUser = await postLogin(
+    db,
+    { username: "admin_ativo", senha: "qualquer" },
+    { ip }
+  );
+  assert.equal(blockedUser.status, 429);
+
+  // Outro username a partir do mesmo IP (com apenas 5 falhas acumuladas no IP, bem abaixo de 20) NÃO é bloqueado
+  const otherUser = await postLogin(
+    db,
+    { username: "outro_usuario", senha: "qualquer" },
+    { ip }
+  );
+  assert.equal(otherUser.status, 401);
+});
+
+test("Hardening IP: IPs distintos permanecem isolados mesmo com limite cumulativo esgotado em um deles", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  await setupUsers(db);
+  const ipBloqueado = "203.0.113.71";
+  const ipLivre = "203.0.113.72";
+
+  // Esgota as 20 falhas no ipBloqueado
+  for (let i = 0; i < 20; i++) {
+    await postLogin(
+      db,
+      { username: `user_spray_${i}`, senha: "errada" },
+      { ip: ipBloqueado }
+    );
+  }
+
+  // ipBloqueado agora toma 429
+  const resBloqueado = await postLogin(
+    db,
+    { username: "qualquer_user", senha: "errada" },
+    { ip: ipBloqueado }
+  );
+  assert.equal(resBloqueado.status, 429);
+
+  // ipLivre não deve ser impactado pelo bloqueio do outro IP
+  const resLivre = await postLogin(
+    db,
+    { username: "qualquer_user", senha: "errada" },
+    { ip: ipLivre }
+  );
+  assert.equal(resLivre.status, 401);
+});
+
+test("Hardening IP: login bem-sucedido limpa o bucket individual (IP + username), mas preserva o bucket cumulativo por IP", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  const { activePassword } = await setupUsers(db);
+  const ip = "203.0.113.80";
+
+  // 3 falhas em 'admin_ativo'
+  for (let i = 0; i < 3; i++) {
+    assert.equal(
+      (await postLogin(db, { username: "admin_ativo", senha: "errada" }, { ip })).status,
+      401
+    );
+  }
+
+  // 2 falhas em outro username
+  for (let i = 0; i < 2; i++) {
+    assert.equal(
+      (await postLogin(db, { username: "outro_user", senha: "errada" }, { ip })).status,
+      401
+    );
+  }
+
+  const ipKey = await app.rateLimit.ipKeyFor(loginRequest({}, { ip }));
+  const userKey = await app.rateLimit.keyFor(loginRequest({}, { ip }), "admin_ativo");
+
+  // Antes do login bem-sucedido: bucket IP tem 5 falhas, bucket admin_ativo tem 3 falhas
+  const rowIpAntes = await db.prepare("SELECT falhas FROM auth_rate_limits WHERE chave = ?").bind(ipKey).first();
+  const rowUserAntes = await db.prepare("SELECT falhas FROM auth_rate_limits WHERE chave = ?").bind(userKey).first();
+  assert.equal(rowIpAntes.falhas, 5);
+  assert.equal(rowUserAntes.falhas, 3);
+
+  // Login bem-sucedido com 'admin_ativo'
+  const loginOk = await postLogin(db, { username: "admin_ativo", senha: activePassword }, { ip });
+  assert.equal(loginOk.status, 200);
+
+  // Bucket individual foi limpo
+  const rowUserDepois = await db.prepare("SELECT * FROM auth_rate_limits WHERE chave = ?").bind(userKey).first();
+  assert.equal(rowUserDepois, null, "bucket individual deve ser removido após login com sucesso");
+
+  // Bucket cumulativo de IP permanece preservado com suas 5 falhas
+  const rowIpDepois = await db.prepare("SELECT falhas, bloqueado_ate FROM auth_rate_limits WHERE chave = ?").bind(ipKey).first();
+  assert.ok(rowIpDepois, "bucket cumulativo de IP deve continuar existindo");
+  assert.equal(rowIpDepois.falhas, 5, "contagem cumulativa do IP deve ser mantida");
+});
+
+test("Hardening IP: requisição bloqueada em 429 por limite cumulativo de IP não executa derivação PBKDF2", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  await setupUsers(db);
+  const ip = "203.0.113.90";
+
+  // Esgota o limite cumulativo de 20 falhas no IP
+  for (let i = 0; i < 20; i++) {
+    await postLogin(
+      db,
+      { username: `spray_${i}`, senha: "errada" },
+      { ip }
+    );
+  }
+
+  // Prepara monitoramento de deriveBits
+  let pbkdf2Calls = 0;
+  const originalDeriveBits = crypto.subtle.deriveBits.bind(crypto.subtle);
+  t.mock.method(crypto.subtle, "deriveBits", async (algorithm, key, length) => {
+    if (algorithm && algorithm.name === "PBKDF2") {
+      pbkdf2Calls++;
+    }
+    return originalDeriveBits(algorithm, key, length);
+  });
+
+  // Requisição enviada para IP bloqueado com username novo
+  const resBlocked = await postLogin(
+    db,
+    { username: "usuario_novo_qualquer", senha: "senha-teste" },
+    { ip }
+  );
+
+  assert.equal(resBlocked.status, 429);
+  assert.equal(pbkdf2Calls, 0, "requisição bloqueada por limite de IP não deve executar deriveBits PBKDF2");
 });
