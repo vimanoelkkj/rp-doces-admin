@@ -1025,6 +1025,56 @@ test("POST /api/admin/push/test: erro no push service retorna 502 e não quebra 
   }
 });
 
+test("POST /api/admin/push/test: sanitização de erro 502 não vaza detalhes sensíveis/internos ou mensagens brutas de exceção", async t => {
+  const { db, session } = await bancada(t);
+  const keys = gerarChavesClient();
+
+  await db
+    .prepare("INSERT INTO push_inscricoes (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)")
+    .bind(1, "https://push.mock.test/sensitive-error-sub", keys.p256dh, keys.auth)
+    .run();
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === "https://push.mock.test/sensitive-error-sub") {
+      throw new Error("connect ECONNREFUSED 10.0.4.15:8443?internal_token=SUPER_SECRET_123");
+    }
+    return originalFetch(url, options);
+  };
+
+  try {
+    const res = await app.adminPushTest.onRequestPost({
+      env: {
+        DB: db,
+        VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+        VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+        VAPID_SUBJECT
+      },
+      request: new Request("https://local.test/api/admin/push/test", {
+        method: "POST",
+        headers: {
+          Origin: "https://local.test",
+          Cookie: cookieDe(session),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ endpoint: "https://push.mock.test/sensitive-error-sub" })
+      })
+    });
+
+    assert.equal(res.status, 502);
+    const data = await res.json();
+    assert.equal(data.error, "Falha ao despachar notificação de teste");
+
+    const rawResponse = JSON.stringify(data);
+    assert.ok(!rawResponse.includes("SUPER_SECRET_123"), "resposta não deve conter SUPER_SECRET_123");
+    assert.ok(!rawResponse.includes("10.0.4.15"), "resposta não deve conter 10.0.4.15");
+    assert.ok(!rawResponse.includes("8443"), "resposta não deve conter 8443");
+    assert.ok(!rawResponse.includes("ECONNREFUSED"), "resposta não deve conter ECONNREFUSED");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 /* ──────────────────── 8. Elegibilidade de Subscriptions (Apenas Usuários Ativos) ──────────────────── */
 
 test("pushNotifier: ADMIN ativo com subscription válida recebe exatamente 1 push", async t => {

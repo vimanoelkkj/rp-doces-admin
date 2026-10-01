@@ -116,8 +116,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       message: "Notificação de teste enviada com sucesso."
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
     console.error("Erro ao enviar Web Push de teste para subscription", sub.id, err);
-    return jsonError(`Falha ao despachar notificação de teste: ${message}`, 502);
+    return jsonError("Falha ao despachar notificação de teste", 502);
   }
 };
