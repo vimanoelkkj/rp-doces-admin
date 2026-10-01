@@ -189,10 +189,12 @@ test("filtro de status: rótulo inicial Todos, seleciona Cancelada e consulta co
     assert.deepEqual(statusConsultados(), ["TODOS", "CANCELADA"]);
 
     // Uma renderização posterior (outro filtro) preserva a seleção de status.
-    const hoje = [...document.querySelectorAll(".desp-periods button")].find(
-      button => button.textContent === "Hoje"
+    // Usa "Mês passado" para produzir um intervalo diferente do padrão "Este mês"
+    // inclusive no primeiro dia do mês, evitando dependência de calendário.
+    const mesPassado = [...document.querySelectorAll(".desp-periods button")].find(
+      button => button.textContent === "Mês passado"
     );
-    await ui.act(async () => hoje.click());
+    await ui.act(async () => mesPassado.click());
     await flush();
     assert.equal(trigger().textContent.trim(), "Cancelada");
     assert.deepEqual(statusConsultados(), ["TODOS", "CANCELADA", "CANCELADA"]);
