@@ -681,6 +681,7 @@ for (const path of ["ADMIN", "SITE"])
           request: new Request("https://local.test/api/checkout", {
             // operationKey: contrato A1, obrigatório no endpoint. Asserções inalteradas.
             method: "POST",
+            headers: { Origin: "https://local.test" },
             body: JSON.stringify({
               items: [{ id: 1, quantity: 2 }],
               cliente: { nome: "Teste", whatsapp: "11999999999" },

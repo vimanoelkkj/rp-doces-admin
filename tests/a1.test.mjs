@@ -446,6 +446,7 @@ const checkout = (db, body) =>
     env: { DB: db, MP_ACCESS_TOKEN: "fake" },
     request: new Request("https://local.test/api/checkout", {
       method: "POST",
+      headers: { Origin: "https://local.test" },
       body: JSON.stringify({
         items: [{ id: 1, quantity: 2 }],
         cliente: { nome: "Teste", whatsapp: "11999999999" },

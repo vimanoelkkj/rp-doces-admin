@@ -41,12 +41,12 @@ function mpPost(t) {
   });
 }
 
-const checkout = (db, ip, operationKey) =>
+const checkout = (db, ip, operationKey, extraHeaders = {}) =>
   app.checkout.onRequestPost({
     env: { DB: db, MP_ACCESS_TOKEN: "fake" },
     request: new Request("https://local.test/api/checkout", {
       method: "POST",
-      headers: { "CF-Connecting-IP": ip },
+      headers: { Origin: "https://local.test", "CF-Connecting-IP": ip, ...extraHeaders },
       body: JSON.stringify({
         items: [{ id: 1, quantity: 1 }],
         cliente: { nome: "Teste", whatsapp: "11999999999" },
@@ -174,5 +174,82 @@ test("9C: retry idempotente com a mesma operationKey não é punido pelo limite"
     pagamentos: LIMITE,
     operacoes: LIMITE,
     reservado: LIMITE
+  });
+});
+
+test("checkout rejeita requisição de origem cruzada ou sem origem válida com 403 (sameOrigin)", async t => {
+  const db = await siteLimpo(t);
+  const mp = mpPost(t);
+
+  // 1. Origem cruzada (tentativa de CSRF vinda de outro domínio)
+  const cruzada = await app.checkout.onRequestPost({
+    env: { DB: db, MP_ACCESS_TOKEN: "fake" },
+    request: new Request("https://local.test/api/checkout", {
+      method: "POST",
+      headers: { Origin: "https://evil.test", "CF-Connecting-IP": IP_A },
+      body: JSON.stringify({
+        items: [{ id: 1, quantity: 1 }],
+        cliente: { nome: "Ataque", whatsapp: "11999999999" },
+        operationKey: "csrf-cruzada"
+      })
+    })
+  });
+  assert.equal(cruzada.status, 403);
+  assert.deepEqual(await cruzada.json(), { error: "Origem inválida" });
+
+  // 2. Sem cabeçalhos Origin ou Referer em POST
+  const semOrigem = await app.checkout.onRequestPost({
+    env: { DB: db, MP_ACCESS_TOKEN: "fake" },
+    request: new Request("https://local.test/api/checkout", {
+      method: "POST",
+      headers: { "CF-Connecting-IP": IP_A },
+      body: JSON.stringify({
+        items: [{ id: 1, quantity: 1 }],
+        cliente: { nome: "Ataque", whatsapp: "11999999999" },
+        operationKey: "csrf-sem-origem"
+      })
+    })
+  });
+  assert.equal(semOrigem.status, 403);
+  assert.deepEqual(await semOrigem.json(), { error: "Origem inválida" });
+
+  // 3. Referer da mesma origem é aceito
+  const comReferer = await app.checkout.onRequestPost({
+    env: { DB: db, MP_ACCESS_TOKEN: "fake" },
+    request: new Request("https://local.test/api/checkout", {
+      method: "POST",
+      headers: { Referer: "https://local.test/checkout", "CF-Connecting-IP": IP_A },
+      body: JSON.stringify({
+        items: [{ id: 1, quantity: 1 }],
+        cliente: { nome: "Legitimo Referer", whatsapp: "11999999999" },
+        operationKey: "csrf-referer-valido"
+      })
+    })
+  });
+  assert.equal(comReferer.status, 200);
+
+  // 4. Origin da mesma origem é aceito
+  const comOrigin = await app.checkout.onRequestPost({
+    env: { DB: db, MP_ACCESS_TOKEN: "fake" },
+    request: new Request("https://local.test/api/checkout", {
+      method: "POST",
+      headers: { Origin: "https://local.test", "CF-Connecting-IP": IP_A },
+      body: JSON.stringify({
+        items: [{ id: 1, quantity: 1 }],
+        cliente: { nome: "Legitimo Origin", whatsapp: "11999999999" },
+        operationKey: "csrf-origin-valido"
+      })
+    })
+  });
+  assert.equal(comOrigin.status, 200);
+
+  // Comprova que as requisições bloqueadas não criaram nada nem chamaram o Mercado Pago
+  assert.equal(mp.mock.callCount(), 2, "apenas os 2 checkouts legítimos chamaram o Mercado Pago");
+  assert.deepEqual(await contagens(db), {
+    pedidos: 2,
+    itens: 2,
+    pagamentos: 2,
+    operacoes: 2,
+    reservado: 2
   });
 });

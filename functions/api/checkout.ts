@@ -5,6 +5,7 @@ import { liberarReservaPedido } from "../lib/stock";
 import { postPagamentoMp } from "../lib/mpPost";
 import { checkCheckoutRateLimit } from "../lib/checkoutRateLimit";
 import { liberarReservasVencidasLocalmente } from "../lib/paymentSync";
+import { sameOrigin } from "../lib/auth";
 import {
   buscarOperacao,
   chaveMp,
@@ -83,6 +84,10 @@ const MENSAGEM_MP_INDISPONIVEL =
   "Não foi possível confirmar com o Mercado Pago se o Pix foi criado. Acompanhe o pedido em instantes.";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  if (!sameOrigin(request)) {
+    return jsonError("Origem inválida", 403);
+  }
+
   try {
     return await handleCheckout(request, env);
   } catch (err) {

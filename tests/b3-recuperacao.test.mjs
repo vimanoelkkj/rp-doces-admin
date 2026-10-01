@@ -112,6 +112,7 @@ async function siteInconclusivo(t, { postar, remoto } = {}) {
     env: { DB: db, MP_ACCESS_TOKEN: "fake" },
     request: new Request("https://local.test/api/checkout", {
       method: "POST",
+      headers: { Origin: "https://local.test" },
       body: JSON.stringify({
         items: [{ id: 1, quantity: 2 }],
         cliente: { nome: "Teste", whatsapp: "11999999999" },
@@ -552,6 +553,7 @@ test("13/15. recuperação repetida é idempotente: mesmo mp_payment_id e mesmos
     env: { DB: db, MP_ACCESS_TOKEN: "fake" },
     request: new Request("https://local.test/api/checkout", {
       method: "POST",
+      headers: { Origin: "https://local.test" },
       body: JSON.stringify({
         items: [{ id: 1, quantity: 2 }],
         cliente: { nome: "Teste", whatsapp: "11999999999" },
@@ -787,6 +789,7 @@ test("R1 SITE: falha no batch de persistência fica LOCAL_CRIADA e é resgatada 
     env: { DB: db, MP_ACCESS_TOKEN: "fake" },
     request: new Request("https://local.test/api/checkout", {
       method: "POST",
+      headers: { Origin: "https://local.test" },
       body: JSON.stringify({
         items: [{ id: 1, quantity: 2 }],
         cliente: { nome: "Teste", whatsapp: "11999999999" },

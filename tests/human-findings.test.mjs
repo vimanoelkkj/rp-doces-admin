@@ -158,6 +158,7 @@ test("HUMAN-04: checkout usa a mesma validação e normalização de WhatsApp", 
     env: { DB: db, MP_ACCESS_TOKEN: "fake" },
     request: new Request("https://local.test/api/checkout", {
       method: "POST",
+      headers: { Origin: "https://local.test" },
       body: JSON.stringify({
         items: [{ id: 1, quantity: 1 }],
         cliente: { nome: "Cliente", whatsapp: "abc" },
@@ -180,6 +181,7 @@ test("HUMAN-04: checkout usa a mesma validação e normalização de WhatsApp", 
     env: { DB: db, MP_ACCESS_TOKEN: "fake" },
     request: new Request("https://local.test/api/checkout", {
       method: "POST",
+      headers: { Origin: "https://local.test" },
       body: JSON.stringify({
         items: [{ id: 1, quantity: 1 }],
         cliente: { nome: "Cliente", whatsapp: "(11) 3333-4444" },

@@ -47,6 +47,7 @@ async function checkoutSite(db, items, operationKey = KEY_SITE) {
     env: env(db),
     request: new Request("https://local.test/api/checkout", {
       method: "POST",
+      headers: { Origin: "https://local.test" },
       body: JSON.stringify({
         items,
         cliente: { nome: "Cliente Teste", whatsapp: "11999999999" },
