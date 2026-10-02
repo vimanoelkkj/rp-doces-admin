@@ -15,6 +15,7 @@ import {
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "motion/react";
 import TrustCards from "../components/TrustCards";
+import UltimoPedidoLink from "../components/UltimoPedidoLink";
 import "./Homepage.css";
 
 const PRIMARY_A =
@@ -190,9 +191,12 @@ export default function Homepage() {
               no aconchegante salão {storeConfig.localName}, no Cambuí.
             </p>
 
-            <a href="#sobre" className="btn-primary hero-cta">
-              Saiba mais <span className="arrow-bounce">&nbsp;↓</span>
-            </a>
+            <div className="hero-actions">
+              <a href="#sobre" className="btn-primary hero-cta">
+                Saiba mais <span className="arrow-bounce">&nbsp;↓</span>
+              </a>
+              <UltimoPedidoLink />
+            </div>
 
             <TrustCards />
           </div>

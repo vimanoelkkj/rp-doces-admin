@@ -10,6 +10,7 @@ import {
   novaOperationKey,
   SLOT_CHECKOUT
 } from "../lib/operationKey";
+import { lembrarUltimoPedido } from "../lib/ultimoPedido";
 import PreparandoPedido from "./PreparandoPedido";
 import GerandoPagamento from "./GerandoPagamento";
 import ProcessandoPagamento from "./ProcessandoPagamento";
@@ -144,6 +145,8 @@ export default function AguardandoPagamento() {
           const acompanhavel =
             body.code === "OPERACAO_EM_PROCESSAMENTO" || body.code === "MERCADO_PAGO_INDISPONIVEL";
           if (acompanhavel && typeof body.tokenPublico === "string" && body.tokenPublico) {
+            // O pedido existe: guarda o token para reencontrá-lo mesmo se a aba for fechada.
+            lembrarUltimoPedido(body.tokenPublico);
             if (!cancelled) {
               navigate(`/pedido/${encodeURIComponent(body.tokenPublico)}`);
             }
@@ -175,6 +178,9 @@ export default function AguardandoPagamento() {
         return response.json() as Promise<CheckoutResponse>;
       })
       .then(data => {
+        // O pedido já existe no servidor: guarda o token antes do loading artificial,
+        // para não perdê-lo se a aba for fechada nesse intervalo.
+        if (data) lembrarUltimoPedido(data.tokenPublico);
         if (cancelled || !data) return;
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, duracaoPasso1 + duracaoPasso2 - elapsed);

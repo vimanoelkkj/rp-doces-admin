@@ -156,6 +156,8 @@ async function mount(
   });
   // O CartProvider lê o carrinho salvo ao montar: cada teste começa com o carrinho combinado.
   localStorage.setItem("rp-doces:cart", JSON.stringify(carrinho));
+  // Idem para o último pedido: nenhum teste herda o registro de outro.
+  localStorage.removeItem("rp-doces:ultimo-pedido:v1");
   let root;
   await ui.act(async () => {
     root = ui.mount(container, state);
@@ -369,6 +371,81 @@ test("checkout Pix usa o state da montagem: novo state na mesma rota não cria o
   assert.equal(checkouts[0].options.signal.aborted, false, "a operação original não é abortada");
   assert.equal(ui.currentPath, "/aguardando-pagamento");
 });
+
+// Último pedido: o token é gravado assim que o checkout o devolve — sem esperar o QR, o polling
+// nem o fim do loading — e nada além dele. O fluxo do checkout em si não muda.
+const CHAVE_ULTIMO_PEDIDO = "rp-doces:ultimo-pedido:v1";
+const INICIO_DO_RELOGIO_SIMULADO = Date.parse("2026-09-17T12:00:00Z");
+const ultimoPedidoSalvo = () => {
+  const bruto = localStorage.getItem(CHAVE_ULTIMO_PEDIDO);
+  return bruto === null ? null : JSON.parse(bruto);
+};
+const pollingPendente = () => Promise.resolve(Response.json({ statusPagamento: "PENDENTE" }));
+
+test("último pedido: o token é gravado assim que o checkout responde, ainda no loading, e só ele", async t => {
+  let operationKey;
+  const { checkouts } = await mount(t, pollingPendente, undefined, ({ checkouts }) => {
+    assert.match(container.textContent, /Preparando seu pedido/, "ainda na tela de loading");
+    assert.deepEqual(ultimoPedidoSalvo(), {
+      tokenPublico: "token",
+      salvoEm: INICIO_DO_RELOGIO_SIMULADO
+    });
+    operationKey = JSON.parse(checkouts[0].options.body).operationKey;
+  });
+  assert.equal(checkouts.length, 1, "continua existindo exatamente um POST de checkout");
+  assert.deepEqual(ultimoPedidoSalvo(), {
+    tokenPublico: "token",
+    salvoEm: INICIO_DO_RELOGIO_SIMULADO
+  });
+
+  const bruto = localStorage.getItem(CHAVE_ULTIMO_PEDIDO);
+  const proibidos = [operationKey, initial.cliente.nome, initial.cliente.whatsapp, "qr", "fake"];
+  for (const proibido of proibidos) {
+    assert.ok(!bruto.includes(proibido), `não persiste ${proibido}`);
+  }
+});
+
+for (const [codigo, status] of [
+  ["MERCADO_PAGO_INDISPONIVEL", 502],
+  ["OPERACAO_EM_PROCESSAMENTO", 409]
+]) {
+  test(`último pedido: ${codigo} com token grava o registro e segue para o acompanhamento`, async t => {
+    const { checkouts } = await mount(t, pollingPendente, () =>
+      Response.json(
+        { error: "Pedido em andamento", code: codigo, pedidoId: 7, tokenPublico: "token-ambiguo" },
+        { status }
+      )
+    );
+    assert.equal(ui.currentPath, "/pedido/token-ambiguo");
+    assert.deepEqual(ultimoPedidoSalvo(), {
+      tokenPublico: "token-ambiguo",
+      salvoEm: INICIO_DO_RELOGIO_SIMULADO
+    });
+    assert.equal(checkouts.length, 1, "o resultado ambíguo não dispara outro POST");
+  });
+}
+
+for (const [caso, resposta] of [
+  ["erro interno", () => Response.json({ error: "Erro interno" }, { status: 500 })],
+  [
+    "estoque insuficiente",
+    () => Response.json({ error: 'Estoque insuficiente para "Bolo"' }, { status: 409 })
+  ],
+  [
+    "recusa comprovada do Mercado Pago",
+    () => Response.json({ error: "Falha", code: "MERCADO_PAGO_RECUSOU" }, { status: 502 })
+  ],
+  [
+    "ambíguo sem tokenPublico",
+    () => Response.json({ error: "Falha", code: "MERCADO_PAGO_INDISPONIVEL" }, { status: 502 })
+  ]
+]) {
+  test(`último pedido: ${caso} (sem token rastreável) não grava nada`, async t => {
+    await mount(t, pollingPendente, resposta);
+    assert.equal(ultimoPedidoSalvo(), null);
+    assert.equal(ui.currentPath, "/aguardando-pagamento", "segue na tela de erro, como antes");
+  });
+}
 
 test("late approved response after leaving waiting page cannot navigate or overwrite the new route", async t => {
   const pending = deferred();

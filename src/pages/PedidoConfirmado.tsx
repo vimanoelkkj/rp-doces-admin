@@ -4,6 +4,7 @@ import { useCart } from "../context/CartContext";
 import type { CartItem } from "../context/CartContext";
 import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
+import { lerUltimoPedido } from "../lib/ultimoPedido";
 import "./PedidoConfirmado.css";
 
 interface ConfirmadoState {
@@ -28,7 +29,10 @@ export default function PedidoConfirmado() {
 
   useEffect(() => {
     if (!state) {
-      navigate("/", { replace: true });
+      // Sem state (outra aba, navegador reaberto): reencontra o último pedido deste
+      // navegador; sem registro válido, volta para a Home como antes.
+      const token = lerUltimoPedido();
+      navigate(token ? `/pedido/${encodeURIComponent(token)}` : "/", { replace: true });
     }
   }, [state, navigate]);
 
