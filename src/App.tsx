@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import PageTransition from "./components/PageTransition";
 import RouteLoadingFallback from "./components/RouteLoadingFallback";
@@ -99,9 +99,57 @@ function AdminRoutes() {
   );
 }
 
+function PageSeoController() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
+    }
+
+    let robots = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+
+    if (pathname === "/") {
+      document.title = "R&P Doces - Artesanal & Exclusivo";
+      canonical.href = "https://rpdoces.com.br/";
+      if (robots) robots.remove();
+    } else if (pathname === "/cardapio") {
+      document.title = "Cardápio | R&P Doces";
+      canonical.href = "https://rpdoces.com.br/cardapio";
+      if (robots) robots.remove();
+    } else {
+      const isPrivateOrTransactional =
+        pathname.startsWith("/admin") ||
+        pathname.startsWith("/pedido") ||
+        pathname === "/checkout" ||
+        pathname === "/aguardando-pagamento" ||
+        pathname === "/pagamento-nao-aprovado" ||
+        pathname === "/pedido-confirmado" ||
+        pathname.startsWith("/dev");
+
+      if (isPrivateOrTransactional) {
+        if (!robots) {
+          robots = document.createElement("meta");
+          robots.name = "robots";
+          document.head.appendChild(robots);
+        }
+        robots.content = "noindex, nofollow";
+      } else if (robots) {
+        robots.remove();
+      }
+    }
+  }, [pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <PageSeoController />
       <StoreThemeProvider>
         <CartProvider>
           <StorefrontRoutes />
