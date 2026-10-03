@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import "./ProductCard.css";
 import type { Product } from "../types/product";
 import { remainingAvailability } from "../context/cartReconciliation";
-import { ProductPrices, PromoBadge, StockBadge } from "./productDisplay";
+import { NovoBadge, ProductPrices, PromoBadge, StockBadge } from "./productDisplay";
 
 interface ProductCardProps {
   product: Product;
@@ -60,6 +60,7 @@ export default function ProductCard({
       <div className="product-info">
         <div className="product-meta-row">
           <span className="product-category">{product.category}</span>
+          <NovoBadge product={product} />
           {/* HUMAN-12: selo só aparece com promoção vigente. Estrutura do
               card preservada — é um acréscimo ao lado da categoria. */}
           <PromoBadge product={product} />

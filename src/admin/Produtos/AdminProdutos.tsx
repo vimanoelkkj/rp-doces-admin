@@ -46,6 +46,7 @@ export interface ProdutoAdmin {
   disponivel: number;
   ativo: number;
   destaque: number;
+  novo: number;
   promocao_ativa: number;
   // HUMAN-12: já vinham do GET administrativo; agora o modal também os edita.
   preco_promocional_centavos: number | null;

@@ -19,6 +19,7 @@ export interface ProdutoInput {
   ativo?: boolean;
   disponivel?: boolean;
   destaque?: boolean;
+  novo?: boolean;
   promocaoAtiva?: boolean;
   precoPromocionalCentavos?: number | null;
   promocaoInicio?: string | null;

@@ -120,6 +120,7 @@ export default function NovoProdutoModal({
   const [produtoAtivo, setProdutoAtivo] = useState(true);
   const [disponivelVenda, setDisponivelVenda] = useState(true);
   const [destaque, setDestaque] = useState(false);
+  const [novo, setNovo] = useState(false);
   const [promocao, setPromocao] = useState(false);
   const [promoPrice, setPromoPrice] = useState("0,00");
   const [promoInicio, setPromoInicio] = useState("");
@@ -208,6 +209,7 @@ export default function NovoProdutoModal({
     setProdutoAtivo(true);
     setDisponivelVenda(true);
     setDestaque(false);
+    setNovo(false);
     setPromocao(false);
     setPromoPrice("0,00");
     setPromoInicio("");
@@ -250,6 +252,7 @@ export default function NovoProdutoModal({
     setProdutoAtivo(produto.ativo === 1);
     setDisponivelVenda(produto.disponivel === 1);
     setDestaque(produto.destaque === 1);
+    setNovo(produto.novo === 1);
     setPromocao(produto.promocao_ativa === 1);
     setPromoPrice(
       produto.preco_promocional_centavos != null
@@ -329,6 +332,7 @@ export default function NovoProdutoModal({
           ativo: produtoAtivo,
           disponivel: disponivelVenda,
           destaque,
+          novo,
           promocaoAtiva: promocao,
           precoPromocionalCentavos: promoCentavos,
           promocaoInicio: promoInicioIso,
@@ -671,6 +675,18 @@ export default function NovoProdutoModal({
               <div>
                 <strong>Marcar como destaque</strong>
                 <span>Exibe o selo de destaque no produto.</span>
+              </div>
+            </label>
+            <label className="np-check">
+              <input
+                type="checkbox"
+                checked={novo}
+                onChange={e => setNovo(e.target.checked)}
+              />
+              <span className="np-check-box" />
+              <div>
+                <strong>Marcar como novo</strong>
+                <span>Exibe o selo de novidade no produto.</span>
               </div>
             </label>
             <label className="np-check">

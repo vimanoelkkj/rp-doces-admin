@@ -13,6 +13,12 @@ export function PromoBadge({ product }: { product: Product }) {
   ) : null;
 }
 
+export function NovoBadge({ product }: { product: Product }) {
+  return product.novo ? (
+    <span className="product-novo-badge">NOVO</span>
+  ) : null;
+}
+
 export function StockBadge({ restante }: { restante: number }) {
   const stockBadge = getStockBadgeState(restante);
   if (stockBadge === "esgotado") {

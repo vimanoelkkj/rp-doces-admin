@@ -107,6 +107,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
       `UPDATE produtos
        SET nome = ?, categoria = ?, descricao = ?, preco_centavos = ?, estoque = ?,
            emoji = ?, ativo = ?, disponivel = ?, destaque = ?,
+           novo = COALESCE(?, novo),
            promocao_ativa = ?, preco_promocional_centavos = ?,
            promocao_inicio = ?, promocao_fim = ?,
            peso_texto = COALESCE(?, peso_texto),
@@ -125,6 +126,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
         body.ativo === false ? 0 : 1,
         body.disponivel === false ? 0 : 1,
         body.destaque ? 1 : 0,
+        body.novo === undefined ? null : (body.novo ? 1 : 0),
         promocao.promocaoAtiva,
         promocao.precoPromocionalCentavos,
         promocao.promocaoInicio,

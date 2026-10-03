@@ -67,7 +67,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     const { results } = await env.DB.prepare(
       `SELECT id, nome, categoria, descricao, preco_centavos, preco_promocional_centavos,
-              promocao_inicio, promocao_fim, promocao_ativa, disponivel, ativo, destaque, ordem,
+              promocao_inicio, promocao_fim, promocao_ativa, disponivel, ativo, destaque, novo, ordem,
               estoque, estoque_reservado, emoji, image_key,
               peso_texto, ingredientes, alergenicos
        FROM produtos ORDER BY categoria, ordem, nome`
@@ -107,10 +107,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
     const result = await env.DB.prepare(
-      `INSERT INTO produtos (nome, categoria, descricao, preco_centavos, estoque, emoji, ativo, disponivel, destaque,
+      `INSERT INTO produtos (nome, categoria, descricao, preco_centavos, estoque, emoji, ativo, disponivel, destaque, novo,
                              promocao_ativa, preco_promocional_centavos, promocao_inicio, promocao_fim,
                              peso_texto, ingredientes, alergenicos)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         body.nome.trim(),
@@ -122,6 +122,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         body.ativo === false ? 0 : 1,
         body.disponivel === false ? 0 : 1,
         body.destaque ? 1 : 0,
+        body.novo ? 1 : 0,
         promocao.promocaoAtiva,
         promocao.precoPromocionalCentavos,
         promocao.promocaoInicio,

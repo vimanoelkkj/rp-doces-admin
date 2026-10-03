@@ -18,6 +18,7 @@ interface ProdutoRow {
   promocao_inicio: string | null;
   promocao_fim: string | null;
   destaque: number;
+  novo: number;
   ordem: number;
   estoque: number;
   estoque_reservado: number;
@@ -34,7 +35,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
             p.descricao, p.preco_centavos,
             p.preco_promocional_centavos, p.promocao_ativa,
             p.promocao_inicio, p.promocao_fim,
-            p.destaque, p.ordem, p.estoque, p.estoque_reservado, p.image_key,
+            p.destaque, p.novo, p.ordem, p.estoque, p.estoque_reservado, p.image_key,
             p.peso_texto, p.ingredientes, p.alergenicos
      FROM produtos p
      LEFT JOIN categorias c ON c.id = p.categoria

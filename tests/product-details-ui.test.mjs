@@ -506,3 +506,32 @@ test("C/E: item novo com quantidade > disponibilidade entra limitado; + do card 
   assert.equal(cart.cartItems.find(i => i.id === 9).quantity, 1, "quantidade inválida é ignorada");
   await m.desmontar();
 });
+
+test("card exibe badge NOVO quando produto.novo for verdadeiro e oculta quando desativado ou ausente", async () => {
+  const mNovo = await montar(
+    ui.card({
+      product: { ...minimo, novo: true },
+      quantityInCart: 0
+    })
+  );
+  assert.equal(texto(mNovo.container.querySelector(".product-novo-badge")), "NOVO");
+  await mNovo.desmontar();
+
+  const mSemNovo = await montar(
+    ui.card({
+      product: { ...minimo, novo: false },
+      quantityInCart: 0
+    })
+  );
+  assert.equal(mSemNovo.container.querySelector(".product-novo-badge"), null);
+  await mSemNovo.desmontar();
+
+  const mOmitido = await montar(
+    ui.card({
+      product: minimo,
+      quantityInCart: 0
+    })
+  );
+  assert.equal(mOmitido.container.querySelector(".product-novo-badge"), null);
+  await mOmitido.desmontar();
+});

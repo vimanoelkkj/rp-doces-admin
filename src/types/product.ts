@@ -26,4 +26,6 @@ export interface Product {
   image: string;
   /** Disponibilidade líquida para venda imediata: max(0, estoque - estoque_reservado). */
   disponibilidade: number;
+  /** Indica se o produto é uma novidade (selo "NOVO" no storefront). */
+  novo?: boolean;
 }

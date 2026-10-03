@@ -142,3 +142,19 @@ test("B: campos de detalhe vazios, só espaços ou ausentes viram undefined", as
     assert.equal(produto.allergens, undefined);
   }
 });
+
+test("fetchProducts mapeia flag de novidade (novo)", async t => {
+  t.mock.method(globalThis, "fetch", async () =>
+    Response.json({
+      produtos: [
+        { ...linhaBase, id: 6, novo: 1 },
+        { ...linhaBase, id: 7, novo: 0 },
+        { ...linhaBase, id: 8 }
+      ]
+    })
+  );
+  const [comNovo, semNovo, omitido] = await fetchProducts();
+  assert.equal(comNovo.novo, true, "novo=1 mapeia para true");
+  assert.equal(semNovo.novo, false, "novo=0 mapeia para false");
+  assert.equal(omitido.novo, false, "novo ausente mapeia para false");
+});

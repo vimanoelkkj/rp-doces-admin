@@ -198,6 +198,18 @@
   letter-spacing: 0.5px;
 }
 
+.product-novo-badge {
+  font-family: "Manrope", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--store-accent);
+  background: var(--store-accent-soft);
+  border-radius: 4px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .product-esgotado-badge {
   font-family: "Manrope", sans-serif;
   font-size: 9px;

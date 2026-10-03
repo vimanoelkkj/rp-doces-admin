@@ -8,6 +8,7 @@ interface ProdutoApiRow extends PromocaoCampos {
   categoria_nome: string;
   descricao: string;
   destaque: number;
+  novo?: number;
   ordem: number;
   estoque: number;
   estoque_reservado: number;
@@ -57,7 +58,8 @@ function toProduct(row: ProdutoApiRow): Product {
     price: centavos / 100,
     originalPrice: emPromocao ? row.preco_centavos / 100 : undefined,
     image: imageUrlFor(row.image_key),
-    disponibilidade
+    disponibilidade,
+    novo: row.novo === 1
   };
 }
 
