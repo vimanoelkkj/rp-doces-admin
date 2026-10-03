@@ -507,31 +507,37 @@ test("C/E: item novo com quantidade > disponibilidade entra limitado; + do card 
   await m.desmontar();
 });
 
-test("card exibe badge NOVO quando produto.novo for verdadeiro e oculta quando desativado ou ausente", async () => {
+test("card exibe badge NOVO sobre a imagem e move badge de estoque para acima do preço", async () => {
   const mNovo = await montar(
     ui.card({
-      product: { ...minimo, novo: true },
+      product: { ...minimo, novo: true, disponibilidade: 2 },
       quantityInCart: 0
     })
   );
-  assert.equal(texto(mNovo.container.querySelector(".product-novo-badge")), "NOVO");
+  // NOVO está dentro de .product-image-wrapper e NÃO em .product-meta-row
+  assert.ok(mNovo.container.querySelector(".product-image-wrapper .product-novo-badge"));
+  assert.equal(texto(mNovo.container.querySelector(".product-image-wrapper .product-novo-badge")), "NOVO");
+  assert.equal(mNovo.container.querySelector(".product-meta-row .product-novo-badge"), null);
+
+  // Badge de estoque está dentro de .product-price-col, acima de .product-prices
+  const priceCol = mNovo.container.querySelector(".product-footer .product-price-col");
+  assert.ok(priceCol);
+  assert.equal(texto(priceCol.querySelector(".product-low-stock-badge")), "Poucas unidades");
+  assert.equal(mNovo.container.querySelector(".product-meta-row .product-low-stock-badge"), null);
   await mNovo.desmontar();
 
-  const mSemNovo = await montar(
+  // Sem novo e com estoque amplo: sem badge novo e sem badge de estoque
+  const mSemBadge = await montar(
     ui.card({
-      product: { ...minimo, novo: false },
+      product: { ...minimo, novo: false, disponibilidade: 10 },
       quantityInCart: 0
     })
   );
-  assert.equal(mSemNovo.container.querySelector(".product-novo-badge"), null);
-  await mSemNovo.desmontar();
-
-  const mOmitido = await montar(
-    ui.card({
-      product: minimo,
-      quantityInCart: 0
-    })
-  );
-  assert.equal(mOmitido.container.querySelector(".product-novo-badge"), null);
-  await mOmitido.desmontar();
+  assert.equal(mSemBadge.container.querySelector(".product-novo-badge"), null);
+  assert.equal(mSemBadge.container.querySelector(".product-low-stock-badge"), null);
+  // Sem espaço reservado: apenas .product-prices dentro de .product-price-col
+  const colSemBadge = mSemBadge.container.querySelector(".product-footer .product-price-col");
+  assert.equal(colSemBadge.children.length, 1);
+  assert.ok(colSemBadge.firstElementChild.classList.contains("product-prices"));
+  await mSemBadge.desmontar();
 });

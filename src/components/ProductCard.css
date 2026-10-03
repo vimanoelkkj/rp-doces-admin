@@ -18,6 +18,7 @@
   width: 100%;
   aspect-ratio: 302 / 220;
   overflow: hidden;
+  position: relative;
 }
 
 .product-image {
@@ -161,11 +162,18 @@
 .product-footer {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   margin-top: auto;
   padding-top: 12px;
   position: relative;
   z-index: 2;
+}
+
+.product-price-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .product-price {
@@ -208,6 +216,15 @@
   padding: 2px 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.product-image-wrapper .product-novo-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .product-esgotado-badge {
@@ -386,6 +403,11 @@
 
   .product-image-wrapper {
     aspect-ratio: 358 / 160;
+  }
+
+  .product-image-wrapper .product-novo-badge {
+    top: 10px;
+    right: 10px;
   }
 
   .product-info {

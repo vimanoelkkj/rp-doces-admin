@@ -56,15 +56,14 @@ export default function ProductCard({
         ) : (
           <img src={product.image} alt={product.name} className="product-image" loading="lazy" />
         )}
+        <NovoBadge product={product} />
       </div>
       <div className="product-info">
         <div className="product-meta-row">
           <span className="product-category">{product.category}</span>
-          <NovoBadge product={product} />
           {/* HUMAN-12: selo só aparece com promoção vigente. Estrutura do
               card preservada — é um acréscimo ao lado da categoria. */}
           <PromoBadge product={product} />
-          <StockBadge restante={restante} />
         </div>
         <h3 className="product-name">
           {onOpenDetails ? (
@@ -77,7 +76,10 @@ export default function ProductCard({
         </h3>
         {product.description && <p className="product-description">{product.description}</p>}
         <div className="product-footer">
-          <ProductPrices product={product} />
+          <div className="product-price-col">
+            <StockBadge restante={restante} />
+            <ProductPrices product={product} />
+          </div>
           <motion.button
             className={`add-button${justAdded ? " add-button--added" : ""}${esgotado ? " add-button--esgotado" : ""}`}
             aria-label={esgotado ? `${product.name} esgotado` : `Adicionar ${product.name}`}
