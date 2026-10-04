@@ -304,7 +304,7 @@ test("HUMAN-16 preserva B1: a edição de itens continua bloqueada", async () =>
 /* ─────────────────────────────── HUMAN-15 ─────────────────────────────── */
 
 test("HUMAN-15: ícone do WhatsApp deixou de ser o retângulo de cartão", async () => {
-  const tsx = await ler("src/admin/Loja/AdminLoja.tsx");
+  const tsx = await ler("src/admin/Loja/LojaPreviewPanel.tsx");
   const fim = tsx.indexOf("WhatsApp: {whatsapp}");
   assert.ok(fim > 0, "linha do WhatsApp presente na prévia");
   // Do último início de linha da prévia até o texto: é o bloco do ícone.

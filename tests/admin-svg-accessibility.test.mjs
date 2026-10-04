@@ -6,7 +6,8 @@ const administrativeSvgFiles = new Map([
   ["src/admin/components/AdminSidebar.tsx", 11],
   ["src/admin/notificacoes/AdminNotificacoes.tsx", 6],
   ["src/admin/notificacoes/PushNotificationCard.tsx", 1],
-  ["src/admin/Loja/AdminLoja.tsx", 4],
+  ["src/admin/Loja/AdminLoja.tsx", 0],
+  ["src/admin/Loja/LojaPreviewPanel.tsx", 4],
   ["src/admin/Dashboard/AdminDashboard.tsx", 2],
   ["src/admin/Administradores/AdminAdministradores.tsx", 4]
 ]);
