@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { IconBag } from "../admin/components/AdminSidebar";
-import { lerUltimoPedido } from "../lib/ultimoPedido";
+import { esquecerUltimoPedido, lerUltimoPedido, pedidoEncerrado } from "../lib/ultimoPedido";
 import "./UltimoPedidoLink.css";
 
 interface UltimoPedidoLinkProps {
@@ -9,10 +9,37 @@ interface UltimoPedidoLinkProps {
 }
 
 // Leva ao acompanhamento do último pedido deste navegador (ver lib/ultimoPedido).
-// Sem registro válido não renderiza nada. Lê uma vez ao montar: o registro só muda em outras
-// rotas, e cada página do storefront monta o componente de novo.
+// Sem registro válido não renderiza nada. Mostra o registro na hora e, ao montar, confirma o token
+// com um GET somente leitura em /api/pedido-status (nunca POST: ele dispara a reconciliação com o
+// Mercado Pago). 404 ou pedido encerrado: esquece o registro e esconde o link. Qualquer outra
+// resposta ou falha mantém o link e o registro como estão.
 export default function UltimoPedidoLink({ className = "" }: UltimoPedidoLinkProps) {
-  const [tokenPublico] = useState(() => lerUltimoPedido());
+  const [tokenPublico, setTokenPublico] = useState(() => lerUltimoPedido());
+
+  useEffect(() => {
+    if (!tokenPublico) return;
+
+    const controller = new AbortController();
+    const validar = async () => {
+      try {
+        const response = await fetch(
+          `/api/pedido-status?token=${encodeURIComponent(tokenPublico)}`,
+          { cache: "no-store", signal: controller.signal }
+        );
+        const encerrado =
+          response.status === 404 || (response.ok && pedidoEncerrado(await response.json()));
+        if (!encerrado) return;
+        esquecerUltimoPedido(tokenPublico);
+        setTokenPublico(null);
+      } catch {
+        // Rede, cancelamento ou corpo inválido não provam nada: link e registro ficam como estão.
+      }
+    };
+    void validar();
+
+    return () => controller.abort();
+  }, [tokenPublico]);
+
   if (!tokenPublico) return null;
 
   return (

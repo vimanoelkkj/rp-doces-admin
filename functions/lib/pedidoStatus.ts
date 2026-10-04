@@ -9,6 +9,7 @@ import {
   fetchMpPayment,
   resolveWebhookPayment
 } from "./paymentSync";
+import { LIQUIDO_SQL, REEMBOLSADO_SQL } from "./pedidoFinanceiroSql";
 import { reconcilePedidoAfterFinancialChange } from "./pedidoReconcile";
 import { pedidoTemEstoquePendente } from "./stock";
 import type { PushEnv } from "./pushNotifier";
@@ -42,11 +43,31 @@ async function statusDoPagamento(
   return row?.status ?? null;
 }
 
+// Estornos viram linhas em pedido_reembolsos e a tentativa Pix segue PAGO no
+// ledger, então o status público ficaria PAGO para sempre após um estorno
+// integral. Só consulta quando o status já é PAGO.
+async function statusPublicoPagamento(
+  db: D1Database,
+  pedidoId: number,
+  statusPagamento: string
+): Promise<string> {
+  if (statusPagamento !== "PAGO") return statusPagamento;
+  const row = await db
+    .prepare(
+      `SELECT (${REEMBOLSADO_SQL} > 0 AND ${LIQUIDO_SQL} = 0) AS integral
+     FROM pedidos p WHERE p.id = ?`
+    )
+    .bind(pedidoId)
+    .first<{ integral: number }>();
+  return row?.integral ? "REEMBOLSADO" : statusPagamento;
+}
+
 // M7: leitura PURA do status público, para os GETs do storefront. Nenhuma
 // escrita, nenhuma rede, nenhuma materialização de legado. Mesmos critérios
 // de `resolveLedgerPaymentId` para achar a tentativa SITE PIX_MP (o status
-// público é o dessa tentativa, não o agregado) e o mesmo fail-closed quando
-// a identidade é ambígua. Sem tentativa SITE — ou pedido legado ainda sem
+// público é o dessa tentativa, não o agregado — exceto estorno integral: ver
+// `statusPublicoPagamento`) e o mesmo fail-closed quando a identidade é
+// ambígua. Sem tentativa SITE — ou pedido legado ainda sem
 // ledger — usa a projeção já persistida em `pedidos`. A recuperação (MP,
 // expiração, reconciliação) acontece só em `refreshPedidoStatus`, via POST.
 export async function readPedidoStatus(
@@ -63,7 +84,11 @@ export async function readPedidoStatus(
     .all<{ id: number; status: string }>();
   if (results.length > 1) throw new Error("TENTATIVA_SITE_AMBIGUA");
   return {
-    statusPagamento: results[0]?.status ?? pedido.status_pagamento,
+    statusPagamento: await statusPublicoPagamento(
+      db,
+      pedido.id,
+      results[0]?.status ?? pedido.status_pagamento
+    ),
     statusPedido: pedido.status_pedido,
     estoquePendente: await pedidoTemEstoquePendente(db, pedido.id)
   };
@@ -77,7 +102,8 @@ export async function readPedidoStatus(
 // (PENDENTE/PARCIAL/PAGO — ver recalculatePedidoStatusPagamento). O status
 // devolvido aqui e exposto publicamente continua sendo o da tentativa de
 // pagamento específica (pedido_pagamentos.status), que é a pergunta que o
-// storefront sempre fez — o contrato público não muda.
+// storefront sempre fez — o contrato público não muda (exceto estorno
+// integral: ver `statusPublicoPagamento`).
 export async function refreshPedidoStatus(
   db: D1Database,
   mpAccessToken: string,
@@ -103,7 +129,11 @@ export async function refreshPedidoStatus(
     statusEspecificoAtual !== "EXPIRADO"
   ) {
     return {
-      statusPagamento: statusEspecificoAtual ?? statusAgregado,
+      statusPagamento: await statusPublicoPagamento(
+        db,
+        pedido.id,
+        statusEspecificoAtual ?? statusAgregado
+      ),
       statusPedido: pedido.status_pedido,
       estoquePendente: await pedidoTemEstoquePendente(db, pedido.id)
     };

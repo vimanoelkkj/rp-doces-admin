@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
-import { esquecerUltimoPedido } from "../lib/ultimoPedido";
+import { esquecerUltimoPedido, pedidoEncerrado } from "../lib/ultimoPedido";
 import "./PedidoConfirmado.css";
 
 interface PedidoItem {
@@ -26,17 +26,6 @@ interface PedidoDetalhe {
 }
 
 type StatusPublico = Pick<PedidoDetalhe, "statusPagamento" | "statusPedido" | "estoquePendente">;
-
-// Estados em que não há mais o que acompanhar. EXPIRADO fica de fora de propósito: um Pix
-// tardio ainda pode virar PAGO, então o TTL do último pedido é quem o encerra.
-function pedidoEncerrado(status: Pick<PedidoDetalhe, "statusPagamento" | "statusPedido">): boolean {
-  return (
-    status.statusPedido === "ENTREGUE" ||
-    status.statusPedido === "CANCELADO" ||
-    status.statusPagamento === "CANCELADO" ||
-    status.statusPagamento === "REEMBOLSADO"
-  );
-}
 
 const STEPS: { key: PedidoDetalhe["statusPedido"]; label: string }[] = [
   { key: "NOVO", label: "Pedido recebido" },

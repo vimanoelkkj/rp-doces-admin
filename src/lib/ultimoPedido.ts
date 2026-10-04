@@ -85,3 +85,17 @@ export function lerUltimoPedido(agora: number = Date.now()): string | null {
 export function esquecerUltimoPedido(tokenPublico: string): void {
   if (lerUltimoPedido() === tokenPublico) removerRegistro();
 }
+
+// Estados em que não há mais o que acompanhar. EXPIRADO fica de fora de propósito: um Pix
+// tardio ainda pode virar PAGO, então o TTL do último pedido é quem o encerra.
+export function pedidoEncerrado(status: {
+  statusPagamento?: string;
+  statusPedido?: string;
+}): boolean {
+  return (
+    status.statusPedido === "ENTREGUE" ||
+    status.statusPedido === "CANCELADO" ||
+    status.statusPagamento === "CANCELADO" ||
+    status.statusPagamento === "REEMBOLSADO"
+  );
+}

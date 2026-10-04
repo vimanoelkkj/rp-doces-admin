@@ -233,6 +233,8 @@ for (const [statusPagamento, statusPedido, limpa] of [
   ["PAGO", "CANCELADO", true],
   ["CANCELADO", "NOVO", true],
   ["REEMBOLSADO", "NOVO", true],
+  ["REEMBOLSADO", "PREPARANDO", true],
+  ["REEMBOLSADO", "CANCELADO", true],
   ["PENDENTE", "NOVO", false],
   ["PAGO", "NOVO", false],
   ["PAGO", "PREPARANDO", false],
@@ -313,6 +315,23 @@ test("AcompanharPedido: falha de rede nunca remove o registro", async t => {
   }
 });
 
+// ───────────────────────── AcompanharPedido: pedido reembolsado ─────────────────────────
+
+for (const statusPedido of ["PREPARANDO", "CANCELADO"]) {
+  test(`AcompanharPedido: REEMBOLSADO/${statusPedido} mostra "Reembolsado", sem "Confirmado", "Em preparação" nem linha do tempo`, async t => {
+    mockApi(t, { pedido: { statusPagamento: "REEMBOLSADO", statusPedido } });
+    const root = await acompanhar(TOKEN);
+    try {
+      assert.match(container.textContent, /Reembolsado/);
+      assert.doesNotMatch(container.textContent, /Confirmado/);
+      assert.doesNotMatch(container.textContent, /Em preparação/);
+      assert.ok(container.querySelector(".confirmado-timeline") === null);
+    } finally {
+      await unmount(root);
+    }
+  });
+}
+
 // ───────────────────────── PedidoConfirmado sem location.state ─────────────────────────
 
 async function confirmar(state) {
@@ -384,14 +403,87 @@ test("PedidoConfirmado com state continua na confirmação, mesmo havendo últim
   }
 });
 
+// ───────────────────── PedidoConfirmado: pedido encerrado depois da aprovação ─────────────────────
+
+const stateConfirmado = {
+  pedidoId: 8,
+  tokenPublico: TOKEN,
+  items: [{ id: 1, name: "Pudim", price: 12, image: "", quantity: 1 }],
+  totalCentavos: 1200
+};
+
+for (const statusPedido of ["PREPARANDO", "CANCELADO", "ENTREGUE"]) {
+  test(`PedidoConfirmado: REEMBOLSADO/${statusPedido} sai (replace) para o acompanhamento do pedido`, async t => {
+    mockApi(t, { pedido: { statusPagamento: "REEMBOLSADO", statusPedido } });
+    const root = await confirmar(stateConfirmado);
+    try {
+      assert.equal(ui.currentPath, `/pedido/${TOKEN}`);
+      assert.equal(ui.navigationType, "REPLACE");
+    } finally {
+      await unmount(root);
+    }
+  });
+}
+
+test("PedidoConfirmado: PAGO/ENTREGUE continua na confirmação e mostra Retirado", async t => {
+  mockApi(t, { pedido: { statusPagamento: "PAGO", statusPedido: "ENTREGUE" } });
+  const root = await confirmar(stateConfirmado);
+  try {
+    assert.equal(ui.currentPath, "/pedido-confirmado");
+    assert.match(container.textContent, /Retirado/);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("PedidoConfirmado: PAGO/CANCELADO (Pix tardio depois do cancelamento) sai (replace) para o acompanhamento", async t => {
+  mockApi(t, { pedido: { statusPagamento: "PAGO", statusPedido: "CANCELADO" } });
+  const root = await confirmar(stateConfirmado);
+  try {
+    assert.equal(ui.currentPath, `/pedido/${TOKEN}`);
+    assert.equal(ui.navigationType, "REPLACE");
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("PedidoConfirmado: 404 do pedido (anulado) sai (replace) para o acompanhamento", async t => {
+  mockApi(t, { detalheHttp: 404 });
+  const root = await confirmar(stateConfirmado);
+  try {
+    assert.equal(ui.currentPath, `/pedido/${TOKEN}`);
+    assert.equal(ui.navigationType, "REPLACE");
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("PedidoConfirmado: falha de rede na consulta mantém a confirmação", async t => {
+  mockApi(t, { semRede: true });
+  const root = await confirmar(stateConfirmado);
+  try {
+    assert.equal(ui.currentPath, "/pedido-confirmado");
+    assert.match(container.textContent, /Pagamento aprovado/);
+  } finally {
+    await unmount(root);
+  }
+});
+
 // ───────────────────────── UltimoPedidoLink na Home ─────────────────────────
 
-function mockHome(t) {
-  t.mock.method(globalThis, "fetch", async url => {
+// `responderStatus` (opcional) responde o GET de /api/pedido-status; devolve as chamadas feitas a ele.
+function mockHome(t, responderStatus) {
+  const chamadas = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
     if (url === "/api/config") return Response.json({ config: storeConfig });
     if (url === "/api/produtos") return Response.json({ produtos: [] });
+    if (String(url).startsWith("/api/pedido-status")) {
+      chamadas.push({ url, init });
+      if (responderStatus) return responderStatus();
+    }
     return Response.json({ ok: true });
   });
+  return chamadas;
 }
 
 async function abrirHome() {
@@ -499,5 +591,59 @@ test("Home com registro vencido, corrompido ou com dado a mais não mostra o lin
     } finally {
       await unmount(root);
     }
+  }
+});
+
+// ───────────────────── UltimoPedidoLink: validação do token no servidor ─────────────────────
+
+const statusPublico = (statusPagamento, statusPedido) => () =>
+  Response.json({ pedidoId: 7, statusPagamento, statusPedido, estoquePendente: false });
+const semRede = () => {
+  throw new TypeError("Failed to fetch");
+};
+
+for (const [caso, responder, esquecido] of [
+  ["404", () => Response.json({ error: "Pedido não encontrado" }, { status: 404 }), true],
+  ["200 REEMBOLSADO/PREPARANDO", statusPublico("REEMBOLSADO", "PREPARANDO"), true],
+  ["200 PAGO/CANCELADO", statusPublico("PAGO", "CANCELADO"), true],
+  ["200 PAGO/PREPARANDO", statusPublico("PAGO", "PREPARANDO"), false],
+  ["falha de rede", semRede, false],
+  ["HTTP 500", () => Response.json({ error: "Erro interno" }, { status: 500 }), false],
+  ["200 com JSON inválido", () => new Response("{nao-e-json"), false]
+]) {
+  test(`Home valida o último pedido: ${caso} ${esquecido ? "esconde o link e remove o registro" : "mantém o link e o registro"}`, async t => {
+    gravar(TOKEN);
+    mockHome(t, responder);
+    const root = await abrirHome();
+    try {
+      assert.equal(linksDoUltimoPedido().length, esquecido ? 0 : 1);
+      assert.equal(gravado() === null, esquecido);
+    } finally {
+      await unmount(root);
+    }
+  });
+}
+
+test("Home valida o último pedido com um único GET (nunca POST) em /api/pedido-status?token=", async t => {
+  gravar(TOKEN);
+  const chamadas = mockHome(t, statusPublico("PAGO", "PREPARANDO"));
+  const root = await abrirHome();
+  try {
+    assert.equal(chamadas.length, 1);
+    assert.equal(chamadas[0].url, `/api/pedido-status?token=${TOKEN}`);
+    assert.equal((chamadas[0].init?.method ?? "GET").toUpperCase(), "GET");
+    assert.equal(chamadas[0].init?.cache, "no-store");
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("Home sem registro não consulta /api/pedido-status", async t => {
+  const chamadas = mockHome(t);
+  const root = await abrirHome();
+  try {
+    assert.equal(chamadas.length, 0);
+  } finally {
+    await unmount(root);
   }
 });

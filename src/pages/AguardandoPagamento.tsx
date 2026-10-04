@@ -247,7 +247,7 @@ export default function AguardandoPagamento() {
         const data = (await response.json()) as PedidoStatusResponse;
         if (cancelled) return;
         if (data.statusPagamento === "EXPIRADO") setExpiradoNoServidor(true);
-        if (["PAGO", "CANCELADO", "FALHOU"].includes(data.statusPagamento)) {
+        if (["PAGO", "CANCELADO", "FALHOU", "REEMBOLSADO"].includes(data.statusPagamento)) {
           goToResult(data.statusPagamento);
         }
       } catch {
@@ -280,6 +280,10 @@ export default function AguardandoPagamento() {
             totalCentavos: payment.totalCentavos
           }
         });
+      } else if (resultadoPendente === "REEMBOLSADO") {
+        // Estornado (p.ex. ao voltar a esta tela depois de pagar): não há o que pagar; o
+        // acompanhamento mostra o estado real.
+        navigate(`/pedido/${encodeURIComponent(payment.tokenPublico)}`, { replace: true });
       } else {
         navigate("/pagamento-nao-aprovado", {
           state: { items: tentativa.items, totalCentavos: payment.totalCentavos }

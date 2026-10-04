@@ -449,7 +449,8 @@ test("PedidoConfirmado move a etapa atual ate concluir toda a timeline", async t
   let remoteStatus = "PREPARANDO";
   t.mock.method(globalThis, "fetch", async url => {
     if (url === "/api/config") return Response.json({ config: storeConfig });
-    if (String(url).startsWith("/api/pedido")) return Response.json({ statusPedido: remoteStatus });
+    if (String(url).startsWith("/api/pedido"))
+      return Response.json({ statusPagamento: "PAGO", statusPedido: remoteStatus });
     return Response.json({ ok: true });
   });
   const state = {

@@ -469,6 +469,16 @@ test("timer zero during success transition cannot replace approval with failure"
   assert.equal(ui.currentPath, "/pedido-confirmado");
 });
 
+test("estornado (REEMBOLSADO) ao reabrir a tela de espera segue para o acompanhamento e para de consultar", async t => {
+  const { calls, advance } = await mount(t, () =>
+    Promise.resolve(Response.json({ statusPagamento: "REEMBOLSADO" }))
+  );
+  await advance(RESULT_TRANSITION_MIN_MS);
+  assert.equal(ui.currentPath, "/pedido/token");
+  await advance(POLL_INTERVAL_MS * 2);
+  assert.equal(calls.length, 1, "estado terminal: sem novas consultas");
+});
+
 test("known rejection keeps the existing result transition without claiming no money was charged", async t => {
   const { advance } = await mount(t, () =>
     Promise.resolve(Response.json({ statusPagamento: "CANCELADO" }))

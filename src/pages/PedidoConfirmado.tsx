@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import type { CartItem } from "../context/CartContext";
 import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
-import { lerUltimoPedido } from "../lib/ultimoPedido";
+import { lerUltimoPedido, pedidoEncerrado } from "../lib/ultimoPedido";
 import "./PedidoConfirmado.css";
 
 interface ConfirmadoState {
@@ -17,6 +17,7 @@ interface ConfirmadoState {
 type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
 
 interface PedidoStatusResponse {
+  statusPagamento: string;
   statusPedido: StatusPedido;
 }
 
@@ -26,6 +27,7 @@ export default function PedidoConfirmado() {
   const state = location.state as ConfirmadoState | null;
   const { clearCart } = useCart();
   const [statusPedido, setStatusPedido] = useState<StatusPedido>("PREPARANDO");
+  const [encerrado, setEncerrado] = useState(false);
 
   useEffect(() => {
     if (!state) {
@@ -43,9 +45,18 @@ export default function PedidoConfirmado() {
       const response = await fetch(`/api/pedido?token=${encodeURIComponent(state.tokenPublico)}`, {
         cache: "no-store"
       });
+      // Anulado ("excluído") ou inexistente: o acompanhamento mostra "Pedido não encontrado".
+      if (response.status === 404) {
+        setEncerrado(true);
+        return;
+      }
       if (!response.ok) return;
       const pedido = (await response.json()) as PedidoStatusResponse;
       setStatusPedido(pedido.statusPedido);
+      // Reembolsado ou cancelado depois da aprovação: esta tela deixou de valer e o acompanhamento
+      // mostra o estado real. Só a entrega normal (ENTREGUE e PAGO) continua aqui ("Retirado").
+      const entregaNormal = pedido.statusPedido === "ENTREGUE" && pedido.statusPagamento === "PAGO";
+      if (pedidoEncerrado(pedido) && !entregaNormal) setEncerrado(true);
     } catch {
       // Falha pontual de rede não muda a tela; tenta novamente no próximo ciclo.
     }
@@ -80,6 +91,10 @@ export default function PedidoConfirmado() {
   };
 
   if (!state) return null;
+
+  if (encerrado && state.tokenPublico) {
+    return <Navigate to={`/pedido/${encodeURIComponent(state.tokenPublico)}`} replace />;
+  }
 
   const totalPrice = state.totalCentavos / 100;
 

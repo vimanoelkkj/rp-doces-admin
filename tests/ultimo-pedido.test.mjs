@@ -15,10 +15,15 @@ const bundle = await build({
   platform: "node"
 });
 
-const { ULTIMO_PEDIDO_TTL_MS, lembrarUltimoPedido, lerUltimoPedido, esquecerUltimoPedido } =
-  await import(
-    `data:text/javascript;base64,${Buffer.from(`${bundle.outputFiles[0].text}\n//# sourceURL=ultimo-pedido-bundle.mjs`).toString("base64")}`
-  );
+const {
+  ULTIMO_PEDIDO_TTL_MS,
+  lembrarUltimoPedido,
+  lerUltimoPedido,
+  esquecerUltimoPedido,
+  pedidoEncerrado
+} = await import(
+  `data:text/javascript;base64,${Buffer.from(`${bundle.outputFiles[0].text}\n//# sourceURL=ultimo-pedido-bundle.mjs`).toString("base64")}`
+);
 
 const CHAVE = "rp-doces:ultimo-pedido:v1";
 const TOKEN = "3f2b8c1e-5d4a-4b7e-9c1d-0a2b3c4d5e6f";
@@ -173,4 +178,27 @@ test("sem Web Storage no ambiente nada lança e a leitura volta vazia", t => {
   assert.doesNotThrow(() => lembrarUltimoPedido(TOKEN, AGORA));
   assert.equal(lerUltimoPedido(AGORA), null);
   assert.doesNotThrow(() => esquecerUltimoPedido(TOKEN));
+});
+
+test("pedidoEncerrado: só ENTREGUE/CANCELADO (pedido) e CANCELADO/REEMBOLSADO (pagamento) encerram", () => {
+  for (const [status, encerrado] of [
+    [{ statusPagamento: "PAGO", statusPedido: "ENTREGUE" }, true],
+    [{ statusPagamento: "PAGO", statusPedido: "CANCELADO" }, true],
+    [{ statusPagamento: "CANCELADO", statusPedido: "NOVO" }, true],
+    [{ statusPagamento: "REEMBOLSADO", statusPedido: "NOVO" }, true],
+    [{ statusPagamento: "REEMBOLSADO", statusPedido: "PREPARANDO" }, true],
+    [{ statusPagamento: "REEMBOLSADO", statusPedido: "CANCELADO" }, true],
+    [{ statusPagamento: "PENDENTE", statusPedido: "NOVO" }, false],
+    [{ statusPagamento: "PAGO", statusPedido: "NOVO" }, false],
+    [{ statusPagamento: "PAGO", statusPedido: "PREPARANDO" }, false],
+    [{ statusPagamento: "PAGO", statusPedido: "PRONTO" }, false],
+    // Um Pix tardio ainda pode virar PAGO: EXPIRADO fica de fora até o TTL.
+    [{ statusPagamento: "EXPIRADO", statusPedido: "NOVO" }, false],
+    // Corpo de formato desconhecido ou incompleto nunca encerra (nem lança).
+    [{}, false],
+    [{ statusPagamento: "PAGO" }, false],
+    [{ statusPedido: "PREPARANDO" }, false]
+  ]) {
+    assert.equal(pedidoEncerrado(status), encerrado, JSON.stringify(status));
+  }
 });

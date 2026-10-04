@@ -352,6 +352,137 @@ test("estoquePendente ignora pedido sem produto controlado", async t => {
   assert.equal(await app.stock.pedidoTemEstoquePendente(db, 1), false);
 });
 
+// Estorno integral: o razão registra o reembolso em linha própria e nunca muta a
+// tentativa Pix, que segue PAGO. O status público deriva REEMBOLSADO quando nada
+// líquido resta no pedido; statusPedido (eixo operacional) nunca é alterado.
+const estornar = (db, valor, chave, status = "REEMBOLSADO") =>
+  db
+    .prepare(
+      `INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,
+  status,idempotency_key) VALUES(1,1,'MANUAL','PIX_MP',?,?,?)`
+    )
+    .bind(valor, status, chave)
+    .run();
+
+// As três rotas públicas que expõem statusPagamento/statusPedido (GET, GET, POST).
+async function respostasPublicas(db) {
+  const rotas = [
+    ["GET /api/pedido", getDetalhe],
+    ["GET /api/pedido-status", getStatus],
+    ["POST /api/pedido-status", postStatus]
+  ];
+  const corpos = {};
+  for (const [nome, chamar] of rotas) {
+    const r = await chamar(db);
+    assert.equal(r.status, 200, nome);
+    corpos[nome] = await r.json();
+  }
+  return corpos;
+}
+
+test("Estorno integral + todos os itens cancelados: REEMBOLSADO, statusPedido intacto, total 0 e sem itens", async t => {
+  const db = await fixture(t, { paid: true });
+  await estornar(db, 10000, "estorno-integral");
+  await db
+    .prepare(
+      `UPDATE pedido_itens SET status_item='CANCELADO', estoque_estado='LIBERADO',
+  estoque_liberado_em=CURRENT_TIMESTAMP WHERE id=1`
+    )
+    .run();
+  await db
+    .prepare(`UPDATE pedidos SET valor_total_centavos=0, status_pedido='PREPARANDO' WHERE id=1`)
+    .run();
+
+  const corpos = await respostasPublicas(db);
+  for (const [rota, body] of Object.entries(corpos)) {
+    assert.equal(body.statusPagamento, "REEMBOLSADO", rota);
+    assert.equal(body.statusPedido, "PREPARANDO", rota);
+  }
+  assert.equal(corpos["GET /api/pedido"].valorTotalCentavos, 0);
+  assert.deepEqual(corpos["GET /api/pedido"].itens, []);
+});
+
+test("Estorno integral + pedido cancelado pelo admin: REEMBOLSADO com statusPedido CANCELADO", async t => {
+  const db = await fixture(t, { paid: true });
+  await estornar(db, 10000, "estorno-integral");
+  await db.prepare(`UPDATE pedidos SET status_pedido='CANCELADO' WHERE id=1`).run();
+
+  for (const [rota, body] of Object.entries(await respostasPublicas(db))) {
+    assert.equal(body.statusPagamento, "REEMBOLSADO", rota);
+    assert.equal(body.statusPedido, "CANCELADO", rota);
+  }
+});
+
+test("Estorno parcial: statusPagamento continua PAGO", async t => {
+  const db = await fixture(t, { paid: true });
+  await estornar(db, 4000, "estorno-parcial");
+
+  for (const [rota, body] of Object.entries(await respostasPublicas(db))) {
+    assert.equal(body.statusPagamento, "PAGO", rota);
+  }
+});
+
+// Só o estorno confirmado (REEMBOLSADO) devolve dinheiro: um estorno em andamento (PENDENTE)
+// ou que falhou (FALHOU) não pode mudar o status público.
+for (const statusEstorno of ["PENDENTE", "FALHOU"]) {
+  test(`Estorno ${statusEstorno} de 100%: statusPagamento continua PAGO`, async t => {
+    const db = await fixture(t, { paid: true });
+    await estornar(db, 10000, `estorno-${statusEstorno.toLowerCase()}`, statusEstorno);
+
+    for (const [rota, body] of Object.entries(await respostasPublicas(db))) {
+      assert.equal(body.statusPagamento, "PAGO", rota);
+    }
+  });
+}
+
+test("Tentativa Pix 100% estornada, mas outro pagamento retém dinheiro: statusPagamento continua PAGO", async t => {
+  const db = await fixture(t, { paid: true });
+  await db
+    .prepare(
+      `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+  idempotency_key) VALUES(2,1,'DINHEIRO','ADMIN',4000,'PAGO','pagamento-2')`
+    )
+    .run();
+  await estornar(db, 10000, "estorno-integral");
+
+  for (const [rota, body] of Object.entries(await respostasPublicas(db))) {
+    assert.equal(body.statusPagamento, "PAGO", rota);
+  }
+});
+
+test("Estorno integral: GETs derivam REEMBOLSADO sem escrita e sem rede", async t => {
+  const db = await fixture(t, { paid: true });
+  await estornar(db, 10000, "estorno-integral");
+  const chamadas = mercadoPago(t, () => {
+    throw new Error("GET não pode chamar o MP");
+  });
+  const escritas = registrarEscritas(db);
+  const detalhe = await getDetalhe(db);
+  const status = await getStatus(db);
+  db.hook = null;
+  assert.equal((await detalhe.json()).statusPagamento, "REEMBOLSADO");
+  assert.equal((await status.json()).statusPagamento, "REEMBOLSADO");
+  assert.deepEqual(escritas, []);
+  assert.deepEqual(chamadas, []);
+});
+
+// Legado sem ledger: BRUTO 0 e REEMBOLSADO 0 deixam o líquido em 0, mas sem estorno
+// registrado o pedido já PAGO não pode virar REEMBOLSADO.
+test("Pedido legado sem ledger e PAGO persistido: GETs continuam PAGO, sem derivar REEMBOLSADO", async t => {
+  const db = await fixture(t, { ledger: false });
+  await db.prepare(`UPDATE pedidos SET status_pagamento='PAGO' WHERE id=1`).run();
+
+  for (const [rota, r] of [
+    ["GET /api/pedido", await getDetalhe(db)],
+    ["GET /api/pedido-status", await getStatus(db)]
+  ]) {
+    assert.equal(r.status, 200, rota);
+    const body = await r.json();
+    assert.equal(body.statusPagamento, "PAGO", rota);
+    assert.equal(body.statusPedido, "NOVO", rota);
+  }
+});
+
 // Onda 9B: respostas desses endpoints carregam dados de pedido mediante token
 // — sucesso e erros tratados (token inválido/inexistente) nunca são cacheáveis.
 test("Onda 9B: Cache-Control no-store em token inválido e inexistente (GET)", async t => {

@@ -57,9 +57,10 @@ async function handleDetalhe(request: Request, env: Env): Promise<Response> {
   // Somente leitura (M7): a recuperação acontece via POST /api/pedido-status.
   const atual = await readPedidoStatus(env.DB, pedido);
 
+  // Linhas CANCELADO ficam fora da lista pública (o histórico segue no banco e no admin).
   const { results: itens } = await env.DB.prepare(
     `SELECT id, produto_nome, quantidade, valor_unitario_centavos, valor_total_centavos
-     FROM pedido_itens WHERE pedido_id = ?
+     FROM pedido_itens WHERE pedido_id = ? AND status_item <> 'CANCELADO'
      ORDER BY pedido_itens.id ASC`
   )
     .bind(pedido.id)
