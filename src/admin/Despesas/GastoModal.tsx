@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
+import { useDropdown } from "../components/useDropdown";
 import {
   DESPESA_CATEGORIAS,
   DESPESA_CATEGORIA_LABEL,
@@ -69,27 +70,6 @@ function IconChevron({ open }: { open: boolean }) {
       />
     </svg>
   );
-}
-
-function useDropdown() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        ref.current &&
-        !ref.current.contains(e.target as Node) &&
-        !menuRef.current?.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-  return { open, setOpen, ref, menuRef };
 }
 
 function GastoDropdown<T extends string>({

@@ -1,24 +1,9 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
+import { IconClose } from "../components/AdminIcons";
 import { EMOJI_OPTIONS } from "./EmojiIcons";
 import "./CategoriasModal.css";
-
-/* ── Icons ── */
-const IconClose = () => (
-  <svg
-    aria-hidden="true"
-    width="18"
-    height="18"
-    viewBox="0 0 18 18"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-  >
-    <path d="M4.5 4.5l9 9M13.5 4.5l-9 9" />
-  </svg>
-);
 
 /* ── Types (espelham o retorno de GET /api/admin/categorias) ── */
 interface Category {

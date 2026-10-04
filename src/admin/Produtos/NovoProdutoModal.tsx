@@ -3,25 +3,11 @@ import { ALERGENICOS_MAX, INGREDIENTES_MAX, PESO_TEXTO_MAX } from "../../../shar
 import { createPortal } from "react-dom";
 import type { ProdutoAdmin } from "./AdminProdutos";
 import { useAdminModal } from "../components/useAdminModal";
+import { IconClose } from "../components/AdminIcons";
 import { formatBrlInput, formatCentsAsBrlInput, parseBrlInputToCents } from "../../lib/brl";
 import { estadoPromocao } from "../../../shared/promocao";
 import "./NovoProdutoModal.css";
 import { EMOJI_OPTIONS } from "./EmojiIcons";
-
-const IconClose = () => (
-  <svg
-    aria-hidden="true"
-    width="18"
-    height="18"
-    viewBox="0 0 18 18"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-  >
-    <path d="M4.5 4.5l9 9M13.5 4.5l-9 9" />
-  </svg>
-);
 
 const IconMinus = () => (
   <svg

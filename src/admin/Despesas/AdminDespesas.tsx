@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DESPESA_CATEGORIA_LABEL, type DespesaCategoria } from "../../../shared/despesas";
 import GastoModal from "./GastoModal";
 import {
@@ -10,6 +10,7 @@ import {
   paraISODate,
   type Periodo
 } from "./formatarDespesas";
+import { useDropdown } from "../components/useDropdown";
 import "./AdminDespesas.css";
 
 interface DespesaListItem {
@@ -79,27 +80,6 @@ function IconChevron({ open }: { open: boolean }) {
       />
     </svg>
   );
-}
-
-function useDropdown() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        ref.current &&
-        !ref.current.contains(e.target as Node) &&
-        !menuRef.current?.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-  return { open, setOpen, ref, menuRef };
 }
 
 function StatusDropdown({
