@@ -7,6 +7,11 @@ const cookieDe = session => session.cookie.split(";")[0];
 
 const PNG_SIGNATURE = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
+// WebP 1x1 lossy real (42 bytes): "RIFF", tamanho 34, "WEBP", chunk "VP8 ".
+const WEBP_1X1 = Uint8Array.from(
+  Buffer.from("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA", "base64")
+);
+
 function criarR2() {
   const objetos = new Map();
   const gravacoes = [];
@@ -201,6 +206,47 @@ test("PNG com assinatura reconhecida persiste no R2 e no D1", async t => {
   const produto = await db.prepare("SELECT image_key FROM produtos WHERE id = ?").bind(1).first();
 
   assert.equal(produto.image_key, body.imageKey);
+});
+
+test("WebP válido persiste no R2 e no D1 e é entregue como image/webp", async t => {
+  const db = await fixture(t);
+  const session = await app.auth.createSession(db, 1);
+  const r2 = criarR2();
+
+  const file = new File([WEBP_1X1], "produto.webp", {
+    type: "image/webp"
+  });
+
+  const res = await enviar(db, r2, session, file);
+
+  assert.equal(res.status, 200);
+
+  const body = await res.json();
+
+  assert.equal(body.ok, true);
+  assert.match(body.imageKey, /^product-1-[0-9a-f-]+\.webp$/);
+  assert.equal(body.imageUrl, `/api/images/${encodeURIComponent(body.imageKey)}`);
+
+  assert.equal(r2.gravacoes.length, 1);
+
+  const gravacao = r2.gravacoes[0];
+
+  assert.equal(gravacao.options.httpMetadata.contentType, "image/webp");
+  assert.deepEqual(new Uint8Array(gravacao.bytes), WEBP_1X1);
+
+  const produto = await db.prepare("SELECT image_key FROM produtos WHERE id = ?").bind(1).first();
+
+  assert.equal(produto.image_key, body.imageKey);
+
+  const publica = await app.publicImage.onRequestGet({
+    env: { PRODUCT_IMAGES: r2 },
+    params: { key: body.imageKey }
+  });
+
+  assert.equal(publica.status, 200);
+  assert.equal(publica.headers.get("content-type"), "image/webp");
+  assert.equal(publica.headers.get("x-content-type-options"), "nosniff");
+  assert.deepEqual(new Uint8Array(await publica.arrayBuffer()), WEBP_1X1);
 });
 
 test("novo upload substitui a imagem anterior do produto", async t => {

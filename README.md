@@ -560,10 +560,27 @@ Toda escrita crítica no sistema requer uma chave de operação:
 
 - **Endpoint de Recepção:** `POST /api/webhooks/mercadopago`.
 - **Validação Criptográfica HMAC-SHA256:**
-  - O header `x-signature` é inspecionado extraindo o timestamp `ts` e a assinatura criptográfica `v1`.
-  - O hash calculado sobre a query string e o corpo é comparado em tempo constante (_timing-safe equal_) contra o segredo `MP_WEBHOOK_SECRET`.
-  - Requisições sem assinatura válida são sumariamente rejeitadas com código HTTP `401 Unauthorized`.
+  - O header `x-signature` é lido como `ts=<timestamp>,v1=<assinatura>`; sem `ts` ou sem `v1` a requisição é inválida.
+  - O texto assinado (_manifest_) é `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, com `data.id` em minúsculas, vindo da query (`data.id` ou `data_id`) ou, na falta dela, do corpo JSON. Os trechos `id:` e `request-id:` só entram quando o valor existe; `ts:` sempre entra. O corpo da requisição não faz parte do hash.
+  - O HMAC-SHA256 do _manifest_, calculado com `MP_WEBHOOK_SECRET` como chave, é comparado em tempo constante (_timing-safe equal_) com `v1`.
+  - Requisições com assinatura inválida são rejeitadas com `401 Unauthorized`. Sem `MP_WEBHOOK_SECRET` configurado o endpoint responde `503` e não processa nada.
+  - Depois da assinatura, só eventos `payment`/`payments` (ou sem tipo) são processados; os demais respondem `200` sem efeito.
 - **Nunca Confia no Payload:** O webhook do Mercado Pago serve apenas como um sinalizador de evento. O backend nunca extrai o status diretamente do corpo do webhook; ele realiza uma chamada segura para `fetchMpPayment` para obter o dado oficial e imutável antes de atualizar o ledger.
+
+### Checklist de produção (go-live) do Mercado Pago
+
+Os dois primeiros itens são exigidos pelo código. Os passos no painel do Mercado Pago são **operacionais e devem ser verificados no ambiente real** (nomes de menu e telas podem variar): o checkout não envia `notification_url` ao criar o Pix, então a entrega do webhook depende do cadastro no painel.
+
+- [ ] `MP_ACCESS_TOKEN` configurado como secret do projeto no Cloudflare Pages (produção).
+- [ ] `MP_WEBHOOK_SECRET` configurado como secret no mesmo ambiente (sem ele o webhook responde `503`).
+- [ ] URL pública do webhook registrada no painel do Mercado Pago: `https://<domínio>/api/webhooks/mercadopago` _(verificar no painel)_.
+- [ ] Evento de pagamentos habilitado _(verificar no painel)_.
+- [ ] Chave de assinatura exibida no painel idêntica ao valor de `MP_WEBHOOK_SECRET` _(verificar no painel)_.
+- [ ] Pix real de baixo valor criado e pago.
+- [ ] Notificação recebida e respondida com `200` _(verificar no histórico de notificações do painel e nos logs da função)_.
+- [ ] Pedido convergiu para `PAGO` após a notificação (acompanhamento do cliente e comanda no admin).
+
+Sem o webhook o sistema ainda converge pelo polling da tela do cliente e pela reconciliação do admin, porém com atraso; por isso a verificação acima deve ser feita antes de abrir a loja ao público.
 
 ---
 
