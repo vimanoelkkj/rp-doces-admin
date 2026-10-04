@@ -130,7 +130,7 @@ export default function AguardandoPagamento() {
                   {copied ? "Copiado!" : "Copiar código"}
                 </button>
               </div>
-              <div className="pix-code-box">
+              <div className="pix-code-box selectable">
                 {prazoEncerrado ? "Código Pix com prazo encerrado" : payment.qrCode}
               </div>
 

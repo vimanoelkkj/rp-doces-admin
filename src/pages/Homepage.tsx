@@ -558,10 +558,10 @@ export default function Homepage() {
                         rel="noopener noreferrer"
                         style={{ color: "inherit", textDecoration: "none" }}
                       >
-                        <p>{storeConfig.address}</p>
+                        <p className="selectable">{storeConfig.address}</p>
                       </a>
                     ) : (
-                      <p>{storeConfig.address}</p>
+                      <p className="selectable">{storeConfig.address}</p>
                     )}
                   </div>
                 </div>
@@ -608,7 +608,7 @@ export default function Homepage() {
                   </div>
                   <div className="contact-info-text">
                     <h4>WhatsApp para Encomendas</h4>
-                    <p>{storeWhatsapp}</p>
+                    <p className="selectable">{storeWhatsapp}</p>
                   </div>
                 </div>
 

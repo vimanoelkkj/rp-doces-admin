@@ -61,7 +61,7 @@ export default function PedidoConfirmado() {
         <div className="confirmado-card">
           <div className="confirmado-header">
             <div>
-              <h2 className="confirmado-order-id">Pedido #{state.pedidoId}</h2>
+              <h2 className="confirmado-order-id selectable">Pedido #{state.pedidoId}</h2>
               <span className="confirmado-date">
                 Realizado em{" "}
                 {new Date().toLocaleDateString("pt-BR", {

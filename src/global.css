@@ -112,6 +112,25 @@ img {
   display: block;
 }
 
+/* Seleção de texto: na loja fica desligada, para não selecionar por acidente ao tocar ou arrastar. Vale
+   para o body inteiro, o que inclui os portais da loja (carrinho, modal de produto, menu, voltar ao
+   topo); o admin (AdminLayout e a tela de login) fica de fora. Campos de texto e o que o cliente
+   precisa copiar (código Pix, número do pedido, endereço, telefone) continuam selecionáveis: os
+   campos explicitamente (o Safari trava a digitação em campo dentro de um ancestral com
+   user-select: none) e o resto com a classe utilitária .selectable. */
+body:not(:has(.admin-layout, .admin-login-page)) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Camada de fundo fixa no viewport para o storefront */
 .store-background {
   position: fixed;

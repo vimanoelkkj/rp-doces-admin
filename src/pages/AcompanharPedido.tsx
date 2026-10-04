@@ -179,7 +179,7 @@ export default function AcompanharPedido() {
             <div className="confirmado-card">
               <div className="confirmado-header">
                 <div>
-                  <h2 className="confirmado-order-id">Pedido #{pedido.pedidoId}</h2>
+                  <h2 className="confirmado-order-id selectable">Pedido #{pedido.pedidoId}</h2>
                   <span className="confirmado-date">
                     Realizado em{" "}
                     {new Date(pedido.criadoEm).toLocaleDateString("pt-BR", {

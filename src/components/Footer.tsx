@@ -57,12 +57,12 @@ export default function Footer({ watermarkOnly = false }: FooterProps) {
 
         <div className="footer-col">
           <h4>Localização &amp; Contato</h4>
-          <p>
+          <p className="selectable">
             {storeConfig.localName}
             <br />
             {storeConfig.address}
           </p>
-          <p className="footer-phone">{formatStoreWhatsapp(storeConfig.whatsapp)}</p>
+          <p className="footer-phone selectable">{formatStoreWhatsapp(storeConfig.whatsapp)}</p>
         </div>
       </div>
 
