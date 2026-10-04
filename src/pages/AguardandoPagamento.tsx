@@ -1,298 +1,40 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import StorefrontFrame from "../components/StorefrontFrame";
 import Footer from "../components/Footer";
-import { type CartItem, useCart } from "../context/CartContext";
-import { fetchProducts } from "../api/products";
-import {
-  gravarOperationKey,
-  lerOperationKey,
-  novaOperationKey,
-  SLOT_CHECKOUT
-} from "../lib/operationKey";
-import { lembrarUltimoPedido } from "../lib/ultimoPedido";
+import { useAcompanharPagamento } from "../hooks/useAcompanharPagamento";
+import { useCheckoutPix } from "../hooks/useCheckoutPix";
+import { useContagemRegressiva } from "../hooks/useContagemRegressiva";
+import { type CheckoutState, formatarContagem } from "../lib/aguardandoPagamento";
 import PreparandoPedido from "./PreparandoPedido";
 import GerandoPagamento from "./GerandoPagamento";
 import ProcessandoPagamento from "./ProcessandoPagamento";
 import "./AguardandoPagamento.css";
 
-interface CheckoutState {
-  items: CartItem[];
-  cliente: { nome: string; whatsapp: string };
-  recado?: string;
-  operationKey?: string;
-}
-
-interface CheckoutResponse {
-  pedidoId: number;
-  tokenPublico: string;
-  paymentId: number;
-  status: string;
-  qrCode: string | null;
-  qrCodeBase64: string | null;
-  ticketUrl: string | null;
-  expiresAt: string | null;
-  totalCentavos: number;
-}
-
-interface PedidoStatusResponse {
-  pedidoId: number;
-  statusPagamento: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO" | "REEMBOLSADO" | "FALHOU";
-  statusPedido: string;
-}
-
-const POLL_INTERVAL_MS = 4000;
-
-// A criação do Pix é uma única chamada de rede — não existem "3 etapas"
-// reais de backend. Essa progressão de 2 passos (carrinho → gerando
-// pagamento) é puramente estética: durações mínimas garantem que o cliente
-// perceba as duas telas mesmo quando a rede responde quase instantaneamente,
-// sem inventar uma 3ª etapa fake no lugar do QR Code real (que precisa
-// aparecer assim que estiver pronto para o cliente pagar). Cada visita sorteia
-// uma duração diferente dentro da faixa — não é uma barra de progresso com
-// passos previsíveis, é só a percepção de "algo está acontecendo".
-const LOADING_STEP_MIN_MS = 1500;
-const LOADING_STEP_MAX_MS = 2500;
-const duracaoAleatoria = () =>
-  LOADING_STEP_MIN_MS + Math.random() * (LOADING_STEP_MAX_MS - LOADING_STEP_MIN_MS);
-
-// Aparece só depois que a confirmação do pagamento chega de verdade (via
-// polling), como uma transição breve antes de navegar para o resultado —
-// nunca substitui a tela do QR Code, que é a etapa real de espera do
-// cliente. Sem barra de progresso: não é uma etapa fake com passos
-// conhecidos, é só uma pausa perceptível pra não pular direto pro
-// resultado no instante em que detectamos a mudança de status.
-
-type Status = "criando" | "pronto" | "processando" | "erro";
-type LoadingStep = 1 | 2;
-
 export default function AguardandoPagamento() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { clearCart, reconcileWithProducts } = useCart();
   // Tentativa de checkout fixada na montagem. `location.state` pode ser substituído ou virar null
   // com a página montada (navegação para a mesma rota), mas o Pix criado, a tela e o destino final
   // pertencem sempre à tentativa que o gerou.
   const [tentativa] = useState(() => location.state as CheckoutState | null);
 
-  // A1: a MESMA identidade durante todo o ciclo de vida desta finalização.
-  // `useRef` a resolve UMA vez por montagem e o `sessionStorage` a preserva
-  // entre remontagens, StrictMode e retry — assim uma resposta HTTP perdida,
-  // um abort ou um remount não viram um segundo pedido. Prioridade:
-  // navegação (criada no Checkout) > sessão > geração local de último
-  // recurso (mantém a página funcional mesmo sem storage disponível).
-  const operationKeyRef = useRef<string | null>(null);
-  if (operationKeyRef.current === null) {
-    const resolvida =
-      tentativa?.operationKey ?? lerOperationKey(SLOT_CHECKOUT) ?? novaOperationKey();
-    gravarOperationKey(SLOT_CHECKOUT, resolvida);
-    operationKeyRef.current = resolvida;
-  }
-
-  const [status, setStatus] = useState<Status>("criando");
-  const [loadingStep, setLoadingStep] = useState<LoadingStep>(1);
-  const [payment, setPayment] = useState<CheckoutResponse | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isEstoqueError, setIsEstoqueError] = useState(false);
+  const { fase, etapa, payment, errorMessage, isEstoqueError } = useCheckoutPix(tentativa);
+  const timeLeft = useContagemRegressiva(payment?.expiresAt);
+  const { resultado, expiradoNoServidor } = useAcompanharPagamento(
+    payment,
+    fase === "pronto",
+    tentativa
+  );
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [resultadoPendente, setResultadoPendente] = useState<string | null>(null);
-  const [expiradoNoServidor, setExpiradoNoServidor] = useState(false);
   const prazoEncerrado = timeLeft === 0 || expiradoNoServidor;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: o checkout usa de propósito a tentativa fixada na montagem (A1: uma operação por visita); mudanças posteriores de navigate ou reconcileWithProducts não devem recriar uma operação financeira
-  useEffect(() => {
-    if (!tentativa || tentativa.items.length === 0) {
-      navigate("/cardapio");
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-    const startedAt = Date.now();
-    // Sorteados uma vez por visita: cada carregamento "varia" de verdade,
-    // não é sempre o mesmo tempo fixo.
-    const duracaoPasso1 = duracaoAleatoria();
-    const duracaoPasso2 = duracaoAleatoria();
-
-    const stepTimer = setTimeout(() => {
-      if (!cancelled) setLoadingStep(2);
-    }, duracaoPasso1);
-
-    fetch("/api/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        items: tentativa.items.map(item => ({
-          id: item.id,
-          quantity: item.quantity
-        })),
-        cliente: tentativa.cliente,
-        recado: tentativa.recado,
-        // A1: mesma finalização, mesma key — em toda tentativa.
-        operationKey: operationKeyRef.current
-      })
-    })
-      .then(async response => {
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          // A1: a operação já foi iniciada e o resultado remoto ainda não é
-          // conhecido (retry que encontrou a operação em andamento, ou o
-          // primeiro envio com resultado ambíguo). O pedido JÁ existe —
-          // nunca disparar outro checkout (isso criaria outro pedido, outra
-          // reserva e outra cobrança). Segue para o acompanhamento dele.
-          const acompanhavel =
-            body.code === "OPERACAO_EM_PROCESSAMENTO" || body.code === "MERCADO_PAGO_INDISPONIVEL";
-          if (acompanhavel && typeof body.tokenPublico === "string" && body.tokenPublico) {
-            // O pedido existe: guarda o token para reencontrá-lo mesmo se a aba for fechada.
-            lembrarUltimoPedido(body.tokenPublico);
-            if (!cancelled) {
-              navigate(`/pedido/${encodeURIComponent(body.tokenPublico)}`);
-            }
-            return null;
-          }
-
-          const isEstoque =
-            response.status === 409 &&
-            (body.code === "ESTOQUE_INSUFICIENTE" || /estoque/i.test(body.error || ""));
-
-          if (isEstoque) {
-            // Reconcilia o carrinho com os dados mais recentes do estoque
-            fetchProducts()
-              .then(products => {
-                reconcileWithProducts(products);
-              })
-              .catch(() => {});
-          }
-
-          const msg = isEstoque
-            ? body.error ||
-              "O estoque de um ou mais itens selecionados não está mais disponível. Por favor, revise seu carrinho."
-            : body.error || "Falha ao criar pagamento Pix";
-
-          const erro = new Error(msg);
-          (erro as unknown as { isEstoque: boolean }).isEstoque = isEstoque;
-          throw erro;
-        }
-        return response.json() as Promise<CheckoutResponse>;
-      })
-      .then(data => {
-        // O pedido já existe no servidor: guarda o token antes do loading artificial,
-        // para não perdê-lo se a aba for fechada nesse intervalo.
-        if (data) lembrarUltimoPedido(data.tokenPublico);
-        if (cancelled || !data) return;
-        const elapsed = Date.now() - startedAt;
-        const remaining = Math.max(0, duracaoPasso1 + duracaoPasso2 - elapsed);
-        setTimeout(() => {
-          if (cancelled) return;
-          setPayment(data);
-          setStatus("pronto");
-        }, remaining);
-      })
-      .catch(err => {
-        if (controller.signal.aborted || cancelled) return;
-        setErrorMessage(err.message);
-        setIsEstoqueError(Boolean((err as unknown as { isEstoque?: boolean })?.isEstoque));
-        setStatus("erro");
-      });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      clearTimeout(stepTimer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!payment?.expiresAt) return;
-    const expiresAt = payment.expiresAt;
-    const update = () => {
-      const diff = Math.max(0, Math.floor((Date.parse(expiresAt) - Date.now()) / 1000));
-      setTimeLeft(diff);
-    };
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [payment?.expiresAt]);
-
-  useEffect(() => {
-    if (status !== "pronto" || !payment) return;
-
-    let cancelled = false;
-    let inFlight = false;
-    const controller = new AbortController();
-
-    const goToResult = (statusPagamento: string) => {
-      if (cancelled) return;
-      cancelled = true;
-      // Não navega direto: mostra a etapa "processando" por um instante
-      // perceptível antes de revelar o resultado.
-      setResultadoPendente(statusPagamento);
-      setStatus("processando");
-    };
-
-    const poll = async () => {
-      if (cancelled || inFlight) return;
-      inFlight = true;
-      try {
-        // POST: o GET é somente leitura; a recuperação (MP, expiração) é
-        // explícita e o servidor limita a consulta ao MP a uma por 15s.
-        const response = await fetch(
-          `/api/pedido-status?token=${encodeURIComponent(payment.tokenPublico)}`,
-          { method: "POST", signal: controller.signal }
-        );
-        if (cancelled || !response.ok) return;
-        const data = (await response.json()) as PedidoStatusResponse;
-        if (cancelled) return;
-        if (data.statusPagamento === "EXPIRADO") setExpiradoNoServidor(true);
-        if (["PAGO", "CANCELADO", "FALHOU", "REEMBOLSADO"].includes(data.statusPagamento)) {
-          goToResult(data.statusPagamento);
-        }
-      } catch {
-        // falha de rede pontual — tenta de novo no próximo ciclo
-      } finally {
-        inFlight = false;
-      }
-    };
-
-    poll();
-    const interval = setInterval(poll, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      controller.abort();
-      clearInterval(interval);
-    };
-  }, [status, payment]);
-
-  useEffect(() => {
-    if (status !== "processando" || !resultadoPendente || !payment || !tentativa) return;
-
-    const timer = setTimeout(() => {
-      if (resultadoPendente === "PAGO") {
-        clearCart();
-        navigate("/pedido-confirmado", {
-          state: {
-            pedidoId: payment.pedidoId,
-            tokenPublico: payment.tokenPublico,
-            items: tentativa.items,
-            totalCentavos: payment.totalCentavos
-          }
-        });
-      } else if (resultadoPendente === "REEMBOLSADO") {
-        // Estornado (p.ex. ao voltar a esta tela depois de pagar): não há o que pagar; o
-        // acompanhamento mostra o estado real.
-        navigate(`/pedido/${encodeURIComponent(payment.tokenPublico)}`, { replace: true });
-      } else {
-        navigate("/pagamento-nao-aprovado", {
-          state: { items: tentativa.items, totalCentavos: payment.totalCentavos }
-        });
-      }
-    }, duracaoAleatoria());
-
-    return () => clearTimeout(timer);
-  }, [status, resultadoPendente, payment, navigate, clearCart, tentativa]);
+  // "processando" aparece só depois que a confirmação do pagamento chega de verdade (via
+  // polling), como uma transição breve antes de navegar para o resultado — nunca substitui a
+  // tela do QR Code, que é a etapa real de espera do cliente. Sem barra de progresso: não é uma
+  // etapa fake com passos conhecidos, é só uma pausa perceptível pra não pular direto pro
+  // resultado no instante em que detectamos a mudança de status.
+  const status = resultado !== null ? "processando" : fase;
 
   const handleCopy = () => {
     if (!payment?.qrCode || prazoEncerrado) return;
@@ -305,17 +47,11 @@ export default function AguardandoPagamento() {
 
   // Telas de loading tomam a tela inteira (mesmo tratamento visual do
   // Figma) — sem Header/Footer/onda do storefront por trás.
-  if (status === "criando" && loadingStep === 1) return <PreparandoPedido />;
-  if (status === "criando" && loadingStep === 2) return <GerandoPagamento />;
+  if (status === "criando" && etapa === 1) return <PreparandoPedido />;
+  if (status === "criando" && etapa === 2) return <GerandoPagamento />;
   if (status === "processando") return <ProcessandoPagamento />;
 
-  const minutes =
-    timeLeft != null
-      ? Math.floor(timeLeft / 60)
-          .toString()
-          .padStart(2, "0")
-      : "--";
-  const seconds = timeLeft != null ? (timeLeft % 60).toString().padStart(2, "0") : "--";
+  const { minutes, seconds } = formatarContagem(timeLeft);
 
   return (
     <StorefrontFrame className="aguardando-page">
