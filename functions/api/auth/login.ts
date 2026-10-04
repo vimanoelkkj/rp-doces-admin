@@ -73,13 +73,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return jsonError("Usuário ou senha incorretos", 401);
   }
 
-  await clearLoginFailures(env.DB, rate.key);
-
   await env.DB.prepare(`DELETE FROM admin_sessoes WHERE expira_em <= ?`)
     .bind(new Date().toISOString())
     .run();
 
-  const session = await createSession(env.DB, user.id);
+  const session = await createSession(env.DB, user.id, user.senha_hash);
+  if (!session) {
+    // A senha estava certa quando foi lida, mas a credencial foi redefinida (ou a
+    // conta desativada) antes de a sessão ser gravada. Mesma resposta e mesma
+    // contagem de falha de uma senha errada.
+    await recordLoginFailure(env.DB, rate.key, rate.ipKey);
+    await new Promise(r => setTimeout(r, 350));
+    return jsonError("Usuário ou senha incorretos", 401);
+  }
+
+  await clearLoginFailures(env.DB, rate.key);
 
   return Response.json(
     {

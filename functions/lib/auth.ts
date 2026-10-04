@@ -106,18 +106,32 @@ export function getCookie(request: Request, name = COOKIE_NAME): string | null {
   return null;
 }
 
+// Único ponto de criação de sessão: `senhaHash` é obrigatório e a sessão só nasce
+// se a credencial recém-validada ainda é a vigente e a conta segue ativa. É um
+// único INSERT condicional e o D1 processa uma instrução por vez: uma redefinição
+// de senha ou desativação que termine entre a validação e este INSERT faz a
+// condição falhar e a sessão nunca existe (retorna null); se terminar depois, o
+// DELETE de sessões dela alcança a linha. `senha_hash` é a época da credencial: o
+// salt é novo a cada hashPassword(), então qualquer redefinição, até para a mesma
+// senha, muda o valor.
 export async function createSession(
   db: D1Database,
-  userId: number
-): Promise<{ token: string; cookie: string }> {
+  userId: number,
+  senhaHash: string
+): Promise<{ token: string; cookie: string } | null> {
   const token = randomToken(32);
   const tokenHash = await sha256(token);
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400000).toISOString();
 
-  await db
-    .prepare(`INSERT INTO admin_sessoes (usuario_id, token_hash, expira_em) VALUES (?, ?, ?)`)
-    .bind(userId, tokenHash, expiresAt)
+  const inserted = await db
+    .prepare(
+      `INSERT INTO admin_sessoes (usuario_id, token_hash, expira_em)
+       SELECT ?, ?, ?
+       WHERE EXISTS (SELECT 1 FROM usuarios_admin WHERE id = ? AND senha_hash = ? AND ativo = 1)`
+    )
+    .bind(userId, tokenHash, expiresAt, userId, senhaHash)
     .run();
+  if (Number(inserted?.meta?.changes || 0) === 0) return null;
 
   const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_DAYS * 86400}`;
   return { token, cookie };

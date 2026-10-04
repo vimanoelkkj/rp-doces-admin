@@ -65,63 +65,73 @@ export async function postPagamentoMp(
   const controller = new AbortController();
   const prazo = setTimeout(() => controller.abort(), MP_PAYMENT_POST_TIMEOUT_MS);
 
-  let response: Response;
+  // O prazo cobre a operação HTTP INTEIRA, headers e corpo (como em fetchMpPayment): um
+  // corpo que nunca termina também vira AMBÍGUO/TIMEOUT, em vez de pendurar a requisição.
   try {
-    response = await fetch(MP_PAYMENTS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-        // Estável por operação lógica (A1): um retry da MESMA intenção
-        // reenvia exatamente esta key, nunca uma nova.
-        "X-Idempotency-Key": idempotencyKey
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-  } catch {
-    const expirou = controller.signal.aborted;
-    return {
-      resultado: "AMBIGUO",
-      motivo: expirou ? "TIMEOUT" : "TRANSPORTE",
-      httpStatus: null
-    };
+    let response: Response;
+    try {
+      response = await fetch(MP_PAYMENTS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          // Estável por operação lógica (A1): um retry da MESMA intenção
+          // reenvia exatamente esta key, nunca uma nova.
+          "X-Idempotency-Key": idempotencyKey
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch {
+      const expirou = controller.signal.aborted;
+      return {
+        resultado: "AMBIGUO",
+        motivo: expirou ? "TIMEOUT" : "TRANSPORTE",
+        httpStatus: null
+      };
+    }
+
+    if (!response.ok) {
+      if (response.status >= 500 || response.status === 408 || response.status === 429) {
+        return { resultado: "AMBIGUO", motivo: "HTTP_INDISPONIVEL", httpStatus: response.status };
+      }
+      if (response.status < 400) {
+        return { resultado: "AMBIGUO", motivo: "HTTP_INDETERMINADO", httpStatus: response.status };
+      }
+      // O corpo do 4xx só traz diagnóstico: se travar, a decisão continua pelo STATUS.
+      const corpo = await response.text().catch(() => "");
+      let mensagem: string | null = null;
+      let detalhe: string | null = null;
+      try {
+        const parsed = JSON.parse(corpo) as { message?: string; cause?: unknown };
+        mensagem = parsed.message ?? null;
+        detalhe = parsed.cause ? JSON.stringify(parsed.cause).slice(0, 500) : null;
+      } catch {
+        // corpo de erro não era JSON — segue sem detalhe estruturado
+      }
+      return { resultado: "RECUSA_DEFINITIVA", httpStatus: response.status, mensagem, detalhe };
+    }
+
+    let payment: MpPaymentCriado | null = null;
+    try {
+      payment = (await response.json()) as MpPaymentCriado;
+    } catch {
+      // Abort durante o corpo é o prazo estourado: o provedor já respondeu 2xx, então o
+      // recurso pode existir e o resultado segue AMBÍGUO. Qualquer outra falha segue ilegível.
+      if (controller.signal.aborted) {
+        return { resultado: "AMBIGUO", motivo: "TIMEOUT", httpStatus: response.status };
+      }
+      payment = null;
+    }
+    // 2xx sem `id` utilizável é ambíguo, não sucesso: o recurso pode existir
+    // do outro lado e nós não conseguimos nomeá-lo.
+    if (!payment || !Number.isFinite(Number(payment.id)) || Number(payment.id) <= 0) {
+      return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
+    }
+    return { resultado: "SUCESSO", payment };
   } finally {
     clearTimeout(prazo);
   }
-
-  if (!response.ok) {
-    if (response.status >= 500 || response.status === 408 || response.status === 429) {
-      return { resultado: "AMBIGUO", motivo: "HTTP_INDISPONIVEL", httpStatus: response.status };
-    }
-    if (response.status < 400) {
-      return { resultado: "AMBIGUO", motivo: "HTTP_INDETERMINADO", httpStatus: response.status };
-    }
-    const corpo = await response.text().catch(() => "");
-    let mensagem: string | null = null;
-    let detalhe: string | null = null;
-    try {
-      const parsed = JSON.parse(corpo) as { message?: string; cause?: unknown };
-      mensagem = parsed.message ?? null;
-      detalhe = parsed.cause ? JSON.stringify(parsed.cause).slice(0, 500) : null;
-    } catch {
-      // corpo de erro não era JSON — segue sem detalhe estruturado
-    }
-    return { resultado: "RECUSA_DEFINITIVA", httpStatus: response.status, mensagem, detalhe };
-  }
-
-  let payment: MpPaymentCriado | null = null;
-  try {
-    payment = (await response.json()) as MpPaymentCriado;
-  } catch {
-    payment = null;
-  }
-  // 2xx sem `id` utilizável é ambíguo, não sucesso: o recurso pode existir
-  // do outro lado e nós não conseguimos nomeá-lo.
-  if (!payment || !Number.isFinite(Number(payment.id)) || Number(payment.id) <= 0) {
-    return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
-  }
-  return { resultado: "SUCESSO", payment };
 }
 
 export type MpCancelResultado =
@@ -142,66 +152,72 @@ export async function cancelarPagamentoMp(
   const controller = new AbortController();
   const prazo = setTimeout(() => controller.abort(), MP_PAYMENT_POST_TIMEOUT_MS);
 
-  let response: Response;
+  // Mesmo prazo único para headers e corpo (ver postPagamentoMp).
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`
-    };
-    if (idempotencyKey) {
-      headers["X-Idempotency-Key"] = idempotencyKey;
+    let response: Response;
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`
+      };
+      if (idempotencyKey) {
+        headers["X-Idempotency-Key"] = idempotencyKey;
+      }
+      response = await fetch(`${MP_PAYMENTS_URL}/${encodeURIComponent(String(paymentId))}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ status: "cancelled" }),
+        signal: controller.signal
+      });
+    } catch {
+      const expirou = controller.signal.aborted;
+      return {
+        resultado: "AMBIGUO",
+        motivo: expirou ? "TIMEOUT" : "TRANSPORTE",
+        httpStatus: null
+      };
     }
-    response = await fetch(`${MP_PAYMENTS_URL}/${encodeURIComponent(String(paymentId))}`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify({ status: "cancelled" }),
-      signal: controller.signal
-    });
-  } catch {
-    const expirou = controller.signal.aborted;
+
+    if (!response.ok) {
+      if (response.status >= 500 || response.status === 408 || response.status === 429) {
+        return { resultado: "AMBIGUO", motivo: "HTTP_INDISPONIVEL", httpStatus: response.status };
+      }
+      if (response.status < 400) {
+        return { resultado: "AMBIGUO", motivo: "HTTP_INDETERMINADO", httpStatus: response.status };
+      }
+      const corpo = await response.text().catch(() => "");
+      let mensagem: string | null = null;
+      let detalhe: string | null = null;
+      try {
+        const parsed = JSON.parse(corpo) as { message?: string; cause?: unknown };
+        mensagem = parsed.message ?? null;
+        detalhe = parsed.cause ? JSON.stringify(parsed.cause).slice(0, 500) : null;
+      } catch {
+        // corpo de erro não era JSON
+      }
+      return { resultado: "RECUSA_DEFINITIVA", httpStatus: response.status, mensagem, detalhe };
+    }
+
+    let payment: { status?: string; status_detail?: string } | null = null;
+    try {
+      payment = (await response.json()) as { status?: string; status_detail?: string };
+    } catch {
+      if (controller.signal.aborted) {
+        return { resultado: "AMBIGUO", motivo: "TIMEOUT", httpStatus: response.status };
+      }
+      payment = null;
+    }
+
+    if (!payment || typeof payment.status !== "string") {
+      return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
+    }
+
     return {
-      resultado: "AMBIGUO",
-      motivo: expirou ? "TIMEOUT" : "TRANSPORTE",
-      httpStatus: null
+      resultado: "SUCESSO",
+      status: payment.status,
+      statusDetail: payment.status_detail ?? null
     };
   } finally {
     clearTimeout(prazo);
   }
-
-  if (!response.ok) {
-    if (response.status >= 500 || response.status === 408 || response.status === 429) {
-      return { resultado: "AMBIGUO", motivo: "HTTP_INDISPONIVEL", httpStatus: response.status };
-    }
-    if (response.status < 400) {
-      return { resultado: "AMBIGUO", motivo: "HTTP_INDETERMINADO", httpStatus: response.status };
-    }
-    const corpo = await response.text().catch(() => "");
-    let mensagem: string | null = null;
-    let detalhe: string | null = null;
-    try {
-      const parsed = JSON.parse(corpo) as { message?: string; cause?: unknown };
-      mensagem = parsed.message ?? null;
-      detalhe = parsed.cause ? JSON.stringify(parsed.cause).slice(0, 500) : null;
-    } catch {
-      // corpo de erro não era JSON
-    }
-    return { resultado: "RECUSA_DEFINITIVA", httpStatus: response.status, mensagem, detalhe };
-  }
-
-  let payment: { status?: string; status_detail?: string } | null = null;
-  try {
-    payment = (await response.json()) as { status?: string; status_detail?: string };
-  } catch {
-    payment = null;
-  }
-
-  if (!payment || typeof payment.status !== "string") {
-    return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
-  }
-
-  return {
-    resultado: "SUCESSO",
-    status: payment.status,
-    statusDetail: payment.status_detail ?? null
-  };
 }

@@ -39,6 +39,7 @@ const bundle = await build({
       export * as mpPost from './functions/lib/mpPost';
       export * as mpRefund from './functions/lib/mpRefund';
       export * as mpRefundIntent from './functions/lib/mpRefundIntent';
+      export * as mpSearch from './functions/lib/mpSearch';
       export * as liveTabRecovery from './functions/lib/liveTabRecovery';
       export * as adminCreate from './functions/api/admin/pedidos';
       export * as promocao from './shared/promocao';
@@ -86,9 +87,26 @@ const bundle = await build({
   platform: "node"
 });
 const source = `${bundle.outputFiles[0].text}\n//# sourceURL=rp-doces-b3-bundle.mjs`;
-export const app = await import(
+const producao = await import(
   `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
 );
+
+// `createSession` de produção exige o hash validado no login (guarda de credencial).
+// Nos testes a sessão é só fixture: lê o hash vigente do usuário e delega à MESMA
+// função, então o caminho exercitado é o de produção. A função real fica em
+// `authDeProducao`, para os testes que verificam a guarda.
+async function createSession(db, userId) {
+  const usuario = await db
+    .prepare("SELECT senha_hash FROM usuarios_admin WHERE id = ?")
+    .bind(userId)
+    .first();
+  const sessao = usuario && (await producao.auth.createSession(db, userId, usuario.senha_hash));
+  if (!sessao) throw new Error(`fixture: usuário ${userId} inexistente ou inativo`);
+  return sessao;
+}
+
+export const authDeProducao = producao.auth;
+export const app = { ...producao, auth: { ...producao.auth, createSession } };
 
 export const approvedMp = (extra = {}) => ({
   id: 101,

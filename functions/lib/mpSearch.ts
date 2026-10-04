@@ -61,32 +61,38 @@ export async function buscarPagamentosPorReferenciaExterna(
   const controller = new AbortController();
   const prazo = setTimeout(() => controller.abort(), MP_PAYMENT_SEARCH_TIMEOUT_MS);
 
-  let response: Response;
-  try {
-    response = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: controller.signal
-    });
-  } catch {
-    // Falha de observação NUNCA é rejeição: a operação continua inconclusiva
-    // e a consulta pode ser repetida depois.
-    return {
-      resultado: "INDISPONIVEL",
-      motivo: controller.signal.aborted ? "TIMEOUT" : "TRANSPORTE"
-    };
-  } finally {
-    clearTimeout(prazo);
-  }
-
-  if (!response.ok) {
-    return { resultado: "INDISPONIVEL", motivo: `HTTP_${response.status}` };
-  }
-
+  // O prazo vale para a consulta INTEIRA, headers e corpo (como em fetchMpPayment):
+  // um corpo que nunca termina também vira TIMEOUT, em vez de prender o chamador.
   let corpo: { results?: PagamentoBuscado[] } | null = null;
   try {
-    corpo = (await response.json()) as { results?: PagamentoBuscado[] };
-  } catch {
-    corpo = null;
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: controller.signal
+      });
+    } catch {
+      // Falha de observação NUNCA é rejeição: a operação continua inconclusiva
+      // e a consulta pode ser repetida depois.
+      return {
+        resultado: "INDISPONIVEL",
+        motivo: controller.signal.aborted ? "TIMEOUT" : "TRANSPORTE"
+      };
+    }
+
+    if (!response.ok) {
+      return { resultado: "INDISPONIVEL", motivo: `HTTP_${response.status}` };
+    }
+
+    try {
+      corpo = (await response.json()) as { results?: PagamentoBuscado[] };
+    } catch {
+      // Abort durante o corpo é prazo estourado; qualquer outra falha segue ilegível.
+      if (controller.signal.aborted) return { resultado: "INDISPONIVEL", motivo: "TIMEOUT" };
+      corpo = null;
+    }
+  } finally {
+    clearTimeout(prazo);
   }
   if (!corpo || !Array.isArray(corpo.results)) {
     return { resultado: "INDISPONIVEL", motivo: "RESPOSTA_ILEGIVEL" };

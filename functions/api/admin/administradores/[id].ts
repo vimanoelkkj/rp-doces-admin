@@ -155,21 +155,24 @@ async function handlePut({
       }
     }
 
+    const atualizar = env.DB.prepare(
+      `UPDATE usuarios_admin SET ativo = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
+    ).bind(body.ativo ? 1 : 0, id);
+
     try {
-      await env.DB.prepare(
-        `UPDATE usuarios_admin SET ativo = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
-      )
-        .bind(body.ativo ? 1 : 0, id)
-        .run();
+      // Desativar e encerrar as sessões é uma operação só, como em alterar_papel:
+      // se o DELETE falhar o UPDATE desfaz, e não sobra sessão órfã para reviver
+      // numa reativação futura.
+      await env.DB.batch(
+        body.ativo
+          ? [atualizar]
+          : [atualizar, env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(id)]
+      );
     } catch (err: unknown) {
       if (isLastActiveOwnerError(err)) {
         return jsonError("A loja precisa manter pelo menos um administrador mestre ativo", 409);
       }
       throw err;
-    }
-
-    if (!body.ativo) {
-      await env.DB.prepare(`DELETE FROM admin_sessoes WHERE usuario_id = ?`).bind(id).run();
     }
     return Response.json({ ok: true });
   }
