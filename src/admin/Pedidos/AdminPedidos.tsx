@@ -1,42 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import PedidoDetalheModal from "./PedidoDetalheModal";
-import "./AdminPedidos.css";
 import NovoPedidoModal from "./NovoPedidoModal";
-import { formatarFinanceiroTexto, type FinanceiroPedido } from "./formatarFinanceiro";
+import PedidoDetalheModal from "./PedidoDetalheModal";
+import PedidosPaginacao from "./PedidosPaginacao";
+import PedidosTabela from "./PedidosTabela";
+import { type PedidosResponse, type TabFilter, statusLabel } from "./adminPedidosHelpers";
+import "./AdminPedidos.css";
 
-/* ── Types (espelham o retorno de GET /api/admin/pedidos) ── */
-type StatusPedido = "NOVO" | "PREPARANDO" | "PRONTO" | "ENTREGUE" | "CANCELADO";
-
-type TabFilter =
-  "todos" | "hoje" | "novos" | "em_producao" | "prontos" | "entregues" | "arquivados";
-
-interface PedidoListItem {
-  id: number;
-  cliente_nome: string;
-  valor_total_centavos: number;
-  status_pedido: StatusPedido;
-  criado_em: string;
-  financeiro: FinanceiroPedido;
-}
-
-interface Counts {
-  todos: number;
-  hoje: number;
-  novos: number;
-  em_producao: number;
-  prontos: number;
-  entregues: number;
-  arquivados: number;
-}
-
-interface PedidosResponse {
-  pedidos: PedidoListItem[];
-  total: number;
-  page: number;
-  totalPages: number;
-  counts: Counts;
-}
+export { statusLabel };
 
 const TABS: { key: TabFilter; label: string }[] = [
   { key: "todos", label: "Todos" },
@@ -47,29 +18,6 @@ const TABS: { key: TabFilter; label: string }[] = [
   { key: "entregues", label: "Entregues" },
   { key: "arquivados", label: "Arquivados" }
 ];
-
-/* ── Helpers ── */
-const formatarPreco = (centavos: number) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
-
-const STATUS_LABEL: Record<StatusPedido, string> = {
-  NOVO: "Novo",
-  PREPARANDO: "Em produção",
-  PRONTO: "Pronto",
-  ENTREGUE: "Entregue",
-  CANCELADO: "Cancelado"
-};
-
-export const statusLabel = (status: StatusPedido) => STATUS_LABEL[status];
-
-const STATUS_CLASS: Record<StatusPedido, string> = {
-  NOVO: "ped-badge--orange",
-  PREPARANDO: "ped-badge--orange",
-  PRONTO: "ped-badge--blue",
-  ENTREGUE: "ped-badge--green",
-  CANCELADO: "ped-badge--red"
-};
-
-const statusClass = (status: StatusPedido) => STATUS_CLASS[status];
 
 /* ── Component ── */
 export default function AdminPedidos() {
@@ -313,108 +261,20 @@ export default function AdminPedidos() {
 
       {/* Orders table */}
       <div className="ped-table-panel">
-        {/* Table header */}
-        <div className="ped-table-header">
-          <span className="ped-th ped-th-id">Pedido</span>
-          <span className="ped-th ped-th-client">Cliente</span>
-          <span className="ped-th ped-th-status">Status</span>
-          <span className="ped-th ped-th-payment">Pagamento</span>
-          <span className="ped-th ped-th-total">Total</span>
-        </div>
-
-        {error && <div className="ped-empty-message">{error}</div>}
-        {!error && !loading && pedidos.length === 0 && (
-          <div className="ped-empty-message">Nenhum pedido encontrado.</div>
-        )}
-
-        {/* Table rows */}
-        {pedidos.map((pedido, i) => (
-          <button
-            type="button"
-            key={pedido.id}
-            className={`ped-table-row${i === pedidos.length - 1 ? " ped-table-row--last" : ""}`}
-            onClick={() => setSelectedOrderId(pedido.id)}
-          >
-            <span className="ped-td ped-td-id">RP-{pedido.id}</span>
-            <span className="ped-td ped-td-client">{pedido.cliente_nome}</span>
-            <span className="ped-td ped-td-status">
-              <span className={`ped-badge ${statusClass(pedido.status_pedido)}`}>
-                {statusLabel(pedido.status_pedido)}
-              </span>
-            </span>
-            <span className="ped-td ped-td-payment">
-              <span
-                className={`ped-badge ped-badge--${formatarFinanceiroTexto(pedido.financeiro).cor}`}
-              >
-                {formatarFinanceiroTexto(pedido.financeiro).texto}
-              </span>
-            </span>
-            <span className="ped-td ped-td-total">
-              {formatarPreco(pedido.valor_total_centavos)}
-            </span>
-          </button>
-        ))}
-
-        {/* Pagination */}
-        <div className="ped-pagination">
-          <span className="ped-pagination-info">
-            Mostrando {startItem}-{endItem} de {total} pedidos
-          </span>
-          <div className="ped-pagination-controls">
-            <button
-              type="button"
-              className="ped-page-btn ped-page-arrow"
-              aria-label="Página anterior"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <svg
-                aria-hidden="true"
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="9,2 4,7 9,12" />
-              </svg>
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                type="button"
-                key={page}
-                className={`ped-page-btn ped-page-num${currentPage === page ? " ped-page-num--active" : ""}`}
-                onClick={() => setCurrentPage(page)}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="ped-page-btn ped-page-arrow"
-              aria-label="Próxima página"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <svg
-                aria-hidden="true"
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="5,2 10,7 5,12" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <PedidosTabela
+          pedidos={pedidos}
+          loading={loading}
+          error={error}
+          onSelectOrder={setSelectedOrderId}
+        />
+        <PedidosPaginacao
+          startItem={startItem}
+          endItem={endItem}
+          total={total}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
       {selectedOrderId !== null && (
         <PedidoDetalheModal
