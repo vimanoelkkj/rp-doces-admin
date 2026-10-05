@@ -1,0 +1,126 @@
+{
+  "builders": {
+    "origin/LIBERAR_RESERVA/": {
+      "count": 1,
+      "contract": "fe27f1a39723b6d7ae986e7967d92dd52a65824387568b3c541348bf620ee00f"
+    },
+    "origin/LIBERAR_RESERVA/AND 1=1": {
+      "count": 1,
+      "contract": "28e002bd55c9f5fa993f96459ae5dd555dafdfb23b5f7f36a74c1f303997c99c"
+    },
+    "complete/LIBERAR_RESERVA": {
+      "count": 10,
+      "contract": "6879dab1c2a521afecbad9d2614c7e9b95520ccc52f0128678509200a0d06d26"
+    },
+    "initial/LIBERAR_RESERVA/0": {
+      "count": 8,
+      "contract": "2ed506b3dbb256d99c4866dbc46995ccfb4402b2a15656874ae564c3acd02681"
+    },
+    "initial/LIBERAR_RESERVA/500": {
+      "count": 7,
+      "contract": "9b4feba20b019534a214d52c82bfa3397dc64a940ca252f12f9dd39ba575630a"
+    },
+    "origin/REPOR/": {
+      "count": 1,
+      "contract": "d4ac148e492637ef276d99a6f50b7528fca46191772bbb7f3ec202f97de468dd"
+    },
+    "origin/REPOR/AND 1=1": {
+      "count": 1,
+      "contract": "44323d8d1d3d87eb7f15e78e476b7ba674ef9bd3595308a8ba9f6932a73c12b9"
+    },
+    "complete/REPOR": {
+      "count": 10,
+      "contract": "5884f4e2a5f8b75683dd5fbdaca286b8cc819ecea215247c17d1a6a942a25178"
+    },
+    "initial/REPOR/0": {
+      "count": 8,
+      "contract": "5c51b43468f6b9934ca3681fd441263a8c31c7895e2d1dd9203f220ccaf52029"
+    },
+    "initial/REPOR/500": {
+      "count": 7,
+      "contract": "8073a9658fb4ae9c319c2ceed8d78a6fd36c71e4265abe7ba08fede3a795483b"
+    },
+    "origin/NAO_REPOR/": {
+      "count": 0,
+      "contract": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "origin/NAO_REPOR/AND 1=1": {
+      "count": 0,
+      "contract": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "complete/NAO_REPOR": {
+      "count": 9,
+      "contract": "7717b25a33bc0497cabdbd6784a71481b20de74f0bc91630db1352cc7b514eed"
+    },
+    "initial/NAO_REPOR/0": {
+      "count": 7,
+      "contract": "8efb3f700fb144c1d73fd233a007e6440afb40d543084260508c547d60e28584"
+    },
+    "initial/NAO_REPOR/500": {
+      "count": 6,
+      "contract": "2d1b477f0613fbed48bd097549206bd21452fedea4370ef83830c5aa72e0aea0"
+    },
+    "origin/NENHUMA/": {
+      "count": 0,
+      "contract": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "origin/NENHUMA/AND 1=1": {
+      "count": 0,
+      "contract": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "complete/NENHUMA": {
+      "count": 9,
+      "contract": "fb785dc8bc190ae29ca78d278f5f86c9a69eaa4b7f17edf8d1a942703b31f7bc"
+    },
+    "initial/NENHUMA/0": {
+      "count": 7,
+      "contract": "c230fdf9096b68e4ea89e9c5e9a0f76218dd977adb28a0bd28cb9f156ce32660"
+    },
+    "initial/NENHUMA/500": {
+      "count": 6,
+      "contract": "798ba1a6bec4d206957d3f3cf67e3d33fb9ea6654c1f8413ba699f053123e977"
+    },
+    "destination/{\"exchangeId\":17}/": {
+      "count": 2,
+      "contract": "dfbdd551409c7bb9981b07d8937538b8a9574fc4acb037a2a280535fc21ec0e7"
+    },
+    "destination/{\"exchangeId\":17}/AND 1=1": {
+      "count": 2,
+      "contract": "901473c01e6a4889889c6a2d73d0f3c7044d6aecfc8ee15a832331bea5ce1bc8"
+    },
+    "destination/{\"operationKey\":\"statements-key\"}/": {
+      "count": 2,
+      "contract": "b846f0035a6e2227f0692b10ab0f86057e0ac77d8a053a5c966d947155149379"
+    },
+    "destination/{\"operationKey\":\"statements-key\"}/AND 1=1": {
+      "count": 2,
+      "contract": "f07f20e1c98146a387bc570e2c44cac9b74998e6ff34005dd565ac5a46dee8f7"
+    },
+    "complete/invalid snapshot": {
+      "count": 10,
+      "contract": "b28c1e54e0913baf700472cd29bcfe05a393bb67713844f6c5896e39c6a93836"
+    },
+    "completed invariant": {
+      "count": 1,
+      "contract": "ec53f1c8701e0740aaf4bf1d6197c5316ca6bec45e182f4a0233d851b3273f30"
+    },
+    "invariant/{\"originStatus\":\"ATIVO\",\"destinationStatus\":\"TROCA_PENDENTE\",\"destinationStock\":\"RESERVADO\"}": {
+      "count": 1,
+      "contract": "88f6b565c242518cb6203a7a24d09dac1ab9fc94467c928730a8591d941e5840"
+    },
+    "invariant/{\"originStatus\":\"CANCELADO\",\"destinationStatus\":\"ATIVO\",\"destinationStock\":\"RESERVADO\"}": {
+      "count": 1,
+      "contract": "f1bf9c454ed2f5ee00e1382e6840b4909a4136028eb23911021f846e27fa4a32"
+    },
+    "invariant/{\"originStatus\":\"CANCELADO\",\"destinationStatus\":\"ATIVO\",\"destinationStock\":\"BAIXADO\"}": {
+      "count": 1,
+      "contract": "5d5d092d5353367a9bbc120d08284f3f2196d78d9d7244ce233011fb706b48ed"
+    }
+  },
+  "immediate": "63c168b65bb1307e06bd0915ef3967c1b4edd47af58187091405e5ae81993cea",
+  "waiting charge": "f01f05441a4068dc628c98b2fcfbb25391697b2b79ffd3a1061f5e743c1f8a6d",
+  "destination deduction": "5f74606a97f3e02ed2355e575e7a05d68450c557fd759059864629c1581d9dc8",
+  "physical rollback": "f01f05441a4068dc628c98b2fcfbb25391697b2b79ffd3a1061f5e743c1f8a6d",
+  "total rollback": "f01f05441a4068dc628c98b2fcfbb25391697b2b79ffd3a1061f5e743c1f8a6d",
+  "completed invariant rollback": "63c168b65bb1307e06bd0915ef3967c1b4edd47af58187091405e5ae81993cea"
+}

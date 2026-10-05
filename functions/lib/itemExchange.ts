@@ -1,6 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { getPedidoAnulacao } from "./pedidoValido";
 import { temEstornoAnulacaoAtivo } from "./pedidoAnulacao";
 
 import { precoVigenteCentavos } from "../../shared/promocao";
@@ -14,17 +13,12 @@ import {
   fonteTrocaCriada,
   parseOperationKey,
   prepareClaimOperacao,
-  type ConflitoOperacao,
   type IdentidadeEsperada,
   type OperacaoRow
 } from "./operacoes";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
 import { preparePedidoPhysicalProjection } from "./stock";
-import {
-  getPixMpRefundIntentForLeg,
-  reconcilePixMpRefundIntent,
-  type PixMpRefundIntentStatus
-} from "./mpRefundIntent";
+import { reconcilePixMpRefundIntent } from "./mpRefundIntent";
 import {
   CONFIRMED_REFUNDS_BY_ALLOCATION_CTE,
   financialLineageCte,
@@ -32,127 +26,61 @@ import {
   REFUND_ALLOCATIONS_UNION_SQL
 } from "./financialCoverage";
 
-export type ExchangeStockAction = "LIBERAR_RESERVA" | "NAO_REPOR" | "REPOR" | "NENHUMA";
-export type ExchangeStatus =
-  | "SOLICITADA"
-  | "AGUARDANDO_COBRANCA"
-  | "AGUARDANDO_REEMBOLSO"
-  | "CONCLUIDA"
-  | "INCONCLUSIVA"
-  | "FALHOU";
+import {
+  stockActions,
+  effectiveExchangeAllocations,
+  calculateExchangePreviewFinancial,
+  proposedExchangeRefunds,
+  exchangePreviewBlockers,
+  buildExchangePreviewContent
+} from "./itemExchangePreview";
+import {
+  ItemExchangePreviewError,
+  type OriginRow,
+  type ProductRow,
+  type AllocationRow,
+  type ExchangeStatus,
+  type ExchangeStockAction,
+  type ItemExchangePreview,
+  type ExchangeResult
+} from "./itemExchangeTypes";
+import { exchangeById, getExchangeView, exchangeView } from "./itemExchangeView";
+import {
+  destinationPhysicalStatements,
+  completeInitialExchangeStatements,
+  completeExchangeStatements,
+  exchangeInvariant,
+  completedExchangeInvariant
+} from "./itemExchangeStatements";
+import { createExchangeReconciliation } from "./itemExchangeReconciliation";
+export { getExchangeView } from "./itemExchangeView";
+export { ItemExchangePreviewError } from "./itemExchangeTypes";
+export type {
+  ExchangeStockAction,
+  ExchangeStatus,
+  ExchangeRefundLeg,
+  ItemExchangePreview,
+  ExchangeView,
+  ExchangeResult
+} from "./itemExchangeTypes";
 
-export interface ExchangeRefundLeg {
-  pagamentoId: number;
-  pagamentoAlocacaoId: number;
-  metodo: string;
-  valorCentavos: number;
-  confirmacaoManualPermitida: boolean;
-  refundRemoto?: {
-    status: PixMpRefundIntentStatus;
-    tentativas: number;
-    mpRefundId: string | null;
-    ultimoErro: string | null;
-    operationKey: string;
-    atualizadoEm: string;
-    podeVerificar: boolean;
-  };
-}
+const {
+  tryFinalizeExchange,
+  reconcileExchangeFinalization,
+  reconcileExchangeFinalizationsForPedido,
+  reconcileExchangeCharges
+} = createExchangeReconciliation({
+  completeExchangeStatements,
+  destinationPhysicalStatements,
+  completedExchangeInvariant
+});
+export {
+  reconcileExchangeFinalization,
+  reconcileExchangeFinalizationsForPedido,
+  reconcileExchangeCharges
+};
 
-export interface ItemExchangePreview {
-  previewFingerprint: string;
-  pedidoId: number;
-  itemOrigem: {
-    id: number;
-    nome: string;
-    valorCentavos: number;
-    coberturaEfetivaCentavos: number;
-    estoqueEstado: string;
-  };
-  itemDestino: {
-    produtoId: number;
-    nome: string;
-    quantidade: number;
-    precoUnitarioCentavos: number;
-    valorCentavos: number;
-    estoqueDisponivel: number;
-  };
-  financeiro: {
-    totalAtualCentavos: number;
-    liquidoAtualCentavos: number;
-    totalProjetadoCentavos: number;
-    diferencaCentavos: number;
-    tipoDiferenca: "COBRAR" | "DEVOLVER" | "ZERO";
-    saldoProjetadoCentavos: number;
-    excessoProjetadoCentavos: number;
-  };
-  refundsPropostos: ExchangeRefundLeg[];
-  estoque: {
-    acaoOrigem: ExchangeStockAction;
-    acoesOrigemPermitidas: ExchangeStockAction[];
-    estadoDestino: "RESERVADO";
-  };
-  bloqueios: Array<{ codigo: string; mensagem: string }>;
-  trocaExecutavel: boolean;
-}
-
-export class ItemExchangePreviewError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public status = 409,
-    public extra: Record<string, unknown> = {}
-  ) {
-    super(message);
-  }
-}
-
-interface OriginRow {
-  id: number;
-  pedido_id: number;
-  produto_nome: string;
-  quantidade: number;
-  valor_total_centavos: number;
-  status_item: string;
-  estoque_estado: string;
-}
-interface ProductRow {
-  id: number;
-  nome: string;
-  preco_centavos: number;
-  preco_promocional_centavos: number | null;
-  promocao_inicio: string | null;
-  promocao_fim: string | null;
-  estoque: number;
-  promocao_ativa: number;
-  estoque_reservado: number;
-  ativo: number;
-  disponivel: number;
-}
-interface AllocationRow {
-  pagamentoId: number;
-  pagamentoAlocacaoId: number;
-  metodo: string;
-  valorAlocadoCentavos: number;
-  valorReembolsadoCentavos: number;
-}
-interface ExchangeRow {
-  id: number;
-  pedido_id: number;
-  item_origem_id: number;
-  item_destino_id: number | null;
-  status: ExchangeStatus;
-  estoque_acao_origem: ExchangeStockAction;
-  snapshot_financeiro: string;
-}
-
-const MANUAL_METHODS = new Set(["DINHEIRO", "CARTAO", "PIX_EXTERNO"]);
 const refundsUnion = REFUND_ALLOCATIONS_UNION_SQL;
-
-function stockActions(state: string): ExchangeStockAction[] {
-  if (state === "RESERVADO") return ["LIBERAR_RESERVA"];
-  if (state === "BAIXADO") return ["NAO_REPOR", "REPOR"];
-  return ["NENHUMA"];
-}
 
 export async function getItemExchangePreview(
   db: D1Database,
@@ -269,35 +197,17 @@ export async function getItemExchangePreview(
     )
     .bind(params.itemId)
     .all<AllocationRow>();
-  const effective = allocations.map(a => ({
-    ...a,
-    efetivo: Math.max(0, Number(a.valorAlocadoCentavos) - Number(a.valorReembolsadoCentavos))
-  }));
-  const originCoverage = effective.reduce((s, a) => s + a.efetivo, 0);
+  const { effective, originCoverage } = effectiveExchangeAllocations(allocations);
   const financeiroAtual = await getFinanceiroPedido(db, params.pedidoId);
-  const destinationValue = currentPrice * params.quantidadeDestino;
-  const projectedTotal =
-    Number(pedido.valor_total_centavos) - Number(origin.valor_total_centavos) + destinationValue;
-  const projectedBalance = Math.max(0, projectedTotal - financeiroAtual.liquidoCentavos);
-  const projectedExcess = Math.max(0, financeiroAtual.liquidoCentavos - projectedTotal);
-  const difference = projectedBalance > 0 ? projectedBalance : -projectedExcess;
-  const differenceType: "COBRAR" | "DEVOLVER" | "ZERO" =
-    difference > 0 ? "COBRAR" : difference < 0 ? "DEVOLVER" : "ZERO";
-  let remainingRefund = projectedExcess;
-  const proposedRefunds: ExchangeRefundLeg[] = [];
-  for (const allocation of effective) {
-    if (remainingRefund <= 0) break;
-    const amount = Math.min(remainingRefund, allocation.efetivo);
-    if (amount > 0)
-      proposedRefunds.push({
-        pagamentoId: Number(allocation.pagamentoId),
-        pagamentoAlocacaoId: Number(allocation.pagamentoAlocacaoId),
-        metodo: allocation.metodo,
-        valorCentavos: amount,
-        confirmacaoManualPermitida: MANUAL_METHODS.has(allocation.metodo)
-      });
-    remainingRefund -= amount;
-  }
+  const financial = calculateExchangePreviewFinancial(
+    pedido,
+    origin,
+    currentPrice,
+    params,
+    financeiroAtual
+  );
+  const { projectedExcess } = financial;
+  const { proposedRefunds, remainingRefund } = proposedExchangeRefunds(effective, projectedExcess);
   const stockAvailable = Math.max(0, Number(product.estoque) - Number(product.estoque_reservado));
   const availableAfterOrigin =
     stockAvailable +
@@ -329,22 +239,6 @@ export async function getItemExchangePreview(
     projectedExcess === 0
       ? Number(origin.quantidade)
       : 0);
-  const blockers: Array<{ codigo: string; mensagem: string }> = [];
-  if (
-    pedido.origem_pedido !== "MANUAL" ||
-    pedido.status_comanda !== "ABERTA" ||
-    !["NOVO", "PREPARANDO", "PRONTO"].includes(pedido.status_pedido)
-  ) {
-    blockers.push({
-      codigo: "PEDIDO_NAO_TROCAVEL",
-      mensagem: "Este pedido não aceita troca nesta etapa."
-    });
-  } else if (pedido.status_pedido === "PRONTO") {
-    blockers.push({
-      codigo: "STATUS_PEDIDO_PRONTO",
-      mensagem: "Pedido pronto não pode ser reaberto nesta fase."
-    });
-  }
   const pendingPix = await db
     .prepare(
       `SELECT 1 FROM pedido_pagamentos
@@ -352,249 +246,29 @@ export async function getItemExchangePreview(
     )
     .bind(params.pedidoId)
     .first();
-  if (pendingPix)
-    blockers.push({ codigo: "PIX_PENDENTE", mensagem: "Há um Pix pendente nesta comanda." });
-  if (product.disponivel !== 1 || availableAfterOrigin < params.quantidadeDestino) {
-    blockers.push({
-      codigo: "ESTOQUE_INSUFICIENTE",
-      mensagem: "Estoque insuficiente para o produto de destino."
-    });
-  }
-  if (remainingRefund > 0)
-    blockers.push({
-      codigo: "COBERTURA_INSUFICIENTE",
-      mensagem: "A origem financeira do excesso não pôde ser determinada."
-    });
-
-  const content = {
-    pedidoId: params.pedidoId,
-    itemOrigem: {
-      id: Number(origin.id),
-      nome: origin.produto_nome,
-      valorCentavos: Number(origin.valor_total_centavos),
-      coberturaEfetivaCentavos: originCoverage,
-      estoqueEstado: origin.estoque_estado
-    },
-    itemDestino: {
-      produtoId: Number(product.id),
-      nome: product.nome,
-      quantidade: params.quantidadeDestino,
-      precoUnitarioCentavos: currentPrice,
-      valorCentavos: destinationValue,
-      estoqueDisponivel: stockAvailable
-    },
-    financeiro: {
-      totalAtualCentavos: Number(pedido.valor_total_centavos),
-      liquidoAtualCentavos: financeiroAtual.liquidoCentavos,
-      totalProjetadoCentavos: projectedTotal,
-      diferencaCentavos: difference,
-      tipoDiferenca: differenceType,
-      saldoProjetadoCentavos: projectedBalance,
-      excessoProjetadoCentavos: projectedExcess
-    },
-    refundsPropostos: proposedRefunds,
-    estoque: {
-      acaoOrigem: selectedAction,
-      acoesOrigemPermitidas: allowed,
-      estadoDestino: "RESERVADO" as const
-    },
-    bloqueios: blockers,
-    trocaExecutavel: blockers.length === 0
-  };
-  return { previewFingerprint: fingerprint(content), ...content };
-}
-
-export interface ExchangeView {
-  id: number;
-  pedidoId: number;
-  itemOrigemId: number;
-  itemDestinoId: number | null;
-  status: ExchangeStatus;
-  reembolsoPendenteCentavos: number;
-  refundsPendentes: ExchangeRefundLeg[];
-  estoqueOrigemEstado: string;
-  estoqueDestinoEstado: string | null;
-  reembolsosConfirmados: Array<{
-    id: number;
-    metodo: string;
-    valorCentavos: number;
-    origem: string;
-    mpRefundId: string | null;
-  }>;
-  financeiro: {
-    status: string;
-    totalCentavos: number;
-    liquidoCentavos: number;
-    saldoCentavos: number;
-  };
-}
-type ExchangeError =
-  | "OPERATION_KEY_INVALIDA"
-  | "PREVIEW_OBSOLETO"
-  | "PRECO_ALTERADO"
-  | "ESTOQUE_INSUFICIENTE"
-  | "PIX_PENDENTE"
-  | "TROCA_NAO_ENCONTRADA"
-  | "TROCA_NAO_AGUARDANDO"
-  | "PAGAMENTO_ALOCACAO_INVALIDA"
-  | "PIX_MP_REFUND_REMOTO_PENDENTE"
-  | "VALOR_REFUND_DIVERGENTE"
-  | "MERCADO_PAGO_NAO_CONFIGURADO"
-  | "REFUND_REMOTO_EM_ANDAMENTO"
-  | "SALDO_REEMBOLSAVEL_INSUFICIENTE"
-  | "OPERACAO_INCOMPLETA"
-  | "ESTORNO_ANULACAO_ATIVO"
-  | ConflitoOperacao;
-export type ExchangeResult =
-  | {
-      ok: true;
-      troca: ExchangeView;
-      replay?: boolean;
-      reembolsoId?: number;
-      refundStatus?: PixMpRefundIntentStatus;
-    }
-  | { ok: false; erro: ExchangeError; preview?: ItemExchangePreview; precoAtualCentavos?: number };
-
-async function exchangeById(db: D1Database, id: number): Promise<ExchangeRow | null> {
-  return db
-    .prepare(
-      `SELECT id,pedido_id,item_origem_id,item_destino_id,status,estoque_acao_origem,snapshot_financeiro
-    FROM pedido_item_trocas WHERE id=? LIMIT 1`
-    )
-    .bind(id)
-    .first<ExchangeRow>();
-}
-
-export async function getExchangeView(
-  db: D1Database,
-  pedidoId: number,
-  itemId: number
-): Promise<ExchangeView | null> {
-  const row = await db
-    .prepare(
-      `SELECT id,pedido_id,item_origem_id,item_destino_id,status,estoque_acao_origem,snapshot_financeiro
-    FROM pedido_item_trocas WHERE pedido_id=? AND item_origem_id=? AND status<>'FALHOU' ORDER BY id DESC LIMIT 1`
-    )
-    .bind(pedidoId, itemId)
-    .first<ExchangeRow>();
-  return row ? exchangeView(db, row) : null;
-}
-
-async function exchangeView(db: D1Database, row: ExchangeRow): Promise<ExchangeView> {
-  let projectedTotal = 0;
-  try {
-    projectedTotal = (JSON.parse(row.snapshot_financeiro) as ItemExchangePreview).financeiro
-      .totalProjetadoCentavos;
-  } catch {
-    projectedTotal = 0;
-  }
-  let pending: ExchangeRefundLeg[] = [];
-  if (!["CONCLUIDA", "AGUARDANDO_COBRANCA", "FALHOU"].includes(row.status)) {
-    const financial = await getFinanceiroPedido(db, row.pedido_id);
-    let required = Math.max(0, financial.liquidoCentavos - projectedTotal);
-    const { results: allocations } = await db
-      .prepare(
-        `WITH RECURSIVE ${financialLineageCte("?")},
-        ${CONFIRMED_REFUNDS_BY_ALLOCATION_CTE}
-      SELECT pp.id AS pagamentoId,a.id AS pagamentoAlocacaoId,
-        pp.metodo AS metodo,a.valor_centavos AS valorAlocadoCentavos,
-        COALESCE(rf.valor_centavos,0) AS valorReembolsadoCentavos
-      FROM pedido_pagamento_alocacoes a JOIN pedido_pagamentos pp ON pp.id=a.pagamento_id
-      LEFT JOIN refunds_confirmados rf ON rf.pagamento_alocacao_id=a.id
-      WHERE a.pedido_item_id IN (SELECT item_id FROM linhagem_financeira) AND pp.status='PAGO'
-      ORDER BY a.id DESC`
-      )
-      .bind(row.item_origem_id)
-      .all<AllocationRow>();
-    pending = [];
-    for (const allocation of allocations) {
-      if (required <= 0) break;
-      const effective = Math.max(
-        0,
-        Number(allocation.valorAlocadoCentavos) - Number(allocation.valorReembolsadoCentavos)
-      );
-      const amount = Math.min(required, effective);
-      if (amount > 0) {
-        const remote =
-          allocation.metodo === "PIX_MP"
-            ? await getPixMpRefundIntentForLeg(db, {
-                exchangeId: Number(row.id),
-                pagamentoAlocacaoId: Number(allocation.pagamentoAlocacaoId)
-              })
-            : null;
-        pending.push({
-          pagamentoId: Number(allocation.pagamentoId),
-          pagamentoAlocacaoId: Number(allocation.pagamentoAlocacaoId),
-          metodo: allocation.metodo,
-          valorCentavos: amount,
-          confirmacaoManualPermitida: MANUAL_METHODS.has(allocation.metodo),
-          ...(remote
-            ? {
-                refundRemoto: {
-                  status: remote.status,
-                  tentativas: remote.tentativas,
-                  mpRefundId: remote.mpRefundId,
-                  ultimoErro: remote.ultimoErro,
-                  operationKey: remote.operationKey,
-                  atualizadoEm: remote.atualizadoEm,
-                  podeVerificar: remote.podeVerificar
-                }
-              }
-            : {})
-        });
-      }
-      required -= amount;
-    }
-  }
-  const [stocks, refunds, financeiro] = await Promise.all([
-    db
-      .prepare(`SELECT id,estoque_estado FROM pedido_itens WHERE id IN (?,?)`)
-      .bind(row.item_origem_id, row.item_destino_id ?? -1)
-      .all<{ id: number; estoque_estado: string }>(),
-    db
-      .prepare(
-        `SELECT r.id,r.metodo,r.valor_centavos,r.origem,r.mp_refund_id
-      FROM pedido_item_troca_reembolso_alocacoes ra JOIN pedido_reembolsos r ON r.id=ra.reembolso_id
-      WHERE ra.pedido_item_troca_id=? AND r.status='REEMBOLSADO' ORDER BY r.id`
-      )
-      .bind(row.id)
-      .all<{
-        id: number;
-        metodo: string;
-        valor_centavos: number;
-        origem: string;
-        mp_refund_id: string | null;
-      }>(),
-    getFinanceiroPedido(db, Number(row.pedido_id))
-  ]);
-  const originStock = stocks.results.find(item => Number(item.id) === Number(row.item_origem_id));
-  const destinationStock = stocks.results.find(
-    item => Number(item.id) === Number(row.item_destino_id)
+  const blockers = exchangePreviewBlockers(
+    pedido,
+    !!pendingPix,
+    product,
+    availableAfterOrigin,
+    params,
+    remainingRefund
   );
-  return {
-    id: Number(row.id),
-    pedidoId: Number(row.pedido_id),
-    itemOrigemId: Number(row.item_origem_id),
-    itemDestinoId: row.item_destino_id == null ? null : Number(row.item_destino_id),
-    status: row.status,
-    reembolsoPendenteCentavos: pending.reduce((s, x) => s + x.valorCentavos, 0),
-    refundsPendentes: pending,
-    estoqueOrigemEstado: originStock?.estoque_estado ?? "DESCONHECIDO",
-    estoqueDestinoEstado: destinationStock?.estoque_estado ?? null,
-    reembolsosConfirmados: refunds.results.map(refund => ({
-      id: Number(refund.id),
-      metodo: refund.metodo,
-      valorCentavos: Number(refund.valor_centavos),
-      origem: refund.origem,
-      mpRefundId: refund.mp_refund_id
-    })),
-    financeiro: {
-      status: financeiro.status,
-      totalCentavos: financeiro.totalCentavos,
-      liquidoCentavos: financeiro.liquidoCentavos,
-      saldoCentavos: financeiro.saldoCentavos
-    }
-  };
+  const content = buildExchangePreviewContent({
+    params,
+    pedido,
+    origin,
+    product,
+    currentPrice,
+    originCoverage,
+    financial: { ...financial, liquidoAtualCentavos: financeiroAtual.liquidoCentavos },
+    proposedRefunds,
+    stockAvailable,
+    selectedAction,
+    allowed,
+    blockers
+  });
+  return { previewFingerprint: fingerprint(content), ...content };
 }
 
 async function replayExchange(
@@ -609,266 +283,6 @@ async function replayExchange(
   return row
     ? { ok: true, troca: await exchangeView(db, row), replay: true }
     : { ok: false, erro: "OPERACAO_INCOMPLETA" };
-}
-
-function originPhysicalStatements(
-  db: D1Database,
-  itemId: number,
-  action: ExchangeStockAction,
-  extraGuard = ""
-): D1PreparedStatement[] {
-  if (action === "LIBERAR_RESERVA")
-    return [
-      db
-        .prepare(
-          `UPDATE produtos SET estoque_reservado=estoque_reservado-(SELECT quantidade FROM pedido_itens WHERE id=?),atualizado_em=CURRENT_TIMESTAMP
-    WHERE id=(SELECT produto_id FROM pedido_itens WHERE id=?)
-      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=? AND status_item='ATIVO' AND estoque_estado='RESERVADO') ${extraGuard}`
-        )
-        .bind(itemId, itemId, itemId)
-    ];
-  if (action === "REPOR")
-    return [
-      db
-        .prepare(
-          `UPDATE produtos SET estoque=estoque+(SELECT quantidade FROM pedido_itens WHERE id=?),disponivel=CASE WHEN ativo=1 THEN 1 ELSE disponivel END,atualizado_em=CURRENT_TIMESTAMP
-    WHERE id=(SELECT produto_id FROM pedido_itens WHERE id=?)
-      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=? AND status_item='ATIVO' AND estoque_estado='BAIXADO') ${extraGuard}`
-        )
-        .bind(itemId, itemId, itemId)
-    ];
-  return [];
-}
-
-function destinationPhysicalStatements(
-  db: D1Database,
-  selector: { exchangeId: number } | { operationKey: string },
-  extraGuard = ""
-): D1PreparedStatement[] {
-  const byOperation = "operationKey" in selector;
-  const exchangePredicate = byOperation
-    ? `t.id=(SELECT pedido_item_troca_id FROM pedido_operacoes WHERE operation_key=?)`
-    : `t.id=?`;
-  const value = byOperation ? selector.operationKey : selector.exchangeId;
-  return [
-    db
-      .prepare(
-        `WITH destino AS (
-      SELECT pi.produto_id,pi.quantidade FROM pedido_item_trocas t
-      JOIN pedido_itens pi ON pi.id=t.item_destino_id
-      WHERE ${exchangePredicate} AND pi.status_item IN ('TROCA_PENDENTE','ATIVO')
-        AND pi.estoque_estado='RESERVADO' ${extraGuard}
-    )
-    UPDATE produtos SET estoque=estoque-(SELECT quantidade FROM destino),
-      estoque_reservado=estoque_reservado-(SELECT quantidade FROM destino),
-      disponivel=CASE WHEN ativo=1
-        AND (estoque-(SELECT quantidade FROM destino))-(estoque_reservado-(SELECT quantidade FROM destino))>0
-        THEN disponivel ELSE 0 END,
-      atualizado_em=CURRENT_TIMESTAMP
-    WHERE id=(SELECT produto_id FROM destino)
-      AND estoque>=(SELECT quantidade FROM destino)
-      AND estoque_reservado>=(SELECT quantidade FROM destino)`
-      )
-      .bind(value),
-    db
-      .prepare(
-        `UPDATE pedido_itens SET status_item='ATIVO',pedido_item_troca_id=NULL,
-      estoque_estado='BAIXADO',estoque_baixado_em=COALESCE(estoque_baixado_em,CURRENT_TIMESTAMP)
-    WHERE id=(SELECT t.item_destino_id FROM pedido_item_trocas t WHERE ${exchangePredicate})
-      AND status_item IN ('TROCA_PENDENTE','ATIVO') AND estoque_estado='RESERVADO' ${extraGuard}`
-      )
-      .bind(value)
-  ];
-}
-
-function completedExchangeInvariant(db: D1Database, row: ExchangeRow): D1PreparedStatement {
-  return db
-    .prepare(
-      `UPDATE pedidos SET valor_total_centavos=-1 WHERE id=?
-    AND EXISTS(SELECT 1 FROM pedido_item_trocas WHERE id=? AND status='CONCLUIDA')
-    AND NOT EXISTS(
-      SELECT 1 FROM pedido_item_trocas t
-      JOIN pedido_itens destino ON destino.id=t.item_destino_id
-      WHERE t.id=? AND destino.status_item='ATIVO' AND destino.estoque_estado='BAIXADO'
-        AND NOT EXISTS(
-          SELECT 1 FROM produtos pr WHERE pr.id=destino.produto_id
-            AND pr.estoque_reservado<>(SELECT COALESCE(SUM(pi.quantidade),0) FROM pedido_itens pi
-              WHERE pi.produto_id=pr.id AND pi.status_item IN ('ATIVO','TROCA_PENDENTE')
-                AND pi.estoque_estado='RESERVADO')
-        )
-    )`
-    )
-    .bind(row.pedido_id, row.id, row.id);
-}
-
-function completeExchangeStatements(db: D1Database, row: ExchangeRow): D1PreparedStatement[] {
-  let projectedTotal = 0;
-  try {
-    projectedTotal = (JSON.parse(row.snapshot_financeiro) as ItemExchangePreview).financeiro
-      .totalProjetadoCentavos;
-  } catch {
-    projectedTotal = -1;
-  }
-  const net = `(COALESCE((SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id=${Number(row.pedido_id)} AND status='PAGO'),0)
-    -COALESCE((SELECT SUM(valor_centavos) FROM pedido_reembolsos WHERE pedido_id=${Number(row.pedido_id)} AND status='REEMBOLSADO'),0))`;
-  const safe = `AND ${net}<=${Number(projectedTotal)}`;
-  const statements = originPhysicalStatements(
-    db,
-    row.item_origem_id,
-    row.estoque_acao_origem,
-    safe
-  );
-  statements.push(
-    db
-      .prepare(
-        `UPDATE pedido_itens SET status_item='CANCELADO',
-      estoque_estado=CASE WHEN ?='LIBERAR_RESERVA' THEN 'LIBERADO' WHEN ?='REPOR' THEN 'REPOSTO' ELSE estoque_estado END,
-      estoque_liberado_em=CASE WHEN ?='LIBERAR_RESERVA' THEN COALESCE(estoque_liberado_em,CURRENT_TIMESTAMP) ELSE estoque_liberado_em END,
-      estoque_reposto_em=CASE WHEN ?='REPOR' THEN COALESCE(estoque_reposto_em,CURRENT_TIMESTAMP) ELSE estoque_reposto_em END
-    WHERE id=? AND status_item='ATIVO' ${safe}`
-      )
-      .bind(
-        row.estoque_acao_origem,
-        row.estoque_acao_origem,
-        row.estoque_acao_origem,
-        row.estoque_acao_origem,
-        row.item_origem_id
-      )
-  );
-  statements.push(
-    db
-      .prepare(
-        `UPDATE pedido_itens SET status_item='ATIVO',pedido_item_troca_id=NULL
-    WHERE id=? AND pedido_item_troca_id=? AND status_item='TROCA_PENDENTE' ${safe}`
-      )
-      .bind(row.item_destino_id, row.id)
-  );
-  const financiallyResolved = `${safe} AND ${net}>=(SELECT COALESCE(SUM(valor_total_centavos),0)
-    FROM pedido_itens WHERE pedido_id=${Number(row.pedido_id)} AND status_item='ATIVO')`;
-  statements.push(
-    ...destinationPhysicalStatements(db, { exchangeId: row.id }, financiallyResolved)
-  );
-  statements.push(
-    db
-      .prepare(
-        `UPDATE pedidos SET valor_total_centavos=(SELECT COALESCE(SUM(valor_total_centavos),0)
-    FROM pedido_itens WHERE pedido_id=? AND status_item='ATIVO'),atualizado_em=CURRENT_TIMESTAMP WHERE id=?`
-      )
-      .bind(row.pedido_id, row.pedido_id)
-  );
-  statements.push(preparePedidoFinancialProjection(db, row.pedido_id));
-  statements.push(preparePedidoPhysicalProjection(db, row.pedido_id));
-  statements.push(
-    db
-      .prepare(
-        `UPDATE pedido_item_trocas SET status=CASE
-      WHEN (SELECT MAX(0,p.valor_total_centavos-COALESCE((SELECT SUM(valor_centavos) FROM pedido_pagamentos WHERE pedido_id=p.id AND status='PAGO'),0)+COALESCE((SELECT SUM(valor_centavos) FROM pedido_reembolsos WHERE pedido_id=p.id AND status='REEMBOLSADO'),0)) FROM pedidos p WHERE p.id=pedido_id)>0
-      THEN 'AGUARDANDO_COBRANCA' ELSE 'CONCLUIDA' END,
-      concluido_em=CASE WHEN (SELECT status_pagamento FROM pedidos WHERE id=pedido_id)='PAGO' THEN COALESCE(concluido_em,CURRENT_TIMESTAMP) ELSE concluido_em END
-    WHERE id=? AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_origem_id AND status_item='CANCELADO')
-      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_destino_id AND status_item='ATIVO'
-        AND estoque_estado=CASE WHEN (SELECT MAX(0,p.valor_total_centavos-${net}) FROM pedidos p WHERE p.id=pedido_id)>0
-          THEN 'RESERVADO' ELSE 'BAIXADO' END)`
-      )
-      .bind(row.id)
-  );
-  statements.push(completedExchangeInvariant(db, row));
-  return statements;
-}
-
-function completeInitialExchangeStatements(
-  db: D1Database,
-  params: {
-    pedidoId: number;
-    itemId: number;
-    operationKey: string;
-    action: ExchangeStockAction;
-    projectedBalance: number;
-  }
-): D1PreparedStatement[] {
-  const statements = originPhysicalStatements(db, params.itemId, params.action);
-  statements.push(
-    db
-      .prepare(
-        `UPDATE pedido_itens SET status_item='CANCELADO',
-    estoque_estado=CASE WHEN ?='LIBERAR_RESERVA' THEN 'LIBERADO' WHEN ?='REPOR' THEN 'REPOSTO' ELSE estoque_estado END,
-    estoque_liberado_em=CASE WHEN ?='LIBERAR_RESERVA' THEN COALESCE(estoque_liberado_em,CURRENT_TIMESTAMP) ELSE estoque_liberado_em END,
-    estoque_reposto_em=CASE WHEN ?='REPOR' THEN COALESCE(estoque_reposto_em,CURRENT_TIMESTAMP) ELSE estoque_reposto_em END
-    WHERE id=? AND status_item='ATIVO'`
-      )
-      .bind(params.action, params.action, params.action, params.action, params.itemId)
-  );
-  if (params.projectedBalance > 0)
-    statements.push(
-      db
-        .prepare(
-          `UPDATE pedido_itens SET status_item='ATIVO',pedido_item_troca_id=NULL
-    WHERE pedido_item_troca_id=(SELECT pedido_item_troca_id FROM pedido_operacoes WHERE operation_key=?)
-      AND status_item='TROCA_PENDENTE'`
-        )
-        .bind(params.operationKey)
-    );
-  else statements.push(...destinationPhysicalStatements(db, { operationKey: params.operationKey }));
-  statements.push(
-    db
-      .prepare(
-        `UPDATE pedidos SET valor_total_centavos=(SELECT COALESCE(SUM(valor_total_centavos),0)
-    FROM pedido_itens WHERE pedido_id=? AND status_item='ATIVO'),atualizado_em=CURRENT_TIMESTAMP WHERE id=?`
-      )
-      .bind(params.pedidoId, params.pedidoId)
-  );
-  statements.push(preparePedidoFinancialProjection(db, params.pedidoId));
-  statements.push(preparePedidoPhysicalProjection(db, params.pedidoId));
-  statements.push(
-    db
-      .prepare(
-        `UPDATE pedido_item_trocas SET status=?,concluido_em=CASE WHEN ?='CONCLUIDA' THEN CURRENT_TIMESTAMP ELSE NULL END
-    WHERE id=(SELECT pedido_item_troca_id FROM pedido_operacoes WHERE operation_key=?)`
-      )
-      .bind(
-        params.projectedBalance > 0 ? "AGUARDANDO_COBRANCA" : "CONCLUIDA",
-        params.projectedBalance > 0 ? "AGUARDANDO_COBRANCA" : "CONCLUIDA",
-        params.operationKey
-      )
-  );
-  return statements;
-}
-
-function exchangeInvariant(
-  db: D1Database,
-  pedidoId: number,
-  operationKey: string,
-  expected: {
-    originStatus: "ATIVO" | "CANCELADO";
-    destinationStatus: "TROCA_PENDENTE" | "ATIVO";
-    destinationStock: "RESERVADO" | "BAIXADO";
-  }
-): D1PreparedStatement {
-  return db
-    .prepare(
-      `UPDATE pedidos AS p SET valor_total_centavos=-1 WHERE p.id=? AND NOT EXISTS(
-    SELECT 1 FROM pedido_operacoes o JOIN pedido_item_trocas t ON t.id=o.pedido_item_troca_id
-    JOIN pedido_itens origem ON origem.id=t.item_origem_id
-    JOIN pedido_itens destino ON destino.id=t.item_destino_id
-    WHERE o.operation_key=? AND t.pedido_id=p.id
-      AND origem.status_item=? AND destino.status_item=?
-      AND destino.estoque_estado=?
-      AND p.valor_total_centavos=(SELECT COALESCE(SUM(valor_total_centavos),0) FROM pedido_itens
-                                  WHERE pedido_id=p.id AND status_item='ATIVO')
-      AND NOT EXISTS(
-        SELECT 1 FROM produtos pr WHERE pr.id IN (origem.produto_id,destino.produto_id)
-          AND pr.estoque_reservado<>(SELECT COALESCE(SUM(pi.quantidade),0) FROM pedido_itens pi
-            WHERE pi.produto_id=pr.id AND pi.status_item IN ('ATIVO','TROCA_PENDENTE') AND pi.estoque_estado='RESERVADO')
-      )
-  )`
-    )
-    .bind(
-      pedidoId,
-      operationKey,
-      expected.originStatus,
-      expected.destinationStatus,
-      expected.destinationStock
-    );
 }
 
 export async function createItemExchange(
@@ -1251,78 +665,4 @@ export async function confirmExchangeRefund(
   const op = await buscarOperacao(db, parsed.key);
   if (!op?.reembolso_id) return { ok: false, erro: "OPERACAO_INCOMPLETA" };
   return { ok: true, troca: await exchangeView(db, updated), reembolsoId: op.reembolso_id };
-}
-
-async function tryFinalizeExchange(db: D1Database, row: ExchangeRow): Promise<void> {
-  const view = await exchangeView(db, row);
-  if (view.reembolsoPendenteCentavos > 0) return;
-  await db.batch(completeExchangeStatements(db, row));
-}
-
-export async function reconcileExchangeFinalization(
-  db: D1Database,
-  exchangeId: number
-): Promise<void> {
-  const row = await exchangeById(db, exchangeId);
-  if (row) await tryFinalizeExchange(db, row);
-}
-
-export async function reconcileExchangeFinalizationsForPedido(
-  db: D1Database,
-  pedidoId: number,
-  limit = 8
-): Promise<void> {
-  const { results } = await db
-    .prepare(
-      `SELECT id FROM pedido_item_trocas
-    WHERE pedido_id=? AND status IN ('SOLICITADA','AGUARDANDO_REEMBOLSO','INCONCLUSIVA')
-    ORDER BY id LIMIT ?`
-    )
-    .bind(pedidoId, Math.max(1, Math.min(limit, 20)))
-    .all<{ id: number }>();
-  for (const row of results) await reconcileExchangeFinalization(db, Number(row.id));
-}
-
-export async function reconcileExchangeCharges(db: D1Database, pedidoId: number): Promise<void> {
-  if (await getPedidoAnulacao(db, pedidoId)) return;
-  const financeiro = await getFinanceiroPedido(db, pedidoId);
-  const { results } = await db
-    .prepare(
-      `SELECT id,pedido_id,item_origem_id,item_destino_id,status,estoque_acao_origem,snapshot_financeiro
-    FROM pedido_item_trocas t WHERE pedido_id=?
-      AND (status='CONCLUIDA' OR (status='AGUARDANDO_COBRANCA' AND ?<=0))
-      AND EXISTS(SELECT 1 FROM pedido_itens pi WHERE pi.id=t.item_destino_id
-        AND pi.status_item='ATIVO' AND pi.estoque_estado='RESERVADO')
-    ORDER BY id`
-    )
-    .bind(pedidoId, financeiro.saldoCentavos)
-    .all<ExchangeRow>();
-  for (const row of results) {
-    const statements = destinationPhysicalStatements(db, { exchangeId: Number(row.id) });
-    statements.push(preparePedidoPhysicalProjection(db, pedidoId));
-    statements.push(
-      db
-        .prepare(
-          `UPDATE pedido_item_trocas
-      SET status='CONCLUIDA',concluido_em=COALESCE(concluido_em,CURRENT_TIMESTAMP)
-      WHERE id=? AND status IN ('AGUARDANDO_COBRANCA','CONCLUIDA')
-        AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_destino_id
-          AND status_item='ATIVO' AND estoque_estado='BAIXADO')`
-        )
-        .bind(row.id)
-    );
-    statements.push(completedExchangeInvariant(db, row));
-    await db.batch(statements);
-  }
-  if (financeiro.saldoCentavos <= 0)
-    await db
-      .prepare(
-        `UPDATE pedido_item_trocas
-    SET status='CONCLUIDA',concluido_em=COALESCE(concluido_em,CURRENT_TIMESTAMP)
-    WHERE pedido_id=? AND status='AGUARDANDO_COBRANCA'
-      AND EXISTS(SELECT 1 FROM pedido_itens WHERE id=item_destino_id
-        AND status_item='ATIVO' AND estoque_estado='BAIXADO')`
-      )
-      .bind(pedidoId)
-      .run();
 }
