@@ -2097,6 +2097,191 @@ test("histórico mostra a troca concluída da origem e 'Ver detalhes' abre a tro
   }
 });
 
+test("histórico renderiza contrato JSON com tipos, valores, métodos, nulos e ordem recebida", async t => {
+  // Representative HTTP JSON; backend grouping and normalization stay in their own harness.
+  const data = "2026-01-02 10:00:00";
+  const origem = { id: 10, nome: "Bolo original", valorCentavos: 101, estoqueEstado: "BAIXADO" };
+  const payload = {
+    eventos: [
+      {
+        id: "anulacao-60",
+        tipo: "PEDIDO_ANULADO",
+        data: "2026-01-09 10:00:00",
+        titulo: "Pedido anulado",
+        status: "ANULADO",
+        motivo: "",
+        usuario: "Ana",
+        estoqueAcao: "MANTER",
+        valorCentavos: -101
+      },
+      {
+        id: "reembolso-50",
+        tipo: "REEMBOLSO",
+        data: "2026-01-08 10:00:00",
+        titulo: "Reembolso confirmado",
+        metodo: "CARTAO",
+        valorReembolsoCentavos: 99,
+        motivo: "Cortesia",
+        usuario: null,
+        referenciaId: 50
+      },
+      {
+        id: "pagamento-40",
+        tipo: "PAGAMENTO",
+        data: "2026-01-07 10:00:00",
+        titulo: "Pagamento registrado",
+        metodo: "PIX_MP",
+        valorCentavos: 1,
+        usuario: null,
+        referenciaId: 40
+      },
+      {
+        id: "cancelamento-concluido-30",
+        tipo: "CANCELAMENTO_CONCLUIDO",
+        data: "2026-01-06 10:00:00",
+        titulo: "Cancelamento concluído",
+        status: "CONCLUIDO",
+        item: { id: 12, nome: "Doce cancelado", valorCentavos: 101, estoqueEstado: "REPOSTO" },
+        estoqueAcao: "REPOR",
+        valorReembolsoCentavos: 101,
+        metodosReembolso: ["PIX_MP", "CARTAO"],
+        usuario: null,
+        referenciaId: 12
+      },
+      {
+        id: "cancelamento-solicitado-30",
+        tipo: "CANCELAMENTO_SOLICITADO",
+        data: "2026-01-05 10:00:00",
+        titulo: "Cancelamento solicitado",
+        status: null,
+        item: { id: 12, nome: "Doce cancelado", valorCentavos: 101, estoqueEstado: null },
+        estoqueAcao: "NENHUMA",
+        usuario: null,
+        referenciaId: 12
+      },
+      {
+        id: "troca-solicitada-20",
+        tipo: "TROCA_SOLICITADA",
+        data,
+        titulo: "Troca solicitada",
+        status: "AGUARDANDO_COBRANCA",
+        itemOrigem: origem,
+        // The backend has already resolved the fallback name; the UI displays it verbatim.
+        itemDestino: {
+          id: null,
+          nome: "Produto atual",
+          quantidade: 2,
+          valorCentavos: 200,
+          estoqueEstado: null
+        },
+        diferencaCentavos: 99,
+        tipoDiferenca: "COBRAR",
+        estoqueAcao: "NAO_REPOR",
+        usuario: null,
+        referenciaId: 10
+      },
+      {
+        id: "troca-concluida-21",
+        tipo: "TROCA_CONCLUIDA",
+        data,
+        titulo: "Troca concluída",
+        status: "CONCLUIDA",
+        itemOrigem: origem,
+        itemDestino: {
+          id: 13,
+          nome: "Torta histórica",
+          quantidade: 1,
+          valorCentavos: 2,
+          estoqueEstado: "BAIXADO"
+        },
+        diferencaCentavos: -99,
+        tipoDiferenca: "DEVOLVER",
+        estoqueAcao: "REPOR",
+        metodosReembolso: ["PIX_EXTERNO", "DINHEIRO"],
+        usuario: null,
+        referenciaId: 10
+      },
+      {
+        id: "item-10",
+        tipo: "ITEM_ADICIONADO",
+        data: "2026-01-01 10:00:00",
+        titulo: "Bolo original adicionado",
+        item: { id: 10, nome: "Bolo original", quantidade: 3, valorCentavos: 101 },
+        usuario: null,
+        referenciaId: 10
+      }
+    ]
+  };
+  const calls = [];
+  const root = await mountWith(t, async url => {
+    calls.push(String(url));
+    return Response.json(String(url).endsWith("/historico") ? payload : detalhe());
+  });
+  try {
+    await ui.act(async () => document.querySelector(".pedmodal-btn-historico").click());
+    await flush();
+    assert.equal(calls.filter(url => url.endsWith("/historico")).length, 1);
+    const history = document.querySelector(".histmodal-card");
+    assert.equal(history.querySelector("h2").textContent, "Histórico da comanda");
+    const cards = [...history.querySelectorAll(".histmodal-evento")];
+    assert.deepEqual(
+      cards.map(card => card.querySelector(".histmodal-evento-titulo").textContent),
+      [
+        "Pedido anulado",
+        "Reembolso confirmado",
+        "Pagamento registrado",
+        "Cancelamento concluído",
+        "Cancelamento solicitado",
+        "Troca solicitada",
+        "Troca concluída",
+        "Bolo original adicionado"
+      ]
+    );
+    const lines = index =>
+      [...cards[index].querySelectorAll(".histmodal-evento-linha")].map(line =>
+        line.textContent.trim()
+      );
+    assert.match(cards[0].textContent, /Impacto nos totais: R\$ -1,01/);
+    assert.match(cards[0].textContent, /Estoque mantidoAnaMotivo não informado/);
+    assert.deepEqual(lines(1), ["Cartão · R$ 0,99Cortesia"]);
+    assert.deepEqual(lines(2), ["Pix Mercado Pago · R$ 0,01"]);
+    assert.deepEqual(lines(3), [
+      "Doce cancelado · R$ 1,01",
+      "Reembolso: R$ 1,01 · Pix Mercado Pago + Cartão",
+      "Estoque: Repôs estoque · Estado final: reposto"
+    ]);
+    assert.equal(cards[3].querySelector(".histmodal-badge").textContent, "Concluído");
+    assert.equal(cards[4].querySelector(".histmodal-badge"), null);
+    assert.deepEqual(lines(4), ["Doce cancelado · R$ 1,01", "Estoque: Sem ação de estoque"]);
+    assert.match(
+      cards[5].querySelector(".histmodal-troca-linha").textContent,
+      /Bolo original · R\$ 1,01.*Produto atual · R\$ 2,00/
+    );
+    assert.deepEqual(lines(5), ["Diferença cobrada: R$ 0,99", "Estoque origem: Não repôs estoque"]);
+    assert.equal(cards[5].querySelector(".histmodal-badge").textContent, "Aguardando pagamento");
+    assert.match(
+      cards[6].querySelector(".histmodal-troca-linha").textContent,
+      /Torta histórica · R\$ 0,02/
+    );
+    assert.deepEqual(lines(6), [
+      "Diferença devolvida: R$ 0,99 · Pix externo + Dinheiro",
+      "Estoque origem: Repôs estoque · Estado destino: baixado"
+    ]);
+    assert.deepEqual(lines(7), ["3x R$ 1,01"]);
+    assert.equal(
+      cards[5].querySelector(".histmodal-evento-data").textContent,
+      cards[6].querySelector(".histmodal-evento-data").textContent
+    );
+    assert.deepEqual(
+      cards.map(card => card.querySelectorAll(".histmodal-btn-detalhes").length),
+      [0, 0, 0, 1, 1, 1, 1, 0]
+    );
+    assert.doesNotMatch(history.textContent, /undefined|null|NaN/);
+  } finally {
+    await unmount(root);
+  }
+});
+
 test("cancelamento concluído reabre em modo leitura sem ação financeira duplicada", async t => {
   const current = detalhe({
     total: 0,
