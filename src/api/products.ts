@@ -67,11 +67,25 @@ function toProduct(row: ProdutoApiRow): Product {
 // antes de ler o catálogo, para a vitrine não mostrar como esgotado um item
 // preso por Pix abandonado. Best-effort: qualquer falha é ignorada e o
 // catálogo carrega do mesmo jeito. A regra de expiração vive só no servidor.
+const RESERVATION_MAINTENANCE_TIMEOUT_MS = 2_000;
+
 async function liberarReservasVencidas(): Promise<void> {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    await fetch("/api/reservas/reconciliar", { method: "POST" });
+    await Promise.race([
+      fetch("/api/reservas/reconciliar", { method: "POST", signal: controller.signal }),
+      new Promise<void>(resolve => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          resolve();
+        }, RESERVATION_MAINTENANCE_TIMEOUT_MS);
+      })
+    ]);
   } catch {
     // ignora: o GET abaixo continua
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
