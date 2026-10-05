@@ -24,7 +24,7 @@ interface ItemRef {
 interface HistoricoEvento {
   id: string;
   tipo: EventoTipo;
-  data: string;
+  data?: string | null;
   titulo: string;
   status?: string | null;
   item?: ItemRef;
@@ -52,7 +52,8 @@ interface Props {
 
 const formatarPreco = (centavos: number) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
-const formatarData = (isoLike: string) => {
+const formatarData = (isoLike: string | null | undefined) => {
+  if (isoLike === null || isoLike === undefined) return "—";
   const iso = isoLike.replace(" ", "T");
   const comFuso = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso) ? iso : `${iso}Z`;
   return new Date(comFuso).toLocaleString("pt-BR", {

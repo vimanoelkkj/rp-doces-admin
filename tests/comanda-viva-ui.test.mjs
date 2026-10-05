@@ -2282,6 +2282,46 @@ test("histórico renderiza contrato JSON com tipos, valores, métodos, nulos e o
   }
 });
 
+test("histórico renderiza data ausente com fallback e preserva datas válidas", async t => {
+  const eventos = [
+    { id: "pagamento-1", data: null },
+    { id: "pagamento-2", data: undefined },
+    { id: "pagamento-3", data: "2026-01-01 12:00:00" },
+    { id: "pagamento-4", data: "2026-01-01T09:00:00-03:00" }
+  ].map(evento => ({
+    ...evento,
+    tipo: "PAGAMENTO",
+    titulo: evento.id,
+    metodo: "DINHEIRO",
+    valorCentavos: 101
+  }));
+  const root = await mountWith(t, async url =>
+    Response.json(String(url).endsWith("/historico") ? { eventos } : detalhe())
+  );
+  try {
+    await ui.act(async () => document.querySelector(".pedmodal-btn-historico").click());
+    await flush();
+    const cards = [...document.querySelectorAll(".histmodal-evento")];
+    assert.deepEqual(
+      cards.map(card => card.querySelector(".histmodal-evento-titulo").textContent),
+      eventos.map(evento => evento.id)
+    );
+    const dataValida = new Date("2026-01-01T12:00:00Z").toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    assert.deepEqual(
+      cards.map(card => card.querySelector(".histmodal-evento-data").textContent),
+      ["—", "—", dataValida, dataValida]
+    );
+    for (const card of cards) assert.match(card.textContent, /Dinheiro · R\$ 1,01/);
+  } finally {
+    await unmount(root);
+  }
+});
+
 test("cancelamento concluído reabre em modo leitura sem ação financeira duplicada", async t => {
   const current = detalhe({
     total: 0,
