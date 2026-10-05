@@ -1,7 +1,59 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { promisify } from "node:util";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 import { app, fixture, barrier } from "./helpers/b3.mjs";
+
+const inputMutations = {
+  objectGuard: ['!body ||\n    typeof body !== "object" ||\n    Array.isArray(body) ||\n    ', ""],
+  usernameNumber: [
+    'typeof body.username !== "string"',
+    '(typeof body.username !== "string" && typeof body.username !== "number")'
+  ],
+  passwordNumber: ['typeof body.senha !== "string"', "false"],
+  coercion: [
+    "  if (\n    !body ||",
+    '  if (body && typeof body === "object" && !Array.isArray(body)) { body = { ...body, username: String(body.username ?? ""), senha: String(body.senha ?? "") }; }\n  if (\n    !body ||'
+  ],
+  trimBeforeGuard: [
+    "  if (\n    !body ||",
+    "  const premature = body.username.trim();\n  if (\n    !body ||"
+  ],
+  nullBody: ["    !body ||\n", ""]
+};
+let loginHandler = app.login.onRequestPost;
+if (process.env.LOGIN_INPUT_MUTATION) {
+  const sourcePath = new URL("../functions/api/auth/login.ts", import.meta.url);
+  const source = (await readFile(sourcePath, "utf8")).replaceAll("\r\n", "\n");
+  const [before, after] = inputMutations[process.env.LOGIN_INPUT_MUTATION];
+  assert.ok(source.includes(before), "Mutation anchor must exist");
+  const bundle = await build({
+    entryPoints: [fileURLToPath(sourcePath)],
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "node",
+    plugins: [
+      {
+        name: "login-mutant",
+        setup(b) {
+          b.onLoad({ filter: /[/\\]api[/\\]auth[/\\]login\.ts$/ }, args => ({
+            contents: source.replace(before, after),
+            loader: "ts",
+            resolveDir: args.path.replace(/[/\\][^/\\]+$/, "")
+          }));
+        }
+      }
+    ]
+  });
+  const code = `${bundle.outputFiles[0].text}\n//# sourceURL=rp-login-input-mutant.mjs`;
+  loginHandler = (
+    await import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`)
+  ).onRequestPost;
+}
 
 function loginRequest(
   body,
@@ -19,7 +71,7 @@ function loginRequest(
 }
 
 function postLogin(db, body, options) {
-  return app.login.onRequestPost({ env: { DB: db }, request: loginRequest(body, options) });
+  return loginHandler({ env: { DB: db }, request: loginRequest(body, options) });
 }
 
 async function setupUsers(db) {
@@ -45,6 +97,138 @@ async function setupUsers(db) {
 
   return { activePassword, inactivePassword, activeHash, inactiveHash };
 }
+
+test("login input: invalid JSON structures return 400 without DB, password verification or session", async t => {
+  const cases = [
+    ["null", null],
+    ["array", []],
+    ["string", "login"],
+    ["number", 123],
+    ["boolean", true],
+    ["empty object", {}],
+    ["missing username", { senha: "secret" }],
+    ["missing senha/password", { username: "admin_ativo" }],
+    ["username null", { username: null, senha: "secret" }],
+    ["senha null", { username: "admin_ativo", senha: null }],
+    ["username number", { username: 123, senha: "secret" }],
+    ["senha number", { username: "admin_ativo", senha: 123 }],
+    ["username array", { username: ["admin_ativo"], senha: "secret" }],
+    ["senha array", { username: "admin_ativo", senha: ["secret"] }],
+    ["username object", { username: {}, senha: "secret" }],
+    ["senha object", { username: "admin_ativo", senha: {} }],
+    ["username boolean", { username: false, senha: "secret" }],
+    ["senha boolean", { username: "admin_ativo", senha: false }],
+    ["empty strings", { username: "", senha: "" }],
+    ["whitespace username", { username: " \t\n ", senha: "secret" }],
+    ["username too long", { username: "x".repeat(81), senha: "secret" }],
+    ["senha too long", { username: "admin_ativo", senha: "x".repeat(257) }],
+    ["password alias absent", { username: "admin_ativo", password: undefined }],
+    ["password alias null", { username: "admin_ativo", password: null }],
+    ["password alias number", { username: "admin_ativo", password: 123 }],
+    ["password alias array", { username: "admin_ativo", password: [] }],
+    ["password alias object", { username: "admin_ativo", password: {} }],
+    ["password alias string", { username: "admin_ativo", password: "secret" }]
+  ];
+  for (const [name, input] of cases)
+    await t.test(name, async t => {
+      const queries = [];
+      const db = {
+        prepare(sql) {
+          queries.push(sql);
+          throw new Error("Invalid input reached D1");
+        }
+      };
+      const derive = t.mock.method(crypto.subtle, "deriveBits", () => {
+        throw new Error("Invalid input reached PBKDF2");
+      });
+      let response;
+      await assert.doesNotReject(async () => {
+        response = await postLogin(db, input);
+      });
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { error: "Credenciais inválidas" });
+      assert.equal(response.headers.get("Set-Cookie"), null);
+      assert.deepEqual(queries, [], "no rate limit, user lookup or session statements");
+      assert.equal(derive.mock.callCount(), 0);
+    });
+});
+
+test("login validation: origin and JSON errors precede structural validation", async () => {
+  const db = {
+    prepare() {
+      assert.fail("Invalid request must not reach D1");
+    }
+  };
+  const crossOrigin = await postLogin(db, null, { origin: "https://evil.test" });
+  assert.equal(crossOrigin.status, 403);
+  assert.deepEqual(await crossOrigin.json(), { error: "Origem inválida" });
+  const malformed = await loginHandler({
+    env: { DB: db },
+    request: new Request("https://local.test/api/auth/login", {
+      method: "POST",
+      headers: { Origin: "https://local.test" },
+      body: "{"
+    })
+  });
+  assert.equal(malformed.status, 400);
+  assert.deepEqual(await malformed.json(), { error: "JSON inválido" });
+});
+
+test("login validation: username normalization, exact password and empty/whitespace password policy survive", async t => {
+  const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });
+  const { activePassword } = await setupUsers(db);
+  const response = await postLogin(db, {
+    username: " \tADMIN_ATIVO\n ",
+    senha: activePassword,
+    password: 123,
+    extra: true
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).usuario.username, "admin_ativo");
+  for (const senha of ["", " \t ", ` ${activePassword} `]) {
+    const rejected = await postLogin(db, { username: "admin_ativo", senha });
+    assert.equal(rejected.status, 401);
+    assert.deepEqual(await rejected.json(), { error: "Usuário ou senha incorretos" });
+    assert.equal(rejected.headers.get("Set-Cookie"), null);
+  }
+  assert.equal(
+    (await db.prepare("SELECT COUNT(*) AS n FROM admin_sessoes WHERE usuario_id=10").first()).n,
+    1
+  );
+  const rate = await db.prepare("SELECT falhas FROM auth_rate_limits").all();
+  assert.deepEqual(
+    rate.results.map(row => row.falhas),
+    [3, 3]
+  );
+});
+
+if (!process.env.LOGIN_INPUT_MUTATION)
+  test("login negative controls: in-memory mutants must fail behavioral assertions", async t => {
+    const run = promisify(execFile),
+      env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    for (const mutation of Object.keys(inputMutations))
+      await t.test(mutation, async () => {
+        let failure;
+        try {
+          await run(
+            process.execPath,
+            ["--test", "--test-name-pattern=^login input:", "tests/admin-login.test.mjs"],
+            {
+              env: { ...env, LOGIN_INPUT_MUTATION: mutation },
+              timeout: 30000,
+              maxBuffer: 2_000_000
+            }
+          );
+        } catch (error) {
+          failure = error;
+        }
+        assert.ok(failure, `${mutation} survived`);
+        assert.equal(failure.code, 1);
+        assert.match(failure.stdout, /ERR_ASSERTION/);
+        assert.doesNotMatch(failure.stdout, /Mutation anchor must exist/);
+      });
+  });
 
 test("usuário ativo + senha correta autentica com sucesso e gera cookie de sessão", async t => {
   const db = await fixture(t, { ledger: false, reserve: "SEM_RESERVA" });

@@ -42,6 +42,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return jsonError("JSON inválido", 400);
   }
 
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    typeof body.username !== "string" ||
+    typeof body.senha !== "string"
+  ) {
+    return jsonError("Credenciais inválidas", 400);
+  }
+
   const username = (body.username ?? "").trim().toLowerCase();
   const senha = body.senha ?? "";
 
