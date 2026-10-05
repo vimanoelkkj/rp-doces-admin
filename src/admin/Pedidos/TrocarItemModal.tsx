@@ -5,82 +5,17 @@ import { novaOperationKey } from "../../lib/operationKey";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
 import { useAdminModal } from "../components/useAdminModal";
 import { reconciliarPedido } from "./reconciliarPedido";
+import TrocarItemFormSection from "./TrocarItemFormSection";
+import TrocarItemExchangeSection from "./TrocarItemExchangeSection";
+import {
+  money,
+  type Exchange,
+  type Preview,
+  type RefundLeg,
+  type TrocarItemModalProps
+} from "./trocarItemHelpers";
 import "./AdicionarItemModal.css";
 import "./CancelamentoItemPreviewModal.css";
-
-interface Item {
-  id: number;
-  produto_nome: string;
-  valor_total_centavos: number;
-  estoque_estado: string;
-}
-interface RefundLeg {
-  pagamentoId: number;
-  pagamentoAlocacaoId: number;
-  metodo: string;
-  valorCentavos: number;
-  confirmacaoManualPermitida: boolean;
-  refundRemoto?: {
-    status: "PENDENTE" | "PROCESSANDO" | "CONFIRMADO" | "RECUSADO" | "INCONCLUSIVO";
-    tentativas: number;
-    mpRefundId: string | null;
-    ultimoErro: string | null;
-    operationKey: string;
-    atualizadoEm: string;
-    podeVerificar: boolean;
-  };
-}
-interface Preview {
-  previewFingerprint: string;
-  itemDestino: { nome: string; valorCentavos: number };
-  financeiro: {
-    totalProjetadoCentavos: number;
-    diferencaCentavos: number;
-    saldoProjetadoCentavos: number;
-    excessoProjetadoCentavos: number;
-  };
-  refundsPropostos: RefundLeg[];
-  estoque: { acaoOrigem: string; acoesOrigemPermitidas: string[] };
-  bloqueios: Array<{ codigo: string; mensagem: string }>;
-  trocaExecutavel: boolean;
-}
-interface Exchange {
-  id: number;
-  status: string;
-  reembolsoPendenteCentavos: number;
-  refundsPendentes: RefundLeg[];
-  estoqueOrigemEstado?: string;
-  estoqueDestinoEstado?: string | null;
-  reembolsosConfirmados?: Array<{
-    id: number;
-    metodo: string;
-    valorCentavos: number;
-    origem: string;
-    mpRefundId: string | null;
-  }>;
-  financeiro?: {
-    status: string;
-    totalCentavos: number;
-    liquidoCentavos: number;
-    saldoCentavos: number;
-  };
-}
-interface Props {
-  orderId: number;
-  item: Item;
-  existingExchangeId?: number | null;
-  existingExchangeStatus?: string | null;
-  onClose: () => void;
-  onChanged: () => void | Promise<void>;
-}
-const money = (v: number) => `R$ ${(v / 100).toFixed(2).replace(".", ",")}`;
-const free = (p: ProdutoAdmin) => Math.max(0, p.estoque - p.estoque_reservado);
-const labels: Record<string, string> = {
-  DINHEIRO: "Dinheiro",
-  CARTAO: "Cartão",
-  PIX_EXTERNO: "Pix externo",
-  PIX_MP: "Pix Mercado Pago"
-};
 
 export default function TrocarItemModal({
   orderId,
@@ -89,7 +24,7 @@ export default function TrocarItemModal({
   existingExchangeStatus,
   onClose,
   onChanged
-}: Props) {
+}: TrocarItemModalProps) {
   const modalProps = useAdminModal(true, onClose);
   const [products, setProducts] = useState<ProdutoAdmin[]>([]);
   const [productId, setProductId] = useState<number | null>(null);
@@ -259,21 +194,6 @@ export default function TrocarItemModal({
       setSaving(false);
     }
   };
-  const remoteLabel = (leg: RefundLeg) => {
-    const status = leg.refundRemoto?.status;
-    if (status === "PENDENTE") return "Aguardando envio";
-    if (status === "PROCESSANDO") return "Processando";
-    if (status === "CONFIRMADO") return "Confirmado";
-    if (status === "RECUSADO") return "Recusado pelo provedor";
-    if (status === "INCONCLUSIVO") return "Verificar novamente";
-    return "Solicitar estorno";
-  };
-  const remoteCanRun = (leg: RefundLeg) => {
-    const remote = leg.refundRemoto;
-    if (!remote) return true;
-    if (["RECUSADO", "CONFIRMADO"].includes(remote.status)) return false;
-    return remote.podeVerificar;
-  };
   return createPortal(
     <div className="additem-overlay" {...modalProps}>
       <section className="additem-card" role="dialog" aria-modal="true">
@@ -292,262 +212,33 @@ export default function TrocarItemModal({
         {loading && <div className="additem-loading">Carregando...</div>}
         {error && <p className="additem-error">{error}</p>}
         {!exchange && !loading && (
-          <div className="additem-form">
-            <label className="additem-field">
-              <span>Novo produto</span>
-              <div
-                className={`additem-dropdown${productDropdownOpen ? " additem-dropdown--open" : ""}`}
-              >
-                <button
-                  type="button"
-                  className="additem-dropdown-trigger"
-                  onClick={() => setProductDropdownOpen(open => !open)}
-                  onBlur={() => setTimeout(() => setProductDropdownOpen(false), 150)}
-                >
-                  <span>
-                    {(() => {
-                      const selected = products.find(p => p.id === productId);
-                      return selected
-                        ? `${selected.nome} · ${money(precoVigenteCentavos(selected))} · ${free(selected)} disponíveis`
-                        : "Selecione";
-                    })()}
-                  </span>
-                  <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
-                    <path
-                      d="M1 1.5L6 6.5L11 1.5"
-                      stroke="#634738"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                {productDropdownOpen && (
-                  <ul className="additem-dropdown-list">
-                    {products.map(p => (
-                      <li key={p.id}>
-                        <button
-                          type="button"
-                          className={`additem-dropdown-option${productId === p.id ? " additem-dropdown-option--active" : ""}`}
-                          onClick={() => {
-                            setProductId(p.id);
-                            setQuantity(1);
-                            setProductDropdownOpen(false);
-                          }}
-                        >
-                          {p.nome} · {money(precoVigenteCentavos(p))} · {free(p)} disponíveis
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </label>
-            <label className="additem-field">
-              <span>Quantidade</span>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                value={quantity}
-                onChange={e => setQuantity(Number(e.target.value))}
-              />
-            </label>
-            {item.estoque_estado === "BAIXADO" && (
-              <label className="additem-field">
-                <span>Produto atual</span>
-                <div
-                  className={`additem-dropdown${actionDropdownOpen ? " additem-dropdown--open" : ""}`}
-                >
-                  <button
-                    type="button"
-                    className="additem-dropdown-trigger"
-                    onClick={() => setActionDropdownOpen(open => !open)}
-                    onBlur={() => setTimeout(() => setActionDropdownOpen(false), 150)}
-                  >
-                    <span>
-                      {action === "REPOR"
-                        ? "Voltou fisicamente ao estoque"
-                        : "Não voltou ao estoque"}
-                    </span>
-                    <svg aria-hidden="true" width="12" height="8" viewBox="0 0 12 8" fill="none">
-                      <path
-                        d="M1 1.5L6 6.5L11 1.5"
-                        stroke="#634738"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                  {actionDropdownOpen && (
-                    <ul className="additem-dropdown-list">
-                      {[
-                        { value: "NAO_REPOR", label: "Não voltou ao estoque" },
-                        { value: "REPOR", label: "Voltou fisicamente ao estoque" }
-                      ].map(option => (
-                        <li key={option.value}>
-                          <button
-                            type="button"
-                            className={`additem-dropdown-option${action === option.value ? " additem-dropdown-option--active" : ""}`}
-                            onClick={() => {
-                              setAction(option.value);
-                              setActionDropdownOpen(false);
-                            }}
-                          >
-                            {option.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </label>
-            )}
-            {preview && (
-              <>
-                <div className="cancelpreview-values">
-                  <div>
-                    <span>Valor atual</span>
-                    <strong>{money(item.valor_total_centavos)}</strong>
-                  </div>
-                  <div>
-                    <span>Novo valor</span>
-                    <strong>{money(preview.itemDestino.valorCentavos)}</strong>
-                  </div>
-                  <div>
-                    <span>Diferença</span>
-                    <strong>
-                      {preview.financeiro.diferencaCentavos > 0
-                        ? "+ "
-                        : preview.financeiro.diferencaCentavos < 0
-                          ? "- "
-                          : ""}
-                      {money(Math.abs(preview.financeiro.diferencaCentavos))}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Saldo após troca</span>
-                    <strong>{money(preview.financeiro.saldoProjetadoCentavos)}</strong>
-                  </div>
-                  {preview.financeiro.excessoProjetadoCentavos > 0 && (
-                    <div>
-                      <span>Será necessário devolver</span>
-                      <strong>{money(preview.financeiro.excessoProjetadoCentavos)}</strong>
-                    </div>
-                  )}
-                </div>
-                {preview.bloqueios.map(b => (
-                  <div className="cancelpreview-block" key={b.codigo}>
-                    {b.mensagem}
-                  </div>
-                ))}
-              </>
-            )}
-            <footer className="additem-actions">
-              <button type="button" className="additem-cancel" onClick={onClose}>
-                Voltar
-              </button>
-              <button
-                type="button"
-                className="additem-confirm"
-                onClick={() => void confirm()}
-                disabled={!preview?.trocaExecutavel || saving}
-              >
-                {saving ? "Confirmando..." : "Confirmar troca"}
-              </button>
-            </footer>
-          </div>
+          <TrocarItemFormSection
+            item={item}
+            products={products}
+            productId={productId}
+            quantity={quantity}
+            action={action}
+            preview={preview}
+            saving={saving}
+            disabled={!preview?.trocaExecutavel || saving}
+            productDropdownOpen={productDropdownOpen}
+            actionDropdownOpen={actionDropdownOpen}
+            setProductId={setProductId}
+            setQuantity={setQuantity}
+            setAction={setAction}
+            setProductDropdownOpen={setProductDropdownOpen}
+            setActionDropdownOpen={setActionDropdownOpen}
+            onClose={onClose}
+            onConfirm={confirm}
+          />
         )}
         {exchange && (
-          <div className="cancelpreview-content">
-            <div className="cancelpreview-success">
-              <strong>{exchange.status.replace(/_/g, " ")}</strong>
-              <span>
-                {exchange.status === "AGUARDANDO_COBRANCA"
-                  ? "A troca foi aplicada. A diferença pode ser cobrada pelo Pix da comanda."
-                  : exchange.status === "AGUARDANDO_REEMBOLSO"
-                    ? "O produto atual permanece ativo até as devoluções terminarem."
-                    : "Troca concluída."}
-              </span>
-            </div>
-            {exchange.financeiro && (
-              <div className="cancelpreview-values">
-                <div>
-                  <span>Total atual</span>
-                  <strong>{money(exchange.financeiro.totalCentavos)}</strong>
-                </div>
-                <div>
-                  <span>Pago líquido</span>
-                  <strong>{money(exchange.financeiro.liquidoCentavos)}</strong>
-                </div>
-                <div>
-                  <span>Saldo</span>
-                  <strong>{money(exchange.financeiro.saldoCentavos)}</strong>
-                </div>
-                <div>
-                  <span>Estoque origem</span>
-                  <strong>{exchange.estoqueOrigemEstado}</strong>
-                </div>
-              </div>
-            )}
-            {(exchange.reembolsosConfirmados?.length ?? 0) > 0 && (
-              <div className="cancelpreview-section">
-                <span className="cancelpreview-label">Devoluções confirmadas</span>
-                {exchange.reembolsosConfirmados?.map(refund => (
-                  <div className="cancelpreview-refund-leg" key={refund.id}>
-                    <div>
-                      <strong>{labels[refund.metodo] ?? refund.metodo}</strong>
-                      <span>{money(refund.valorCentavos)}</span>
-                    </div>
-                    <span>Confirmado</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {exchange.refundsPendentes.map(leg => (
-              <div className="cancelpreview-refund-leg" key={leg.pagamentoAlocacaoId}>
-                <div>
-                  <strong>{labels[leg.metodo] ?? leg.metodo}</strong>
-                  <span>{money(leg.valorCentavos)}</span>
-                </div>
-                {leg.confirmacaoManualPermitida ? (
-                  <button type="button" onClick={() => void refund(leg)} disabled={saving}>
-                    Confirmar devolução
-                  </button>
-                ) : (
-                  <div>
-                    {leg.refundRemoto?.status === "INCONCLUSIVO" && (
-                      <span>Não foi possível confirmar o resultado do estorno.</span>
-                    )}
-                    {leg.refundRemoto?.status === "RECUSADO" && (
-                      <span>
-                        O Mercado Pago recusou esta tentativa. Revise antes de iniciar outra
-                        operação.
-                      </span>
-                    )}
-                    {remoteCanRun(leg) ? (
-                      <button type="button" onClick={() => void refund(leg)} disabled={saving}>
-                        {remoteLabel(leg)}
-                      </button>
-                    ) : (
-                      <span>{remoteLabel(leg)}</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-            <div className="cancelpreview-footer">
-              <span>
-                {exchange.reembolsoPendenteCentavos
-                  ? `Pendente: ${money(exchange.reembolsoPendenteCentavos)}`
-                  : "Sem devoluções pendentes"}
-              </span>
-              <button type="button" onClick={onClose}>
-                Fechar
-              </button>
-            </div>
-          </div>
+          <TrocarItemExchangeSection
+            exchange={exchange}
+            saving={saving}
+            refund={refund}
+            onClose={onClose}
+          />
         )}
       </section>
     </div>,
