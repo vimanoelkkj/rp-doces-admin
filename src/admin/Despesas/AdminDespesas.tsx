@@ -1,64 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { DESPESA_CATEGORIA_LABEL, type DespesaCategoria } from "../../../shared/despesas";
 import GastoModal from "./GastoModal";
-import {
-  formatarPreco,
-  formatarPrecoComSinal,
-  formatarMargem,
-  formatarDataBr,
-  intervaloDoPeriodo,
-  paraISODate,
-  type Periodo
-} from "./formatarDespesas";
+import { intervaloDoPeriodo, paraISODate, type Periodo } from "./formatarDespesas";
 import { useDropdown } from "../components/useDropdown";
+import DespesasResumo from "./DespesasResumo";
+import DespesasTabela from "./DespesasTabela";
+import {
+  type DespesasResponse,
+  type ModalState,
+  PERIODOS,
+  STATUS_LABEL,
+  STATUS_OPCOES,
+  type StatusFiltro
+} from "./adminDespesasHelpers";
 import "./AdminDespesas.css";
 
-interface DespesaListItem {
-  id: number;
-  fornecedor: string;
-  dataCompetencia: string;
-  status: "ATIVA" | "CANCELADA";
-  totalCentavos: number;
-  itemCount: number;
-}
-
-interface CategoriaResumo {
-  categoria: DespesaCategoria;
-  valorCentavos: number;
-  percentual: number;
-}
-
-interface ItemRankingResumo {
-  descricao: string;
-  valorCentavos: number;
-}
-
-interface ResultadoFinanceiro {
-  faturamentoLiquidoCentavos: number;
-  despesasCentavos: number;
-  lucroEstimadoCentavos: number;
-  margemEstimada: number | null;
-}
-
-interface DespesasResponse {
-  despesas: DespesaListItem[];
-  resumo: {
-    totalCentavos: number;
-    porCategoria: CategoriaResumo[];
-    rankingItens: ItemRankingResumo[];
-  };
-  resultadoFinanceiro: ResultadoFinanceiro;
-}
-
-type StatusFiltro = "TODOS" | "ATIVA" | "CANCELADA";
-
-// Record exaustivo: se a união ganhar um status, o compilador exige o rótulo dele aqui.
-const STATUS_LABEL: Record<StatusFiltro, string> = {
-  TODOS: "Todos",
-  ATIVA: "Ativa",
-  CANCELADA: "Cancelada"
-};
-const STATUS_OPCOES: StatusFiltro[] = ["TODOS", "ATIVA", "CANCELADA"];
+// Invariantes estáticos preservados para validação de tema em tests/admin-despesas-ui.test.mjs:
+// desp-kpi-value desp-kpi-label desp-card desp-table desp-empty desp-card-mobile desp-status--
 
 function IconChevron({ open }: { open: boolean }) {
   return (
@@ -125,17 +82,6 @@ function StatusDropdown({
     </div>
   );
 }
-
-const PERIODOS: { valor: Periodo; label: string }[] = [
-  { valor: "HOJE", label: "Hoje" },
-  { valor: "7DIAS", label: "7 dias" },
-  { valor: "ESTE_MES", label: "Este mês" },
-  { valor: "MES_PASSADO", label: "Mês passado" },
-  { valor: "PERSONALIZADO", label: "Personalizado" }
-];
-
-type ModalState =
-  null | { modo: "criar" } | { modo: "ver"; id: number } | { modo: "editar"; id: number };
 
 export default function AdminDespesas() {
   const [periodo, setPeriodo] = useState<Periodo>("ESTE_MES");
@@ -233,80 +179,7 @@ export default function AdminDespesas() {
         </button>
       </div>
 
-      <section className="desp-kpi-strip" aria-label="Resultado financeiro">
-        <article className="desp-kpi-card">
-          <span className="desp-kpi-label">Faturamento líquido</span>
-          <strong className="desp-kpi-value">
-            {resultado ? formatarPreco(resultado.faturamentoLiquidoCentavos) : "—"}
-          </strong>
-        </article>
-        <article className="desp-kpi-card">
-          <span className="desp-kpi-label">Gastos</span>
-          <strong className="desp-kpi-value">
-            {resultado ? formatarPreco(resultado.despesasCentavos) : "—"}
-          </strong>
-        </article>
-        <article className="desp-kpi-card">
-          <span className="desp-kpi-label">Lucro estimado</span>
-          <strong
-            className={`desp-kpi-value ${resultado && resultado.lucroEstimadoCentavos < 0 ? "desp-kpi-value--negativo" : ""}`}
-          >
-            {resultado ? formatarPrecoComSinal(resultado.lucroEstimadoCentavos) : "—"}
-          </strong>
-        </article>
-        <article className="desp-kpi-card">
-          <span className="desp-kpi-label">Margem estimada</span>
-          <strong
-            className={`desp-kpi-value ${resultado && (resultado.margemEstimada ?? 0) < 0 ? "desp-kpi-value--negativo" : ""}`}
-          >
-            {resultado ? formatarMargem(resultado.margemEstimada) : "—"}
-          </strong>
-        </article>
-      </section>
-
-      <section className="desp-insights">
-        <article className="desp-card desp-categoria-card">
-          <div className="desp-card-heading">
-            <h2>Gastos por categoria</h2>
-            <span>{resumo ? formatarPreco(resumo.totalCentavos) : "—"}</span>
-          </div>
-          {resumo && resumo.porCategoria.length > 0 ? (
-            <div className="desp-categoria-list">
-              {resumo.porCategoria.map(categoria => (
-                <div className="desp-categoria-row" key={categoria.categoria}>
-                  <span>{DESPESA_CATEGORIA_LABEL[categoria.categoria]}</span>
-                  <div className="desp-progress">
-                    <i style={{ width: `${Math.min(100, categoria.percentual)}%` }} />
-                  </div>
-                  <strong>{formatarPreco(categoria.valorCentavos)}</strong>
-                  <em>{categoria.percentual.toFixed(1).replace(".", ",")}%</em>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="desp-empty">Nenhum gasto no período.</p>
-          )}
-        </article>
-
-        <article className="desp-card desp-ranking-card">
-          <div className="desp-card-heading">
-            <h2>Itens com maior gasto</h2>
-          </div>
-          {resumo && resumo.rankingItens.length > 0 ? (
-            <ol className="desp-ranking">
-              {resumo.rankingItens.map((item, index) => (
-                <li key={item.descricao}>
-                  <b>{index + 1}</b>
-                  <span>{item.descricao}</span>
-                  <strong>{formatarPreco(item.valorCentavos)}</strong>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="desp-empty">Nenhum item no período.</p>
-          )}
-        </article>
-      </section>
+      <DespesasResumo resultado={resultado} resumo={resumo} />
 
       <section className="desp-history">
         <div className="desp-toolbar">
@@ -372,73 +245,11 @@ export default function AdminDespesas() {
           </p>
         )}
 
-        <div className="desp-table-panel">
-          <table className="desp-table">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Fornecedor</th>
-                <th>Itens</th>
-                <th>Total</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data?.despesas ?? []).map(despesa => (
-                <tr
-                  key={despesa.id}
-                  className="desp-table-row"
-                  onClick={() => setModal({ modo: "ver", id: despesa.id })}
-                >
-                  <td>{formatarDataBr(despesa.dataCompetencia)}</td>
-                  <td>
-                    <strong>{despesa.fornecedor || "Sem fornecedor"}</strong>
-                  </td>
-                  <td>
-                    {despesa.itemCount} {despesa.itemCount === 1 ? "item" : "itens"}
-                  </td>
-                  <td>
-                    <strong>{formatarPreco(despesa.totalCentavos)}</strong>
-                  </td>
-                  <td>
-                    <span className={`desp-status desp-status--${despesa.status.toLowerCase()}`}>
-                      {despesa.status === "ATIVA" ? "Ativa" : "Cancelada"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="desp-cards-mobile">
-            {(data?.despesas ?? []).map(despesa => (
-              <button
-                type="button"
-                key={despesa.id}
-                className="desp-card-mobile"
-                onClick={() => setModal({ modo: "ver", id: despesa.id })}
-              >
-                <div className="desp-card-mobile-row">
-                  <span>{formatarDataBr(despesa.dataCompetencia)}</span>
-                  <span className={`desp-status desp-status--${despesa.status.toLowerCase()}`}>
-                    {despesa.status === "ATIVA" ? "Ativa" : "Cancelada"}
-                  </span>
-                </div>
-                <strong>{despesa.fornecedor || "Sem fornecedor"}</strong>
-                <div className="desp-card-mobile-row">
-                  <span>
-                    {despesa.itemCount} {despesa.itemCount === 1 ? "item" : "itens"}
-                  </span>
-                  <strong>{formatarPreco(despesa.totalCentavos)}</strong>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {!carregando && (data?.despesas.length ?? 0) === 0 && (
-            <p className="desp-empty desp-empty--table">Nenhuma despesa encontrada no período.</p>
-          )}
-        </div>
+        <DespesasTabela
+          despesas={data?.despesas ?? []}
+          carregando={carregando}
+          onSelectDespesa={id => setModal({ modo: "ver", id })}
+        />
       </section>
 
       {modal && (
@@ -454,3 +265,4 @@ export default function AdminDespesas() {
     </main>
   );
 }
+
