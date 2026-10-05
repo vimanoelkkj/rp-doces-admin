@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
-import { IconBag, IconDashboard, IconProdutosCake, IconStore } from "./AdminSidebar";
+import {
+  IconBag,
+  IconDashboard,
+  IconProdutosCake,
+  IconStore
+} from "../../components/icons/AdminNavigationIcons";
 import AdminMobileMoreSheet from "./AdminMobileMoreSheet";
 import "./AdminMobileNavigation.css";
 

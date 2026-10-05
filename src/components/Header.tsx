@@ -12,7 +12,7 @@ import {
   IconStore,
   IconUsers,
   IconBell
-} from "../admin/components/AdminSidebar";
+} from "./icons/AdminNavigationIcons";
 import { useDrawerDrag } from "./useDrawerDrag";
 import { useHomeHashScroll } from "./useHomeHashScroll";
 import MobileMenuDrawer from "./MobileMenuDrawer";

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IconBag } from "../admin/components/AdminSidebar";
+import { IconBag } from "./icons/AdminNavigationIcons";
 import { esquecerUltimoPedido, lerUltimoPedido, pedidoEncerrado } from "../lib/ultimoPedido";
 import "./UltimoPedidoLink.css";
 

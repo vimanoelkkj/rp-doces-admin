@@ -10,7 +10,13 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useAdminAuth } from "../auth/AdminAuthContext";
 import { useNotificacoes } from "../notificacoes/NotificacoesContext";
 import { useAdminTheme } from "../theme/AdminThemeContext";
-import { IconBell, IconMoon, IconReceipt, IconSun, IconUsers } from "./AdminSidebar";
+import {
+  IconBell,
+  IconMoon,
+  IconReceipt,
+  IconSun,
+  IconUsers
+} from "../../components/icons/AdminNavigationIcons";
 import { useAdminModal } from "./useAdminModal";
 
 interface RenderProps {
