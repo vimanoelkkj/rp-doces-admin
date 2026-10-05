@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { sendPushNotification } from "@mmmike/web-push/send";
+import { criarPayloadPedidoPago, enviarPush } from "./pushTransport";
 
 export interface PushEnv {
   DB: D1Database;
@@ -34,11 +34,6 @@ export interface ReconciliarPushResult {
 export const RETRY_BACKOFF_SECONDS = 30;
 export const RETRY_MAX_ATTEMPTS = 3;
 export const RETRY_BATCH_SIZE = 5;
-
-function formatarMoedaCentavos(centavos: number): string {
-  const valor = (centavos / 100).toFixed(2).replace(".", ",");
-  return `R$ ${valor}`;
-}
 
 interface PedidoBasico {
   id: number;
@@ -101,13 +96,7 @@ async function despacharParaInscricoes(
   }
 
   // 2. Payload mínimo sem PII
-  const payload = {
-    title: "Novo pedido 🍰",
-    body: `Pedido RP-${pedido.id} · ${formatarMoedaCentavos(pedido.valor_total_centavos)}`,
-    tag: `pedido-${pedido.id}`,
-    url: `/admin/pedidos?pedido=${pedido.id}`,
-    pedidoId: pedido.id
-  };
+  const payload = criarPayloadPedidoPago(pedido.id, pedido.valor_total_centavos);
 
   let sucessos = 0;
   let falhas = 0;
@@ -116,7 +105,7 @@ async function despacharParaInscricoes(
 
   for (const sub of inscricoes) {
     try {
-      const delivered = await sendPushNotification(
+      const delivered = await enviarPush(
         {
           endpoint: sub.endpoint,
           keys: {
