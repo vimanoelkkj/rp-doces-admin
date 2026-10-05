@@ -33,10 +33,7 @@ test("imageUrlFor: resolve corretamente chaves R2 e imagens estáticas de seed",
     imageUrlFor("product-42-12345678-abcd-1234-abcd-123456789abc.jpg"),
     "/api/images/product-42-12345678-abcd-1234-abcd-123456789abc.jpg"
   );
-  assert.equal(
-    imageUrlFor("product-1-a1b2c3d4.png"),
-    "/api/images/product-1-a1b2c3d4.png"
-  );
+  assert.equal(imageUrlFor("product-1-a1b2c3d4.png"), "/api/images/product-1-a1b2c3d4.png");
 });
 
 test("isoParaDatetimeLocal e datetimeLocalParaIso: conversão e tratamento de nulos", () => {
@@ -186,4 +183,3 @@ test("calcularPromoEstadoEHint: deriva os 5 estados esperados", () => {
   assert.equal(h5.promoEstado, "EXPIRADA");
   assert.equal(h5.promoHint, "Período encerrado: o catálogo voltou ao preço normal.");
 });
-

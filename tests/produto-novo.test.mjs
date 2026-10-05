@@ -54,7 +54,10 @@ test("admin cria produto com novo: true/false e persiste no banco", async t => {
   const resSemNovo = await salvar(db, session, { novo: false });
   assert.equal(resSemNovo.status, 201);
   const { id: idSemNovo } = await resSemNovo.json();
-  const rowSemNovo = await db.prepare("SELECT novo FROM produtos WHERE id=?").bind(idSemNovo).first();
+  const rowSemNovo = await db
+    .prepare("SELECT novo FROM produtos WHERE id=?")
+    .bind(idSemNovo)
+    .first();
   assert.equal(rowSemNovo.novo, 0);
 });
 

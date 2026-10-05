@@ -44,7 +44,7 @@ export type StatusFiltro = "TODOS" | "ATIVA" | "CANCELADA";
 export const STATUS_LABEL: Record<StatusFiltro, string> = {
   TODOS: "Todos",
   ATIVA: "Ativa",
-  CANCELADA: "Cancelada",
+  CANCELADA: "Cancelada"
 };
 
 export const STATUS_OPCOES: StatusFiltro[] = ["TODOS", "ATIVA", "CANCELADA"];
@@ -54,12 +54,8 @@ export const PERIODOS: { valor: Periodo; label: string }[] = [
   { valor: "7DIAS", label: "7 dias" },
   { valor: "ESTE_MES", label: "Este mês" },
   { valor: "MES_PASSADO", label: "Mês passado" },
-  { valor: "PERSONALIZADO", label: "Personalizado" },
+  { valor: "PERSONALIZADO", label: "Personalizado" }
 ];
 
 export type ModalState =
-  | null
-  | { modo: "criar" }
-  | { modo: "ver"; id: number }
-  | { modo: "editar"; id: number };
-
+  null | { modo: "criar" } | { modo: "ver"; id: number } | { modo: "editar"; id: number };

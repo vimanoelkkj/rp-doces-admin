@@ -516,7 +516,10 @@ test("card exibe badge NOVO sobre a imagem e move badge de estoque para acima do
   );
   // NOVO está dentro de .product-image-wrapper e NÃO em .product-meta-row
   assert.ok(mNovo.container.querySelector(".product-image-wrapper .product-novo-badge"));
-  assert.equal(texto(mNovo.container.querySelector(".product-image-wrapper .product-novo-badge")), "NOVO");
+  assert.equal(
+    texto(mNovo.container.querySelector(".product-image-wrapper .product-novo-badge")),
+    "NOVO"
+  );
   assert.equal(mNovo.container.querySelector(".product-meta-row .product-novo-badge"), null);
 
   // Badge de estoque está dentro de .product-price-col, acima de .product-prices

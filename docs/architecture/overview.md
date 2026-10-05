@@ -45,22 +45,26 @@ The RP Doces application is structured as an edge-native web application deploye
 ## 2. Layers and Boundaries
 
 ### 2.1 Client Application (`src/`)
+
 - Single-page application built with React and TypeScript.
 - Communicates with `/api/*` endpoints via JSON payloads.
 - Implements idempotent transaction request patterns by generating client-side operation keys (`operationKey`) and tracking client-side state.
 
 ### 2.2 Edge Functions & API Endpoints (`functions/api/`)
+
 - Serverless request handlers running on Cloudflare Workers/Pages Functions runtime.
 - Enforces input validation on incoming parameters before initiating persistence operations.
 - Isolates public checkout flows from administrative management interfaces.
 - Translates incoming webhooks and client actions into atomic transactional batches executed via `env.DB.batch()`.
 
 ### 2.3 Domain Logic Layer (`functions/lib/`)
+
 - Encapsulates state transitions, financial calculations, and inventory operations.
 - Pure functions and deterministic domain modules that take database bindings and domain models as inputs.
 - Contains gateway clients and data synchronizers responsible for validating third-party provider responses.
 
 ### 2.4 Persistence Layer (`migrations/` and Cloudflare D1)
+
 - Relational schema managed via sequential SQL migration scripts (`migrations/*.sql`).
 - Relies on SQLite constraints (`CHECK`, `FOREIGN KEY`, `UNIQUE`) to enforce referential and business invariants at the database engine level.
 

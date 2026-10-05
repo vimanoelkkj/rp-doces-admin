@@ -14,9 +14,7 @@ export function PromoBadge({ product }: { product: Product }) {
 }
 
 export function NovoBadge({ product }: { product: Product }) {
-  return product.novo ? (
-    <span className="product-novo-badge">NOVO</span>
-  ) : null;
+  return product.novo ? <span className="product-novo-badge">NOVO</span> : null;
 }
 
 export function StockBadge({ restante }: { restante: number }) {

@@ -5,6 +5,7 @@
 The financial domain in RP Doces operates on ledger principles: historical payment receipts and disbursements are recorded as discrete facts. Financial positions are derived dynamically rather than updated over historical records.
 
 ### 1.1 Integer Cents (`*_centavos`)
+
 All monetary values in the codebase, database schema, APIs, and client-side calculations are represented as integer cents (`INTEGER` in SQLite, `number` in TypeScript constrained to integer domain):
 
 ```sql
@@ -63,16 +64,19 @@ The financial state of an order is distributed across dedicated ledger tables:
 ```
 
 ### 2.1 Immutability and Lifecycle of Payments (`pedido_pagamentos`)
+
 - **Lifecycle Transitions**: Rows in `pedido_pagamentos` are created with `status = 'PENDENTE'` and advance through their lifecycle (`PAGO`, `CANCELADO`, `EXPIRADO`, `FALHOU`).
 - **Accounting Immutability**: By application convention, once a payment row reaches a settled state (`PAGO`), its incoming monetary amount (`valor_centavos`) is never reduced or edited in place.
 - **Refund Segregation**: Monetary reductions, cancellations, and customer reimbursements do not overwrite the original payment row; they are written as discrete, additive entries in `pedido_reembolsos`.
 
 ### 2.2 Additive Refunds (`pedido_reembolsos`)
+
 - Refunds represent discrete outbound financial events tied directly to a specific parent payment.
 - Attributes include `pedido_id`, `pagamento_id`, `valor_centavos`, `origem` (`'MERCADO_PAGO'` | `'MANUAL'`), `status` (`'PENDENTE'` | `'REEMBOLSADO'` | `'FALHOU'`), and a unique `idempotency_key`.
 - Multiple partial refunds can reference the same payment up to the total received amount.
 
 ### 2.3 Proportional Payment Allocation (`pedido_pagamento_alocacoes`)
+
 - When an order containing multiple items is paid, the payment is mapped to individual items via `pedido_pagamento_alocacoes`.
 - This allocation records the exact distribution of settled funds across line items, enabling item-level cancellation, substitution, and refund tracking without ambiguous revenue attribution.
 
@@ -108,14 +112,16 @@ GROUP BY p.id;
 Financial mutations (order creation, payment registration, refund requests) are protected against replay attacks and network duplication via the A1 idempotency pattern.
 
 ### 4.1 Client Key Generation (`src/lib/operationKey.ts`)
+
 1. The client generates an `operationKey` (UUID v4 or stable formatted string matching `^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$`) prior to the first network transmission.
 2. The client computes a deterministic SHA-256 fingerprint over the canonical JSON payload:
    ```ts
-   fingerprint = sha256(canonicalStringify(payload))
+   fingerprint = sha256(canonicalStringify(payload));
    ```
 3. The request transmits both `operationKey` and the payload to the API endpoint.
 
 ### 4.2 Server-Side Execution and Replay Handling (`pedido_operacoes`)
+
 The database maintains an authoritative operation ledger (`migrations/0012_operacoes_idempotencia.sql`):
 
 ```sql
@@ -144,6 +150,7 @@ CREATE UNIQUE INDEX uq_pedido_operacoes_key ON pedido_operacoes(operation_key);
 ```
 
 ### 4.3 Atomic Batch Claim Protocol
+
 1. **Atomic Ingestion**: The creation of local business records (e.g., `pedidos`, `pedido_pagamentos`) and the operation claim (`pedido_operacoes` with `fase='LOCAL_CRIADA'`) are executed together in a single `env.DB.batch()` transaction.
 2. **Race Resolution**:
    - If two identical requests race, one batch succeeds and claims the unique index `uq_pedido_operacoes_key`.

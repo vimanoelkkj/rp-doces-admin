@@ -2,11 +2,7 @@ import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
 import PortalDropdown from "../components/PortalDropdown";
 import { useDropdown } from "../components/useDropdown";
 import { IconRemove } from "../components/AdminIcons";
-import {
-  formatarPreco,
-  estoqueLivre,
-  type ProductItemRowProps
-} from "./novoPedidoHelpers";
+import { formatarPreco, estoqueLivre, type ProductItemRowProps } from "./novoPedidoHelpers";
 
 export const IconChevron = ({ open }: { open: boolean }) => (
   <svg
@@ -124,4 +120,3 @@ export default function ProductItemRow({
     </div>
   );
 }
-

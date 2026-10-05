@@ -51,13 +51,7 @@ const FILES_TO_HASH = [
   "index.html"
 ];
 
-const IGNORED_DIR_NAMES = new Set([
-  "node_modules",
-  "dist",
-  ".git",
-  ".wrangler",
-  ".test-cache",
-]);
+const IGNORED_DIR_NAMES = new Set(["node_modules", "dist", ".git", ".wrangler", ".test-cache"]);
 
 function collectFiles(relDir) {
   const fullDir = path.join(rootDir, relDir);

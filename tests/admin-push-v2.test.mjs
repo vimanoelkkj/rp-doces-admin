@@ -1066,7 +1066,10 @@ test("POST /api/admin/push/test: sanitização de erro 502 não vaza detalhes se
     assert.equal(data.error, "Falha ao despachar notificação de teste");
 
     const rawResponse = JSON.stringify(data);
-    assert.ok(!rawResponse.includes("SUPER_SECRET_123"), "resposta não deve conter SUPER_SECRET_123");
+    assert.ok(
+      !rawResponse.includes("SUPER_SECRET_123"),
+      "resposta não deve conter SUPER_SECRET_123"
+    );
     assert.ok(!rawResponse.includes("10.0.4.15"), "resposta não deve conter 10.0.4.15");
     assert.ok(!rawResponse.includes("8443"), "resposta não deve conter 8443");
     assert.ok(!rawResponse.includes("ECONNREFUSED"), "resposta não deve conter ECONNREFUSED");

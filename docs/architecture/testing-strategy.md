@@ -5,6 +5,7 @@
 The testing architecture for RP Doces is designed around high execution speed, deterministic concurrency verification, and minimal external test dependencies.
 
 ### 1.1 Core Tooling
+
 - **Native Test Runner**: Tests use the Node.js native test runner (`node --test`) with standard assertions (`node:assert/strict`).
 - **File Format**: Test suites are authored as ES modules (`tests/*.test.mjs`).
 - **Fast Execution**: Tests avoid heavy browser automation for core business logic, executing in-memory against local Cloudflare Workers edge simulations.
@@ -43,10 +44,12 @@ const mf = new Miniflare({
 ```
 
 ### 2.1 Dynamic Module Bundling
+
 - Application source modules in `functions/` are bundled into memory using `esbuild` at the start of the test run.
 - This allows testing real TypeScript production routes with native D1 batch semantics without building disk artifacts.
 
 ### 2.2 Full Migration Application
+
 - Before executing test assertions, the test fixture loads and executes all SQL migrations from `migrations/*.sql` in alphabetical order.
 - Statements and trigger bodies are extracted and executed against the in-memory D1 database, ensuring test cases run against the complete production schema.
 
@@ -57,6 +60,7 @@ const mf = new Miniflare({
 Edge environments frequently encounter concurrent requests attempting to access the same inventory or order. The test suite employs deterministic synchronization hooks rather than arbitrary timeouts.
 
 ### 3.1 Deterministic Database Hooks
+
 To simulate race conditions reliably (such as two checkouts competing for the last available item or conflicting idempotency keys):
 
 1. The test fixture provides a hook mechanism on the database wrapper (`db.hook`).
@@ -84,6 +88,7 @@ To simulate race conditions reliably (such as two checkouts competing for the la
 ## 5. Quality Verification Gates
 
 Prior to merging changes or deploying:
+
 - **Migration Continuity**: Run `node --test tests/check-d1-migrations.test.mjs` to verify migration integrity.
 - **Type Checking**: Run `npm run typecheck` to verify TypeScript strictness across `src/` and `functions/`.
 - **Automated Test Suite**: Run `node --test tests/*.test.mjs` to execute domain, integration, and UI tests.

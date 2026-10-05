@@ -87,4 +87,3 @@ export default function DespesasResumo({ resultado, resumo }: DespesasResumoProp
     </>
   );
 }
-

@@ -5,6 +5,7 @@
 The inventory system prevents overselling under concurrent checkout traffic by combining database-level integrity constraints with atomic batch execution.
 
 ### 1.1 Schema Invariants
+
 Stock is tracked with physical inventory and reserved quantities in `produtos`:
 
 ```sql
@@ -25,6 +26,7 @@ ALTER TABLE produtos ADD COLUMN estoque_reservado INTEGER NOT NULL DEFAULT 0 CHE
 ## 2. Stock Reservation Mechanics
 
 ### 2.1 Checkout Reservation (`functions/api/checkout.ts`)
+
 During customer checkout, the reservation is issued within the primary database batch:
 
 ```sql
@@ -64,11 +66,13 @@ Order: PAGO
 ```
 
 ### 3.1 Reservation Expiration
+
 - Checkout reservations set an expiration timestamp (`reserva_expira_em`), typically 15 to 30 minutes in the future.
 - Orders created manually via the administration panel set `reserva_expira_em = NULL`, representing a persistent hold that does not auto-expire.
 - Scheduled or manual reconciliation sweeps identify pending orders whose expiration timestamp has passed, invoking `liberarReservaPedido` (`functions/lib/stock.ts`) to decrement `estoque_reservado` back to available inventory.
 
 ### 3.2 Physical Deduction (`baixarEstoquePedido`)
+
 - When an order reaches authoritative `PAGO` status, `baixarEstoquePedido` converts the temporary hold into a permanent physical deduction.
 - Each controlled line item in `pedido_itens` is updated to `estoque_estado = 'BAIXADO'`.
 - The corresponding product row is updated:
@@ -89,6 +93,7 @@ Order: PAGO
 The authoritative payment gateway for Pix and online transactions is **Mercado Pago** (`/v1/payments`).
 
 ### 4.1 In-Memory Reference Verification (`paymentSync`)
+
 Incoming webhooks from payment providers are unauthenticated network notifications that can be delayed, repeated, or spoofed. The application implements an in-memory runtime verification pattern:
 
 1. **Webhook Notification**:
@@ -106,7 +111,9 @@ Incoming webhooks from payment providers are unauthenticated network notificatio
    - This in-memory barrier ensures within the V8 runtime isolate that only responses produced by direct, authenticated GET calls can trigger payment settlement and stock conversion.
 
 ### 4.2 Handling Gateway Failures (`ENVIO_INCONCLUSIVO`)
+
 When initiating payments or refunds:
+
 - **Network Timeouts & 5xx Responses**:
   - If a network transport failure, socket timeout, or HTTP 5xx error occurs while sending an operation to the payment provider, the operation is set to `fase='ENVIO_INCONCLUSIVO'` in `pedido_operacoes`.
   - The system **does not** cancel the order or release reserved stock on an inconclusive result.

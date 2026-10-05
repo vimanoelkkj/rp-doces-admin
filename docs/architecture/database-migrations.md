@@ -13,6 +13,7 @@ migrations/
 ```
 
 ### 1.1 Sequencing Rules
+
 - Migration filenames adhere to a 4-digit zero-padded prefix followed by a snake_case descriptive identifier (`XXXX_name.sql`).
 - Numbering is strictly continuous without gaps or duplicates (currently spanning 33 migrations, from `0001` through `0033`).
 - Migrations are strictly forward-only: historical migrations already applied to deployment environments are never edited, deleted, or reordered. Any subsequent schema evolution or bugfix must be introduced via a new migration.
@@ -42,12 +43,15 @@ Due to the architectural properties of SQLite in serverless edge environments, s
 SQLite enforces referential integrity through foreign keys, but requires deliberate handling during table recreations.
 
 ### 3.1 The Cascade Problem
+
 In SQLite, executing a table recreation pattern while foreign keys are active can have destructive side effects:
+
 - If a child table has a foreign key referencing a parent table with `ON DELETE CASCADE`:
 - Executing `DROP TABLE parent;` triggers the cascade rule and silently deletes all referenced rows in child tables.
 - Using `PRAGMA defer_foreign_keys = ON;` defers constraint validation until transaction commit, but **does not prevent `DROP TABLE` from executing cascade triggers**.
 
 ### 3.2 Safe Table Recreation Procedure
+
 When modifying a table in SQLite that requires recreation (e.g., changing primary keys or adjusting constraints):
 
 ```sql

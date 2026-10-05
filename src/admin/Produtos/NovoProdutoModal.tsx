@@ -1,10 +1,6 @@
 import { useId } from "react";
 import { createPortal } from "react-dom";
-import {
-  ALERGENICOS_MAX,
-  INGREDIENTES_MAX,
-  PESO_TEXTO_MAX
-} from "../../../shared/produtoDetalhes";
+import { ALERGENICOS_MAX, INGREDIENTES_MAX, PESO_TEXTO_MAX } from "../../../shared/produtoDetalhes";
 import { formatBrlInput } from "../../lib/brl";
 import { IconClose } from "../components/AdminIcons";
 import { useAdminModal } from "../components/useAdminModal";

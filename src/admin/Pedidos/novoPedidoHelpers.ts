@@ -36,8 +36,7 @@ export const MAX_ITENS_PEDIDO_MANUAL = 20;
 export const formatarPreco = (centavos: number) =>
   `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
-export const estoqueLivre = (p: ProdutoAdmin) =>
-  Math.max(0, p.estoque - p.estoque_reservado);
+export const estoqueLivre = (p: ProdutoAdmin) => Math.max(0, p.estoque - p.estoque_reservado);
 
 export interface NovoPedidoModalProps {
   open: boolean;
@@ -61,4 +60,3 @@ export interface NovoPedidoPagamentoSectionProps {
   onSelectMetodo: (m: MetodoPagamento) => void;
   onSelectStatus: (s: StatusPagamento) => void;
 }
-
