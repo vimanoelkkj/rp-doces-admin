@@ -58,7 +58,20 @@ const mutations = {
   reset: [
     "setAdicionandoItem(false);\n    setEditandoNome(false);",
     "setHistoricoAberto(false);\n    setAdicionandoItem(false);\n    setEditandoNome(false);"
-  ]
+  ],
+  staleGeneration: ["leituraRef.current.generation === generation", "true"],
+  staleOrder: ["if (!podeAplicarLeitura()) return;", ""],
+  staleSequence: ["sequence >= leituraRef.current.appliedSequence", "true"],
+  staleReset: ["leituraRef.current.generation++;", "leituraRef.current.generation = 0;"],
+  staleError: [
+    "if (!podeAplicarLeitura()) return;\n          leituraRef.current.appliedSequence = sequence;\n          setError(err.message);",
+    "setError(err.message);"
+  ],
+  staleLoading: [
+    "pertenceAoPedidoAtual() && sequence >= leituraRef.current.loadingSequence",
+    "!silencioso"
+  ],
+  staleUnmount: ["leituraRef.current.orderId = null;\n      leituraRef.current.generation++;", ""]
 };
 if (process.env.HOOK_MUTATION) {
   const [before, after] = mutations[process.env.HOOK_MUTATION];
@@ -359,7 +372,7 @@ test("load: reconciliation ordering, network/HTTP failures, normal/silent and in
   assert.equal(h.state.error, "network");
 });
 
-test("reset: exact partial snapshot, surviving locks and late old order response", async t => {
+test("reset: exact partial snapshot, surviving locks and discarded old order response", async t => {
   const h = await harness(t);
   await h.load();
   await h.call(s => {
@@ -460,7 +473,8 @@ test("reset: exact partial snapshot, surviving locks and late old order response
     "Pix in-flight set survives order change"
   );
   await h.reply(oldGet, fixture(1));
-  assert.equal(h.state.data.pedido.id, 1);
+  assert.deepEqual(h.state.data, fixture(2));
+  assert.deepEqual(h.events, ["copy:code"]);
   await h.fail(oldPix);
 });
 
@@ -495,6 +509,11 @@ test("polling: exact clock, overlap, archived orders, stop/restart and cleanup",
   );
   assert.equal(h.timers.size, 0);
   await h.reply(firstGet, pending());
+  assert.equal(h.state.data.financeiro.status, "PAGO");
+  assert.equal(h.timers.size, 0);
+  assert.deepEqual(h.events, ["status:old"]);
+  await h.call(s => s.carregarPedido(true));
+  await h.load(pending());
   assert.equal(h.state.data.financeiro.status, "PENDENTE");
   assert.equal(h.timers.size, 2);
   await h.tick(2000);
@@ -506,6 +525,137 @@ test("polling: exact clock, overlap, archived orders, stop/restart and cleanup",
   const count = h.requests.length;
   await h.tick(10000);
   assert.equal(h.requests.length, count);
+});
+
+test("stale: returning to the same order never reuses an earlier generation", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => s.carregarPedido(true));
+  await h.reply(h.requests.at(-1));
+  const oldGet = h.requests.at(-1);
+  await h.render({ orderId: 2 });
+  const otherReconcile = h.requests.at(-1);
+  await h.render({ orderId: 1 });
+  const currentReconcile = h.requests.at(-1);
+  await h.reply(oldGet, pending());
+  assert.equal(h.state.data, null);
+  assert.equal(h.state.loading, true);
+  assert.equal(h.timers.size, 0);
+  await h.load(fixture(), currentReconcile);
+  await h.load(fixture(2, { anulacao: { id: 1 } }), otherReconcile);
+  assert.deepEqual(h.state.data, fixture());
+  assert.equal(h.state.loading, false);
+  assert.deepEqual(h.events, []);
+});
+
+test("stale: older valid read can finish while a newer read is pending", async t => {
+  const h = await harness(t);
+  await h.load(pending());
+  await h.tick(5000);
+  await h.reply(h.requests.at(-1));
+  const firstGet = h.requests.at(-1);
+  await h.tick(5000);
+  const secondReconcile = h.requests.at(-1);
+  const first = pending();
+  first.itens[0].troca_status = "CONCLUIDA";
+  await h.reply(firstGet, first);
+  assert.deepEqual(h.state.data, first);
+  assert.equal(h.state.trocaAguardandoCobranca, false);
+  await h.load(fixture(), secondReconcile);
+  assert.deepEqual(h.state.data, fixture());
+  assert.equal(h.timers.size, 0);
+});
+
+test("stale: errors from old reads cannot replace the latest successful read", async t => {
+  for (const failure of ["network", "http", "invalid"])
+    await t.test(failure, async t => {
+      const h = await harness(t);
+      await h.load();
+      await h.call(s => s.carregarPedido());
+      await h.reply(h.requests.at(-1));
+      const oldGet = h.requests.at(-1);
+      await h.call(s => s.carregarPedido());
+      const current = fixture(1, {
+        financeiro: { status: "PAGO", pagoCentavos: 1000, totalCentavos: 1000 }
+      });
+      await h.load(current);
+      if (failure === "network") await h.fail(oldGet);
+      else await h.reply(oldGet, {}, failure === "http" ? 500 : 200);
+      assert.deepEqual(h.state.data, current);
+      assert.equal(h.state.error, null);
+      assert.equal(h.state.loading, false);
+      assert.deepEqual(h.events, []);
+    });
+});
+
+test("stale: loading belongs to the current foreground read", async t => {
+  const h = await harness(t);
+  await h.reply(h.requests.at(-1));
+  const oldGet = h.requests.at(-1);
+  await h.render({ orderId: 2 });
+  const currentReconcile = h.requests.at(-1);
+  await h.reply(oldGet, fixture());
+  assert.equal(h.state.data, null);
+  assert.equal(h.state.loading, true);
+  await h.reply(currentReconcile);
+  const firstGet = h.requests.at(-1);
+  await h.call(s => s.carregarPedido());
+  const newerReconcile = h.requests.at(-1);
+  await h.reply(firstGet, fixture(2));
+  assert.equal(h.state.loading, true);
+  await h.load(fixture(2), newerReconcile);
+  assert.equal(h.state.loading, false);
+});
+
+test("stale: newer silent success releases superseded foreground loading", async t => {
+  const h = await harness(t);
+  await h.reply(h.requests.at(-1));
+  const oldGet = h.requests.at(-1);
+  await h.call(s => s.carregarPedido(true));
+  await h.load(pending());
+  assert.equal(h.state.loading, false);
+  await h.reply(oldGet, fixture());
+  assert.deepEqual(h.state.data, pending());
+  assert.equal(h.state.loading, false);
+});
+
+test("stale: old reload callback cannot invalidate or refresh the new order", async t => {
+  const h = await harness(t);
+  await h.load();
+  const oldReload = h.state.carregarPedido;
+  await h.render({ orderId: 2 });
+  const count = h.requests.length;
+  await h.call(() => oldReload(true));
+  assert.equal(h.requests.length, count);
+  await h.load(fixture(2));
+  assert.deepEqual(h.state.data, fixture(2));
+});
+
+test("stale: discarded annulment cannot close children or notify the parent", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => s.carregarPedido(true));
+  await h.reply(h.requests.at(-1));
+  const oldGet = h.requests.at(-1);
+  await h.render({ orderId: 2 });
+  await h.load(fixture(2));
+  await h.call(s => {
+    s.setAdicionandoItem(true);
+    s.setRegistrandoPagamento(true);
+    s.setItemTroca(s.data.itens[0]);
+  });
+  await h.reply(
+    oldGet,
+    fixture(1, {
+      anulacao: { id: 1 },
+      financeiro: { status: "PAGO", pagoCentavos: 1000, totalCentavos: 1000 }
+    })
+  );
+  assert.deepEqual(h.state.data, fixture(2));
+  assert.equal(h.state.adicionandoItem, true);
+  assert.equal(h.state.registrandoPagamento, true);
+  assert.deepEqual(h.state.itemTroca, fixture(2).itens[0]);
+  assert.deepEqual(h.events, []);
 });
 
 test("Pix: action identity, synchronous locks, retry, ambiguous/conclusive errors and success", async t => {
@@ -783,7 +933,7 @@ test("children: history navigation, polling refresh and annulment closes all exc
   assert.equal(h.state.itemTroca, null);
 });
 
-test("unmount: late response still notifies externally and copy timeout survives", async t => {
+test("unmount: late read is discarded, mutation callback and copy timeout survive", async t => {
   const h = await harness(t);
   await h.load(pending());
   await h.call(s => {
@@ -813,7 +963,7 @@ test("unmount: late response still notifies externally and copy timeout survives
     fixture(1, { financeiro: { status: "PAGO", pagoCentavos: 1000, totalCentavos: 1000 } })
   );
   await h.reply(status);
-  assert.deepEqual(h.events, ["copy:a", "copy:b", "copy:late", "status:old", "status:old"]);
+  assert.deepEqual(h.events, ["copy:a", "copy:b", "copy:late", "status:old"]);
   await h.tick(2000);
   assert.equal(h.timers.size, 0);
 });
@@ -832,7 +982,14 @@ if (!process.env.HOOK_MUTATION)
       identity: "^Pix:",
       lock: "^manual:",
       callback: "^callbacks:",
-      reset: "^reset:"
+      reset: "^reset:",
+      staleGeneration: "^stale: returning",
+      staleOrder: "^reset:",
+      staleSequence: "^polling:",
+      staleReset: "^stale: returning",
+      staleError: "^stale: errors",
+      staleLoading: "^stale: loading",
+      staleUnmount: "^unmount:"
     })) {
       await t.test(mutation, async () => {
         for (const variant of mutation === "lock" ? Object.keys(lockMutations) : [undefined]) {

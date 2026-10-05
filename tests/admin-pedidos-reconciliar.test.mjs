@@ -277,7 +277,7 @@ test("UI usePedidoDetalhe: carregarPedido executa POST de reconciliação antes 
   // Confirma que a abertura inicial da tela também passa pelo carregarPedido unificado
   assert.match(
     useDetalheSrc,
-    /useEffect\(\(\)\s*=>\s*\{[\s\S]*?void carregarPedido\(\);[\s\S]*?\}, \[carregarPedido\]\);/,
+    /useEffect\(\(\)\s*=>\s*\{[\s\S]*?void carregarPedido\(\);[\s\S]*?\}, \[carregarPedido, orderId\]\);/,
     "efeito de montagem deve invocar carregarPedido() unificado"
   );
 });

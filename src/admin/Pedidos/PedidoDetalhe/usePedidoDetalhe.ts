@@ -31,6 +31,13 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const dataRef = useRef<PedidoDetalheResponse | null>(null);
   const onStatusChangedRef = useRef(onStatusChanged);
+  const leituraRef = useRef({
+    orderId: null as number | null,
+    generation: 0,
+    sequence: 0,
+    appliedSequence: 0,
+    loadingSequence: 0
+  });
 
   useEffect(() => {
     onStatusChangedRef.current = onStatusChanged;
@@ -38,7 +45,17 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
 
   const carregarPedido = useCallback(
     (silencioso = false) => {
-      if (!silencioso) setLoading(true);
+      if (leituraRef.current.orderId !== orderId) return Promise.resolve();
+      const generation = leituraRef.current.generation;
+      const sequence = ++leituraRef.current.sequence;
+      const pertenceAoPedidoAtual = () =>
+        leituraRef.current.orderId === orderId && leituraRef.current.generation === generation;
+      const podeAplicarLeitura = () =>
+        pertenceAoPedidoAtual() && sequence >= leituraRef.current.appliedSequence;
+      if (!silencioso) {
+        leituraRef.current.loadingSequence = sequence;
+        setLoading(true);
+      }
       return fetch(`/api/admin/pedidos/${orderId}/reconciliar`, { method: "POST" })
         .catch(err => {
           console.warn("Falha na reconciliação da comanda", err);
@@ -49,6 +66,8 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
           return response.json() as Promise<PedidoDetalheResponse>;
         })
         .then(result => {
+          if (!podeAplicarLeitura()) return;
+          leituraRef.current.appliedSequence = sequence;
           const anterior = dataRef.current;
           const financeiroMudou = Boolean(
             anterior &&
@@ -79,9 +98,15 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
           setError(null);
           if (silencioso && financeiroMudou) onStatusChangedRef.current?.();
         })
-        .catch(err => setError(err.message))
+        .catch(err => {
+          if (!podeAplicarLeitura()) return;
+          leituraRef.current.appliedSequence = sequence;
+          setError(err.message);
+        })
         .finally(() => {
-          if (!silencioso) setLoading(false);
+          if (pertenceAoPedidoAtual() && sequence >= leituraRef.current.loadingSequence) {
+            setLoading(false);
+          }
         });
     },
     [orderId]
@@ -132,6 +157,8 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
   });
 
   useEffect(() => {
+    leituraRef.current.orderId = orderId;
+    leituraRef.current.generation++;
     dataRef.current = null;
     setData(null);
     setAdicionandoItem(false);
@@ -142,7 +169,11 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
     pagamentoCoordenacaoRef.current.pagamentoKeyRef.current = null;
     pixCoordenacaoRef.current.pixKeysRef.current.clear();
     void carregarPedido();
-  }, [carregarPedido]);
+    return () => {
+      leituraRef.current.orderId = null;
+      leituraRef.current.generation++;
+    };
+  }, [carregarPedido, orderId]);
 
   // Contador de expiração dos Pix pendentes — só liga o relógio quando há
   // algo pra contar. Nunca decide sozinho que um Pix expirou: só o
