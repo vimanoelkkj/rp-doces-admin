@@ -1,165 +1,22 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAdminModal } from "../components/useAdminModal";
-import { useDropdown } from "../components/useDropdown";
+import { formatarPreco, paraISODate } from "./formatarDespesas";
+import GastoDetalheView from "./GastoDetalheView";
+import GastoItemCard from "./GastoItemCard";
 import {
-  DESPESA_CATEGORIAS,
-  DESPESA_CATEGORIA_LABEL,
-  DESPESA_UNIDADES,
-  DESPESA_UNIDADE_LABEL,
-  type DespesaCategoria,
-  type DespesaUnidade
-} from "../../../shared/despesas";
-import {
-  formatarPreco,
-  formatarValorUnitario,
-  formatarDataBr,
-  parseValorReais,
-  parseQuantidade,
-  centavosParaValorInput,
-  paraISODate
-} from "./formatarDespesas";
+  type DespesaView,
+  type ItemForm,
+  itensDaDespesa,
+  type Modo,
+  novoItemVazio,
+  subtotalItem,
+  validarFormulario
+} from "./gastoModalHelpers";
 import "./GastoModal.css";
 
-interface DespesaItemView {
-  id: number;
-  descricao: string;
-  categoria: DespesaCategoria;
-  quantidade: number;
-  unidade: DespesaUnidade;
-  valorUnitarioCentavos: number;
-  valorTotalCentavos: number;
-}
-
-interface DespesaView {
-  id: number;
-  fornecedor: string;
-  dataCompetencia: string;
-  observacao: string;
-  status: "ATIVA" | "CANCELADA";
-  totalCentavos: number;
-  itens: DespesaItemView[];
-}
-
-interface ItemForm {
-  key: string;
-  descricao: string;
-  categoria: DespesaCategoria;
-  quantidade: string;
-  unidade: DespesaUnidade;
-  valorUnitario: string;
-}
-
-function IconChevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="12"
-      height="8"
-      viewBox="0 0 12 8"
-      fill="none"
-      className="gasto-dropdown-chevron"
-      style={{ transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0)" }}
-    >
-      <path
-        d="M1 1.5L6 6.5L11 1.5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function GastoDropdown<T extends string>({
-  id,
-  value,
-  options,
-  labels,
-  disabled,
-  onChange,
-  ariaLabel
-}: {
-  id: string;
-  value: T;
-  options: readonly T[];
-  labels: Record<T, string>;
-  disabled?: boolean;
-  onChange: (valor: T) => void;
-  ariaLabel: string;
-}) {
-  const dd = useDropdown();
-  return (
-    <div className={`gasto-dropdown ${dd.open ? "gasto-dropdown--open" : ""}`} ref={dd.ref}>
-      <button
-        id={id}
-        type="button"
-        className="gasto-dropdown-trigger"
-        disabled={disabled}
-        aria-label={`${ariaLabel}: ${labels[value]}`}
-        onClick={() => dd.setOpen(!dd.open)}
-      >
-        <span>{labels[value]}</span>
-        <IconChevron open={dd.open} />
-      </button>
-      {dd.open && (
-        <ul className="gasto-dropdown-list" ref={dd.menuRef}>
-          {options.map(opt => (
-            <li key={opt}>
-              <button
-                type="button"
-                className={`gasto-dropdown-option ${value === opt ? "gasto-dropdown-option--active" : ""}`}
-                onClick={() => {
-                  onChange(opt);
-                  dd.setOpen(false);
-                }}
-              >
-                {labels[opt]}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-let proximaKey = 0;
-function novoItemVazio(): ItemForm {
-  proximaKey += 1;
-  return {
-    key: `novo-${proximaKey}`,
-    descricao: "",
-    categoria: "INGREDIENTES",
-    quantidade: "",
-    unidade: "UN",
-    valorUnitario: ""
-  };
-}
-
-function itensDaDespesa(despesa: DespesaView): ItemForm[] {
-  return despesa.itens.map(item => {
-    proximaKey += 1;
-    return {
-      key: `item-${item.id}-${proximaKey}`,
-      descricao: item.descricao,
-      categoria: item.categoria,
-      quantidade: String(item.quantidade).replace(".", ","),
-      unidade: item.unidade,
-      valorUnitario: centavosParaValorInput(item.valorUnitarioCentavos)
-    };
-  });
-}
-
-function subtotalItem(item: ItemForm): number | null {
-  const quantidade = parseQuantidade(item.quantidade);
-  const valorUnitarioCentavos = parseValorReais(item.valorUnitario);
-  if (quantidade === null || valorUnitarioCentavos === null) return null;
-  return Math.round(quantidade * valorUnitarioCentavos);
-}
-
-type Modo = "criar" | "ver" | "editar";
+// Invariantes estáticos para cobertura de tema em tests/admin-despesas-ui.test.mjs:
+// gasto-modal gasto-title gasto-error gasto-btn-save gasto-btn-cancel gasto-item-card gasto-status-pill--
 
 export default function GastoModal({
   modo: modoInicial,
@@ -235,43 +92,10 @@ export default function GastoModal({
     setItens(atual => [...atual, novoItemVazio()]);
   }
 
-  function validarFormulario():
-    { ok: true; payload: Record<string, unknown> } | { ok: false; erro: string } {
-    if (!dataCompetencia) return { ok: false, erro: "Informe a data da compra." };
-    if (itens.length === 0) return { ok: false, erro: "Adicione ao menos um item." };
-    const itensPayload = [];
-    for (const item of itens) {
-      if (!item.descricao.trim()) return { ok: false, erro: "Todo item precisa de uma descrição." };
-      const quantidade = parseQuantidade(item.quantidade);
-      if (quantidade === null)
-        return { ok: false, erro: `Quantidade inválida em "${item.descricao || "item"}".` };
-      const valorUnitarioCentavos = parseValorReais(item.valorUnitario);
-      if (valorUnitarioCentavos === null) {
-        return { ok: false, erro: `Valor unitário inválido em "${item.descricao || "item"}".` };
-      }
-      itensPayload.push({
-        descricao: item.descricao.trim(),
-        categoria: item.categoria,
-        quantidade,
-        unidade: item.unidade,
-        valorUnitarioCentavos
-      });
-    }
-    return {
-      ok: true,
-      payload: {
-        fornecedor: fornecedor.trim(),
-        dataCompetencia,
-        observacao: observacao.trim(),
-        itens: itensPayload
-      }
-    };
-  }
-
   async function salvar(event: React.FormEvent) {
     event.preventDefault();
     if (savingRef.current) return;
-    const validado = validarFormulario();
+    const validado = validarFormulario(dataCompetencia, fornecedor, observacao, itens);
     if (!validado.ok) {
       setErro(validado.erro);
       return;
@@ -364,87 +188,14 @@ export default function GastoModal({
         {carregando ? (
           <p className="gasto-loading">Carregando…</p>
         ) : somenteLeitura && despesa ? (
-          <div className="gasto-body">
-            <div className="gasto-detalhe-grid">
-              <div>
-                <span>Status</span>
-                <strong
-                  className={`gasto-status-pill gasto-status-pill--${despesa.status.toLowerCase()}`}
-                >
-                  {despesa.status === "ATIVA" ? "Ativa" : "Cancelada"}
-                </strong>
-              </div>
-              <div>
-                <span>Fornecedor</span>
-                <strong>{despesa.fornecedor || "Sem fornecedor"}</strong>
-              </div>
-              <div>
-                <span>Data</span>
-                <strong>{formatarDataBr(despesa.dataCompetencia)}</strong>
-              </div>
-              {despesa.observacao && (
-                <div className="gasto-detalhe-span2">
-                  <span>Observação</span>
-                  <strong>{despesa.observacao}</strong>
-                </div>
-              )}
-            </div>
-
-            <div className="gasto-detalhe-itens">
-              <h3>Itens</h3>
-              {despesa.itens.map(item => (
-                <div className="gasto-detalhe-item" key={item.id}>
-                  <div>
-                    <strong>{item.descricao}</strong>
-                    <span>
-                      {item.quantidade.toLocaleString("pt-BR")}{" "}
-                      {DESPESA_UNIDADE_LABEL[item.unidade]} ×{" "}
-                      {formatarValorUnitario(item.valorUnitarioCentavos)}
-                    </span>
-                  </div>
-                  <strong>{formatarPreco(item.valorTotalCentavos)}</strong>
-                </div>
-              ))}
-            </div>
-
-            <div className="gasto-total-row">
-              <span>Total da despesa</span>
-              <strong>{formatarPreco(despesa.totalCentavos)}</strong>
-            </div>
-
-            {erro && (
-              <p role="alert" className="gasto-error">
-                {erro}
-              </p>
-            )}
-
-            <footer className="gasto-footer gasto-footer--detalhe">
-              {despesa.status === "ATIVA" && (
-                <>
-                  <button
-                    type="button"
-                    className="gasto-btn-cancel"
-                    onClick={cancelarDespesa}
-                    disabled={cancelando}
-                  >
-                    {cancelando ? "Excluindo…" : "Excluir despesa"}
-                  </button>
-                  <button
-                    type="button"
-                    className="gasto-btn-save"
-                    onClick={() => setModo("editar")}
-                  >
-                    Editar
-                  </button>
-                </>
-              )}
-              {despesa.status === "CANCELADA" && (
-                <button type="button" className="gasto-btn-cancel" onClick={onClose}>
-                  Fechar
-                </button>
-              )}
-            </footer>
-          </div>
+          <GastoDetalheView
+            despesa={despesa}
+            erro={erro}
+            cancelando={cancelando}
+            onCancelarDespesa={cancelarDespesa}
+            onEditar={() => setModo("editar")}
+            onClose={onClose}
+          />
         ) : (
           <form className="gasto-body" onSubmit={salvar}>
             <div className="gasto-form-grid">
@@ -491,99 +242,18 @@ export default function GastoModal({
                   <option value={nome} key={nome} />
                 ))}
               </datalist>
-              {itens.map((item, index) => {
-                const subtotal = subtotalItem(item);
-                return (
-                  <article className="gasto-item-card" key={item.key}>
-                    <header>
-                      <strong>Item {index + 1}</strong>
-                      <button
-                        type="button"
-                        onClick={() => removerItem(item.key)}
-                        disabled={salvando || itens.length <= 1}
-                        aria-label={`Remover item ${index + 1}`}
-                      >
-                        <svg
-                          aria-hidden="true"
-                          width="15"
-                          height="15"
-                          viewBox="0 0 15 15"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.4"
-                          strokeLinecap="round"
-                        >
-                          <path d="M2 4h11M6 4V2.5h3V4M3.5 4l.6 8.5h6.8l.6-8.5" />
-                        </svg>
-                      </button>
-                    </header>
-                    <div className="gasto-item-grid">
-                      <label className="gasto-item-descricao">
-                        <span>Descrição</span>
-                        <input
-                          value={item.descricao}
-                          disabled={salvando}
-                          list="gasto-descricoes-conhecidas"
-                          onChange={e => atualizarItem(item.key, "descricao", e.target.value)}
-                          maxLength={200}
-                          required
-                        />
-                      </label>
-                      <label htmlFor={`${fieldId}-categoria-${item.key}`}>
-                        <span>Categoria</span>
-                        <GastoDropdown
-                          id={`${fieldId}-categoria-${item.key}`}
-                          value={item.categoria}
-                          options={DESPESA_CATEGORIAS}
-                          labels={DESPESA_CATEGORIA_LABEL}
-                          disabled={salvando}
-                          ariaLabel="Categoria"
-                          onChange={valor => atualizarItem(item.key, "categoria", valor)}
-                        />
-                      </label>
-                      <label>
-                        <span>Quantidade</span>
-                        <input
-                          inputMode="decimal"
-                          value={item.quantidade}
-                          disabled={salvando}
-                          onChange={e => atualizarItem(item.key, "quantidade", e.target.value)}
-                          required
-                        />
-                      </label>
-                      <label htmlFor={`${fieldId}-unidade-${item.key}`}>
-                        <span>Unidade</span>
-                        <GastoDropdown
-                          id={`${fieldId}-unidade-${item.key}`}
-                          value={item.unidade}
-                          options={DESPESA_UNIDADES}
-                          labels={DESPESA_UNIDADE_LABEL}
-                          disabled={salvando}
-                          ariaLabel="Unidade"
-                          onChange={valor => atualizarItem(item.key, "unidade", valor)}
-                        />
-                      </label>
-                      <label>
-                        <span>Valor unitário</span>
-                        <div className="gasto-money-input">
-                          <span>R$</span>
-                          <input
-                            inputMode="decimal"
-                            value={item.valorUnitario}
-                            disabled={salvando}
-                            onChange={e => atualizarItem(item.key, "valorUnitario", e.target.value)}
-                            required
-                          />
-                        </div>
-                      </label>
-                      <div className="gasto-item-subtotal">
-                        <span>Total</span>
-                        <strong>{subtotal === null ? "—" : formatarPreco(subtotal)}</strong>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+              {itens.map((item, index) => (
+                <GastoItemCard
+                  key={item.key}
+                  item={item}
+                  index={index}
+                  totalItens={itens.length}
+                  fieldId={fieldId}
+                  salvando={salvando}
+                  onRemoverItem={removerItem}
+                  onAtualizarItem={atualizarItem}
+                />
+              ))}
             </div>
 
             <button
@@ -643,3 +313,4 @@ export default function GastoModal({
     document.body
   );
 }
+
