@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { novaOperationKey } from "../../../lib/operationKey";
-import type {
-  MetodoPagamentoManual,
-  PedidoDetalheResponse,
-  PedidoItemRow,
-  StatusPedido
-} from "./types";
-import { parseValorPagamento, valorPagamentoInicial } from "./helpers";
+import type { PedidoDetalheResponse, PedidoItemRow, StatusPedido } from "./types";
+import { usePedidoDetalhePagamento } from "./usePedidoDetalhePagamento";
+import { usePedidoDetalhePix } from "./usePedidoDetalhePix";
 
 interface UsePedidoDetalheArgs {
   orderId: number;
@@ -28,45 +23,18 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
   const [clienteNome, setClienteNome] = useState("");
   const [salvandoNome, setSalvandoNome] = useState(false);
   const [nomeError, setNomeError] = useState<string | null>(null);
-  const [registrandoPagamento, setRegistrandoPagamento] = useState(false);
-  const [metodoPagamento, setMetodoPagamento] = useState<MetodoPagamentoManual>("DINHEIRO");
-  const [valorPagamento, setValorPagamento] = useState("");
-  const [pagamentoEmVoo, setPagamentoEmVoo] = useState(false);
-  const [pagamentoError, setPagamentoError] = useState<string | null>(null);
-  const pagamentoEmVooRef = useRef(false);
-  const pagamentoKeyRef = useRef<string | null>(null);
 
-  // Pix administrativo: `gerando` cobre a ação sem substituto; `regenerandoId`
-  // guarda qual bloco específico está em voo (desabilita só aquele botão).
-  // `pixAviso` é o caminho AMBÍGUO (MERCADO_PAGO_INDISPONIVEL) — nunca junta
-  // com `pixError` genérico, porque a ação certa é diferente: nunca convidar
-  // a tentar de novo direto, só "atualizar e conferir o que persistiu".
-  const [gerando, setGerando] = useState(false);
-  const [regenerandoId, setRegenerandoId] = useState<number | null>(null);
-  const [pixError, setPixError] = useState<string | null>(null);
-  const [pixAviso, setPixAviso] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
-  const [copiedId, setCopiedId] = useState<number | null>(null);
   const [adicionandoItem, setAdicionandoItem] = useState(false);
   const [itemCancelamentoPreviewId, setItemCancelamentoPreviewId] = useState<number | null>(null);
   const [itemTroca, setItemTroca] = useState<PedidoItemRow | null>(null);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const dataRef = useRef<PedidoDetalheResponse | null>(null);
-  const pixEmVooRef = useRef<Set<string>>(new Set());
   const onStatusChangedRef = useRef(onStatusChanged);
 
   useEffect(() => {
     onStatusChangedRef.current = onStatusChanged;
   }, [onStatusChanged]);
-
-  // A1: uma key por INTENÇÃO de cobrança. A identidade da ação já distingue
-  // "gerar Pix novo" de "regenerar o Pix X", então o mapa é indexado por
-  // ela. A key sobrevive a um retry da mesma ação (resposta perdida, erro de
-  // rede) e é descartada quando a ação se resolve — assim uma regeneração
-  // NOVA, iniciada explicitamente pelo operador depois, recebe key nova.
-  // No caminho AMBÍGUO a key é preservada de propósito: repetir a ação nunca
-  // pode nascer como uma segunda cobrança com outra identidade no MP.
-  const pixKeysRef = useRef<Map<string, string>>(new Map());
 
   const carregarPedido = useCallback(
     (silencioso = false) => {
@@ -92,7 +60,7 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
           setData(result);
           if (result.anulacao) {
             setEditandoNome(false);
-            setRegistrandoPagamento(false);
+            pagamentoCoordenacaoRef.current.setRegistrandoPagamento(false);
             setAdicionandoItem(false);
             setItemCancelamentoPreviewId(null);
             setItemTroca(null);
@@ -119,16 +87,60 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
     [orderId]
   );
 
+  const {
+    registrandoPagamento,
+    setRegistrandoPagamento,
+    metodoPagamento,
+    valorPagamento,
+    setValorPagamento,
+    pagamentoEmVoo,
+    pagamentoError,
+    setPagamentoError,
+    pagamentoEmVooRef,
+    pagamentoKeyRef,
+    selecionarMetodoPagamento,
+    abrirRegistroPagamento,
+    registrarPagamento
+  } = usePedidoDetalhePagamento({
+    orderId,
+    capacidadeCobravelCentavos: data?.capacidadeCobravelCentavos,
+    recarregarSilenciosamente: () => carregarPedido(true)
+  });
+
+  const {
+    gerando,
+    regenerandoId,
+    pixError,
+    pixAviso,
+    setPixAviso,
+    copiedId,
+    pixKeysRef,
+    gerarPix,
+    copiarCodigo
+  } = usePedidoDetalhePix({
+    orderId,
+    recarregarSilenciosamente: () => carregarPedido(true)
+  });
+  const pixCoordenacaoRef = useRef({ pixKeysRef });
+
+  // These setters and refs are stable; keep the existing effect dependencies.
+  const pagamentoCoordenacaoRef = useRef({
+    setRegistrandoPagamento,
+    setPagamentoError,
+    pagamentoEmVooRef,
+    pagamentoKeyRef
+  });
+
   useEffect(() => {
     dataRef.current = null;
     setData(null);
     setAdicionandoItem(false);
     setEditandoNome(false);
-    setRegistrandoPagamento(false);
-    setPagamentoError(null);
-    pagamentoEmVooRef.current = false;
-    pagamentoKeyRef.current = null;
-    pixKeysRef.current.clear();
+    pagamentoCoordenacaoRef.current.setRegistrandoPagamento(false);
+    pagamentoCoordenacaoRef.current.setPagamentoError(null);
+    pagamentoCoordenacaoRef.current.pagamentoEmVooRef.current = false;
+    pagamentoCoordenacaoRef.current.pagamentoKeyRef.current = null;
+    pixCoordenacaoRef.current.pixKeysRef.current.clear();
     void carregarPedido();
   }, [carregarPedido]);
 
@@ -151,67 +163,6 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
     const interval = setInterval(() => void carregarPedido(true), 5000);
     return () => clearInterval(interval);
   }, [carregarPedido, data]);
-
-  const gerarPix = (substituiId?: number, valorCentavos?: number) => {
-    setPixError(null);
-    setPixAviso(null);
-    if (substituiId) setRegenerandoId(substituiId);
-    else setGerando(true);
-
-    const acao = substituiId ? `regen:${substituiId}` : "novo";
-    if (pixEmVooRef.current.has(acao)) return;
-    pixEmVooRef.current.add(acao);
-    let operationKey = pixKeysRef.current.get(acao);
-    if (!operationKey) {
-      operationKey = novaOperationKey();
-      pixKeysRef.current.set(acao, operationKey);
-    }
-
-    fetch(`/api/admin/pedidos/${orderId}/pix`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        substituiId ? { substituiId, operationKey } : { operationKey, valorCentavos }
-      )
-    })
-      .then(async response => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          // Erro ambíguo ou operação ainda em processamento (código, não
-          // texto — nunca inferir pela mensagem): nunca sabemos se o MP criou
-          // a cobrança mesmo assim. Não convida a tentar de novo, só a
-          // atualizar e conferir o que persistiu (a próxima carga do GET
-          // reflete a verdade do ledger). A key é PRESERVADA: se a ação for
-          // repetida, ela recupera a MESMA operação em vez de abrir outra.
-          if (
-            body.code === "MERCADO_PAGO_INDISPONIVEL" ||
-            body.code === "OPERACAO_EM_PROCESSAMENTO"
-          ) {
-            setPixAviso(body.error ?? "Não foi possível confirmar a criação do Pix.");
-            return;
-          }
-          // Qualquer outro erro é conclusivo para esta intenção: descarta a
-          // key para que uma nova tentativa do operador seja tratada como a
-          // intenção nova que ela é.
-          pixKeysRef.current.delete(acao);
-          throw new Error(body.error ?? "Falha ao gerar Pix");
-        }
-        pixKeysRef.current.delete(acao);
-        return carregarPedido(true);
-      })
-      .catch(err => setPixError(err.message))
-      .finally(() => {
-        pixEmVooRef.current.delete(acao);
-        setGerando(false);
-        setRegenerandoId(null);
-      });
-  };
-
-  const copiarCodigo = (pixId: number, codigo: string) => {
-    navigator.clipboard.writeText(codigo);
-    setCopiedId(pixId);
-    setTimeout(() => setCopiedId(atual => (atual === pixId ? null : atual)), 2000);
-  };
 
   const alterarStatus = (novoStatus: StatusPedido) => {
     if (!data || novoStatus === data.pedido.status_pedido) return;
@@ -319,59 +270,6 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
       })
       .catch(err => setNomeError(err.message))
       .finally(() => setSalvandoNome(false));
-  };
-
-  const selecionarMetodoPagamento = (metodo: MetodoPagamentoManual) => {
-    setMetodoPagamento(metodo);
-    setPagamentoError(null);
-    pagamentoKeyRef.current = null;
-  };
-
-  const abrirRegistroPagamento = () => {
-    if (!data) return;
-    setValorPagamento(valorPagamentoInicial(data.capacidadeCobravelCentavos));
-    setPagamentoError(null);
-    pagamentoKeyRef.current = null;
-    setRegistrandoPagamento(true);
-  };
-
-  const registrarPagamento = () => {
-    if (!data || pagamentoEmVooRef.current) return;
-    const valorCentavos = parseValorPagamento(valorPagamento);
-    if (!valorCentavos) {
-      setPagamentoError("Informe um valor válido.");
-      return;
-    }
-    if (valorCentavos > data.capacidadeCobravelCentavos) {
-      setPagamentoError("O valor não pode ultrapassar o saldo em aberto.");
-      return;
-    }
-
-    pagamentoEmVooRef.current = true;
-    setPagamentoEmVoo(true);
-    setPagamentoError(null);
-    const operationKey = pagamentoKeyRef.current ?? novaOperationKey();
-    pagamentoKeyRef.current = operationKey;
-
-    fetch(`/api/admin/pedidos/${orderId}/pagamentos`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ metodo: metodoPagamento, valorCentavos, operationKey })
-    })
-      .then(async response => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(body.error ?? "Falha ao registrar pagamento");
-        }
-        pagamentoKeyRef.current = null;
-        setRegistrandoPagamento(false);
-        return carregarPedido(true);
-      })
-      .catch(err => setPagamentoError(err.message))
-      .finally(() => {
-        pagamentoEmVooRef.current = false;
-        setPagamentoEmVoo(false);
-      });
   };
 
   const anulado = Boolean(data?.anulacao);
