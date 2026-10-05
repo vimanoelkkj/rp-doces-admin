@@ -20,11 +20,6 @@ on:
 permissions:
   contents: read
 
-# Um novo push no mesmo PR cancela a execução anterior; na main nunca cancela.
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   checks:
     name: Typecheck e build
