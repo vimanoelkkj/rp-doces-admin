@@ -1,80 +1,22 @@
 import { useState, useRef, useEffect, useId } from "react";
-import { novaOperationKey } from "../../lib/operationKey";
 import { createPortal } from "react-dom";
+import { novaOperationKey } from "../../lib/operationKey";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
-import PortalDropdown from "../components/PortalDropdown";
 import { useAdminModal } from "../components/useAdminModal";
-import { useDropdown } from "../components/useDropdown";
-import { IconClose, IconPlus, IconRemove } from "../components/AdminIcons";
+import { IconClose, IconPlus } from "../components/AdminIcons";
 import { formatWhatsappBr, isValidWhatsappBr, normalizeWhatsappBr } from "../../../shared/whatsapp";
+import {
+  type OrderItem,
+  type MetodoPagamento,
+  type StatusPagamento,
+  type NovoPedidoModalProps,
+  MAX_ITENS_PEDIDO_MANUAL,
+  newOrderItem,
+  estoqueLivre
+} from "./novoPedidoHelpers";
+import ProductItemRow from "./NovoPedidoProductRow";
+import NovoPedidoPagamentoSection from "./NovoPedidoPagamentoSection";
 import "./NovoPedidoModal.css";
-
-/* ── Icons ── */
-const IconChevron = ({ open }: { open: boolean }) => (
-  <svg
-    aria-hidden="true"
-    width="12"
-    height="8"
-    viewBox="0 0 12 8"
-    fill="none"
-    style={{
-      transition: "transform 0.15s",
-      transform: open ? "rotate(180deg)" : "rotate(0)"
-    }}
-  >
-    <path
-      d="M1 1.5L6 6.5L11 1.5"
-      stroke="#634738"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-/* ── Types ── */
-interface OrderItem {
-  // Estável por linha, nunca reaproveitado pelo índice do array: usado como
-  // React key para o dropdown de cada linha (`useDropdown()`, estado local
-  // `open`) não vazar para a linha errada quando um item do meio é removido.
-  id: number;
-  produtoId: number | null;
-  quantidade: number;
-}
-
-let nextOrderItemId = 0;
-const newOrderItem = (): OrderItem => ({
-  id: nextOrderItemId++,
-  produtoId: null,
-  quantidade: 1
-});
-
-type MetodoPagamento = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO" | "A_COMBINAR";
-type StatusPagamento = "PENDENTE" | "PAGO";
-
-const METODO_OPTIONS: { value: MetodoPagamento; label: string }[] = [
-  { value: "DINHEIRO", label: "Dinheiro" },
-  { value: "CARTAO", label: "Cartão" },
-  { value: "PIX_EXTERNO", label: "Pix externo" },
-  { value: "A_COMBINAR", label: "A combinar" }
-];
-
-const STATUS_OPTIONS: { value: StatusPagamento; label: string }[] = [
-  { value: "PENDENTE", label: "Aguardando pagamento" },
-  { value: "PAGO", label: "Já pago" }
-];
-
-const MAX_ITENS_PEDIDO_MANUAL = 20;
-
-const formatarPreco = (centavos: number) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
-
-const estoqueLivre = (p: ProdutoAdmin) => Math.max(0, p.estoque - p.estoque_reservado);
-
-interface NovoPedidoModalProps {
-  open: boolean;
-  onClose: () => void;
-  onCreated?: () => void;
-}
 
 /* ── Component ── */
 export default function NovoPedidoModal({ open, onClose, onCreated }: NovoPedidoModalProps) {
@@ -101,10 +43,6 @@ export default function NovoPedidoModal({ open, onClose, onCreated }: NovoPedido
   // diferente e recebe uma key nova.
   const operationKeyRef = useRef<string | null>(null);
   const assinaturaRef = useRef<string | null>(null);
-
-  // Dropdowns for payment
-  const payMethodDd = useDropdown();
-  const payStatusDd = useDropdown();
 
   // Reseta o formulário e recarrega o catálogo toda vez que o modal abre —
   // sem isso, o state da última venda registrada ficaria vazando pra
@@ -316,93 +254,13 @@ export default function NovoPedidoModal({ open, onClose, onCreated }: NovoPedido
             </div>
 
             {/* Pagamento */}
-            <div className="nped-row-2">
-              <div className="nped-field">
-                <label id={`${fieldId}-metodo-label`} htmlFor={`${fieldId}-metodo`}>
-                  Forma de pagamento
-                </label>
-                <div
-                  className={`nped-dropdown ${payMethodDd.open ? "nped-dropdown--open" : ""}`}
-                  ref={payMethodDd.ref}
-                >
-                  <button
-                    id={`${fieldId}-metodo`}
-                    type="button"
-                    className="nped-dropdown-trigger"
-                    aria-labelledby={`${fieldId}-metodo-label ${fieldId}-metodo-value`}
-                    onClick={() => payMethodDd.setOpen(!payMethodDd.open)}
-                  >
-                    <span id={`${fieldId}-metodo-value`}>
-                      {METODO_OPTIONS.find(m => m.value === metodoPagamento)?.label}
-                    </span>
-                    <IconChevron open={payMethodDd.open} />
-                  </button>
-                  {payMethodDd.open && (
-                    <ul className="nped-dropdown-list">
-                      {METODO_OPTIONS.filter(
-                        m => statusPagamento !== "PAGO" || m.value !== "A_COMBINAR"
-                      ).map(m => (
-                        <li key={m.value}>
-                          <button
-                            type="button"
-                            className={`nped-dropdown-option ${metodoPagamento === m.value ? "nped-dropdown-option--active" : ""}`}
-                            onClick={() => {
-                              selecionarMetodo(m.value);
-                              payMethodDd.setOpen(false);
-                            }}
-                          >
-                            {m.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              <div className="nped-field">
-                <label id={`${fieldId}-status-label`} htmlFor={`${fieldId}-status`}>
-                  Situação do pagamento
-                </label>
-                <div
-                  className={`nped-dropdown ${payStatusDd.open ? "nped-dropdown--open" : ""}`}
-                  ref={payStatusDd.ref}
-                >
-                  <button
-                    id={`${fieldId}-status`}
-                    type="button"
-                    className="nped-dropdown-trigger"
-                    aria-labelledby={`${fieldId}-status-label ${fieldId}-status-value`}
-                    onClick={() => payStatusDd.setOpen(!payStatusDd.open)}
-                  >
-                    <span id={`${fieldId}-status-value`}>
-                      {STATUS_OPTIONS.find(s => s.value === statusPagamento)?.label}
-                    </span>
-                    <IconChevron open={payStatusDd.open} />
-                  </button>
-                  {payStatusDd.open && (
-                    <ul className="nped-dropdown-list">
-                      {STATUS_OPTIONS.filter(
-                        s => metodoPagamento !== "A_COMBINAR" || s.value !== "PAGO"
-                      ).map(s => (
-                        <li key={s.value}>
-                          <button
-                            type="button"
-                            className={`nped-dropdown-option ${statusPagamento === s.value ? "nped-dropdown-option--active" : ""}`}
-                            onClick={() => {
-                              selecionarStatus(s.value);
-                              payStatusDd.setOpen(false);
-                            }}
-                          >
-                            {s.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </div>
+            <NovoPedidoPagamentoSection
+              fieldId={fieldId}
+              metodoPagamento={metodoPagamento}
+              statusPagamento={statusPagamento}
+              onSelectMetodo={selecionarMetodo}
+              onSelectStatus={selecionarStatus}
+            />
 
             {/* Observação */}
             <div className="nped-field">
@@ -432,110 +290,5 @@ export default function NovoPedidoModal({ open, onClose, onCreated }: NovoPedido
       </div>
     </div>,
     document.body
-  );
-}
-
-/* ── Product Item Row (sub-component) ── */
-interface ProductItemRowProps {
-  item: OrderItem;
-  produtos: ProdutoAdmin[];
-  onChangeProduct: (id: number | null) => void;
-  onChangeQty: (qty: number) => void;
-  onRemove: () => void;
-  canRemove: boolean;
-}
-
-function ProductItemRow({
-  item,
-  produtos,
-  onChangeProduct,
-  onChangeQty,
-  onRemove,
-  canRemove
-}: ProductItemRowProps) {
-  const dd = useDropdown();
-  const selected = item.produtoId ? produtos.find(p => p.id === item.produtoId) : null;
-
-  const formatProduct = (p: ProdutoAdmin) =>
-    `${p.nome} ${p.emoji} · ${formatarPreco(p.preco_centavos)} · ${estoqueLivre(p)} disp.`;
-
-  return (
-    <div className="nped-item-row">
-      <div className="nped-item-row-labels">
-        <span className="nped-item-label nped-item-label--product">Produto</span>
-        <span className="nped-item-label nped-item-label--qty">Qtd.</span>
-      </div>
-      <div className="nped-item-row-fields">
-        {/* Product dropdown */}
-        <div
-          className={`nped-dropdown nped-dropdown--product ${dd.open ? "nped-dropdown--open" : ""}`}
-          ref={dd.ref}
-        >
-          <button
-            type="button"
-            className="nped-dropdown-trigger"
-            onClick={() => dd.setOpen(!dd.open)}
-          >
-            <span className={selected ? "" : "nped-placeholder"}>
-              {selected ? formatProduct(selected) : "Selecionar produto..."}
-            </span>
-            <IconChevron open={dd.open} />
-          </button>
-          <PortalDropdown
-            open={dd.open}
-            anchorRef={dd.ref}
-            menuRef={dd.menuRef}
-            className="nped-dropdown-list nped-dropdown-list--products"
-          >
-            {produtos.length === 0 && (
-              <li>
-                <div className="nped-dropdown-option nped-placeholder">
-                  Nenhum produto disponível
-                </div>
-              </li>
-            )}
-            {produtos.map(p => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className={`nped-dropdown-option ${item.produtoId === p.id ? "nped-dropdown-option--active" : ""}`}
-                  onClick={() => {
-                    onChangeProduct(p.id);
-                    dd.setOpen(false);
-                  }}
-                >
-                  {formatProduct(p)}
-                </button>
-              </li>
-            ))}
-          </PortalDropdown>
-        </div>
-
-        {/* Qty */}
-        <input
-          type="number"
-          className="nped-qty-input"
-          min={1}
-          max={selected ? estoqueLivre(selected) : undefined}
-          value={item.quantidade}
-          onChange={e => {
-            const parsed = Math.max(1, parseInt(e.target.value, 10) || 1);
-            const limite = selected ? estoqueLivre(selected) : parsed;
-            onChangeQty(Math.min(parsed, limite || 1));
-          }}
-        />
-
-        {/* Remove */}
-        <button
-          type="button"
-          className="nped-btn-remove"
-          aria-label="Remover item do pedido"
-          onClick={onRemove}
-          disabled={!canRemove}
-        >
-          <IconRemove />
-        </button>
-      </div>
-    </div>
   );
 }
