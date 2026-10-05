@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import type { CartItem } from "../context/CartContext";
+import {
+  calculateCartTotals,
+  getFabSpring,
+  getModalTransition,
+  getModalVariants
+} from "./cartWidgetHelpers";
+import CartItemRow from "./CartItemRow";
+import CartFooter from "./CartFooter";
 import "./CartWidget.css";
 
 interface CartWidgetProps {
@@ -25,8 +33,7 @@ export default function CartWidget({
   const navigate = useNavigate();
   const shouldReduceMotion = useReducedMotion();
 
-  const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
-  const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const { totalItems, totalPrice } = calculateCartTotals(items);
 
   // Detecção de mobile para transição bottom-sheet vs scale bottom-right
   const [isMobile, setIsMobile] = useState(() =>
@@ -167,34 +174,9 @@ export default function CartWidget({
     navigate("/checkout");
   };
 
-  // Variantes de animação
-  const fabSpring = shouldReduceMotion
-    ? { duration: 0.15 }
-    : { type: "spring" as const, stiffness: 400, damping: 25 };
-
-  const modalVariants = {
-    initial: shouldReduceMotion
-      ? { opacity: 0 }
-      : isMobile
-        ? { opacity: 0, y: 32 }
-        : { opacity: 0, scale: 0.9 },
-    animate: shouldReduceMotion
-      ? { opacity: 1 }
-      : isMobile
-        ? { opacity: 1, y: 0 }
-        : { opacity: 1, scale: 1 },
-    exit: shouldReduceMotion
-      ? { opacity: 0 }
-      : isMobile
-        ? { opacity: 0, y: 32 }
-        : { opacity: 0, scale: 0.9 }
-  };
-
-  const modalTransition = shouldReduceMotion
-    ? { duration: 0.15 }
-    : isMobile
-      ? { type: "spring" as const, damping: 30, stiffness: 320 }
-      : { type: "spring" as const, damping: 30, stiffness: 350 };
+  const fabSpring = getFabSpring(shouldReduceMotion);
+  const modalVariants = getModalVariants(shouldReduceMotion, isMobile);
+  const modalTransition = getModalTransition(shouldReduceMotion, isMobile);
 
   return createPortal(
     <>
@@ -345,149 +327,22 @@ export default function CartWidget({
                     <div className="cart-modal-items">
                       <AnimatePresence mode="popLayout" initial={false}>
                         {items.map(item => (
-                          <motion.div
+                          <CartItemRow
                             key={item.id}
-                            layout="position"
-                            className="cart-item"
-                            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
-                            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                            exit={
-                              shouldReduceMotion
-                                ? { opacity: 0 }
-                                : { opacity: 0, x: -24, scale: 0.98 }
-                            }
-                            transition={
-                              shouldReduceMotion
-                                ? { duration: 0.1 }
-                                : {
-                                    layout: { duration: 0.25, ease: "easeOut" },
-                                    opacity: { duration: 0.18 },
-                                    x: { duration: 0.2, ease: "easeOut" },
-                                    scale: { duration: 0.2 },
-                                    y: { duration: 0.2, ease: "easeOut" }
-                                  }
-                            }
-                          >
-                            <img src={item.image} alt={item.name} className="cart-item-img" />
-                            <div className="cart-item-info">
-                              <span className="cart-item-name">{item.name}</span>
-                              <span className="cart-item-price">
-                                R$ {item.price.toFixed(2).replace(".", ",")}
-                              </span>
-                              <div className="cart-qty-controls">
-                                <button
-                                  type="button"
-                                  onClick={e => {
-                                    e.currentTarget.blur();
-                                    onUpdateQuantity(item.id, item.quantity - 1);
-                                  }}
-                                  aria-label={`Diminuir quantidade de ${item.name}`}
-                                >
-                                  −
-                                </button>
-                                <motion.span
-                                  key={item.quantity}
-                                  initial={
-                                    shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }
-                                  }
-                                  animate={
-                                    shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
-                                  }
-                                  transition={
-                                    shouldReduceMotion
-                                      ? { duration: 0.08 }
-                                      : { duration: 0.15, ease: "easeOut" }
-                                  }
-                                >
-                                  {item.quantity}
-                                </motion.span>
-                                <button
-                                  type="button"
-                                  onClick={e => {
-                                    e.currentTarget.blur();
-                                    onUpdateQuantity(item.id, item.quantity + 1);
-                                  }}
-                                  disabled={
-                                    item.disponibilidade !== undefined &&
-                                    item.quantity >= item.disponibilidade
-                                  }
-                                  aria-disabled={
-                                    item.disponibilidade !== undefined &&
-                                    item.quantity >= item.disponibilidade
-                                      ? "true"
-                                      : undefined
-                                  }
-                                  aria-label={`Aumentar quantidade de ${item.name}`}
-                                  title={
-                                    item.disponibilidade !== undefined &&
-                                    item.quantity >= item.disponibilidade
-                                      ? "Limite de estoque atingido"
-                                      : undefined
-                                  }
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              className="cart-remove-btn"
-                              onClick={() => onRemoveItem(item.id)}
-                              aria-label="Remover"
-                            >
-                              <svg
-                                aria-hidden="true"
-                                width="14"
-                                height="14"
-                                viewBox="0 0 14 16"
-                                fill="none"
-                              >
-                                <path
-                                  d="M1 4H13M5 4V2H9V4M3 4V14H11V4"
-                                  stroke="#8C7A76"
-                                  strokeWidth="1.2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            </button>
-                          </motion.div>
+                            item={item}
+                            shouldReduceMotion={shouldReduceMotion}
+                            onUpdateQuantity={onUpdateQuantity}
+                            onRemoveItem={onRemoveItem}
+                          />
                         ))}
                       </AnimatePresence>
                     </div>
 
-                    <div className="cart-modal-footer">
-                      <div className="cart-total">
-                        <span>TOTAL</span>
-                        <span className="cart-total-value">
-                          R$ {totalPrice.toFixed(2).replace(".", ",")}
-                        </span>
-                      </div>
-                      <p className="cart-notice">
-                        Os pedidos do cardápio do dia devem ser retirados diretamente em nosso salão
-                        parceiro, Tempori Concept no Cambuí.
-                      </p>
-                      <button
-                        type="button"
-                        className="cart-checkout-btn"
-                        onClick={e => {
-                          e.currentTarget.blur();
-                          handleCheckout();
-                        }}
-                      >
-                        CONTINUAR PARA PAGAMENTO
-                      </button>
-                      <button
-                        type="button"
-                        className="cart-continue-btn"
-                        onClick={e => {
-                          e.currentTarget.blur();
-                          onClose();
-                        }}
-                      >
-                        Continuar comprando
-                      </button>
-                    </div>
+                    <CartFooter
+                      totalPrice={totalPrice}
+                      onCheckout={handleCheckout}
+                      onClose={onClose}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>
