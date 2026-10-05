@@ -78,7 +78,14 @@ export async function listPedidos(context: Parameters<PagesFunction<Env>>[0]): P
     const url = new URL(request.url);
     const search = (url.searchParams.get("search") ?? "").trim().slice(0, 100);
     const tab = url.searchParams.get("status") ?? "todos";
-    const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+    const requestedPage = Number(url.searchParams.get("page"));
+    // SQLite OFFSET must fit a signed 64-bit integer; overflow also covers Infinity.
+    const page =
+      Number.isInteger(requestedPage) &&
+      requestedPage >= 1 &&
+      (requestedPage - 1) * ITEMS_PER_PAGE < 2 ** 63
+        ? requestedPage
+        : 1;
 
     const hoje = storeToday();
     const tabFilter = tab === "hoje" ? `AND ${HOJE_SQL}` : (TAB_FILTERS[tab] ?? "");
