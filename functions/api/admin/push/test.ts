@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { sanitizePushError } from "../../../lib/pushError";
 import { requireUser, sameOrigin } from "../../../lib/auth";
 import { sendPushNotification } from "@mmmike/web-push/send";
 
@@ -116,7 +117,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       message: "Notificação de teste enviada com sucesso."
     });
   } catch (err: unknown) {
-    console.error("Erro ao enviar Web Push de teste para subscription", sub.id, err);
+    console.error(
+      "Erro ao enviar Web Push de teste para subscription",
+      sub.id,
+      sanitizePushError(err)
+    );
     return jsonError("Falha ao despachar notificação de teste", 502);
   }
 };

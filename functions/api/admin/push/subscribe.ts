@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { sanitizePushError } from "../../../lib/pushError";
 import { requireUser, sameOrigin } from "../../../lib/auth";
 
 interface Env {
@@ -76,7 +77,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
     return Response.json({ ok: true }, { status: 201 });
   } catch (err) {
-    console.error("Erro ao registrar push subscription", err);
+    console.error("Erro ao registrar push subscription", sanitizePushError(err));
     return jsonError("Erro interno ao registrar inscrição de notificação", 500);
   }
 };

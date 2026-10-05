@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { sanitizePushError } from "../../../lib/pushError";
 import { requireUser, sameOrigin } from "../../../lib/auth";
 
 interface Env {
@@ -41,7 +42,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
     return Response.json({ ok: true });
   } catch (err) {
-    console.error("Erro ao remover push subscription", err);
+    console.error("Erro ao remover push subscription", sanitizePushError(err));
     return jsonError("Erro interno ao remover inscrição de notificação", 500);
   }
 };

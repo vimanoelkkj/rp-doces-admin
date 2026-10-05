@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { sanitizePushError } from "./pushError";
 import { criarPayloadPedidoPago, enviarPush } from "./pushTransport";
 
 export interface PushEnv {
@@ -129,8 +130,9 @@ async function despacharParaInscricoes(
       }
     } catch (err: unknown) {
       falhas++;
-      ultimoErro = err instanceof Error ? err.message : String(err);
-      console.error("Erro ao despachar Web Push para inscrição", sub.id, err);
+      const safeError = sanitizePushError(err);
+      ultimoErro = JSON.stringify(safeError);
+      console.error("Erro ao despachar Web Push para inscrição", sub.id, safeError);
     }
   }
 
@@ -237,7 +239,11 @@ export async function notificarNovoPedidoPagoSafe(
   try {
     await notificarNovoPedidoPago(db, env, pedidoId, options);
   } catch (err) {
-    console.error("Erro não-bloqueante ao despachar Web Push para pedido", pedidoId, err);
+    console.error(
+      "Erro não-bloqueante ao despachar Web Push para pedido",
+      pedidoId,
+      sanitizePushError(err)
+    );
   }
 }
 
@@ -329,7 +335,11 @@ export async function reconciliarPushEventosFalhos(
       }
     } catch (err) {
       falhas++;
-      console.error("Erro na retentativa de push para pedido", cand.pedido_id, err);
+      console.error(
+        "Erro na retentativa de push para pedido",
+        cand.pedido_id,
+        sanitizePushError(err)
+      );
     }
   }
 
@@ -344,6 +354,6 @@ export async function reconciliarPushEventosFalhosSafe(
   try {
     await reconciliarPushEventosFalhos(db, env, options);
   } catch (err) {
-    console.error("Erro não-bloqueante na reconciliação de push falho", err);
+    console.error("Erro não-bloqueante na reconciliação de push falho", sanitizePushError(err));
   }
 }

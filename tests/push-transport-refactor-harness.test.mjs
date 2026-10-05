@@ -359,7 +359,10 @@ test("Persisted push coordination characterization", async t => {
     ]) {
       const run = await coordinate(module, db, outcomes, { attempts: 1 });
       const last = outcomes.at(-1);
-      const error = last instanceof Error ? last.message : last;
+      const error =
+        last instanceof Error
+          ? '{"category":"NETWORK","code":"NETWORK_ERROR"}'
+          : '{"category":"UNKNOWN","code":"UNKNOWN_ERROR"}';
       assert.deepEqual(run.result, { ok: false, motivo: "FALHA_PUSH_SERVICE", ultimoErro: error });
       assert.deepEqual(run.event, { status: "FALHA", tentativas: 2, ultimo_erro: error });
       assert.deepEqual(

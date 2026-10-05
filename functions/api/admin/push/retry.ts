@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { sanitizePushError } from "../../../lib/pushError";
 import { requireUser, sameOrigin } from "../../../lib/auth";
 import { reconciliarPushEventosFalhos, type PushEnv } from "../../../lib/pushNotifier";
 
@@ -19,7 +20,7 @@ export const onRequestPost: PagesFunction<PushEnv> = async ({ request, env }) =>
     const result = await reconciliarPushEventosFalhos(env.DB, env);
     return Response.json(result);
   } catch (err) {
-    console.error("Erro ao reconciliar push eventos falhos (admin)", err);
+    console.error("Erro ao reconciliar push eventos falhos (admin)", sanitizePushError(err));
     return jsonError("Erro interno ao reconciliar eventos de push", 500);
   }
 };
