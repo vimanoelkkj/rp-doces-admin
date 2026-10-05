@@ -2602,6 +2602,60 @@ test("Pix pendente: copiar envia exatamente o qrCode do cartão clicado e confir
   }
 });
 
+test("Pix pendente: cópia pendente ou rejeitada não confirma e uma nova tentativa recupera o feedback", async t => {
+  t.mock.timers.enable({ apis: ["setInterval", "setTimeout"] });
+  const writes = [];
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      writeText: codigo =>
+        new Promise((resolve, reject) => writes.push({ codigo, resolve, reject }))
+    }
+  });
+  t.after(() => {
+    delete navigator.clipboard;
+  });
+  const root = await mountWith(t, async () =>
+    Response.json(
+      detalhe({
+        total: 3000,
+        pago: 1000,
+        status: "PARCIAL",
+        capacidade: 0,
+        pix: [pixPendente(8, "code-A"), pixPendente(9, "code-B")]
+      })
+    )
+  );
+  const buttons = () => [...document.querySelectorAll(".pedmodal-pix-copy-btn")];
+  const labels = () => buttons().map(button => button.textContent);
+  try {
+    await ui.act(async () => buttons()[0].click());
+    assert.deepEqual(labels(), ["Copiar código", "Copiar código"]);
+    await ui.act(async () => writes[0].resolve());
+    assert.deepEqual(labels(), ["Copiado!", "Copiar código"]);
+    await ui.act(async () => buttons()[1].click());
+    assert.deepEqual(labels(), ["Copiar código", "Copiar código"]);
+    await ui.act(async () => writes[1].reject(new Error("permission denied")));
+    assert.deepEqual(labels(), ["Copiar código", "Copiar código"]);
+    assert.equal(
+      document.querySelector('.pedmodal-status-error[role="alert"]').textContent,
+      "Não foi possível copiar o código Pix. Tente novamente."
+    );
+    await ui.act(async () => buttons()[1].click());
+    assert.equal(document.querySelector('.pedmodal-status-error[role="alert"]'), null);
+    await ui.act(async () => writes[2].resolve());
+    assert.deepEqual(labels(), ["Copiar código", "Copiado!"]);
+    assert.deepEqual(
+      writes.map(write => write.codigo),
+      ["code-A", "code-B", "code-B"]
+    );
+    await ui.act(async () => t.mock.timers.tick(2000));
+    assert.deepEqual(labels(), ["Copiar código", "Copiar código"]);
+  } finally {
+    await unmount(root);
+  }
+});
+
 test("Pix pendente sem qrCode (nulo ou vazio): não oferece cópia e mantém o QR em imagem", async t => {
   t.mock.timers.enable({ apis: ["setInterval"] });
   const root = await mountWith(t, async () =>

@@ -140,6 +140,7 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
     pixAviso,
     setPixAviso,
     copiedId,
+    copyError,
     pixKeysRef,
     gerarPix,
     copiarCodigo
@@ -361,6 +362,7 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
     setPixAviso,
     agora,
     copiedId,
+    copyError,
     adicionandoItem,
     setAdicionandoItem,
     itemCancelamentoPreviewId,

@@ -91,6 +91,28 @@ const mutations = {
   intentPremature: [
     "storePaymentIntent(intent);",
     "storePaymentIntent(intent); resolvePaymentIntent(intent);"
+  ],
+  copyAwait: [
+    "await navigator.clipboard.writeText(codigo);",
+    "navigator.clipboard.writeText(codigo);"
+  ],
+  copyPremature: [
+    "await navigator.clipboard.writeText(codigo);",
+    "setCopiedId(pixId); await navigator.clipboard.writeText(codigo);"
+  ],
+  copyRejectSuccess: [
+    'setCopyError("Não foi possível copiar o código Pix. Tente novamente.");',
+    "setCopiedId(pixId);"
+  ],
+  copyOldSuccess: [
+    "const copySequence = ++copySequenceRef.current;\n    setCopiedId(null);",
+    "const copySequence = ++copySequenceRef.current;"
+  ],
+  copyTimeout: ["if (copySequence === copySequenceRef.current) setCopiedId(null);", ""],
+  copyOrdering: ["if (copySequence !== copySequenceRef.current) return;", ""],
+  copyTimerIdentity: [
+    "if (copySequence === copySequenceRef.current) setCopiedId(null);",
+    "setCopiedId(null);"
   ]
 };
 if (process.env.HOOK_MUTATION) {
@@ -967,6 +989,156 @@ test("children: history navigation, polling refresh and annulment closes all exc
   assert.equal(h.state.itemTroca, null);
 });
 
+function controlledClipboard(t) {
+  const writes = [];
+  t.mock.method(
+    navigator.clipboard,
+    "writeText",
+    codigo =>
+      new Promise((resolve, reject) => {
+        writes.push({ codigo, resolve, reject });
+      })
+  );
+  return writes;
+}
+
+test("copy: success waits for clipboard resolution and resets after exactly 2 seconds", async t => {
+  const h = await harness(t);
+  await h.load();
+  const writes = controlledClipboard(t);
+  let completion;
+  await h.call(s => {
+    completion = s.copiarCodigo(7, "code-A");
+  });
+  assert.equal(writes[0].codigo, "code-A");
+  assert.equal(h.state.copiedId, null);
+  assert.equal(h.timers.size, 0);
+  await h.call(() => writes[0].resolve());
+  await assert.doesNotReject(completion);
+  assert.equal(h.state.copiedId, 7);
+  assert.equal(h.state.copyError, null);
+  await h.tick(1999);
+  assert.equal(h.state.copiedId, 7);
+  await h.tick(1);
+  assert.equal(h.state.copiedId, null);
+  assert.equal(h.timers.size, 0);
+  assert.equal(h.requests.length, 2, "copy must not generate or reconcile Pix");
+});
+
+test("copy: failure is handled without success, unhandled rejection or changes to Pix errors", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => s.gerarPix(7));
+  await h.reply(h.requests.at(-1), { error: "generation error" }, 400);
+  await h.call(s => s.setPixAviso("ambiguous payment warning"));
+  const writes = controlledClipboard(t);
+  const unhandled = [];
+  const onUnhandled = reason => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  t.after(() => process.off("unhandledRejection", onUnhandled));
+  let completion;
+  await h.call(s => {
+    completion = s.copiarCodigo(7, "code-A");
+  });
+  await h.call(() => writes[0].reject(new Error("permission denied")));
+  await assert.doesNotReject(completion);
+  assert.equal(h.state.copiedId, null);
+  assert.equal(h.state.copyError, "Não foi possível copiar o código Pix. Tente novamente.");
+  assert.equal(h.state.pixError, "generation error");
+  assert.equal(h.state.pixAviso, "ambiguous payment warning");
+  assert.equal(h.timers.size, 0);
+  assert.deepEqual(unhandled, []);
+});
+
+test("copy: retry clears prior success before a failed attempt, then succeeds again", async t => {
+  const h = await harness(t);
+  await h.load();
+  const writes = controlledClipboard(t);
+  await h.call(s => s.copiarCodigo(7, "code-A"));
+  await h.call(() => writes[0].resolve());
+  assert.equal(h.state.copiedId, 7);
+  await h.call(s => s.copiarCodigo(8, "code-B"));
+  assert.equal(h.state.copiedId, null, "prior success must disappear before the new copy resolves");
+  await h.call(() => writes[1].reject(new Error("denied")));
+  assert.equal(h.state.copiedId, null);
+  assert.ok(h.state.copyError);
+  await h.call(s => s.copiarCodigo(8, "code-B"));
+  assert.equal(h.state.copyError, null);
+  await h.call(() => writes[2].resolve());
+  assert.equal(h.state.copiedId, 8);
+  assert.equal(h.state.copyError, null);
+  assert.deepEqual(
+    writes.map(w => w.codigo),
+    ["code-A", "code-B", "code-B"]
+  );
+});
+
+test("copy: concurrent completions belong only to the latest action", async t => {
+  for (const outcome of ["success", "failure"])
+    await t.test(outcome, async t => {
+      const h = await harness(t);
+      await h.load();
+      const writes = controlledClipboard(t);
+      await h.call(s => {
+        s.copiarCodigo(7, "code-A");
+        s.copiarCodigo(8, "code-B");
+      });
+      await h.call(() => writes[1].resolve());
+      assert.equal(h.state.copiedId, 8);
+      await h.call(() =>
+        outcome === "success" ? writes[0].resolve() : writes[0].reject(new Error("old failure"))
+      );
+      assert.equal(h.state.copiedId, 8);
+      assert.equal(h.state.copyError, null);
+      assert.equal(h.timers.size, 1);
+      assert.deepEqual(
+        writes.map(w => w.codigo),
+        ["code-A", "code-B"]
+      );
+    });
+});
+
+test("copy: repeated IDs keep the newer success until its own timeout", async t => {
+  const h = await harness(t);
+  await h.load();
+  const writes = controlledClipboard(t);
+  await h.call(s => s.copiarCodigo(7, "old-code"));
+  await h.call(() => writes[0].resolve());
+  await h.tick(1000);
+  await h.call(s => s.copiarCodigo(7, "new-code"));
+  await h.call(() => writes[1].resolve());
+  await h.tick(1000);
+  assert.equal(h.state.copiedId, 7, "old timer must not clear the newer copy of the same ID");
+  await h.tick(999);
+  assert.equal(h.state.copiedId, 7);
+  await h.tick(1);
+  assert.equal(h.state.copiedId, null);
+});
+
+test("copy: missing clipboard and synchronous throws are handled", async t => {
+  for (const clipboard of [
+    undefined,
+    {
+      writeText() {
+        throw new Error("insecure context");
+      }
+    }
+  ])
+    await t.test(clipboard ? "throws" : "missing", async t => {
+      const h = await harness(t);
+      await h.load();
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: clipboard });
+      let completion;
+      await h.call(s => {
+        completion = s.copiarCodigo(7, "code-A");
+      });
+      await assert.doesNotReject(completion);
+      assert.equal(h.state.copiedId, null);
+      assert.ok(h.state.copyError);
+      assert.equal(h.timers.size, 0);
+    });
+});
+
 test("unmount: late read is discarded, mutation callback and copy timeout survive", async t => {
   const h = await harness(t);
   await h.load(pending());
@@ -1030,7 +1202,14 @@ if (!process.env.HOOK_MUTATION)
       intentOrder: "^manual intent: orders",
       intentSuccess: "^manual intent: conclusive",
       intentValueOnly: "^manual intent: payload",
-      intentPremature: "^manual intent: retry"
+      intentPremature: "^manual intent: retry",
+      copyAwait: "^copy: success",
+      copyPremature: "^copy: success",
+      copyRejectSuccess: "^copy: failure",
+      copyOldSuccess: "^copy: retry",
+      copyTimeout: "^copy: success",
+      copyOrdering: "^copy: concurrent",
+      copyTimerIdentity: "^copy: repeated"
     })) {
       await t.test(mutation, async () => {
         for (const variant of mutation === "lock" ? Object.keys(lockMutations) : [undefined]) {

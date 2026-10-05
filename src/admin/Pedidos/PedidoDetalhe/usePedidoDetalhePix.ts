@@ -20,6 +20,8 @@ export function usePedidoDetalhePix({
   const [pixError, setPixError] = useState<string | null>(null);
   const [pixAviso, setPixAviso] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const copySequenceRef = useRef(0);
   const pixEmVooRef = useRef<Set<string>>(new Set());
 
   // A1: uma key por INTENÇÃO de cobrança. A identidade da ação já distingue
@@ -86,10 +88,22 @@ export function usePedidoDetalhePix({
       });
   };
 
-  const copiarCodigo = (pixId: number, codigo: string) => {
-    navigator.clipboard.writeText(codigo);
-    setCopiedId(pixId);
-    setTimeout(() => setCopiedId(atual => (atual === pixId ? null : atual)), 2000);
+  const copiarCodigo = async (pixId: number, codigo: string) => {
+    const copySequence = ++copySequenceRef.current;
+    setCopiedId(null);
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(codigo);
+      if (copySequence !== copySequenceRef.current) return;
+      setCopiedId(pixId);
+      setTimeout(() => {
+        if (copySequence === copySequenceRef.current) setCopiedId(null);
+      }, 2000);
+    } catch {
+      if (copySequence === copySequenceRef.current) {
+        setCopyError("Não foi possível copiar o código Pix. Tente novamente.");
+      }
+    }
   };
 
   return {
@@ -99,6 +113,7 @@ export function usePedidoDetalhePix({
     pixAviso,
     setPixAviso,
     copiedId,
+    copyError,
     pixEmVooRef,
     pixKeysRef,
     gerarPix,

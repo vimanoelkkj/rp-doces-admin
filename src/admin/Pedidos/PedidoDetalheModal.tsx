@@ -156,6 +156,7 @@ export default function PedidoDetalheModal({
               pixAviso={detalhe.pixAviso}
               agora={detalhe.agora}
               copiedId={detalhe.copiedId}
+              copyError={detalhe.copyError}
               onAbrirRegistroPagamento={detalhe.abrirRegistroPagamento}
               onMetodoPagamentoChange={detalhe.selecionarMetodoPagamento}
               onValorPagamentoChange={valor => {

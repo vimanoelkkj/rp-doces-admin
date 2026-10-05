@@ -27,6 +27,7 @@ interface PedidoPagamentoProps {
   pixAviso: string | null;
   agora: number;
   copiedId: number | null;
+  copyError?: string | null;
   onAbrirRegistroPagamento: () => void;
   onMetodoPagamentoChange: (metodo: MetodoPagamentoManual) => void;
   onValorPagamentoChange: (valor: string) => void;
@@ -58,6 +59,7 @@ export default function PedidoPagamento({
   pixAviso,
   agora,
   copiedId,
+  copyError,
   onAbrirRegistroPagamento,
   onMetodoPagamentoChange,
   onValorPagamentoChange,
@@ -163,6 +165,11 @@ export default function PedidoPagamento({
       )}
 
       {pixError && <p className="pedmodal-status-error">{pixError}</p>}
+      {copyError && (
+        <p className="pedmodal-status-error" role="alert">
+          {copyError}
+        </p>
+      )}
       {pixAviso && (
         <div className="pedmodal-pix-aviso">
           <span>⚠ {pixAviso}</span>
