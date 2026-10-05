@@ -19,6 +19,7 @@ for (const name of [
   "window",
   "document",
   "navigator",
+  "sessionStorage",
   "HTMLElement",
   "Node",
   "Event",
@@ -144,7 +145,8 @@ const detalhe = (overrides = {}) => {
   };
 };
 
-async function mountWith(t, handler, callbacks = {}) {
+async function mountWith(t, handler, callbacks = {}, { preserveStorage = false } = {}) {
+  if (!preserveStorage) sessionStorage.clear();
   t.mock.method(globalThis, "fetch", handler);
   let root;
   await ui.act(async () => {
@@ -1339,6 +1341,50 @@ test("pagamento parcial preenche e registra somente o saldo restante", async t =
     assert.match(document.querySelector(".pedmodal-payment-row").textContent, /Pago/);
   } finally {
     await unmount(root);
+  }
+});
+
+test("pagamento com resposta perdida pode ser retomado após fechar o detalhe com saldo zerado", async t => {
+  let atual = detalhe({ total: 4000, pago: 0, capacidade: 4000 });
+  const bodies = [];
+  const handler = async (url, options = {}) => {
+    if (options.method === "POST" && String(url).endsWith("/pagamentos")) {
+      bodies.push(JSON.parse(options.body));
+      atual = detalhe({ total: 4000, pago: 4000, status: "PAGO", capacidade: 0 });
+      if (bodies.length === 1) throw new Error("response lost after commit");
+      return Response.json({ ok: true, replay: true }, { status: 201 });
+    }
+    return Response.json(atual);
+  };
+  let root = await mountWith(t, handler);
+  try {
+    const button = label =>
+      [...document.querySelectorAll("button")].find(b => b.textContent === label);
+    await ui.act(async () => button("Registrar pagamento").click());
+    await ui.act(async () => button("Confirmar pagamento").click());
+    await flush();
+    assert.match(document.querySelector(".pedmodal-status-error").textContent, /response lost/);
+    await ui.act(async () => button("Cancelar").click());
+    await ui.act(async () => button("Retomar pagamento").click());
+    assert.equal(document.querySelector('input[aria-label="Valor recebido"]').value, "40,00");
+    await unmount(root);
+    root = null;
+    root = await mountWith(t, handler, {}, { preserveStorage: true });
+    assert.ok(
+      button("Retomar pagamento"),
+      "zero balance still permits recovery of the pending intent"
+    );
+    await ui.act(async () => button("Retomar pagamento").click());
+    assert.equal(document.querySelector('input[aria-label="Valor recebido"]').value, "40,00");
+    await ui.act(async () => button("Confirmar pagamento").click());
+    await flush();
+    assert.equal(bodies.length, 2);
+    assert.deepEqual(bodies[1], bodies[0]);
+    assert.equal(sessionStorage.getItem("rp:pedido:1:pagamento-manual:intents"), null);
+    assert.equal(button("Retomar pagamento"), undefined);
+    assert.equal(button("Registrar pagamento"), undefined);
+  } finally {
+    if (root) await unmount(root);
   }
 });
 

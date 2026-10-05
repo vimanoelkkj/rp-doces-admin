@@ -123,6 +123,7 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
     setPagamentoError,
     pagamentoEmVooRef,
     pagamentoKeyRef,
+    pagamentoPendente,
     selecionarMetodoPagamento,
     abrirRegistroPagamento,
     registrarPagamento
@@ -352,6 +353,7 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
     pagamentoError,
     setPagamentoError,
     pagamentoKeyRef,
+    pagamentoPendente,
     gerando,
     regenerandoId,
     pixError,

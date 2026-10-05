@@ -149,6 +149,7 @@ export default function PedidoDetalheModal({
               valorPagamento={detalhe.valorPagamento}
               pagamentoEmVoo={detalhe.pagamentoEmVoo}
               pagamentoError={detalhe.pagamentoError}
+              pagamentoPendente={detalhe.pagamentoPendente}
               gerando={detalhe.gerando}
               regenerandoId={detalhe.regenerandoId}
               pixError={detalhe.pixError}
@@ -160,13 +161,11 @@ export default function PedidoDetalheModal({
               onValorPagamentoChange={valor => {
                 detalhe.setValorPagamento(valor);
                 detalhe.setPagamentoError(null);
-                detalhe.pagamentoKeyRef.current = null;
               }}
               onRegistrarPagamento={detalhe.registrarPagamento}
               onCancelarRegistroPagamento={() => {
                 detalhe.setRegistrandoPagamento(false);
                 detalhe.setPagamentoError(null);
-                detalhe.pagamentoKeyRef.current = null;
               }}
               onGerarPix={detalhe.gerarPix}
               onCopiarCodigo={detalhe.copiarCodigo}

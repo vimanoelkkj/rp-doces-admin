@@ -20,6 +20,7 @@ interface PedidoPagamentoProps {
   valorPagamento: string;
   pagamentoEmVoo: boolean;
   pagamentoError: string | null;
+  pagamentoPendente?: boolean;
   gerando: boolean;
   regenerandoId: number | null;
   pixError: string | null;
@@ -50,6 +51,7 @@ export default function PedidoPagamento({
   valorPagamento,
   pagamentoEmVoo,
   pagamentoError,
+  pagamentoPendente = false,
   gerando,
   regenerandoId,
   pixError,
@@ -73,7 +75,7 @@ export default function PedidoPagamento({
   const podeRegistrarPagamento = Boolean(
     !anulado &&
     pedido.arquivado === 0 &&
-    capacidadeCobravelCentavos > 0 &&
+    (capacidadeCobravelCentavos > 0 || pagamentoPendente) &&
     (pedido.status_comanda === "ABERTA" || pedido.status_pedido === "ENTREGUE")
   );
   const podeGerarPix = Boolean(
@@ -188,7 +190,7 @@ export default function PedidoPagamento({
                   className="pedmodal-btn-edit"
                   onClick={onAbrirRegistroPagamento}
                 >
-                  Registrar pagamento
+                  {pagamentoPendente ? "Retomar pagamento" : "Registrar pagamento"}
                 </button>
               )}
               {podeGerarPix && (
@@ -210,7 +212,11 @@ export default function PedidoPagamento({
             <div className="pedmodal-manual-payment">
               <div>
                 <strong>Registrar pagamento recebido</strong>
-                <span>O saldo em aberto já está preenchido.</span>
+                <span>
+                  {pagamentoPendente
+                    ? "Tentativa pendente recuperada. Confirme para verificar o resultado."
+                    : "O saldo em aberto já está preenchido."}
+                </span>
               </div>
               <label>
                 Valor recebido

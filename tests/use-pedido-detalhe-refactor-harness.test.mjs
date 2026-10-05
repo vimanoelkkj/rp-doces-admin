@@ -10,9 +10,10 @@ import { JSDOM } from "jsdom";
 const hookPath = "src/admin/Pedidos/PedidoDetalhe/usePedidoDetalhe.ts";
 const paymentHookPath = "src/admin/Pedidos/PedidoDetalhe/usePedidoDetalhePagamento.ts";
 const pixHookPath = "src/admin/Pedidos/PedidoDetalhe/usePedidoDetalhePix.ts";
+const intentPath = "src/admin/Pedidos/PedidoDetalhe/manualPaymentIntent.ts";
 const sources = new Map(
   await Promise.all(
-    [hookPath, paymentHookPath, pixHookPath].map(async path => [
+    [hookPath, paymentHookPath, pixHookPath, intentPath].map(async path => [
       resolve(path),
       await readFile(path, "utf8")
     ])
@@ -71,7 +72,26 @@ const mutations = {
     "pertenceAoPedidoAtual() && sequence >= leituraRef.current.loadingSequence",
     "!silencioso"
   ],
-  staleUnmount: ["leituraRef.current.orderId = null;\n      leituraRef.current.generation++;", ""]
+  staleUnmount: ["leituraRef.current.orderId = null;\n      leituraRef.current.generation++;", ""],
+  intentAmbiguous: [
+    ".catch(err => setPagamentoError(err.message))",
+    ".catch(err => { resolvePaymentIntent(intent); setPagamentoError(err.message); })"
+  ],
+  intentReopen: [
+    "const pending = readPaymentIntents(orderId).slice(-1)[0];",
+    "const pending = undefined;"
+  ],
+  intentPayload: ["intent.payload.metodo === payload.metodo", "true"],
+  intentOrder: ["intent.pedidoId === pedidoId &&", "true &&"],
+  intentSuccess: ["resolvePaymentIntent(intent);", ""],
+  intentValueOnly: [
+    "pending.operationKey !== intent.operationKey",
+    "pending.payload.valorCentavos !== intent.payload.valorCentavos"
+  ],
+  intentPremature: [
+    "storePaymentIntent(intent);",
+    "storePaymentIntent(intent); resolvePaymentIntent(intent);"
+  ]
 };
 if (process.env.HOOK_MUTATION) {
   const [before, after] = mutations[process.env.HOOK_MUTATION];
@@ -92,6 +112,7 @@ if (process.env.HOOK_MUTATION) {
 }
 const channels = [];
 const NativeMessageChannel = globalThis.MessageChannel;
+const NativeCrypto = globalThis.crypto;
 globalThis.MessageChannel = class extends NativeMessageChannel {
   constructor() {
     super();
@@ -129,11 +150,14 @@ const bundle = await build({
     {
       name: "hook-source",
       setup(b) {
-        b.onLoad({ filter: /usePedidoDetalhe(?:Pagamento|Pix)?\.ts$/ }, args => ({
-          contents: sources.get(args.path),
-          loader: "ts",
-          resolveDir: args.path.replace(/[/\\][^/\\]+$/, "")
-        }));
+        b.onLoad(
+          { filter: /(?:usePedidoDetalhe(?:Pagamento|Pix)?|manualPaymentIntent)\.ts$/ },
+          args => ({
+            contents: sources.get(args.path),
+            loader: "ts",
+            resolveDir: args.path.replace(/[/\\][^/\\]+$/, "")
+          })
+        );
       }
     }
   ]
@@ -196,18 +220,28 @@ const pending = () =>
       { id: 7, valorCentavos: 1000, qrCode: "code", expiresAt: new Date(1500).toISOString() }
     ]
   });
-async function harness(t) {
+async function harness(
+  t,
+  {
+    preserveStorage = false,
+    storage = dom.window.sessionStorage,
+    keyOffset = 0,
+    realTimers = false
+  } = {}
+) {
   const requests = [],
     events = [],
     timers = new Map();
   let now = 0,
     nextTimer = 0,
-    nextKey = 0;
+    nextKey = keyOffset;
   const originals = new Map();
   const patch = (key, value) => {
     originals.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
     Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
   };
+  if (!preserveStorage) storage.clear();
+  patch("sessionStorage", storage);
   patch(
     "fetch",
     (url, options = {}) =>
@@ -222,19 +256,26 @@ async function harness(t) {
         })
       )
   );
-  patch("crypto", { randomUUID: () => `operation-${++nextKey}` });
+  patch("crypto", {
+    subtle: NativeCrypto.subtle,
+    getRandomValues: NativeCrypto.getRandomValues.bind(NativeCrypto),
+    randomUUID: () => `operation-${++nextKey}`
+  });
   for (const [name, repeat] of [
     ["setInterval", true],
     ["setTimeout", false]
-  ])
+  ]) {
+    if (realTimers) continue;
     patch(name, (fn, delay) => {
       const id = ++nextTimer;
       timers.set(id, { fn, delay, at: now + delay, repeat });
       return id;
     });
-  for (const name of ["clearInterval", "clearTimeout"]) patch(name, id => timers.delete(id));
+  }
+  if (!realTimers)
+    for (const name of ["clearInterval", "clearTimeout"]) patch(name, id => timers.delete(id));
   const realNow = Date.now;
-  Date.now = () => now;
+  if (!realTimers) Date.now = () => now;
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: {
@@ -710,7 +751,7 @@ test("Pix: action identity, synchronous locks, retry, ambiguous/conclusive error
   assert.equal(h.requests.at(-1).body.operationKey, "operation-2");
 });
 
-test("manual: synchronous lock, validation, retry and distributed value/cancel key resets", async t => {
+test("manual: synchronous lock, validation, retry and distinct payload identities", async t => {
   const h = await harness(t);
   await h.load();
   await h.call(s => s.abrirRegistroPagamento());
@@ -741,42 +782,35 @@ test("manual: synchronous lock, validation, retry and distributed value/cancel k
   await h.fail(request);
   await h.call(s => s.setValorPagamento("2,00"));
   await h.call(s => s.registrarPagamento());
-  assert.equal(h.requests.at(-1).body.operationKey, "operation-1");
+  assert.equal(h.requests.at(-1).body.operationKey, "operation-2");
   await h.reply(h.requests.at(-1), { error: "denied" }, 400);
   assert.equal(h.state.pagamentoError, "denied");
   await h.call(s => s.setRegistrandoPagamento(false));
-  assert.equal(h.state.pagamentoKeyRef.current, "operation-1");
-  // The modal, rather than these setters, owns invalidation on value edits/cancellation.
+  assert.equal(h.state.pagamentoKeyRef.current, null);
+  // Closing and editing the form must not erase persisted unresolved intents.
   const modal = await readFile("src/admin/Pedidos/PedidoDetalheModal.tsx", "utf8");
-  assert.match(
-    modal,
-    /setValorPagamento\(valor\);\s*detalhe\.setPagamentoError\(null\);\s*detalhe\.pagamentoKeyRef\.current = null/
-  );
-  assert.match(
-    modal,
-    /setRegistrandoPagamento\(false\);\s*detalhe\.setPagamentoError\(null\);\s*detalhe\.pagamentoKeyRef\.current = null/
-  );
+  assert.doesNotMatch(modal, /detalhe\.pagamentoKeyRef\.current = null/);
   await h.call(s => {
     s.setValorPagamento("3,00");
     s.setPagamentoError(null);
     s.pagamentoKeyRef.current = null;
   });
   await h.call(s => s.registrarPagamento());
-  assert.equal(h.requests.at(-1).body.operationKey, "operation-2");
+  assert.equal(h.requests.at(-1).body.operationKey, "operation-3");
   await h.fail(h.requests.at(-1));
   await h.call(s => s.selecionarMetodoPagamento("PIX_EXTERNO"));
   await h.call(s => s.registrarPagamento());
   assert.deepEqual(h.requests.at(-1).body, {
     metodo: "PIX_EXTERNO",
     valorCentavos: 300,
-    operationKey: "operation-3"
+    operationKey: "operation-4"
   });
   await h.fail(h.requests.at(-1));
   await h.call(s => s.abrirRegistroPagamento());
-  assert.equal(h.state.pagamentoKeyRef.current, null);
+  assert.equal(h.state.pagamentoKeyRef.current, "operation-4");
   await h.call(s => s.registrarPagamento());
   assert.equal(h.requests.at(-1).body.operationKey, "operation-4");
-  await h.reply(h.requests.at(-1));
+  await h.reply(h.requests.at(-1), { ok: true });
   assert.equal(h.state.registrandoPagamento, false);
   assert.equal(h.state.pagamentoKeyRef.current, null);
   assert.equal(h.state.loading, false);
@@ -989,7 +1023,14 @@ if (!process.env.HOOK_MUTATION)
       staleReset: "^stale: returning",
       staleError: "^stale: errors",
       staleLoading: "^stale: loading",
-      staleUnmount: "^unmount:"
+      staleUnmount: "^unmount:",
+      intentAmbiguous: "^manual intent: retry",
+      intentReopen: "^manual intent: reopen",
+      intentPayload: "^manual intent: payload",
+      intentOrder: "^manual intent: orders",
+      intentSuccess: "^manual intent: conclusive",
+      intentValueOnly: "^manual intent: payload",
+      intentPremature: "^manual intent: retry"
     })) {
       await t.test(mutation, async () => {
         for (const variant of mutation === "lock" ? Object.keys(lockMutations) : [undefined]) {
@@ -1028,7 +1069,7 @@ test("reload callbacks: Pix/manual success use latest ref during their silent re
       await h.call(s => (action === "pix" ? s.gerarPix() : s.registrarPagamento()));
       const request = h.requests.at(-1);
       await h.render({ onStatusChanged: () => h.events.push("status:new") });
-      await h.reply(request);
+      await h.reply(request, action === "manual" ? { ok: true } : {});
       await h.load(
         fixture(1, { financeiro: { status: "PARCIAL", pagoCentavos: 100, totalCentavos: 1000 } })
       );
@@ -1084,4 +1125,314 @@ test("reset errors: errors, warning, method and clock survive a new order", asyn
       null
     ]
   );
+});
+
+const paymentSlot = id => `rp:pedido:${id}:pagamento-manual:intents`;
+const savedIntents = (id = 1) => JSON.parse(sessionStorage.getItem(paymentSlot(id)) ?? "[]");
+
+test("manual intent: retry preserves the persisted identity before and after network loss", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => {
+    s.abrirRegistroPagamento();
+    s.setValorPagamento("2,00");
+    s.selecionarMetodoPagamento("CARTAO");
+  });
+  await h.call(s => s.registrarPagamento());
+  const first = h.requests.at(-1);
+  assert.deepEqual(savedIntents(), [
+    {
+      version: 1,
+      state: "pending",
+      pedidoId: 1,
+      operationKey: first.body.operationKey,
+      payload: { metodo: "CARTAO", valorCentavos: 200 }
+    }
+  ]);
+  await h.fail(first);
+  assert.equal(savedIntents()[0]?.operationKey, first.body.operationKey);
+  await h.call(s => s.registrarPagamento());
+  assert.deepEqual(h.requests.at(-1).body, first.body);
+});
+
+test("manual intent: reopen restores the original payload and key without treating close as abandonment", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => {
+    s.abrirRegistroPagamento();
+    s.setValorPagamento("2,00");
+    s.selecionarMetodoPagamento("CARTAO");
+  });
+  await h.call(s => s.registrarPagamento());
+  const first = h.requests.at(-1);
+  await h.fail(first);
+  await h.call(s => s.setRegistrandoPagamento(false));
+  await h.call(s => s.abrirRegistroPagamento());
+  assert.equal(h.state.valorPagamento, "2,00");
+  assert.equal(h.state.metodoPagamento, "CARTAO");
+  assert.equal(h.state.pagamentoKeyRef.current, first.body.operationKey);
+  await h.call(s => s.registrarPagamento());
+  assert.deepEqual(h.requests.at(-1).body, first.body);
+});
+
+test("manual intent: payload changes create distinct pending intentions, including equal values", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => {
+    s.abrirRegistroPagamento();
+    s.setValorPagamento("2,00");
+  });
+  await h.call(s => s.registrarPagamento());
+  const first = h.requests.at(-1);
+  await h.fail(first);
+  await h.call(s => s.selecionarMetodoPagamento("CARTAO"));
+  await h.call(s => s.registrarPagamento());
+  const second = h.requests.at(-1);
+  assert.notEqual(second.body.operationKey, first.body.operationKey);
+  assert.equal(savedIntents().length, 2);
+  await h.fail(second);
+  await h.call(s => {
+    s.selecionarMetodoPagamento("DINHEIRO");
+    s.setValorPagamento("3,00");
+  });
+  await h.call(s => s.registrarPagamento());
+  const third = h.requests.at(-1);
+  assert.notEqual(third.body.operationKey, first.body.operationKey);
+  await h.fail(third);
+  await h.call(s => s.setValorPagamento("2,00"));
+  await h.call(s => s.registrarPagamento());
+  assert.deepEqual(h.requests.at(-1).body, first.body);
+  await h.fail(h.requests.at(-1));
+  await h.call(s => s.setRegistrandoPagamento(false));
+  await h.call(s => s.abrirRegistroPagamento());
+  assert.equal(h.state.valorPagamento, "2,00");
+  assert.equal(h.state.metodoPagamento, "DINHEIRO");
+});
+
+test("manual intent: orders isolate keys and reject a foreign record in their own slot", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => s.abrirRegistroPagamento());
+  await h.call(s => s.registrarPagamento());
+  const first = h.requests.at(-1);
+  await h.fail(first);
+  sessionStorage.setItem(paymentSlot(2), sessionStorage.getItem(paymentSlot(1)));
+  await h.render({ orderId: 2 });
+  await h.load(fixture(2));
+  await h.call(s => s.abrirRegistroPagamento());
+  await h.call(s => s.registrarPagamento());
+  const second = h.requests.at(-1);
+  assert.equal(second.url, "/api/admin/pedidos/2/pagamentos");
+  assert.notEqual(second.body.operationKey, first.body.operationKey);
+  assert.equal(savedIntents(2)[0].pedidoId, 2);
+  await h.fail(second);
+  await h.render({ orderId: 1 });
+  await h.load();
+  await h.call(s => s.abrirRegistroPagamento());
+  await h.call(s => s.registrarPagamento());
+  assert.deepEqual(h.requests.at(-1).body, first.body);
+});
+
+test("manual intent: conclusive success allows two legitimate equal payments with different keys", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => {
+    s.abrirRegistroPagamento();
+    s.setValorPagamento("2,00");
+  });
+  await h.call(s => s.registrarPagamento());
+  const first = h.requests.at(-1);
+  await h.reply(first, { ok: true }, 201);
+  assert.deepEqual(savedIntents(), []);
+  assert.equal(h.state.pagamentoPendente, false);
+  await h.load();
+  await h.call(s => {
+    s.abrirRegistroPagamento();
+    s.setValorPagamento("2,00");
+  });
+  await h.call(s => s.registrarPagamento());
+  assert.notEqual(h.requests.at(-1).body.operationKey, first.body.operationKey);
+  assert.equal(h.requests.at(-1).body.valorCentavos, first.body.valorCentavos);
+});
+
+test("manual intent: definitive rejection clears only the rejected intention", async t => {
+  for (const [status, code] of [
+    [400, undefined],
+    [409, "VALOR_ACIMA_DO_SALDO"],
+    [409, "OPERACAO_CONFLITO_PAYLOAD"],
+    [404, "PEDIDO_NAO_ENCONTRADO"]
+  ])
+    await t.test(`${status}/${code}`, async t => {
+      const h = await harness(t);
+      await h.load();
+      await h.call(s => s.abrirRegistroPagamento());
+      await h.call(s => s.registrarPagamento());
+      const first = h.requests.at(-1);
+      await h.reply(first, { error: "rejected", ...(code ? { code } : {}) }, status);
+      assert.deepEqual(savedIntents(), []);
+      assert.equal(h.state.pagamentoKeyRef.current, null);
+      await h.call(s => s.registrarPagamento());
+      assert.notEqual(h.requests.at(-1).body.operationKey, first.body.operationKey);
+    });
+});
+
+test("manual intent: ambiguous HTTP, authentication and malformed responses preserve identity", async t => {
+  for (const [status, code] of [
+    [500, undefined],
+    [408, undefined],
+    [429, undefined],
+    [401, undefined],
+    [403, undefined],
+    [409, "OPERACAO_EM_PROCESSAMENTO"],
+    [409, "OPERACAO_INCOMPLETA"],
+    [201, undefined]
+  ])
+    await t.test(`${status}/${code}`, async t => {
+      const h = await harness(t);
+      await h.load();
+      await h.call(s => s.abrirRegistroPagamento());
+      await h.call(s => s.registrarPagamento());
+      const first = h.requests.at(-1);
+      await h.reply(first, { error: "uncertain", ...(code ? { code } : {}) }, status);
+      assert.equal(savedIntents()[0].operationKey, first.body.operationKey);
+      await h.call(s => s.registrarPagamento());
+      assert.deepEqual(h.requests.at(-1).body, first.body);
+    });
+});
+
+test("manual intent: invalid JSON and storage failure cannot turn uncertainty into a new payment", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => s.abrirRegistroPagamento());
+  await h.call(s => s.registrarPagamento());
+  const first = h.requests.at(-1);
+  await h.call(() =>
+    first.resolve({
+      ok: true,
+      status: 201,
+      json: async () => {
+        throw new Error("truncated JSON");
+      }
+    })
+  );
+  assert.equal(savedIntents()[0].operationKey, first.body.operationKey);
+  const count = h.requests.length;
+  t.mock.method(sessionStorage.constructor.prototype, "setItem", () => {
+    throw new Error("quota");
+  });
+  await h.call(s => s.registrarPagamento());
+  assert.equal(h.requests.length, count);
+  assert.match(h.state.pagamentoError, /armazenamento/);
+});
+
+test("manual intent: corrupt and resolved records are never reused", async t => {
+  for (const raw of [
+    "{",
+    "null",
+    JSON.stringify([{ version: 0 }]),
+    JSON.stringify([
+      {
+        version: 1,
+        state: "resolved",
+        pedidoId: 1,
+        operationKey: "old-operation",
+        payload: { metodo: "DINHEIRO", valorCentavos: 1000 }
+      }
+    ]),
+    JSON.stringify([
+      {
+        version: 1,
+        state: "pending",
+        pedidoId: 1,
+        operationKey: "old-operation",
+        payload: { metodo: "DINHEIRO", valorCentavos: "1000" }
+      }
+    ])
+  ])
+    await t.test(raw, async t => {
+      const h = await harness(t);
+      sessionStorage.setItem(paymentSlot(1), raw);
+      await h.load();
+      await h.call(s => s.abrirRegistroPagamento());
+      await h.call(s => s.registrarPagamento());
+      assert.equal(h.requests.at(-1).body.operationKey, "operation-1");
+      assert.equal(savedIntents()[0].state, "pending");
+    });
+});
+
+test("manual intent integration: committed payment, lost response, reload and replay", async t => {
+  const { app, fixture: databaseFixture, state } = await import("./helpers/b3.mjs");
+  for (const mode of ["retry", "reopen", "remount", "reload", "fully paid reload"])
+    await t.test(mode, async t => {
+      const db = await databaseFixture(t, { ledger: false });
+      const session = await app.auth.createSession(db, 1);
+      const commit = request =>
+        app.adminPayment.onRequestPost({
+          env: { DB: db },
+          params: { id: "1" },
+          request: new Request("https://local.test/api/admin/pedidos/1/pagamentos", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Origin: "https://local.test",
+              Cookie: session.cookie.split(";")[0]
+            },
+            body: JSON.stringify(request.body)
+          })
+        });
+      const h = await harness(t, { realTimers: true });
+      await h.load(fixture(1, { capacidadeCobravelCentavos: 10000 }));
+      await h.call(s => {
+        s.abrirRegistroPagamento();
+        s.setValorPagamento(mode === "fully paid reload" ? "100,00" : "30,00");
+      });
+      await h.call(s => s.registrarPagamento());
+      const first = h.requests.at(-1);
+      assert.equal((await commit(first)).status, 201);
+      assert.equal((await state(db)).pagamentos.length, 1);
+      await h.fail(first);
+      const persisted = Object.entries(dom.window.sessionStorage);
+      let reloaded = h;
+      if (mode === "retry" || mode === "reopen") {
+        await h.call(s => s.carregarPedido(true));
+        await h.load(fixture(1, { capacidadeCobravelCentavos: 7000 }));
+        if (mode === "reopen") {
+          await h.call(s => s.setRegistrandoPagamento(false));
+          await h.call(s => s.abrirRegistroPagamento());
+        }
+      } else {
+        await h.unmount();
+        // Reload restores only serialized Storage, with a fresh hook and key generator.
+        const reloadDom = new JSDOM("", { url: "https://local.test" });
+        t.after(() => reloadDom.window.close());
+        for (const [key, value] of persisted) reloadDom.window.sessionStorage.setItem(key, value);
+        reloaded = await harness(t, {
+          preserveStorage: true,
+          storage: mode === "remount" ? dom.window.sessionStorage : reloadDom.window.sessionStorage,
+          keyOffset: 100,
+          realTimers: true
+        });
+        await reloaded.load(
+          fixture(1, { capacidadeCobravelCentavos: mode === "fully paid reload" ? 0 : 7000 })
+        );
+        await reloaded.call(s => s.abrirRegistroPagamento());
+      }
+      assert.equal(
+        reloaded.state.valorPagamento,
+        mode === "fully paid reload" ? "100,00" : "30,00"
+      );
+      await reloaded.call(s => s.registrarPagamento());
+      const retry = reloaded.requests.at(-1);
+      const response = await commit(retry);
+      assert.equal(response.status, 201);
+      assert.equal((await state(db)).pagamentos.length, 1, "reload must not create a second fact");
+      assert.equal((await state(db)).operacoes.length, 1);
+      assert.equal((await state(db)).alocacoes.length, 1);
+      assert.equal(retry.body.operationKey, first.body.operationKey);
+      const body = await response.json();
+      assert.equal(body.replay, true);
+      await reloaded.reply(retry, body, response.status);
+      assert.deepEqual(savedIntents(), []);
+      await reloaded.load();
+    });
 });
