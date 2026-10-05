@@ -9,6 +9,11 @@ import {
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { precoAtualCentavos, type ProdutoRow } from "../../../../lib/pricing";
 import {
+  validarAdicionarItemBody,
+  validarEditarItensBody,
+  type AdicionarItemBody
+} from "../../../../lib/pedidoItensValidation";
+import {
   BRUTO_PAGO_SQL,
   LIQUIDO_SQL,
   REEMBOLSADO_SQL,
@@ -32,15 +37,6 @@ import {
 
 interface Env {
   DB: D1Database;
-}
-
-const MAX_ITENS_PER_PEDIDO = 50;
-
-interface AdicionarItemBody {
-  operationKey?: unknown;
-  produtoId?: unknown;
-  quantidade?: unknown;
-  precoEsperadoCentavos?: unknown;
 }
 
 interface PedidoAdicaoRow {
@@ -271,23 +267,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   } catch {
     return jsonError("JSON inválido", 400);
   }
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return jsonError("Dados do item inválidos", 400);
+  const validacao = validarAdicionarItemBody(body);
+  if (!validacao.ok) {
+    return jsonError(validacao.error, validacao.status, validacao.code);
   }
-  const produtoId = body.produtoId;
-  const quantidade = body.quantidade;
-  const precoEsperadoCentavos = body.precoEsperadoCentavos;
-  if (
-    !Number.isInteger(produtoId) ||
-    Number(produtoId) <= 0 ||
-    !Number.isInteger(quantidade) ||
-    Number(quantidade) < 1 ||
-    Number(quantidade) > 50 ||
-    !Number.isSafeInteger(precoEsperadoCentavos) ||
-    Number(precoEsperadoCentavos) < 1
-  ) {
-    return jsonError("Dados do item inválidos", 400);
-  }
+  const { produtoId, quantidade, precoEsperadoCentavos } = validacao.dados;
 
   const chave = parseOperationKey(body.operationKey);
   if (!chave.ok) return jsonError(OPERACAO_MENSAGENS.OPERATION_KEY_INVALIDA, 400, chave.erro);
@@ -581,33 +565,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
     return jsonError("JSON inválido", 400);
   }
 
-  if (
-    body === null ||
-    typeof body !== "object" ||
-    Array.isArray(body) ||
-    !("itens" in body) ||
-    !Array.isArray(body.itens) ||
-    body.itens.length === 0
-  ) {
-    return jsonError("A comanda precisa ter ao menos um item", 400);
-  }
-  if (body.itens.length > MAX_ITENS_PER_PEDIDO) {
-    return jsonError("Itens demais", 400);
-  }
-  if (
-    !body.itens.every(
-      i =>
-        i &&
-        typeof i === "object" &&
-        !Array.isArray(i) &&
-        Number.isInteger(i.produtoId) &&
-        i.produtoId > 0 &&
-        Number.isInteger(i.quantidade) &&
-        i.quantidade >= 1 &&
-        i.quantidade <= 50
-    )
-  ) {
-    return jsonError("Item inválido", 400);
+  const validacao = validarEditarItensBody(body);
+  if (!validacao.ok) {
+    return jsonError(validacao.error, validacao.status, validacao.code);
   }
 
   try {
