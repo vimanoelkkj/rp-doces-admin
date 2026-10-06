@@ -298,19 +298,19 @@ jobs:
             exit 1
           fi
           echo "Deployment de produção do commit $short confirmado (deploy:success)."
-          # Fumaça somente leitura do site publicado. O corpo vai para uma
-          # variável: nada de `curl | grep -q`.
-          curl -fsS --max-time 30 --retry 8 --retry-delay 8 --retry-all-errors -o /dev/null "$PRODUCTION_URL/"
-          produtos="$(curl -fsS --max-time 30 --retry 8 --retry-delay 8 --retry-all-errors "$PRODUCTION_URL/api/produtos")"
-          case "$produtos" in
-            *'"produtos"'*) ;;
-            *)
-              echo "::error::$PRODUCTION_URL/api/produtos não devolveu a lista de produtos."
-              exit 1
-              ;;
-          esac
+
+      - name: Smoke test pós-deploy (somente leitura)
+        if: steps.gate.outputs.superseded == 'false'
+        env:
+          SMOKE_BASE_URL: ${{ env.PRODUCTION_URL }}
+        run: node scripts/smoke-production.mjs
+
+      - name: Registrar sucesso de publicação
+        if: steps.gate.outputs.superseded == 'false'
+        run: |
+          short="${GITHUB_SHA::7}"
           echo "### Publicado em produção" >> "$GITHUB_STEP_SUMMARY"
-          echo "Commit \`$short\` no ar em $PRODUCTION_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit \`$short\` no ar e validado via smoke test em $PRODUCTION_URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Sinalizar falha de publicação
         if: failure()

@@ -17,7 +17,8 @@
     "pages:dev": "wrangler pages dev dist",
     "db:migrations:check": "node scripts/check-d1-migrations.mjs",
     "db:migrate:local": "wrangler d1 migrations apply rp-doces-db --local",
-    "db:seed:local": "wrangler d1 execute rp-doces-db --local --file=./seed/products.sql"
+    "db:seed:local": "wrangler d1 execute rp-doces-db --local --file=./seed/products.sql",
+    "smoke:prod": "node scripts/smoke-production.mjs"
   },
   "dependencies": {
     "@mmmike/web-push": "^1.3.0",
