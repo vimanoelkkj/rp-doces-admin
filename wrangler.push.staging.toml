@@ -7,7 +7,7 @@ workers_dev = false
 [[d1_databases]]
 binding = "DB"
 database_name = "rp-doces-db-staging"
-database_id = "STAGING_D1_ID_REPLACE_AFTER_CREATE"
+database_id = "a63daa6e-c268-409a-a143-f23b4c469ca7"
 migrations_dir = "migrations"
 
 [[queues.consumers]]
