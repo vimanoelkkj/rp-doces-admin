@@ -131,6 +131,11 @@ restore: o banco volta, o dinheiro não.
 
 ## Manutenção
 
+- O exercício operacional local de preparação da v1.0 aplicou todas as migrations atuais, usou a fixture sintética
+  do teste existente, detectou alterações controladas e recuperou dados, histórico, schema e sequências. O export
+  restaurado foi idêntico byte a byte ao backup, inclusive em um segundo restore independente. Checksum divergente
+  e tentativa de sobrescrever D1 existente foram recusados. Esta evidência não valida restore remoto nem produção.
+
 - As sondas de `constraints` (em `scripts/d1-verify.mjs`) inserem linhas nas tabelas `produtos`, `pedido_pagamentos`,
   `pedidos`, `pedido_itens` e `usuarios_admin`. Se uma migration futura exigir uma coluna nova nessas tabelas, a sonda
   falha por "outro motivo" e o teste acusa: ajuste o `INSERT` da sonda.

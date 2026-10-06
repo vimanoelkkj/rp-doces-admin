@@ -66,14 +66,24 @@ Só se `git diff --name-only origin/main..HEAD -- migrations/` listar arquivos. 
 
 ## 4. Versionamento, commit e tag
 
-Estado real: o repositório não tem tags nem CHANGELOG, e o `package.json` fica em `0.1.0` sem participar do release. A
-**versão publicada é o SHA** (`wrangler pages deploy --commit-hash`).
+Versão preparada: `1.0.0` em `package.json` e `package-lock.json`, com notas em
+[CHANGELOG.md](../CHANGELOG.md). A tag semântica será `v1.0.0`; a preparação não cria tag nem GitHub Release.
+O deployment continua identificado pelo **SHA** (`wrangler pages deploy --commit-hash`).
+
+- [ ] **[MANUAL]** Versão `1.0.0` consistente no manifesto e lockfile; CHANGELOG revisado, com data real de publicação
+      preenchida somente depois da confirmação da release.
+- [ ] **[MANUAL]** `CI` e `Dependency audit` verdes no SHA da release; nenhuma high/critical de produção e riscos
+      moderados triados conforme a [aceitação documentada](architecture/dependency-risk-acceptance.md).
+- [ ] **[MANUAL]** D1 sem migrations pendentes; backup verificado e exercício local de restore validado. A prova local
+      não substitui a conferência do backup de produção exigida no [PRODUCTION-CHECKLIST](PRODUCTION-CHECKLIST.md).
+- [ ] **[MANUAL]** Deployment saudável de rollback identificado, compatibilidade com D1 conferida e smoke pós-deploy
+      previsto para o SHA publicado.
 
 - [ ] **[MANUAL]** Mensagem no padrão do histórico: `rp-doces: <descrição curta>`, sem `Co-Authored-By`.
 - [ ] **[MANUAL]** Caminho até a `main`: PR com CI verde e revisão, depois merge ([ROLLBACK](ROLLBACK.md) §7 usa PR para
       correções). Push direto só por decisão do responsável.
-- [ ] **[MANUAL, opcional]** Tag anotada no SHA publicado, depois do smoke verde. Convenção proposta aqui, sem automação:
-      `git tag -a release-AAAAMMDD[-N] <sha> -m "<resumo>"` e `git push origin release-AAAAMMDD[-N]`.
+- [ ] **[MANUAL, após autorização de publicação]** Criar a tag anotada `v1.0.0` no SHA publicado, depois do smoke verde:
+      `git tag -a v1.0.0 <sha> -m "R&P Doces v1.0.0"` e `git push origin v1.0.0`. Não executar durante a preparação.
 
 ## 5. Deploy
 
@@ -136,11 +146,12 @@ Quando: o smoke ou a validação manual falhou, ou há erro em pedido ou pagamen
 
 ## 10. Release notes
 
-Onde: comentário no PR ou na issue da release, ou GitHub Release se você usar tag. O repositório não tem CHANGELOG.
+Fonte das mudanças: [CHANGELOG.md](../CHANGELOG.md). Registro operacional: comentário no PR ou na issue da release;
+GitHub Release somente após autorização de publicação.
 Modelo:
 
 ```text
-Release AAAAMMDD[-N] — <sha7>
+Release v1.0.0 — <sha7>
 - Publicado em AAAA-MM-DD HH:MM (BRT) por <nome> · Execução: <link do Actions>
 - Mudanças (git log --oneline <sha-anterior>..<sha>):
   - ...

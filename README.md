@@ -1,5 +1,8 @@
 # R&P Doces — Manual de Engenharia e Documentação Técnica Oficial
 
+Versão preparada: **1.0.0**, ainda sem publicação formal. Notas em [CHANGELOG.md](CHANGELOG.md) e procedimento em
+[RELEASE-CHECKLIST.md](docs/RELEASE-CHECKLIST.md). A tag planejada é `v1.0.0`; o deployment é identificado pelo SHA.
+
 > **Fonte Única de Verdade:** Este `README.md` é a documentação técnica oficial, definitiva e viva da plataforma R&P Doces (storefront de e-commerce e painel administrativo). Em caso de qualquer divergência pontual entre textos legados, anotações de conversas ou comentários em arquivos antigos, as implementações de código, os schemas e as migrations do `HEAD` atual prevalecem de forma autoritativa.
 
 ---
@@ -58,7 +61,7 @@ A stack da plataforma foi estritamente verificada contra as dependências do có
 - **TypeScript nativo no backend:** Tipagem de contextos e bindings via `@cloudflare/workers-types@4.20260702.1`.
 - **Cloudflare D1 (SQLite Engine):** Banco de dados relacional distribuído, com suporte a transações atômicas com `db.batch()` e constraints nativas de integridade.
 - **Cloudflare R2 Storage:** Armazenamento de objetos S3-compatível para fotos de produtos enviadas pelo lojista, servidas através de streaming autenticado em `functions/api/images/[key].ts`.
-- **Wrangler 3:** CLI oficial da Cloudflare para execução de migrações, bindings locais e simulação de ambiente (`wrangler@3.78.0`).
+- **Wrangler 3:** CLI oficial da Cloudflare para execução de migrações, bindings locais e simulação de ambiente; versão resolvida no `package-lock.json`.
 
 ### Gateway de Pagamento
 
@@ -71,7 +74,7 @@ A stack da plataforma foi estritamente verificada contra as dependências do có
 ### Infraestrutura de Testes
 
 - **Node.js Native Test Runner:** Execução direta com `node --test` através de scripts orquestradores em JavaScript ES Modules (`scripts/run-tests.mjs`).
-- **JSDOM:** Simulação de árvore DOM para componentes React com listeners e portais (`jsdom@30.1.0`).
+- **JSDOM:** Simulação de árvore DOM para componentes React com listeners e portais; versão resolvida no `package-lock.json`.
 - **Miniflare & esbuild:** Subida de D1 e bindings locais descartáveis em memória durante testes de concorrência e idempotência.
 
 ---
@@ -194,7 +197,8 @@ rp-doces/
 │       ├── adminPedidos/         # Módulos internos da orquestração de comandas
 │       ├── stock.ts              # Regras físicas de estoque e reservas
 │       ├── pedidoReconcile.ts    # Ponte entre fatos financeiros e baixa física
-│       └── webPush.ts            # Despacho de notificações Web Push VAPID
+│       ├── pushNotifier.ts       # Claims, envio e retry de eventos Web Push
+│       └── pushTransport.ts      # Transporte Web Push VAPID
 │
 ├── migrations/                   # Migrations sequenciais do Cloudflare D1
 │   ├── 0001_products.sql         # Criação de produtos e constraint de reserva
@@ -209,7 +213,7 @@ rp-doces/
 │
 └── tests/                        # Bateria de testes automatizados com node:test
     ├── helpers/                  # Subida de D1 simulado e fixtures Miniflare
-    └── *.test.mjs                # 50 suítes completas de testes de domínio e UI
+    └── *.test.mjs                # Testes de domínio e UI descobertos pelo runner
 ```
 
 ---
@@ -268,7 +272,7 @@ A plataforma adota design responsivo rigoroso sem quebra de leiautes em disposit
 
 A aplicação oferece alternância instantânea entre modo claro e escuro:
 
-- **Sincronização Bidirecional Contínua:** O contexto único [StoreThemeContext.tsx](file:///c:/Users/vitormanoel/dev/rp-doces/src/context/StoreThemeContext.tsx) gerencia o estado e sincroniza simultaneamente:
+- **Sincronização Bidirecional Contínua:** O contexto único [StoreThemeContext.tsx](src/context/StoreThemeContext.tsx) gerencia o estado e sincroniza simultaneamente:
   - O atributo `data-theme` em `document.documentElement`.
   - O atributo `data-admin-theme` em `document.documentElement`.
   - As chaves `store-theme` e `admin-theme` em `localStorage`.
@@ -588,7 +592,7 @@ Sem o webhook o sistema ainda converge pelo polling da tela do cliente e pela re
 
 - **Central de Notificações Interna:** Exibe alertas em tempo real para os atendentes: novos pedidos aguardando preparo, pagamentos confirmados no Pix, estoque baixo ou esgotado e falhas operacionais que exijam atenção.
 - **Badge Dinâmico Unificado:** O número de notificações não lidas é consumido pelo `Header.tsx` a partir de `NotificacoesContext.tsx` e atualizado automaticamente sem necessidade de recarregar a página.
-- **Web Push (PWA):** Integração com a API de notificações do navegador via chaves VAPID (`functions/lib/webPush.ts`). Dispara notificações no desktop ou celular do operador quando um novo pedido com pagamento confirmado ingressa no sistema.
+- **Web Push (PWA):** Integração com a API de notificações do navegador via chaves VAPID (`functions/lib/pushNotifier.ts` e `functions/lib/pushTransport.ts`). Dispara notificações no desktop ou celular do operador quando um novo pedido com pagamento confirmado ingressa no sistema. Claims com lease renovável permitem recuperação de eventos abandonados; a entrega é at-least-once, com possibilidade de duplicidade rara.
 
 ---
 
@@ -708,17 +712,17 @@ npm run pages:dev
 
 ## 29. Scripts npm e Ciclo de Vida
 
-| Comando                    | Descrição                                                                     |
-| :------------------------- | :---------------------------------------------------------------------------- |
-| `npm run dev`              | Inicia o servidor Vite para desenvolvimento rápido da interface SPA.          |
-| `npm run build`            | Valida tipos do frontend (`tsc --noEmit`) e gera a pasta de produção `dist/`. |
-| `npm run typecheck`        | Executa a checagem de tipos do TypeScript sem gerar arquivos.                 |
-| `npm test`                 | Executa a suíte completa de 50 testes automatizados com `node --test`.        |
-| `npm run test:cached`      | Executa testes ignorando suítes cujos arquivos fonte não foram alterados.     |
-| `npm run preview`          | Previsualiza a pasta `dist/` estaticamente.                                   |
-| `npm run pages:dev`        | Roda o emulador do Cloudflare Pages com banco D1 local e Functions.           |
-| `npm run db:migrate:local` | Aplica todas as migrações pendentes no banco D1 local.                        |
-| `npm run db:seed:local`    | Popula o banco local com o catálogo inicial de doces e bolos.                 |
+| Comando                    | Descrição                                                                 |
+| :------------------------- | :------------------------------------------------------------------------ |
+| `npm run dev`              | Inicia o servidor Vite para desenvolvimento rápido da interface SPA.      |
+| `npm run build`            | Valida tipos do frontend e Functions e gera a pasta de produção `dist/`.  |
+| `npm run typecheck`        | Checa frontend e Functions sem gerar arquivos.                            |
+| `npm test`                 | Executa os testes descobertos em `tests/*.test.mjs` pelo runner oficial.  |
+| `npm run test:cached`      | Executa testes ignorando suítes cujos arquivos fonte não foram alterados. |
+| `npm run preview`          | Previsualiza a pasta `dist/` estaticamente.                               |
+| `npm run pages:dev`        | Roda o emulador do Cloudflare Pages com banco D1 local e Functions.       |
+| `npm run db:migrate:local` | Aplica todas as migrações pendentes no banco D1 local.                    |
+| `npm run db:seed:local`    | Popula o banco local com o catálogo inicial de doces e bolos.             |
 
 ---
 
@@ -727,19 +731,19 @@ npm run pages:dev
 O comando `npm run build` executa:
 
 ```bash
-tsc --noEmit && vite build
+npm run typecheck && vite build
 ```
 
 - **Escopo do `tsconfig.json` Principal:** O arquivo `tsconfig.json` cobre primordialmente o frontend SPA (`src/` e `vite.config.ts`).
-- **Verificação do Backend (`functions/**`):** A checagem de tipos das funções serverless da Cloudflare é realizada pelo bundler do Wrangler e durante os testes automatizados, que importam e compilam os módulos de backend via `esbuild`.
+- **Verificação do Backend (`functions/**`):** `npm run typecheck:functions` executa `tsc --noEmit -p tsconfig.functions.json`; `npm run typecheck` e `npm run build` incluem essa checagem.
 
 ---
 
 ## 31. Estrutura e Execução de Testes Automatizados
 
-A plataforma possui uma robusta rede de segurança com **50 suítes de testes automatizados**, totalizando centenas de asserções executadas nativamente:
+A plataforma possui testes automatizados de domínio e UI, descobertos pelo runner a partir dos arquivos atuais em `tests/`:
 
-- **Runner Oficial:** `scripts/run-tests.mjs` itera recursivamente sobre todos os arquivos `tests/*.test.mjs`.
+- **Runner Oficial:** `scripts/run-tests.mjs` descobre os arquivos `tests/*.test.mjs` no diretório principal de testes. Playwright executa os E2E em `tests/e2e/` separadamente.
 - **Testes de Concorrência e Rollback:** Utilizam simuladores D1 em memória através de Miniflare, testando corridas entre webhooks e aprovações manuais com travas e barreiras determinísticas.
 - **Testes de Interface (UI):** Utilizam JSDOM para renderizar componentes modais, verificar bloqueios de scroll e simular cliques em backdrops de fechamento.
 - **Execução:**
@@ -791,8 +795,8 @@ A plataforma possui uma robusta rede de segurança com **50 suítes de testes au
    - Caso um cliente gere dois códigos Pix e pague ambos, o ledger preserva corretamente o montante total recebido, mas a interface visual ainda não possui um módulo dedicado para converter o excedente em crédito de loja.
 2. **Edição Destrutiva de Itens Bloqueada (B1):**
    - A rota `PUT /api/admin/pedidos/:id/itens` permanece bloqueada com código `409` por segurança. A manipulação de itens em comandas vivas deve ser feita exclusivamente através das rotas de cancelamento de item com reposição e troca de item.
-3. **Typecheck Separado para Functions:**
-   - O `npm run build` valida os tipos do frontend via `tsc --noEmit`. Os tipos das rotas sob `functions/` dependem da compilação e dos testes do Wrangler/esbuild.
+3. **Riscos de Dependências para v1.0:**
+   - As moderadas atuais do React Router têm [triagem e aceitação documentadas](docs/architecture/dependency-risk-acceptance.md). A migração para v7 será tratada separadamente após a v1.0; high/critical de produção bloqueiam release.
 
 ---
 
@@ -818,4 +822,4 @@ A plataforma possui uma robusta rede de segurança com **50 suítes de testes au
 | **Web Push Notifications**            |    ✅    | Notificações no navegador para alertas operacionais e novos pedidos pagos.         |
 | **Ledger Contábil**                   |    ✅    | Partidas financeiras, waterfall de alocações e projeção líquida em SQL.            |
 | **Reserva Atômica de Estoque**        |    ✅    | Constraints `CHECK` no SQLite impedindo qualquer venda excedente.                  |
-| **Suíte de Testes (50 Suítes)**       |    ✅    | 100% dos testes aprovados cobrindo concorrência, domínio e UI.                     |
+| **Testes e CI**                       |    ✅    | Testes de concorrência, domínio e UI; resultado conferido por SHA no CI.           |

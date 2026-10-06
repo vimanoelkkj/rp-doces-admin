@@ -165,6 +165,8 @@ Não abra a loja (ou pare de operar) enquanto:
 - `MP_ACCESS_TOKEN` ou `MP_WEBHOOK_SECRET` ausente, ou webhook não cadastrado e testado.
 - Migration pendente, desconhecida ou com lacuna (`npm run db:migrations:check` diferente de OK).
 - O smoke falha: 5xx, `/api/admin/pedidos` sem `401`, HTTPS inválido.
+- `Dependency audit` reprovado ou vulnerabilidade high/critical de produção. Moderadas exigem triagem e aceitação
+  documentada quando aplicável; para v1.0, conferir a [aceitação do React Router](architecture/dependency-risk-acceptance.md).
 - Nenhum OWNER ativo, ou login do admin quebrado.
 - Nenhum caminho de recuperação: Time Travel inacessível e nenhum export verificado.
 - Nenhum deployment saudável anterior, ou ninguém sabe pausar o deploy.
