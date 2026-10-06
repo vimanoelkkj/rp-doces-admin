@@ -279,7 +279,8 @@ são dados financeiros.
    ```
    O restore devolve um bookmark que permite desfazer, mas **não recupera dinheiro nem reconcilia
    pagamentos**. Exporte/inspecione antes o que existir depois do ponto (pedidos e pagamentos do período) e
-   reconcile com o Mercado Pago. Isso é decisão humana.
+   reconcile com o Mercado Pago. Isso é decisão humana. Como exportar e provar que o export restaura:
+   `docs/BACKUP-RESTORE.md`.
 5. **Nunca** gere migration reversa automática, nem `DROP`/`DELETE` para "limpar".
 
 ### D. Credenciais inválidas
@@ -363,6 +364,8 @@ Somente leitura. **Não** gere Pix real, reembolso, pedido de teste nem "Diagnó
 
 - Pipeline: `.github/workflows/ci.yml` (jobs `checks`, `tests`, `e2e`, `ci-status`, `deploy`).
 - Migration Guard: `scripts/check-d1-migrations.mjs`, teste em `tests/check-d1-migrations.test.mjs`.
+- Backup e restore do D1 (export, verificação em D1 local descartável): `docs/BACKUP-RESTORE.md`,
+  `scripts/d1-backup.mjs`, teste em `tests/d1-backup-restore.test.mjs`.
 - Configuração de bindings: `wrangler.toml` (`DB` = `rp-doces-db`, `PRODUCT_IMAGES` = `rp-doces-images`).
 - Documentação Cloudflare: Pages > Configuration > Rollbacks; API "Pages deployment rollback";
   D1 > Time Travel.
