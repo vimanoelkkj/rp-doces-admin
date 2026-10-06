@@ -163,6 +163,9 @@ async function coordinate(module, db, outcomes, options = {}) {
   const trace = [];
   let active = 0;
   let maximum = 0;
+  let recipientsSelected = false;
+  let completedSends = 0;
+  const recipientProgress = [];
   const calls = [];
   globalThis[bridge] = async (...args) => {
     const [subscription] = args;
@@ -170,9 +173,10 @@ async function coordinate(module, db, outcomes, options = {}) {
     calls.push(args);
     trace.push(`send:${id}`);
     maximum = Math.max(maximum, ++active);
-    // Yield deterministically; Promise.all would start another send before completion.
+    // Network overlap is useful evidence, but D1 scheduling can hide parallel iterations.
     await new Promise(resolve => setImmediate(resolve));
     active--;
+    completedSends++;
     trace.push(`done:${id}`);
     const result = outcomes[id - 1];
     if (result instanceof Error || typeof result === "string") throw result;
@@ -183,6 +187,17 @@ async function coordinate(module, db, outcomes, options = {}) {
     for (const statement of statements) {
       const normalized = statement.sql.replace(/\s+/g, " ").trim();
       sql.push({ sql: normalized, args: statement.args });
+      if (normalized.includes("FROM push_inscricoes pi")) recipientsSelected = true;
+      if (
+        recipientsSelected &&
+        normalized.startsWith("UPDATE push_eventos SET claim_expires_at =") &&
+        recipientProgress.length < outcomes.length
+      ) {
+        // The hook observes renewal submission before any D1 I/O. Promise.all submits
+        // every recipient renewal before any send settles, even if DB replies serialize.
+        // Only recipient renewals are counted; deferred stale cleanup renewals come later.
+        recipientProgress.push(completedSends);
+      }
       let stage;
       if (normalized.startsWith("DELETE FROM push_inscricoes"))
         stage = `delete:${statement.args[0]}`;
@@ -225,6 +240,7 @@ async function coordinate(module, db, outcomes, options = {}) {
     remaining: remaining.map(row => row.id),
     trace,
     maximum,
+    recipientProgress,
     calls,
     sql,
     env
@@ -268,6 +284,11 @@ async function payloadContract(module, db) {
 async function orderContract(module, db) {
   const run = await coordinate(module, db, [false, true, false]);
   assert.ifError(run.failure);
+  assert.deepEqual(
+    run.recipientProgress,
+    [0, 1, 2],
+    "each recipient must start only after the previous send settles"
+  );
   assert.deepEqual(run.trace, [
     "send:1",
     "done:1",
