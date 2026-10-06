@@ -2,15 +2,53 @@ import { useState, useEffect } from "react";
 
 type PushState = "CHECKING" | "UNSUPPORTED" | "DENIED" | "SUBSCRIBED" | "PROMPT";
 
+class PushActivationError extends Error {}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  if (!/^[A-Za-z0-9_-]+={0,2}$/.test(base64String))
+    throw new PushActivationError("Chave de notificação inválida no servidor.");
+  const unpadded = base64String.replace(/=+$/, "");
+  const padding = "=".repeat((4 - (unpadded.length % 4)) % 4);
+  const base64 = (unpadded + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; ++i) {
     outputArray[i] = rawData.charCodeAt(i);
   }
+  if (outputArray.length !== 65 || outputArray[0] !== 4)
+    throw new PushActivationError("Chave de notificação inválida no servidor.");
   return outputArray;
+}
+
+async function loadPublicKey(): Promise<Uint8Array> {
+  const response = await fetch("/api/admin/push/vapid-key");
+  if (!response.ok)
+    throw new PushActivationError("Não foi possível carregar a chave de notificação do servidor.");
+  const { publicKey } = await response.json();
+  if (typeof publicKey !== "string" || !publicKey)
+    throw new PushActivationError("Chave de notificação não configurada no servidor.");
+  return urlBase64ToUint8Array(publicKey);
+}
+
+function subscriptionUsesKey(sub: PushSubscription, publicKey: Uint8Array): boolean {
+  try {
+    const source: BufferSource | null | undefined = sub.options?.applicationServerKey;
+    if (!source) return false;
+    // Views must respect their byte offset. ArrayBuffers can come from another realm.
+    if (
+      !ArrayBuffer.isView(source) &&
+      Object.prototype.toString.call(source) !== "[object ArrayBuffer]"
+    )
+      return false;
+    const bytes = ArrayBuffer.isView(source)
+      ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
+      : new Uint8Array(source);
+    return (
+      bytes.length === publicKey.length && bytes.every((byte, index) => byte === publicKey[index])
+    );
+  } catch {
+    return false;
+  }
 }
 
 export default function PushNotificationCard() {
@@ -39,17 +77,25 @@ export default function PushNotificationCard() {
       }
 
       try {
+        const publicKey = await loadPublicKey();
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
         if (cancel) return;
 
-        if (sub) {
+        if (sub && subscriptionUsesKey(sub, publicKey)) {
           setStatus("SUBSCRIBED");
         } else {
           setStatus("PROMPT");
+          if (sub)
+            setFeedback(
+              "As chaves de notificação foram atualizadas. Reative as notificações neste dispositivo."
+            );
         }
       } catch {
-        if (!cancel) setStatus("PROMPT");
+        if (!cancel) {
+          setStatus("PROMPT");
+          setFeedback("Não foi possível verificar as notificações. Tente ativá-las novamente.");
+        }
       }
     }
 
@@ -76,24 +122,38 @@ export default function PushNotificationCard() {
       }
 
       // 1. Busca chave VAPID pública
-      const keyRes = await fetch("/api/admin/push/vapid-key");
-      if (!keyRes.ok) {
-        throw new Error("Não foi possível carregar a chave de notificação do servidor.");
-      }
-      const { publicKey } = await keyRes.json();
-      if (!publicKey) {
-        throw new Error("Chave de notificação não configurada no servidor.");
-      }
+      const publicKey = await loadPublicKey();
 
       // 2. Inscreve no Service Worker
       const reg = await navigator.serviceWorker.ready;
       let sub = await reg.pushManager.getSubscription();
+      if (sub && !subscriptionUsesKey(sub, publicKey)) {
+        const cleanup = await fetch("/api/admin/push/unsubscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: sub.endpoint })
+        });
+        if (!cleanup.ok || (await cleanup.json().catch(() => null))?.ok !== true)
+          throw new PushActivationError(
+            "Não foi possível remover a inscrição antiga no servidor. Tente novamente."
+          );
+        if (!(await sub.unsubscribe()))
+          throw new PushActivationError(
+            "Não foi possível desativar a inscrição antiga neste dispositivo. Tente novamente."
+          );
+        sub = null;
+      }
       if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource
+          applicationServerKey: publicKey as BufferSource
         });
       }
+
+      if (!subscriptionUsesKey(sub, publicKey))
+        throw new PushActivationError(
+          "Não foi possível verificar a chave de notificação neste navegador."
+        );
 
       // 3. Registra inscrição no backend
       const subJson = sub.toJSON();
@@ -110,14 +170,16 @@ export default function PushNotificationCard() {
       });
 
       if (!saveRes.ok) {
-        throw new Error("Falha ao salvar inscrição de notificação no servidor.");
+        throw new PushActivationError("Falha ao salvar inscrição de notificação no servidor.");
       }
 
       setStatus("SUBSCRIBED");
       setFeedback("Notificações Web Push ativadas com sucesso neste dispositivo.");
     } catch (err: unknown) {
-      console.error("Erro ao ativar Web Push:", err);
-      setFeedback(err instanceof Error ? err.message : "Erro ao ativar notificações.");
+      console.error("Erro ao ativar Web Push:");
+      setFeedback(
+        err instanceof PushActivationError ? err.message : "Erro ao ativar notificações."
+      );
     } finally {
       setBusy(false);
     }
