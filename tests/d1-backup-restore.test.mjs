@@ -35,6 +35,34 @@ INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,m
 INSERT INTO pedido_pagamento_alocacoes(pagamento_id,pedido_item_id,valor_centavos) VALUES(1,1,10000);
 `;
 
+// O histórico (d1_migrations) cresce a cada migration nova: nada abaixo assume quantas existem. O próximo
+// id livre sai do próprio dump, nunca de um número fixo.
+const LINHA_MIGRATION = /^INSERT INTO "?d1_migrations"? VALUES\((\d+),[^\n]*(?:\n|$)/gim;
+
+function historicoDoDump(dump) {
+  const linhas = [...dump.matchAll(LINHA_MIGRATION)];
+  assert.ok(linhas.length > 0, "o dump não tem INSERTs de d1_migrations");
+  const ultima = linhas.reduce((a, b) => (Number(b[1]) > Number(a[1]) ? b : a));
+  return { total: linhas.length, ultimoId: Number(ultima[1]), ultimaLinha: ultima[0] };
+}
+
+// Acrescenta uma migration ao dump, com o próximo id livre, logo depois da linha de maior id. Com
+// `sequencia`, a linha de d1_migrations em sqlite_sequence acompanha o novo id (como no banco de verdade).
+function comMigrationAcrescentada(dump, nome, { sequencia = false } = {}) {
+  const { ultimoId, ultimaLinha } = historicoDoDump(dump);
+  const id = ultimoId + 1;
+  const nova = `INSERT INTO "d1_migrations" VALUES(${id},'${nome}','2026-01-01 00:00:00');\n`;
+  const inteira = ultimaLinha.endsWith("\n") ? ultimaLinha : `${ultimaLinha}\n`;
+  let out = dump.replace(ultimaLinha, () => inteira + nova);
+  if (sequencia) {
+    out = out.replace(
+      /(INSERT INTO "sqlite_sequence" VALUES\('d1_migrations',)\d+(\);)/,
+      (_, antes, depois) => `${antes}${id}${depois}`
+    );
+  }
+  return { dump: out, id };
+}
+
 test("normalizeDump sobe os CREATE TABLE para o topo e preserva o resto", () => {
   const dump = [
     "PRAGMA defer_foreign_keys=TRUE;",
@@ -72,6 +100,53 @@ test("normalizeDump sobe os CREATE TABLE para o topo e preserva o resto", () => 
     "nenhuma linha perdida ou criada"
   );
   assert.throws(() => normalizeDump("CREATE TABLE incompleta (id INTEGER\n"), /sem ";" final/);
+});
+
+test("a migration acrescentada ao dump usa o próximo id livre, com qualquer tamanho de histórico", () => {
+  const sintetico = total =>
+    [
+      "PRAGMA defer_foreign_keys=TRUE;",
+      "CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE);",
+      ...Array.from(
+        { length: total },
+        (_, i) =>
+          `INSERT INTO "d1_migrations" VALUES(${i + 1},'${String(i + 1).padStart(4, "0")}_m.sql','2026-01-01 00:00:00');`
+      ),
+      "DELETE FROM sqlite_sequence;",
+      `INSERT INTO "sqlite_sequence" VALUES('d1_migrations',${total});`,
+      ""
+    ].join("\n");
+  const ids = dump => [...dump.matchAll(LINHA_MIGRATION)].map(m => Number(m[1]));
+
+  // Hoje (35), a primeira migration seguinte (36) e históricos bem maiores.
+  for (const total of [1, 35, 36, 120]) {
+    const { dump, id } = comMigrationAcrescentada(sintetico(total), "0099_inexistente.sql");
+    const todos = ids(dump);
+    assert.equal(id, total + 1, `total=${total}: próximo id`);
+    assert.equal(new Set(todos).size, todos.length, `total=${total}: id duplicado`);
+    assert.equal(todos.at(-1), total + 1, `total=${total}: a linha nova vem depois da última`);
+  }
+
+  // Linhas fora de ordem: vale o MAIOR id, não o último nem o primeiro.
+  const fora = sintetico(3).replace(
+    /(INSERT INTO "d1_migrations" VALUES\(1,[^\n]*\n)([\s\S]*?VALUES\(3,[^\n]*\n)/,
+    "$2$1"
+  );
+  assert.notEqual(fora, sintetico(3));
+  assert.equal(comMigrationAcrescentada(fora, "0099_inexistente.sql").id, 4);
+
+  const comSequencia = comMigrationAcrescentada(sintetico(36), "0037_nova.sql", {
+    sequencia: true
+  });
+  assert.match(
+    comSequencia.dump,
+    /VALUES\('d1_migrations',37\);/,
+    "sqlite_sequence acompanha o id"
+  );
+  assert.throws(
+    () => comMigrationAcrescentada("CREATE TABLE x (a);\n", "x.sql"),
+    /não tem INSERTs de d1_migrations/
+  );
 });
 
 test("o script só opera em D1 local: --remote, --preview e d1 sem --local são recusados", () => {
@@ -239,22 +314,45 @@ test(
       "dump sem triggers e com migration desconhecida é reprovado em vários pontos",
       () => {
         const original = readFileSync(dump, "utf8");
-        const broken = original
-          .replace(/^CREATE TRIGGER[\s\S]*?^END;$/gm, "")
-          .replace(
-            /(INSERT INTO "d1_migrations" VALUES\(35,[^\n]*\n)/,
-            `$1INSERT INTO "d1_migrations" VALUES(36,'0099_inexistente.sql','2026-01-01 00:00:00');\n`
-          );
+        const { dump: broken, id } = comMigrationAcrescentada(
+          original.replace(/^CREATE TRIGGER[\s\S]*?^END;$/gm, ""),
+          "0099_inexistente.sql"
+        );
         assert.notEqual(broken, original);
+        assert.equal(id, historicoDoDump(original).ultimoId + 1);
         const bad = path.join(work, "backup", "sem-triggers.sql");
         writeFileSync(bad, broken);
         const result = verifyDump(bad);
         assert.equal(result.ok, false);
         const names = failing(result);
+        assert.ok(
+          !names.includes("restauração"),
+          `colisão de id na restauração: ${JSON.stringify(result.checks)}`
+        );
         for (const expected of ["migrations", "schema", "constraints"]) {
           assert.ok(names.includes(expected), `"${expected}" deveria reprovar; falhas: ${names}`);
         }
       }
     );
+
+    await t.test("histórico com migrations a mais continua sem colisão de id", () => {
+      const original = readFileSync(dump, "utf8");
+      const { ultimoId } = historicoDoDump(original);
+      // Como se o banco já tivesse a migration seguinte (a sequência acompanha) e mais uma desconhecida.
+      const crescido = comMigrationAcrescentada(
+        original,
+        `${String(ultimoId + 1).padStart(4, "0")}_simulada.sql`,
+        { sequencia: true }
+      );
+      const { dump: broken, id } = comMigrationAcrescentada(crescido.dump, "0099_inexistente.sql", {
+        sequencia: true
+      });
+      assert.equal(crescido.id, ultimoId + 1);
+      assert.equal(id, ultimoId + 2);
+      const bad = path.join(work, "backup", "historico-maior.sql");
+      writeFileSync(bad, broken);
+      const result = verifyDump(bad);
+      assert.deepEqual(failing(result), ["migrations"], JSON.stringify(result.checks, null, 1));
+    });
   }
 );
