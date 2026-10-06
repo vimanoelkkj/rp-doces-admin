@@ -261,11 +261,11 @@ test("Push logs and persistence are sanitized without changing HTTP or coordinat
     await db.prepare("UPDATE push_eventos SET atualizado_em='2000-01-01 00:00:00'").run();
     hook("UPDATE push_eventos");
     // Let the CAS succeed, then fail the final update after network delivery.
-    let updates = 0;
+    let completionWrites = 0;
     db.hook = statements => {
       if (
-        statements.some(row => row.sql.trim().startsWith("UPDATE push_eventos")) &&
-        ++updates === 2
+        statements.some(row => row.sql.includes("SET status = ?, tentativas")) &&
+        ++completionWrites === 1
       )
         throw error;
     };

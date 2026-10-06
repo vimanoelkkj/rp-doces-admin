@@ -36,6 +36,108 @@ export const RETRY_BACKOFF_SECONDS = 30;
 export const RETRY_MAX_ATTEMPTS = 3;
 export const RETRY_BATCH_SIZE = 5;
 
+// At-least-once: remote acceptance followed by a local crash can be replayed.
+// 120 seconds covers one 30-second transport call plus 90 seconds of margin.
+// Renew before each sequential send, not once for the entire recipient batch.
+export const PUSH_CLAIM_LEASE_SECONDS = 120;
+interface PushClaim {
+  token: string;
+  tentativas: number;
+}
+const CLAIM_ELIGIBILITY = `(
+  (status = 'FALHA' AND tentativas < ?
+    AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
+    AND (claim_expires_at IS NULL OR datetime(claim_expires_at) <= datetime('now')))
+  OR (status = 'PENDENTE' AND claim_expires_at IS NOT NULL
+    AND datetime(claim_expires_at) <= datetime('now'))
+)`;
+
+async function adquirirClaim(
+  db: D1Database,
+  pedidoId: number,
+  tentativas: number,
+  backoff: number
+): Promise<PushClaim | null> {
+  const token = crypto.randomUUID();
+  const result = await db
+    .prepare(
+      `UPDATE push_eventos
+    SET status = 'PENDENTE', claim_token = ?,
+        claim_expires_at = datetime('now', '+' || ? || ' seconds')
+    WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO' AND tentativas = ?
+      AND ${CLAIM_ELIGIBILITY}`
+    )
+    .bind(token, PUSH_CLAIM_LEASE_SECONDS, pedidoId, tentativas, RETRY_MAX_ATTEMPTS, backoff)
+    .run();
+  return result.meta?.changes ? { token, tentativas } : null;
+}
+
+async function renovarClaim(db: D1Database, pedidoId: number, claim: PushClaim): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE push_eventos
+    SET claim_expires_at = datetime('now', '+' || ? || ' seconds')
+    WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO' AND status = 'PENDENTE'
+      AND claim_token = ? AND datetime(claim_expires_at) > datetime('now')`
+    )
+    .bind(PUSH_CLAIM_LEASE_SECONDS, pedidoId, claim.token)
+    .run();
+  return Boolean(result.meta?.changes);
+}
+
+async function concluirClaim(
+  db: D1Database,
+  pedidoId: number,
+  claim: PushClaim,
+  status: "ENVIADO" | "FALHA",
+  erro?: string | null
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE push_eventos
+    SET status = ?, tentativas = ?,
+        ultimo_erro = CASE WHEN ? = 'FALHA' THEN ? ELSE ultimo_erro END,
+        atualizado_em = CURRENT_TIMESTAMP, claim_token = NULL, claim_expires_at = NULL
+    WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO' AND status = 'PENDENTE'
+      AND claim_token = ? AND datetime(claim_expires_at) > datetime('now')`
+    )
+    .bind(status, claim.tentativas + 1, status, erro ?? null, pedidoId, claim.token)
+    .run();
+  return Boolean(result.meta?.changes);
+}
+
+const claimPerdido = (): NotificarPushResult => ({ ok: false, motivo: "CLAIM_PERDIDO" });
+
+async function processarClaim(
+  db: D1Database,
+  env: PushEnv,
+  pedidoId: number,
+  claim: PushClaim,
+  options?: NotificarPushOptions
+): Promise<NotificarPushResult> {
+  try {
+    if (!(await renovarClaim(db, pedidoId, claim))) return claimPerdido();
+    const pedido = await db
+      .prepare("SELECT id, valor_total_centavos FROM pedidos WHERE id = ?")
+      .bind(pedidoId)
+      .first<PedidoBasico>();
+    if (!pedido) {
+      await concluirClaim(db, pedidoId, claim, "FALHA", "PEDIDO_INEXISTENTE");
+      return { ok: false, motivo: "PEDIDO_NAO_ENCONTRADO" };
+    }
+    return await despacharParaInscricoes(db, env, pedido, claim, options);
+  } catch (error) {
+    // Ownership fencing also covers an ambiguous delivery followed by a failed
+    // success write. If persistence stays unavailable, leave the lease to expire.
+    try {
+      await concluirClaim(db, pedidoId, claim, "FALHA", JSON.stringify(sanitizePushError(error)));
+    } catch {
+      /* The original sanitized error is logged by the caller. */
+    }
+    throw error;
+  }
+}
+
 interface PedidoBasico {
   id: number;
   valor_total_centavos: number;
@@ -48,7 +150,7 @@ async function despacharParaInscricoes(
   db: D1Database,
   env: PushEnv,
   pedido: PedidoBasico,
-  tentativasAtuais: number,
+  claim: PushClaim,
   options?: NotificarPushOptions
 ): Promise<NotificarPushResult> {
   const publicKey = env.VAPID_PUBLIC_KEY;
@@ -57,6 +159,16 @@ async function despacharParaInscricoes(
 
   if (!publicKey || !privateKey) {
     console.warn("VAPID keys não configuradas. Web push não enviado para pedido", pedido.id);
+    if (
+      !(await concluirClaim(
+        db,
+        pedido.id,
+        claim,
+        "FALHA",
+        JSON.stringify({ category: "CONFIGURATION", code: "VAPID_NAO_CONFIGURADO" })
+      ))
+    )
+      return claimPerdido();
     return { ok: false, motivo: "VAPID_NAO_CONFIGURADO" };
   }
 
@@ -72,6 +184,7 @@ async function despacharParaInscricoes(
     params.push(options.excludeUsuarioId);
   }
 
+  if (!(await renovarClaim(db, pedido.id, claim))) return claimPerdido();
   const { results: inscricoes } = await db
     .prepare(query)
     .bind(...params)
@@ -84,15 +197,7 @@ async function despacharParaInscricoes(
     }>();
 
   if (!inscricoes || inscricoes.length === 0) {
-    const novaTentativa = tentativasAtuais + 1;
-    await db
-      .prepare(
-        `UPDATE push_eventos
-         SET status = 'ENVIADO', tentativas = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
-      )
-      .bind(novaTentativa, pedido.id)
-      .run();
+    if (!(await concluirClaim(db, pedido.id, claim, "ENVIADO"))) return claimPerdido();
     return { ok: true, enviado: false, destinatarios: 0 };
   }
 
@@ -105,6 +210,7 @@ async function despacharParaInscricoes(
   const staleIds: number[] = [];
 
   for (const sub of inscricoes) {
+    if (!(await renovarClaim(db, pedido.id, claim))) return claimPerdido();
     try {
       const delivered = await enviarPush(
         {
@@ -139,32 +245,25 @@ async function despacharParaInscricoes(
   // 3. Limpeza de inscrições expiradas (404/410)
   if (staleIds.length > 0) {
     for (const id of staleIds) {
-      await db.prepare("DELETE FROM push_inscricoes WHERE id = ?").bind(id).run();
+      if (!(await renovarClaim(db, pedido.id, claim))) return claimPerdido();
+      await db
+        .prepare(
+          `DELETE FROM push_inscricoes WHERE id = ? AND EXISTS (
+        SELECT 1 FROM push_eventos WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'
+          AND status = 'PENDENTE' AND claim_token = ?
+          AND datetime(claim_expires_at) > datetime('now'))`
+        )
+        .bind(id, pedido.id, claim.token)
+        .run();
     }
   }
 
-  const novaTentativa = tentativasAtuais + 1;
-
-  // 4. Conclusão do evento
+  // 4. Completion is fenced; old owners cannot overwrite a recovered event.
   if (sucessos > 0 || (falhas === 0 && staleIds.length > 0)) {
-    await db
-      .prepare(
-        `UPDATE push_eventos
-         SET status = 'ENVIADO', tentativas = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
-      )
-      .bind(novaTentativa, pedido.id)
-      .run();
+    if (!(await concluirClaim(db, pedido.id, claim, "ENVIADO"))) return claimPerdido();
     return { ok: true, enviado: true, sucessos, stale: staleIds.length };
   } else {
-    await db
-      .prepare(
-        `UPDATE push_eventos
-         SET status = 'FALHA', tentativas = ?, ultimo_erro = ?, atualizado_em = CURRENT_TIMESTAMP
-         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
-      )
-      .bind(novaTentativa, ultimoErro, pedido.id)
-      .run();
+    if (!(await concluirClaim(db, pedido.id, claim, "FALHA", ultimoErro))) return claimPerdido();
     return { ok: false, motivo: "FALHA_PUSH_SERVICE", ultimoErro };
   }
 }
@@ -197,8 +296,8 @@ export async function notificarNovoPedidoPago(
   // 1. Registro atômico ou preservação do evento
   await db
     .prepare(
-      `INSERT INTO push_eventos (pedido_id, evento, status)
-       VALUES (?, 'PEDIDO_PAGO', 'PENDENTE')
+      `INSERT INTO push_eventos (pedido_id, evento, status, claim_expires_at)
+       VALUES (?, 'PEDIDO_PAGO', 'PENDENTE', CURRENT_TIMESTAMP)
        ON CONFLICT(pedido_id, evento) DO NOTHING`
     )
     .bind(pedidoId)
@@ -223,7 +322,9 @@ export async function notificarNovoPedidoPago(
     return { ok: false, motivo: "LIMITE_TENTATIVAS_EXCEDIDO" };
   }
 
-  return despacharParaInscricoes(db, env, pedido, eventoRow.tentativas, options);
+  const claim = await adquirirClaim(db, pedidoId, eventoRow.tentativas, RETRY_BACKOFF_SECONDS);
+  if (!claim) return { ok: true, enviado: false, motivo: "EM_PROCESSAMENTO_OU_BACKOFF" };
+  return processarClaim(db, env, pedidoId, claim, options);
 }
 
 /**
@@ -252,7 +353,7 @@ export async function notificarNovoPedidoPagoSafe(
  *
  * Regras:
  * - Apenas evento 'PEDIDO_PAGO'
- * - Apenas status 'FALHA'
+ * - Eligible FALHA or PENDENTE with an expired lease
  * - Tentativas < 3 (impede retry infinito)
  * - Backoff mínimo configurável (default 30 segundos)
  * - Lote limitado (default 5)
@@ -272,9 +373,7 @@ export async function reconciliarPushEventosFalhos(
       `SELECT pedido_id, tentativas
        FROM push_eventos
        WHERE evento = 'PEDIDO_PAGO'
-         AND status = 'FALHA'
-         AND tentativas < ?
-         AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
+         AND ${CLAIM_ELIGIBILITY}
        ORDER BY atualizado_em ASC
        LIMIT ?`
     )
@@ -290,44 +389,11 @@ export async function reconciliarPushEventosFalhos(
 
   for (const cand of candidatos) {
     // 2. CAS atômico: adquire o claim do evento impedindo execução simultânea
-    const claim = await db
-      .prepare(
-        `UPDATE push_eventos
-         SET status = 'PENDENTE',
-             atualizado_em = CURRENT_TIMESTAMP
-         WHERE pedido_id = ?
-           AND evento = 'PEDIDO_PAGO'
-           AND status = 'FALHA'
-           AND tentativas < ?`
-      )
-      .bind(cand.pedido_id, RETRY_MAX_ATTEMPTS)
-      .run();
-
-    if (!claim.meta?.changes || claim.meta.changes === 0) {
-      // Outro worker obteve o claim concorrentemente
-      continue;
-    }
-
-    const pedido = await db
-      .prepare("SELECT id, valor_total_centavos FROM pedidos WHERE id = ?")
-      .bind(cand.pedido_id)
-      .first<PedidoBasico>();
-
-    if (!pedido) {
-      await db
-        .prepare(
-          `UPDATE push_eventos
-           SET status = 'FALHA', ultimo_erro = 'PEDIDO_INEXISTENTE', atualizado_em = CURRENT_TIMESTAMP
-           WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
-        )
-        .bind(cand.pedido_id)
-        .run();
-      falhas++;
-      continue;
-    }
+    const claim = await adquirirClaim(db, cand.pedido_id, cand.tentativas, backoff);
+    if (!claim) continue;
 
     try {
-      const res = await despacharParaInscricoes(db, env, pedido, cand.tentativas);
+      const res = await processarClaim(db, env, cand.pedido_id, claim);
       if (res.ok) {
         sucessos++;
       } else {

@@ -146,7 +146,7 @@ async function reset(db, outcomes, { status = "PENDENTE", attempts = 0, error = 
   await db.prepare("UPDATE pedidos SET valor_total_centavos = 123456 WHERE id = 1").run();
   await db
     .prepare(
-      "INSERT INTO push_eventos(pedido_id,evento,status,tentativas,ultimo_erro) VALUES(1,'PEDIDO_PAGO',?,?,?)"
+      "INSERT INTO push_eventos(pedido_id,evento,status,tentativas,ultimo_erro,claim_expires_at,atualizado_em) VALUES(1,'PEDIDO_PAGO',?,?,?,'2000-01-01 00:00:00','2000-01-01 00:00:00')"
     )
     .bind(status, attempts, error)
     .run();
@@ -186,7 +186,7 @@ async function coordinate(module, db, outcomes, options = {}) {
       let stage;
       if (normalized.startsWith("DELETE FROM push_inscricoes"))
         stage = `delete:${statement.args[0]}`;
-      if (normalized.startsWith("UPDATE push_eventos")) stage = "update";
+      if (normalized.includes("SET status = ?, tentativas")) stage = "update";
       if (stage) {
         trace.push(stage);
         if (options.fail === stage) throw new Error(`persist:${stage}`);
@@ -371,18 +371,18 @@ test("Persisted push coordination characterization", async t => {
       );
     }
   });
-  await t.test(
-    "missing VAPID returns after registration, before recipients or attempt update",
-    async () => {
-      const run = await coordinate(module, db, [true], { env: { VAPID_PRIVATE_KEY: undefined } });
-      assert.deepEqual(run.result, { ok: false, motivo: "VAPID_NAO_CONFIGURADO" });
-      assert.deepEqual(run.event, { status: "PENDENTE", tentativas: 0, ultimo_erro: null });
-      assert.deepEqual(run.trace, []);
-      assert.equal(run.sql.length, 3);
-      assert.match(run.sql[1].sql, /ON CONFLICT\(pedido_id, evento\) DO NOTHING/);
-      assert.match(run.sql[2].sql, /^SELECT status, tentativas/);
-    }
-  );
+  await t.test("missing VAPID releases claim as retryable sanitized failure", async () => {
+    const run = await coordinate(module, db, [true], { env: { VAPID_PRIVATE_KEY: undefined } });
+    assert.deepEqual(run.result, { ok: false, motivo: "VAPID_NAO_CONFIGURADO" });
+    assert.deepEqual(run.event, {
+      status: "FALHA",
+      tentativas: 1,
+      ultimo_erro: JSON.stringify({ category: "CONFIGURATION", code: "VAPID_NAO_CONFIGURADO" })
+    });
+    assert.deepEqual(run.trace, ["update"]);
+    assert.match(run.sql[1].sql, /ON CONFLICT\(pedido_id, evento\) DO NOTHING/);
+    assert.match(run.sql[2].sql, /^SELECT status, tentativas/);
+  });
   await t.test("operator exclusion remains in recipient query", async () => {
     const run = await coordinate(module, db, [true], { notify: { excludeUsuarioId: 1 } });
     assert.deepEqual(run.result, { ok: true, enviado: false, destinatarios: 0 });
@@ -404,10 +404,15 @@ test("Persisted push coordination characterization", async t => {
       "send:3",
       "done:3",
       "delete:1",
-      "delete:2"
+      "delete:2",
+      "update"
     ]);
     assert.deepEqual(run.remaining, [2, 3]);
-    assert.deepEqual(run.event, { status: "PENDENTE", tentativas: 0, ultimo_erro: null });
+    assert.deepEqual(run.event, {
+      status: "FALHA",
+      tentativas: 1,
+      ultimo_erro: JSON.stringify({ category: "UNKNOWN", code: "UNKNOWN_ERROR" })
+    });
   });
   await t.test("final UPDATE failure retains prior state after network and cleanup", async () => {
     for (const status of ["PENDENTE", "FALHA"]) {
@@ -419,8 +424,16 @@ test("Persisted push coordination characterization", async t => {
       });
       assert.equal(run.failure?.message, "persist:update");
       assert.deepEqual(run.remaining, [2]);
-      assert.deepEqual(run.event, { status, tentativas: 1, ultimo_erro: "previous" });
-      assert.deepEqual(run.trace, ["send:1", "done:1", "send:2", "done:2", "delete:1", "update"]);
+      assert.deepEqual(run.event, { status: "PENDENTE", tentativas: 1, ultimo_erro: "previous" });
+      assert.deepEqual(run.trace, [
+        "send:1",
+        "done:1",
+        "send:2",
+        "done:2",
+        "delete:1",
+        "update",
+        "update"
+      ]);
     }
   });
   await t.test("safe notifier suppresses persistence exception after successful send", async () => {
@@ -428,7 +441,7 @@ test("Persisted push coordination characterization", async t => {
     assert.ifError(run.failure);
     assert.equal(run.result, undefined);
     assert.deepEqual(run.event, { status: "PENDENTE", tentativas: 0, ultimo_erro: null });
-    assert.deepEqual(run.trace, ["send:1", "done:1", "update"]);
+    assert.deepEqual(run.trace, ["send:1", "done:1", "update", "update"]);
   });
   await t.test("failed FALHA update also leaves attempts and error unchanged", async () => {
     const run = await coordinate(module, db, [new Error("network")], {
@@ -438,7 +451,7 @@ test("Persisted push coordination characterization", async t => {
     assert.equal(run.failure?.message, "persist:update");
     assert.deepEqual(run.remaining, [1]);
     assert.deepEqual(run.event, { status: "PENDENTE", tentativas: 0, ultimo_erro: "previous" });
-    assert.deepEqual(run.trace, ["send:1", "done:1", "update"]);
+    assert.deepEqual(run.trace, ["send:1", "done:1", "update", "update"]);
   });
   await t.test(
     "retry constants, ordered candidate SQL, CAS and dedup remain unchanged",
@@ -466,15 +479,16 @@ test("Persisted push coordination characterization", async t => {
         falhas: 0
       });
       db.hook = null;
-      assert.deepEqual(queries[0], {
-        sql: "SELECT pedido_id, tentativas FROM push_eventos WHERE evento = 'PEDIDO_PAGO' AND status = 'FALHA' AND tentativas < ? AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds') ORDER BY atualizado_em ASC LIMIT ?",
-        args: [3, 30, 5]
-      });
-      assert.deepEqual(queries[1], {
-        sql: "UPDATE push_eventos SET status = 'PENDENTE', atualizado_em = CURRENT_TIMESTAMP WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO' AND status = 'FALHA' AND tentativas < ?",
-        args: [1, 3]
-      });
-      assert.equal(queries[2].sql, "SELECT id, valor_total_centavos FROM pedidos WHERE id = ?");
+      assert.deepEqual(queries[0].args, [3, 30, 5]);
+      assert.match(queries[0].sql, /status = 'FALHA'.*tentativas < \?/);
+      assert.match(queries[0].sql, /status = 'PENDENTE'.*claim_expires_at.*datetime\('now'\)/);
+      assert.match(queries[1].sql, /SET status = 'PENDENTE', claim_token = \?/);
+      assert.match(queries[1].sql, /WHERE pedido_id = \?.*tentativas = \?/);
+      assert.equal(typeof queries[1].args[0], "string");
+      assert.deepEqual(queries[1].args.slice(1), [120, 1, 1, 3, 30]);
+      assert.ok(
+        queries.some(q => q.sql === "SELECT id, valor_total_centavos FROM pedidos WHERE id = ?")
+      );
       assert.deepEqual(await module.notificarNovoPedidoPago(db, run.env, 1), {
         ok: true,
         enviado: false,
