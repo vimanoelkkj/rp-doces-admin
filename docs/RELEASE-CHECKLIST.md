@@ -39,6 +39,9 @@ O CI repete tudo; rodar antes evita um ciclo de falha.
 - [ ] **[MANUAL]** `npm run build` (inclui o typecheck).
 - [ ] **[MANUAL]** Testes direcionados dos módulos alterados: `node --test tests/<arquivo>.test.mjs`. A suíte completa
       (`npm test`) é o CI que roda, em 10 fatias; localmente leva dezenas de minutos.
+- [ ] **[MANUAL]** `npm audit --omit=dev`: vulnerabilidades high/critical de produção bloqueiam release; moderadas
+      exigem triagem e aceitação documentada quando aplicável. Para a v1.0, conferir a
+      [aceitação de risco do React Router](architecture/dependency-risk-acceptance.md) e seus critérios de reavaliação.
 - [ ] **[MANUAL]** `git diff --check` e revisão do diff: sem tokens, `.dev.vars`, dumps nem `backups/`.
 
 ## 3. Migrations
@@ -153,6 +156,8 @@ Release AAAAMMDD[-N] — <sha7>
 Não publique, ou pare, se qualquer item for verdadeiro:
 
 - `CI` vermelho, cancelado ou pulado; `typecheck` ou `build` falhando.
+- Vulnerabilidade high/critical de produção; vulnerabilidade moderada sem triagem e, quando aplicável, sem aceitação
+  de risco documentada para a release.
 - Migration pendente, desconhecida, com lacuna ou duplicada; migration editada depois de aplicada ou arquivo apagado.
 - Mudança de schema sem backup verificado e sem bookmark do Time Travel anotado.
 - Mudança em dinheiro, estoque ou idempotência (`functions/lib/ledger`, `pix`, `paymentSync`, `stock.ts`,
@@ -165,6 +170,7 @@ Não publique, ou pare, se qualquer item for verdadeiro:
 ## 12. Não fazer
 
 - `git push --force` na `main`; reescrever histórico.
+- `npm audit fix --force`: atualizações de dependências exigem revisão e validação separadas.
 - Editar, renomear ou apagar arquivo de `migrations/`; desfazer migration com SQL manual.
 - Aplicar migration remota depois do deploy, sem revisão ou sem o backup exigido na seção 3.
 - `wrangler pages deploy` de pasta local: fica fora do pipeline, sem CI nem Guard.
