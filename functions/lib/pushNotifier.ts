@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { operationalAlert } from "./operationalAlert";
 import { requestLogger } from "./requestContext";
 import { sanitizePushError } from "./pushError";
 import { criarPayloadPedidoPago, enviarPush } from "./pushTransport";
@@ -104,7 +105,12 @@ async function concluirClaim(
     )
     .bind(status, claim.tentativas + 1, status, erro ?? null, pedidoId, claim.token)
     .run();
-  return Boolean(result.meta?.changes);
+  const completed = Boolean(result.meta?.changes);
+  if (completed && status === "FALHA" && claim.tentativas + 1 >= RETRY_MAX_ATTEMPTS)
+    operationalAlert({ code: "PUSH_RETRY_EXHAUSTED", pedidoId, tentativas: claim.tentativas + 1 });
+  if (completed && status === "ENVIADO" && claim.tentativas > 0)
+    operationalAlert({ code: "PUSH_RETRY_RECOVERED", pedidoId, tentativas: claim.tentativas + 1 });
+  return completed;
 }
 
 const claimPerdido = (): NotificarPushResult => ({ ok: false, motivo: "CLAIM_PERDIDO" });

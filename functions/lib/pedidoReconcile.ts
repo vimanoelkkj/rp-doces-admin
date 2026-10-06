@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { operationalAlert } from "./operationalAlert";
 import { requestLogger } from "./requestContext";
 import { pedidoValidoSql, getPedidoAnulacao } from "./pedidoValido";
 
@@ -28,12 +29,14 @@ export async function reconcilePedidoAfterFinancialChange(
 
   const estoque: BaixaResultado =
     agregado === "PAGO" ? await baixarEstoquePedido(db, pedidoId) : { ok: true, baixado: false };
-  if (!estoque.ok)
+  if (!estoque.ok) {
+    operationalAlert({ code: "PAID_ORDER_STOCK_INCONSISTENT", pedidoId });
     requestLogger.error(
       "Reconciliação financeira com pendência de estoque",
       pedidoId,
       estoque.erro
     );
+  }
 
   // M2 (auditoria Comanda Viva) — mesmo gatilho de qualquer mudança
   // financeira (pagamento admin, refund admin, sync de webhook MP, ou este

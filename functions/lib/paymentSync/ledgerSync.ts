@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { operationalAlert } from "../operationalAlert";
 import type { MpMappedStatus, SyncPaymentResult } from "./types";
 import { mapMpStatus } from "./status";
 import { type MpPaymentResponse, isVerifiedMpResponse } from "./client";
@@ -215,7 +216,15 @@ async function applyLedgerTransition(
       .run();
   }
 
-  if (diagnostico) return { ok: true, status: atual.status, transicionou: false };
+  if (diagnostico) {
+    if (atual.mp_status_detail !== diagnostico)
+      operationalAlert({
+        code: "FINANCIAL_INTEGRITY_MISMATCH",
+        pedidoId: atual.pedido_id,
+        pagamentoId
+      });
+    return { ok: true, status: atual.status, transicionou: false };
+  }
 
   if (
     !novoStatus ||
@@ -299,6 +308,12 @@ async function applyLedgerTransition(
 
   const transicionou = atual.status !== novoStatus;
   await finalizePayment(db, pagamentoId, atual.pedido_id);
+  if (transicionou && integridadeRemotaPendente)
+    operationalAlert({
+      code: "FINANCIAL_INTEGRITY_RESOLVED",
+      pedidoId: atual.pedido_id,
+      pagamentoId
+    });
 
   if (novoStatus === "PAGO" && transicionou && env) {
     await notificarNovoPedidoPagoSafe(db, env, atual.pedido_id);
