@@ -1,0 +1,57 @@
+name: Dependency audit
+
+on:
+  pull_request:
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/dependency-audit.yml
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/dependency-audit.yml
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Production dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # Report the full baseline without blocking on existing development issues.
+      # Registry/network errors must still fail the job.
+      - name: Report all dependency vulnerabilities
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+
+          const result = spawnSync('npm', ['audit', '--package-lock-only', '--json'], { encoding: 'utf8' });
+          if (result.error || ![0, 1].includes(result.status)) {
+            throw new Error('Dependency audit could not complete');
+          }
+          const report = JSON.parse(result.stdout);
+          if (report.error || !report.metadata?.vulnerabilities) {
+            throw new Error('Dependency audit returned an invalid report');
+          }
+          const counts = report.metadata.vulnerabilities;
+          const summary = `All dependencies: ${counts.total} vulnerabilities (${counts.critical} critical, ${counts.high} high, ${counts.moderate} moderate, ${counts.low} low)`;
+          console.log(summary);
+          for (const [name, entry] of Object.entries(report.vulnerabilities ?? {})) {
+            console.log(`${name}: ${entry.severity}`);
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n\nOnly high/critical production vulnerabilities block this workflow. Development findings require separate dependency updates.\n`);
+          NODE
+      - name: Block high and critical production vulnerabilities
+        run: npm audit --package-lock-only --omit=dev --audit-level=high
