@@ -34,7 +34,7 @@ A **R&P Doces** é uma confeitaria artesanal com operação híbrida: e-commerce
    - Nenhuma escrita financeira ou mutação operacional de pedido é executada sem uma `operationKey` gerada pelo cliente antes do envio.
    - Retries de rede, telas remontadas, quedas de conexão ou recarregamentos de página reaproveitam a mesma chave e retornam o mesmo resultado original, sem duplicar cobranças, pedidos ou baixas físicas.
 5. **Zero Migrations Destrutivas:**
-   - Migrations do banco relacional D1 são puramente aditivas e sequenciais (`migrations/0001_*.sql` a `migrations/0030_*.sql`). Nunca se aplica `DROP TABLE` em entidades que sustentam histórico em produção.
+   - Migrations do banco relacional D1 são puramente aditivas e sequenciais (`migrations/NNNN_*.sql`, numeração contínua a partir de `0001`). Nunca se aplica `DROP TABLE` em entidades que sustentam histórico em produção.
 
 ---
 
@@ -107,7 +107,7 @@ O sistema é construído como uma aplicação unificada que compartilha infraest
 │  - stock.ts (Reservas físicas, conversão em baixa, devoluções)         │
 ├────────────────────────────────────────────────────────────────────────┤
 │                           STORAGE & STORAGE                            │
-│  - Cloudflare D1 (SQLite com 30 Migrations Atômicas)                   │
+│  - Cloudflare D1 (SQLite, migrations aditivas sequenciais)             │
 │  - Cloudflare R2 (Buckets de Imagens de Alta Resolução)                │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -198,7 +198,7 @@ rp-doces/
 │
 ├── migrations/                   # Migrations sequenciais do Cloudflare D1
 │   ├── 0001_products.sql         # Criação de produtos e constraint de reserva
-│   └── ... (0002 a 0030)         # Evolução aditiva do schema
+│   └── ... (0002 em diante)      # Evolução aditiva do schema
 │
 ├── seed/                         # Dados de inicialização para testes locais
 │   └── products.sql              # Catálogo semente de desenvolvimento
@@ -616,7 +616,7 @@ bucket_name = "rp-doces-images"
 
 ---
 
-## 27. Migrations do Banco de Dados (0001 a 0030)
+## 27. Migrations do Banco de Dados
 
 O banco de dados D1 evolui estritamente através das migrações sequenciais em `migrations/`:
 
@@ -651,8 +651,15 @@ O banco de dados D1 evolui estritamente através das migrações sequenciais em 
 0028_operacao_expiracao.sql                    # Expiração controlada de operações órfãs
 0029_operacao_regeneracao_ativa.sql            # Regeneração ativa de cobranças em voo
 0030_admin_push_subscriptions.sql              # Inscrições de navegadores para Web Push VAPID
+0031_pix_mp_refund_capacity_guards.sql         # Capacidade de refund Pix MP nunca excede o valor pago
+0032_admin_last_active_owner_guard.sql         # Guarda no banco: sempre existe ao menos 1 OWNER ativo
+0033_produto_detalhes.sql                      # Detalhes do produto no cardápio (peso, ingredientes, alergênicos)
+0034_produto_novo.sql                          # Flag de novidade (`novo`) em produtos
+0035_push_event_claim_lease.sql                # Lease de claim de eventos de push (entrega at-least-once)
 ```
 
+> A lista acima é ilustrativa: a fonte da verdade é o diretório `migrations/` (`ls migrations`).
+>
 > **Regra de Ouro das Migrações:** Nunca edite um arquivo `.sql` já aplicado em produção. Correções e novos campos devem ser implementados exclusivamente via uma nova migration numerada de forma estritamente sequencial.
 
 ---

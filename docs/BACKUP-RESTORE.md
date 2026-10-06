@@ -4,7 +4,7 @@ Procedimento para exportar o banco, **provar que o export restaura** e restaurar
 Complementa `docs/ROLLBACK.md` (incidentes) e `docs/architecture/database-migrations.md` (migrations).
 
 > **Estado:** tudo que está marcado como _validado_ foi executado em D1 **local** (Wrangler 3.114.17, banco criado
-> pelas 35 migrations reais) e é coberto por `tests/d1-backup-restore.test.mjs`. O export do banco **remoto de
+> pelas migrations reais do repositório) e é coberto por `tests/d1-backup-restore.test.mjs`. O export do banco **remoto de
 > produção** e qualquer restore em produção **nunca foram executados** por este repositório: estão documentados
 > abaixo e dependem de credencial e de decisão humana.
 
@@ -95,7 +95,7 @@ node scripts/d1-backup.mjs restore backups/meu.sql --dir C:/tmp/d1-restaurado
 | `constraints`   | CHECK de estoque, CHECK de valor do pagamento, FOREIGN KEY, UNIQUE e um trigger continuam rejeitando.  |
 | `contagem`      | Informativo: linhas por tabela. Migration do repositório ainda não aplicada no backup vira AVISO.      |
 
-Resultado esperado (banco com as 35 migrations): `Resultado: OK`, cerca de 8 s.
+Resultado esperado (banco com todas as migrations do repositório): `Resultado: OK`, cerca de 8 s.
 
 `restore` recusa pasta que já tenha D1 local. Não há opção para sobrescrever: apague a pasta de propósito.
 
@@ -128,15 +128,13 @@ restore: o banco volta, o dinheiro não.
   `internal error; reference = ...`, sem dizer o motivo. O script avisa; use uma pasta curta (`C:/tmp/d1`).
   Vale também para `wrangler pages dev` se o repositório estiver numa pasta muito funda.
 - O Wrangler instalado avisa que existe a v4. Subir de versão está fora deste escopo.
-- Documentação desatualizada (não alterada aqui): o `README.md` cita 30 migrations e
-  `docs/architecture/database-migrations.md` cita 33; o repositório tem 35.
 
 ## Manutenção
 
 - As sondas de `constraints` (em `scripts/d1-verify.mjs`) inserem linhas nas tabelas `produtos`, `pedido_pagamentos`,
   `pedidos`, `pedido_itens` e `usuarios_admin`. Se uma migration futura exigir uma coluna nova nessas tabelas, a sonda
   falha por "outro motivo" e o teste acusa: ajuste o `INSERT` da sonda.
-- `tests/d1-backup-restore.test.mjs` leva cerca de 35 s (aplica as 35 migrations com o Wrangler). Roda nas fatias
+- `tests/d1-backup-restore.test.mjs` leva cerca de 35 s (aplica todas as migrations com o Wrangler). Roda nas fatias
   normais do CI.
 - Para agendar backup de produção (CI ou cron) é preciso um token com permissão de exportar e um destino cifrado:
   decisão pendente, nada foi configurado.

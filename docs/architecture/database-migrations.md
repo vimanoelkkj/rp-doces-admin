@@ -8,14 +8,13 @@ The persistence layer uses Cloudflare D1, a distributed serverless relational da
 migrations/
   0001_products.sql
   0002_orders.sql
-  ...
-  0033_produto_detalhes.sql
+  ...   (one file per schema change, strictly sequential)
 ```
 
 ### 1.1 Sequencing Rules
 
 - Migration filenames adhere to a 4-digit zero-padded prefix followed by a snake_case descriptive identifier (`XXXX_name.sql`).
-- Numbering is strictly continuous without gaps or duplicates (currently spanning 33 migrations, from `0001` through `0033`).
+- Numbering is strictly continuous without gaps or duplicates, starting at `0001`. The `migrations/` directory is the source of truth for the current range (`ls migrations`).
 - Migrations are strictly forward-only: historical migrations already applied to deployment environments are never edited, deleted, or reordered. Any subsequent schema evolution or bugfix must be introduced via a new migration.
 
 ---

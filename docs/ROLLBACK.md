@@ -125,7 +125,7 @@ não está na `main` (por rollback, deploy pausado, falha ou deploy em andamento
 Alvo = SHA do deployment candidato (`ALVO`). Somente leitura.
 
 ```bash
-# a) O que o banco remoto tem aplicado (SELECT; deve terminar em 0033_... ou a última do repositório)
+# a) O que o banco remoto tem aplicado (SELECT; a mais recente deve ser a última do repositório: ls migrations | tail -1)
 npx wrangler d1 execute rp-doces-db --remote \
   --command "SELECT id, name, applied_at FROM d1_migrations ORDER BY id DESC LIMIT 5"
 
@@ -366,6 +366,8 @@ Somente leitura. **Não** gere Pix real, reembolso, pedido de teste nem "Diagnó
 - Migration Guard: `scripts/check-d1-migrations.mjs`, teste em `tests/check-d1-migrations.test.mjs`.
 - Backup e restore do D1 (export, verificação em D1 local descartável): `docs/BACKUP-RESTORE.md`,
   `scripts/d1-backup.mjs`, teste em `tests/d1-backup-restore.test.mjs`.
+- Estado esperado da produção e procedimento de publicação: [PRODUCTION-CHECKLIST.md](PRODUCTION-CHECKLIST.md) e
+  [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
 - Configuração de bindings: `wrangler.toml` (`DB` = `rp-doces-db`, `PRODUCT_IMAGES` = `rp-doces-images`).
 - Documentação Cloudflare: Pages > Configuration > Rollbacks; API "Pages deployment rollback";
   D1 > Time Travel.
