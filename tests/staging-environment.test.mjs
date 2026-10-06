@@ -48,6 +48,13 @@ const provisioned = () => {
   for (const config of [copy.pages, copy.worker]) config.d1_databases[0].database_id = uuid;
   return copy;
 };
+const unprovisioned = () => {
+  const copy = structuredClone(configs);
+  for (const config of [copy.pages, copy.worker]) {
+    config.d1_databases[0].database_id = STAGING_D1_PLACEHOLDER;
+  }
+  return copy;
+};
 
 function workflowContract(w) {
   assert.deepEqual(w.on.push.branches, ["main", "staging"]);
@@ -154,9 +161,15 @@ function workflowContract(w) {
 }
 
 test("staging config parses and isolates every binding", () => {
-  assert.equal(validateStaging(configs), STAGING_D1_PLACEHOLDER);
+  const databaseId = configs.pages.d1_databases[0].database_id;
+  assert.notEqual(databaseId, STAGING_D1_PLACEHOLDER);
+  assert.equal(configs.worker.d1_databases[0].database_id, databaseId);
+  assert.equal(validateStaging(configs), databaseId);
+  assert.equal(validateStaging(configs, { requireProvisioned: true }), databaseId);
+  assert.notEqual(uuid, databaseId);
   assert.equal(validateStaging(provisioned(), { requireProvisioned: true }), uuid);
-  assert.throws(() => validateStaging(configs, { requireProvisioned: true }), {
+  assert.equal(validateStaging(unprovisioned()), STAGING_D1_PLACEHOLDER);
+  assert.throws(() => validateStaging(unprovisioned(), { requireProvisioned: true }), {
     name: "AssertionError"
   });
 });
