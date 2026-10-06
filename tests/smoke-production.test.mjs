@@ -179,11 +179,67 @@ test("Suite de smoke test contra servidor HTTP simulado", async t => {
     }
   );
 
-  await t.test("checkNotFoundEndpoint valida retorno 404 em rota inexistente", async () => {
+  await t.test("checkNotFoundEndpoint aceita HTTP 404 padrão", async () => {
     const res = await checkNotFoundEndpoint(baseUrl);
     assert.equal(res.ok, true);
     assert.equal(res.status, 404);
+    assert.equal(res.type, "not_found");
   });
+
+  await t.test(
+    "checkNotFoundEndpoint aceita HTTP 200 quando for SPA fallback legítimo",
+    async () => {
+      let customServer;
+      let customUrl;
+      await new Promise(resolve => {
+        customServer = http.createServer((_req, res) => {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(htmlResponse);
+        });
+        customServer.listen(0, "127.0.0.1", () => {
+          const addr = customServer.address();
+          customUrl = `http://127.0.0.1:${addr.port}`;
+          resolve();
+        });
+      });
+
+      try {
+        const res = await checkNotFoundEndpoint(customUrl);
+        assert.equal(res.ok, true);
+        assert.equal(res.status, 200);
+        assert.equal(res.type, "spa_fallback");
+      } finally {
+        customServer.close();
+      }
+    }
+  );
+
+  await t.test(
+    "checkNotFoundEndpoint rejeita HTTP 200 com corpo ou content-type inválido",
+    async () => {
+      let customServer;
+      let customUrl;
+      await new Promise(resolve => {
+        customServer = http.createServer((_req, res) => {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        });
+        customServer.listen(0, "127.0.0.1", () => {
+          const addr = customServer.address();
+          customUrl = `http://127.0.0.1:${addr.port}`;
+          resolve();
+        });
+      });
+
+      try {
+        const res = await checkNotFoundEndpoint(customUrl);
+        assert.equal(res.ok, false);
+        assert.match(res.error, /corpo não reconhecido como fallback SPA/);
+      } finally {
+        customServer.close();
+      }
+    }
+  );
 
   await t.test("executeSmokeWithRetries recupera falha temporária e tem sucesso", async () => {
     let callCount = 0;

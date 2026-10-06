@@ -321,16 +321,37 @@ export async function checkNotFoundEndpoint(baseUrl, { timeoutMs = 10_000 } = {}
     return { ok: false, error: leaks.join("; "), status: res.status };
   }
 
-  // Endpoint de API inexistente deve responder 404 (nunca 5xx nem 200)
-  if (res.status !== 404) {
+  // Comportamento esperado em Cloudflare Pages:
+  // - Ou responde HTTP 404 (caso exista regra/função de 404 específica);
+  // - Ou responde HTTP 200 entregando o fallback da SPA (index.html), padrão da plataforma Pages
+  //   quando não há match estático ou de Function.
+  if (res.status === 404) {
+    return { ok: true, status: 404, type: "not_found" };
+  }
+
+  if (res.status === 200) {
+    const contentType = res.headers.get("content-type") || "";
+    const isHtml = contentType.includes("text/html");
+    const hasAppShell =
+      text.includes('<div id="root"') ||
+      (text.includes("<html") && text.includes("<!doctype html>"));
+
+    if (isHtml && hasAppShell) {
+      return { ok: true, status: 200, type: "spa_fallback" };
+    }
+
     return {
       ok: false,
-      error: `Comportamento inesperado em rota inexistente: HTTP ${res.status} (esperado 404)`,
+      error: `Rota inexistente respondeu HTTP 200 com corpo não reconhecido como fallback SPA (Content-Type: "${contentType}")`,
       status: res.status
     };
   }
 
-  return { ok: true, status: res.status };
+  return {
+    ok: false,
+    error: `Comportamento inesperado em rota inexistente: HTTP ${res.status} (esperado 404 ou 200 SPA fallback)`,
+    status: res.status
+  };
 }
 
 export async function runSmokeSuite(config) {
@@ -381,10 +402,10 @@ export async function runSmokeSuite(config) {
     ...adminResult
   });
 
-  // 6. Rota inexistente (404 sem erro 5xx)
+  // 6. Rota inexistente (404 ou SPA fallback sem erro 5xx)
   const notFoundResult = await checkNotFoundEndpoint(baseUrl, { timeoutMs });
   checks.push({
-    name: "Rota inexistente (/api/smoke-... -> 404)",
+    name: "Rota inexistente (/api/smoke-... -> 404 ou SPA fallback)",
     ...notFoundResult
   });
 
