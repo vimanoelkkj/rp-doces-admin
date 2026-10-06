@@ -663,13 +663,17 @@ test("migration 0036: legacy event and financial records remain intact", async t
   // Disposable D1 only: recreate the pre-0036 schema, then apply the real migration.
   await db.prepare("ALTER TABLE push_eventos DROP COLUMN exclude_usuario_id").run();
   const before = await db.prepare("SELECT * FROM push_eventos").first();
-  const financialBefore = await db.prepare("SELECT * FROM pedido_pagamentos").all();
+  const financialBefore = (await db.prepare("SELECT * FROM pedido_pagamentos ORDER BY id").all())
+    .results;
   await db.prepare(await readFile("migrations/0036_push_event_exclusion.sql", "utf8")).run();
   assert.deepEqual(await db.prepare("SELECT * FROM push_eventos").first(), {
     ...before,
     exclude_usuario_id: null
   });
-  assert.deepEqual(await db.prepare("SELECT * FROM pedido_pagamentos").all(), financialBefore);
+  assert.deepEqual(
+    (await db.prepare("SELECT * FROM pedido_pagamentos ORDER BY id").all()).results,
+    financialBefore
+  );
 });
 
 test("outbox: D1 registration failure cannot publish or fail the caller", async t => {
