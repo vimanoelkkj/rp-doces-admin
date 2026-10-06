@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { app, fixture, state } from "./helpers/b3.mjs";
+import { exchangeContractState } from "./helpers/exchange-contract-state.mjs";
 
 // Captured before extraction. Hashes cover full SQL, bindings, batch boundaries and
 // persisted records without embedding large snapshots or a duplicate implementation.
@@ -28,7 +29,7 @@ function normalizeClock(value) {
 
 async function snapshot(db) {
   return normalizeClock({
-    ...(await state(db)),
+    ...exchangeContractState(await state(db)),
     exchanges: (await db.prepare("SELECT * FROM pedido_item_trocas ORDER BY id").all()).results,
     refundAllocations: (
       await db.prepare("SELECT * FROM pedido_item_troca_reembolso_alocacoes ORDER BY id").all()

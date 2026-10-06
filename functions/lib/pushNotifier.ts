@@ -4,6 +4,7 @@ import { operationalAlert } from "./operationalAlert";
 import { requestLogger } from "./requestContext";
 import { sanitizePushError } from "./pushError";
 import { criarPayloadPedidoPago, enviarPush } from "./pushTransport";
+import { registrarEventoPedidoPago } from "./pushOutbox";
 
 export interface PushEnv {
   DB: D1Database;
@@ -119,8 +120,7 @@ async function processarClaim(
   db: D1Database,
   env: PushEnv,
   pedidoId: number,
-  claim: PushClaim,
-  options?: NotificarPushOptions
+  claim: PushClaim
 ): Promise<NotificarPushResult> {
   try {
     if (!(await renovarClaim(db, pedidoId, claim))) return claimPerdido();
@@ -132,7 +132,15 @@ async function processarClaim(
       await concluirClaim(db, pedidoId, claim, "FALHA", "PEDIDO_INEXISTENTE");
       return { ok: false, motivo: "PEDIDO_NAO_ENCONTRADO" };
     }
-    return await despacharParaInscricoes(db, env, pedido, claim, options);
+    const evento = await db
+      .prepare(
+        "SELECT exclude_usuario_id FROM push_eventos WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'"
+      )
+      .bind(pedidoId)
+      .first<{ exclude_usuario_id: number | null }>();
+    return await despacharParaInscricoes(db, env, pedido, claim, {
+      excludeUsuarioId: evento?.exclude_usuario_id ?? undefined
+    });
   } catch (error) {
     // Ownership fencing also covers an ambiguous delivery followed by a failed
     // success write. If persistence stays unavailable, leave the lease to expire.
@@ -301,15 +309,29 @@ export async function notificarNovoPedidoPago(
   }
 
   // 1. Registro atômico ou preservação do evento
-  await db
-    .prepare(
-      `INSERT INTO push_eventos (pedido_id, evento, status, claim_expires_at)
-       VALUES (?, 'PEDIDO_PAGO', 'PENDENTE', CURRENT_TIMESTAMP)
-       ON CONFLICT(pedido_id, evento) DO NOTHING`
-    )
-    .bind(pedidoId)
-    .run();
+  await registrarEventoPedidoPago(db, pedidoId, options);
 
+  // Preserve the direct-send API for legacy, unprocessed events without a policy.
+  // Never replace a persisted exclusion or change an acquired/attempted event.
+  if (options?.excludeUsuarioId)
+    await db
+      .prepare(
+        `UPDATE push_eventos SET exclude_usuario_id = ?
+         WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO' AND status = 'PENDENTE'
+           AND tentativas = 0 AND claim_token IS NULL AND exclude_usuario_id IS NULL`
+      )
+      .bind(options.excludeUsuarioId, pedidoId)
+      .run();
+
+  return processarPushEventoPersistido(db, env, pedidoId);
+}
+
+// Queue consumers never register or reset an event: D1 owns eligibility and fencing.
+export async function processarPushEventoPersistido(
+  db: D1Database,
+  env: PushEnv,
+  pedidoId: number
+): Promise<NotificarPushResult> {
   const eventoRow = await db
     .prepare(
       `SELECT status, tentativas FROM push_eventos WHERE pedido_id = ? AND evento = 'PEDIDO_PAGO'`
@@ -331,7 +353,7 @@ export async function notificarNovoPedidoPago(
 
   const claim = await adquirirClaim(db, pedidoId, eventoRow.tentativas, RETRY_BACKOFF_SECONDS);
   if (!claim) return { ok: true, enviado: false, motivo: "EM_PROCESSAMENTO_OU_BACKOFF" };
-  return processarClaim(db, env, pedidoId, claim, options);
+  return processarClaim(db, env, pedidoId, claim);
 }
 
 /**

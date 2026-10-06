@@ -1,0 +1,9 @@
+# First deployment only. Same Worker name, no D1, Queue consumer or cron.
+name = "rp-doces-push"
+main = "workers/push-bootstrap.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_als"]
+workers_dev = false
+
+[triggers]
+crons = []

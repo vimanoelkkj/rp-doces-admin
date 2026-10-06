@@ -1,0 +1,22 @@
+name = "rp-doces-push"
+main = "workers/push.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_als"]
+workers_dev = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rp-doces-db"
+database_id = "c2e15599-3d68-4801-9a1c-96a84977dd7c"
+migrations_dir = "migrations"
+
+[[queues.consumers]]
+queue = "rp-doces-push"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 3
+
+[triggers]
+crons = ["* * * * *"]
+
+# Set VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT using Worker secrets.

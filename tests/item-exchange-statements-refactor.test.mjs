@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { build } from "esbuild";
 import { app, fixture, state } from "./helpers/b3.mjs";
+import { exchangeContractState } from "./helpers/exchange-contract-state.mjs";
 
 const expected = JSON.parse(
   await readFile(
@@ -27,6 +28,34 @@ const builders = await import(
 );
 const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
+test("legacy exchange projection checks push defaults and retains every other field", () => {
+  const payment = {
+    id: 1,
+    valor_centavos: 101,
+    status: "PAGO",
+    push_pedido_pago: 0,
+    push_exclude_usuario_id: null,
+    extra: "retained"
+  };
+  const snapshot = { pagamentos: [payment], itens: [{ id: 2 }] };
+  assert.deepEqual(exchangeContractState(snapshot), {
+    pagamentos: [{ id: 1, valor_centavos: 101, status: "PAGO", extra: "retained" }],
+    itens: [{ id: 2 }]
+  });
+  assert.equal(payment.push_pedido_pago, 0, "input is not mutated");
+  for (const fields of [{ push_pedido_pago: 1 }, { push_exclude_usuario_id: 1 }])
+    assert.throws(() => exchangeContractState({ pagamentos: [{ ...payment, ...fields }] }), {
+      name: "AssertionError"
+    });
+  assert.notEqual(
+    digest(exchangeContractState(snapshot)),
+    digest(
+      exchangeContractState({ ...snapshot, pagamentos: [{ ...payment, valor_centavos: 99 }] })
+    ),
+    "financial changes remain visible to the hash"
+  );
+});
+
 function normalizeClock(value) {
   if (Array.isArray(value)) return value.map(normalizeClock);
   if (value && typeof value === "object")
@@ -41,7 +70,7 @@ function normalizeClock(value) {
 
 async function records(db) {
   return normalizeClock({
-    ...(await state(db)),
+    ...exchangeContractState(await state(db)),
     exchanges: (await db.prepare("SELECT * FROM pedido_item_trocas ORDER BY id").all()).results
   });
 }

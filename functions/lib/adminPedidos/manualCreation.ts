@@ -2,7 +2,7 @@
 
 import { precoAtualCentavos, type ProdutoRow } from "../pricing";
 import { baixarEstoquePedido } from "../stock";
-import { notificarNovoPedidoPagoSafe } from "../pushNotifier";
+import { enfileirarNovoPedidoPagoSafe } from "../pushOutbox";
 import {
   buscarOperacao,
   chavePagamento,
@@ -181,8 +181,9 @@ export async function createManualPedido(
       env.DB.prepare(
         `INSERT INTO pedido_pagamentos
            (pedido_id, metodo, origem, valor_centavos, status, registrado_por_usuario_id,
-            observacao, idempotency_key, pago_em)
-         SELECT id, ?, 'ADMIN', ?, ?, ?, ?, ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END
+            observacao, idempotency_key, pago_em, push_pedido_pago, push_exclude_usuario_id)
+         SELECT id, ?, 'ADMIN', ?, ?, ?, ?, ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
+                ?, CASE WHEN ? THEN ? ELSE NULL END
          FROM pedidos WHERE token_publico = ?`
       ).bind(
         metodoPagamento,
@@ -192,6 +193,9 @@ export async function createManualPedido(
         observacao,
         idempotencyKey,
         nascePago ? 1 : 0,
+        nascePago ? 1 : 0,
+        nascePago ? 1 : 0,
+        usuarioId,
         tokenPublico
       ),
       env.DB.prepare(
@@ -260,7 +264,7 @@ export async function createManualPedido(
       } catch (err) {
         console.error("Falha ao baixar estoque do pedido manual recém-criado", pedidoId, err);
       }
-      await notificarNovoPedidoPagoSafe(env.DB, env, pedidoId, {
+      await enfileirarNovoPedidoPagoSafe(env.DB, env, pedidoId, {
         excludeUsuarioId: usuarioId
       });
     }

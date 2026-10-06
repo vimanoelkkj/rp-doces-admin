@@ -7,7 +7,7 @@ import { type MpPaymentResponse, isVerifiedMpResponse } from "./client";
 import type { LedgerStatus } from "../comandaLedger";
 import { reconcilePedidoAfterFinancialChange } from "../pedidoReconcile";
 import { liberarReservaPedido } from "../stock";
-import { notificarNovoPedidoPagoSafe, type PushEnv } from "../pushNotifier";
+import { enfileirarNovoPedidoPagoSafe, type PushProducerEnv as PushEnv } from "../pushOutbox";
 
 // Matriz de transição de pedido_pagamentos.status (Passo 6, aprovada):
 // PENDENTE -> PAGO/CANCELADO/EXPIRADO/REEMBOLSADO: permitido.
@@ -259,6 +259,9 @@ async function applyLedgerTransition(
   const resolucaoIntegridadeGuard = resolucaoSemCaptura
     ? "AND LOWER(COALESCE(mp_status, '')) = 'approved'"
     : "";
+  // Record the existing notification intent in the same guarded financial write.
+  // No outbox insert/Queue failure can undo payment or lose this recovery source.
+  const pushIntentSet = novoStatus === "PAGO" && env ? "push_pedido_pago = 1," : "";
   const result = await db
     .prepare(
       `UPDATE pedido_pagamentos
@@ -266,6 +269,7 @@ async function applyLedgerTransition(
            pago_em = CASE WHEN ? = 'PAGO' THEN COALESCE(pago_em, ?, CURRENT_TIMESTAMP) ELSE pago_em END,
            cancelado_em = CASE WHEN ? IN ('CANCELADO', 'EXPIRADO') THEN COALESCE(cancelado_em, CURRENT_TIMESTAMP) ELSE cancelado_em END
            ${resolucaoIntegridadeSet},
+           ${pushIntentSet}
            atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND ${origemGuard}
          ${mp ? "AND metodo = 'PIX_MP' AND mp_payment_id = ? AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos outro WHERE outro.mp_payment_id = ? AND outro.metodo = 'PIX_MP' AND outro.id != pedido_pagamentos.id)" : ""}
@@ -316,7 +320,7 @@ async function applyLedgerTransition(
     });
 
   if (novoStatus === "PAGO" && transicionou && env) {
-    await notificarNovoPedidoPagoSafe(db, env, atual.pedido_id);
+    await enfileirarNovoPedidoPagoSafe(db, env, atual.pedido_id);
   }
 
   return { ok: true, status: novoStatus, transicionou };

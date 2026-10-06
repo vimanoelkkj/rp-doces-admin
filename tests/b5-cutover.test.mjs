@@ -8,6 +8,7 @@ import {
   aplicarOperacaoPorItem,
   aplicarCancelamentoPorItem,
   aplicarCheckoutRateLimit,
+  applyPushPaidIntent,
   aplicarTrocaPorItem,
   aplicarRefundPixMpRecuperavel,
   aplicarCoberturaFinanceiraLinhagem,
@@ -369,6 +370,7 @@ test("ADMIN: pedido manual real é criado contra o schema de produção", async 
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
   await aplicarCancelamentoPorItem(db);
+  await applyPushPaidIntent(db);
   const pedidosAntes = await contar(db, "pedidos");
 
   const resposta = await pedidoAdmin(db, [
@@ -423,6 +425,7 @@ test("ADMIN: replay da mesma key não cria segundo pedido de balcão", async t =
   await aplicarEstoquePorItem(db);
   await aplicarOperacaoPorItem(db);
   await aplicarCancelamentoPorItem(db);
+  await applyPushPaidIntent(db);
   const a = await (await pedidoAdmin(db, [{ produtoId: 2, quantidade: 1 }])).json();
   const b = await (await pedidoAdmin(db, [{ produtoId: 2, quantidade: 1 }])).json();
   assert.equal(b.pedidoId, a.pedidoId);

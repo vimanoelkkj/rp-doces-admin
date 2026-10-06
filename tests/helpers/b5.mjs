@@ -58,6 +58,9 @@ export const PEDIDO_ANULACOES = separarStatements(
 export const CHECKOUT_RATE_LIMIT = separarStatements(
   await readFile("migrations/0027_checkout_rate_limits.sql", "utf8")
 );
+const PUSH_PAID_INTENT = separarStatements(
+  await readFile("migrations/0037_push_paid_intent.sql", "utf8")
+);
 
 function criarDb(mf) {
   const db = {
@@ -155,6 +158,11 @@ export async function aplicarPedidoAnulacoes(db) {
 /** Aplica a infraestrutura exigida pelo checkout atual sem reescrever o cutover B5 histórico. */
 export async function aplicarCheckoutRateLimit(db) {
   for (const sql of CHECKOUT_RATE_LIMIT) await db.prepare(sql).run();
+}
+
+// Apply the current manual-creation metadata without rewriting historical B5.
+export async function applyPushPaidIntent(db) {
+  for (const sql of PUSH_PAID_INTENT) await db.prepare(sql).run();
 }
 
 /** Roda a validação e devolve as linhas de verificacao/resultado. */

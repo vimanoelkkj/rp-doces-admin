@@ -353,7 +353,13 @@ test("syncPaymentFromMp: transição para PAGO dispara pushNotifier desacoplado"
     .prepare("SELECT * FROM push_eventos WHERE pedido_id = 1 AND evento = 'PEDIDO_PAGO'")
     .first();
   assert.ok(evento, "Deve registrar evento PEDIDO_PAGO");
-  assert.equal(evento.status, "ENVIADO");
+  assert.equal(evento.status, "PENDENTE", "Financial confirmation only persists the outbox");
+  assert.equal(evento.tentativas, 0);
+  await app.pushNotifier.processarPushEventoPersistido(db, env, 1);
+  assert.equal(
+    (await db.prepare("SELECT status FROM push_eventos WHERE pedido_id=1").first()).status,
+    "ENVIADO"
+  );
 });
 
 test("webhook duplicado: retentativa não gera segundo push", async t => {
