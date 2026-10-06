@@ -507,6 +507,8 @@ jobs:
         if: steps.publish.outputs.deployed == 'true'
         env:
           SMOKE_BASE_URL: ${{ env.STAGING_URL }}
+          SMOKE_RETRIES: "19"
+          SMOKE_RETRY_DELAY_MS: "3000"
         run: node scripts/smoke-production.mjs
 
       - name: Registrar sucesso de publicação

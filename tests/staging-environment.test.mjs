@@ -139,7 +139,15 @@ function workflowContract(w) {
   assert.match(verify.run, /commit_hash == \$sha/);
   assert.match(verify.run, /latest_stage.status == "success"/);
   const smoke = steps.find(step => step.run === "node scripts/smoke-production.mjs");
-  assert.deepEqual(smoke.env, { SMOKE_BASE_URL: expression("env.STAGING_URL") });
+  assert.deepEqual(smoke.env, {
+    SMOKE_BASE_URL: expression("env.STAGING_URL"),
+    SMOKE_RETRIES: "19",
+    SMOKE_RETRY_DELAY_MS: "3000"
+  });
+  const productionSmoke = w.jobs.deploy.steps.find(
+    step => step.run === "node scripts/smoke-production.mjs"
+  );
+  assert.deepEqual(productionSmoke.env, { SMOKE_BASE_URL: expression("env.PRODUCTION_URL") });
   for (const step of [isolation, guard, buildStep, publish]) {
     assert.equal(step.if, "steps.gate.outputs.publish == 'true'");
   }
