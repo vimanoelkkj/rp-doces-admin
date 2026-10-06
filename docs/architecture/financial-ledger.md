@@ -109,16 +109,17 @@ GROUP BY p.id;
 
 ## 4. Idempotency Protocol (A1 Pattern)
 
-Financial mutations (order creation, payment registration, refund requests) are protected against replay attacks and network duplication via the A1 idempotency pattern.
+Financial mutations (order creation, payment registration, refund requests) avoid duplicate writes under retries and network duplication via the A1 idempotency pattern.
 
 ### 4.1 Client Key Generation (`src/lib/operationKey.ts`)
 
 1. The client generates an `operationKey` (UUID v4 or stable formatted string matching `^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$`) prior to the first network transmission.
-2. The client computes a deterministic SHA-256 fingerprint over the canonical JSON payload:
-   ```ts
-   fingerprint = sha256(canonicalStringify(payload));
-   ```
-3. The request transmits both `operationKey` and the payload to the API endpoint.
+2. The request transmits both `operationKey` and the payload to the API endpoint.
+3. The server computes `fingerprint(payload)` from `functions/lib/operacaoIdentity.ts`. Its format is `<version>:<canonical JSON>`, currently `1:<canonical JSON>` (`FINGERPRINT_VERSAO = 1`). The private `canonical` helper recursively sorts object keys, omits object properties whose value is `undefined`, and preserves array order. Other values follow `JSON.stringify` semantics, including `null` and `undefined` in arrays.
+
+Each caller selects the fields passed to `fingerprint(payload)`; the helper does not select fields or automatically include the entire request. For example, checkout includes sorted item ID/quantity pairs, `nome`, `whatsapp`, and `recado`, but excludes server-resolved prices. The operation key and type/scope/actor checks are separate from this payload identity.
+
+The fingerprint is a deterministic, canonical, versioned payload identity used to detect incompatible reuse of the same operation key. It is not a hash, signature, HMAC, authentication mechanism, or cryptographic protection against tampering. Deduplication uses the operation key: identical payloads with different keys remain distinct operations.
 
 ### 4.2 Server-Side Execution and Replay Handling (`pedido_operacoes`)
 
@@ -157,5 +158,6 @@ CREATE UNIQUE INDEX uq_pedido_operacoes_key ON pedido_operacoes(operation_key);
    - The competing request fails with a unique constraint violation on `operation_key`, triggering an automatic rollback of its entire batch.
 3. **Replay Flow**:
    - On conflict, the handler fetches the existing operation via `buscarOperacao`.
-   - If the recorded `fingerprint` matches the incoming request, the server safely replays the outcome (e.g., via `replayCheckout`).
-   - If the key exists but the `fingerprint` does not match, the server returns HTTP `409 Conflict`, blocking conflicting mutation attempts.
+   - `conflitoOperacao` checks compatibility in order: type (`OPERACAO_CONFLITO_TIPO`), scope and actor (`OPERACAO_CONFLITO_ESCOPO`), then fingerprint version and exact string (`OPERACAO_CONFLITO_PAYLOAD`).
+   - If all checks match, the server safely replays the outcome (e.g., via `replayCheckout`).
+   - Incompatible reuse returns HTTP `409 Conflict`, blocking conflicting mutation attempts. A different fingerprint version is also a payload conflict, never an equivalent payload.

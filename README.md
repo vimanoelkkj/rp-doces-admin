@@ -548,11 +548,11 @@ A estabilidade da plataforma decorre de protocolos rigorosos de engenharia:
 
 Toda escrita crítica no sistema requer uma chave de operação:
 
-1. **Geração no Cliente:** Antes de despachar a requisição, o frontend cria um UUID v4 e versiona o payload gerando um fingerprint SHA-256 canônico.
+1. **Geração no Cliente:** Antes de despachar a requisição, o frontend cria um UUID v4 e envia a `operationKey` com o payload. O backend calcula `fingerprint(payload)` (`functions/lib/operacaoIdentity.ts`): uma identidade determinística/canônica versionada, no formato `1:<JSON canônico>`. A canonicalização ordena recursivamente as chaves dos objetos, omite propriedades `undefined` e preserva a ordem dos arrays. Não é hash, assinatura, HMAC, autenticação nem proteção criptográfica contra adulteração.
 2. **Tabela `pedido_operacoes`:** O banco grava a chave em uma coluna `UNIQUE`. Se duas chamadas simultâneas chegarem com a mesma chave:
    - A primeira adquire a operação e realiza os lançamentos no mesmo `db.batch()`.
    - A segunda falha no `UNIQUE` e executa um **replay idempotente da resposta original**, devolvendo exatamente os mesmos dados da primeira sem criar registros duplicados.
-3. **Detecção de Conflito:** Caso a mesma `operationKey` seja reutilizada com dados diferentes (fingerprint conflitante), a requisição é terminantemente recusada com `409 Conflict`.
+3. **Detecção de Conflito:** `conflitoOperacao` verifica tipo, escopo/ator e versão/conteúdo do fingerprint, nessa ordem. Reutilizar a mesma `operationKey` com identidade incompatível retorna `409 Conflict`; uma identidade compatível permite replay. A deduplicação é pela chave, não pelo fingerprint: payloads iguais com chaves distintas representam operações distintas.
 
 ---
 
