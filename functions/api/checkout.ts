@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { requestLogger } from "../lib/requestContext";
 import { precoAtualCentavos, type ProdutoRow } from "../lib/pricing";
 import { liberarReservaPedido } from "../lib/stock";
 import { postPagamentoMp } from "../lib/mpPost";
@@ -91,7 +92,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     return await handleCheckout(request, env);
   } catch (err) {
-    console.error("Erro inesperado no checkout", err);
+    requestLogger.error("Erro inesperado no checkout", err);
     return jsonError("Erro interno ao processar checkout", 500);
   }
 };
@@ -178,7 +179,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   try {
     await liberarReservasVencidasLocalmente(env);
   } catch (err) {
-    console.error("Falha ao liberar reservas vencidas antes do checkout", err);
+    requestLogger.error("Falha ao liberar reservas vencidas antes do checkout", err);
   }
 
   const ids = [...new Set(body.items.map(i => i.id))];
@@ -362,7 +363,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     // INCONCLUSIVA e recuperável: ledger continua PENDENTE, reserva intacta
     // (B4), nenhuma key nova, nenhum pedido novo, nenhum sucesso nem
     // rejeição inventados. Um retry com a mesma key recupera esta operação.
-    console.error("Resultado ambíguo ao criar pagamento Pix (checkout)", {
+    requestLogger.error("Resultado ambíguo ao criar pagamento Pix (checkout)", {
       pedidoId,
       motivo: envio.motivo,
       httpStatus: envio.httpStatus
@@ -384,7 +385,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     // O Mercado Pago respondeu e recusou — rejeição COMPROVADA, não
     // ambígua. O ledger já pode registrar isso com mais fidelidade que
     // `pedidos`, que por compatibilidade do 4c-1 permanece PENDENTE.
-    console.error("Mercado Pago checkout error", envio.httpStatus, envio.mensagem);
+    requestLogger.error("Mercado Pago checkout error", envio.httpStatus, envio.mensagem);
 
     await env.DB.prepare(
       `UPDATE pedido_pagamentos

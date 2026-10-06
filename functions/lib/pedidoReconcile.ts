@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { requestLogger } from "./requestContext";
 import { pedidoValidoSql, getPedidoAnulacao } from "./pedidoValido";
 
 import { recalculatePedidoStatusPagamento } from "./ledger/projection";
@@ -28,7 +29,11 @@ export async function reconcilePedidoAfterFinancialChange(
   const estoque: BaixaResultado =
     agregado === "PAGO" ? await baixarEstoquePedido(db, pedidoId) : { ok: true, baixado: false };
   if (!estoque.ok)
-    console.error("Reconciliação financeira com pendência de estoque", pedidoId, estoque.erro);
+    requestLogger.error(
+      "Reconciliação financeira com pendência de estoque",
+      pedidoId,
+      estoque.erro
+    );
 
   // M2 (auditoria Comanda Viva) — mesmo gatilho de qualquer mudança
   // financeira (pagamento admin, refund admin, sync de webhook MP, ou este
@@ -40,7 +45,7 @@ export async function reconcilePedidoAfterFinancialChange(
   try {
     await reconcileExchangeCharges(db, pedidoId);
   } catch (err) {
-    console.error("Reconciliação financeira com pendência de troca", pedidoId, err);
+    requestLogger.error("Reconciliação financeira com pendência de troca", pedidoId, err);
   }
 
   // A baixa revalida no batch: um refund concorrente pode mudar a projeção.
@@ -94,7 +99,7 @@ export async function reconcilePedidosDivergentes(db: D1Database): Promise<void>
       try {
         await reconcilePedidoAfterFinancialChange(db, id);
       } catch (err) {
-        console.error("Falha ao reconciliar pedido com ledger", id, err);
+        requestLogger.error("Falha ao reconciliar pedido com ledger", id, err);
       }
     })
   );

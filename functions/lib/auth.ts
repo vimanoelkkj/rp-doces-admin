@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { logRequestEvent } from "./requestContext";
 const COOKIE_NAME = "rp_admin_session";
 const SESSION_DAYS = 7;
 const PBKDF2_ITERATIONS = 100000;
@@ -172,6 +173,7 @@ export async function requireUser(
 ): Promise<{ user: AdminUser } | { error: Response }> {
   const user = await currentUser(db, request);
   if (!user) {
+    logRequestEvent("AUTHENTICATION_REQUIRED", 401);
     return { error: Response.json({ error: "Não autenticado" }, { status: 401 }) };
   }
   return { user };

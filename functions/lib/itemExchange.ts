@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { requestLogger } from "./requestContext";
 import { temEstornoAnulacaoAtivo } from "./pedidoAnulacao";
 
 import { precoVigenteCentavos } from "../../shared/promocao";
@@ -586,7 +587,7 @@ export async function confirmExchangeRefund(
       try {
         await tryFinalizeExchange(db, row);
       } catch (error) {
-        console.error("Refund MP persistido; finalizacao de troca pendente", row.id, error);
+        requestLogger.error("Refund MP persistido; finalizacao de troca pendente", row.id, error);
       }
     }
     const updated = await exchangeById(db, row.id);
@@ -651,7 +652,7 @@ export async function confirmExchangeRefund(
   try {
     await tryFinalizeExchange(db, row);
   } catch (error) {
-    console.error("Refund da troca persistido; finalização pendente", row.id, error);
+    requestLogger.error("Refund da troca persistido; finalização pendente", row.id, error);
     await db
       .prepare(
         `UPDATE pedido_item_trocas SET status='INCONCLUSIVA' WHERE id=? AND status='AGUARDANDO_REEMBOLSO'`

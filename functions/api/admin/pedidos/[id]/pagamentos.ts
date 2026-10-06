@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { requestLogger } from "../../../../lib/requestContext";
 import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
 import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../lib/pedidoAnulacao";
 
@@ -111,7 +112,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       { status: 201 }
     );
   } catch (err) {
-    console.error("Erro ao registrar pagamento manual (admin)", err);
+    requestLogger.error("Erro ao registrar pagamento manual (admin)", err);
     return jsonError("Erro interno ao registrar pagamento", 500);
   }
 };
