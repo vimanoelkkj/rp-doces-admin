@@ -1,0 +1,20 @@
+name = "rp-doces-push-staging"
+main = "workers/push.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_als"]
+workers_dev = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rp-doces-db-staging"
+database_id = "STAGING_D1_ID_REPLACE_AFTER_CREATE"
+migrations_dir = "migrations"
+
+[[queues.consumers]]
+queue = "rp-doces-push-staging"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 3
+
+[triggers]
+crons = ["* * * * *"]
