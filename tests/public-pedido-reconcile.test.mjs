@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, approvedMp } from "./helpers/b3.mjs";
@@ -126,7 +127,7 @@ test("M7: POST exige mesma origem e, com MP approved, sincroniza normalmente", a
   const db = await fixture(t);
   await abrirJanela(db);
   const chamadas = mercadoPago(t, url =>
-    Response.json(approvedMp({ id: Number(String(url).split("/").at(-1)) }))
+    mpResponse(approvedMp({ id: Number(String(url).split("/").at(-1).replace(/^ORD/, "")) }))
   );
 
   const antes = await state(db);
@@ -145,7 +146,7 @@ test("M7: POST exige mesma origem e, com MP approved, sincroniza normalmente", a
     statusPedido: "PREPARANDO",
     estoquePendente: false
   });
-  assert.deepEqual(chamadas, ["GET https://api.mercadopago.com/v1/payments/101"]);
+  assert.deepEqual(chamadas, ["GET https://api.mercadopago.com/v1/orders/ORD101"]);
   const s = await state(db);
   assert.equal(s.pagamentos[0].status, "PAGO");
   assert.equal(s.pedido.status_pagamento, "PAGO");
@@ -157,7 +158,7 @@ test("M7: POST exige mesma origem e, com MP approved, sincroniza normalmente", a
 test("M7: polling repetido consulta o MP no máximo uma vez por janela de 15s", async t => {
   const db = await fixture(t);
   await abrirJanela(db);
-  const chamadas = mercadoPago(t, () => Response.json({ id: 101, status: "pending" }));
+  const chamadas = mercadoPago(t, () => mpResponse({ id: 101, status: "pending" }));
   for (let i = 0; i < 5; i++) {
     const r = await postStatus(db);
     assert.equal(r.status, 200);
@@ -173,7 +174,7 @@ test("M7: falha de rede consome a janela; reaberta, uma nova consulta é permiti
   let falhar = true;
   const chamadas = mercadoPago(t, () => {
     if (falhar) throw new TypeError("network down");
-    return Response.json({ id: 101, status: "pending" });
+    return mpResponse({ id: 101, status: "pending" });
   });
 
   const primeira = await postStatus(db);
@@ -203,7 +204,7 @@ test("M7: EXPIRADO -> PAGO tardio continua recuperável pelo POST", async t => {
   await app.sync.expireLocalPayment(db, 1);
   assert.equal((await state(db)).pagamentos[0].status, "EXPIRADO");
   await abrirJanela(db);
-  const chamadas = mercadoPago(t, () => Response.json(approvedMp()));
+  const chamadas = mercadoPago(t, () => mpResponse(approvedMp()));
   const r = await postStatus(db);
   assert.equal(r.status, 200);
   assert.equal((await r.json()).statusPagamento, "PAGO");
@@ -214,7 +215,7 @@ test("M7: EXPIRADO -> PAGO tardio continua recuperável pelo POST", async t => {
 test("M7: GETs repetidos nunca aumentam o contador de chamadas ao MP", async t => {
   const db = await fixture(t);
   await abrirJanela(db);
-  const chamadas = mercadoPago(t, () => Response.json({ id: 101, status: "pending" }));
+  const chamadas = mercadoPago(t, () => mpResponse({ id: 101, status: "pending" }));
   for (let i = 0; i < 5; i++) {
     assert.equal((await getStatus(db)).status, 200);
     assert.equal((await getDetalhe(db)).status, 200);
@@ -228,7 +229,7 @@ test("M7: GETs repetidos nunca aumentam o contador de chamadas ao MP", async t =
 test("M7: claim compartilhado — a janela aberta pelo POST público também throttle o sweep do admin", async t => {
   const db = await fixture(t);
   await abrirJanela(db);
-  const chamadas = mercadoPago(t, () => Response.json({ id: 101, status: "pending" }));
+  const chamadas = mercadoPago(t, () => mpResponse({ id: 101, status: "pending" }));
   assert.equal((await postStatus(db)).status, 200);
   await app.sync.reconcilePendingPixPayments(env(db));
   assert.equal(chamadas.length, 1, "mesmo claim: o sweep respeita a janela já consumida");
@@ -243,7 +244,7 @@ async function pixTardioSemEstoque(t) {
   await db.prepare("UPDATE produtos SET estoque=3, estoque_reservado=2 WHERE id=1").run();
   await abrirJanela(db);
   t.mock.method(console, "error", () => {});
-  const chamadas = mercadoPago(t, () => Response.json(approvedMp()));
+  const chamadas = mercadoPago(t, () => mpResponse(approvedMp()));
   return { db, chamadas };
 }
 

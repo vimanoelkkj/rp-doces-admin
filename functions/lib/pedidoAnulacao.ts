@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import { decimalToCents, isBrazilCountryCode } from "./mp/orders/types";
 
 import { BRUTO_PAGO_SQL, REEMBOLSADO_SQL, LIQUIDO_SQL } from "./pedidoFinanceiroSql";
 import { preparePedidoPhysicalProjection } from "./stock";
@@ -11,7 +12,12 @@ import {
 } from "./paymentSync";
 import { cancelarPagamentoMp } from "./mpPost";
 import { buscarPagamentosPorReferenciaExterna } from "./mpSearch";
-import { externalReferenceDaOperacao, registrarFase, type OperacaoInconclusiva } from "./operacoes";
+import {
+  externalReferenceDaOperacao,
+  registrarFase,
+  chavePagamento,
+  type OperacaoInconclusiva
+} from "./operacoes";
 
 export const ESTORNO_ANULACAO_ATIVO_MENSAGEM =
   "Este pedido tem um estorno de exclusão em andamento no Mercado Pago. Nenhuma ação financeira é permitida até a exclusão ser concluída ou o estorno ser recusado.";
@@ -157,7 +163,7 @@ export async function resolverPixNaoPagosParaAnulacao(
 
   const { results: operacoes } = await db
     .prepare(
-      `SELECT o.id, o.operation_key, o.tipo, o.fase, o.pedido_id, o.pagamento_id,
+      `SELECT o.id, o.criado_em, o.operation_key, o.tipo, o.fase, o.pedido_id, o.pagamento_id,
             o.mp_idempotency_key, o.mp_payment_id, o.mp_request, o.erro, o.atualizado_em,
             o.expirado_em, o.ator_usuario_id
      FROM pedido_operacoes o
@@ -179,7 +185,7 @@ export async function resolverPixNaoPagosParaAnulacao(
 
   const { results: pagamentos } = await db
     .prepare(
-      `SELECT id, pedido_id, metodo, status, mp_payment_id, valor_centavos, idempotency_key
+      `SELECT id, pedido_id, metodo, status, mp_order_id, mp_payment_id, valor_centavos, idempotency_key
      FROM pedido_pagamentos
      WHERE pedido_id = ? AND metodo = 'PIX_MP' AND status IN ('PENDENTE', 'EXPIRADO')
      ORDER BY id ASC`
@@ -190,6 +196,7 @@ export async function resolverPixNaoPagosParaAnulacao(
       pedido_id: number;
       metodo: string;
       status: string;
+      mp_order_id: string | null;
       mp_payment_id: string | null;
       valor_centavos: number;
       idempotency_key: string | null;
@@ -210,7 +217,13 @@ export async function resolverPixNaoPagosParaAnulacao(
   }
 
   for (const operacao of ops) {
-    let mpPaymentId = operacao.mp_payment_id;
+    const existing = operacao.pagamento_id
+      ? await db
+          .prepare("SELECT mp_order_id FROM pedido_pagamentos WHERE id = ?")
+          .bind(operacao.pagamento_id)
+          .first<{ mp_order_id: string | null }>()
+      : null;
+    let mpPaymentId = existing?.mp_order_id ?? null;
 
     if (!mpPaymentId) {
       const referencia = externalReferenceDaOperacao(operacao);
@@ -222,7 +235,11 @@ export async function resolverPixNaoPagosParaAnulacao(
         };
       }
 
-      const busca = await buscarPagamentosPorReferenciaExterna(accessToken, referencia);
+      const busca = await buscarPagamentosPorReferenciaExterna(
+        accessToken,
+        referencia,
+        operacao.criado_em
+      );
       if (busca.resultado === "INDISPONIVEL") {
         return {
           ok: false,
@@ -245,7 +262,7 @@ export async function resolverPixNaoPagosParaAnulacao(
         };
       }
 
-      mpPaymentId = busca.mpPaymentId;
+      mpPaymentId = busca.mpOrderId;
     }
 
     let payment: MpPaymentResponse;
@@ -261,10 +278,11 @@ export async function resolverPixNaoPagosParaAnulacao(
 
     if (operacao.tipo === "PIX_ADMIN_REGENERACAO") {
       const referencia = externalReferenceDaOperacao(operacao);
+      const chaveB = chavePagamento(operacao.operation_key);
       let bRow = referencia
         ? await db
             .prepare(`SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`)
-            .bind(referencia)
+            .bind(chaveB)
             .first<{ id: number; status: string }>()
         : null;
 
@@ -277,11 +295,28 @@ export async function resolverPixNaoPagosParaAnulacao(
           }
         ).point_of_interaction?.transaction_data;
         const req = operacao.mp_request
-          ? (JSON.parse(operacao.mp_request) as { transaction_amount?: number })
+          ? (JSON.parse(operacao.mp_request) as {
+              total_amount?: string;
+              transaction_amount?: number;
+            })
           : null;
-        const valorCentavos = req?.transaction_amount
-          ? Math.round(Number(req.transaction_amount) * 100)
-          : 0;
+        const valorCentavos =
+          decimalToCents(req?.total_amount) ??
+          (req?.transaction_amount ? Math.round(Number(req.transaction_amount) * 100) : 0);
+        if (
+          payment.external_reference !== referencia ||
+          decimalToCents(payment.total_amount) !== valorCentavos ||
+          decimalToCents(payment.transaction_amount) !== valorCentavos ||
+          payment.payment_method_id !== "pix" ||
+          payment.payment_method_type !== "bank_transfer" ||
+          !isBrazilCountryCode(payment.country_code)
+        ) {
+          return {
+            ok: false,
+            erro: "OPERACAO_INCONCLUSIVA",
+            mensagem: "Cobrança Mercado Pago divergente da operação persistida."
+          };
+        }
 
         await db.batch([
           db
@@ -297,16 +332,17 @@ export async function resolverPixNaoPagosParaAnulacao(
               `INSERT INTO pedido_pagamentos (
                pedido_id, metodo, origem, valor_centavos, status,
                registrado_por_usuario_id, idempotency_key, substitui_pagamento_id,
-               mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
+               mp_order_id, mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
              )
-             VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+             VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             )
             .bind(
               operacao.pedido_id,
               valorCentavos,
               operacao.ator_usuario_id,
-              referencia,
+              chaveB,
               operacao.pagamento_id,
+              payment.order_id,
               String(payment.id),
               payment.status,
               txData?.qr_code ?? null,
@@ -322,19 +358,19 @@ export async function resolverPixNaoPagosParaAnulacao(
                  atualizado_em = CURRENT_TIMESTAMP
              WHERE operation_key = ?`
             )
-            .bind(String(payment.id), referencia, operacao.operation_key)
+            .bind(String(payment.id), chaveB, operacao.operation_key)
         ]);
 
         bRow = await db
           .prepare(`SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`)
-          .bind(referencia)
+          .bind(chaveB)
           .first<{ id: number; status: string }>();
       }
 
       if (bRow) {
         await registrarFase(db, operacao.operation_key, {
           fase: "REMOTO_CONHECIDO",
-          mpPaymentId
+          mpPaymentId: String(payment.id)
         });
         await syncPaymentFromMp(db, bRow.id, payment);
       }
@@ -343,19 +379,23 @@ export async function resolverPixNaoPagosParaAnulacao(
       let targetPagamentoId: number | null = null;
       if (resolvido.kind === "found") {
         targetPagamentoId = resolvido.pagamentoId;
-      } else if (operacao.pagamento_id) {
+      } else if (
+        resolvido.kind === "not_found" &&
+        operacao.pagamento_id &&
+        payment.external_reference === externalReferenceDaOperacao(operacao)
+      ) {
         await db
           .prepare(
             `UPDATE pedido_pagamentos
-          SET mp_payment_id = ?,
+          SET mp_order_id = ?, mp_payment_id = ?,
               mp_status = CASE
                 WHEN status NOT IN ('PAGO', 'REEMBOLSADO')
                  AND LOWER(COALESCE(mp_status, '')) IN ('approved', 'refunded') THEN mp_status
                 ELSE ?
               END
-          WHERE id = ?`
+          WHERE id = ? AND mp_order_id IS NULL AND mp_payment_id IS NULL`
           )
-          .bind(String(payment.id), payment.status, operacao.pagamento_id)
+          .bind(payment.order_id, String(payment.id), payment.status, operacao.pagamento_id)
           .run();
         targetPagamentoId = operacao.pagamento_id;
       }
@@ -363,7 +403,7 @@ export async function resolverPixNaoPagosParaAnulacao(
       if (targetPagamentoId) {
         await registrarFase(db, operacao.operation_key, {
           fase: "REMOTO_CONHECIDO",
-          mpPaymentId
+          mpPaymentId: String(payment.id)
         });
         await syncPaymentFromMp(db, targetPagamentoId, payment);
       } else {
@@ -387,7 +427,7 @@ export async function resolverPixNaoPagosParaAnulacao(
 
   const { results: pagamentosAResolver } = await db
     .prepare(
-      `SELECT id, pedido_id, metodo, status, mp_payment_id, valor_centavos, idempotency_key
+      `SELECT id, pedido_id, metodo, status, mp_order_id, mp_payment_id, valor_centavos, idempotency_key
      FROM pedido_pagamentos
      WHERE pedido_id = ? AND metodo = 'PIX_MP' AND status IN ('PENDENTE', 'EXPIRADO')
      ORDER BY id ASC`
@@ -398,13 +438,14 @@ export async function resolverPixNaoPagosParaAnulacao(
       pedido_id: number;
       metodo: string;
       status: string;
+      mp_order_id: string | null;
       mp_payment_id: string | null;
       valor_centavos: number;
       idempotency_key: string | null;
     }>();
 
   for (const pag of pagamentosAResolver || []) {
-    if (!pag.mp_payment_id) {
+    if (!pag.mp_order_id) {
       return {
         ok: false,
         erro: "PIX_SEM_ID_REMOTO",
@@ -414,7 +455,7 @@ export async function resolverPixNaoPagosParaAnulacao(
 
     let mp: MpPaymentResponse;
     try {
-      mp = await fetchMpPayment(accessToken, String(pag.mp_payment_id));
+      mp = await fetchMpPayment(accessToken, String(pag.mp_order_id));
     } catch {
       return {
         ok: false,
@@ -436,7 +477,7 @@ export async function resolverPixNaoPagosParaAnulacao(
       };
     }
 
-    if (statusRemoto === "cancelled" || statusRemoto === "rejected") {
+    if (statusRemoto === "cancelled" || statusRemoto === "rejected" || statusRemoto === "expired") {
       await syncPaymentFromMp(db, pag.id, mp);
       continue;
     }
@@ -447,18 +488,22 @@ export async function resolverPixNaoPagosParaAnulacao(
       statusRemoto === "authorized"
     ) {
       const cancelKey = `a1:anul-cancel:${pedidoId}:${pag.id}:${pag.mp_payment_id}`;
-      await cancelarPagamentoMp(accessToken, pag.mp_payment_id, cancelKey);
+      await cancelarPagamentoMp(accessToken, pag.mp_order_id, cancelKey);
 
       let reconsulta: MpPaymentResponse | null = null;
       try {
-        reconsulta = await fetchMpPayment(accessToken, String(pag.mp_payment_id));
+        reconsulta = await fetchMpPayment(accessToken, String(pag.mp_order_id));
       } catch {
         reconsulta = null;
       }
 
       if (reconsulta) {
         const reconsultaStatus = String(reconsulta.status || "").toLowerCase();
-        if (reconsultaStatus === "cancelled" || reconsultaStatus === "rejected") {
+        if (
+          reconsultaStatus === "cancelled" ||
+          reconsultaStatus === "rejected" ||
+          reconsultaStatus === "expired"
+        ) {
           await syncPaymentFromMp(db, pag.id, reconsulta);
           continue;
         }

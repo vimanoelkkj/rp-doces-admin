@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, barrier } from "./helpers/b3.mjs";
@@ -38,8 +39,8 @@ async function refundedOrder(t) {
 function mockPix(t) {
   let id = 700;
   t.mock.method(globalThis, "fetch", async (_url, init) => {
-    assert.equal(JSON.parse(init.body).transaction_amount, 0.01);
-    return Response.json({
+    assert.equal(JSON.parse(init.body).total_amount, "0.01");
+    return mpResponse({
       id: ++id,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",

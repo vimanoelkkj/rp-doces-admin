@@ -65,7 +65,7 @@ A stack da plataforma foi estritamente verificada contra as dependências do có
 
 ### Gateway de Pagamento
 
-- **Mercado Pago Payments API:** Utiliza exclusivamente o endpoint de pagamentos diretos (`/v1/payments`) com Pix dinâmico, verificação criptográfica de Webhooks via HMAC-SHA256 e polling síncrono. Deliberadamente **não** utiliza a Orders API legada.
+- **Mercado Pago Orders API:** O Pix utiliza `/v1/orders`, webhooks assinados de Order e chamadas autoritativas de GET em Orders. `mp_order_id` armazena o ORD; `mp_payment_id` armazena o PAY. A Payments API foi completamente removida dos fluxos ativos. Consulte o [contrato de cutover](docs/MP_ORDERS.md).
 
 ### Notificações
 
@@ -315,7 +315,7 @@ O checkout é a porta de entrada para a compra pública:
 1. **Submissão do Formulário:** Ao clicar em "Finalizar Pedido", `Checkout.tsx` gera uma `operationKey` única (UUID v4) associada a essa intenção de compra.
 2. **Envio para `POST /api/checkout`:** O backend valida estoque livre, preços vigentes de cada item e integridade do payload no mesmo batch atômico.
 3. **Reserva Imediata:** O estoque reservado é incrementado atomicamente antes do contato com o provedor externo.
-4. **Chamada ao Mercado Pago Payments API:** Um pagamento Pix com expiração inicial é criado no gateway.
+4. **Mercado Pago Orders API:** Uma ordem online automática com uma transação Pix e prazo de expiração inicial é criada no gateway.
 5. **Gravação do Pedido e Ledger:** O pedido nasce como `PENDENTE`, acompanhado de sua linha correspondente em `pedido_pagamentos`.
 6. **Acompanhamento no Frontend:** O cliente é redirecionado para `AguardandoPagamento.tsx`, onde visualiza o QR Code Pix e a chave Copia e Cola, com contador regressivo e polling automático para detecção instantânea do pagamento.
 
@@ -420,10 +420,10 @@ O status financeiro do pedido **nunca** é gravado manualmente como uma verdade 
 
 ## 17. Pagamentos, Gateway Mercado Pago e Pix
 
-A integração com o Mercado Pago segue a **Payments API** oficial com resiliência de nível bancário:
+The Mercado Pago integration uses the **Orders API**, with the existing financial guards preserved:
 
 - **Chave de Idempotência Externa (`X-Idempotency-Key`):** Cada chamada ao Mercado Pago recebe uma chave derivada de forma determinística da `operationKey` da tentativa (`a1:<key>:mp`). Quedas de conexão no envio do POST recuperam a transação já criada no PSP sem gerar duas cobranças.
-- **Consulta Autoritativa (Protocolo B2):** Uma cobrança expirada localmente **só pode virar PAGO** se o backend obtiver uma resposta `approved` comprovada via chamada GET direta e verificada contra a API do Mercado Pago (`fetchMpPayment`). Webhooks isolados ou relógios descalibrados não possuem autoridade para aprovar transações expiradas.
+- **Authoritative query (B2):** A locally expired charge can become PAGO only through a verified `GET /v1/orders/{ORD}`, with `processed/accredited` and matching identity, reference, amounts and Pix method. The compatibility alias `fetchMpPayment` performs this Orders GET. Webhooks, search and mutation acknowledgments carry no financial authority.
 - **Tratamento de Respostas Ambíguas:** Falhas de rede, timeouts HTTP (408/429/5xx) durante o envio do Pix nunca inventam status `FALHOU`. A operação permanece em `ENVIO_INCONCLUSIVO`, preservando a reserva e aguardando confirmação do webhook ou do motor de recuperação.
 
 ---
@@ -540,7 +540,7 @@ A estabilidade da plataforma decorre de protocolos rigorosos de engenharia:
 - **B4 (Reserva por Pedido com Múltiplos Pix):** A existência de qualquer cobrança Pix pendente impede a liberação indevida da reserva do pedido.
 - **B-1 (Visibilidade Operacional de Balcão):** Pedidos criados no balcão (`origem = 'MANUAL'`) permanecem visíveis imediatamente na listagem, independentemente de estarem pendentes.
 - **B-2 (Estorno Manual de Pix):** Registro contábil de estorno para pagamentos `PIX_MP` devolvidos por fora pelo lojista.
-- **B-3 (Recuperação de Envio Inconclusivo):** Varredura de busca via `GET /v1/payments/search` no Mercado Pago para descobrir cobranças criadas cujo retorno HTTP se perdeu por timeout.
+- **B-3 (Inconclusive dispatch recovery):** Bounded, read-only `GET /v1/orders` searches use the persisted external reference and creation window. A unique ORD candidate must be re-read through the authoritative GET; multiple candidates remain inconclusive.
 - **B5 (GETs Idempotentes e Livres de Efeitos Colaterais):** Segregação estrita de responsabilidade HTTP. As rotas `GET /api/admin/pedidos` e `GET /api/admin/pedidos/:id` operam como puramente de leitura. Efeitos colaterais de manutenção financeira e sincronização em background foram movidos para endpoints POST explícitos e idempotentes com proteção `sameOrigin`:
   - `POST /api/admin/pedidos/reconciliar`: Executa em lote a rotina `reconcilePedidosEmBackground` para a lista de comandas.
   - `POST /api/admin/pedidos/:id/reconciliar`: Executa a reconciliação sob demanda da comanda ativa (`reconcileLiveTabPedido`).
@@ -565,10 +565,10 @@ Toda escrita crítica no sistema requer uma chave de operação:
 - **Endpoint de Recepção:** `POST /api/webhooks/mercadopago`.
 - **Validação Criptográfica HMAC-SHA256:**
   - O header `x-signature` é lido como `ts=<timestamp>,v1=<assinatura>`; sem `ts` ou sem `v1` a requisição é inválida.
-  - O texto assinado (_manifest_) é `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, com `data.id` em minúsculas, vindo da query (`data.id` ou `data_id`) ou, na falta dela, do corpo JSON. Os trechos `id:` e `request-id:` só entram quando o valor existe; `ts:` sempre entra. O corpo da requisição não faz parte do hash.
+  - O texto assinado (_manifest_) é `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, com `data.id` exatamente como recebido (a caixa não é normalizada), vindo da query (`data.id` ou `data_id`) ou, na falta dela, do corpo JSON. Os trechos `id:` e `request-id:` só entram quando o valor existe; `ts:` sempre entra. O corpo da requisição não faz parte do hash. Exceção comprovada em staging: o sandbox do Orders envia `data.id` em maiúsculas (`ORDTST...`) e assina com ele em minúsculas; por isso, se o _manifest_ acima não validar e o `data.id` tiver o formato de Order (`ORD...`), vale também o mesmo _manifest_ com `data.id` em minúsculas. Nenhuma outra variante é aceita.
   - O HMAC-SHA256 do _manifest_, calculado com `MP_WEBHOOK_SECRET` como chave, é comparado em tempo constante (_timing-safe equal_) com `v1`.
   - Requisições com assinatura inválida são rejeitadas com `401 Unauthorized`. Sem `MP_WEBHOOK_SECRET` configurado o endpoint responde `503` e não processa nada.
-  - Depois da assinatura, só eventos `payment`/`payments` (ou sem tipo) são processados; os demais respondem `200` sem efeito.
+  - Após a validação da assinatura, apenas eventos de `order` são processados; outros tópicos respondem `200` sem efeito.
 - **Nunca Confia no Payload:** O webhook do Mercado Pago serve apenas como um sinalizador de evento. O backend nunca extrai o status diretamente do corpo do webhook; ele realiza uma chamada segura para `fetchMpPayment` para obter o dado oficial e imutável antes de atualizar o ledger.
 
 ### Checklist de produção (go-live) do Mercado Pago
@@ -578,7 +578,7 @@ Os dois primeiros itens são exigidos pelo código. Os passos no painel do Merca
 - [ ] `MP_ACCESS_TOKEN` configurado como secret do projeto no Cloudflare Pages (produção).
 - [ ] `MP_WEBHOOK_SECRET` configurado como secret no mesmo ambiente (sem ele o webhook responde `503`).
 - [ ] URL pública do webhook registrada no painel do Mercado Pago: `https://<domínio>/api/webhooks/mercadopago` _(verificar no painel)_.
-- [ ] Evento de pagamentos habilitado _(verificar no painel)_.
+- [ ] Eventos de Order habilitados no painel do Mercado Pago _(verificar no painel)_.
 - [ ] Chave de assinatura exibida no painel idêntica ao valor de `MP_WEBHOOK_SECRET` _(verificar no painel)_.
 - [ ] Pix real de baixo valor criado e pago.
 - [ ] Notificação recebida e respondida com `200` _(verificar no histórico de notificações do painel e nos logs da função)_.
@@ -778,8 +778,8 @@ A plataforma possui testes automatizados de domínio e UI, descobertos pelo runn
 
 ## 34. Decisões Arquiteturais Relevantes
 
-1. **Adoção da Payments API em Detrimento da Orders API:**
-   - A Payments API do Mercado Pago oferece maior controle sobre cada tentativa de pagamento individual (`PIX_MP`), expiração explícita por cobrança e suporte à identificação de pagamentos aditivos, alinhando-se perfeitamente ao ledger de comandas.
+1. **Mercado Pago Orders API:**
+   - Uma ordem online automática contém exatamente uma transação Pix. As identidades ORD e PAY são persistidas separadamente, enquanto pagamentos adicionais, estornos separados, proteção contra replay (A1), CAS e projeções de estoque preservam seus contratos existentes. Consulte o [contrato de cutover](docs/MP_ORDERS.md).
 2. **Fatos Financeiros em Partidas Dobradas:**
    - Nenhuma linha de pagamento confirmada é alterada ou cancelada retrospectivamente. Estornos geram fatos contábeis próprios, mantendo a trilha de auditoria limpa.
 3. **Header Único com Degradação Elegante:**

@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { operationalAlert } from "../operationalAlert";
+import { isBrazilCountryCode, orderExternalReference } from "../mp/orders/types";
 import type { MpMappedStatus, SyncPaymentResult } from "./types";
 import { mapMpStatus } from "./status";
 import { type MpPaymentResponse, isVerifiedMpResponse } from "./client";
@@ -66,6 +67,9 @@ interface PagamentoRow {
   valor_centavos: number;
   idempotency_key: string | null;
   token_publico: string;
+  mp_order_id: string | null;
+  mp_payment_id: string | null;
+  external_reference: string | null;
 }
 
 function decimalParaCentavos(valor: number | string | null | undefined): number | null {
@@ -77,25 +81,47 @@ function decimalParaCentavos(valor: number | string | null | undefined): number 
 }
 
 function diagnosticoIntegridadeMp(atual: PagamentoRow, mp: MpPaymentResponse): string | null {
+  if (mp.order_id !== atual.mp_order_id || mp.id !== atual.mp_payment_id)
+    return "INTEGRIDADE_MP:ORDER_DIVERGENTE";
   const valor = decimalParaCentavos(mp.transaction_amount);
   if (valor === null) return "INTEGRIDADE_MP:VALOR_INVALIDO";
   if (valor !== atual.valor_centavos) return "INTEGRIDADE_MP:VALOR_DIVERGENTE";
+  if (decimalParaCentavos(mp.total_amount) !== atual.valor_centavos)
+    return "INTEGRIDADE_MP:TOTAL_DIVERGENTE";
   if (mp.payment_method_id !== "pix") return "INTEGRIDADE_MP:METODO_DIVERGENTE";
-  const referenciaEsperada = atual.origem === "SITE" ? atual.token_publico : atual.idempotency_key;
+  if (mp.payment_method_type !== "bank_transfer") return "INTEGRIDADE_MP:TIPO_METODO_DIVERGENTE";
+  if (
+    mp.order_status !== "processed" ||
+    !["accredited", "partially_refunded"].includes(mp.order_status_detail ?? "")
+  )
+    return "INTEGRIDADE_MP:STATUS_ORDER_DIVERGENTE";
+  if (
+    mp.transaction_status !== "processed" ||
+    !["accredited", "partially_refunded"].includes(mp.transaction_status_detail ?? "")
+  )
+    return "INTEGRIDADE_MP:STATUS_TRANSACAO_DIVERGENTE";
+  const referenciaEsperada =
+    atual.external_reference ??
+    (atual.origem === "SITE" ? atual.token_publico : atual.idempotency_key);
   if (!referenciaEsperada || mp.external_reference !== referenciaEsperada) {
     return "INTEGRIDADE_MP:REFERENCIA_DIVERGENTE";
   }
-  if (mp.currency_id !== "BRL") return "INTEGRIDADE_MP:MOEDA_DIVERGENTE";
+  if (!isBrazilCountryCode(mp.country_code)) return "INTEGRIDADE_MP:PAIS_DIVERGENTE";
   return null;
 }
 
 function identidadeTerminalMpCompativel(atual: PagamentoRow, mp: MpPaymentResponse): boolean {
-  const referenciaEsperada = atual.origem === "SITE" ? atual.token_publico : atual.idempotency_key;
+  const referenciaEsperada =
+    atual.external_reference ??
+    (atual.origem === "SITE" ? atual.token_publico : atual.idempotency_key);
   return Boolean(
     referenciaEsperada &&
     mp.external_reference === referenciaEsperada &&
+    mp.order_id === atual.mp_order_id &&
+    mp.id === atual.mp_payment_id &&
     mp.payment_method_id === "pix" &&
-    mp.currency_id === "BRL"
+    mp.payment_method_type === "bank_transfer" &&
+    isBrazilCountryCode(mp.country_code)
   );
 }
 
@@ -117,11 +143,16 @@ async function applyLedgerTransition(
     if (!isVerifiedMpResponse(mp)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
     const { results: vinculados } = await db
       .prepare(
-        `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`
+        `SELECT id,mp_order_id,mp_payment_id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND (mp_payment_id = ? OR mp_order_id = ?) LIMIT 2`
       )
-      .bind(String(mp.id))
-      .all<{ id: number }>();
-    if (vinculados.length !== 1 || vinculados[0].id !== pagamentoId) {
+      .bind(String(mp.id), mp.order_id)
+      .all<{ id: number; mp_order_id: string | null; mp_payment_id: string | null }>();
+    if (
+      vinculados.length !== 1 ||
+      vinculados[0].id !== pagamentoId ||
+      vinculados[0].mp_order_id !== mp.order_id ||
+      vinculados[0].mp_payment_id !== mp.id
+    ) {
       throw new Error("IDENTIDADE_PAGAMENTO_MP_AMBIGUA_OU_DIVERGENTE");
     }
   } else if (novoStatus !== "EXPIRADO") {
@@ -131,7 +162,10 @@ async function applyLedgerTransition(
     .prepare(
       `SELECT pp.id, pp.pedido_id, pp.status, pp.mp_status, pp.mp_status_detail,
                      pp.origem, pp.valor_centavos,
-                     pp.idempotency_key, p.token_publico
+                     pp.idempotency_key, p.token_publico, pp.mp_order_id, pp.mp_payment_id,
+                     (SELECT json_extract(o.mp_request, '$.external_reference') FROM pedido_operacoes o
+                      WHERE o.pagamento_id = pp.id AND o.tipo IN ('CHECKOUT_SITE','PIX_ADMIN','PIX_ADMIN_REGENERACAO')
+                      ORDER BY o.id ASC LIMIT 1) AS external_reference
               FROM pedido_pagamentos pp
               JOIN pedidos p ON p.id = pp.pedido_id
               WHERE pp.id = ?`
@@ -139,6 +173,19 @@ async function applyLedgerTransition(
     .bind(pagamentoId)
     .first<PagamentoRow>();
   if (!atual) return { ok: false, status: null, transicionou: false };
+  if (atual.external_reference === null && atual.origem === "ADMIN" && atual.idempotency_key) {
+    atual.external_reference = await orderExternalReference(atual.idempotency_key);
+  }
+  // A known legacy Payments resource has no readable Orders identity. The
+  // cutover must not turn inability to query it into evidence of non-payment.
+  if (
+    !mp &&
+    ["PENDENTE", "EXPIRADO"].includes(atual.status) &&
+    atual.mp_payment_id &&
+    !/^ORD[A-Za-z0-9]+$/.test(atual.mp_order_id ?? "")
+  ) {
+    throw new Error("LEGACY_MP_ORDER_ID_AUSENTE");
+  }
 
   // Uma aprovacao remota ja observada, mas ainda nao validada, e um fato
   // financeiro inconclusivo. Expiracao local e respostas posteriores nao
@@ -272,7 +319,7 @@ async function applyLedgerTransition(
            ${pushIntentSet}
            atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND ${origemGuard}
-         ${mp ? "AND metodo = 'PIX_MP' AND mp_payment_id = ? AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos outro WHERE outro.mp_payment_id = ? AND outro.metodo = 'PIX_MP' AND outro.id != pedido_pagamentos.id)" : ""}
+         ${mp ? "AND metodo = 'PIX_MP' AND mp_payment_id = ? AND mp_order_id = ? AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos outro WHERE outro.mp_payment_id = ? AND outro.metodo = 'PIX_MP' AND outro.id != pedido_pagamentos.id)" : ""}
          ${expiracaoIntegridadeGuard}
          ${resolucaoIntegridadeGuard}
          ${integridadeGuard}`
@@ -291,7 +338,7 @@ async function applyLedgerTransition(
           ]
         : []),
       pagamentoId,
-      ...(mp ? [String(mp.id), String(mp.id)] : []),
+      ...(mp ? [String(mp.id), mp.order_id, String(mp.id)] : []),
       ...(integridadeGuard
         ? [atual.valor_centavos, atual.origem, atual.idempotency_key, atual.token_publico]
         : [])

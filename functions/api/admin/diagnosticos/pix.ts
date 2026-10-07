@@ -1,27 +1,33 @@
-/// <reference types="@cloudflare/workers-types" />
+import {
+  decimalToCents,
+  orderIdempotencyKey,
+  type PixOrderBody
+} from "../../../lib/mp/orders/types";
+import {
+  diagnosticPaymentId,
+  diagnosticExternalReference,
+  createDiagnosticPixOrderBody
+} from "../../../lib/mp/orders/diagnosticId";
 
 // Admin > Loja > Diagnósticos permanentes — "Pix real de diagnóstico".
 //
-// Gera uma cobrança Pix REAL de R$ 0,01 na Payments API do Mercado Pago
+// Generates a R$ 0.01 diagnostic Pix through Mercado Pago Orders API.
 // (mesma integração/credenciais do resto do projeto — reaproveita
 // `postPagamentoMp`, o helper de A1 que já classifica sucesso, recusa
 // definitiva e resultado ambíguo, sem duplicar essa lógica) para confirmar
 // que a integração bancária está de pé.
 //
-// ISOLAMENTO DELIBERADO: este endpoint NUNCA escreve no banco. Não cria
-// pedido, não cria linha em `pedido_pagamentos`, não toca `produtos` nem
-// `pedido_operacoes`. Sem escrita local, é estruturalmente impossível que o
-// diagnóstico apareça na listagem de pedidos, altere estoque ou polua o
-// Dashboard — essas telas leem tabelas que este endpoint nunca grava.
+// ISOLAMENTO DELIBERADO: este endpoint NUNCA escreve em tabelas de vendas,
+// estoque ou faturamento. Não cria pedido, não cria linha em `pedido_pagamentos`,
+// não toca `produtos` nem `pedido_operacoes`. Sem escrita no domínio de vendas,
+// é estruturalmente impossível que o diagnóstico apareça na listagem de pedidos,
+// altere estoque ou polua o Dashboard.
 //
-// IDEMPOTÊNCIA SEM PERSISTÊNCIA: o cliente gera uma `operationKey` (mesmo
-// helper de A1, `parseOperationKey`) antes do primeiro envio e a preserva
-// enquanto durar a MESMA tentativa (retry). A key deriva a
-// `X-Idempotency-Key` enviada ao Mercado Pago — é o próprio provedor que
-// garante "mesma key = mesmo recurso", exatamente o mecanismo que a
-// Payments API já oferece e que o projeto já usa em todos os outros
-// writers. Não é preciso uma tabela local para isso: não há pedido/reserva
-// para proteger, só um clique administrativo de baixíssimo risco.
+// IDEMPOTÊNCIA DURÁVEL: a `operationKey` gerada pelo cliente é preservada durante
+// retries da mesma tentativa. Para evitar HTTP 409 na Orders API por divergência
+// de timestamp/payload em retries, a expiração e o body original são estabilizados
+// na tabela isolada `admin_diagnostico_pix` (migration 0038). A key deriva a
+// `X-Idempotency-Key` e assegura body estritamente idêntico em todas as tentativas.
 //
 // NUNCA finge sucesso: resultado ambíguo (timeout, 5xx, transporte) e
 // recusa definitiva são devolvidos como erro explícito ao operador, nunca
@@ -34,6 +40,7 @@ import { postPagamentoMp } from "../../../lib/mpPost";
 interface Env {
   DB: D1Database;
   MP_ACCESS_TOKEN?: string;
+  MP_TEST_MODE?: string;
 }
 
 interface DiagnosticoPixInput {
@@ -110,28 +117,84 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     );
   }
 
-  const idempotencyKey = chaveDiagnosticoMp(chave.key);
-  const expiresAtEstimado = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000).toISOString();
+  const idempotencyKey = await orderIdempotencyKey(chaveDiagnosticoMp(chave.key));
 
-  const mpRequest = {
-    transaction_amount: VALOR_DIAGNOSTICO_CENTAVOS / 100,
-    description: "Diagnóstico R&P Doces (não é um pedido)",
-    payment_method_id: "pix",
-    date_of_expiration: expiresAtEstimado,
-    // Referência estruturalmente distinta de token_publico/idempotency_key
-    // de tentativas reais: nunca resolve por engano em `resolveWebhookPayment`
-    // caso o evento chegue pelo webhook (cai em "not_found", sem efeito).
-    external_reference: `ADMIN_DIAG_PIX:${chave.key}`,
-    payer: { email: "diagnostico@rpdoces.com.br", first_name: "Diagnostico" }
-  };
+  // Idempotência durável: reutiliza a expiração e o body calculados na primeira tentativa
+  // para garantir que retries da mesma operação lógica enviem exatamente a mesma
+  // X-Idempotency-Key e o mesmo body (evitando HTTP 409 na Orders API).
+  const registroExistente = await env.DB.prepare(
+    "SELECT expires_at, mp_request FROM admin_diagnostico_pix WHERE operation_key = ?"
+  )
+    .bind(chave.key)
+    .first<{ expires_at: string; mp_request: string | null }>();
+
+  let expiresAtEstimado: string;
+  let mpRequest: PixOrderBody;
+
+  if (registroExistente?.expires_at) {
+    expiresAtEstimado = registroExistente.expires_at;
+    if (registroExistente.mp_request) {
+      try {
+        mpRequest = JSON.parse(registroExistente.mp_request);
+      } catch {
+        mpRequest = await createDiagnosticPixOrderBody(
+          await diagnosticExternalReference(chave.key),
+          env.MP_TEST_MODE
+        );
+      }
+    } else {
+      mpRequest = await createDiagnosticPixOrderBody(
+        await diagnosticExternalReference(chave.key),
+        env.MP_TEST_MODE
+      );
+    }
+  } else {
+    expiresAtEstimado = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000).toISOString();
+    mpRequest = await createDiagnosticPixOrderBody(
+      await diagnosticExternalReference(chave.key),
+      env.MP_TEST_MODE
+    );
+
+    await env.DB.prepare(
+      `INSERT INTO admin_diagnostico_pix (operation_key, expires_at, mp_request)
+         VALUES (?, ?, ?)
+         ON CONFLICT (operation_key) DO NOTHING`
+    )
+      .bind(chave.key, expiresAtEstimado, JSON.stringify(mpRequest))
+      .run();
+
+    // Guarda de concorrência: se outro worker inseriu primeiro em corrida atômica,
+    // garantimos o reaproveitamento do registro vencedor.
+    const registroDefinitivo = await env.DB.prepare(
+      "SELECT expires_at, mp_request FROM admin_diagnostico_pix WHERE operation_key = ?"
+    )
+      .bind(chave.key)
+      .first<{ expires_at: string; mp_request: string | null }>();
+
+    if (registroDefinitivo?.expires_at && registroDefinitivo.expires_at !== expiresAtEstimado) {
+      expiresAtEstimado = registroDefinitivo.expires_at;
+      if (registroDefinitivo.mp_request) {
+        try {
+          mpRequest = JSON.parse(registroDefinitivo.mp_request);
+        } catch {
+          mpRequest = await createDiagnosticPixOrderBody(
+            await diagnosticExternalReference(chave.key),
+            env.MP_TEST_MODE
+          );
+        }
+      }
+    }
+  }
 
   const envio = await postPagamentoMp(env.MP_ACCESS_TOKEN, idempotencyKey, mpRequest);
 
   if (envio.resultado === "AMBIGUO") {
     // Nunca vira sucesso nem rejeição inventados — só o erro explícito.
+    // Log estritamente sanitizado: apenas código de erro do MP / motivo, status HTTP e x-request-id
     console.error("Resultado ambíguo ao gerar Pix de diagnóstico", {
+      httpStatus: envio.httpStatus,
       motivo: envio.motivo,
-      httpStatus: envio.httpStatus
+      requestId: envio.requestId ?? null
     });
     return jsonError(
       MENSAGENS.MERCADO_PAGO_INDISPONIVEL,
@@ -141,9 +204,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   if (envio.resultado === "RECUSA_DEFINITIVA") {
-    // `mensagem`/`detalhe` são a explicação do MP sobre a REQUISIÇÃO
-    // recusada (ex.: parâmetro inválido) — nunca QR/copia-e-cola/token.
-    console.error("Mercado Pago recusou o Pix de diagnóstico", envio.httpStatus, envio.mensagem);
+    // Log estritamente sanitizado: apenas código de erro do MP, status HTTP e x-request-id
+    console.error("Mercado Pago recusou o Pix de diagnóstico", {
+      httpStatus: envio.httpStatus,
+      mensagem: envio.mensagem,
+      requestId: envio.requestId ?? null
+    });
     return jsonError(
       MENSAGENS.MERCADO_PAGO_RECUSOU,
       STATUS_HTTP.MERCADO_PAGO_RECUSOU,
@@ -153,12 +219,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const payment = envio.payment;
   const txData = payment.point_of_interaction?.transaction_data;
+  const valorCentavos = decimalToCents(mpRequest.total_amount) ?? VALOR_DIAGNOSTICO_CENTAVOS;
+  const modoSimulador = env.MP_TEST_MODE === "orders_pix";
 
   return Response.json(
     {
       ok: true,
-      valorCentavos: VALOR_DIAGNOSTICO_CENTAVOS,
-      mpPaymentId: String(payment.id),
+      valorCentavos,
+      modoSimulador,
+      mpPaymentId: diagnosticPaymentId(payment.order_id, payment.id),
       qrCode: txData?.qr_code ?? null,
       qrCodeBase64: txData?.qr_code_base64 ?? null,
       ticketUrl: txData?.ticket_url ?? null,

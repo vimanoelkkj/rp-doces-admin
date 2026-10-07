@@ -152,12 +152,27 @@ copy production credentials. Do not put secrets in `VITE_*`.
 
 Configure the test webhook at `<STAGING_URL>/api/webhooks/mercadopago`, starting with
 the Pages domain. Do not point test credentials/webhooks at `rpdoces.com.br`.
-The application uses the Payments API, not the Orders API. Confirm current test
+The application uses the Orders API. `mp_order_id` stores ORD and `mp_payment_id`
+stores the PAY transaction. Subscribe to the Mercado Pago **Order** event; only
+GET `/v1/orders/{ORD}` supplies financial authority. Payments API calls have been
+removed from active flows. See [the cutover contract](MP_ORDERS.md) before enabling
+this integration in an environment with legacy payments. Confirm current test
 support for its Pix/refund/webhook flows in the relevant Mercado Pago documentation
 before relying on manual payment simulation. Staging provisioning does not guarantee
 that all external sandbox payment transitions can be simulated. If a sandbox flow
 is unsupported, keep it disabled and use deterministic local mocks/tests; never
 substitute a production token or real payment to bypass a sandbox limitation.
+
+The staging Pages TOML alone sets non-secret `MP_TEST_MODE=orders_pix`. Functions
+explicitly select the official simulator payer (`test_user_br@testuser.com`,
+`first_name=APRO`) for checkout, administrative Pix and diagnostics. Production
+configs omit this variable and preserve the real payer; token formats, hostnames
+and `VITE_APP_ENV` never select this server mode. Both `BR` and `BRA` identify Brazil.
+The flag does not provision credentials or guarantee search/refund availability.
+Equal partial refunds use a persisted pre-dispatch REF set and unique difference,
+not amount alone. A 409 idempotency retry retains its key and reconciles via GET.
+Legacy rows remain fail-closed but cannot occupy the Orders sweep batch; production
+cutover still requires draining/reconciling legacy charges and refund intents.
 
 ### 4. Bootstrap the inert Worker, then activate it
 
@@ -304,4 +319,4 @@ runner and investigate the native runtime failure separately.
 
 References: [Cloudflare Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/),
 [GitHub deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments),
-[Mercado Pago Payments integration tests](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/integration-test/make-test-purchase?scope=prod).
+[Mercado Pago Orders Pix integration](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-orders/payment-integration/websites/pix).

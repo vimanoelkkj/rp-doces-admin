@@ -368,6 +368,7 @@ export const OPERACAO_HTTP_STATUS: Record<string, number> = {
 export const RECUPERACAO_APOS_SEGUNDOS = 60;
 
 export interface OperacaoInconclusiva {
+  criado_em: string;
   operation_key: string;
   tipo: OperacaoTipo;
   fase: OperacaoFase;
@@ -379,7 +380,7 @@ export interface OperacaoInconclusiva {
 }
 
 const OPERACAO_INCONCLUSIVA_SQL = `
-  SELECT o.operation_key, o.tipo, o.fase, o.pedido_id, o.pagamento_id,
+  SELECT o.criado_em, o.operation_key, o.tipo, o.fase, o.pedido_id, o.pagamento_id,
          o.mp_request, o.erro, o.atualizado_em
   FROM pedido_operacoes o
   JOIN pedido_pagamentos pp ON pp.id = o.pagamento_id
@@ -496,31 +497,74 @@ export function externalReferenceDaOperacao(operacao: OperacaoInconclusiva): str
 }
 
 // R2 — prazo terminal de uma operação PIX cuja criação remota ficou
-// inconclusiva. `mp_request.date_of_expiration` é o TTL real do Pix que o A1
-// persistiu ANTES do envio (SITE em checkout.ts, ADMIN em comandaPix.ts). A
-// margem de 24h existe porque "nenhum pagamento encontrado por
-// external_reference" NUNCA prova que o provedor não criou a cobrança —
-// eventual consistency, cliente que paga no fim do TTL, webhook atrasado.
-// Só depois de TTL + 24h a ausência observada deixa de ser ambígua o bastante
-// para fechar a operação como EXPIRADA.
+// inconclusiva. O TTL do Pix vem do que o A1 persistiu em `mp_request` ANTES do
+// envio (SITE em checkout.ts, ADMIN em comandaPix.ts). O contrato atual envia
+// só `expiration_time` (duração): o prazo é o `criado_em` da operação somado a
+// ela. Um `mp_request` legado traz a data absoluta `date_of_expiration`, que
+// continua valendo e tem precedência. A margem de 24h existe porque "nenhum
+// pagamento encontrado por external_reference" NUNCA prova que o provedor não
+// criou a cobrança — eventual consistência, cliente que paga no fim do TTL,
+// webhook atrasado. Só depois de TTL + 24h a ausência observada deixa de ser
+// ambígua o bastante para fechar a operação como EXPIRADA.
 export const RECUPERACAO_EXPIRACAO_MARGEM_MS = 24 * 60 * 60 * 1000;
+
+// Duração ISO 8601 ESTRITA, em ms: P[nD][T[nH][nM][nS]] com ao menos um
+// componente, total positivo e de até 30 dias (limite do Pix). Anos, meses,
+// semanas, frações, sinal, minúsculas e qualquer outro formato devolvem null:
+// o prazo nunca é inventado.
+const DURACAO_ISO_MAXIMA_MS = 30 * 24 * 60 * 60 * 1000;
+
+function duracaoIsoEstritaMs(valor: unknown): number | null {
+  if (typeof valor !== "string") return null;
+  const partes = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(valor);
+  if (!partes) return null;
+  const [, dias, horas, minutos, segundos] = partes;
+  const temTempo = horas !== undefined || minutos !== undefined || segundos !== undefined;
+  // "P", "PT" e "P1DT" casam na regex mas não são durações.
+  if ((dias === undefined && !temTempo) || (valor.includes("T") && !temTempo)) return null;
+  const ms =
+    (((Number(dias ?? 0) * 24 + Number(horas ?? 0)) * 60 + Number(minutos ?? 0)) * 60 +
+      Number(segundos ?? 0)) *
+    1000;
+  return ms > 0 && ms <= DURACAO_ISO_MAXIMA_MS ? ms : null;
+}
+
+// `criado_em` vem do SQLite (CURRENT_TIMESTAMP): UTC, "YYYY-MM-DD HH:MM:SS", sem fuso.
+function criadoEmMs(criadoEm: unknown): number | null {
+  if (typeof criadoEm !== "string") return null;
+  const ts = Date.parse(criadoEm.includes("T") ? criadoEm : `${criadoEm.replace(" ", "T")}Z`);
+  return Number.isNaN(ts) ? null : ts;
+}
 
 export function dateOfExpirationDaOperacao(operacao: OperacaoInconclusiva): number | null {
   if (!operacao.mp_request) return null;
   try {
     const request = JSON.parse(operacao.mp_request) as { date_of_expiration?: unknown };
-    const valor = String(request?.date_of_expiration ?? "").trim();
-    if (!valor) return null;
-    const ts = Date.parse(valor);
-    return Number.isNaN(ts) ? null : ts;
+    const order = request as {
+      transactions?: {
+        payments?: Array<{ date_of_expiration?: unknown; expiration_time?: unknown }>;
+      };
+    };
+    const payment = order.transactions?.payments?.[0];
+    // Formato legado: data absoluta persistida no body. Presente mas ilegível → null.
+    const valor = String(payment?.date_of_expiration ?? request?.date_of_expiration ?? "").trim();
+    if (valor) {
+      const ts = Date.parse(valor);
+      return Number.isNaN(ts) ? null : ts;
+    }
+    // Contrato atual: instante de criação da operação + a duração enviada.
+    const duracao = duracaoIsoEstritaMs(payment?.expiration_time);
+    const criado = criadoEmMs(operacao.criado_em);
+    return duracao === null || criado === null ? null : criado + duracao;
   } catch {
     return null;
   }
 }
 
-// O prazo só decorre quando a operação TINHA uma expiração persistida e ela
-// já passou (TTL + margem). Sem expiração persistida, nada decorre: a
-// operação permanece inconclusiva e visível para intervenção.
+// O prazo só decorre quando a operação TINHA um prazo determinável (data
+// absoluta legada ou expiration_time válido) e ele já passou (TTL + margem).
+// Sem prazo determinável, nada decorre: a operação permanece inconclusiva e
+// visível para intervenção.
 export function expiracaoDecorrida(operacao: OperacaoInconclusiva, agora = Date.now()): boolean {
   const expira = dateOfExpirationDaOperacao(operacao);
   return expira !== null && expira + RECUPERACAO_EXPIRACAO_MARGEM_MS <= agora;

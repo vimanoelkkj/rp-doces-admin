@@ -1,4 +1,5 @@
-﻿import assert from "node:assert/strict";
+import { mpResponse } from "./helpers/mp-orders.mjs";
+import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { build } from "esbuild";
@@ -92,7 +93,7 @@ test("operational alert safe contract and integration", async t => {
       logs.length = 0;
       const response = await through(module, async () => {
         module.alert.operationalAlert({ code: `HTTP_${status}` });
-        return Response.json({ error: "expected" }, { status });
+        return mpResponse({ error: "expected" }, { status });
       });
       assert.equal(response.status, status);
       assert.deepEqual(await response.json(), { error: "expected" });
@@ -102,7 +103,7 @@ test("operational alert safe contract and integration", async t => {
   contracts.http = async module => {
     const response = await through(module, async () => {
       module.alert.operationalAlert({ code: "PUSH_RETRY_EXHAUSTED", pedidoId: 1, tentativas: 3 });
-      return Response.json(
+      return mpResponse(
         { ok: false, code: "unchanged" },
         { status: 409, headers: { "Cache-Control": "no-store", "X-Functional": "original" } }
       );
@@ -169,13 +170,13 @@ test("operational alert safe contract and integration", async t => {
       external_reference: "token",
       currency_id: "BRL"
     };
-    t.mock.method(globalThis, "fetch", async () => Response.json(mp));
+    t.mock.method(globalThis, "fetch", async () => mpResponse(mp));
     async function sync() {
-      const payment = await production.sync.fetchMpPayment("SECRET_TOKEN", "101");
+      const payment = await production.sync.fetchMpPayment("SECRET_TOKEN", "ORD101");
       return production.sync.syncPaymentFromMp(db, 1, payment);
     }
     logs.length = 0;
-    const response = await through(production, async () => Response.json(await sync()));
+    const response = await through(production, async () => mpResponse(await sync()));
     assert.deepEqual(await response.json(), { ok: true, status: "PENDENTE", transicionou: false });
     assert.deepEqual(alerts(), [
       {
@@ -188,11 +189,11 @@ test("operational alert safe contract and integration", async t => {
       }
     ]);
     logs.length = 0;
-    await through(production, async () => Response.json(await sync()));
+    await through(production, async () => mpResponse(await sync()));
     assert.deepEqual(alerts(), [], "Repeated identical observation does not flood alerts");
     mp.transaction_amount = 100;
     logs.length = 0;
-    await through(production, async () => Response.json(await sync()));
+    await through(production, async () => mpResponse(await sync()));
     assert.ok(
       alerts().some(row => row.code === "FINANCIAL_INTEGRITY_RESOLVED" && row.severity === "INFO")
     );
@@ -200,7 +201,7 @@ test("operational alert safe contract and integration", async t => {
     await db.prepare("UPDATE pedido_itens SET estoque_estado='LIBERADO' WHERE pedido_id=1").run();
     logs.length = 0;
     const stock = await through(production, async () =>
-      Response.json(await production.reconcile.reconcilePedidoAfterFinancialChange(db, 1))
+      mpResponse(await production.reconcile.reconcilePedidoAfterFinancialChange(db, 1))
     );
     assert.deepEqual((await stock.json()).estoque, {
       ok: false,
@@ -225,7 +226,7 @@ test("operational alert safe contract and integration", async t => {
       const env = { DB: db, VAPID_PUBLIC_KEY: "invalid", VAPID_PRIVATE_KEY: "invalid" };
       logs.length = 0;
       await through(production, async () =>
-        Response.json(await production.push.notificarNovoPedidoPago(db, env, 1))
+        mpResponse(await production.push.notificarNovoPedidoPago(db, env, 1))
       );
       assert.deepEqual(alerts(), [], "First transport failure is recoverable, not an alert");
       await db
@@ -233,7 +234,7 @@ test("operational alert safe contract and integration", async t => {
         .run();
       logs.length = 0;
       const response = await through(production, async () =>
-        Response.json(await production.push.reconciliarPushEventosFalhos(db, env))
+        mpResponse(await production.push.reconciliarPushEventosFalhos(db, env))
       );
       assert.deepEqual(alerts(), [
         {
@@ -247,7 +248,7 @@ test("operational alert safe contract and integration", async t => {
       ]);
       logs.length = 0;
       await through(production, async () =>
-        Response.json(await production.push.reconciliarPushEventosFalhos(db, env))
+        mpResponse(await production.push.reconciliarPushEventosFalhos(db, env))
       );
       assert.deepEqual(alerts(), []);
       await db
@@ -256,7 +257,7 @@ test("operational alert safe contract and integration", async t => {
       await db.prepare("DELETE FROM push_inscricoes").run();
       logs.length = 0;
       await through(production, async () =>
-        Response.json(await production.push.reconciliarPushEventosFalhos(db, env))
+        mpResponse(await production.push.reconciliarPushEventosFalhos(db, env))
       );
       assert.ok(
         alerts().some(row => row.code === "PUSH_RETRY_RECOVERED" && row.severity === "INFO")

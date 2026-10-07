@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import type { PixOrderBody } from "../mp/orders/types";
 
 import { preparePedidoPhysicalProjection } from "../stock";
 import { postPagamentoMp, cancelarPagamentoMp } from "../mpPost";
@@ -18,17 +19,7 @@ export interface RegenerateAdminPixArgs {
   valorCentavos: number;
   idempotencyKey: string;
   mpIdempotencyKey: string;
-  mpRequest: {
-    transaction_amount: number;
-    description: string;
-    payment_method_id: string;
-    date_of_expiration: string;
-    external_reference: string;
-    payer: {
-      email: string;
-      first_name: string;
-    };
-  };
+  mpRequest: PixOrderBody;
   reservaStatements: D1PreparedStatement[];
   waterfall: {
     alocacoes: Array<{
@@ -48,7 +39,7 @@ export async function regenerateAdminPix(
   // Releia o pagamento predecessor A no banco antes de qualquer GET/PUT/POST no MP.
   const aPosClaim = await db
     .prepare(
-      `SELECT id, pedido_id, metodo, origem, status, mp_payment_id
+      `SELECT id, pedido_id, metodo, origem, status, mp_order_id, mp_payment_id
        FROM pedido_pagamentos
        WHERE id = ?`
     )
@@ -59,6 +50,7 @@ export async function regenerateAdminPix(
       metodo: string;
       origem: string;
       status: string;
+      mp_order_id: string | null;
       mp_payment_id: string | null;
     }>();
 
@@ -79,6 +71,7 @@ export async function regenerateAdminPix(
     aPosClaim.origem !== "ADMIN" ||
     aPosClaim.status !== "PENDENTE" ||
     !aPosClaim.mp_payment_id ||
+    !aPosClaim.mp_order_id ||
     sucessorIncompativel !== null
   ) {
     await registrarFase(db, args.operationKey, {
@@ -91,7 +84,7 @@ export async function regenerateAdminPix(
   // 3. Inspeção remota de A
   let mpA: MpPaymentResponse;
   try {
-    mpA = await fetchMpPayment(args.env.MP_ACCESS_TOKEN, aPosClaim.mp_payment_id);
+    mpA = await fetchMpPayment(args.env.MP_ACCESS_TOKEN, aPosClaim.mp_order_id);
   } catch {
     await registrarFase(db, args.operationKey, {
       fase: "ENVIO_INCONCLUSIVO",
@@ -101,6 +94,13 @@ export async function regenerateAdminPix(
   }
 
   const statusRemotoA = String(mpA.status || "").toLowerCase();
+  if (mpA.id !== aPosClaim.mp_payment_id) {
+    await registrarFase(db, args.operationKey, {
+      fase: "ENVIO_INCONCLUSIVO",
+      erro: "IDENTIDADE_PREDECESSOR_DIVERGENTE"
+    });
+    return { ok: false, erro: "MERCADO_PAGO_INDISPONIVEL" };
+  }
 
   if (statusRemotoA === "approved") {
     await syncPaymentFromMp(db, aPosClaim.id, mpA);
@@ -114,9 +114,9 @@ export async function regenerateAdminPix(
   let aConfirmadoNaoPagavel = false;
   let aStatusCancelado = "CANCELADO";
 
-  if (statusRemotoA === "cancelled") {
+  if (statusRemotoA === "cancelled" || statusRemotoA === "expired") {
     aConfirmadoNaoPagavel = true;
-    if (mpA.status_detail === "expired") {
+    if (statusRemotoA === "expired" || mpA.status_detail === "expired") {
       aStatusCancelado = "EXPIRADO";
     }
   } else if (statusRemotoA === "rejected") {
@@ -126,29 +126,25 @@ export async function regenerateAdminPix(
     statusRemotoA === "in_process" ||
     statusRemotoA === "authorized"
   ) {
-    const cancelResultado = await cancelarPagamentoMp(
-      args.env.MP_ACCESS_TOKEN,
-      aPosClaim.mp_payment_id,
-      cancelKey
-    );
+    await cancelarPagamentoMp(args.env.MP_ACCESS_TOKEN, aPosClaim.mp_order_id, cancelKey);
 
-    if (cancelResultado.resultado === "SUCESSO" && cancelResultado.status === "cancelled") {
-      aConfirmadoNaoPagavel = true;
-      if (cancelResultado.statusDetail === "expired") {
-        aStatusCancelado = "EXPIRADO";
-      }
-    } else {
-      // Cancelamento inconclusivo: reconsulta A
+    {
+      // Only the authoritative GET, including after a successful cancel ACK,
+      // proves that A can no longer be paid before creating B.
       let reconsulta: MpPaymentResponse | null = null;
       try {
-        reconsulta = await fetchMpPayment(args.env.MP_ACCESS_TOKEN, aPosClaim.mp_payment_id);
+        reconsulta = await fetchMpPayment(args.env.MP_ACCESS_TOKEN, aPosClaim.mp_order_id);
       } catch {
         reconsulta = null;
       }
 
-      if (reconsulta && reconsulta.status === "cancelled") {
+      if (
+        reconsulta &&
+        reconsulta.id === aPosClaim.mp_payment_id &&
+        ["cancelled", "expired"].includes(reconsulta.status)
+      ) {
         aConfirmadoNaoPagavel = true;
-        if (reconsulta.status_detail === "expired") {
+        if (reconsulta.status === "expired" || reconsulta.status_detail === "expired") {
           aStatusCancelado = "EXPIRADO";
         }
       } else if (reconsulta && reconsulta.status === "approved") {
@@ -243,9 +239,9 @@ export async function regenerateAdminPix(
         `INSERT INTO pedido_pagamentos (
            pedido_id, metodo, origem, valor_centavos, status,
            registrado_por_usuario_id, idempotency_key, substitui_pagamento_id,
-           mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
+           mp_order_id, mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
          )
-         VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         args.pedidoId,
@@ -253,6 +249,7 @@ export async function regenerateAdminPix(
         args.usuarioId,
         args.idempotencyKey,
         args.substituiId,
+        payment.order_id,
         String(payment.id),
         payment.status,
         txData?.qr_code ?? null,

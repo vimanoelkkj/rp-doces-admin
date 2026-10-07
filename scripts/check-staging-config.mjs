@@ -20,6 +20,17 @@ export function readConfigs() {
 // Local config only. No credentials, D1 requests or provisioning.
 export function validateStaging(configs, { requireProvisioned = false, url } = {}) {
   const { production, productionWorker, pages, worker, bootstrap } = configs;
+  assert.equal(pages.vars?.MP_TEST_MODE, "orders_pix");
+  for (const config of [production, productionWorker]) {
+    assert.equal(config.vars?.MP_TEST_MODE, undefined, "Production must not enable Pix test mode");
+    for (const env of Object.values(config.env ?? {})) {
+      assert.equal(
+        env.vars?.MP_TEST_MODE,
+        undefined,
+        "Production environments must not enable Pix test mode"
+      );
+    }
+  }
   const forbidden = new Set([
     production.name,
     productionWorker.name,

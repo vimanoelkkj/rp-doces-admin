@@ -29,15 +29,31 @@ export async function resolveWebhookPayment(
 
   const { results: diretos } = await db
     .prepare(
-      `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`
+      `SELECT id,mp_order_id,mp_payment_id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND (mp_order_id = ? OR mp_payment_id = ?) LIMIT 2`
     )
-    .bind(mpPaymentId)
-    .all<{ id: number }>();
+    .bind(payment.order_id, mpPaymentId)
+    .all<{ id: number; mp_order_id: string | null; mp_payment_id: string | null }>();
   if (diretos.length > 1) return { kind: "ambiguous" };
-  if (diretos.length === 1) return { kind: "found", pagamentoId: Number(diretos[0].id) };
+  if (diretos.length === 1)
+    return diretos[0].mp_order_id === payment.order_id && diretos[0].mp_payment_id === mpPaymentId
+      ? { kind: "found", pagamentoId: Number(diretos[0].id) }
+      : { kind: "ambiguous" };
 
   const externalReference = String(payment.external_reference || "").trim();
   if (!externalReference) return { kind: "not_found" };
+
+  const { results: porOperacao } = await db
+    .prepare(
+      `SELECT DISTINCT pp.id FROM pedido_operacoes o
+     JOIN pedido_pagamentos pp ON pp.id = o.pagamento_id
+     WHERE pp.metodo = 'PIX_MP' AND pp.status IN ('PENDENTE','EXPIRADO')
+       AND o.tipo IN ('CHECKOUT_SITE','PIX_ADMIN')
+       AND json_extract(o.mp_request, '$.external_reference') = ? LIMIT 2`
+    )
+    .bind(externalReference)
+    .all<{ id: number }>();
+  if (porOperacao.length > 1) return { kind: "ambiguous" };
+  if (porOperacao.length === 1) return associateWebhookPayment(db, porOperacao[0].id, payment);
 
   const porIdempotencyKey = await db
     .prepare(
@@ -48,7 +64,7 @@ export async function resolveWebhookPayment(
     .bind(externalReference)
     .first<{ id: number }>();
   if (porIdempotencyKey) {
-    return associateWebhookPayment(db, Number(porIdempotencyKey.id), mpPaymentId);
+    return associateWebhookPayment(db, Number(porIdempotencyKey.id), payment);
   }
 
   const tokenPublico = externalReference;
@@ -71,34 +87,36 @@ export async function resolveWebhookPayment(
   if (!candidatos || candidatos.length === 0) return { kind: "not_found" };
   if (candidatos.length > 1) return { kind: "ambiguous" };
 
-  return associateWebhookPayment(db, Number(candidatos[0].id), mpPaymentId);
+  return associateWebhookPayment(db, Number(candidatos[0].id), payment);
 }
 
 async function associateWebhookPayment(
   db: D1Database,
   pagamentoId: number,
-  mpPaymentId: string
+  payment: MpPaymentResponse
 ): Promise<ResolveWebhookPaymentResult> {
+  const mpPaymentId = payment.id;
   await db
     .prepare(
-      `UPDATE pedido_pagamentos SET mp_payment_id = ?, atualizado_em = CURRENT_TIMESTAMP
+      `UPDATE pedido_pagamentos SET mp_order_id = ?, mp_payment_id = ?, atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ? AND status IN ('PENDENTE', 'EXPIRADO') AND mp_payment_id IS NULL
+         AND mp_order_id IS NULL
          AND (origem = 'ADMIN' OR (
            SELECT COUNT(*) FROM pedido_pagamentos candidato
            WHERE candidato.pedido_id = pedido_pagamentos.pedido_id AND candidato.metodo = 'PIX_MP'
              AND candidato.origem = 'SITE' AND candidato.status IN ('PENDENTE', 'EXPIRADO')
          ) = 1)
-         AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos WHERE mp_payment_id = ? AND metodo = 'PIX_MP')`
+         AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos WHERE (mp_payment_id = ? OR mp_order_id = ?) AND metodo = 'PIX_MP')`
     )
-    .bind(mpPaymentId, pagamentoId, mpPaymentId)
+    .bind(payment.order_id, mpPaymentId, pagamentoId, mpPaymentId, payment.order_id)
     .run();
   // Outro evento pode ter associado outro ID ou concluído a mesma associação.
   // Nunca retorna o candidato sem verificar quem de fato ficou com o ID.
   const { results } = await db
     .prepare(
-      `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? LIMIT 2`
+      `SELECT id FROM pedido_pagamentos WHERE metodo = 'PIX_MP' AND mp_payment_id = ? AND mp_order_id = ? LIMIT 2`
     )
-    .bind(mpPaymentId)
+    .bind(mpPaymentId, payment.order_id)
     .all<{ id: number }>();
   return results.length === 1 && results[0].id === pagamentoId
     ? { kind: "found", pagamentoId }
@@ -119,6 +137,10 @@ function timingSafeEqual(a: string, b: string): boolean {
 // Porta fiel do protocolo HMAC de produção: manifest
 // `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` assinado com
 // HMAC-SHA256 e comparado contra x-signature de forma timing-safe.
+// O data.id entra no manifest exatamente como recebido. Única exceção, provada em staging real: o sandbox do
+// MP Orders envia data.id em maiúsculas (ORDTST...) mas assina com ele em minúsculas. Só para data.id no
+// formato Order, se o manifest oficial falhar, vale também o mesmo manifest com data.id em minúsculas.
+// Nenhuma outra variante (sem id, sem request-id, só ts...) é aceita.
 export async function validateMpWebhookSignature(
   request: Request,
   secret: string,
@@ -132,11 +154,6 @@ export async function validateMpWebhookSignature(
   const v1 = parts.v1;
   if (!ts || !v1) return false;
 
-  let manifest = "";
-  if (dataId) manifest += `id:${String(dataId).toLowerCase()};`;
-  if (requestId) manifest += `request-id:${requestId};`;
-  manifest += `ts:${ts};`;
-
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -144,6 +161,16 @@ export async function validateMpWebhookSignature(
     false,
     ["sign"]
   );
-  const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
-  return timingSafeEqual(hex(digest), v1.toLowerCase());
+  const matchesManifest = async (id: string) => {
+    let manifest = "";
+    if (id) manifest += `id:${String(id)};`;
+    if (requestId) manifest += `request-id:${requestId};`;
+    manifest += `ts:${ts};`;
+    const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
+    return timingSafeEqual(hex(digest), v1.toLowerCase());
+  };
+  return (
+    (await matchesManifest(dataId)) ||
+    (/^ORD[A-Za-z0-9]+$/.test(dataId) && (await matchesManifest(dataId.toLowerCase())))
+  );
 }

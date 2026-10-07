@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture } from "./helpers/b3.mjs";
@@ -173,8 +174,8 @@ async function cenarioRefund(t) {
     db.prepare(`UPDATE produtos SET estoque_reservado=1 WHERE id=1`),
     db.prepare(
       `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-       mp_payment_id,idempotency_key,pago_em)
-       VALUES(1,1,'PIX_MP','ADMIN',2000,'PAGO','9001','pix-paid',CURRENT_TIMESTAMP)`
+       mp_payment_id,mp_order_id,idempotency_key,pago_em)
+       VALUES(1,1,'PIX_MP','ADMIN',2000,'PAGO','PAY9001','ORD9001','pix-paid',CURRENT_TIMESTAMP)`
     ),
     db.prepare(
       `INSERT INTO pedido_pagamento_alocacoes(id,pagamento_id,pedido_item_id,valor_centavos)
@@ -195,9 +196,20 @@ for (const [nome, resposta, ultimoErro] of [
     const noPost = new Promise(r => {
       chegou = r;
     });
+    const calls = [];
     t.mock.method(globalThis, "fetch", (url, opcoes) => {
-      if (opcoes?.method === "POST" && String(url).endsWith("/refunds")) {
-        posts.push({ key: opcoes.headers["X-Idempotency-Key"] });
+      calls.push({ method: opcoes?.method ?? "GET", url: String(url) });
+      if (
+        (opcoes?.method ?? "GET") === "GET" &&
+        String(url) === "https://api.mercadopago.com/v1/orders/ORD9001"
+      ) {
+        return mpResponse({ id: 9001, status: "approved", transaction_amount: 20 });
+      }
+      if (
+        opcoes?.method === "POST" &&
+        String(url) === "https://api.mercadopago.com/v1/orders/ORD9001/refund"
+      ) {
+        posts.push({ key: opcoes.headers["X-Idempotency-Key"], body: JSON.parse(opcoes.body) });
         chegou();
         return resposta(opcoes.signal);
       }
@@ -223,6 +235,16 @@ for (const [nome, resposta, ultimoErro] of [
         accessToken: "TEST_TOKEN"
       });
       await aguardarChamada(noPost, passada);
+      const intent = await db
+        .prepare("SELECT mp_idempotency_key FROM pedido_reembolso_pix_mp_intencoes")
+        .first();
+      assert.equal(posts[0].key, intent.mp_idempotency_key);
+      assert.deepEqual(posts[0].body, { transactions: [{ id: "PAY9001", amount: "15.00" }] });
+      assert.deepEqual(
+        JSON.parse((await db.prepare("SELECT resultado FROM pedido_operacoes").first()).resultado)
+          .refund_association,
+        { version: 1, before_ids: [], order_id: "ORD9001", payment_id: "PAY9001" }
+      );
 
       assert.deepEqual(await estado(), {
         intencao: { status: "PROCESSANDO", tentativas: 1, mp_refund_id: null },
@@ -246,6 +268,28 @@ for (const [nome, resposta, ultimoErro] of [
         reembolsos: 0
       });
       assert.equal(posts.length, 1, "exatamente um POST ao Mercado Pago nesta passada");
+      assert.equal(
+        (
+          await db
+            .prepare("SELECT mp_idempotency_key FROM pedido_reembolso_pix_mp_intencoes")
+            .first()
+        ).mp_idempotency_key,
+        posts[0].key,
+        "timeout preserves the same remote key"
+      );
+      assert.deepEqual(calls, [
+        { method: "GET", url: "https://api.mercadopago.com/v1/orders/ORD9001" },
+        { method: "POST", url: "https://api.mercadopago.com/v1/orders/ORD9001/refund" }
+      ]);
+      assert.deepEqual(
+        await db
+          .prepare(
+            "SELECT pp.valor_centavos AS paid, (SELECT COALESCE(SUM(i.valor_centavos),0) FROM pedido_reembolso_pix_mp_intencoes i WHERE i.pagamento_id=pp.id AND i.status IN ('PENDENTE','PROCESSANDO','INCONCLUSIVO')) AS reserved FROM pedido_pagamentos pp WHERE pp.id=1"
+          )
+          .first(),
+        { paid: 2000, reserved: 1500 },
+        "the inconclusive refund preserves its reserved capacity"
+      );
     } finally {
       t.mock.timers.reset();
     }

@@ -1,5 +1,7 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { app, fixture, state } from "./helpers/b3.mjs";
 
 // B-3 — recuperação de operações cujo envio ao Mercado Pago ficou
@@ -7,7 +9,7 @@ import { app, fixture, state } from "./helpers/b3.mjs";
 //
 // Provedor simulado determinístico. O contrato da busca foi confirmado na
 // documentação oficial antes da implementação:
-//   GET /v1/payments/search?sort=&criteria=&external_reference=
+//   GET /v1/orders??sort=&criteria=&external_reference=
 //   -> { paging: {...}, results: [...] }, 200 com results vazio quando não há.
 //
 // INVARIANTE: a busca só PROPÕE um id. A autoridade financeira continua
@@ -27,7 +29,9 @@ const envelhecer = db =>
 async function expirarOperacao(db, horasAtras = 25) {
   const operacao = (await db.prepare("SELECT * FROM pedido_operacoes").all()).results[0];
   const request = JSON.parse(operacao.mp_request);
-  request.date_of_expiration = new Date(Date.now() - horasAtras * 60 * 60 * 1000).toISOString();
+  request.transactions.payments[0].date_of_expiration = new Date(
+    Date.now() - horasAtras * 60 * 60 * 1000
+  ).toISOString();
   await db
     .prepare("UPDATE pedido_operacoes SET mp_request = ? WHERE id = ?")
     .bind(JSON.stringify(request), operacao.id)
@@ -40,47 +44,57 @@ async function expirarOperacao(db, horasAtras = 25) {
  * Registra todas as chamadas por tipo para provar ausência de segundo POST.
  */
 function provedor(t, { postar, remoto = new Map() } = {}) {
+  const canceled = new Set();
   const chamadas = { post: 0, search: 0, get: 0, put: 0 };
   const mock = t.mock.method(globalThis, "fetch", async (url, options) => {
     const alvo = String(url);
-    if (options?.method === "PUT") {
+    if (alvo.endsWith("/cancel")) {
       chamadas.put = (chamadas.put ?? 0) + 1;
-      const id = alvo.split("/").at(-1);
-      return Response.json({ id: Number(id) || id, status: "cancelled" });
+      const id = alvo
+        .replace(/\/cancel$/, "")
+        .split("/")
+        .at(-1)
+        .replace(/^ORD/, "");
+      canceled.add(String(id));
+      return mpResponse({ id: Number(id) || id, status: "cancelled" });
     }
     if (options?.method === "POST") {
-      assert.equal(alvo, "https://api.mercadopago.com/v1/payments");
+      assert.equal(alvo, "https://api.mercadopago.com/v1/orders");
       chamadas.post++;
       return postar(chamadas.post, options);
     }
-    if (alvo.startsWith("https://api.mercadopago.com/v1/payments/search")) {
+    if (alvo.startsWith("https://api.mercadopago.com/v1/orders?")) {
       chamadas.search++;
       const parsed = new URL(alvo);
-      assert.equal(parsed.searchParams.get("sort"), "date_created", "sort é obrigatório");
-      assert.equal(parsed.searchParams.get("criteria"), "desc", "criteria é obrigatório");
+      assert.equal(parsed.searchParams.get("sort_by"), "created_date");
+      assert.equal(parsed.searchParams.get("sort_order"), "asc");
       const referencia = parsed.searchParams.get("external_reference");
       const encontrados = remoto.get(referencia) ?? [];
-      return Response.json({
+      return mpResponse({
         paging: { total: encontrados.length, limit: 30, offset: 0 },
         results: encontrados
       });
     }
-    // GET autoritativo /v1/payments/:id
+    // GET autoritativo /v1/orders/ORD:id
     chamadas.get++;
-    const id = alvo.split("/").at(-1);
+    const id = alvo
+      .replace(/\/cancel$/, "")
+      .split("/")
+      .at(-1)
+      .replace(/^ORD/, "");
     for (const lista of remoto.values()) {
       const achado = lista.find(p => String(p.id) === id);
       if (achado)
-        return Response.json({
+        return mpResponse({
           transaction_amount: 100,
           payment_method_id: "pix",
           currency_id: "BRL",
           ...achado
         });
     }
-    return Response.json({
+    return mpResponse({
       id: Number(id) || id,
-      status: "pending",
+      status: canceled.has(String(id)) ? "cancelled" : "pending",
       date_of_expiration: "2099-01-01T00:00:00Z"
     });
   });
@@ -187,13 +201,13 @@ test("1. POST timeout, MP criou e aprovou: busca encontra, GET verifica, sistema
 
   const s = await state(db);
   assert.equal(s.pagamentos.length, 1, "nenhuma tentativa nova");
-  assert.equal(s.pagamentos[0].mp_payment_id, "9001", "identidade remota associada");
+  assert.equal(s.pagamentos[0].mp_payment_id, "PAY9001", "identidade remota associada");
   assert.equal(s.pagamentos[0].status, "PAGO");
   assert.equal(s.pedido.status_pagamento, "PAGO");
   assert.ok(s.itens[0].estoque_baixado_em, "baixa física uma única vez");
   assert.equal(s.produtos[0].estoque, 8);
   assert.equal(s.operacoes.length, 1, "nenhuma operação nova");
-  assert.equal(s.operacoes[0].mp_payment_id, "9001");
+  assert.equal(s.operacoes[0].mp_payment_id, "PAY9001");
   assert.equal(p.chamadas.post, postsAntes, "nenhum segundo POST lógico");
   assert.equal(p.chamadas.search, 1);
   assert.equal(p.chamadas.get, 1, "autoridade vem do GET verificado");
@@ -210,7 +224,7 @@ test("2. POST 5xx, recurso remoto PENDENTE: associa o ID sem inventar PAGO", asy
   await recuperar(db);
 
   const s = await state(db);
-  assert.equal(s.pagamentos[0].mp_payment_id, "9002");
+  assert.equal(s.pagamentos[0].mp_payment_id, "PAY9002");
   assert.equal(s.pagamentos[0].status, "PENDENTE", "pending não inventa aprovação");
   assert.equal(s.pedido.status_pagamento, "PENDENTE");
   assert.equal(s.pedido.reserva_status, "ATIVA", "reserva intacta");
@@ -297,12 +311,12 @@ test("5. webhook chega antes da recuperação: associação única e recuperaç�
     await crypto.subtle.sign(
       "HMAC",
       chave,
-      new TextEncoder().encode("id:9200;request-id:b3r;ts:1;")
+      new TextEncoder().encode("id:ORD9200;request-id:b3r;ts:1;")
     )
   ).toString("hex");
   const webhook = await app.webhook.onRequestPost({
     env: { DB: db, MP_ACCESS_TOKEN: "fake", MP_WEBHOOK_SECRET: secret },
-    request: new Request("https://local.test/api/webhooks/mercadopago?data.id=9200&type=payment", {
+    request: new Request("https://local.test/api/webhooks/mercadopago?data.id=ORD9200&type=order", {
       method: "POST",
       headers: { "x-signature": `ts=1,v1=${assinatura}`, "x-request-id": "b3r" },
       body: JSON.stringify({ data: { id: 9200 } })
@@ -310,7 +324,7 @@ test("5. webhook chega antes da recuperação: associação única e recuperaç�
   });
   assert.equal(webhook.status, 200);
   const aposWebhook = await state(db);
-  assert.equal(aposWebhook.pagamentos[0].mp_payment_id, "9200");
+  assert.equal(aposWebhook.pagamentos[0].mp_payment_id, "PAY9200");
   assert.equal(aposWebhook.pagamentos[0].status, "PAGO");
 
   // A recuperação nem seleciona mais o caso (já tem ID) e nada duplica.
@@ -335,7 +349,7 @@ test("6. recuperação vence antes do webhook: webhook posterior converge sem du
   await envelhecer(db);
   await recuperar(db);
   const aposRecuperacao = await state(db);
-  assert.equal(aposRecuperacao.pagamentos[0].mp_payment_id, "9300");
+  assert.equal(aposRecuperacao.pagamentos[0].mp_payment_id, "PAY9300");
   assert.equal(aposRecuperacao.pagamentos[0].status, "PAGO");
 
   const secret = "b3-local-only";
@@ -350,12 +364,12 @@ test("6. recuperação vence antes do webhook: webhook posterior converge sem du
     await crypto.subtle.sign(
       "HMAC",
       chave,
-      new TextEncoder().encode("id:9300;request-id:b3w;ts:1;")
+      new TextEncoder().encode("id:ORD9300;request-id:b3w;ts:1;")
     )
   ).toString("hex");
   const webhook = await app.webhook.onRequestPost({
     env: { DB: db, MP_ACCESS_TOKEN: "fake", MP_WEBHOOK_SECRET: secret },
-    request: new Request("https://local.test/api/webhooks/mercadopago?data.id=9300&type=payment", {
+    request: new Request("https://local.test/api/webhooks/mercadopago?data.id=ORD9300&type=order", {
       method: "POST",
       headers: { "x-signature": `ts=1,v1=${assinatura}`, "x-request-id": "b3w" },
       body: JSON.stringify({ data: { id: 9300 } })
@@ -376,7 +390,11 @@ test("8. ADMIN: recuperação usa a idempotency_key da tentativa como referênci
   const { db, provedor: p, operacao } = await adminInconclusivo(t, { remoto });
   const referencia = referenciaPersistida(operacao);
   const tentativa = (await db.prepare("SELECT * FROM pedido_pagamentos").all()).results[0];
-  assert.equal(referencia, tentativa.idempotency_key, "ADMIN usa a key da tentativa");
+  assert.equal(
+    referencia,
+    createHash("sha256").update(tentativa.idempotency_key).digest("hex"),
+    "ADMIN encodes the stable attempt identity for Orders"
+  );
   remoto.set(referencia, [{ id: 9400, status: "approved", external_reference: referencia }]);
 
   await envelhecer(db);
@@ -384,7 +402,7 @@ test("8. ADMIN: recuperação usa a idempotency_key da tentativa como referênci
 
   const s = await state(db);
   assert.equal(s.pagamentos.length, 1, "nenhuma segunda tentativa Pix");
-  assert.equal(s.pagamentos[0].mp_payment_id, "9400");
+  assert.equal(s.pagamentos[0].mp_payment_id, "PAY9400");
   assert.equal(s.pagamentos[0].status, "PAGO");
   assert.equal(s.pedido.status_pagamento, "PAGO");
   assert.equal(p.chamadas.post, 1, "nenhum segundo POST lógico");
@@ -401,7 +419,7 @@ test("9. Pix ADMIN substituído: recuperação do sucessor não mexe no original
       posts++;
       // Primeiro Pix nasce normal; a regeneração fica inconclusiva.
       return posts === 1
-        ? Response.json({
+        ? mpResponse({
             id: 9500,
             status: "pending",
             date_of_expiration: "2099-01-01T00:00:00Z",
@@ -448,9 +466,9 @@ test("9. Pix ADMIN substituído: recuperação do sucessor não mexe no original
   const orig = s.pagamentos.find(x => x.id === original.pagamentoId);
   const suc = s.pagamentos.find(x => x.substitui_pagamento_id === original.pagamentoId);
   assert.ok(suc, "sucessor materializado pela recuperação");
-  assert.equal(orig.mp_payment_id, "9500", "original intocado");
+  assert.equal(orig.mp_payment_id, "PAY9500", "original intocado");
   assert.equal(orig.status, "CANCELADO", "predecessor cancelado pelo R3");
-  assert.equal(suc.mp_payment_id, "9501", "sucessor associado");
+  assert.equal(suc.mp_payment_id, "PAY9501", "sucessor associado");
   assert.equal(suc.status, "PENDENTE");
   assert.equal(s.pedido.reserva_status, "ATIVA");
   assert.equal(p.chamadas.post, 2, "um POST por intenção legítima");
@@ -473,7 +491,7 @@ test("10. EXPIRADO -> PAGO continua exigindo autoridade do GET verificado (B2)",
 
   const s = await state(db);
   assert.equal(s.pagamentos[0].status, "PAGO", "recuperado por GET autoritativo");
-  assert.equal(s.pagamentos[0].mp_payment_id, "9600");
+  assert.equal(s.pagamentos[0].mp_payment_id, "PAY9600");
   assert.equal(s.pedido.status_pagamento, "PAGO");
   // A reserva já havia sido liberada pela expiração operacional; a baixa
   // reclama o estoque físico uma única vez e marca a conversão (Passo 7/B2).
@@ -540,7 +558,7 @@ test("13/15. recuperação repetida é idempotente: mesmo mp_payment_id e mesmos
   }
   const depois = await state(db);
   assert.equal(depois.pagamentos.length, 1);
-  assert.equal(depois.pagamentos[0].mp_payment_id, "9700");
+  assert.equal(depois.pagamentos[0].mp_payment_id, "PAY9700");
   assert.equal(depois.pagamentos[0].status, "PAGO");
   assert.equal(depois.refunds.length, 0);
   assert.equal(depois.operacoes.length, 1);
@@ -563,7 +581,7 @@ test("13/15. recuperação repetida é idempotente: mesmo mp_payment_id e mesmos
   });
   assert.equal(retry.status, 200, "mesma operationKey, mesma operação");
   const corpo = await retry.json();
-  assert.equal(String(corpo.paymentId), "9700");
+  assert.equal(String(corpo.paymentId), "PAY9700");
   assert.equal(corpo.pedidoId, depois.pedido.id);
   assert.equal(p.chamadas.post, 1, "nenhum segundo POST lógico");
 });
@@ -604,9 +622,9 @@ const tentativaAlheia = (db, origem, mpId) =>
   db
     .prepare(
       `INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,
-    mp_payment_id,idempotency_key) VALUES(1,'PIX_MP',?,10000,'PENDENTE',?,?)`
+    mp_order_id,mp_payment_id,idempotency_key) VALUES(1,'PIX_MP',?,10000,'PENDENTE',?,?,?)`
     )
-    .bind(origem, mpId, `alheia-${mpId}`)
+    .bind(origem, `ORD${mpId}`, `PAY${mpId}`, `alheia-${mpId}`)
     .run();
 
 for (const escopo of ["SITE", "ADMIN"]) {
@@ -667,10 +685,10 @@ test("correlação: convergente segue o fluxo normal (mesma bancada, id próprio
 
   const s = await state(db);
   const nossa = s.pagamentos.find(x => x.id === operacao.pagamento_id);
-  assert.equal(nossa.mp_payment_id, "9901", "a tentativa da operação é a associada");
+  assert.equal(nossa.mp_payment_id, "PAY9901", "a tentativa da operação é a associada");
   assert.equal(nossa.status, "PAGO");
   assert.equal(
-    s.pagamentos.find(x => x.mp_payment_id === "9900").status,
+    s.pagamentos.find(x => x.mp_payment_id === "PAY9900").status,
     "PENDENTE",
     "alheia intocada"
   );
@@ -680,7 +698,7 @@ test("correlação: convergente segue o fluxo normal (mesma bancada, id próprio
       .bind(operacao.operation_key)
       .all()
   ).results[0];
-  assert.equal(op.mp_payment_id, "9901");
+  assert.equal(op.mp_payment_id, "PAY9901");
 });
 
 test("correlação: retry após divergência continua seguro e sem tentativa nova", async t => {
@@ -732,7 +750,7 @@ test("correlação: webhook legítimo posterior ainda converge normalmente", asy
 
   // O recurso REAL da nossa tentativa aparece pelo caminho autoritativo.
   remoto.set(referencia, [{ id: 9904, status: "approved", external_reference: referencia }]);
-  const payment = await app.sync.fetchMpPayment("fake", "9904");
+  const payment = await app.sync.fetchMpPayment("fake", "ORD9904");
   const resolvido = await app.sync.resolveWebhookPayment(db, payment);
   assert.equal(resolvido.kind, "found");
   assert.equal(resolvido.pagamentoId, operacao.pagamento_id);
@@ -770,7 +788,7 @@ test("R1 SITE: falha no batch de persistência fica LOCAL_CRIADA e é resgatada 
   await db.prepare("UPDATE produtos SET estoque=10, estoque_reservado=0 WHERE id=1").run();
   const p = provedor(t, {
     postar: () =>
-      Response.json({
+      mpResponse({
         id: 9810,
         status: "pending",
         date_of_expiration: "2099-01-01T00:00:00Z",
@@ -780,7 +798,7 @@ test("R1 SITE: falha no batch de persistência fica LOCAL_CRIADA e é resgatada 
   });
   const key = uuid("r1-site");
   db.hook = (s, op) => {
-    if (op === "batch" && s.some(x => x.sql.includes("SET mp_payment_id = ?"))) {
+    if (op === "batch" && s.some(x => x.sql.includes("mp_payment_id = ?"))) {
       db.hook = null;
       throw new Error("injected local persistence failure");
     }
@@ -817,7 +835,7 @@ test("R1 SITE: falha no batch de persistência fica LOCAL_CRIADA e é resgatada 
 
   const s = await state(db);
   assert.equal(s.pagamentos.length, 1, "nenhuma tentativa nova");
-  assert.equal(s.pagamentos[0].mp_payment_id, "9810", "identidade remota resgatada pelo B3");
+  assert.equal(s.pagamentos[0].mp_payment_id, "PAY9810", "identidade remota resgatada pelo B3");
   assert.equal(s.pagamentos[0].status, "PAGO");
   assert.equal(s.operacoes[0].fase, "REMOTO_CONHECIDO");
   assert.equal(p.chamadas.post, 1, "nenhum segundo POST lógico");
@@ -830,7 +848,7 @@ test("R1 ADMIN: falha no batch de persistência fica LOCAL_CRIADA e é resgatada
   const session = await app.auth.createSession(db, 1);
   const p = provedor(t, {
     postar: () =>
-      Response.json({
+      mpResponse({
         id: 9820,
         status: "pending",
         date_of_expiration: "2099-01-01T00:00:00Z",
@@ -840,7 +858,7 @@ test("R1 ADMIN: falha no batch de persistência fica LOCAL_CRIADA e é resgatada
   });
   const key = uuid("r1-admin");
   db.hook = (s, op) => {
-    if (op === "batch" && s.some(x => x.sql.includes("SET mp_payment_id = ?"))) {
+    if (op === "batch" && s.some(x => x.sql.includes("mp_payment_id = ?"))) {
       db.hook = null;
       throw new Error("injected local persistence failure");
     }
@@ -869,8 +887,8 @@ test("R1 ADMIN: falha no batch de persistência fica LOCAL_CRIADA e é resgatada
   const referencia = referenciaPersistida(operacao);
   assert.equal(
     referencia,
-    tentativa.idempotency_key,
-    "ADMIN usa a key da tentativa como referência"
+    createHash("sha256").update(tentativa.idempotency_key).digest("hex"),
+    "ADMIN persists the Orders-compatible reference derived from the local key"
   );
   remoto.set(referencia, [{ id: 9820, status: "approved", external_reference: referencia }]);
 
@@ -879,7 +897,7 @@ test("R1 ADMIN: falha no batch de persistência fica LOCAL_CRIADA e é resgatada
 
   const s = await state(db);
   assert.equal(s.pagamentos.length, 1, "nenhuma tentativa nova");
-  assert.equal(s.pagamentos[0].mp_payment_id, "9820", "identidade remota resgatada pelo B3");
+  assert.equal(s.pagamentos[0].mp_payment_id, "PAY9820", "identidade remota resgatada pelo B3");
   assert.equal(s.pagamentos[0].status, "PAGO");
   assert.equal(s.operacoes[0].fase, "REMOTO_CONHECIDO");
   assert.equal(p.chamadas.post, 1, "nenhum segundo POST lógico");
@@ -891,8 +909,9 @@ test("R1 ADMIN: falha no batch de persistência fica LOCAL_CRIADA e é resgatada
  * por external_reference retorna NENHUM ficava presa PARA SEMPRE: sem
  * mp_payment_id, sem TTL, sem contador, sem estado terminal. A cobrança local
  * (pedido_pagamentos PENDENTE), a reserva de estoque e a operação nunca eram
- * fechadas. O prazo terminal é TTL persistido (mp_request.date_of_expiration)
- * + 24h de margem — só então a ausência observada deixa de ser ambígua. */
+ * fechadas. O prazo terminal é o TTL persistido + 24h de margem (formato legado:
+ * mp_request.date_of_expiration; contrato atual: criado_em + expiration_time) —
+ * só então a ausência observada deixa de ser ambígua. */
 
 test("R2: busca NENHUM dentro do prazo (TTL vencido, margem não) permanece inconclusiva", async t => {
   silenciar(t);
@@ -945,6 +964,235 @@ test("R2: busca NENHUM após o prazo fecha a operação como EXPIRADA e libera a
   assert.equal(visiveis.length, 0, "operação fechada sai da seleção de inconclusivas");
 });
 
+/* ── R2, contrato atual: o mp_request não tem date_of_expiration (só expiration_time). O prazo
+ * terminal é criado_em + PT30M + 24h; os testes acima cobrem o formato legado (data absoluta). */
+
+// Faz o TTL (criado_em + PT30M) ter vencido há `horasAtras` horas (só do `tipo`, se informado).
+const expirarPorCriacao = (db, horasAtras = 25, tipo = null) =>
+  db
+    .prepare(
+      "UPDATE pedido_operacoes SET criado_em = datetime('now', ?, '-30 minutes') WHERE ? IS NULL OR tipo = ?"
+    )
+    .bind(`-${horasAtras} hours`, tipo, tipo)
+    .run();
+
+const semDateOfExpiration = operacao =>
+  assert.equal(
+    "date_of_expiration" in JSON.parse(operacao.mp_request).transactions.payments[0],
+    false,
+    "o contrato atual não persiste (nem envia) date_of_expiration"
+  );
+
+test("R2: o checkout persiste o body enviado e o replay não reenvia nem altera o body persistido", async t => {
+  silenciar(t);
+  const enviados = [];
+  const {
+    db,
+    provedor: p,
+    operacao
+  } = await siteInconclusivo(t, {
+    postar: (_n, options) => {
+      enviados.push(options.body);
+      return new Response("offline", { status: 500 });
+    }
+  });
+  semDateOfExpiration(operacao);
+  assert.equal(JSON.parse(operacao.mp_request).transactions.payments[0].expiration_time, "PT30M");
+  assert.deepEqual(enviados, [operacao.mp_request], "o body persistido é exatamente o enviado");
+
+  const replay = await app.checkout.onRequestPost({
+    env: { DB: db, MP_ACCESS_TOKEN: "fake" },
+    request: new Request("https://local.test/api/checkout", {
+      method: "POST",
+      headers: { Origin: "https://local.test" },
+      body: JSON.stringify({
+        items: [{ id: 1, quantity: 2 }],
+        cliente: { nome: "Teste", whatsapp: "11999999999" },
+        operationKey: uuid("site")
+      })
+    })
+  });
+  assert.equal((await replay.json()).code, "OPERACAO_EM_PROCESSAMENTO");
+  assert.equal(p.chamadas.post, 1, "o replay não faz outro POST");
+  assert.deepEqual(enviados, [operacao.mp_request]);
+  const depois = (await db.prepare("SELECT * FROM pedido_operacoes").all()).results;
+  assert.equal(depois.length, 1);
+  assert.equal(depois[0].mp_request, operacao.mp_request, "mp_request intacto após o replay");
+  assert.equal(depois[0].mp_idempotency_key, operacao.mp_idempotency_key);
+});
+
+test("R2: busca NENHUM dentro do prazo (criado_em + PT30M vencido há 2h, margem não) permanece inconclusiva", async t => {
+  silenciar(t);
+  const { db, provedor: p, operacao } = await siteInconclusivo(t);
+  semDateOfExpiration(operacao);
+  const antes = await state(db);
+
+  await expirarPorCriacao(db, 2);
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos[0].status, "PENDENTE", "TTL vencido sozinho não prova rejeição");
+  assert.equal(s.pedido.reserva_status, "ATIVA", "reserva intacta");
+  assert.equal(s.produtos[0].estoque_reservado, antes.produtos[0].estoque_reservado);
+  assert.equal(s.operacoes[0].fase, "ENVIO_INCONCLUSIVO");
+  assert.equal(s.operacoes[0].expirado_em, null, "operação ainda não fechada");
+  assert.equal(s.operacoes[0].erro, "BUSCA:NENHUM");
+  assert.equal(p.chamadas.post, 1, "nenhum reenvio");
+});
+
+test("R2: busca NENHUM após criado_em + PT30M + 24h fecha o checkout como EXPIRADO e libera a reserva", async t => {
+  silenciar(t);
+  const { db, provedor: p, operacao } = await siteInconclusivo(t);
+  semDateOfExpiration(operacao);
+
+  await expirarPorCriacao(db);
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos[0].status, "EXPIRADO", "terminal local é EXPIRADO, nunca FALHOU");
+  assert.equal(s.pagamentos[0].mp_payment_id, null);
+  assert.equal(s.pedido.reserva_status, "LIBERADA");
+  assert.equal(s.produtos[0].estoque_reservado, 0);
+  assert.equal(s.produtos[0].estoque, 10, "sem baixa física");
+  assert.equal(s.operacoes[0].fase, "ENVIO_INCONCLUSIVO", "fase preservada para o replay A1");
+  assert.ok(s.operacoes[0].expirado_em, "operação marcada como expirada");
+  assert.equal(p.chamadas.post, 1, "nenhum reenvio");
+});
+
+test("R2: operação ADMIN sem date_of_expiration também fecha após criado_em + PT30M + 24h", async t => {
+  silenciar(t);
+  const { db, provedor: p, operacao } = await adminInconclusivo(t);
+  semDateOfExpiration(operacao);
+
+  await expirarPorCriacao(db);
+  await envelhecer(db);
+  await recuperar(db);
+
+  const s = await state(db);
+  assert.equal(s.pagamentos[0].status, "EXPIRADO");
+  assert.equal(s.pedido.reserva_status, "LIBERADA");
+  assert.equal(s.produtos[0].estoque_reservado, 0);
+  assert.ok(s.operacoes[0].expirado_em, "operação marcada como expirada");
+  assert.equal(p.chamadas.post, 1, "nenhum reenvio");
+});
+
+// Pix ADMIN original criado com sucesso e regeneração inconclusiva (500), como no teste 9.
+async function regeneracaoInconclusiva(t) {
+  const db = await fixture(t, { ledger: false });
+  const session = await app.auth.createSession(db, 1);
+  let posts = 0;
+  const p = provedor(t, {
+    postar: () => {
+      posts++;
+      return posts === 1
+        ? mpResponse({
+            id: 9700,
+            status: "pending",
+            date_of_expiration: "2099-01-01T00:00:00Z",
+            point_of_interaction: { transaction_data: { qr_code: "qr" } }
+          })
+        : new Response("offline", { status: 500 });
+    }
+  });
+  const gerar = body =>
+    app.adminPix.onRequestPost({
+      env: { DB: db, MP_ACCESS_TOKEN: "fake" },
+      params: { id: "1" },
+      request: new Request("https://local.test/api/admin/pedidos/1/pix", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: cookieDe(session),
+          Origin: "https://local.test"
+        },
+        body: JSON.stringify(body)
+      })
+    });
+  const original = await (
+    await gerar({ valorCentavos: 10000, operationKey: uuid("reg-a") })
+  ).json();
+  const regen = await gerar({ substituiId: original.pagamentoId, operationKey: uuid("reg-b") });
+  assert.equal(regen.status, 502);
+  const operacao = (
+    await db
+      .prepare("SELECT * FROM pedido_operacoes WHERE tipo = ?")
+      .bind("PIX_ADMIN_REGENERACAO")
+      .all()
+  ).results[0];
+  assert.equal(operacao.fase, "ENVIO_INCONCLUSIVO");
+  semDateOfExpiration(operacao);
+  assert.equal(JSON.parse(operacao.mp_request).transactions.payments[0].expiration_time, "PT30M");
+  return { db, provedor: p, operacao };
+}
+
+// Snapshot comparável: a observação/o fechamento da recuperação só podem mexer em
+// erro, atualizado_em e expirado_em das operações; todo o resto precisa ficar idêntico.
+const comparavel = ({ operacoes, ...resto }) => ({
+  ...resto,
+  operacoes: operacoes.map(({ erro, atualizado_em, expirado_em, ...fixos }) => fixos)
+});
+
+test("R2: regeneração no contrato atual permanece inconclusiva antes de criado_em + PT30M + 24h", async t => {
+  silenciar(t);
+  const { db, provedor: p, operacao } = await regeneracaoInconclusiva(t);
+
+  await expirarPorCriacao(db, 2, "PIX_ADMIN_REGENERACAO"); // TTL venceu há 2h, a margem de 24h não
+  await envelhecer(db);
+  // O envelhecimento é setup: o snapshot de comparação é tirado depois dele.
+  const antes = await state(db);
+  const chamadasAntes = { ...p.chamadas };
+  await recuperar(db);
+
+  const s = await state(db);
+  const regen = s.operacoes.find(o => o.tipo === "PIX_ADMIN_REGENERACAO");
+  assert.equal(regen.fase, "ENVIO_INCONCLUSIVO");
+  assert.equal(regen.expirado_em, null, "dentro da margem a operação segue aberta");
+  assert.equal(regen.erro, "BUSCA:NENHUM");
+  assert.equal(regen.mp_idempotency_key, operacao.mp_idempotency_key, "mesma key MP");
+  assert.deepEqual(comparavel(s), comparavel(antes), "nada além da observação mudou");
+  assert.equal(p.chamadas.post, chamadasAntes.post, "nenhum POST novo");
+  assert.equal(p.chamadas.put, chamadasAntes.put, "nenhum cancelamento novo");
+  assert.equal((await app.operacoes.listarOperacoesInconclusivasDoPedido(db, 1)).length, 1);
+});
+
+test("R2: regeneração no contrato atual fecha após criado_em + PT30M + 24h só na operação, sem recusa nem mudança de estoque", async t => {
+  silenciar(t);
+  const { db, provedor: p, operacao } = await regeneracaoInconclusiva(t);
+
+  await expirarPorCriacao(db, 25, "PIX_ADMIN_REGENERACAO");
+  await envelhecer(db);
+  // O envelhecimento é setup: o snapshot de comparação é tirado depois dele.
+  const antes = await state(db);
+  const chamadasAntes = { ...p.chamadas };
+  await recuperar(db);
+
+  const s = await state(db);
+  const regen = s.operacoes.find(o => o.tipo === "PIX_ADMIN_REGENERACAO");
+  assert.ok(regen.expirado_em, "operação de regeneração encerrada pelo fluxo existente");
+  assert.equal(regen.fase, "ENVIO_INCONCLUSIVO", "fase preservada para o replay A1");
+  assert.equal(regen.mp_idempotency_key, operacao.mp_idempotency_key, "nenhuma key nova");
+  assert.equal(regen.mp_request, operacao.mp_request, "body persistido intacto");
+  assert.equal(s.operacoes.length, antes.operacoes.length, "nenhuma operação nova");
+  assert.deepEqual(
+    s.operacoes.filter(o => o.expirado_em).map(o => o.tipo),
+    ["PIX_ADMIN_REGENERACAO"],
+    "só a regeneração é encerrada"
+  );
+
+  // Nenhum pagamento recusado, nenhuma tentativa nova, reserva/estoque exatamente como antes.
+  assert.ok(!s.pagamentos.some(x => x.status === "FALHOU"));
+  assert.deepEqual(
+    comparavel(s),
+    comparavel(antes),
+    "pagamentos, reserva, estoque e demais campos das operações intactos"
+  );
+  assert.equal(p.chamadas.post, chamadasAntes.post, "nenhum POST novo");
+  assert.equal(p.chamadas.put, chamadasAntes.put, "nenhum cancelamento novo");
+  assert.equal((await app.operacoes.listarOperacoesInconclusivasDoPedido(db, 1)).length, 0);
+});
+
 test("R2: busca INDISPONÍVEL após o prazo não finaliza (não é confirmação negativa)", async t => {
   silenciar(t);
   const { db, provedor: p } = await siteInconclusivo(t);
@@ -979,7 +1227,7 @@ test("R2: cobrança encontrada após o prazo segue o fluxo normal de sincroniza�
 
   const s = await state(db);
   assert.equal(s.pagamentos[0].status, "PAGO", "a cobrança existe: sincroniza, não expira");
-  assert.equal(s.pagamentos[0].mp_payment_id, "9550");
+  assert.equal(s.pagamentos[0].mp_payment_id, "PAY9550");
   assert.equal(s.pedido.status_pagamento, "PAGO");
   assert.equal(s.operacoes[0].fase, "REMOTO_CONHECIDO");
   assert.equal(s.operacoes[0].expirado_em, null, "não expira quando a cobrança existe");
@@ -1001,7 +1249,7 @@ test("R2: EXPIRADO -> PAGO tardio continua funcionando após o fechamento", asyn
 
   // Webhook/GET tardio: autoridade verificada ainda promove EXPIRADO -> PAGO.
   remoto.set(referencia, [{ id: 9560, status: "approved", external_reference: referencia }]);
-  const payment = await app.sync.fetchMpPayment("fake", "9560");
+  const payment = await app.sync.fetchMpPayment("fake", "ORD9560");
   const resolvido = await app.sync.resolveWebhookPayment(db, payment);
   assert.equal(resolvido.kind, "found");
   await app.sync.syncPaymentFromMp(db, resolvido.pagamentoId, payment);

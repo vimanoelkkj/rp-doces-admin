@@ -10,7 +10,7 @@ export interface CheckoutState {
 export interface CheckoutResponse {
   pedidoId: number;
   tokenPublico: string;
-  paymentId: number;
+  paymentId: number | string;
   status: string;
   qrCode: string | null;
   qrCodeBase64: string | null;

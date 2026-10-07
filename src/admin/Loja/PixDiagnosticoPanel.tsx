@@ -8,6 +8,7 @@ interface PixDiagnosticoResultado {
   qrCodeBase64: string | null;
   ticketUrl: string | null;
   expiresAt: string | null;
+  modoSimulador?: boolean;
 }
 
 interface PixReembolsoResultado {
@@ -162,10 +163,14 @@ export default function PixDiagnosticoPanel() {
     <div className="loj-diag-card">
       <div className="loj-diag-card-header">
         <span className="loj-diag-card-title">Pix real de diagnóstico</span>
-        <span className="loj-badge-cost">R$ 0,01</span>
+        <span className="loj-badge-cost">
+          {pixResultado?.modoSimulador ? "R$ 50,00 (Simulador)" : "R$ 0,01"}
+        </span>
       </div>
       <p className="loj-diag-card-desc">
-        Cria um Pix real de centavos para confirmar que a integração com o banco está de pé e ativa.
+        {pixResultado?.modoSimulador
+          ? "Cria um Pix de diagnóstico via Orders API (simulador sandbox oficial com valor fixo de R$ 50,00)."
+          : "Cria um Pix real de centavos para confirmar que a integração com o banco está de pé e ativa."}
       </p>
       <button
         type="button"
@@ -181,6 +186,11 @@ export default function PixDiagnosticoPanel() {
           <p className="loj-diag-pix-valor">
             R$ {(pixResultado.valorCentavos / 100).toFixed(2).replace(".", ",")}
           </p>
+          {pixResultado.modoSimulador && (
+            <p className="loj-diag-pix-expira" style={{ marginTop: "-4px", marginBottom: "8px" }}>
+              Ambiente sandbox: valor oficial de R$ 50,00 do simulador Orders Pix
+            </p>
+          )}
           {pixResultado.qrCodeBase64 && (
             <img
               className="loj-diag-pix-qr"

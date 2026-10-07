@@ -2,7 +2,7 @@
 
 import type { MpMappedStatus } from "./types";
 
-// Vocabulário de eventos do Mercado Pago (Payments API) -> vocabulário do
+// Compatibility vocabulary emitted by the explicit Orders mapper -> ledger.
 // nosso ledger. `null` significa "ainda não é um estado final conhecido"
 // (ex.: in_process/authorized/pending) — nesse caso não há nada a aplicar.
 export function mapMpStatus(mpStatus: string): MpMappedStatus | null {

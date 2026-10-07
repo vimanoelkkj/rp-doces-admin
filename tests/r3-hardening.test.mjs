@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, approvedMp } from "./helpers/b3.mjs";
@@ -8,10 +9,10 @@ test("R3 - A: A pending -> cancelamento confirmado -> B criado", async t => {
   const db = await fixture(t, { ledger: false });
   let putCalled = false;
   let postCount = 0;
-  t.mock.method(globalThis, "fetch", async (_url, options) => {
-    if (options?.method === "POST") {
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
       postCount++;
-      return Response.json({
+      return mpResponse({
         id: 100 + postCount,
         status: "pending",
         date_of_expiration: "2099-01-01T00:00:00Z",
@@ -20,12 +21,12 @@ test("R3 - A: A pending -> cancelamento confirmado -> B criado", async t => {
         }
       });
     }
-    if (options?.method === "PUT") {
+    if (String(url).endsWith("/cancel")) {
       putCalled = true;
-      assert.equal(JSON.parse(options.body).status, "cancelled");
-      return Response.json({ id: 101, status: "cancelled" });
+      assert.equal(options.body, undefined);
+      return mpResponse({ id: 101, status: "cancelled" });
     }
-    return Response.json({ id: 101, status: "pending" });
+    return mpResponse({ id: 101, status: putCalled ? "cancelled" : "pending" });
   });
 
   const a = await app.pix.createAdminPixCharge(env(db), {
@@ -45,7 +46,7 @@ test("R3 - A: A pending -> cancelamento confirmado -> B criado", async t => {
   });
   assert.equal(b.ok, true);
   assert.equal(putCalled, true);
-  assert.equal(b.mpPaymentId, "102");
+  assert.equal(b.mpPaymentId, "PAY102");
 
   const s = await state(db);
   const pagA = s.pagamentos.find(p => p.id === a.pagamentoId);
@@ -65,21 +66,21 @@ test("R3 - B: A approved antes da regeneração -> sincroniza -> B não criado",
   let postCount = 0;
   let putCalled = false;
   let requestBody;
-  t.mock.method(globalThis, "fetch", async (_url, options) => {
-    if (options?.method === "POST") {
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
       postCount++;
       requestBody = JSON.parse(options.body);
-      return Response.json({ id: 101, status: "pending", date_of_expiration: "2099-01-01" });
+      return mpResponse({ id: 101, status: "pending", date_of_expiration: "2099-01-01" });
     }
-    if (options?.method === "PUT") {
+    if (String(url).endsWith("/cancel")) {
       putCalled = true;
-      return Response.json({ id: 101, status: "cancelled" });
+      return mpResponse({ id: 101, status: "cancelled" });
     }
-    return Response.json(
+    return mpResponse(
       approvedMp({
         id: 101,
         date_approved: "2026-09-23T15:00:00Z",
-        transaction_amount: requestBody.transaction_amount,
+        transaction_amount: requestBody.total_amount,
         external_reference: requestBody.external_reference
       })
     );
@@ -115,15 +116,15 @@ test("R3 - B: A approved antes da regeneração -> sincroniza -> B não criado",
 test("R3 - C: PUT cancelamento inconclusivo + reconsulta inconclusiva -> ENVIO_INCONCLUSIVO -> B não criado", async t => {
   const db = await fixture(t, { ledger: false });
   let postCount = 0;
-  t.mock.method(globalThis, "fetch", async (_url, options) => {
-    if (options?.method === "POST") {
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
       postCount++;
-      return Response.json({ id: 101, status: "pending", date_of_expiration: "2099-01-01" });
+      return mpResponse({ id: 101, status: "pending", date_of_expiration: "2099-01-01" });
     }
-    if (options?.method === "PUT") {
+    if (String(url).endsWith("/cancel")) {
       return new Response("Internal Server Error", { status: 500 });
     }
-    return Response.json({ id: 101, status: "pending" });
+    return mpResponse({ id: 101, status: "pending" });
   });
 
   const a = await app.pix.createAdminPixCharge(env(db), {
@@ -158,7 +159,7 @@ test("R3 - C: PUT cancelamento inconclusivo + reconsulta inconclusiva -> ENVIO_I
 
 test("R3 - D: webhook cancelled de A durante LOCAL_CRIADA -> reserva NÃO liberada", async t => {
   const db = await fixture(t, { ledger: false });
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: 101, status: "pending" }));
+  t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 101, status: "pending" }));
 
   const a = await app.pix.createAdminPixCharge(env(db), {
     pedidoId: 1,
@@ -178,8 +179,8 @@ test("R3 - D: webhook cancelled de A durante LOCAL_CRIADA -> reserva NÃO libera
     .bind(a.pagamentoId)
     .run();
 
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: 101, status: "cancelled" }));
-  const paymentA = await app.sync.fetchMpPayment("fake", "101");
+  t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 101, status: "cancelled" }));
+  const paymentA = await app.sync.fetchMpPayment("fake", "ORD101");
   await app.sync.syncPaymentFromMp(db, a.pagamentoId, paymentA);
 
   const s = await state(db);
@@ -192,19 +193,19 @@ test("R3 - D: webhook cancelled de A durante LOCAL_CRIADA -> reserva NÃO libera
 test("R3 - E: duas regenerações simultâneas com operationKeys diferentes -> somente uma adquire o claim; somente uma pode tocar no Mercado Pago", async t => {
   const db = await fixture(t, { ledger: false });
   let mpCalls = 0;
-  t.mock.method(globalThis, "fetch", async (_url, options) => {
+  t.mock.method(globalThis, "fetch", async (url, options) => {
     mpCalls++;
-    if (options?.method === "POST") {
-      return Response.json({
+    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
+      return mpResponse({
         id: 101 + mpCalls,
         status: "pending",
         date_of_expiration: "2099-01-01"
       });
     }
-    if (options?.method === "PUT") {
-      return Response.json({ id: 101, status: "cancelled" });
+    if (String(url).endsWith("/cancel")) {
+      return mpResponse({ id: 101, status: "cancelled" });
     }
-    return Response.json({ id: 101, status: "pending" });
+    return mpResponse({ id: 101, status: "pending" });
   });
 
   const a = await app.pix.createAdminPixCharge(env(db), {
@@ -242,11 +243,12 @@ test("R3 - E: duas regenerações simultâneas com operationKeys diferentes -> s
 test("R3 - F: cenário TOCTOU: Y valida A como PENDENTE, X conclui regeneração, Y recheck pós-claim detecta A não elegível e NÃO toca no MP", async t => {
   const db = await fixture(t, { ledger: false });
   let mpCalls = 0;
+  let canceled = false;
   t.mock.method(globalThis, "fetch", async (url, options) => {
     mpCalls++;
     const urlStr = String(url);
-    if (options?.method === "POST") {
-      return Response.json({
+    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
+      return mpResponse({
         id: 100 + mpCalls,
         status: "pending",
         date_of_expiration: "2099-01-01",
@@ -255,11 +257,18 @@ test("R3 - F: cenário TOCTOU: Y valida A como PENDENTE, X conclui regeneração
         }
       });
     }
-    const paymentId = Number(urlStr.split("/").at(-1));
-    if (options?.method === "PUT") {
-      return Response.json({ id: paymentId, status: "cancelled" });
+    const paymentId = Number(
+      urlStr
+        .replace(/\/cancel$/, "")
+        .split("/")
+        .at(-1)
+        .replace(/^ORD/, "")
+    );
+    if (String(url).endsWith("/cancel")) {
+      canceled = true;
+      return mpResponse({ id: paymentId, status: "cancelled" });
     }
-    return Response.json({ id: paymentId, status: "pending" });
+    return mpResponse({ id: paymentId, status: canceled ? "cancelled" : "pending" });
   });
 
   const a = await app.pix.createAdminPixCharge(env(db), {
@@ -296,7 +305,7 @@ test("R3 - F: cenário TOCTOU: Y valida A como PENDENTE, X conclui regeneração
 
 test("R3 - G: operação com expirado_em preenchido -> não mantém hold de estoque", async t => {
   const db = await fixture(t, { ledger: false });
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: 101, status: "pending" }));
+  t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 101, status: "pending" }));
 
   const a = await app.pix.createAdminPixCharge(env(db), {
     pedidoId: 1,
@@ -333,9 +342,9 @@ test("R3 - H: B criado remotamente e persistência local falha -> recovery encon
   const db = await fixture(t, { ledger: false });
   let postCount = 0;
   t.mock.method(globalThis, "fetch", async (url, options) => {
-    if (options?.method === "POST") {
+    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
       postCount++;
-      return Response.json({
+      return mpResponse({
         id: 202,
         status: "pending",
         date_of_expiration: "2099-01-01T00:00:00Z",
@@ -345,30 +354,37 @@ test("R3 - H: B criado remotamente e persistência local falha -> recovery encon
       });
     }
     const urlStr = String(url);
-    if (urlStr.includes("/v1/payments/search")) {
-      return Response.json({
-        results: [{ id: 202, status: "pending", external_reference: "idemp-b-h" }]
+    if (urlStr.includes("/v1/orders?")) {
+      return mpResponse({
+        results: [
+          {
+            id: 202,
+            status: "pending",
+            external_reference: "ee211f5f4691b8a8e4c66a2db1a6f2bbb9ec16c21000ca83212b136ff57fd1ea"
+          }
+        ]
       });
     }
-    if (urlStr.includes("/v1/payments/202")) {
-      return Response.json({
+    if (urlStr.includes("/v1/orders/ORD202")) {
+      return mpResponse({
         id: 202,
         status: "pending",
         date_of_expiration: "2099-01-01T00:00:00Z",
-        external_reference: "idemp-b-h",
+        external_reference: "ee211f5f4691b8a8e4c66a2db1a6f2bbb9ec16c21000ca83212b136ff57fd1ea",
         transaction_amount: 50.0,
+        payment_method_id: "pix",
         point_of_interaction: {
           transaction_data: { qr_code: "qr-b", qr_code_base64: "b64-b", ticket_url: "url-b" }
         }
       });
     }
-    return Response.json({ id: 101, status: "pending" });
+    return mpResponse({ id: 101, status: "pending" });
   });
 
   await db
     .prepare(
-      `INSERT INTO pedido_pagamentos (id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id)
-       VALUES (1, 1, 'PIX_MP', 'ADMIN', 5000, 'PENDENTE', '101')`
+      `INSERT INTO pedido_pagamentos (id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id, mp_order_id)
+       VALUES (1, 1, 'PIX_MP', 'ADMIN', 5000, 'PENDENTE', 'PAY101', 'ORD101')`
     )
     .run();
 
@@ -377,7 +393,7 @@ test("R3 - H: B criado remotamente e persistência local falha -> recovery encon
     description: "Pedido R&P Doces",
     payment_method_id: "pix",
     date_of_expiration: "2099-01-01T00:00:00Z",
-    external_reference: "idemp-b-h",
+    external_reference: "ee211f5f4691b8a8e4c66a2db1a6f2bbb9ec16c21000ca83212b136ff57fd1ea",
     payer: { email: "cliente@checkout.rpdoces.com.br", first_name: "Cliente" }
   };
   await db
@@ -400,9 +416,9 @@ test("R3 - H: B criado remotamente e persistência local falha -> recovery encon
 
   const s = await state(db);
   const pagA = s.pagamentos.find(p => p.id === 1);
-  const pagB = s.pagamentos.find(p => p.idempotency_key === "idemp-b-h");
+  const pagB = s.pagamentos.find(p => p.idempotency_key === "a1:op-regen-h:pag");
   assert.ok(pagB, "Pagamento B deve ter sido persistido pelo recovery");
-  assert.equal(pagB.mp_payment_id, "202");
+  assert.equal(pagB.mp_payment_id, "PAY202");
   assert.equal(pagB.status, "PENDENTE");
   assert.equal(pagA.status, "CANCELADO");
 
@@ -417,9 +433,9 @@ test("R3 - I: sobrepagamento: total 5000; líquido 10000; excessoCentavos 5000; 
   await db.prepare("UPDATE pedidos SET valor_total_centavos = 5000 WHERE id = 1").run();
   await db
     .prepare(
-      `INSERT INTO pedido_pagamentos (id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id)
-       VALUES (1, 1, 'PIX_MP', 'ADMIN', 5000, 'PAGO', '101'),
-              (2, 1, 'PIX_MP', 'ADMIN', 5000, 'PAGO', '102')`
+      `INSERT INTO pedido_pagamentos (id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id, mp_order_id)
+       VALUES (1, 1, 'PIX_MP', 'ADMIN', 5000, 'PAGO', 'PAY101', 'ORD101'),
+              (2, 1, 'PIX_MP', 'ADMIN', 5000, 'PAGO', 'PAY102', 'ORD102')`
     )
     .run();
 
@@ -435,9 +451,9 @@ test("R3 - J: após reembolso parcial de 5000: líquido 5000; excesso 0; temExce
   await db.prepare("UPDATE pedidos SET valor_total_centavos = 5000 WHERE id = 1").run();
   await db
     .prepare(
-      `INSERT INTO pedido_pagamentos (id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id)
-       VALUES (1, 1, 'PIX_MP', 'ADMIN', 5000, 'PAGO', '101'),
-              (2, 1, 'PIX_MP', 'ADMIN', 5000, 'PAGO', '102')`
+      `INSERT INTO pedido_pagamentos (id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id, mp_order_id)
+       VALUES (1, 1, 'PIX_MP', 'ADMIN', 5000, 'PAGO', 'PAY101', 'ORD101'),
+              (2, 1, 'PIX_MP', 'ADMIN', 5000, 'PAGO', 'PAY102', 'ORD102')`
     )
     .run();
   await db
@@ -463,8 +479,8 @@ test("R3 - K: estoque continua baixado apenas uma vez", async t => {
     .run();
   await db
     .prepare(
-      `INSERT INTO pedido_pagamentos (id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id)
-       VALUES (1, 1, 'PIX_MP', 'ADMIN', 10000, 'PAGO', '101')`
+      `INSERT INTO pedido_pagamentos (id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id, mp_order_id)
+       VALUES (1, 1, 'PIX_MP', 'ADMIN', 10000, 'PAGO', 'PAY101', 'ORD101')`
     )
     .run();
 

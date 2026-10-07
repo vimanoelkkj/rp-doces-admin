@@ -1,3 +1,4 @@
+import { mpResponse, mockRefundProvider } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture } from "./helpers/b3.mjs";
@@ -29,7 +30,7 @@ async function cancellationScenario(t, { payment = 2000, item = 500 } = {}) {
     db
       .prepare(
         `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-      mp_payment_id,idempotency_key,pago_em) VALUES(1,1,'PIX_MP','ADMIN',?,'PAGO','9001','pix-paid',CURRENT_TIMESTAMP)`
+      mp_payment_id,mp_order_id,idempotency_key,pago_em) VALUES(1,1,'PIX_MP','ADMIN',?,'PAGO','PAY9001','ORD9001','pix-paid',CURRENT_TIMESTAMP)`
       )
       .bind(payment),
     db
@@ -107,7 +108,7 @@ async function exchangeScenario(t, { destination = 1200, mixed = false } = {}) {
     db
       .prepare(
         `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-      mp_payment_id,idempotency_key,pago_em) VALUES(1,1,'PIX_MP','ADMIN',?,'PAGO','9002','pix-exchange',CURRENT_TIMESTAMP)`
+      mp_payment_id,mp_order_id,idempotency_key,pago_em) VALUES(1,1,'PIX_MP','ADMIN',?,'PAGO','PAY9002','ORD9002','pix-exchange',CURRENT_TIMESTAMP)`
       )
       .bind(mixed ? 1000 : 1500),
     db
@@ -158,8 +159,8 @@ async function twoLegCapacityScenario(t) {
       valor_unitario_centavos,valor_total_centavos,status_item,estoque_estado,estoque_reservado_em)
       VALUES(2,1,2,'Doce',1,4000,4000,'ATIVO','RESERVADO',CURRENT_TIMESTAMP)`),
     db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-      mp_payment_id,idempotency_key,pago_em)
-      VALUES(1,1,'PIX_MP','ADMIN',10000,'PAGO','9901','capacity-payment',CURRENT_TIMESTAMP)`),
+      mp_payment_id,mp_order_id,idempotency_key,pago_em)
+      VALUES(1,1,'PIX_MP','ADMIN',10000,'PAGO','PAY9901','ORD9901','capacity-payment',CURRENT_TIMESTAMP)`),
     db.prepare(`INSERT INTO pedido_pagamento_alocacoes(id,pagamento_id,pedido_item_id,valor_centavos)
       VALUES(1,1,1,6000)`),
     db.prepare(`INSERT INTO pedido_pagamento_alocacoes(id,pagamento_id,pedido_item_id,valor_centavos)
@@ -182,9 +183,9 @@ async function twoLegCapacityScenario(t) {
 test("caso 1: pagamento PIX_MP 2000, item 500 envia somente amount 5 e confirma uma vez", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   const calls = [];
-  t.mock.method(globalThis, "fetch", async (url, init) => {
+  mockRefundProvider(t, async (url, init) => {
     calls.push({ url: String(url), init });
-    return Response.json(
+    return mpResponse(
       { id: 7001, payment_id: 9001, amount: 5, status: "approved" },
       { status: 201 }
     );
@@ -197,8 +198,10 @@ test("caso 1: pagamento PIX_MP 2000, item 500 envia somente amount 5 e confirma 
   assert.equal(result.refundStatus, "CONFIRMADO");
   assert.equal(result.cancelamento.status, "CONCLUIDO");
   assert.equal(calls.length, 1);
-  assert.deepEqual(JSON.parse(calls[0].init.body), { amount: 5 });
-  assert.equal(calls[0].init.headers["X-Render-In-Process-Refunds"], "true");
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    transactions: [{ id: "PAY9001", amount: "5.00" }]
+  });
+  assert.equal(calls[0].init.headers["X-Render-In-Process-Refunds"], undefined);
   const intent = await db
     .prepare(
       `SELECT status,valor_centavos,mp_request,mp_refund_id,tentativas FROM pedido_reembolso_pix_mp_intencoes`
@@ -207,8 +210,8 @@ test("caso 1: pagamento PIX_MP 2000, item 500 envia somente amount 5 e confirma 
   assert.deepEqual(intent, {
     status: "CONFIRMADO",
     valor_centavos: 500,
-    mp_request: '{"amount":5}',
-    mp_refund_id: "7001",
+    mp_request: '{"transactions":[{"id":"PAY9001","amount":"5.00"}]}',
+    mp_refund_id: "REF7001",
     tentativas: 1
   });
   assert.equal(
@@ -243,7 +246,7 @@ test("C1: mesma operation key concorrente adquire um unico claim antes do POST",
   const releaseFirst = deferred();
   const remoteByKey = new Map();
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+  mockRefundProvider(t, async (_url, init = {}) => {
     posts++;
     const key = init.headers["X-Idempotency-Key"];
     if (!remoteByKey.has(key)) {
@@ -253,7 +256,7 @@ test("C1: mesma operation key concorrente adquire um unico claim antes do POST",
       firstArrived.resolve();
       await releaseFirst.promise;
     }
-    return Response.json(remoteByKey.get(key), { status: 201 });
+    return mpResponse(remoteByKey.get(key), { status: 201 });
   });
   const input = refundInput(cancellation, leg, "c1-same-operation-key");
   const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
@@ -279,14 +282,14 @@ test("C5: timeout ambiguo apos efeito remoto reutiliza key sem refund duplo", as
   const { db, cancellation, leg } = await cancellationScenario(t);
   const calls = [];
   const remoteByKey = new Map();
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  mockRefundProvider(t, async (_url, init) => {
     const key = init.headers["X-Idempotency-Key"];
     const body = init.body;
     calls.push({ key, body });
     if (!remoteByKey.has(key))
       remoteByKey.set(key, { id: 7002, payment_id: 9001, amount: 5, status: "approved" });
     if (calls.length === 1) throw new Error("connection lost after provider commit");
-    return Response.json(remoteByKey.get(key), { status: 201 });
+    return mpResponse(remoteByKey.get(key), { status: 201 });
   });
   const input = refundInput(cancellation, leg, "refund-response-lost-01");
   const first = await app.itemCancellation.confirmCancellationRefund(db, input);
@@ -324,7 +327,8 @@ test("4xx apos envio ambiguo nao libera capacidade sem provar ausencia de efeito
   const remoteByKey = new Map();
   const calls = [];
   let effects = 0;
-  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+  mockRefundProvider(t, async (_url, init = {}) => {
+    if (init.method !== "POST") return Response.json({}, { status: 503 });
     const key = init.headers["X-Idempotency-Key"];
     calls.push({ key, body: init.body });
     if (!remoteByKey.has(key)) {
@@ -332,7 +336,7 @@ test("4xx apos envio ambiguo nao libera capacidade sem provar ausencia de efeito
       effects++;
       throw new Error("response lost after provider commit");
     }
-    return Response.json(
+    return mpResponse(
       { message: "idempotency conflict without refund representation" },
       { status: 409 }
     );
@@ -393,11 +397,11 @@ test("C6: falha de persistencia apos MP usa GET e materializa uma vez", async t 
   const { db, cancellation, leg } = await cancellationScenario(t);
   const calls = [];
   let effects = 0;
-  t.mock.method(globalThis, "fetch", async (url, init = {}) => {
+  mockRefundProvider(t, async (url, init = {}) => {
     const method = init.method ?? "GET";
     calls.push({ method, url: String(url), body: init.body });
     if (method === "POST") effects++;
-    return Response.json(
+    return mpResponse(
       { id: 7003, payment_id: 9001, amount: 5, status: "approved" },
       { status: 200 }
     );
@@ -433,7 +437,7 @@ test("C6: falha de persistencia apos MP usa GET e materializa uma vez", async t 
     ["POST", "GET"]
   );
   assert.equal(effects, 1);
-  assert.match(calls[1].url, /\/refunds\/7003$/);
+  assert.match(calls[1].url, /\/orders\/ORD9001$/);
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
   assert.equal(
     (await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolso_alocacoes`).first()).n,
@@ -453,7 +457,7 @@ test("C6b: falha ao persistir mp_refund_id mantém reserva e recupera pela mesma
   const keys = [];
   let posts = 0;
   let effects = 0;
-  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+  mockRefundProvider(t, async (_url, init = {}) => {
     if ((init.method ?? "GET") !== "POST") throw new Error("GET sem refund remoto identificado");
     posts++;
     const key = init.headers["X-Idempotency-Key"];
@@ -462,7 +466,7 @@ test("C6b: falha ao persistir mp_refund_id mantém reserva e recupera pela mesma
       remoteByKey.set(key, { id: 7005, payment_id: 9001, amount: 5, status: "approved" });
       effects++;
     }
-    return Response.json(remoteByKey.get(key), { status: 201 });
+    return mpResponse(remoteByKey.get(key), { status: 201 });
   });
   let failRemoteIdentity = true;
   db.hook = async statements => {
@@ -517,7 +521,7 @@ test("C6b: falha ao persistir mp_refund_id mantém reserva e recupera pela mesma
   assert.equal((await db.prepare(`SELECT COUNT(*) n FROM pedido_reembolsos`).first()).n, 1);
   assert.deepEqual(
     await db.prepare(`SELECT status,mp_refund_id FROM pedido_reembolso_pix_mp_intencoes`).first(),
-    { status: "CONFIRMADO", mp_refund_id: "7005" }
+    { status: "CONFIRMADO", mp_refund_id: "REF7005" }
   );
   assert.deepEqual(await refundCapacity(db), {
     paid: 2000,
@@ -533,7 +537,7 @@ test("C2: keys distintas concorrentes compartilham claim e deixam aliases audita
   const releaseFirst = deferred();
   const remoteByKey = new Map();
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+  mockRefundProvider(t, async (_url, init = {}) => {
     const refund = { id: 7004, payment_id: 9001, amount: 5, status: "approved" };
     if ((init.method ?? "GET") === "POST") {
       posts++;
@@ -543,9 +547,9 @@ test("C2: keys distintas concorrentes compartilham claim e deixam aliases audita
         firstArrived.resolve();
         await releaseFirst.promise;
       }
-      return Response.json(remoteByKey.get(key), { status: 201 });
+      return mpResponse(remoteByKey.get(key), { status: 201 });
     }
-    return Response.json(refund);
+    return mpResponse(refund);
   });
   const firstPromise = app.itemCancellation.confirmCancellationRefund(
     db,
@@ -618,7 +622,7 @@ test("C3: parciais concorrentes cuja soma excede capacidade param antes do segun
   const releaseFirst = deferred();
   const remoteByKey = new Map();
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+  mockRefundProvider(t, async (_url, init = {}) => {
     posts++;
     const key = init.headers["X-Idempotency-Key"];
     if (!remoteByKey.has(key)) {
@@ -628,7 +632,7 @@ test("C3: parciais concorrentes cuja soma excede capacidade param antes do segun
       firstArrived.resolve();
       await releaseFirst.promise;
     }
-    return Response.json(remoteByKey.get(key), { status: 201 });
+    return mpResponse(remoteByKey.get(key), { status: 201 });
   });
   const params = (id, value, allocation) => ({
     pedidoId: 1,
@@ -680,9 +684,9 @@ test("C4: request pausada antes do dispatch perde o CAS e nao envia segundo POST
     }
     return statements;
   };
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     posts++;
-    return Response.json({ id: 7304, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7304, payment_id: 9001, amount: 5, status: "approved" });
   });
   const input = refundInput(cancellation, leg, "c4-paused-before-dispatch");
   const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
@@ -707,15 +711,15 @@ test("C4: request pausada antes do dispatch perde o CAS e nao envia segundo POST
 test("in_process permanece sem efeito financeiro e GET oportunista conclui depois", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   const methods = [];
-  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+  mockRefundProvider(t, async (_url, init = {}) => {
     methods.push(init.method ?? "GET");
     if ((init.method ?? "GET") === "POST") {
-      return Response.json(
+      return mpResponse(
         { id: 7005, payment_id: 9001, amount: 5, status: "in_process" },
         { status: 201 }
       );
     }
-    return Response.json({ id: 7005, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7005, payment_id: 9001, amount: 5, status: "approved" });
   });
   const input = refundInput(cancellation, leg, "refund-in-process-01");
   const first = await app.itemCancellation.confirmCancellationRefund(db, input);
@@ -748,13 +752,13 @@ test("in_process permanece sem efeito financeiro e GET oportunista conclui depoi
 test("GET de refund conhecido aplica recusa terminal somente pelo estado remoto", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   const methods = [];
-  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+  mockRefundProvider(t, async (_url, init = {}) => {
     const method = init.method ?? "GET";
     methods.push(method);
     if (method === "POST") {
-      return Response.json({ id: 7007, payment_id: 9001, amount: 5, status: "in_process" });
+      return mpResponse({ id: 7007, payment_id: 9001, amount: 5, status: "in_process" });
     }
-    return Response.json({ id: 7007, payment_id: 9001, amount: 5, status: "rejected" });
+    return mpResponse({ id: 7007, payment_id: 9001, amount: 5, status: "rejected" });
   });
   const input = refundInput(cancellation, leg, "known-refund-rejected-by-get");
   const pending = await app.itemCancellation.confirmCancellationRefund(db, input);
@@ -776,7 +780,7 @@ test("GET de refund conhecido aplica recusa terminal somente pelo estado remoto"
       .first(),
     {
       status: "RECUSADO",
-      mp_refund_id: "7007",
+      mp_refund_id: "REF7007",
       mp_status: "rejected"
     }
   );
@@ -809,11 +813,12 @@ test("408, 429, 5xx e resposta ilegível são ambíguos; 400 inequívoco é recu
     new Response("not-json", { status: 201 }),
     new Response(JSON.stringify({ message: "invalid refund" }), { status: 400 })
   ];
-  t.mock.method(globalThis, "fetch", async () => responses.shift());
+  mockRefundProvider(t, async () => responses.shift());
   for (const expected of ["AMBIGUO", "AMBIGUO", "AMBIGUO", "AMBIGUO", "RECUSA_DEFINITIVA"]) {
     const result = await app.mpRefund.postRefundMp(
       "token",
-      "9",
+      "ORD9",
+      "PAY9",
       `key-${expected}-${responses.length}`,
       { amountCentavos: 200, renderInProcess: true }
     );
@@ -824,10 +829,10 @@ test("408, 429, 5xx e resposta ilegível são ambíguos; 400 inequívoco é recu
 test("recusa inequívoca é terminal para a key e uma nova intenção pode tentar a mesma perna", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     calls++;
-    if (calls === 1) return Response.json({ message: "refund rejected" }, { status: 400 });
-    return Response.json({ id: 7006, payment_id: 9001, amount: 5, status: "approved" });
+    if (calls === 1) return mpResponse({ message: "refund rejected" }, { status: 400 });
+    return mpResponse({ id: 7006, payment_id: 9001, amount: 5, status: "approved" });
   });
   const refused = await app.itemCancellation.confirmCancellationRefund(
     db,
@@ -870,7 +875,7 @@ test("recusa inequívoca é terminal para a key e uma nova intenção pode tenta
 test("falha D1 antes de persistir intenção impede qualquer chamada ao provedor", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     calls++;
     throw new Error("network must not run");
   });
@@ -895,7 +900,7 @@ test("falha D1 antes de persistir intenção impede qualquer chamada ao provedor
 
 test("intenção remota ativa bloqueia registro manual PIX_MP concorrente", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     throw new Error("ambiguous transport");
   });
   const remote = await app.itemCancellation.confirmCancellationRefund(
@@ -919,21 +924,21 @@ test("intenção remota ativa bloqueia registro manual PIX_MP concorrente", asyn
 
 test("helper preserva refund integral diagnóstico e valida resposta parcial", async t => {
   const calls = [];
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  mockRefundProvider(t, async (_url, init) => {
     calls.push(init);
-    return Response.json({ id: 88, payment_id: 9, amount: 2, status: "approved" });
+    return mpResponse({ id: 88, payment_id: 9, amount: 2, status: "approved" });
   });
-  const full = await app.mpRefund.postRefundMp("token", "9", "diag-key");
+  const full = await app.mpRefund.postRefundMp("token", "ORD9", "PAY9", "diag-key");
   assert.equal(full.resultado, "SUCESSO");
   assert.equal(calls[0].body, undefined);
   assert.equal(calls[0].headers["X-Render-In-Process-Refunds"], undefined);
-  const partial = await app.mpRefund.postRefundMp("token", "9", "partial-key", {
+  const partial = await app.mpRefund.postRefundMp("token", "ORD9", "PAY9", "partial-key", {
     amountCentavos: 200,
     renderInProcess: true
   });
   assert.equal(partial.resultado, "SUCESSO");
-  assert.deepEqual(JSON.parse(calls[1].body), { amount: 2 });
-  const mismatch = await app.mpRefund.postRefundMp("token", "10", "bad-key", {
+  assert.deepEqual(JSON.parse(calls[1].body), { transactions: [{ id: "PAY9", amount: "2.00" }] });
+  const mismatch = await app.mpRefund.postRefundMp("token", "ORD10", "PAY10", "bad-key", {
     amountCentavos: 200
   });
   assert.equal(mismatch.resultado, "AMBIGUO");
@@ -943,9 +948,9 @@ test("caso 2: troca 1500 por 1200 envia refund PIX_MP de exatamente 300", async 
   const { db, exchange } = await exchangeScenario(t);
   const leg = exchange.refundsPendentes[0];
   let sent;
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  mockRefundProvider(t, async (_url, init) => {
     sent = JSON.parse(init.body);
-    return Response.json({ id: 7100, payment_id: 9002, amount: 3, status: "approved" });
+    return mpResponse({ id: 7100, payment_id: 9002, amount: 3, status: "approved" });
   });
   const result = await app.itemExchange.confirmExchangeRefund(db, {
     pedidoId: 1,
@@ -958,7 +963,7 @@ test("caso 2: troca 1500 por 1200 envia refund PIX_MP de exatamente 300", async 
     confirmacao: true,
     mpAccessToken: "TEST_TOKEN"
   });
-  assert.deepEqual(sent, { amount: 3 });
+  assert.deepEqual(sent, { transactions: [{ id: "PAY9002", amount: "3.00" }] });
   assert.equal(result.ok, true);
   assert.equal(result.troca.status, "CONCLUIDA");
   assert.equal(
@@ -972,9 +977,9 @@ test("releitura pós-refund PIX_MP suprimida retorna OPERACAO_INCOMPLETA sem ree
   const leg = exchange.refundsPendentes[0];
   assert.equal(leg.metodo, "PIX_MP");
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  mockRefundProvider(t, async (_url, init) => {
     if (init?.method === "POST") posts++;
-    return Response.json({ id: 7100, payment_id: 9002, amount: 3, status: "approved" });
+    return mpResponse({ id: 7100, payment_id: 9002, amount: 3, status: "approved" });
   });
   const input = {
     pedidoId: 1,
@@ -1038,9 +1043,9 @@ test("caso 3: LIFO devolve 500 em dinheiro e envia somente 200 ao Mercado Pago",
   });
   const pix = cashResult.troca.refundsPendentes[0];
   let sent;
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  mockRefundProvider(t, async (_url, init) => {
     sent = JSON.parse(init.body);
-    return Response.json({ id: 7101, payment_id: 9002, amount: 2, status: "approved" });
+    return mpResponse({ id: 7101, payment_id: 9002, amount: 2, status: "approved" });
   });
   const pixResult = await app.itemExchange.confirmExchangeRefund(db, {
     pedidoId: 1,
@@ -1053,7 +1058,7 @@ test("caso 3: LIFO devolve 500 em dinheiro e envia somente 200 ao Mercado Pago",
     confirmacao: true,
     mpAccessToken: "TEST_TOKEN"
   });
-  assert.deepEqual(sent, { amount: 2 });
+  assert.deepEqual(sent, { transactions: [{ id: "PAY9002", amount: "2.00" }] });
   assert.equal(pixResult.ok, true);
   assert.equal(pixResult.troca.status, "CONCLUIDA");
   assert.deepEqual(
@@ -1116,9 +1121,9 @@ test("migration 0020 preserva integralmente fatos e operações A1 anteriores", 
 test("PROCESSANDO antigo com refund ainda in_process permanece recuperável", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     calls++;
-    return Response.json({ id: 7007, payment_id: 9001, amount: 5, status: "in_process" });
+    return mpResponse({ id: 7007, payment_id: 9001, amount: 5, status: "in_process" });
   });
   const first = await app.itemCancellation.confirmCancellationRefund(
     db,
@@ -1145,8 +1150,8 @@ test("PROCESSANDO antigo com refund ainda in_process permanece recuperável", as
 test("duas reconciliações concorrentes materializam um único efeito", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   let approved = false;
-  t.mock.method(globalThis, "fetch", async () =>
-    Response.json({
+  mockRefundProvider(t, async () =>
+    mpResponse({
       id: 7008,
       payment_id: 9001,
       amount: 5,
@@ -1182,9 +1187,9 @@ test("duas reconciliações concorrentes materializam um único efeito", async t
 test("reconcile e clique manual simultâneos preservam um refund lógico", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   let ambiguous = true;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     if (ambiguous) throw new Error("timeout");
-    return Response.json({ id: 7012, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7012, payment_id: 9001, amount: 5, status: "approved" });
   });
   const input = refundInput(cancellation, leg, "refund-reconcile-click-01");
   const first = await app.itemCancellation.confirmCancellationRefund(db, input);
@@ -1205,7 +1210,7 @@ test("reconcile e clique manual simultâneos preservam um refund lógico", async
 
 test("reload expõe a operationKey persistida e mantém a mesma intenção inconclusiva", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     throw new Error("timeout depois do envio");
   });
   const operationKey = "refund-reload-same-intent-01";
@@ -1227,9 +1232,9 @@ test("reload expõe a operationKey persistida e mantém a mesma intenção incon
 test("queda após persistir intenção PENDENTE e antes da rede é retomada no reload", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   let remoteCalls = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     remoteCalls++;
-    return Response.json({ id: 7009, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7009, payment_id: 9001, amount: 5, status: "approved" });
   });
   let crashBeforeNetwork = true;
   db.hook = async statements => {
@@ -1288,9 +1293,9 @@ test("lease PROCESSANDO expirada sem refund remoto nao reenvia POST cegamente", 
     )
     .run();
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     posts++;
-    return Response.json({ id: 7310, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7310, payment_id: 9001, amount: 5, status: "approved" });
   });
 
   await app.mpRefundIntent.recoverPixMpRefundIntentsForParent(db, "TEST_TOKEN", {
@@ -1320,11 +1325,11 @@ test("S4: force=true nao rompe lease nem redispara POST sem identidade remota", 
   const firstArrived = deferred();
   const releaseFirst = deferred();
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     posts++;
     firstArrived.resolve();
     await releaseFirst.promise;
-    return Response.json({ id: 7313, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7313, payment_id: 9001, amount: 5, status: "approved" });
   });
   const input = refundInput(cancellation, leg, "force-does-not-bypass-claim");
   const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
@@ -1382,7 +1387,7 @@ test("resposta ambigua antiga nao revoga claim de uma tentativa mais nova", asyn
   const releaseFirst = deferred();
   const releaseSecond = deferred();
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     posts++;
     if (posts === 1) {
       firstArrived.resolve();
@@ -1391,7 +1396,7 @@ test("resposta ambigua antiga nao revoga claim de uma tentativa mais nova", asyn
     }
     secondArrived.resolve();
     await releaseSecond.promise;
-    return Response.json({ id: 7311, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7311, payment_id: 9001, amount: 5, status: "approved" });
   });
   const input = refundInput(cancellation, leg, "fenced-dispatch-attempt-01");
   const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
@@ -1429,7 +1434,7 @@ test("B1: HTTP 400 tardio nao recusa refund remoto conhecido por tentativa mais 
   const releaseFirst = deferred();
   const calls = [];
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async (url, init = {}) => {
+  mockRefundProvider(t, async (url, init = {}) => {
     const method = init.method ?? "GET";
     calls.push({ method, url: String(url), key: init.headers?.["X-Idempotency-Key"] });
     if (method === "POST") {
@@ -1437,11 +1442,11 @@ test("B1: HTTP 400 tardio nao recusa refund remoto conhecido por tentativa mais 
       if (posts === 1) {
         firstArrived.resolve();
         await releaseFirst.promise;
-        return Response.json({ message: "late refusal from attempt one" }, { status: 400 });
+        return mpResponse({ message: "late refusal from attempt one" }, { status: 400 });
       }
-      return Response.json({ id: 7312, payment_id: 9001, amount: 5, status: "in_process" });
+      return mpResponse({ id: 7312, payment_id: 9001, amount: 5, status: "in_process" });
     }
-    return Response.json({ id: 7312, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7312, payment_id: 9001, amount: 5, status: "approved" });
   });
   const input = refundInput(cancellation, leg, "b1-late-post-refusal");
   const firstPromise = app.itemCancellation.confirmCancellationRefund(db, input);
@@ -1470,7 +1475,7 @@ test("B1: HTTP 400 tardio nao recusa refund remoto conhecido por tentativa mais 
     {
       status: "PROCESSANDO",
       tentativas: 2,
-      mp_refund_id: "7312"
+      mp_refund_id: "REF7312"
     }
   );
 
@@ -1486,7 +1491,7 @@ test("B1: HTTP 400 tardio nao recusa refund remoto conhecido por tentativa mais 
     {
       status: "PROCESSANDO",
       tentativas: 2,
-      mp_refund_id: "7312"
+      mp_refund_id: "REF7312"
     }
   );
   assert.equal(
@@ -1535,9 +1540,9 @@ test("B1: HTTP 400 tardio nao recusa refund remoto conhecido por tentativa mais 
 test("ledger confirmado com finalização local interrompida converge no detalhe sem nova rede", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   let remoteCalls = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     remoteCalls++;
-    return Response.json({ id: 7010, payment_id: 9001, amount: 5, status: "approved" });
+    return mpResponse({ id: 7010, payment_id: 9001, amount: 5, status: "approved" });
   });
   let failFinalization = true;
   db.hook = async statements => {
@@ -1587,9 +1592,9 @@ test("troca com refund confirmado e finalização interrompida converge sem segu
   const { db, exchange } = await exchangeScenario(t);
   const leg = exchange.refundsPendentes[0];
   let remoteCalls = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     remoteCalls++;
-    return Response.json({ id: 7011, payment_id: 9002, amount: 3, status: "approved" });
+    return mpResponse({ id: 7011, payment_id: 9002, amount: 3, status: "approved" });
   });
   let failFinalization = true;
   db.hook = async statements => {
@@ -1642,9 +1647,9 @@ test("troca com refund confirmado e finalização interrompida converge sem segu
 test("RECUSADO é terminal para recuperação automática e não chama o provedor", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     calls++;
-    return Response.json({ message: "refund rejected" }, { status: 400 });
+    return mpResponse({ message: "refund rejected" }, { status: 400 });
   });
   const refused = await app.itemCancellation.confirmCancellationRefund(
     db,
@@ -1673,7 +1678,7 @@ const ESCRITA_SQL = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i;
 function observarGet(t, db) {
   const rede = [];
   const escritas = [];
-  t.mock.method(globalThis, "fetch", async url => {
+  mockRefundProvider(t, async url => {
     rede.push(String(url));
     throw new Error(`GET somente leitura não pode chamar a rede: ${url}`);
   });
@@ -1714,7 +1719,7 @@ const reconciliar = (db, session) =>
 test("M2: GET de cancelamento com refund INCONCLUSIVO não chama o MP nem escreve; POST /reconciliar retoma", async t => {
   const { db, cancellation, leg } = await cancellationScenario(t);
   const session = await app.auth.createSession(db, 1);
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     throw new Error("connection lost");
   });
   const first = await app.itemCancellation.confirmCancellationRefund(
@@ -1743,9 +1748,9 @@ test("M2: GET de cancelamento com refund INCONCLUSIVO não chama o MP nem escrev
   db.hook = null;
   t.mock.restoreAll();
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  mockRefundProvider(t, async (_url, init) => {
     if (init?.method === "POST") posts++;
-    return Response.json(
+    return mpResponse(
       { id: 7201, payment_id: 9001, amount: 5, status: "approved" },
       { status: 201 }
     );
@@ -1760,7 +1765,7 @@ test("M2: GET de troca com refund INCONCLUSIVO não chama o MP nem escreve; POST
   const { db, exchange } = await exchangeScenario(t);
   const session = await app.auth.createSession(db, 1);
   const leg = exchange.refundsPendentes[0];
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     throw new Error("connection lost");
   });
   const first = await app.itemExchange.confirmExchangeRefund(db, {
@@ -1796,8 +1801,8 @@ test("M2: GET de troca com refund INCONCLUSIVO não chama o MP nem escreve; POST
 
   db.hook = null;
   t.mock.restoreAll();
-  t.mock.method(globalThis, "fetch", async () =>
-    Response.json({ id: 7202, payment_id: 9002, amount: 3, status: "approved" }, { status: 201 })
+  mockRefundProvider(t, async () =>
+    mpResponse({ id: 7202, payment_id: 9002, amount: 3, status: "approved" }, { status: 201 })
   );
   assert.equal((await reconciliar(db, session)).status, 200);
   assert.equal((await intencao(db)).status, "CONFIRMADO");

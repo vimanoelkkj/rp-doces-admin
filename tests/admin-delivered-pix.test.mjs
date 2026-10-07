@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, barrier } from "./helpers/b3.mjs";
@@ -29,7 +30,7 @@ function mockPix(t) {
   t.mock.method(globalThis, "fetch", async (_url, init) => {
     requests.push({ body: JSON.parse(init.body), headers: init.headers });
     id += 1;
-    return Response.json({
+    return mpResponse({
       id,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",
@@ -70,7 +71,7 @@ test("ENTREGUE sem pagamento permite Pix do saldo integral e retry nao duplica",
   const primeiro = await criarPix(db, 4000, "delivered-full-pix-01");
   assert.equal(primeiro.ok, true);
   assert.equal(primeiro.valorCentavos, 4000);
-  assert.equal(requests[0].body.transaction_amount, 40);
+  assert.equal(requests[0].body.total_amount, "40.00");
   assert.equal(await app.pix.getCapacidadeCobravel(db, 1), 0);
 
   const retry = await criarPix(db, 4000, "delivered-full-pix-01");
@@ -106,7 +107,7 @@ test("ENTREGUE parcial permite somente Pix do restante e confirmacao preserva EN
 
   const pix = await criarPix(db, 500, "delivered-balance-pix-01");
   assert.equal(pix.ok, true);
-  assert.equal(requests[0].body.transaction_amount, 5);
+  assert.equal(requests[0].body.total_amount, "5.00");
   assert.equal(await app.pix.getCapacidadeCobravel(db, 1), 0);
 
   const excesso = await criarPix(db, 500, "delivered-extra-pix-01");
@@ -220,6 +221,6 @@ test("ENTREGUE com refund cobra somente o saldo reaberto pelo liquido", async t 
 
   const pix = await criarPix(db, 500, "delivered-refund-balance-pix-01");
   assert.equal(pix.ok, true);
-  assert.equal(requests[0].body.transaction_amount, 5);
+  assert.equal(requests[0].body.total_amount, "5.00");
   assert.equal(await app.pix.getCapacidadeCobravel(db, 1), 0);
 });

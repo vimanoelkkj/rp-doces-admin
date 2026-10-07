@@ -11,6 +11,7 @@
 
 import { requireUser } from "../../../lib/auth";
 import { fetchMpPayment, mapMpStatus } from "../../../lib/paymentSync";
+import { parseDiagnosticPaymentId } from "../../../lib/mp/orders/diagnosticId";
 
 interface Env {
   DB: D1Database;
@@ -34,7 +35,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const mpPaymentId = new URL(request.url).searchParams.get("mpPaymentId") || "";
-  if (!/^\d+$/.test(mpPaymentId)) {
+  const identity = parseDiagnosticPaymentId(mpPaymentId);
+  if (!identity) {
     return jsonError("mpPaymentId inválido", 400);
   }
 
@@ -47,7 +49,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   try {
-    const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN, mpPaymentId);
+    const payment = await fetchMpPayment(env.MP_ACCESS_TOKEN, identity.orderId);
+    if (payment.id !== identity.paymentId) throw new Error("DIAGNOSTIC_PAYMENT_ID_MISMATCH");
     return Response.json({
       ok: true,
       // "PENDENTE" cobre pending/in_process/authorized — mapMpStatus só

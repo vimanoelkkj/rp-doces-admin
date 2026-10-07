@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "./helpers/b3.mjs";
@@ -34,7 +35,7 @@ const contar = async (db, tabela) =>
 
 function mpPixOk(t) {
   return t.mock.method(globalThis, "fetch", async () =>
-    Response.json({
+    mpResponse({
       id: 777001,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",
@@ -295,7 +296,7 @@ test("SITE: checkout real cria pedido multi-item contra o schema de produção",
   assert.equal(novo.origem_pedido, "SITE");
   assert.equal(novo.reserva_status, "ATIVA");
   assert.ok(novo.reserva_expira_em, "reserva com prazo");
-  assert.equal(novo.mp_payment_id, "777001");
+  assert.equal(novo.mp_payment_id, "PAY777001");
 
   // Colunas legadas: preenchidas com os valores neutros, sem semântica.
   assert.equal(novo.cliente_email, "");
@@ -337,6 +338,9 @@ test("SITE: checkout real cria pedido multi-item contra o schema de produção",
   assert.equal(pag.metodo, "PIX_MP");
   assert.equal(pag.origem, "SITE");
   assert.equal(pag.valor_centavos, 10900);
+  assert.equal(pag.status, "PENDENTE");
+  assert.equal(pag.mp_order_id, "ORD777001");
+  assert.equal(pag.mp_payment_id, "PAY777001");
   const op = await db
     .prepare("SELECT * FROM pedido_operacoes WHERE operation_key = ?")
     .bind(KEY_SITE)
@@ -354,10 +358,16 @@ test("SITE: A1 continua idempotente contra o schema legado", async t => {
   await aplicarOperacaoPorItem(db);
   await aplicarCancelamentoPorItem(db);
   await aplicarCheckoutRateLimit(db);
-  mpPixOk(t);
+  const mp = mpPixOk(t);
 
-  const primeira = await (await checkoutSite(db, [{ id: 1, quantity: 1 }])).json();
-  const segunda = await (await checkoutSite(db, [{ id: 1, quantity: 1 }])).json();
+  const firstResponse = await checkoutSite(db, [{ id: 1, quantity: 1 }]);
+  assert.equal(firstResponse.status, 200);
+  const primeira = await firstResponse.json();
+  assert.equal((await db.prepare("SELECT fase FROM pedido_operacoes").first()).fase, "CONCLUIDA");
+  const replayResponse = await checkoutSite(db, [{ id: 1, quantity: 1 }]);
+  assert.equal(replayResponse.status, 200);
+  const segunda = await replayResponse.json();
+  assert.equal(mp.mock.callCount(), 1, "replay must not issue another remote POST");
   assert.deepEqual(segunda, primeira, "replay devolve o mesmo resultado");
   assert.equal(await contar(db, "pedidos"), 27, "nenhum segundo pedido");
   assert.equal(await contar(db, "pedido_operacoes"), 1);

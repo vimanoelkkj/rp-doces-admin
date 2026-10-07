@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "./helpers/b3.mjs";
@@ -29,17 +30,18 @@ const HELPERS = [
     statusOk: 201,
     chamar: () => app.mpPost.postPagamentoMp("fake", "key-1", { transaction_amount: 10 }),
     respostaValida: () =>
-      Response.json({ id: 9001, status: "pending", date_of_expiration: null }, { status: 201 }),
-    ehSucesso: r => r.resultado === "SUCESSO" && r.payment.id === 9001
+      mpResponse({ id: 9001, status: "pending", date_of_expiration: null }, { status: 201 }),
+    ehSucesso: r => r.resultado === "SUCESSO" && r.payment.id === "PAY9001"
   },
   {
     nome: "cancelarPagamentoMp",
     indeterminado: true,
     prazo: MP_PAYMENT_POST_TIMEOUT_MS,
-    metodo: "PUT",
+    metodo: "POST",
     statusOk: 200,
-    chamar: () => app.mpPost.cancelarPagamentoMp("fake", 9001, "key-1"),
-    respostaValida: () => Response.json({ status: "cancelled", status_detail: "by_collector" }),
+    chamar: () => app.mpPost.cancelarPagamentoMp("fake", "ORD9001", "key-1"),
+    respostaValida: () =>
+      mpResponse({ id: 9001, status: "cancelled", status_detail: "by_collector" }),
     ehSucesso: r => r.resultado === "SUCESSO" && r.status === "cancelled"
   },
   {
@@ -48,20 +50,20 @@ const HELPERS = [
     prazo: MP_REFUND_TIMEOUT_MS,
     metodo: "POST",
     statusOk: 201,
-    chamar: () => app.mpRefund.postRefundMp("fake", "9001", "key-1", { amountCentavos: 1500 }),
+    chamar: () =>
+      app.mpRefund.postRefundMp("fake", "ORD9001", "PAY9001", "key-1", { amountCentavos: 1500 }),
     respostaValida: () =>
-      Response.json({ id: 555, payment_id: 9001, amount: 15, status: "approved" }, { status: 201 }),
-    ehSucesso: r => r.resultado === "SUCESSO" && r.refund.id === 555
+      mpResponse({ id: 555, payment_id: 9001, amount: 15, status: "approved" }, { status: 201 }),
+    ehSucesso: r => r.resultado === "SUCESSO" && r.refund.id === "REF555"
   },
   {
     nome: "getRefundMp", // sem ramo para status <400 (comportamento preexistente, sem efeito financeiro)
     prazo: MP_REFUND_TIMEOUT_MS,
     metodo: undefined, // GET: sem `method` explícito
     statusOk: 200,
-    chamar: () => app.mpRefund.getRefundMp("fake", "9001", "555", 1500),
-    respostaValida: () =>
-      Response.json({ id: 555, payment_id: 9001, amount: 15, status: "approved" }),
-    ehSucesso: r => r.resultado === "SUCESSO" && r.refund.id === 555
+    chamar: () => app.mpRefund.getRefundMp("fake", "ORD9001", "PAY9001", "REF555", 1500),
+    respostaValida: () => mpResponse({ id: 555, payment_id: 9001, amount: 15, status: "approved" }),
+    ehSucesso: r => r.resultado === "SUCESSO" && r.refund.id === "REF555"
   }
 ];
 
@@ -120,6 +122,7 @@ for (const helper of HELPERS) {
     const { resultado, chamadas } = await executar(t, helper, signal => ({
       ok: true,
       status: helper.statusOk,
+      headers: new Headers(),
       json: () => pendenteAteAbortar(signal),
       text: () => pendenteAteAbortar(signal)
     }));
@@ -135,13 +138,15 @@ for (const helper of HELPERS) {
     const { resultado, chamadas } = await executar(t, helper, signal => ({
       ok: false,
       status: 422,
+      headers: new Headers(),
       text: () => pendenteAteAbortar(signal)
     }));
     assert.deepEqual(resultado, {
       resultado: "RECUSA_DEFINITIVA",
       httpStatus: 422,
       mensagem: null,
-      detalhe: null
+      detalhe: null,
+      ...(helper.nome === "postPagamentoMp" ? { code: null, requestId: undefined } : {})
     });
     verificaChamadaUnica(chamadas);
   });
@@ -150,7 +155,7 @@ for (const helper of HELPERS) {
     const { resultado, sinal } = await executar(
       t,
       helper,
-      () => Response.json({ message: "dado inválido", cause: [{ code: 1 }] }, { status: 422 }),
+      () => mpResponse({ message: "dado inválido", cause: [{ code: 1 }] }, { status: 422 }),
       { avancar: false }
     );
     assert.equal(resultado.resultado, "RECUSA_DEFINITIVA");
@@ -183,6 +188,7 @@ for (const helper of HELPERS) {
       () => ({
         ok: true,
         status: helper.statusOk,
+        headers: new Headers(),
         json: async () => {
           throw new TypeError("terminated");
         }
@@ -207,7 +213,8 @@ for (const helper of HELPERS) {
       assert.deepEqual(resultado, {
         resultado: "AMBIGUO",
         motivo: "HTTP_INDISPONIVEL",
-        httpStatus: status
+        httpStatus: status,
+        ...(helper.nome === "postPagamentoMp" ? { requestId: undefined } : {})
       });
       t.mock.timers.tick(helper.prazo);
       assert.equal(sinal.aborted, false, `HTTP ${status}: o prazo é desarmado ao concluir`);
@@ -226,7 +233,8 @@ for (const helper of HELPERS) {
       assert.deepEqual(resultado, {
         resultado: "AMBIGUO",
         motivo: "HTTP_INDETERMINADO",
-        httpStatus: 304
+        httpStatus: 304,
+        ...(helper.nome === "postPagamentoMp" ? { requestId: undefined } : {})
       });
       t.mock.timers.tick(helper.prazo);
       assert.equal(sinal.aborted, false, "o prazo é desarmado ao concluir");
@@ -244,3 +252,29 @@ for (const helper of HELPERS) {
     verificaChamadaUnica(chamadas);
   });
 }
+
+test("postPagamentoMp propaga x-request-id quando o header está presente", async t => {
+  const { resultado: res409, limpar: limpar409 } = await executar(
+    t,
+    HELPERS[0],
+    () => new Response("conflito", { status: 409, headers: { "x-request-id": "req-custom-409" } }),
+    { avancar: false }
+  );
+  assert.equal(res409.resultado, "AMBIGUO");
+  assert.equal(res409.requestId, "req-custom-409");
+  limpar409();
+
+  const { resultado: res400, limpar: limpar400 } = await executar(
+    t,
+    HELPERS[0],
+    () =>
+      new Response(JSON.stringify({ message: "bad request" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", "x-request-id": "req-custom-400" }
+      }),
+    { avancar: false }
+  );
+  assert.equal(res400.resultado, "RECUSA_DEFINITIVA");
+  assert.equal(res400.requestId, "req-custom-400");
+  limpar400();
+});

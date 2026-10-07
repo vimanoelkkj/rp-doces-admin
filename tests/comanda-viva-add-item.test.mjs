@@ -1,6 +1,9 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
+import { createHmac, createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { build } from "esbuild";
 import { app, fixture, state, barrier } from "./helpers/b3.mjs";
 import {
   bancoProducao,
@@ -456,8 +459,8 @@ test("adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa soment
     if (options.method === "POST") {
       posts += 1;
       mpRequest = JSON.parse(options.body);
-      assert.equal(mpRequest.transaction_amount, 12);
-      return Response.json({
+      assert.equal(mpRequest.total_amount, "12.00");
+      return mpResponse({
         id: 777,
         status: "pending",
         date_of_expiration: "2099-01-01T00:00:00Z",
@@ -470,13 +473,13 @@ test("adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa soment
         }
       });
     }
-    const id = Number(String(url).split("/").at(-1));
-    return Response.json(
+    const id = Number(String(url).split("/").at(-1).replace(/^ORD/, ""));
+    return mpResponse(
       id === 777
         ? {
             id,
             status: "approved",
-            transaction_amount: mpRequest.transaction_amount,
+            transaction_amount: mpRequest.total_amount,
             payment_method_id: "pix",
             currency_id: "BRL",
             external_reference: mpRequest.external_reference
@@ -527,7 +530,10 @@ test("adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa soment
   const pagamentoAdmin = await db
     .prepare("SELECT idempotency_key FROM pedido_pagamentos WHERE origem='ADMIN'")
     .first();
-  assert.equal(mpRequest.external_reference, pagamentoAdmin.idempotency_key);
+  assert.equal(
+    mpRequest.external_reference,
+    createHash("sha256").update(pagamentoAdmin.idempotency_key).digest("hex")
+  );
 
   const retry = await gerarPix(db, session, {
     key: "live-tab-pix-00000001",
@@ -546,11 +552,11 @@ test("adicao PAGO expoe saldo autoritativo, Pix exato e confirmacao baixa soment
   const ts = "1";
   const requestId = "live-tab-payment";
   const signature = createHmac("sha256", secret)
-    .update(`id:777;request-id:${requestId};ts:${ts};`)
+    .update(`id:ORD777;request-id:${requestId};ts:${ts};`)
     .digest("hex");
   const webhook = await app.webhook.onRequestPost({
     env: { ...env(db), MP_WEBHOOK_SECRET: secret },
-    request: new Request("https://local.test/api/webhooks/mercadopago?data.id=777&type=payment", {
+    request: new Request("https://local.test/api/webhooks/mercadopago?data.id=ORD777&type=order", {
       method: "POST",
       headers: { "x-signature": `ts=${ts},v1=${signature}`, "x-request-id": requestId }
     })
@@ -587,8 +593,8 @@ test("Pix pendente parcial reduz capacidade e capacidade zero impede nova cobran
   t.mock.method(globalThis, "fetch", async (_url, options = {}) => {
     assert.equal(options.method, "POST");
     posts += 1;
-    assert.equal(JSON.parse(options.body).transaction_amount, 7);
-    return Response.json({
+    assert.equal(JSON.parse(options.body).total_amount, "7.00");
+    return mpResponse({
       id: 778,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",
@@ -643,15 +649,42 @@ test("webhook/reconcile concorrente converge sem repetir baixa de item antigo", 
   const ts = "1";
   const requestId = "phase-3";
   const signature = createHmac("sha256", secret)
-    .update(`id:101;request-id:${requestId};ts:${ts};`)
+    .update(`id:ORD101;request-id:${requestId};ts:${ts};`)
     .digest("hex");
+  let gets = 0;
+  t.mock.method(globalThis, "fetch", async url => {
+    assert.equal(url, "https://api.mercadopago.com/v1/orders/ORD101");
+    gets++;
+    return mpResponse({
+      id: 101,
+      status: "approved",
+      transaction_amount: 30,
+      external_reference: "token",
+      payment_method_id: "pix"
+    });
+  });
+  const gate = barrier(2);
+  db.hook = async statements => {
+    if (
+      statements.some(
+        s =>
+          s.sql.includes("ITEM_ADICAO_ADMIN") ||
+          s.sql.includes("UPDATE pedido_pagamentos SET mp_status")
+      )
+    )
+      await gate();
+    return statements;
+  };
   const webhook = () =>
     app.webhook.onRequestPost({
       env: { ...env(db), MP_WEBHOOK_SECRET: secret },
-      request: new Request("https://local.test/api/webhooks/mercadopago?data.id=101&type=payment", {
-        method: "POST",
-        headers: { "x-signature": `ts=${ts},v1=${signature}`, "x-request-id": requestId }
-      })
+      request: new Request(
+        "https://local.test/api/webhooks/mercadopago?data.id=ORD101&type=order",
+        {
+          method: "POST",
+          headers: { "x-signature": `ts=${ts},v1=${signature}`, "x-request-id": requestId }
+        }
+      )
     });
 
   const [addResponse, webhookResponse] = await Promise.all([
@@ -661,6 +694,12 @@ test("webhook/reconcile concorrente converge sem repetir baixa de item antigo", 
   ]);
   assert.equal(addResponse.status, 201);
   assert.equal(webhookResponse.status, 200);
+  db.hook = null;
+  assert.equal(gets, 1, "signed Orders webhook must execute the authoritative GET");
+  assert.equal(
+    (await db.prepare("SELECT mp_status FROM pedido_pagamentos WHERE id=1").first()).mp_status,
+    "approved"
+  );
   await app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
   assert.deepEqual(await db.prepare("SELECT * FROM pedido_itens WHERE id=1").first(), itemAntes);
   assert.deepEqual(await db.prepare("SELECT * FROM produtos WHERE id=1").first(), produtoAntes);
@@ -668,6 +707,46 @@ test("webhook/reconcile concorrente converge sem repetir baixa de item antigo", 
     (await db.prepare("SELECT status_pagamento FROM pedidos WHERE id=1").first()).status_pagamento,
     "PARCIAL"
   );
+});
+
+test("negative control: a no-op webhook cannot satisfy the reconciliation contract", async t => {
+  const db = await fixture(t, { paid: true });
+  const source = await readFile("functions/api/webhooks/mercadopago.ts", "utf8");
+  const anchor = 'const supportedType = type === "order";';
+  assert.equal(source.split(anchor).length - 1, 1);
+  const compiled = await build({
+    stdin: {
+      contents: source.replace(anchor, "const supportedType = false;"),
+      resolveDir: `${process.cwd()}/functions/api/webhooks`,
+      loader: "ts"
+    },
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "node"
+  });
+  const mutant = await import(
+    `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
+  );
+  let gets = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    gets++;
+    return mpResponse({ id: 101, status: "approved" });
+  });
+  const signature = createHmac("sha256", "fake-secret")
+    .update("id:ORD101;request-id:audit;ts:1;")
+    .digest("hex");
+  const result = await mutant.onRequestPost({
+    env: { ...env(db), MP_WEBHOOK_SECRET: "fake-secret" },
+    request: new Request("https://local.test/api/webhooks/mercadopago?data.id=ORD101&type=order", {
+      method: "POST",
+      headers: { "x-signature": `ts=1,v1=${signature}`, "x-request-id": "audit" }
+    })
+  });
+  assert.equal(result.status, 200);
+  assert.throws(() => assert.equal(gets, 1, "webhook must perform Orders GET"), {
+    name: "AssertionError"
+  });
 });
 
 test("detalhe admin expoe ids e estados estaveis; PUT integral continua bloqueado", async t => {

@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, barrier } from "./helpers/b3.mjs";
@@ -410,22 +411,34 @@ test("pedido ADMIN: retry recupera o pedido mesmo sem estoque para criar um igua
 
 function mpPost(t, { responder } = {}) {
   let id = 500;
+  const canceled = new Set();
   return t.mock.method(globalThis, "fetch", async (url, options) => {
-    assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/payments/);
-    if (options?.method === "PUT") {
-      const paymentId = Number(String(url).split("/").at(-1)) || 101;
-      return Response.json({ id: paymentId, status: "cancelled" });
+    assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/orders/);
+    if (String(url).endsWith("/cancel")) {
+      const paymentId =
+        Number(
+          String(url)
+            .replace(/\/cancel$/, "")
+            .split("/")
+            .at(-1)
+            .replace(/^ORD/, "")
+        ) || 101;
+      canceled.add(paymentId);
+      return mpResponse({ id: paymentId, status: "cancelled" });
     }
     if (options?.method !== "POST") {
-      const paymentId = Number(String(url).split("/").at(-1)) || 101;
-      return Response.json({ id: paymentId, status: paymentId === 101 ? "approved" : "pending" });
+      const paymentId = Number(String(url).split("/").at(-1).replace(/^ORD/, "")) || 101;
+      return mpResponse({
+        id: paymentId,
+        status: canceled.has(paymentId) ? "cancelled" : paymentId === 101 ? "approved" : "pending"
+      });
     }
     const key = options.headers["X-Idempotency-Key"];
     if (responder) {
       const resposta = await responder({ key, body: JSON.parse(options.body) });
       if (resposta) return resposta;
     }
-    return Response.json({
+    return mpResponse({
       id: ++id,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",
@@ -467,7 +480,7 @@ test("checkout: mesma key => um pedido, uma reserva, uma tentativa, uma identida
   assert.deepEqual(retry.body, primeira.body, "mesmo resultado lógico, inclusive o QR");
 
   const chavesMp = mp.mock.calls
-    .filter(c => c.arguments[1]?.method === "POST")
+    .filter(c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel"))
     .map(c => c.arguments[1].headers["X-Idempotency-Key"]);
   assert.equal(chavesMp.length, 1, "nenhum segundo POST lógico");
   assert.equal(new Set(chavesMp).size, 1);
@@ -519,7 +532,12 @@ test("checkout: mesma key concorrente => uma operação; o perdedor não reserva
     );
   }
 
-  assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length, 1);
+  assert.equal(
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
+    1
+  );
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM pedidos").first()).n, 1);
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM pedido_pagamentos").first()).n, 1);
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM pedido_operacoes").first()).n, 1);
@@ -533,7 +551,12 @@ test("checkout: mesma key concorrente => uma operação; o perdedor não reserva
   const depois = await corpo(await checkout(db, { operationKey: KEY }));
   assert.equal(depois.status, 200);
   assert.equal(depois.body.pedidoId, vencedoras[0].body.pedidoId);
-  assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length, 1);
+  assert.equal(
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
+    1
+  );
 });
 
 test("checkout: payload incompatível é conflito; key nova é uma intenção nova", async t => {
@@ -625,7 +648,7 @@ for (const [nome, resposta] of [
   ["HTTP 500", new Response("offline", { status: 500 })],
   ["HTTP 502", new Response("bad gateway", { status: 502 })],
   ["HTTP 429", new Response("slow down", { status: 429 })],
-  ["2xx sem id utilizável", Response.json({ status: "pending" })]
+  ["2xx sem id utilizável", mpResponse({ status: "pending" })]
 ]) {
   test(`checkout: resultado ambíguo (${nome}) mantém a operação inconclusiva e a reserva`, async t => {
     const db = await siteLimpo(t);
@@ -650,7 +673,9 @@ for (const [nome, resposta] of [
     assert.equal(r.body.pedidoId, pedido.id);
     assert.equal(r.body.tokenPublico, pedido.token_publico);
     assert.equal(
-      mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length,
+      mp.mock.calls.filter(
+        c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+      ).length,
       1,
       "exatamente um POST ao Mercado Pago"
     );
@@ -683,7 +708,9 @@ test("checkout: retry depois de ambíguo não gera nova key, novo pedido nem nov
   silenciarLogs(t);
   const mp = mpPost(t, { responder: async () => new Response("offline", { status: 500 }) });
   await checkout(db, { operationKey: KEY });
-  const postsAmbiguos = mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length;
+  const postsAmbiguos = mp.mock.calls.filter(
+    c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+  ).length;
 
   const retry = await corpo(await checkout(db, { operationKey: KEY }));
   assert.equal(retry.status, 409);
@@ -691,7 +718,9 @@ test("checkout: retry depois de ambíguo não gera nova key, novo pedido nem nov
   assert.ok(retry.body.tokenPublico, "devolve o pedido que já existe para acompanhamento");
 
   assert.equal(
-    mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length,
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
     postsAmbiguos,
     "nenhum reenvio automático"
   );
@@ -706,7 +735,7 @@ test("checkout: recusa comprovada libera reserva e o retry devolve a MESMA recus
   const db = await siteLimpo(t);
   silenciarLogs(t);
   const mp = mpPost(t, {
-    responder: async () => Response.json({ message: "invalid" }, { status: 400 })
+    responder: async () => mpResponse({ message: "invalid" }, { status: 400 })
   });
 
   const r = await corpo(await checkout(db, { operationKey: KEY }));
@@ -719,11 +748,18 @@ test("checkout: recusa comprovada libera reserva e o retry devolve a MESMA recus
     "LIBERADA"
   );
 
-  const posts = mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length;
+  const posts = mp.mock.calls.filter(
+    c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+  ).length;
   const retry = await corpo(await checkout(db, { operationKey: KEY }));
   assert.equal(retry.status, 502);
   assert.equal(retry.body.code, "MERCADO_PAGO_RECUSOU");
-  assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length, posts);
+  assert.equal(
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
+    posts
+  );
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM pedidos").first()).n, 1);
 });
 
@@ -737,7 +773,7 @@ test("checkout: recurso MP conhecido + falha no batch de persistência permanece
   // permanece LOCAL_CRIADA — a janela que antes deixava a operação
   // REMOTO_CONHECIDO com a tentativa órfã de identidade remota não existe mais.
   db.hook = (s, op) => {
-    if (op === "batch" && s.some(x => x.sql.includes("SET mp_payment_id = ?"))) {
+    if (op === "batch" && s.some(x => x.sql.includes("mp_payment_id = ?"))) {
       db.hook = null;
       throw new Error("injected local persistence failure");
     }
@@ -760,13 +796,17 @@ test("checkout: recurso MP conhecido + falha no batch de persistência permanece
   // O retry com a MESMA key NÃO faz novo POST nem inventa sucesso: devolve a
   // operação ainda inconclusiva e recuperável pelo B3 (mp_payment_id NULL +
   // LOCAL_CRIADA entram na seleção de operações inconclusivas).
-  const posts = mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length;
+  const posts = mp.mock.calls.filter(
+    c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+  ).length;
   const retry = await corpo(await checkout(db, { operationKey: KEY }));
   assert.equal(retry.status, 409);
   assert.equal(retry.body.code, "OPERACAO_EM_PROCESSAMENTO");
   assert.ok(retry.body.tokenPublico, "devolve o pedido que já existe para acompanhamento");
   assert.equal(
-    mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length,
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
     posts,
     "nenhum reenvio automático"
   );
@@ -822,7 +862,9 @@ test("checkout: última unidade em disputa entre keys distintas faz rollback com
   assert.equal(resultados.filter(r => r.status === 200).length, 1);
   assert.equal(resultados.filter(r => r.status === 409).length, 1);
   assert.equal(
-    mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length,
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
     1,
     "o perdedor não chega a enviar nada ao provedor"
   );
@@ -858,7 +900,7 @@ test("pix ADMIN: retry da mesma key => mesma tentativa, mesma identidade MP, mes
   assert.equal(retry.body.replay, true);
 
   const chaves = mp.mock.calls
-    .filter(c => c.arguments[1]?.method === "POST")
+    .filter(c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel"))
     .map(c => c.arguments[1].headers["X-Idempotency-Key"]);
   assert.equal(chaves.length, 1, "nenhum segundo POST lógico com outra identidade");
 
@@ -966,7 +1008,9 @@ test("pix ADMIN: regeneração com a mesma key => mesmo sucessor, mesmo depois d
   assert.equal((await state(db)).pagamentos.length, 3);
 
   assert.equal(
-    mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length,
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
     3,
     "um POST por intenção legítima, nunca por retry"
   );
@@ -1002,12 +1046,19 @@ test("pix ADMIN: 5xx do POST não inventa FALHOU nem libera a reserva; retry rec
   assert.equal(s.produtos[0].estoque_reservado, 2);
   assert.equal(s.operacoes[0].fase, "ENVIO_INCONCLUSIVO");
 
-  const posts = mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length;
+  const posts = mp.mock.calls.filter(
+    c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+  ).length;
   const retry = await corpo(
     await gerarPix(db, session, { valorCentavos: 5000, operationKey: KEY })
   );
   assert.equal(retry.body.code, "OPERACAO_EM_PROCESSAMENTO");
-  assert.equal(mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length, posts);
+  assert.equal(
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
+    posts
+  );
   assert.equal((await state(db)).pagamentos.length, 1);
 });
 
@@ -1021,7 +1072,7 @@ test("pix ADMIN: recurso MP conhecido + falha no batch de persistência permanec
   // fica sem identidade remota E a operação permanece LOCAL_CRIADA (estado
   // recuperável pelo B3, nunca o órfão REMOTO_CONHECIDO+NULL de antes).
   db.hook = (s, op) => {
-    if (op === "batch" && s.some(x => x.sql.includes("SET mp_payment_id = ?"))) {
+    if (op === "batch" && s.some(x => x.sql.includes("mp_payment_id = ?"))) {
       db.hook = null;
       throw new Error("injected local persistence failure");
     }
@@ -1035,14 +1086,18 @@ test("pix ADMIN: recurso MP conhecido + falha no batch de persistência permanec
   const tentativa = (await db.prepare("SELECT * FROM pedido_pagamentos").all()).results[0];
   assert.equal(tentativa.mp_payment_id, null);
 
-  const posts = mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length;
+  const posts = mp.mock.calls.filter(
+    c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+  ).length;
   const retry = await corpo(
     await gerarPix(db, session, { valorCentavos: 5000, operationKey: KEY })
   );
   assert.equal(retry.status, 409);
   assert.equal(retry.body.code, "OPERACAO_EM_PROCESSAMENTO");
   assert.equal(
-    mp.mock.calls.filter(c => c.arguments[1]?.method === "POST").length,
+    mp.mock.calls.filter(
+      c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+    ).length,
     posts,
     "nenhum reenvio automático"
   );
@@ -1175,8 +1230,8 @@ test("contrato: classificação do POST MP separa recusa comprovada de resultado
     [new Response("slow", { status: 429 }), "AMBIGUO"],
     [new Response("boom", { status: 500 }), "AMBIGUO"],
     [new Response("gateway", { status: 503 }), "AMBIGUO"],
-    [Response.json({ status: "pending" }), "AMBIGUO"],
-    [Response.json({ id: 7, status: "pending" }), "SUCESSO"]
+    [mpResponse({ status: "pending" }), "AMBIGUO"],
+    [mpResponse({ id: 7, status: "pending" }), "SUCESSO"]
   ];
   for (const [resposta, esperado] of casos) {
     t.mock.method(globalThis, "fetch", async () => resposta.clone());
@@ -1217,7 +1272,7 @@ test("B1 continua bloqueado: A1 não reabriu a edição destrutiva de itens", as
 test("B2 continua recuperando pagamento verificado; replay A1 não inventa aprovação", async t => {
   const db = await fixture(t);
   await db.prepare("UPDATE pedido_pagamentos SET status='EXPIRADO' WHERE id=1").run();
-  const verificado = await app.sync.fetchMpPayment("fake", "101");
+  const verificado = await app.sync.fetchMpPayment("fake", "ORD101");
   const r = await app.sync.syncPaymentFromMp(db, 1, verificado);
   assert.equal(r.transicionou, true);
   const s = await state(db);

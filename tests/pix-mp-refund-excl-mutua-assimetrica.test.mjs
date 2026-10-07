@@ -1,3 +1,4 @@
+import { mpResponse, mockRefundProvider } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state } from "./helpers/b3.mjs";
@@ -34,7 +35,7 @@ async function cenario(t, { payment = 2000, item = 500 } = {}) {
     db
       .prepare(
         `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-      mp_payment_id,idempotency_key,pago_em) VALUES(1,1,'PIX_MP','ADMIN',?,'PAGO','9001','pix-paid',CURRENT_TIMESTAMP)`
+      mp_payment_id,mp_order_id,idempotency_key,pago_em) VALUES(1,1,'PIX_MP','ADMIN',?,'PAGO','PAY9001','ORD9001','pix-paid',CURRENT_TIMESTAMP)`
       )
       .bind(payment),
     db
@@ -75,8 +76,13 @@ let proximoRefundId = 1;
 function mockAprovado() {
   return async (_url, init) => {
     const body = init?.body ? JSON.parse(init.body) : {};
-    return Response.json(
-      { id: proximoRefundId++, payment_id: 9001, amount: body.amount, status: "approved" },
+    return mpResponse(
+      {
+        id: proximoRefundId++,
+        payment_id: 9001,
+        amount: body.transactions?.[0]?.amount,
+        status: "approved"
+      },
       { status: 201 }
     );
   };
@@ -84,14 +90,19 @@ function mockAprovado() {
 function mockEmProcesso() {
   return async (_url, init) => {
     const body = init?.body ? JSON.parse(init.body) : {};
-    return Response.json(
-      { id: proximoRefundId++, payment_id: 9001, amount: body.amount, status: "in_process" },
+    return mpResponse(
+      {
+        id: proximoRefundId++,
+        payment_id: 9001,
+        amount: body.transactions?.[0]?.amount,
+        status: "in_process"
+      },
       { status: 201 }
     );
   };
 }
 function mockRecusado() {
-  return async () => Response.json({ message: "recusado" }, { status: 400 });
+  return async () => mpResponse({ message: "recusado" }, { status: 400 });
 }
 function mockIndisponivel() {
   return async () => {
@@ -118,7 +129,7 @@ async function intencaoPorItem(t, db, status) {
     accessToken: "TEST_TOKEN"
   };
   if (status === "PENDENTE") {
-    t.mock.method(globalThis, "fetch", mockAprovado());
+    mockRefundProvider(t, mockAprovado());
     let travou = false;
     db.hook = async statements => {
       if (!travou && statements.some(s => s.sql.includes("SET status='PROCESSANDO'"))) {
@@ -131,9 +142,8 @@ async function intencaoPorItem(t, db, status) {
     db.hook = null;
     return { leg, status: "PENDENTE" };
   }
-  t.mock.method(
-    globalThis,
-    "fetch",
+  mockRefundProvider(
+    t,
     status === "CONFIRMADO"
       ? mockAprovado()
       : status === "RECUSADO"
@@ -161,7 +171,7 @@ async function intencaoAnulacao(t, db, status, { pagamentoId = 1, valorCentavos 
     accessToken: "TEST_TOKEN"
   };
   if (status === "PENDENTE") {
-    t.mock.method(globalThis, "fetch", mockAprovado());
+    mockRefundProvider(t, mockAprovado());
     let travou = false;
     db.hook = async statements => {
       if (!travou && statements.some(s => s.sql.includes("SET status='PROCESSANDO'"))) {
@@ -174,9 +184,8 @@ async function intencaoAnulacao(t, db, status, { pagamentoId = 1, valorCentavos 
     db.hook = null;
     return { status: "PENDENTE" };
   }
-  t.mock.method(
-    globalThis,
-    "fetch",
+  mockRefundProvider(
+    t,
     status === "CONFIRMADO"
       ? mockAprovado()
       : status === "RECUSADO"
@@ -269,7 +278,7 @@ test("8: intencao de anulacao RECUSADA nao bloqueia intencao por item", async t 
   await intencaoAnulacao(t, db, "RECUSADO");
   const cancelamento = await criarCancelamentoAguardando(db);
   const leg = cancelamento.pernasPendentes[0];
-  t.mock.method(globalThis, "fetch", mockAprovado());
+  mockRefundProvider(t, mockAprovado());
   const result = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, {
     pedidoId: 1,
     pagamentoId: leg.pagamentoId,

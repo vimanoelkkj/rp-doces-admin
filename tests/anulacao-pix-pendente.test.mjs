@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, approvedMp } from "./helpers/b3.mjs";
@@ -52,13 +53,13 @@ test("B. Pix PENDENTE -> MP cancelled -> local CANCELADO -> anulação funciona"
   let putCalled = false;
   t.mock.method(globalThis, "fetch", async (url, options) => {
     const urlStr = String(url);
-    if (options?.method === "PUT") {
+    if (String(url).endsWith("/cancel")) {
       putCalled = true;
-      assert.equal(JSON.parse(options.body).status, "cancelled");
-      return Response.json({ id: 101, status: "cancelled" });
+      assert.equal(options.body, undefined);
+      return mpResponse({ id: 101, status: "cancelled" });
     }
-    if (urlStr.includes("/v1/payments/101")) {
-      return Response.json({
+    if (urlStr.includes("/v1/orders/ORD101")) {
+      return mpResponse({
         id: 101,
         status: putCalled ? "cancelled" : "pending"
       });
@@ -86,8 +87,8 @@ test("C. Pix EXPIRADO local -> MP cancelled -> local converge -> anulação func
 
   t.mock.method(globalThis, "fetch", async url => {
     const urlStr = String(url);
-    if (urlStr.includes("/v1/payments/101")) {
-      return Response.json({ id: 101, status: "cancelled", status_detail: "expired" });
+    if (urlStr.includes("/v1/orders/ORD101")) {
+      return mpResponse({ id: 101, status: "cancelled", status_detail: "expired" });
     }
     throw new Error(`Unexpected url: ${urlStr}`);
   });
@@ -109,7 +110,7 @@ test("D. Pix approved durante consulta -> sincroniza PAGO -> anulação recusada
   const session = await app.auth.createSession(db, 1);
 
   t.mock.method(globalThis, "fetch", async () => {
-    return Response.json(
+    return mpResponse(
       approvedMp({
         date_approved: "2026-09-23T16:00:00Z"
       })
@@ -136,17 +137,17 @@ test("E. PUT timeout + GET cancelled -> converge -> anulação funciona", async 
   const session = await app.auth.createSession(db, 1);
 
   let initialGet = true;
-  t.mock.method(globalThis, "fetch", async (_url, options) => {
-    if (options?.method === "PUT") {
+  t.mock.method(globalThis, "fetch", async (url, _options) => {
+    if (String(url).endsWith("/cancel")) {
       const err = new Error("Gateway Timeout");
       err.name = "AbortError";
       throw err;
     }
     if (initialGet) {
       initialGet = false;
-      return Response.json({ id: 101, status: "pending" });
+      return mpResponse({ id: 101, status: "pending" });
     }
-    return Response.json({ id: 101, status: "cancelled" });
+    return mpResponse({ id: 101, status: "cancelled" });
   });
 
   const response = await anular(db, session);
@@ -165,13 +166,13 @@ test("F. PUT timeout + GET pending -> fail closed -> pedido não anulado", async
   const db = await fixture(t);
   const session = await app.auth.createSession(db, 1);
 
-  t.mock.method(globalThis, "fetch", async (_url, options) => {
-    if (options?.method === "PUT") {
+  t.mock.method(globalThis, "fetch", async (url, _options) => {
+    if (String(url).endsWith("/cancel")) {
       const err = new Error("Gateway Timeout");
       err.name = "AbortError";
       throw err;
     }
-    return Response.json({ id: 101, status: "pending" });
+    return mpResponse({ id: 101, status: "pending" });
   });
 
   const response = await anular(db, session);
@@ -193,8 +194,8 @@ test("G. múltiplos Pix: todos cancelados -> anula", async t => {
   await db
     .prepare(
       `
-    INSERT INTO pedido_pagamentos(id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id, idempotency_key)
-    VALUES(2, 1, 'PIX_MP', 'ADMIN', 5000, 'EXPIRADO', '102', 'pag-extra-2')
+    INSERT INTO pedido_pagamentos(id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id, mp_order_id, idempotency_key)
+    VALUES(2, 1, 'PIX_MP', 'ADMIN', 5000, 'EXPIRADO', 'PAY102','ORD102', 'pag-extra-2')
   `
     )
     .run();
@@ -202,17 +203,17 @@ test("G. múltiplos Pix: todos cancelados -> anula", async t => {
   const session = await app.auth.createSession(db, 1);
 
   let put101 = false;
-  t.mock.method(globalThis, "fetch", async (url, options) => {
+  t.mock.method(globalThis, "fetch", async (url, _options) => {
     const urlStr = String(url);
-    if (options?.method === "PUT") {
+    if (String(url).endsWith("/cancel")) {
       put101 = true;
-      return Response.json({ id: 101, status: "cancelled" });
+      return mpResponse({ id: 101, status: "cancelled" });
     }
-    if (urlStr.includes("/v1/payments/101")) {
-      return Response.json({ id: 101, status: put101 ? "cancelled" : "pending" });
+    if (urlStr.includes("/v1/orders/ORD101")) {
+      return mpResponse({ id: 101, status: put101 ? "cancelled" : "pending" });
     }
-    if (urlStr.includes("/v1/payments/102")) {
-      return Response.json({ id: 102, status: "cancelled", status_detail: "expired" });
+    if (urlStr.includes("/v1/orders/ORD102")) {
+      return mpResponse({ id: 102, status: "cancelled", status_detail: "expired" });
     }
     throw new Error(`Unexpected url: ${urlStr}`);
   });
@@ -232,8 +233,8 @@ test("G. múltiplos Pix: um cancelado e outro inconclusivo -> NÃO anula", async
   await db
     .prepare(
       `
-    INSERT INTO pedido_pagamentos(id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id, idempotency_key)
-    VALUES(2, 1, 'PIX_MP', 'ADMIN', 5000, 'PENDENTE', '102', 'pag-extra-2')
+    INSERT INTO pedido_pagamentos(id, pedido_id, metodo, origem, valor_centavos, status, mp_payment_id, mp_order_id, idempotency_key)
+    VALUES(2, 1, 'PIX_MP', 'ADMIN', 5000, 'PENDENTE', 'PAY102','ORD102', 'pag-extra-2')
   `
     )
     .run();
@@ -241,22 +242,22 @@ test("G. múltiplos Pix: um cancelado e outro inconclusivo -> NÃO anula", async
   const session = await app.auth.createSession(db, 1);
 
   let put101 = false;
-  t.mock.method(globalThis, "fetch", async (url, options) => {
+  t.mock.method(globalThis, "fetch", async (url, _options) => {
     const urlStr = String(url);
-    if (urlStr.includes("/v1/payments/101")) {
-      if (options?.method === "PUT") {
+    if (urlStr.includes("/v1/orders/ORD101")) {
+      if (String(url).endsWith("/cancel")) {
         put101 = true;
-        return Response.json({ id: 101, status: "cancelled" });
+        return mpResponse({ id: 101, status: "cancelled" });
       }
-      return Response.json({ id: 101, status: put101 ? "cancelled" : "pending" });
+      return mpResponse({ id: 101, status: put101 ? "cancelled" : "pending" });
     }
-    if (urlStr.includes("/v1/payments/102")) {
-      if (options?.method === "PUT") {
+    if (urlStr.includes("/v1/orders/ORD102")) {
+      if (String(url).endsWith("/cancel")) {
         const err = new Error("Connection timeout");
         err.name = "AbortError";
         throw err;
       }
-      return Response.json({ id: 102, status: "pending" });
+      return mpResponse({ id: 102, status: "pending" });
     }
     throw new Error(`Unexpected url: ${urlStr}`);
   });
@@ -303,14 +304,14 @@ test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery encontra payment a
 
   t.mock.method(globalThis, "fetch", async url => {
     const urlStr = String(url);
-    if (urlStr.includes("/payments/search")) {
-      return Response.json({
+    if (urlStr.includes("/v1/orders?")) {
+      return mpResponse({
         paging: { total: 1, limit: 30, offset: 0 },
         results: [{ id: 999, external_reference: "token", status: "approved" }]
       });
     }
-    if (urlStr.includes("/v1/payments/999")) {
-      return Response.json(
+    if (urlStr.includes("/v1/orders/ORD999")) {
+      return mpResponse(
         approvedMp({
           id: 999,
           date_approved: "2026-09-23T16:00:00Z",
@@ -357,20 +358,20 @@ test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery encontra payment p
   const session = await app.auth.createSession(db, 1);
 
   let putCancelled = false;
-  t.mock.method(globalThis, "fetch", async (url, options) => {
+  t.mock.method(globalThis, "fetch", async (url, _options) => {
     const urlStr = String(url);
-    if (urlStr.includes("/payments/search")) {
-      return Response.json({
+    if (urlStr.includes("/v1/orders?")) {
+      return mpResponse({
         paging: { total: 1, limit: 30, offset: 0 },
         results: [{ id: 888, external_reference: "token", status: "pending" }]
       });
     }
-    if (urlStr.includes("/v1/payments/888")) {
-      if (options?.method === "PUT") {
+    if (urlStr.includes("/v1/orders/ORD888")) {
+      if (String(url).endsWith("/cancel")) {
         putCancelled = true;
-        return Response.json({ id: 888, status: "cancelled" });
+        return mpResponse({ id: 888, status: "cancelled" });
       }
-      return Response.json({
+      return mpResponse({
         id: 888,
         status: putCancelled ? "cancelled" : "pending",
         external_reference: "token"
@@ -404,8 +405,8 @@ test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery continua inconclus
 
   t.mock.method(globalThis, "fetch", async url => {
     const urlStr = String(url);
-    if (urlStr.includes("/payments/search")) {
-      return Response.json({
+    if (urlStr.includes("/v1/orders?")) {
+      return mpResponse({
         paging: { total: 0, limit: 30, offset: 0 },
         results: []
       });

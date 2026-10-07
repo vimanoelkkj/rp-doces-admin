@@ -433,3 +433,34 @@ test("Pix de diagnóstico: erro no estorno aparece no card, nunca finge sucesso"
     await desmontar(root);
   }
 });
+
+test("Pix de diagnóstico em modo simulador (Orders Sandbox): exibe R$ 50,00 e aviso explícito", async t => {
+  const { root } = await montar(t, {
+    pix: async () =>
+      Response.json(
+        {
+          ok: true,
+          valorCentavos: 5000,
+          modoSimulador: true,
+          mpPaymentId: "ORD555:PAY555",
+          qrCode: "000201-sandbox-50",
+          qrCodeBase64: null,
+          ticketUrl: null,
+          expiresAt: "2099-01-01T00:10:00Z"
+        },
+        { status: 201 }
+      )
+  });
+  try {
+    const card = diagCard("Pix real de diagnóstico");
+    await ui.act(async () => card.querySelector(".loj-diag-action").click());
+    await flush();
+
+    assert.match(card.querySelector(".loj-badge-cost").textContent, /50,00/);
+    assert.match(card.querySelector(".loj-diag-pix-valor").textContent, /50,00/);
+    assert.match(card.querySelector(".loj-diag-card-desc").textContent, /50,00/);
+    assert.match(card.textContent, /Orders Pix/);
+  } finally {
+    await desmontar(root);
+  }
+});

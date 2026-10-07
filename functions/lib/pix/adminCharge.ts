@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import { createPixOrderBody, orderIdempotencyKey } from "../mp/orders/types";
 
 import { getItensComSaldo, computeWaterfallAllocations, type LedgerMetodo } from "../comandaLedger";
 import { liberarReservaPedido, preparePedidoPhysicalProjection } from "../stock";
@@ -30,6 +31,7 @@ import { getCapacidadeCobravel } from "./queries";
 interface Env {
   DB: D1Database;
   MP_ACCESS_TOKEN: string;
+  MP_TEST_MODE?: string;
 }
 
 interface PedidoParaPix {
@@ -51,7 +53,6 @@ interface PedidoItemParaReserva {
 }
 
 const METODO_PIX: LedgerMetodo = "PIX_MP";
-const PIX_EXPIRATION_MINUTES = 30;
 const MAX_TEXT_LENGTH = 200;
 
 // "Quanto ainda podemos transformar em cobrança Pix nova" — não confundir
@@ -220,24 +221,26 @@ export async function createAdminPixCharge(
   // Key MP estável por operação lógica: timeout, 5xx ou resposta local
   // perdida NUNCA geram uma key nova (era a causa de um segundo POST lógico
   // com outra identidade).
-  const mpIdempotencyKey = operationKey ? chaveMp(operationKey) : idempotencyKey;
+  const mpIdempotencyKey = await orderIdempotencyKey(
+    operationKey ? chaveMp(operationKey) : idempotencyKey
+  );
 
   const whatsappDigits = pedido.cliente_whatsapp.replace(/\D/g, "") || "cliente";
   const payerEmail = `${whatsappDigits}@checkout.rpdoces.com.br`;
-  const expiresAtEstimado = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000).toISOString();
 
   // Conteúdo original do POST, persistido junto com o claim (antes do
   // envio): preserva valor resolvido, expiração, referência externa e dados
   // do pagador necessários para que a MESMA operação possa ser reconhecida
   // com segurança depois de um resultado ambíguo.
-  const mpRequest = {
-    transaction_amount: valorCentavos / 100,
-    description: "Pedido R&P Doces",
-    payment_method_id: "pix",
-    date_of_expiration: expiresAtEstimado,
-    external_reference: externalReference,
-    payer: { email: payerEmail, first_name: pedido.cliente_nome.slice(0, MAX_TEXT_LENGTH) }
-  };
+  const mpRequest = await createPixOrderBody(
+    valorCentavos,
+    externalReference,
+    {
+      email: payerEmail,
+      first_name: pedido.cliente_nome.slice(0, MAX_TEXT_LENGTH)
+    },
+    env.MP_TEST_MODE
+  );
 
   // Ordem importa: os incrementos de estoque_reservado (se houver) e o
   // flip de reserva_status precisam rodar ANTES do INSERT do pagamento,
@@ -557,7 +560,7 @@ export async function createAdminPixCharge(
     db
       .prepare(
         `UPDATE pedido_pagamentos
-         SET mp_payment_id = ?,
+         SET mp_order_id = ?, mp_payment_id = ?,
              mp_status = CASE
                WHEN status NOT IN ('PAGO', 'REEMBOLSADO')
                 AND LOWER(COALESCE(mp_status, '')) IN ('approved', 'refunded') THEN mp_status
@@ -568,6 +571,7 @@ export async function createAdminPixCharge(
          WHERE id = ?`
       )
       .bind(
+        payment.order_id,
         String(payment.id),
         payment.status,
         txData?.qr_code ?? null,

@@ -19,10 +19,13 @@ import { requireUser, sameOrigin } from "../../../lib/auth";
 import { parseOperationKey } from "../../../lib/operacoes";
 import { postRefundMp } from "../../../lib/mpRefund";
 import { fetchMpPayment, type MpPaymentResponse } from "../../../lib/paymentSync";
+import { parseDiagnosticPaymentId } from "../../../lib/mp/orders/diagnosticId";
+import { decimalToCents, isBrazilCountryCode } from "../../../lib/mp/orders/types";
 
 interface Env {
   DB: D1Database;
   MP_ACCESS_TOKEN?: string;
+  MP_TEST_MODE?: string;
 }
 
 interface DiagnosticoRefundInput {
@@ -83,7 +86,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const mpPaymentId = typeof body.mpPaymentId === "string" ? body.mpPaymentId.trim() : "";
-  if (!/^\d+$/.test(mpPaymentId)) {
+  const identity = parseDiagnosticPaymentId(mpPaymentId);
+  if (!identity) {
     return jsonError(
       MENSAGENS.MP_PAYMENT_ID_INVALIDO,
       STATUS_HTTP.MP_PAYMENT_ID_INVALIDO,
@@ -108,9 +112,27 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     );
   }
 
+  // Isolamento estrito de domínio: uma Order/PAY associada a pagamento de
+  // pedido real jamais pode ser estornada por este canal de diagnóstico.
+  const associadoAPedidoReal = await env.DB.prepare(
+    `SELECT 1 FROM pedido_pagamentos
+     WHERE mp_order_id = ? OR mp_payment_id = ?
+     LIMIT 1`
+  )
+    .bind(identity.orderId, identity.paymentId)
+    .first();
+
+  if (associadoAPedidoReal) {
+    return jsonError(
+      MENSAGENS.PAGAMENTO_NAO_DIAGNOSTICO,
+      STATUS_HTTP.PAGAMENTO_NAO_DIAGNOSTICO,
+      "PAGAMENTO_NAO_DIAGNOSTICO"
+    );
+  }
+
   let payment: MpPaymentResponse;
   try {
-    payment = await fetchMpPayment(env.MP_ACCESS_TOKEN, mpPaymentId);
+    payment = await fetchMpPayment(env.MP_ACCESS_TOKEN, identity.orderId);
   } catch (err: unknown) {
     if (
       err &&
@@ -135,16 +157,101 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     );
   }
 
-  const ehIdCorreto = String(payment.id) === mpPaymentId;
+  // Verifica se o external_reference conflita com algum token público de pedido real
+  if (typeof payment.external_reference === "string") {
+    const pedidoComEsseToken = await env.DB.prepare(
+      "SELECT 1 FROM pedidos WHERE token_publico = ? LIMIT 1"
+    )
+      .bind(payment.external_reference)
+      .first();
+    if (pedidoComEsseToken) {
+      return jsonError(
+        MENSAGENS.PAGAMENTO_NAO_DIAGNOSTICO,
+        STATUS_HTTP.PAGAMENTO_NAO_DIAGNOSTICO,
+        "PAGAMENTO_NAO_DIAGNOSTICO"
+      );
+    }
+  }
+
+  // Deriva o valor esperado e referência a partir do registro persistido em admin_diagnostico_pix
+  let valorEsperadoCentavos: number | null = null;
+  let externalRefEsperado: string | null = null;
+
+  const totalRegistrosDiag =
+    (
+      await env.DB.prepare("SELECT count(*) as total FROM admin_diagnostico_pix").first<{
+        total: number;
+      }>()
+    )?.total ?? 0;
+
+  if (
+    typeof payment.external_reference === "string" &&
+    payment.external_reference.startsWith("ADMIN_DIAG_PIX_")
+  ) {
+    const possivelOpKey = payment.external_reference.slice("ADMIN_DIAG_PIX_".length);
+    let registro = await env.DB.prepare(
+      "SELECT mp_request FROM admin_diagnostico_pix WHERE operation_key = ?"
+    )
+      .bind(possivelOpKey)
+      .first<{ mp_request: string | null }>();
+
+    if (!registro?.mp_request) {
+      registro = await env.DB.prepare(
+        "SELECT mp_request FROM admin_diagnostico_pix WHERE json_extract(mp_request, '$.external_reference') = ?"
+      )
+        .bind(payment.external_reference)
+        .first<{ mp_request: string | null }>();
+    }
+
+    if (registro?.mp_request) {
+      try {
+        const parsed = JSON.parse(registro.mp_request);
+        if (parsed.total_amount) {
+          valorEsperadoCentavos = decimalToCents(parsed.total_amount);
+        }
+        if (typeof parsed.external_reference === "string") {
+          externalRefEsperado = parsed.external_reference;
+        }
+      } catch {
+        // Ignora erro de parse de JSON corrompido
+      }
+    } else if (totalRegistrosDiag > 0) {
+      // Se há diagnósticos registrados no sistema, mas esta referência não existe no banco,
+      // rejeita imediatamente como pagamento não diagnóstico.
+      return jsonError(
+        MENSAGENS.PAGAMENTO_NAO_DIAGNOSTICO,
+        STATUS_HTTP.PAGAMENTO_NAO_DIAGNOSTICO,
+        "PAGAMENTO_NAO_DIAGNOSTICO"
+      );
+    }
+  }
+
+  if (valorEsperadoCentavos === null) {
+    valorEsperadoCentavos = env.MP_TEST_MODE === "orders_pix" ? 5000 : 1;
+  }
+
+  const ehIdCorreto = payment.id === identity.paymentId && payment.order_id === identity.orderId;
   const ehExternalRefValida =
     typeof payment.external_reference === "string" &&
-    payment.external_reference.startsWith("ADMIN_DIAG_PIX:");
+    payment.external_reference.startsWith("ADMIN_DIAG_PIX_") &&
+    (!externalRefEsperado || payment.external_reference === externalRefEsperado);
+  const valorTxCentavos = decimalToCents(payment.transaction_amount);
+  const valorTotalCentavos = decimalToCents(payment.total_amount);
   const ehValorValido =
-    typeof payment.transaction_amount === "number" &&
-    Math.round(payment.transaction_amount * 100) === 1;
-  const ehPix = payment.payment_method_id === "pix";
+    valorTxCentavos !== null &&
+    valorTotalCentavos !== null &&
+    valorTxCentavos === valorEsperadoCentavos &&
+    valorTotalCentavos === valorEsperadoCentavos;
+  const ehPix =
+    payment.payment_method_id === "pix" &&
+    payment.payment_method_type === "bank_transfer" &&
+    isBrazilCountryCode(payment.country_code);
+  const ehStatusApropriado =
+    payment.status === "approved" ||
+    payment.status === "processed" ||
+    payment.transaction_status === "processed";
 
-  if (!ehIdCorreto || !ehExternalRefValida || !ehValorValido || !ehPix) {
+  if (!ehIdCorreto || !ehExternalRefValida || !ehValorValido || !ehPix || !ehStatusApropriado) {
     return jsonError(
       MENSAGENS.PAGAMENTO_NAO_DIAGNOSTICO,
       STATUS_HTTP.PAGAMENTO_NAO_DIAGNOSTICO,
@@ -153,7 +260,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const idempotencyKey = chaveDiagnosticoRefund(chave.key);
-  const envio = await postRefundMp(env.MP_ACCESS_TOKEN, mpPaymentId, idempotencyKey);
+  const envio = await postRefundMp(
+    env.MP_ACCESS_TOKEN,
+    identity.orderId,
+    identity.paymentId,
+    idempotencyKey
+  );
 
   if (envio.resultado === "AMBIGUO") {
     console.error("Resultado ambíguo ao estornar o Pix de diagnóstico", {

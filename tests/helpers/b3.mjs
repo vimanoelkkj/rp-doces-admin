@@ -1,3 +1,4 @@
+import { orderFixture } from "./mp-orders.mjs";
 import { readFile, readdir } from "node:fs/promises";
 import { build } from "esbuild";
 import { Miniflare } from "miniflare";
@@ -40,6 +41,10 @@ const bundle = await build({
       export * as mpRefund from './functions/lib/mpRefund';
       export * as mpRefundIntent from './functions/lib/mpRefundIntent';
       export * as mpSearch from './functions/lib/mpSearch';
+      export * as orders from './functions/lib/mp/orders/client';
+      export * as orderTypes from './functions/lib/mp/orders/types';
+      export * as orderStatus from './functions/lib/mp/orders/status';
+      export * as diagnosticId from './functions/lib/mp/orders/diagnosticId';
       export * as liveTabRecovery from './functions/lib/liveTabRecovery';
       export * as adminCreate from './functions/api/admin/pedidos';
       export * as promocao from './shared/promocao';
@@ -108,15 +113,16 @@ async function createSession(db, userId) {
 export const authDeProducao = producao.auth;
 export const app = { ...producao, auth: { ...producao.auth, createSession } };
 
-export const approvedMp = (extra = {}) => ({
-  id: 101,
-  status: "approved",
-  transaction_amount: 100,
-  payment_method_id: "pix",
-  external_reference: "token",
-  currency_id: "BRL",
-  ...extra
-});
+export const approvedMp = (extra = {}) =>
+  orderFixture({
+    id: 101,
+    status: "approved",
+    transaction_amount: 100,
+    payment_method_id: "pix",
+    external_reference: "token",
+    currency_id: "BRL",
+    ...extra
+  });
 
 const migrations = [];
 for (const file of (await readdir("migrations")).filter(f => f.endsWith(".sql")).sort()) {
@@ -142,9 +148,11 @@ const bridge = `export default { async fetch(request, env) {
 export async function fixture(t, { paid = false, reserve = "ATIVA", ledger = true } = {}) {
   // Rede MP simulada; a autoridade continua nascendo no GET de produção.
   t.mock.method(globalThis, "fetch", async url => {
-    if (!String(url).startsWith("https://api.mercadopago.com/v1/payments/"))
+    if (!String(url).startsWith("https://api.mercadopago.com/v1/orders/"))
       throw new Error("unexpected network");
-    return Response.json(approvedMp({ id: Number(String(url).split("/").at(-1)) }));
+    return Response.json(
+      approvedMp({ id: Number(String(url).split("/").at(-1).replace(/^ORD/, "")) })
+    );
   });
   const mf = new Miniflare({
     modules: true,
@@ -215,7 +223,7 @@ export async function fixture(t, { paid = false, reserve = "ATIVA", ledger = tru
       .prepare(
         `INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,
       idempotency_key,reserva_status,estoque_baixado_em,mp_payment_id,pix_expira_em)
-      VALUES(1,'token','Teste','000',10000,'pedido-1',?,?,'101','2099-01-01T00:00:00Z')`
+      VALUES(1,'token','Teste','000',10000,'pedido-1',?,?,'PAY101','2099-01-01T00:00:00Z')`
       )
       .bind(reserve, baixadoEm),
     db
@@ -234,7 +242,7 @@ export async function fixture(t, { paid = false, reserve = "ATIVA", ledger = tru
       db
         .prepare(
           `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-      mp_payment_id,idempotency_key) VALUES(1,1,'PIX_MP','SITE',10000,?,'101','pagamento-1')`
+      mp_order_id,mp_payment_id,idempotency_key) VALUES(1,1,'PIX_MP','SITE',10000,?,'ORD101','PAY101','pagamento-1')`
         )
         .bind(paid ? "PAGO" : "PENDENTE"),
       db.prepare(

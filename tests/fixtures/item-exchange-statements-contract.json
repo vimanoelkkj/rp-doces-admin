@@ -117,10 +117,10 @@
       "contract": "5d5d092d5353367a9bbc120d08284f3f2196d78d9d7244ce233011fb706b48ed"
     }
   },
-  "immediate": "63c168b65bb1307e06bd0915ef3967c1b4edd47af58187091405e5ae81993cea",
-  "waiting charge": "f01f05441a4068dc628c98b2fcfbb25391697b2b79ffd3a1061f5e743c1f8a6d",
-  "destination deduction": "5f74606a97f3e02ed2355e575e7a05d68450c557fd759059864629c1581d9dc8",
-  "physical rollback": "f01f05441a4068dc628c98b2fcfbb25391697b2b79ffd3a1061f5e743c1f8a6d",
-  "total rollback": "f01f05441a4068dc628c98b2fcfbb25391697b2b79ffd3a1061f5e743c1f8a6d",
-  "completed invariant rollback": "63c168b65bb1307e06bd0915ef3967c1b4edd47af58187091405e5ae81993cea"
+  "immediate": "bc0933723dbe70062b248dd3785023a2b9dc721eec686f10a3d83d002dc81d1e",
+  "waiting charge": "6003d68891cc784faf4a170c36b2d128671b9e333bce52813f8026ce4bf8b91d",
+  "destination deduction": "b87e7ff36966a6003492f60b129cd3b0f13b953b35c8fc00202c600fafd90caf",
+  "physical rollback": "6003d68891cc784faf4a170c36b2d128671b9e333bce52813f8026ce4bf8b91d",
+  "total rollback": "6003d68891cc784faf4a170c36b2d128671b9e333bce52813f8026ce4bf8b91d",
+  "completed invariant rollback": "bc0933723dbe70062b248dd3785023a2b9dc721eec686f10a3d83d002dc81d1e"
 }

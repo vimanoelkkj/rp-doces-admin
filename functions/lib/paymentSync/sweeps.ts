@@ -2,6 +2,7 @@
 
 import { fetchMpPayment } from "./client";
 import { syncPaymentFromMp, expireLocalPayment } from "./ledgerSync";
+import { operationalAlert } from "../operationalAlert";
 
 const RECONCILE_AFTER_SECONDS = 15;
 const RECONCILE_BATCH_SIZE = 4;
@@ -42,14 +43,15 @@ export async function reconcilePendingPixPayments(env: {
   if (!token) return;
 
   const { results } = await env.DB.prepare(
-    `SELECT id, mp_payment_id FROM pedido_pagamentos
-     WHERE metodo = 'PIX_MP' AND status IN ('PENDENTE', 'EXPIRADO') AND mp_payment_id IS NOT NULL
+    `SELECT id, mp_order_id FROM pedido_pagamentos
+     WHERE metodo = 'PIX_MP' AND status IN ('PENDENTE', 'EXPIRADO') AND mp_order_id IS NOT NULL
+       AND mp_order_id GLOB 'ORD?*' AND mp_order_id NOT GLOB '*[^A-Za-z0-9]*'
        AND datetime(atualizado_em) <= datetime('now', '-' || ? || ' seconds')
      ORDER BY atualizado_em ASC, id ASC
      LIMIT ?`
   )
     .bind(RECONCILE_AFTER_SECONDS, RECONCILE_BATCH_SIZE)
-    .all<{ id: number; mp_payment_id: string }>();
+    .all<{ id: number; mp_order_id: string }>();
 
   const pendentes = results || [];
   if (!pendentes.length) return;
@@ -60,7 +62,7 @@ export async function reconcilePendingPixPayments(env: {
         // Claim por candidato: concorrência e falhas de rede também respeitam
         // o throttle. Não altera fatos nem timestamps históricos financeiros.
         if (!(await claimPendingPixPaymentReconciliation(env.DB, row.id))) return;
-        const payment = await fetchMpPayment(token, row.mp_payment_id);
+        const payment = await fetchMpPayment(token, row.mp_order_id);
         await syncPaymentFromMp(env.DB, row.id, payment, env);
       } catch (err) {
         console.error("Falha ao reconciliar pagamento PIX_MP pendente/expirado", row.id, err);
@@ -80,6 +82,26 @@ const RESERVA_VENCIDA_BATCH_SIZE = 10;
 // ausência de pagamento. Approved posterior continua recuperável pelo B2.
 // Reaproveita expireLocalPayment/applyLedgerTransition e a proteção B4.
 export async function liberarReservasVencidasLocalmente(env: { DB: D1Database }): Promise<void> {
+  // Persist a diagnostic marker once; repeated visits must not spam the alert.
+  const { results: legacy } = await env.DB.prepare(
+    `SELECT id,pedido_id FROM pedido_pagamentos
+    WHERE metodo='PIX_MP' AND status='PENDENTE' AND mp_order_id IS NULL
+      AND mp_payment_id IS NOT NULL AND mp_status_detail IS NULL LIMIT 10`
+  ).all<{ id: number; pedido_id: number }>();
+  for (const row of legacy) {
+    const marked = await env.DB.prepare(
+      `UPDATE pedido_pagamentos SET mp_status_detail='LEGACY_MP_ORDER_ID_AUSENTE'
+      WHERE id=? AND status='PENDENTE' AND mp_order_id IS NULL AND mp_status_detail IS NULL`
+    )
+      .bind(row.id)
+      .run();
+    if (marked.meta.changes)
+      operationalAlert({
+        code: "MP_LEGACY_CUTOVER_BLOCKED",
+        pedidoId: row.pedido_id,
+        pagamentoId: row.id
+      });
+  }
   const { results } = await env.DB.prepare(
     `SELECT pp.id AS pagamento_id
      FROM pedidos p
@@ -87,6 +109,18 @@ export async function liberarReservasVencidasLocalmente(env: { DB: D1Database })
      WHERE p.status_pagamento = 'PENDENTE'
        AND p.reserva_status = 'ATIVA'
        AND pp.metodo = 'PIX_MP' AND pp.origem = 'SITE' AND pp.status = 'PENDENTE'
+       AND (
+         (
+           pp.mp_order_id IS NULL
+           AND pp.mp_payment_id IS NULL
+         )
+         OR (
+           pp.mp_order_id GLOB 'ORD?*'
+           AND pp.mp_order_id NOT GLOB '*[^A-Za-z0-9]*'
+           AND pp.mp_payment_id GLOB 'PAY?*'
+           AND pp.mp_payment_id NOT GLOB '*[^A-Za-z0-9]*'
+         )
+       )
        AND LOWER(COALESCE(pp.mp_status, '')) NOT IN ('approved', 'refunded')
        AND p.reserva_expira_em IS NOT NULL
        AND datetime(p.reserva_expira_em) <= datetime('now')

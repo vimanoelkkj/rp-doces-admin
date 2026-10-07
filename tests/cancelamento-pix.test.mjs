@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, refund, approvedMp } from "./helpers/b3.mjs";
@@ -142,7 +143,7 @@ test("11. corrida: criação de Pix ADMIN entre a decisão e a escrita do cancel
   const db = await fixture(t, { ledger: false });
   const session = await app.auth.createSession(db, 1);
   t.mock.method(globalThis, "fetch", async () =>
-    Response.json({
+    mpResponse({
       id: 777,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",
@@ -200,13 +201,13 @@ test("11. corrida: criação de Pix ADMIN entre a decisão e a escrita do cancel
 test("12. corrida: webhook aprova o Pix entre a decisão e a escrita do cancelamento", async t => {
   silenciar(t);
   const db = await fixture(t);
-  t.mock.method(globalThis, "fetch", async () => Response.json(approvedMp()));
+  t.mock.method(globalThis, "fetch", async () => mpResponse(approvedMp()));
 
   let aprovou = false;
   db.hook = async (s, op) => {
     if (op === "run" && s[0].sql.includes("SET status_pedido = ?") && !aprovou) {
       aprovou = true;
-      const payment = await app.sync.fetchMpPayment("fake", "101");
+      const payment = await app.sync.fetchMpPayment("fake", "ORD101");
       await app.sync.syncPaymentFromMp(db, 1, payment);
     }
   };

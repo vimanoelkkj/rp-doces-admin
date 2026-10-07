@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state } from "./helpers/b3.mjs";
@@ -48,8 +49,8 @@ const pixEnv = (db, token = "fake-token") => ({ DB: db, MP_ACCESS_TOKEN: token }
 
 function mockMpSucesso(t) {
   return t.mock.method(globalThis, "fetch", async url => {
-    assert.equal(url, "https://api.mercadopago.com/v1/payments");
-    return Response.json(
+    assert.equal(url, "https://api.mercadopago.com/v1/orders");
+    return mpResponse(
       {
         id: 555,
         status: "pending",
@@ -81,7 +82,7 @@ test("OWNER gera o Pix de diagnóstico com sucesso", async t => {
   const body = await response.json();
   assert.equal(body.ok, true);
   assert.equal(body.valorCentavos, 1);
-  assert.equal(body.mpPaymentId, "555");
+  assert.equal(body.mpPaymentId, "ORD555:PAY555");
   assert.equal(body.qrCode, "000201...copia-e-cola");
   assert.equal(body.qrCodeBase64, "base64img");
   assert.equal(body.ticketUrl, "https://mp.test/ticket");
@@ -90,8 +91,8 @@ test("OWNER gera o Pix de diagnóstico com sucesso", async t => {
   // Exatamente 1 centavo enviado ao Mercado Pago.
   const [, options] = mock.mock.calls[0].arguments;
   const enviado = JSON.parse(options.body);
-  assert.equal(enviado.transaction_amount, 0.01);
-  assert.equal(enviado.payment_method_id, "pix");
+  assert.equal(enviado.total_amount, "0.01");
+  assert.equal(enviado.transactions.payments[0].payment_method.id, "pix");
 });
 
 test("ADMIN recebe 403 ao tentar gerar o Pix de diagnóstico", async t => {
@@ -141,7 +142,7 @@ test("MP_ACCESS_TOKEN ausente nunca finge sucesso", async t => {
 test("recusa definitiva do Mercado Pago vira erro explícito, nunca sucesso", async t => {
   const { db, owner } = await bancada(t);
   t.mock.method(globalThis, "fetch", async () =>
-    Response.json({ message: "invalid parameter", cause: [{ code: "123" }] }, { status: 400 })
+    mpResponse({ message: "invalid parameter", cause: [{ code: "123" }] }, { status: 400 })
   );
   const response = await app.diagnosticoPix.onRequestPost({
     request: pixRequest(owner),
@@ -201,7 +202,7 @@ test("Pix de diagnóstico nunca escreve em pedidos, pagamentos ou estoque", asyn
 
 /* ────────────────── Status e estorno do Pix de diagnóstico ────────────────── */
 
-function pixStatusRequest(session, mpPaymentId = "555") {
+function pixStatusRequest(session, mpPaymentId = "ORD555:PAY555") {
   return new Request(
     `https://local.test/api/admin/diagnosticos/pix-status?mpPaymentId=${mpPaymentId}`,
     {
@@ -212,7 +213,7 @@ function pixStatusRequest(session, mpPaymentId = "555") {
 
 function pixRefundRequest(
   session,
-  body = { mpPaymentId: "555", operationKey: "diag-refund-000001" }
+  body = { mpPaymentId: "ORD555:PAY555", operationKey: "diag-refund-000001" }
 ) {
   return new Request("https://local.test/api/admin/diagnosticos/pix-reembolso", {
     method: "POST",
@@ -228,8 +229,8 @@ function pixRefundRequest(
 test("OWNER consulta o status do Pix de diagnóstico", async t => {
   const { db, owner } = await bancada(t);
   t.mock.method(globalThis, "fetch", async url => {
-    assert.equal(url, "https://api.mercadopago.com/v1/payments/555");
-    return Response.json({ id: 555, status: "approved" });
+    assert.equal(url, "https://api.mercadopago.com/v1/orders/ORD555");
+    return mpResponse({ id: 555, status: "approved" });
   });
   const response = await app.diagnosticoPixStatus.onRequestGet({
     request: pixStatusRequest(owner),
@@ -242,7 +243,7 @@ test("OWNER consulta o status do Pix de diagnóstico", async t => {
 
 test("status ainda pendente/in_process aparece como PENDENTE, nunca como pago", async t => {
   const { db, owner } = await bancada(t);
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: 555, status: "in_process" }));
+  t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 555, status: "in_process" }));
   const response = await app.diagnosticoPixStatus.onRequestGet({
     request: pixStatusRequest(owner),
     env: pixEnv(db)
@@ -292,7 +293,7 @@ test("falha ao consultar o Mercado Pago nunca finge um status", async t => {
 
 test("consulta de status nunca escreve em pedido_pagamentos", async t => {
   const { db, owner } = await bancada(t);
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: 555, status: "approved" }));
+  t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 555, status: "approved" }));
   const antes = await state(db);
   await app.diagnosticoPixStatus.onRequestGet({
     request: pixStatusRequest(owner),
@@ -303,17 +304,17 @@ test("consulta de status nunca escreve em pedido_pagamentos", async t => {
 
 function mockMpRefundSucesso(t, refundId = 9001) {
   return t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
-      return Response.json({
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+      return mpResponse({
         id: 555,
         status: "approved",
-        external_reference: "ADMIN_DIAG_PIX:diag-refund-000001",
+        external_reference: "ADMIN_DIAG_PIX_diag-refund-000001",
         transaction_amount: 0.01,
         payment_method_id: "pix"
       });
     }
-    assert.equal(url, "https://api.mercadopago.com/v1/payments/555/refunds");
-    return Response.json({ id: refundId, payment_id: 555, status: "approved" }, { status: 201 });
+    assert.equal(url, "https://api.mercadopago.com/v1/orders/ORD555/refund");
+    return mpResponse({ id: refundId, payment_id: 555, status: "approved" }, { status: 201 });
   });
 }
 
@@ -327,9 +328,9 @@ test("OWNER estorna o Pix de diagnóstico com sucesso", async t => {
   assert.equal(response.status, 201);
   const body = await response.json();
   assert.equal(body.ok, true);
-  assert.equal(body.refundId, "9001");
+  assert.equal(body.refundId, "REF9001");
   assert.equal(body.status, "approved");
-  const refundCall = mock.mock.calls.find(c => c.arguments[0].endsWith("/refunds"));
+  const refundCall = mock.mock.calls.find(c => c.arguments[0].endsWith("/refund"));
   assert.ok(refundCall, "endpoint de refund foi invocado");
   assert.equal(refundCall.arguments[1].method, "POST");
 });
@@ -361,7 +362,7 @@ test("origem inválida é recusada no estorno", async t => {
       Origin: "https://evil.test",
       Cookie: cookieDe(owner)
     },
-    body: JSON.stringify({ mpPaymentId: "555", operationKey: "diag-refund-000001" })
+    body: JSON.stringify({ mpPaymentId: "ORD555:PAY555", operationKey: "diag-refund-000001" })
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({ request, env: pixEnv(db) });
   assert.equal(response.status, 403);
@@ -375,7 +376,7 @@ test("mpPaymentId ou operationKey inválidos são rejeitados no estorno", async 
   });
   assert.equal(semId.status, 400);
   const semChave = await app.diagnosticoPixReembolso.onRequestPost({
-    request: pixRefundRequest(owner, { mpPaymentId: "555", operationKey: "curta" }),
+    request: pixRefundRequest(owner, { mpPaymentId: "ORD555:PAY555", operationKey: "curta" }),
     env: pixEnv(db)
   });
   assert.equal(semChave.status, 400);
@@ -393,16 +394,16 @@ test("MP_ACCESS_TOKEN ausente nunca finge um estorno", async t => {
 test("recusa definitiva do estorno vira erro explícito, nunca sucesso", async t => {
   const { db, owner } = await bancada(t);
   t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
-      return Response.json({
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+      return mpResponse({
         id: 555,
         status: "approved",
-        external_reference: "ADMIN_DIAG_PIX:diag-refund-000001",
+        external_reference: "ADMIN_DIAG_PIX_diag-refund-000001",
         transaction_amount: 0.01,
         payment_method_id: "pix"
       });
     }
-    return Response.json({ message: "cannot refund" }, { status: 400 });
+    return mpResponse({ message: "cannot refund" }, { status: 400 });
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
@@ -430,7 +431,7 @@ test("resultado ambíguo do estorno nunca vira sucesso", async t => {
 test("mesma operationKey de estorno deriva a mesma X-Idempotency-Key", async t => {
   const { db, owner } = await bancada(t);
   const mock = mockMpRefundSucesso(t);
-  const corpo = { mpPaymentId: "555", operationKey: "diag-refund-000002" };
+  const corpo = { mpPaymentId: "ORD555:PAY555", operationKey: "diag-refund-000002" };
   await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner, corpo),
     env: pixEnv(db)
@@ -439,7 +440,7 @@ test("mesma operationKey de estorno deriva a mesma X-Idempotency-Key", async t =
     request: pixRefundRequest(owner, corpo),
     env: pixEnv(db)
   });
-  const refundCalls = mock.mock.calls.filter(c => c.arguments[0].endsWith("/refunds"));
+  const refundCalls = mock.mock.calls.filter(c => c.arguments[0].endsWith("/refund"));
   assert.equal(refundCalls.length, 2);
   const chaves = refundCalls.map(c => c.arguments[1].headers["X-Idempotency-Key"]);
   assert.equal(chaves[0], chaves[1]);
@@ -466,18 +467,18 @@ test("Pix diagnóstico de R$ 0,01 válido permite estorno", async t => {
   assert.equal(response.status, 201);
   const body = await response.json();
   assert.equal(body.ok, true);
-  assert.equal(body.refundId, "9002");
+  assert.equal(body.refundId, "REF9002");
   const urls = mock.mock.calls.map(c => c.arguments[0]);
-  assert.ok(urls.some(u => u === "https://api.mercadopago.com/v1/payments/555"));
-  assert.ok(urls.some(u => u === "https://api.mercadopago.com/v1/payments/555/refunds"));
+  assert.ok(urls.some(u => u === "https://api.mercadopago.com/v1/orders/ORD555"));
+  assert.ok(urls.some(u => u === "https://api.mercadopago.com/v1/orders/ORD555/refund"));
 });
 
 test("pagamento real com external_reference normal tem refund bloqueado", async t => {
   const { db, owner } = await bancada(t);
   let refundChamado = false;
   t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
-      return Response.json({
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+      return mpResponse({
         id: 555,
         status: "approved",
         external_reference: "PED-998877",
@@ -485,10 +486,10 @@ test("pagamento real com external_reference normal tem refund bloqueado", async 
         payment_method_id: "pix"
       });
     }
-    if (url.includes("/refunds")) {
+    if (url.includes("/refund")) {
       refundChamado = true;
     }
-    return Response.json({ id: 999 }, { status: 201 });
+    return mpResponse({ id: 999 }, { status: 201 });
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
@@ -504,8 +505,8 @@ test("pagamento com prefixo incorreto tem refund bloqueado", async t => {
   const { db, owner } = await bancada(t);
   let refundChamado = false;
   t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
-      return Response.json({
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+      return mpResponse({
         id: 555,
         status: "approved",
         external_reference: "DIAG_PIX:diag-refund-000001",
@@ -513,10 +514,10 @@ test("pagamento com prefixo incorreto tem refund bloqueado", async t => {
         payment_method_id: "pix"
       });
     }
-    if (url.includes("/refunds")) {
+    if (url.includes("/refund")) {
       refundChamado = true;
     }
-    return Response.json({ id: 999 }, { status: 201 });
+    return mpResponse({ id: 999 }, { status: 201 });
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
@@ -532,22 +533,207 @@ test("pagamento com prefixo ADMIN_DIAG_PIX mas valor diferente de R$ 0,01 tem re
   const { db, owner } = await bancada(t);
   let refundChamado = false;
   t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
-      return Response.json({
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+      return mpResponse({
         id: 555,
         status: "approved",
-        external_reference: "ADMIN_DIAG_PIX:diag-refund-000001",
+        external_reference: "ADMIN_DIAG_PIX_diag-refund-000001",
         transaction_amount: 10.0,
         payment_method_id: "pix"
       });
     }
-    if (url.includes("/refunds")) {
+    if (url.includes("/refund")) {
       refundChamado = true;
     }
-    return Response.json({ id: 999 }, { status: 201 });
+    return mpResponse({ id: 999 }, { status: 201 });
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
+    env: pixEnv(db)
+  });
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.equal(body.code, "PAGAMENTO_NAO_DIAGNOSTICO");
+  assert.equal(refundChamado, false);
+});
+
+test("diagnóstico em MP_TEST_MODE=orders_pix: aceita 50.00 para estorno, mas rejeita 49.99 e 50.01", async t => {
+  for (const amount of ["50.00", "49.99", "50.01"]) {
+    const { db, owner } = await bancada(t);
+    let refundChamado = false;
+    t.mock.method(globalThis, "fetch", async url => {
+      if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+        return mpResponse({
+          id: 555,
+          status: "approved",
+          external_reference: "ADMIN_DIAG_PIX_diag-orders-pix-01",
+          transaction_amount: amount,
+          total_amount: amount,
+          payment_method_id: "pix"
+        });
+      }
+      if (url.includes("/refund")) {
+        refundChamado = true;
+      }
+      return mpResponse({ id: 9901, payment_id: 555, status: "approved" }, { status: 201 });
+    });
+
+    const envOrdersPix = { DB: db, MP_ACCESS_TOKEN: "fake-token", MP_TEST_MODE: "orders_pix" };
+    const response = await app.diagnosticoPixReembolso.onRequestPost({
+      request: pixRefundRequest(owner, {
+        mpPaymentId: "ORD555:PAY555",
+        operationKey: `diag-ref-amt-${amount.replace(".", "-")}`
+      }),
+      env: envOrdersPix
+    });
+
+    if (amount === "50.00") {
+      assert.equal(response.status, 201, `amount 50.00 deve ser aceito em orders_pix`);
+      const body = await response.json();
+      assert.equal(body.ok, true);
+      assert.equal(refundChamado, true);
+    } else {
+      assert.equal(response.status, 400, `amount ${amount} deve ser rejeitado em orders_pix`);
+      const body = await response.json();
+      assert.equal(body.code, "PAGAMENTO_NAO_DIAGNOSTICO");
+      assert.equal(refundChamado, false);
+    }
+  }
+});
+
+test("diagnóstico deriva valor esperado do mp_request persistido em admin_diagnostico_pix", async t => {
+  const { db, owner } = await bancada(t);
+  const opKey = "diag-persisted-op-99";
+  const extRef = "ADMIN_DIAG_PIX_diag-persisted-op-99";
+
+  // Persiste operação com R$ 50,00 no banco
+  const mpRequest = {
+    type: "online",
+    total_amount: "50.00",
+    external_reference: extRef,
+    processing_mode: "automatic",
+    transactions: {
+      payments: [{ amount: "50.00", payment_method: { id: "pix", type: "bank_transfer" } }]
+    }
+  };
+  await db
+    .prepare(
+      "INSERT INTO admin_diagnostico_pix (operation_key, expires_at, mp_request) VALUES (?, ?, ?)"
+    )
+    .bind(opKey, "2099-01-01T00:00:00Z", JSON.stringify(mpRequest))
+    .run();
+
+  let refundChamado = false;
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url === "https://api.mercadopago.com/v1/orders/ORD777") {
+      return mpResponse({
+        id: 777,
+        status: "approved",
+        external_reference: extRef,
+        transaction_amount: "50.00",
+        total_amount: "50.00",
+        payment_method_id: "pix"
+      });
+    }
+    if (url.includes("/refund")) refundChamado = true;
+    return mpResponse({ id: 9902, payment_id: 777, status: "approved" }, { status: 201 });
+  });
+
+  // Mesmo com MP_TEST_MODE indefinido (normal), o registro persistido determina o valor esperado!
+  const response = await app.diagnosticoPixReembolso.onRequestPost({
+    request: pixRefundRequest(owner, {
+      mpPaymentId: "ORD777:PAY777",
+      operationKey: "diag-ref-persisted-01"
+    }),
+    env: pixEnv(db)
+  });
+  assert.equal(response.status, 201);
+  assert.equal(refundChamado, true);
+});
+
+test("Order/PAY associada a pagamento de pedido real no banco de dados é sumariamente rejeitada", async t => {
+  const { db, owner } = await bancada(t);
+
+  // Insere pagamento real em pedido_pagamentos
+  await db
+    .prepare(
+      `INSERT INTO pedido_pagamentos(id, pedido_id, metodo, origem, valor_centavos, status, mp_order_id, mp_payment_id, idempotency_key)
+     VALUES(99, 1, 'PIX_MP', 'SITE', 5000, 'PAGO', 'ORD888', 'PAY888', 'real-pay-idemp')`
+    )
+    .run();
+
+  let refundChamado = false;
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url === "https://api.mercadopago.com/v1/orders/ORD888") {
+      return mpResponse({
+        id: 888,
+        status: "approved",
+        external_reference: "ADMIN_DIAG_PIX_fake",
+        transaction_amount: 0.01,
+        total_amount: 0.01,
+        payment_method_id: "pix"
+      });
+    }
+    if (url.includes("/refund")) refundChamado = true;
+    return mpResponse({ id: 9903 }, { status: 201 });
+  });
+
+  const response = await app.diagnosticoPixReembolso.onRequestPost({
+    request: pixRefundRequest(owner, {
+      mpPaymentId: "ORD888:PAY888",
+      operationKey: "diag-ref-real-reject"
+    }),
+    env: pixEnv(db)
+  });
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.equal(body.code, "PAGAMENTO_NAO_DIAGNOSTICO");
+  assert.equal(
+    refundChamado,
+    false,
+    "refund no Mercado Pago jamais pode ser chamado para pedido real"
+  );
+});
+
+test("external_reference divergente da operação persistida é rejeitado", async t => {
+  const { db, owner } = await bancada(t);
+  const opKey = "diag-mismatch-op";
+  const extRefOriginal = "ADMIN_DIAG_PIX_diag-mismatch-op";
+
+  const mpRequest = {
+    type: "online",
+    total_amount: "0.01",
+    external_reference: extRefOriginal,
+    transactions: { payments: [{ amount: "0.01" }] }
+  };
+  await db
+    .prepare(
+      "INSERT INTO admin_diagnostico_pix (operation_key, expires_at, mp_request) VALUES (?, ?, ?)"
+    )
+    .bind(opKey, "2099-01-01T00:00:00Z", JSON.stringify(mpRequest))
+    .run();
+
+  let refundChamado = false;
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url === "https://api.mercadopago.com/v1/orders/ORD666") {
+      return mpResponse({
+        id: 666,
+        status: "approved",
+        external_reference: "ADMIN_DIAG_PIX_outra_coisa",
+        transaction_amount: 0.01,
+        total_amount: 0.01,
+        payment_method_id: "pix"
+      });
+    }
+    if (url.includes("/refund")) refundChamado = true;
+    return mpResponse({ id: 9904 }, { status: 201 });
+  });
+
+  const response = await app.diagnosticoPixReembolso.onRequestPost({
+    request: pixRefundRequest(owner, {
+      mpPaymentId: "ORD666:PAY666",
+      operationKey: "diag-ref-extref-mismatch"
+    }),
     env: pixEnv(db)
   });
   assert.equal(response.status, 400);
@@ -560,13 +746,13 @@ test("falha ou resultado ambíguo na consulta ao Mercado Pago não chama refund 
   const { db, owner } = await bancada(t);
   let refundChamado = false;
   t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
       throw new Error("503 Service Unavailable");
     }
-    if (url.includes("/refunds")) {
+    if (url.includes("/refund")) {
       refundChamado = true;
     }
-    return Response.json({ id: 999 }, { status: 201 });
+    return mpResponse({ id: 999 }, { status: 201 });
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
@@ -582,13 +768,13 @@ test("pagamento inexistente no Mercado Pago (404) retorna PAGAMENTO_NAO_DIAGNOST
   const { db, owner } = await bancada(t);
   let refundChamado = false;
   t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
-      return Response.json({ message: "Not found" }, { status: 404 });
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+      return mpResponse({ message: "Not found" }, { status: 404 });
     }
-    if (url.includes("/refunds")) {
+    if (url.includes("/refund")) {
       refundChamado = true;
     }
-    return Response.json({ id: 999 }, { status: 201 });
+    return mpResponse({ id: 999 }, { status: 201 });
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
@@ -605,19 +791,19 @@ for (const metodo of [undefined, "credit_card"]) {
     const { db, owner } = await bancada(t);
     let refundChamado = false;
     t.mock.method(globalThis, "fetch", async url => {
-      if (url === "https://api.mercadopago.com/v1/payments/555") {
-        return Response.json({
+      if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+        return mpResponse({
           id: 555,
           status: "approved",
-          external_reference: "ADMIN_DIAG_PIX:diag-refund-000001",
+          external_reference: "ADMIN_DIAG_PIX_diag-refund-000001",
           transaction_amount: 0.01,
-          ...(metodo ? { payment_method_id: metodo } : {})
+          payment_method_id: metodo
         });
       }
-      if (url.includes("/refunds")) {
+      if (url.includes("/refund")) {
         refundChamado = true;
       }
-      return Response.json({ id: 999 }, { status: 201 });
+      return mpResponse({ id: 999 }, { status: 201 });
     });
     const response = await app.diagnosticoPixReembolso.onRequestPost({
       request: pixRefundRequest(owner),
@@ -634,13 +820,13 @@ test("GET do Mercado Pago retornando HTTP 503 resulta em 502 MERCADO_PAGO_INDISP
   const { db, owner } = await bancada(t);
   let refundChamado = false;
   t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
       return new Response("Service Unavailable", { status: 503 });
     }
-    if (url.includes("/refunds")) {
+    if (url.includes("/refund")) {
       refundChamado = true;
     }
-    return Response.json({ id: 999 }, { status: 201 });
+    return mpResponse({ id: 999 }, { status: 201 });
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
@@ -656,19 +842,19 @@ test("resposta do GET com ID diferente do solicitado não chama refund", async t
   const { db, owner } = await bancada(t);
   let refundChamado = false;
   t.mock.method(globalThis, "fetch", async url => {
-    if (url === "https://api.mercadopago.com/v1/payments/555") {
-      return Response.json({
+    if (url === "https://api.mercadopago.com/v1/orders/ORD555") {
+      return mpResponse({
         id: 999,
         status: "approved",
-        external_reference: "ADMIN_DIAG_PIX:diag-refund-000001",
+        external_reference: "ADMIN_DIAG_PIX_diag-refund-000001",
         transaction_amount: 0.01,
         payment_method_id: "pix"
       });
     }
-    if (url.includes("/refunds")) {
+    if (url.includes("/refund")) {
       refundChamado = true;
     }
-    return Response.json({ id: 999 }, { status: 201 });
+    return mpResponse({ id: 999 }, { status: 201 });
   });
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),

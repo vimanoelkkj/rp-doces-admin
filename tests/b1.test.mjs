@@ -321,7 +321,7 @@ const concurrent = [
     setup: db => db.prepare("UPDATE pedido_pagamentos SET status='EXPIRADO' WHERE id=1").run(),
     atWrite: s => s.some(x => x.sql.includes("SET status = ?")),
     run: async db =>
-      app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "101")),
+      app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "ORD101")),
     check(s) {
       assert.equal(s.pagamentos[0].status, "PAGO");
       assert.equal(s.pedido.status_pagamento, "PAGO");

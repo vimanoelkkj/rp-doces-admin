@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, barrier, isProjection, refund, approvedMp } from "./helpers/b3.mjs";
@@ -26,22 +27,33 @@ const deferred = () => {
 function remote(t, statuses = {}) {
   let id = 200;
   return t.mock.method(globalThis, "fetch", async (url, options) => {
-    assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/payments/);
-    if (options?.method === "PUT") {
-      const paymentId = Number(String(url).split("/").at(-1));
-      return Response.json({ id: paymentId, status: "cancelled" });
+    assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/orders/);
+    if (String(url).endsWith("/cancel")) {
+      const paymentId = Number(
+        String(url)
+          .replace(/\/cancel$/, "")
+          .split("/")
+          .at(-1)
+          .replace(/^ORD/, "")
+      );
+      statuses[paymentId] = "cancelled";
+      return mpResponse({ id: paymentId, status: "cancelled" });
     }
     if (options?.method === "POST")
-      return Response.json({ id: ++id, status: "pending", date_of_expiration: "2099-01-01" });
-    const paymentId = Number(String(url).split("/").at(-1));
+      return mpResponse({ id: ++id, status: "pending", date_of_expiration: "2099-01-01" });
+    const paymentId = Number(String(url).split("/").at(-1).replace(/^ORD/, ""));
     const status = statuses[paymentId] ?? "pending";
-    return Response.json(
+    return mpResponse(
       status === "approved" ? approvedMp({ id: paymentId }) : { id: paymentId, status }
     );
   });
 }
 const sync = async (db, id, mpId) =>
-  app.sync.syncPaymentFromMp(db, id, await app.sync.fetchMpPayment("fake", String(mpId)));
+  app.sync.syncPaymentFromMp(
+    db,
+    id,
+    await app.sync.fetchMpPayment("fake", `ORD${String(mpId).replace(/^PAY|^ORD/, "")}`)
+  );
 async function second(
   db,
   { method = "PIX_MP", mpId = "102", deadline = null, substitui = null } = {}
@@ -49,10 +61,16 @@ async function second(
   await db
     .prepare(
       `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-    mp_payment_id,pix_expira_em,idempotency_key,substitui_pagamento_id)
-    VALUES(2,1,?,'ADMIN',5000,'PENDENTE',?,?,'second',?)`
+    mp_order_id,mp_payment_id,pix_expira_em,idempotency_key,substitui_pagamento_id)
+    VALUES(2,1,?,'ADMIN',5000,'PENDENTE',?,?,?,'second',?)`
     )
-    .bind(method, mpId, deadline, substitui)
+    .bind(
+      method,
+      mpId === null ? null : `ORD${mpId}`,
+      mpId === null ? null : `PAY${mpId}`,
+      deadline,
+      substitui
+    )
     .run();
 }
 function reserved(s) {
@@ -107,11 +125,11 @@ for (const oldDies of [true, false])
     assert.equal(b.ok, true);
     const first = oldDies ? a : b,
       last = oldDies ? b : a;
-    statuses[Number(first.mpPaymentId)] = "cancelled";
+    statuses[Number(first.mpPaymentId.replace(/^PAY/, ""))] = "cancelled";
     await sync(db, first.pagamentoId, first.mpPaymentId);
     if (oldDies) {
       reserved(await state(db));
-      statuses[Number(last.mpPaymentId)] = "expired";
+      statuses[Number(last.mpPaymentId.replace(/^PAY/, ""))] = "expired";
       await sync(db, last.pagamentoId, last.mpPaymentId);
     }
     released(await state(db));
@@ -603,7 +621,9 @@ for (const status of ["cancelled", "expired"])
 
 test("expired without remote ID remains retained after interrupted finalization until explicit retry", async t => {
   const db = await fixture(t);
-  await db.prepare("UPDATE pedido_pagamentos SET mp_payment_id=NULL WHERE id=1").run();
+  await db
+    .prepare("UPDATE pedido_pagamentos SET mp_order_id=NULL,mp_payment_id=NULL WHERE id=1")
+    .run();
   db.hook = (s, op) => {
     if (op === "first" && isProjection(s[0].sql)) {
       db.hook = null;
@@ -650,13 +670,13 @@ for (const path of ["ADMIN", "SITE"])
       if (path === "SITE") await db.prepare("DELETE FROM pedidos WHERE id=1").run();
       let confirmed, requestBody;
       t.mock.method(globalThis, "fetch", async (url, options) => {
-        assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/payments/);
+        assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/orders/);
         if (options?.method !== "POST")
-          return Response.json(
+          return mpResponse(
             status === "approved"
               ? approvedMp({
                   id: 101,
-                  transaction_amount: requestBody.transaction_amount,
+                  transaction_amount: requestBody.total_amount,
                   external_reference: requestBody.external_reference
                 })
               : { id: 101, status }
@@ -666,7 +686,9 @@ for (const path of ["ADMIN", "SITE"])
           .prepare("SELECT id FROM pedido_pagamentos ORDER BY id DESC LIMIT 1")
           .first();
         await db
-          .prepare("UPDATE pedido_pagamentos SET mp_payment_id='101' WHERE id=?")
+          .prepare(
+            "UPDATE pedido_pagamentos SET mp_order_id='ORD101',mp_payment_id='PAY101' WHERE id=?"
+          )
           .bind(payment.id)
           .run();
         await sync(db, payment.id, 101); // webhook/GET path wins before POST completes
@@ -742,7 +764,7 @@ for (const bothFail of [false, true])
     responseB.resolve(
       bothFail
         ? new Response("rejected", { status: 400 })
-        : Response.json({ id: 202, status: "pending", date_of_expiration: "2099-01-01" })
+        : mpResponse({ id: 202, status: "pending", date_of_expiration: "2099-01-01" })
     );
     assert.equal((await b).ok, !bothFail);
     reserved(await state(db));
@@ -773,7 +795,9 @@ for (const replacement of [false, true])
     assert.equal(results.filter(r => r.status === "fulfilled" && r.value.ok).length, 1);
     const posts = mp.mock.calls
       .slice(beforeCalls)
-      .filter(c => c.arguments[1]?.method === "POST").length;
+      .filter(
+        c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
+      ).length;
     assert.equal(posts, 1);
     reserved(await state(db));
     assert.equal((await state(db)).pagamentos.length, replacement ? 2 : 1);
@@ -792,16 +816,19 @@ test("signed webhook reports release failure and its retry recovers CANCELADO", 
     ["sign"]
   );
   const sig = Buffer.from(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("id:101;request-id:b4;ts:1;"))
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("id:ORD101;request-id:b4;ts:1;"))
   ).toString("hex");
   const webhook = () =>
     app.webhook.onRequestPost({
       env: { ...env(db), MP_WEBHOOK_SECRET: secret },
-      request: new Request("https://local.test/api/webhooks/mercadopago?data.id=101&type=payment", {
-        method: "POST",
-        headers: { "x-signature": `ts=1,v1=${sig}`, "x-request-id": "b4" },
-        body: JSON.stringify({ data: { id: 101 } })
-      })
+      request: new Request(
+        "https://local.test/api/webhooks/mercadopago?data.id=ORD101&type=order",
+        {
+          method: "POST",
+          headers: { "x-signature": `ts=1,v1=${sig}`, "x-request-id": "b4" },
+          body: JSON.stringify({ data: { id: 101 } })
+        }
+      )
     });
   db.hook = (s, op) => {
     if (op === "batch" && isRelease(s)) {

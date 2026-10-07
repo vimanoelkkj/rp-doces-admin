@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture } from "./helpers/b3.mjs";
@@ -30,9 +31,9 @@ async function siteLimpo(t) {
 function mpPost(t) {
   let id = 100;
   return t.mock.method(globalThis, "fetch", async (url, options) => {
-    assert.equal(url, "https://api.mercadopago.com/v1/payments");
+    assert.equal(url, "https://api.mercadopago.com/v1/orders");
     assert.equal(options.method, "POST");
-    return Response.json({
+    return mpResponse({
       id: ++id,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",

@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -137,7 +138,7 @@ async function missingOutboxContract(t, module, manual = false) {
     assert.equal(response.status, 201);
     pedidoId = (await response.json()).pedidoId;
   } else {
-    const payment = await module.sync.fetchMpPayment("fake", "101");
+    const payment = await module.sync.fetchMpPayment("fake", "ORD101");
     assert.deepEqual(await module.sync.syncPaymentFromMp(db, 1, payment, env), {
       ok: true,
       status: "PAGO",
@@ -190,7 +191,7 @@ test("missing outbox: paid manual order retains its operator exclusion", t =>
 
 test("missing outbox: interruption immediately after paid CAS retains intent", async t => {
   const { db, env } = await setup(t);
-  const payment = await production.sync.fetchMpPayment("fake", "101");
+  const payment = await production.sync.fetchMpPayment("fake", "ORD101");
   let paidWrite = false;
   db.hook = statements => {
     if (
@@ -239,7 +240,7 @@ for (const status of ["PENDENTE", "FALHOU", "CANCELADO", "EXPIRADO", "REEMBOLSAD
 test("missing outbox: invalid MP approval never records an intent", async t => {
   const { db, env } = await setup(t);
   t.mock.method(globalThis, "fetch", async () =>
-    Response.json({
+    mpResponse({
       id: 101,
       status: "approved",
       transaction_amount: 0.01,
@@ -248,7 +249,7 @@ test("missing outbox: invalid MP approval never records an intent", async t => {
       payment_method_id: "pix"
     })
   );
-  const payment = await production.sync.fetchMpPayment("fake", "101");
+  const payment = await production.sync.fetchMpPayment("fake", "ORD101");
   assert.deepEqual(await production.sync.syncPaymentFromMp(db, 1, payment, env), {
     ok: true,
     status: "PENDENTE",
@@ -343,7 +344,7 @@ for (const queueFails of [false, true]) {
       calls.push("unexpected transport");
       assert.fail("financial confirmation must not invoke transport");
     };
-    const payment = await production.sync.fetchMpPayment("fake", "101");
+    const payment = await production.sync.fetchMpPayment("fake", "ORD101");
     assert.deepEqual(await production.sync.syncPaymentFromMp(db, 1, payment, env), {
       ok: true,
       status: "PAGO",

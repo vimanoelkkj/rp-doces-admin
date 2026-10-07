@@ -1,11 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
-// Pix administrativo (geração e regeneração pelo admin, fora do checkout do
-// cliente) — Payments API, não Orders API (produção usa Orders API; decisão
-// deliberada de não copiar de carona, documentada no README). Cancelamento
-// autônomo (sem substituto) fica fora de escopo: a Payments API não tem
-// cancelamento real de Pix pendente, então essa ação só faria sentido como
-// "esconder da UI sem substituir" — semanticamente estranho sem um Pix novo.
+// Administrative Pix generation/regeneration uses the same Orders adapter as
+// checkout. Standalone cancellation remains outside this UI contract; regeneration
+// verifies cancellation of A before creating B and preserves the existing guards.
 //
 // external_reference: SITE continua usando `token_publico` do pedido
 // (checkout.ts intocado). ADMIN usa o `idempotency_key` da própria

@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -13,7 +14,7 @@ import {
 
 const reconcile = db => app.reconcile.reconcilePedidoAfterFinancialChange(db, 1);
 const approve = async db =>
-  app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "101"));
+  app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "ORD101"));
 
 // operationKey: contrato A1, obrigatório nos endpoints. Uma key fixa por
 // helper mantém as asserções B3 inalteradas (cada teste usa um D1 novo).
@@ -401,7 +402,9 @@ test("projection computes current total and refunds at write, not an older JS sn
 
 test("opportunistic recovery finds confirmed ledger without mp id and corrects stale refunded projection", async t => {
   const db = await fixture(t, { paid: true });
-  await db.prepare("UPDATE pedido_pagamentos SET mp_payment_id=NULL WHERE id=1").run();
+  await db
+    .prepare("UPDATE pedido_pagamentos SET mp_order_id=NULL,mp_payment_id=NULL WHERE id=1")
+    .run();
   await app.reconcile.reconcilePedidosDivergentes(db);
   converted(await state(db));
   await refund(db, 10000);
@@ -441,7 +444,7 @@ for (const handler of ["polling", "detail"])
 
 test("signed webhook retry repairs a failure after ledger commit", async t => {
   const db = await fixture(t);
-  t.mock.method(globalThis, "fetch", async () => Response.json(approvedMp()));
+  t.mock.method(globalThis, "fetch", async () => mpResponse(approvedMp()));
   const secret = "local-test-only";
   const key = await crypto.subtle.importKey(
     "raw",
@@ -451,14 +454,17 @@ test("signed webhook retry repairs a failure after ledger commit", async t => {
     ["sign"]
   );
   const signature = Buffer.from(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("id:101;request-id:b3;ts:1;"))
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("id:ORD101;request-id:b3;ts:1;"))
   ).toString("hex");
   const call = () =>
     app.webhook.onRequestPost({
-      request: new Request("https://local.test/api/webhooks/mercadopago?data.id=101&type=payment", {
-        method: "POST",
-        headers: { "x-signature": `ts=1,v1=${signature}`, "x-request-id": "b3" }
-      }),
+      request: new Request(
+        "https://local.test/api/webhooks/mercadopago?data.id=ORD101&type=order",
+        {
+          method: "POST",
+          headers: { "x-signature": `ts=1,v1=${signature}`, "x-request-id": "b3" }
+        }
+      ),
       env: { DB: db, MP_ACCESS_TOKEN: "fake", MP_WEBHOOK_SECRET: secret }
     });
   db.hook = (s, op) => {
@@ -597,19 +603,20 @@ test("manual payment uses the convergent result without changing registration se
 
 test("non-terminal MP snapshot still repairs persisted PAGO; terminal matrix stays unchanged", async t => {
   const db = await fixture(t, { paid: true });
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: 101, status: "pending" }));
+  t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 101, status: "pending" }));
   const result = await app.sync.syncPaymentFromMp(
     db,
     1,
-    await app.sync.fetchMpPayment("fake", "101")
+    await app.sync.fetchMpPayment("fake", "ORD101")
   );
   assert.equal(result.transicionou, false);
   assert.equal(result.status, "PAGO");
   converted(await state(db));
   await db.prepare("UPDATE pedidos SET status_pagamento='PENDENTE' WHERE id=1").run();
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: 101, status: "cancelled" }));
+  t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 101, status: "cancelled" }));
   assert.equal(
-    (await app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "101"))).status,
+    (await app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "ORD101")))
+      .status,
     "PAGO"
   );
   converted(await state(db));
@@ -639,8 +646,8 @@ test("B4 protects another pending Pix when one payment is cancelled", async t =>
       "INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,idempotency_key) VALUES(1,'PIX_MP','ADMIN',5000,'PENDENTE','second')"
     )
     .run();
-  t.mock.method(globalThis, "fetch", async () => Response.json({ id: 101, status: "cancelled" }));
-  await app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "101"));
+  t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 101, status: "cancelled" }));
+  await app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "ORD101"));
   assert.equal((await state(db)).pedido.reserva_status, "ATIVA");
   assert.equal((await state(db)).produtos[0].estoque_reservado, 2);
 });

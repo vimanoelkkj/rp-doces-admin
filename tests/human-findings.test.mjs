@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { build } from "esbuild";
@@ -170,7 +171,7 @@ test("HUMAN-04: checkout usa a mesma validação e normalização de WhatsApp", 
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM pedidos").first()).n, 0);
 
   t.mock.method(globalThis, "fetch", async () =>
-    Response.json({
+    mpResponse({
       id: 53001,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",

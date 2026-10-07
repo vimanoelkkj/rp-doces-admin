@@ -169,6 +169,9 @@ function workflowContract(w) {
 }
 
 test("staging config parses and isolates every binding", () => {
+  assert.equal(configs.pages.vars.MP_TEST_MODE, "orders_pix");
+  assert.equal(configs.production.vars?.MP_TEST_MODE, undefined);
+  assert.equal(configs.productionWorker.vars?.MP_TEST_MODE, undefined);
   const databaseId = configs.pages.d1_databases[0].database_id;
   assert.notEqual(databaseId, STAGING_D1_PLACEHOLDER);
   assert.equal(configs.worker.d1_databases[0].database_id, databaseId);
@@ -308,6 +311,18 @@ test("real migration guard queries only the explicit staging D1 and only reads",
 });
 
 for (const [name, mutate] of [
+  [
+    "staging Pix test mode missing",
+    c => {
+      delete c.pages.vars.MP_TEST_MODE;
+    }
+  ],
+  [
+    "production Pix test mode",
+    c => {
+      c.production.vars = { ...c.production.vars, MP_TEST_MODE: "orders_pix" };
+    }
+  ],
   [
     "production D1 ID",
     c => {

@@ -1,3 +1,4 @@
+import { mpResponse, mockRefundProvider } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state } from "./helpers/b3.mjs";
@@ -93,11 +94,16 @@ async function pedidoComMp(t, overrides = {}) {
 }
 
 function mockRefundAprovado(t, { refundId = 9001, amount } = {}) {
-  return t.mock.method(globalThis, "fetch", async (url, init) => {
-    if (String(url).endsWith("/refunds")) {
+  return mockRefundProvider(t, async (url, init) => {
+    if (String(url).endsWith("/refund")) {
       const body = init.body ? JSON.parse(init.body) : {};
-      return Response.json(
-        { id: refundId, payment_id: 101, amount: amount ?? body.amount, status: "approved" },
+      return mpResponse(
+        {
+          id: refundId,
+          payment_id: 101,
+          amount: amount ?? body.transactions?.[0]?.amount,
+          status: "approved"
+        },
         { status: 201 }
       );
     }
@@ -106,9 +112,7 @@ function mockRefundAprovado(t, { refundId = 9001, amount } = {}) {
 }
 
 function mockRefundRecusado(t, { status = 400 } = {}) {
-  return t.mock.method(globalThis, "fetch", async () =>
-    Response.json({ message: "refund recusado" }, { status })
-  );
+  return mockRefundProvider(t, async () => mpResponse({ message: "refund recusado" }, { status }));
 }
 
 // 1) pedido MP com valor integral ainda reembolsavel
@@ -156,13 +160,13 @@ test("4: duas requests POST concorrentes com a mesma operationKey nao duplicam o
   const firstArrived = deferred();
   const releaseFirst = deferred();
   let posts = 0;
-  t.mock.method(globalThis, "fetch", async (_url, init = {}) => {
+  mockRefundProvider(t, async (_url, init = {}) => {
     posts++;
     firstArrived.resolve();
     await releaseFirst.promise;
     const body = init.body ? JSON.parse(init.body) : {};
-    return Response.json(
-      { id: 9001, payment_id: 101, amount: body.amount, status: "approved" },
+    return mpResponse(
+      { id: 9001, payment_id: 101, amount: body.transactions?.[0]?.amount, status: "approved" },
       { status: 201 }
     );
   });
@@ -207,8 +211,8 @@ test("5: intencao presa em PROCESSANDO: GET so le; POST /reconciliar recupera", 
   // Primeira tentativa: o Mercado Pago responde "in_process" (real estado
   // pendente do provedor) -- a intencao fica PROCESSANDO com mp_refund_id
   // ja conhecido, exatamente como um envio que nao terminou de convergir.
-  t.mock.method(globalThis, "fetch", async () =>
-    Response.json({ id: 9001, payment_id: 101, amount: 100, status: "in_process" }, { status: 201 })
+  mockRefundProvider(t, async () =>
+    mpResponse({ id: 9001, payment_id: 101, amount: 100, status: "in_process" }, { status: 201 })
   );
   const primeira = await corpo(await postEstorno(db, session));
   assert.equal(primeira.body.pernas[0].intencao.status, "PROCESSANDO");
@@ -222,7 +226,7 @@ test("5: intencao presa em PROCESSANDO: GET so le; POST /reconciliar recupera", 
     .run();
   // GET: somente leitura, mesmo com a intencao elegivel para recuperacao.
   let rede = 0;
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     rede++;
     throw new Error("GET nao pode chamar a rede");
   });
@@ -243,8 +247,8 @@ test("5: intencao presa em PROCESSANDO: GET so le; POST /reconciliar recupera", 
   db.hook = null;
 
   // POST /reconciliar: o gatilho explicito conclui o refund sem novo clique.
-  t.mock.method(globalThis, "fetch", async () =>
-    Response.json({ id: 9001, payment_id: 101, amount: 100, status: "approved" }, { status: 200 })
+  mockRefundProvider(t, async () =>
+    mpResponse({ id: 9001, payment_id: 101, amount: 100, status: "approved" }, { status: 200 })
   );
   assert.equal((await reconciliarPedido(db, session)).status, 200);
   const { body } = await corpo(await getEstorno(db, session));
@@ -258,7 +262,7 @@ test("5: intencao presa em PROCESSANDO: GET so le; POST /reconciliar recupera", 
 
 test("5b: GET com intencao INCONCLUSIVO sem refund remoto nunca reenvia o POST de refund", async t => {
   const { db, session } = await pedidoComMp(t);
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     throw new Error("connection lost");
   });
   const primeira = await corpo(await postEstorno(db, session));
@@ -267,13 +271,13 @@ test("5b: GET com intencao INCONCLUSIVO sem refund remoto nunca reenvia o POST d
   assert.equal(antes.mp_refund_id, null, "estado em que a recuperacao faria POST de refund");
 
   const chamadas = [];
-  t.mock.method(globalThis, "fetch", async (url, init) => {
+  mockRefundProvider(t, async (url, init) => {
     chamadas.push(`${init?.method ?? "GET"} ${url}`);
     throw new Error("GET nao pode chamar a rede");
   });
   const r = await corpo(await getEstorno(db, session));
   assert.equal(r.status, 200);
-  assert.deepEqual(chamadas, [], "nenhum POST /refunds a partir do GET");
+  assert.deepEqual(chamadas, [], "nenhum POST /refund a partir do GET");
   assert.deepEqual(await intencaoAnulacao(db), antes);
 });
 
@@ -302,7 +306,7 @@ test("7: refund recusado pelo Mercado Pago mantem a exclusao bloqueada", async t
 // 8) INCONCLUSIVO mantem exclusao bloqueada
 test("8: resposta ambigua do Mercado Pago mantem a exclusao bloqueada", async t => {
   const { db, session } = await pedidoComMp(t);
-  t.mock.method(globalThis, "fetch", async () => {
+  mockRefundProvider(t, async () => {
     throw new Error("timeout de rede");
   });
   const posted = await corpo(await postEstorno(db, session));
@@ -379,10 +383,14 @@ test("11: o valor enviado pelo cliente no corpo do POST e ignorado; o servidor s
     })
   );
   assert.equal(status, 200);
-  const [, init] = calls.mock.calls[0].arguments;
+  assert.deepEqual(
+    calls.mock.calls.map(c => c.arguments[1]?.method ?? "GET"),
+    ["GET", "POST"]
+  );
+  const [, init] = calls.mock.calls.find(c => c.arguments[1]?.method === "POST").arguments;
   assert.deepEqual(
     JSON.parse(init.body),
-    { amount: 70 },
+    { transactions: [{ id: "PAY101", amount: "70.00" }] },
     "estornou o restante real (R$70), nao o valor do corpo"
   );
   const refunds = (await state(db)).refunds;
@@ -556,15 +564,15 @@ test("12c: dois pagamentos PIX_MP no mesmo pedido sao tratados como pernas indep
       `UPDATE pedido_itens SET valor_unitario_centavos=10000,valor_total_centavos=20000 WHERE id=1`
     ),
     db.prepare(`INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
-        mp_payment_id,idempotency_key,pago_em) VALUES(2,1,'PIX_MP','ADMIN',10000,'PAGO','202','pagamento-2',CURRENT_TIMESTAMP)`),
+        mp_payment_id,mp_order_id,idempotency_key,pago_em) VALUES(2,1,'PIX_MP','ADMIN',10000,'PAGO','PAY202','ORD202','pagamento-2',CURRENT_TIMESTAMP)`),
     db.prepare(
       `INSERT INTO pedido_pagamento_alocacoes(pagamento_id,pedido_item_id,valor_centavos) VALUES(2,1,10000)`
     )
   ]);
-  t.mock.method(globalThis, "fetch", async url => {
-    const paymentId = String(url).match(/payments\/(\d+)\/refunds/)?.[1];
+  mockRefundProvider(t, async url => {
+    const paymentId = String(url).match(/orders\/ORD(\d+)\/refund/)?.[1];
     if (paymentId === "101")
-      return Response.json(
+      return mpResponse(
         { id: 1, payment_id: 101, amount: 100, status: "approved" },
         { status: 201 }
       );
@@ -649,12 +657,12 @@ test("M3: refund manual e estorno de anulação concorrentes nunca devolvem mais
   // Mercado Pago determinístico: o POST de refund só responde (aprovado,
   // valor integral) quando o teste liberar.
   const postsRefund = [];
-  t.mock.method(globalThis, "fetch", async (url, init = {}) => {
-    if (String(url).endsWith("/refunds") && init.method === "POST") {
+  mockRefundProvider(t, async (url, init = {}) => {
+    if (String(url).endsWith("/refund") && init.method === "POST") {
       postsRefund.push(JSON.parse(init.body));
       mpRecebeuPost.resolve();
       await liberarMp.promise;
-      return Response.json(
+      return mpResponse(
         { id: 9301, payment_id: 101, amount: 100, status: "approved" },
         { status: 201 }
       );
@@ -739,7 +747,11 @@ test("M3: refund manual e estorno de anulação concorrentes nunca devolvem mais
     [["CONFIRMADO", 10000]],
     ctx
   );
-  assert.deepEqual(postsRefund, [{ amount: 100 }], "exatamente 1 POST ao Mercado Pago");
+  assert.deepEqual(
+    postsRefund,
+    [{ transactions: [{ id: "PAY101", amount: "100.00" }] }],
+    "exatamente 1 POST ao Mercado Pago"
+  );
   assert.equal(rAnulacao.status, 200, ctx);
   assert.equal(rAnulacao.body.restanteTotalCentavos, 0, ctx);
 });
@@ -769,14 +781,11 @@ test("M3 inversa: intenção calculada antes de um refund manual é recusada pel
   };
 
   const chamadasMp = [];
-  t.mock.method(globalThis, "fetch", async (url, init = {}) => {
+  mockRefundProvider(t, async (url, init = {}) => {
     chamadasMp.push(`${init.method ?? "GET"} ${url}`);
-    if (String(url).endsWith("/refunds") && init.method === "POST") {
-      const { amount } = JSON.parse(init.body);
-      return Response.json(
-        { id: 9401, payment_id: 101, amount, status: "approved" },
-        { status: 201 }
-      );
+    if (String(url).endsWith("/refund") && init.method === "POST") {
+      const amount = JSON.parse(init.body).transactions[0].amount;
+      return mpResponse({ id: 9401, payment_id: 101, amount, status: "approved" }, { status: 201 });
     }
     throw new Error(`chamada MP inesperada: ${init.method ?? "GET"} ${url}`);
   });
@@ -830,7 +839,7 @@ test("M3 inversa: intenção calculada antes de um refund manual é recusada pel
   assert.equal(rNova.status, 200);
   assert.equal(rNova.body.restanteTotalCentavos, 0);
   assert.equal(chamadasMp.length, 1);
-  assert.match(chamadasMp[0], /^POST .*\/refunds$/);
+  assert.match(chamadasMp[0], /^POST .*\/refund$/);
   const refunds = (
     await db.prepare(`SELECT origem,valor_centavos FROM pedido_reembolsos ORDER BY id`).all()
   ).results;

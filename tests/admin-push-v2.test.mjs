@@ -341,7 +341,7 @@ test("syncPaymentFromMp: transição para PAGO dispara pushNotifier desacoplado"
     VAPID_SUBJECT
   };
 
-  const payment = await app.sync.fetchMpPayment("fake", "101");
+  const payment = await app.sync.fetchMpPayment("fake", "ORD101");
   const result = await app.sync.syncPaymentFromMp(db, 1, payment, env);
 
   assert.equal(result.ok, true);
@@ -374,7 +374,7 @@ test("webhook duplicado: retentativa não gera segundo push", async t => {
     VAPID_SUBJECT
   };
 
-  const payment = await app.sync.fetchMpPayment("fake", "101");
+  const payment = await app.sync.fetchMpPayment("fake", "ORD101");
 
   // Primeiro webhook
   const r1 = await app.sync.syncPaymentFromMp(db, 1, payment, env);
@@ -404,7 +404,7 @@ test("concorrência simultânea (webhook + polling): exatamente um transiciona e
     VAPID_SUBJECT
   };
 
-  const payment = await app.sync.fetchMpPayment("fake", "101");
+  const payment = await app.sync.fetchMpPayment("fake", "ORD101");
 
   // Disparo simultâneo
   const [res1, res2] = await Promise.all([

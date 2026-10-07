@@ -55,7 +55,7 @@ export function ledgerPaymentStatus(statusPagamento: string | null): LegacyStatu
 }
 
 function ledgerPaymentMethod(pedido: PedidoLegadoRow): LedgerMetodo {
-  // Nosso checkout ainda é Pix-only via Payments API: todo pedido SITE com
+  // Checkout remains Pix-only through Orders API; historical SITE rows with
   // dado de Mercado Pago é PIX_MP. Sem coluna metodo_pagamento pra ler,
   // A_COMBINAR é o fallback seguro pro que sobrar (ex.: um pedido futuro
   // criado manualmente, quando esse fluxo existir).

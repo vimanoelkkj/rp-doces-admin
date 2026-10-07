@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, withWaitUntil } from "./helpers/b3.mjs";
@@ -332,7 +333,7 @@ test("Pix ADMIN sobre pedido MANUAL preserva B4: reserva única e retida enquant
   const { db, session } = await balcao(t);
   t.mock.method(globalThis, "fetch", async (_url, options) => {
     assert.equal(options?.method, "POST");
-    return Response.json({
+    return mpResponse({
       id: 777,
       status: "pending",
       date_of_expiration: "2099-01-01T00:00:00Z",
@@ -360,6 +361,15 @@ test("Pix ADMIN sobre pedido MANUAL preserva B4: reserva única e retida enquant
     })
   });
   assert.equal(pix.status, 201);
+  assert.deepEqual(
+    await db
+      .prepare(
+        "SELECT mp_order_id, mp_payment_id, status FROM pedido_pagamentos WHERE pedido_id=? AND metodo='PIX_MP'"
+      )
+      .bind(criado.pedidoId)
+      .first(),
+    { mp_order_id: "ORD777", mp_payment_id: "PAY777", status: "PENDENTE" }
+  );
 
   // Reserva preexistente NÃO é recriada nem duplicada.
   assert.equal(

@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "./helpers/b3.mjs";
@@ -32,7 +33,7 @@ test("corpo pendente além do prazo: o abort ainda vale e a busca termina como T
     return { ok: true, status: 200, json: () => pendenteAteAbortar(opcoes.signal) };
   });
 
-  const busca = buscar("fake", "ref-1");
+  const busca = buscar("fake", "ref-1", "2026-01-01T00:00:00Z");
   await new Promise(setImmediate); // fetch resolveu, json() segue pendente
   t.mock.timers.tick(PRAZO);
 
@@ -49,7 +50,7 @@ test("headers pendentes além do prazo: TIMEOUT (comportamento preservado)", asy
   t.mock.timers.enable({ apis: ["setTimeout"] });
   t.mock.method(globalThis, "fetch", (_url, opcoes) => pendenteAteAbortar(opcoes.signal));
 
-  const busca = buscar("fake", "ref-1");
+  const busca = buscar("fake", "ref-1", "2026-01-01T00:00:00Z");
   t.mock.timers.tick(PRAZO);
 
   assert.deepEqual(await assentar(busca), INDISPONIVEL("TIMEOUT"));
@@ -62,7 +63,7 @@ for (const [nome, resposta, motivo] of [
     () => new Response("<html>não é json</html>", { status: 200 }),
     "RESPOSTA_ILEGIVEL"
   ],
-  ["JSON sem results", () => Response.json({ paging: {} }), "RESPOSTA_ILEGIVEL"],
+  ["JSON sem results", () => mpResponse({ paging: {} }), "RESPOSTA_ILEGIVEL"],
   [
     "falha de leitura do corpo que não é abort",
     () => ({
@@ -83,7 +84,7 @@ for (const [nome, resposta, motivo] of [
       return resposta();
     });
 
-    assert.deepEqual(await buscar("fake", "ref-1"), INDISPONIVEL(motivo));
+    assert.deepEqual(await buscar("fake", "ref-1", "2026-01-01T00:00:00Z"), INDISPONIVEL(motivo));
     t.mock.timers.tick(PRAZO);
     assert.equal(sinal.aborted, false, "o timer não pode sobrar armado depois de concluir");
   });
@@ -94,10 +95,13 @@ test("corpo completo dentro do prazo: resultado normal e prazo desarmado", async
   let sinal;
   t.mock.method(globalThis, "fetch", async (_url, opcoes) => {
     sinal = opcoes.signal;
-    return Response.json({ results: [{ id: 9001, external_reference: "ref-1" }] });
+    return mpResponse({ results: [{ id: 9001, external_reference: "ref-1" }] });
   });
 
-  assert.deepEqual(await buscar("fake", "ref-1"), { resultado: "UNICO", mpPaymentId: "9001" });
+  assert.deepEqual(await buscar("fake", "ref-1", "2026-01-01T00:00:00Z"), {
+    resultado: "UNICO",
+    mpOrderId: "ORD9001"
+  });
   t.mock.timers.tick(PRAZO);
   assert.equal(sinal.aborted, false, "o timer não pode sobrar armado depois de concluir");
 });

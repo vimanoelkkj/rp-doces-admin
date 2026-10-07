@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state } from "./helpers/b3.mjs";
@@ -13,14 +14,14 @@ const validPayment = {
 
 function mercadoPago(t, payment) {
   return t.mock.method(globalThis, "fetch", async (url, options) => {
-    assert.equal(String(url), "https://api.mercadopago.com/v1/payments/101");
+    assert.equal(String(url), "https://api.mercadopago.com/v1/orders/ORD101");
     assert.equal(options.headers.Authorization, "Bearer fake");
-    return Response.json(payment);
+    return mpResponse(payment);
   });
 }
 
 async function sincronizar(db) {
-  const payment = await app.sync.fetchMpPayment("fake", "101");
+  const payment = await app.sync.fetchMpPayment("fake", "ORD101");
   return app.sync.syncPaymentFromMp(db, 1, payment);
 }
 
@@ -124,15 +125,18 @@ test("webhook duplicado e sincronização repetida confirmam e baixam estoque um
     await crypto.subtle.sign(
       "HMAC",
       key,
-      new TextEncoder().encode("id:101;request-id:integrity;ts:1;")
+      new TextEncoder().encode("id:ORD101;request-id:integrity;ts:1;")
     )
   ).toString("hex");
   const webhook = () =>
     app.webhook.onRequestPost({
-      request: new Request("https://local.test/api/webhooks/mercadopago?data.id=101&type=payment", {
-        method: "POST",
-        headers: { "x-signature": `ts=1,v1=${signature}`, "x-request-id": "integrity" }
-      }),
+      request: new Request(
+        "https://local.test/api/webhooks/mercadopago?data.id=ORD101&type=order",
+        {
+          method: "POST",
+          headers: { "x-signature": `ts=1,v1=${signature}`, "x-request-id": "integrity" }
+        }
+      ),
       env: { DB: db, MP_ACCESS_TOKEN: "fake", MP_WEBHOOK_SECRET: secret }
     });
 
@@ -165,7 +169,7 @@ test("bloqueia approved em moeda diferente de BRL", async t => {
   mercadoPago(t, { ...validPayment, currency_id: "USD" });
 
   await sincronizar(db);
-  assertBlocked(await state(db), "INTEGRIDADE_MP:MOEDA_DIVERGENTE");
+  assertBlocked(await state(db), "INTEGRIDADE_MP:PAIS_DIVERGENTE");
 });
 
 for (const [label, expirar] of [
@@ -261,7 +265,7 @@ for (const status of ["cancelled", "rejected"])
 
     const snapshot = await state(db);
     assert.equal(snapshot.pagamentos[0].status, "CANCELADO");
-    assert.equal(snapshot.pagamentos[0].mp_status, status);
+    assert.equal(snapshot.pagamentos[0].mp_status, "cancelled");
     assert.equal(snapshot.pedido.reserva_status, "LIBERADA");
     assert.equal(snapshot.produtos[0].estoque_reservado, 0);
     assert.equal(snapshot.itens[0].estoque_estado, "LIBERADO");
@@ -290,9 +294,9 @@ test("approved legitimo concorrente vence resolucao cancelled sem liberar estoqu
   await sincronizar(db);
 
   mercadoPago(t, { ...validPayment, status: "cancelled", transaction_amount: 0.01 });
-  const cancelado = await app.sync.fetchMpPayment("fake", "101");
+  const cancelado = await app.sync.fetchMpPayment("fake", "ORD101");
   mercadoPago(t, validPayment);
-  const aprovado = await app.sync.fetchMpPayment("fake", "101");
+  const aprovado = await app.sync.fetchMpPayment("fake", "ORD101");
   let chegou;
   let liberar;
   const barreira = new Promise(resolve => {
@@ -447,13 +451,13 @@ test("resposta pending tardia do POST nao apaga approved divergente recebido por
         await crypto.subtle.sign(
           "HMAC",
           key,
-          new TextEncoder().encode("id:101;request-id:post-race;ts:1;")
+          new TextEncoder().encode("id:ORD101;request-id:post-race;ts:1;")
         )
       ).toString("hex");
       const webhook = await app.webhook.onRequestPost({
         env: { DB: db, MP_ACCESS_TOKEN: "fake", MP_WEBHOOK_SECRET: secret },
         request: new Request(
-          "https://local.test/api/webhooks/mercadopago?data.id=101&type=payment",
+          "https://local.test/api/webhooks/mercadopago?data.id=ORD101&type=order",
           {
             method: "POST",
             headers: { "x-signature": `ts=1,v1=${signature}`, "x-request-id": "post-race" }
@@ -461,14 +465,14 @@ test("resposta pending tardia do POST nao apaga approved divergente recebido por
         )
       });
       assert.equal(webhook.status, 200);
-      return Response.json({
+      return mpResponse({
         id: 101,
         status: "pending",
         date_of_expiration: "2099-01-01T00:00:00Z",
         point_of_interaction: { transaction_data: { qr_code: "pix-101" } }
       });
     }
-    return Response.json({
+    return mpResponse({
       ...validPayment,
       transaction_amount: 0.01,
       external_reference: externalReference

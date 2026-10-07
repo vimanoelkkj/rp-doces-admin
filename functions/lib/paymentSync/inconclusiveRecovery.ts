@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import { decimalToCents, isBrazilCountryCode } from "../mp/orders/types";
 
 import { fetchMpPayment } from "./client";
 import { syncPaymentFromMp, expireLocalPayment } from "./ledgerSync";
@@ -6,6 +7,7 @@ import { resolveWebhookPayment } from "./webhook";
 import { buscarPagamentosPorReferenciaExterna } from "../mpSearch";
 import {
   claimRecuperacao,
+  chavePagamento,
   expiracaoDecorrida,
   externalReferenceDaOperacao,
   fecharOperacaoExpirada,
@@ -67,7 +69,11 @@ export async function recuperarOperacoesInconclusivas(env: {
           return;
         }
 
-        const busca = await buscarPagamentosPorReferenciaExterna(token, referencia);
+        const busca = await buscarPagamentosPorReferenciaExterna(
+          token,
+          referencia,
+          operacao.criado_em
+        );
 
         if (busca.resultado === "INDISPONIVEL") {
           // Não observamos nada. Isso não é rejeição, não perde identidade e
@@ -109,7 +115,7 @@ export async function recuperarOperacoesInconclusivas(env: {
             {
               operationKey: operacao.operation_key,
               pedidoId: operacao.pedido_id,
-              candidatos: busca.mpPaymentIds
+              candidatos: busca.mpOrderIds
             }
           );
           await registrarObservacao(
@@ -122,13 +128,14 @@ export async function recuperarOperacoesInconclusivas(env: {
 
         // Exatamente um candidato. A partir daqui a busca não decide mais
         // nada: o GET verificado é que produz autoridade financeira.
-        const payment = await fetchMpPayment(token, busca.mpPaymentId);
+        const payment = await fetchMpPayment(token, busca.mpOrderId);
 
         if (operacao.tipo === "PIX_ADMIN_REGENERACAO") {
+          const chaveB = chavePagamento(operacao.operation_key);
           let bRow = await env.DB.prepare(
             `SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`
           )
-            .bind(referencia)
+            .bind(chaveB)
             .first<{ id: number; status: string }>();
 
           if (!bRow) {
@@ -146,11 +153,29 @@ export async function recuperarOperacoesInconclusivas(env: {
               }
             ).point_of_interaction?.transaction_data;
             const req = operacao.mp_request
-              ? (JSON.parse(operacao.mp_request) as { transaction_amount?: number })
+              ? (JSON.parse(operacao.mp_request) as {
+                  total_amount?: string;
+                  transaction_amount?: number;
+                })
               : null;
-            const valorCentavos = req?.transaction_amount
-              ? Math.round(Number(req.transaction_amount) * 100)
-              : 0;
+            const valorCentavos =
+              decimalToCents(req?.total_amount) ??
+              (req?.transaction_amount ? Math.round(Number(req.transaction_amount) * 100) : 0);
+            if (
+              payment.external_reference !== referencia ||
+              decimalToCents(payment.total_amount) !== valorCentavos ||
+              decimalToCents(payment.transaction_amount) !== valorCentavos ||
+              payment.payment_method_id !== "pix" ||
+              payment.payment_method_type !== "bank_transfer" ||
+              !isBrazilCountryCode(payment.country_code)
+            ) {
+              await registrarObservacao(
+                env.DB,
+                operacao.operation_key,
+                "BUSCA:SUCESSOR_DIVERGENTE"
+              );
+              return;
+            }
 
             const recoveryStatements = [
               env.DB.prepare(
@@ -165,15 +190,16 @@ export async function recuperarOperacoesInconclusivas(env: {
                 `INSERT INTO pedido_pagamentos (
                    pedido_id, metodo, origem, valor_centavos, status,
                    registrado_por_usuario_id, idempotency_key, substitui_pagamento_id,
-                   mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
+                   mp_order_id, mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64, mp_ticket_url, pix_expira_em
                  )
-                 VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                 VALUES (?, 'PIX_MP', 'ADMIN', ?, 'PENDENTE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
               ).bind(
                 operacao.pedido_id,
                 valorCentavos,
                 (operacao as { ator_usuario_id?: number | null }).ator_usuario_id ?? null,
-                referencia,
+                chaveB,
                 operacao.pagamento_id,
+                payment.order_id,
                 String(payment.id),
                 payment.status,
                 txData?.qr_code ?? null,
@@ -188,21 +214,21 @@ export async function recuperarOperacoesInconclusivas(env: {
                      pagamento_id = (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?),
                      atualizado_em = CURRENT_TIMESTAMP
                  WHERE operation_key = ?`
-              ).bind(String(payment.id), referencia, operacao.operation_key)
+              ).bind(String(payment.id), chaveB, operacao.operation_key)
             ];
 
             await env.DB.batch(recoveryStatements);
             bRow = await env.DB.prepare(
               `SELECT id, status FROM pedido_pagamentos WHERE idempotency_key = ? LIMIT 1`
             )
-              .bind(referencia)
+              .bind(chaveB)
               .first<{ id: number; status: string }>();
           }
 
           if (bRow) {
             await registrarFase(env.DB, operacao.operation_key, {
               fase: "REMOTO_CONHECIDO",
-              mpPaymentId: busca.mpPaymentId
+              mpPaymentId: String(payment.id)
             });
             await syncPaymentFromMp(env.DB, bRow.id, payment, env);
           }
@@ -215,7 +241,7 @@ export async function recuperarOperacoesInconclusivas(env: {
           console.error("Recuperação de operação inconclusiva: associação não resolvida", {
             operationKey: operacao.operation_key,
             pedidoId: operacao.pedido_id,
-            mpPaymentId: busca.mpPaymentId,
+            mpPaymentId: busca.mpOrderId,
             kind: resolvido.kind
           });
           await registrarObservacao(
@@ -246,7 +272,7 @@ export async function recuperarOperacoesInconclusivas(env: {
             {
               operationKey: operacao.operation_key,
               pedidoId: operacao.pedido_id,
-              mpPaymentId: busca.mpPaymentId,
+              mpPaymentId: busca.mpOrderId,
               pagamentoDaOperacao: operacao.pagamento_id,
               pagamentoResolvido: resolvido.pagamentoId
             }
@@ -260,7 +286,7 @@ export async function recuperarOperacoesInconclusivas(env: {
         // recuperar o resultado a partir das linhas persistidas.
         await registrarFase(env.DB, operacao.operation_key, {
           fase: "REMOTO_CONHECIDO",
-          mpPaymentId: busca.mpPaymentId
+          mpPaymentId: String(payment.id)
         });
 
         // Estado financeiro decidido só aqui, pelo caminho compartilhado.

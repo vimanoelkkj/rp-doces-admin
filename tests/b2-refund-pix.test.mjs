@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, barrier } from "./helpers/b3.mjs";
@@ -90,7 +91,7 @@ test("estorno parcial de PIX_MP é registrado e o líquido passa a refletir a de
   assert.equal(s.pagamentos.length, 1);
   assert.equal(s.pagamentos[0].status, "PAGO");
   assert.equal(s.pagamentos[0].valor_centavos, 10000);
-  assert.equal(s.pagamentos[0].mp_payment_id, "101");
+  assert.equal(s.pagamentos[0].mp_payment_id, "PAY101");
   assert.equal(s.alocacoes.length, 1, "allocations preservadas");
 
   // Estoque NÃO é reposto.
@@ -261,8 +262,12 @@ test("B2 preservado: refunded/charged_back do MP não alteram o ledger por conta
   // o fato local de reembolso continua separado. `charged_back` segue fora.
   for (const status of ["refunded", "charged_back"]) {
     assert.equal(app.sync.mapMpStatus(status), status === "refunded" ? "REEMBOLSADO" : null);
-    t.mock.method(globalThis, "fetch", async () => Response.json({ id: 101, status }));
-    const r = await app.sync.syncPaymentFromMp(db, 1, await app.sync.fetchMpPayment("fake", "101"));
+    t.mock.method(globalThis, "fetch", async () => mpResponse({ id: 101, status }));
+    const r = await app.sync.syncPaymentFromMp(
+      db,
+      1,
+      await app.sync.fetchMpPayment("fake", "ORD101")
+    );
     assert.equal(r.transicionou, false);
     t.mock.restoreAll();
   }

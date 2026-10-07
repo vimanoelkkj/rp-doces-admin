@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture } from "./helpers/b3.mjs";
@@ -304,7 +305,7 @@ for (const [nome, promo, esperado] of [
   test(`checkout é autoridade do preço: promoção ${nome}`, async t => {
     const { db } = await catalogo(t);
     t.mock.method(globalThis, "fetch", async () =>
-      Response.json({
+      mpResponse({
         id: 5000 + Math.floor(Math.random() * 1000),
         status: "pending",
         date_of_expiration: "2099-01-01T00:00:00Z",

@@ -12,6 +12,8 @@ export type {
 export { mapMpStatus } from "./paymentSync/status";
 
 export type { MpPaymentResponse } from "./paymentSync/client";
+export type { VerifiedMpOrder } from "./mp/orders/client";
+export { fetchMpOrder, isVerifiedMpOrder } from "./mp/orders/client";
 
 export { MP_PAYMENT_GET_TIMEOUT_MS, fetchMpPayment } from "./paymentSync/client";
 

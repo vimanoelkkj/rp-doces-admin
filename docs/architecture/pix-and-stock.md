@@ -90,24 +90,25 @@ Order: PAGO
 
 ## 4. Payment Gateway Integration (Mercado Pago)
 
-The authoritative payment gateway for Pix and online transactions is **Mercado Pago** (`/v1/payments`).
+The authoritative gateway is **Mercado Pago Orders API** (`/v1/orders`).
+`mp_order_id` identifies ORD and `mp_payment_id` identifies its PAY transaction.
+See [the cutover contract](../MP_ORDERS.md) before enabling this integration.
 
 ### 4.1 In-Memory Reference Verification (`paymentSync`)
 
-Incoming webhooks from payment providers are unauthenticated network notifications that can be delayed, repeated, or spoofed. The application implements an in-memory runtime verification pattern:
+Incoming webhooks can be delayed, repeated, or spoofed. After HMAC signature validation, the application implements an in-memory runtime verification pattern:
 
 1. **Webhook Notification**:
-   - The webhook endpoint (`functions/api/webhooks/mercadopago.ts`) receives the event and extracts the external payment ID (`data.id`).
+   - The webhook endpoint (`functions/api/webhooks/mercadopago.ts`) receives an `order` event and extracts the ORD identity (`data.id`).
    - Webhooks do not directly mutate order or ledger status.
 2. **Authoritative Fetch**:
-   - The worker executes an authenticated HTTPS `GET /v1/payments/{id}` call to the Mercado Pago API via `fetchMpPayment` (`functions/lib/paymentSync/client.ts`).
+   - The worker executes an authenticated `GET /v1/orders/{ORD}` via `fetchMpOrder` (`functions/lib/mp/orders/client.ts`). The existing `fetchMpPayment` facade delegates to this Orders client.
 3. **Runtime WeakSet Attestation**:
-   - When `fetchMpPayment` successfully parses and freezes the response object, it registers the object reference in a module-scoped `WeakSet`:
+   - When `fetchMpOrder` successfully parses and freezes the snapshot, it registers the object reference in a module-scoped `WeakSet`:
      ```ts
-     const MP_GET_VERIFIED = Symbol("MP_GET_VERIFIED");
-     const verifiedMpResponses = new WeakSet<MpPaymentResponse>();
+     const verifiedOrders = new WeakSet<VerifiedMpOrder>();
      ```
-   - Downstream reconciliation functions verify membership via `isVerifiedMpResponse(mp)`.
+   - Downstream reconciliation checks membership via `isVerifiedMpOrder` (also exposed as `isVerifiedMpResponse` for compatibility).
    - This in-memory barrier ensures within the V8 runtime isolate that only responses produced by direct, authenticated GET calls can trigger payment settlement and stock conversion.
 
 ### 4.2 Handling Gateway Failures (`ENVIO_INCONCLUSIVO`)

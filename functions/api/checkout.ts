@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import { createPixOrderBody, orderIdempotencyKey } from "../lib/mp/orders/types";
 
 import { requestLogger } from "../lib/requestContext";
 import { precoAtualCentavos, type ProdutoRow } from "../lib/pricing";
@@ -30,6 +31,7 @@ import { isValidWhatsappBr, normalizeWhatsappBr } from "../../shared/whatsapp";
 interface Env {
   DB: D1Database;
   MP_ACCESS_TOKEN: string;
+  MP_TEST_MODE?: string;
 }
 
 interface CheckoutItemInput {
@@ -78,7 +80,6 @@ function jsonError(
 
 const MAX_ITEMS_PER_PEDIDO = 50;
 const MAX_TEXT_LENGTH = 200;
-const PIX_EXPIRATION_MINUTES = 30;
 
 const MENSAGEM_MP_RECUSOU = "Falha ao criar pagamento Pix";
 const MENSAGEM_MP_INDISPONIVEL =
@@ -241,22 +242,22 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   // público de acompanhamento e nunca deve ser derivável de uma key.
   const idempotencyKeyPedido = chavePedido(operationKey);
   const idempotencyKey = chavePagamento(operationKey);
-  const mpIdempotencyKey = chaveMp(operationKey);
+  const mpIdempotencyKey = await orderIdempotencyKey(chaveMp(operationKey));
   const tokenPublico = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60 * 1000).toISOString();
 
   // Conteúdo original do POST, persistido ANTES do envio. É o que permite
   // que a mesma operação seja reconhecida/retomada com segurança depois de
   // um resultado ambíguo, preservando valor, expiração, referência externa e
   // dados do pagador — hoje parte disso só existia em memória.
-  const mpRequest = {
-    transaction_amount: totalCentavos / 100,
-    description: "Pedido R&P Doces",
-    payment_method_id: "pix",
-    date_of_expiration: expiresAt,
-    external_reference: tokenPublico,
-    payer: { email: payerEmail, first_name: nome }
-  };
+  const mpRequest = await createPixOrderBody(
+    totalCentavos,
+    tokenPublico,
+    {
+      email: payerEmail,
+      first_name: nome
+    },
+    env.MP_TEST_MODE
+  );
 
   // Persiste pedido + itens + pagamento PENDENTE + alocações + reserva de
   // estoque num único batch (uma transação): o registro financeiro nasce
@@ -363,10 +364,10 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     // INCONCLUSIVA e recuperável: ledger continua PENDENTE, reserva intacta
     // (B4), nenhuma key nova, nenhum pedido novo, nenhum sucesso nem
     // rejeição inventados. Um retry com a mesma key recupera esta operação.
-    requestLogger.error("Resultado ambíguo ao criar pagamento Pix (checkout)", {
-      pedidoId,
+    requestLogger.errorMeta("Resultado ambíguo ao criar pagamento Pix (checkout)", {
+      httpStatus: envio.httpStatus,
       motivo: envio.motivo,
-      httpStatus: envio.httpStatus
+      mpRequestId: envio.requestId ?? null
     });
     await registrarFase(env.DB, operationKey, {
       fase: "ENVIO_INCONCLUSIVO",
@@ -385,7 +386,14 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     // O Mercado Pago respondeu e recusou — rejeição COMPROVADA, não
     // ambígua. O ledger já pode registrar isso com mais fidelidade que
     // `pedidos`, que por compatibilidade do 4c-1 permanece PENDENTE.
-    requestLogger.error("Mercado Pago checkout error", envio.httpStatus, envio.mensagem);
+    requestLogger.errorMeta("Mercado Pago checkout error", {
+      httpStatus: envio.httpStatus,
+      mpRequestId: envio.requestId ?? null,
+      code: envio.code,
+      mpErrorShape: envio.errorShape ?? null,
+      unsupportedPropertyPaths: envio.unsupportedPropertyPaths ?? [],
+      detailsShape: envio.detailsShape ?? null
+    });
 
     await env.DB.prepare(
       `UPDATE pedido_pagamentos
@@ -460,7 +468,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
     ),
     env.DB.prepare(
       `UPDATE pedido_pagamentos
-       SET mp_payment_id = ?,
+       SET mp_order_id = ?, mp_payment_id = ?,
            mp_status = CASE
              WHEN status NOT IN ('PAGO', 'REEMBOLSADO')
               AND LOWER(COALESCE(mp_status, '')) IN ('approved', 'refunded') THEN mp_status
@@ -470,6 +478,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
            mp_ticket_url = ?, pix_expira_em = ?, atualizado_em = CURRENT_TIMESTAMP
        WHERE id = ?`
     ).bind(
+      payment.order_id,
       String(payment.id),
       payment.status,
       txData?.qr_code ?? null,

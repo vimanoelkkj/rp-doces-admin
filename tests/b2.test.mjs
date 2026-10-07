@@ -1,3 +1,4 @@
+import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app, fixture, state, barrier, approvedMp } from "./helpers/b3.mjs";
@@ -43,10 +44,10 @@ const consultar = async (db, handler = "polling", token = "token") => {
 };
 function mp(t, status, extra = {}) {
   return t.mock.method(globalThis, "fetch", async (url, options) => {
-    assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/payments\/\d+$/);
+    assert.match(String(url), /^https:\/\/api\.mercadopago\.com\/v1\/orders\/ORD\d+$/);
     assert.equal(options.headers.Authorization, "Bearer fake");
-    const id = Number(String(url).split("/").at(-1));
-    return Response.json(
+    const id = Number(String(url).split("/").at(-1).replace(/^ORD/, ""));
+    return mpResponse(
       status === "approved" ? approvedMp({ id, ...extra }) : { id, status, ...extra }
     );
   });
@@ -61,7 +62,7 @@ async function assinarWebhook(secret, { id, requestId = "b2", ts = "1" }) {
     false,
     ["sign"]
   );
-  const manifest = `id:${id};request-id:${requestId};ts:${ts};`;
+  const manifest = `id:ORD${id};request-id:${requestId};ts:${ts};`;
   return Buffer.from(
     await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest))
   ).toString("hex");
@@ -74,7 +75,7 @@ async function postWebhook(
 ) {
   return app.webhook.onRequestPost({
     request: new Request(
-      `https://local.test/api/webhooks/mercadopago?data.id=${dataId}&type=payment`,
+      `https://local.test/api/webhooks/mercadopago?data.id=ORD${dataId}&type=order`,
       {
         method: "POST",
         headers:
@@ -88,6 +89,7 @@ async function postWebhook(
   });
 }
 async function hook(db, id = 101, payloadStatus = "approved", signatureValid = true, webhookEnv) {
+  id = String(id).replace(/^PAY|^ORD/, "");
   const sig = await assinarWebhook("b2-local-only", { id });
   return postWebhook(db, {
     dataId: id,
@@ -147,9 +149,9 @@ test("A: real checkout creation then authoritative GET approval preserves normal
   await db.prepare("DELETE FROM pedidos WHERE id=1").run();
   await db.prepare("UPDATE produtos SET estoque_reservado=0 WHERE id=1").run();
   t.mock.method(globalThis, "fetch", async (url, options) => {
-    assert.equal(url, "https://api.mercadopago.com/v1/payments");
+    assert.equal(url, "https://api.mercadopago.com/v1/orders");
     assert.equal(options.method, "POST");
-    return Response.json({
+    return mpResponse({
       id: 101,
       status: "pending",
       date_of_expiration: "2099-01-01",
@@ -235,7 +237,14 @@ for (const status of ["expired", "cancelled", "rejected", "refunded", "charged_b
     const s = await state(db);
     const expectedStatus = ["cancelled", "rejected"].includes(status) ? "CANCELADO" : "EXPIRADO";
     assert.equal(s.pagamentos[0].status, expectedStatus);
-    assert.equal(s.pagamentos[0].mp_status, status);
+    assert.equal(
+      s.pagamentos[0].mp_status,
+      status === "rejected"
+        ? "cancelled"
+        : status === "charged_back"
+          ? "unknown:charged_back:charged_back"
+          : status
+    );
     assert.equal(s.produtos[0].estoque, 10);
     assert.equal(s.refunds.length, 0);
   });
@@ -279,7 +288,7 @@ test("F: GET timeout actually aborts a hanging request using the central deadlin
         signal.addEventListener("abort", () => reject(signal.reason), { once: true });
       })
   );
-  const rejection = assert.rejects(app.sync.fetchMpPayment("fake", "101"), /abort/i);
+  const rejection = assert.rejects(app.sync.fetchMpPayment("fake", "ORD101"), /abort/i);
   t.mock.timers.tick(app.sync.MP_PAYMENT_GET_TIMEOUT_MS);
   await rejection;
 });
@@ -309,20 +318,29 @@ for (const both of [false, true])
     const db = await fixture(t, { ledger: false });
     const session = await app.auth.createSession(db, 1);
     let remoteId = 200;
+    const canceled = new Set();
     t.mock.method(globalThis, "fetch", async (url, options) => {
-      if (options?.method === "PUT") {
-        const paymentId = Number(String(url).split("/").at(-1)) || 201;
-        return Response.json({ id: paymentId, status: "cancelled" });
+      if (String(url).endsWith("/cancel")) {
+        const paymentId =
+          Number(
+            String(url)
+              .replace(/\/cancel$/, "")
+              .split("/")
+              .at(-1)
+              .replace(/^ORD/, "")
+          ) || 201;
+        canceled.add(paymentId);
+        return mpResponse({ id: paymentId, status: "cancelled" });
       }
       if (options?.method !== "POST") {
-        const paymentId = Number(String(url).split("/").at(-1)) || 201;
-        return Response.json({
+        const paymentId = Number(String(url).split("/").at(-1).replace(/^ORD/, "")) || 201;
+        return mpResponse({
           id: paymentId,
-          status: "pending",
+          status: canceled.has(paymentId) ? "cancelled" : "pending",
           date_of_expiration: "2099-01-01"
         });
       }
-      return Response.json({ id: ++remoteId, status: "pending", date_of_expiration: "2099-01-01" });
+      return mpResponse({ id: ++remoteId, status: "pending", date_of_expiration: "2099-01-01" });
     });
     // operationKey: contrato A1, obrigatório no endpoint. Uma key por chamada,
     // porque cada chamada aqui é uma intenção distinta (gerar, depois regenerar).
@@ -352,12 +370,19 @@ for (const both of [false, true])
       .prepare("UPDATE pedido_pagamentos SET status='EXPIRADO' WHERE id=?")
       .bind(a.pagamentoId)
       .run();
+    const references = (
+      await db
+        .prepare(
+          "SELECT pp.mp_payment_id,json_extract(o.mp_request,'$.external_reference') reference FROM pedido_pagamentos pp JOIN pedido_operacoes o ON o.pagamento_id=pp.id"
+        )
+        .all()
+    ).results;
     const referencias = new Map(
-      before.pagamentos.map(p => [Number(p.mp_payment_id), p.idempotency_key])
+      references.map(p => [Number(p.mp_payment_id.replace(/^PAY/, "")), p.reference])
     );
     t.mock.method(globalThis, "fetch", async url => {
-      const id = Number(String(url).split("/").at(-1));
-      return Response.json(approvedMp({ id, external_reference: referencias.get(id) }));
+      const id = Number(String(url).split("/").at(-1).replace(/^ORD/, ""));
+      return mpResponse(approvedMp({ id, external_reference: referencias.get(id) }));
     });
     if (both) assert.equal((await hook(db, b.mpPaymentId)).status, 200);
     assert.equal((await hook(db, a.mpPaymentId)).status, 200);
@@ -382,7 +407,7 @@ for (const order of [
       const gate = barrier(2);
       t.mock.method(globalThis, "fetch", async () => {
         await gate();
-        return Response.json(approvedMp());
+        return mpResponse(approvedMp());
       });
       await Promise.all([consultar(db), hook(db)]);
     } else {
@@ -418,7 +443,7 @@ test("authority: webhook payload approved, GET pending and old mp_status never p
     app.sync.syncPaymentFromMp(db, 1, { id: 101, status: "approved" }),
     /NAO_VERIFICADA/
   );
-  const verifiedPending = await app.sync.fetchMpPayment("fake", "101");
+  const verifiedPending = await app.sync.fetchMpPayment("fake", "ORD101");
   assert.equal(Object.isFrozen(verifiedPending), true);
   await assert.rejects(
     app.sync.syncPaymentFromMp(db, 1, { ...verifiedPending, status: "approved" }),
@@ -444,7 +469,9 @@ for (const origin of ["SITE", "ADMIN"])
     const db = await fixture(t);
     await app.sync.expireLocalPayment(db, 1);
     await db
-      .prepare("UPDATE pedido_pagamentos SET mp_payment_id=NULL,origem=? WHERE id=1")
+      .prepare(
+        "UPDATE pedido_pagamentos SET mp_order_id=NULL,mp_payment_id=NULL,origem=? WHERE id=1"
+      )
       .bind(origin)
       .run();
     mp(t, "approved", { external_reference: origin === "SITE" ? "token" : "pagamento-1" });
@@ -464,18 +491,22 @@ for (const mode of [
     await app.sync.expireLocalPayment(db, 1);
     if (mode === "duplicate-id" || mode === "ambiguous-site") {
       if (mode === "ambiguous-site")
-        await db.prepare("UPDATE pedido_pagamentos SET mp_payment_id=NULL WHERE id=1").run();
+        await db
+          .prepare("UPDATE pedido_pagamentos SET mp_order_id=NULL,mp_payment_id=NULL WHERE id=1")
+          .run();
       await db
         .prepare(
           "INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,mp_payment_id,idempotency_key) VALUES(1,'PIX_MP','SITE',10000,'EXPIRADO',?,'second')"
         )
-        .bind(mode === "duplicate-id" ? "101" : null)
+        .bind(mode === "duplicate-id" ? "PAY101" : null)
         .run();
     }
     if (mode === "association-race" || mode === "new-candidate-race") {
-      await db.prepare("UPDATE pedido_pagamentos SET mp_payment_id=NULL WHERE id=1").run();
+      await db
+        .prepare("UPDATE pedido_pagamentos SET mp_order_id=NULL,mp_payment_id=NULL WHERE id=1")
+        .run();
       db.hook = async (s, op) => {
-        if (op === "run" && s[0].sql.includes("SET mp_payment_id = ?")) {
+        if (op === "run" && s[0].sql.includes("mp_payment_id = ?")) {
           db.hook = null;
           if (mode === "association-race")
             await db.prepare("UPDATE pedido_pagamentos SET mp_payment_id='999' WHERE id=1").run();
@@ -527,16 +558,16 @@ test("sweep: bounded, throttled, concurrent-safe and failing old expired candida
   for (let i = 2; i <= 7; i++)
     await db
       .prepare(
-        "INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,mp_payment_id,idempotency_key,atualizado_em) VALUES(1,'PIX_MP','ADMIN',10000,'EXPIRADO',?,?,'2000-01-01')"
+        "INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,mp_order_id,mp_payment_id,idempotency_key,atualizado_em) VALUES(1,'PIX_MP','ADMIN',10000,'EXPIRADO',?,?,?,'2000-01-01')"
       )
-      .bind(String(100 + i), `expired-${i}`)
+      .bind(`ORD${100 + i}`, `PAY${100 + i}`, `expired-${i}`)
       .run();
   const calls = [];
   t.mock.method(globalThis, "fetch", async url => {
-    const id = Number(String(url).split("/").at(-1));
+    const id = Number(String(url).split("/").at(-1).replace(/^ORD/, ""));
     calls.push(id);
     if (id === 101) return new Response("offline", { status: 500 });
-    return Response.json(approvedMp({ id, external_reference: `expired-${id - 100}` }));
+    return mpResponse(approvedMp({ id, external_reference: `expired-${id - 100}` }));
   });
   // GET da listagem nunca consulta o MP, mesmo com candidatos elegíveis.
   const antesDoGet = await state(db);
@@ -573,16 +604,18 @@ test("sweep: bounded, throttled, concurrent-safe and failing old expired candida
 test("polling: an ADMIN attempt inserted first cannot receive the SITE approval", async t => {
   const db = await fixture(t);
   await db
-    .prepare("UPDATE pedido_pagamentos SET origem='ADMIN',mp_payment_id='202' WHERE id=1")
+    .prepare(
+      "UPDATE pedido_pagamentos SET origem='ADMIN',mp_order_id='ORD202',mp_payment_id='PAY202' WHERE id=1"
+    )
     .run();
   await db
     .prepare(
-      "INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,mp_payment_id,idempotency_key) VALUES(1,'PIX_MP','SITE',10000,'PENDENTE','101','site-second')"
+      "INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,mp_order_id,mp_payment_id,idempotency_key) VALUES(1,'PIX_MP','SITE',10000,'PENDENTE','ORD101','PAY101','site-second')"
     )
     .run();
   const fetch = mp(t, "approved");
   assert.equal((await consultar(db)).body.statusPagamento, "PAGO");
-  assert.equal(fetch.mock.calls[0].arguments[0], "https://api.mercadopago.com/v1/payments/101");
+  assert.equal(fetch.mock.calls[0].arguments[0], "https://api.mercadopago.com/v1/orders/ORD101");
   const s = await state(db);
   assert.equal(s.pagamentos[0].status, "PENDENTE");
   assert.equal(s.pagamentos[1].status, "PAGO");

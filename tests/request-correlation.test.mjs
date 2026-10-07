@@ -379,3 +379,172 @@ test("Workers nodejs_als runtime supports root middleware", async t => {
   assert.equal((await response.json()).requestId, response.headers.get("X-Request-Id"));
   assert.match(response.headers.get("X-Request-Id"), validId);
 });
+
+test("requestLogger errorMeta vs error security and allowlist validation", async t => {
+  const logs = [];
+  for (const level of ["info", "warn", "error"])
+    t.mock.method(console, level, (...args) => logs.push(args));
+
+  const req = request({}, "/api/test-meta");
+
+  // 1. requestLogger.error continua sanitizando Error como antes (gerando SafePushError)
+  await through(production, req, async () => {
+    logs.length = 0;
+    production.context.requestLogger.error("TEST_ERROR", new Error("secret message token=123"));
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0][0], "TEST_ERROR");
+    assert.match(logs[0][1].requestId, validId);
+    assert.deepEqual(logs[0][1].error, { category: "UNKNOWN", code: "UNKNOWN_ERROR" });
+    assert.ok(!JSON.stringify(logs[0]).includes("secret message"));
+    return new Response(null);
+  });
+
+  // 2. errorMeta registra somente os campos allowlisted (httpStatus, mpRequestId, motivo, code)
+  await through(production, req, async () => {
+    logs.length = 0;
+    production.context.requestLogger.errorMeta("TEST_VALID_META", {
+      httpStatus: 400,
+      mpRequestId: "req-mp-test-12345",
+      motivo: "HTTP_INDISPONIVEL",
+      code: "invalid_parameter"
+    });
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0][0], "TEST_VALID_META");
+    assert.match(logs[0][1].requestId, validId);
+    assert.equal(logs[0][1].httpStatus, 400);
+    assert.equal(logs[0][1].mpRequestId, "req-mp-test-12345");
+    assert.equal(logs[0][1].motivo, "HTTP_INDISPONIVEL");
+    assert.equal(logs[0][1].code, "invalid_parameter");
+    return new Response(null);
+  });
+
+  // 3. campos extras/sensíveis NÃO escapam (tokens, cookies, auth, payload bruto, etc.)
+  await through(production, req, async () => {
+    logs.length = 0;
+    production.context.requestLogger.errorMeta("TEST_SENSITIVE_DISCARD", {
+      httpStatus: 500,
+      mpRequestId: "req-mp-ok",
+      motivo: "TRANSPORTE",
+      authorization: "Bearer SECRET_TOKEN",
+      cookie: "session=SECRET_COOKIE",
+      token: "SECRET_ACCESS_TOKEN",
+      body: { sensitive: "data" },
+      payer: { email: "secret@example.com" },
+      qrCode: "000201...",
+      insecureCode: "invalid code with spaces and malicious chars"
+    });
+    assert.equal(logs.length, 1);
+    const entry = logs[0][1];
+    assert.match(entry.requestId, validId);
+    assert.equal(entry.httpStatus, 500);
+    assert.equal(entry.mpRequestId, "req-mp-ok");
+    assert.equal(entry.motivo, "TRANSPORTE");
+    assert.equal(entry.code, undefined, "código inválido/inseguro deve ser descartado");
+    assert.equal(entry.authorization, undefined);
+    assert.equal(entry.cookie, undefined);
+    assert.equal(entry.token, undefined);
+    assert.equal(entry.body, undefined);
+    assert.equal(entry.payer, undefined);
+    assert.equal(entry.qrCode, undefined);
+    const serialized = JSON.stringify(logs[0]);
+    for (const secret of [
+      "SECRET_TOKEN",
+      "SECRET_COOKIE",
+      "SECRET_ACCESS_TOKEN",
+      "secret@example.com",
+      "000201"
+    ]) {
+      assert.ok(!serialized.includes(secret));
+    }
+    return new Response(null);
+  });
+});
+
+test("checkout HTTP 400 recusa definitiva preserva httpStatus e mpRequestId nos logs", async t => {
+  const logs = [];
+  t.mock.method(console, "error", (...args) => logs.push(args));
+  const db = await fixture(t);
+
+  t.mock.method(globalThis, "fetch", async () => {
+    return new Response(JSON.stringify({ message: "invalid_parameter" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json", "x-request-id": "mp-req-400-checkout" }
+    });
+  });
+
+  const req = new Request("https://local.test/api/checkout", {
+    method: "POST",
+    headers: {
+      Origin: "https://local.test",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      items: [{ id: 1, quantity: 1 }],
+      cliente: { nome: "Cliente", whatsapp: "11999999999" },
+      operationKey: "op-checkout-400-log"
+    })
+  });
+
+  const response = await through(production, req, () =>
+    production.checkout.onRequestPost({
+      request: req,
+      env: { DB: db, MP_ACCESS_TOKEN: "fake-token" }
+    })
+  );
+
+  assert.equal(response.status, 502);
+  const checkoutErrorLog = logs.find(r => r[0] === "Mercado Pago checkout error");
+  assert.ok(checkoutErrorLog, "log de erro do checkout deve ter sido emitido");
+  const payload = checkoutErrorLog[1];
+  assert.equal(payload.httpStatus, 400);
+  assert.equal(payload.mpRequestId, "mp-req-400-checkout");
+  assert.equal(payload.code, "invalid_parameter");
+  assert.match(payload.requestId, validId);
+  assert.notEqual(
+    payload.requestId,
+    payload.mpRequestId,
+    "requestId da CF deve ser separado do mpRequestId"
+  );
+});
+
+test("checkout AMBIGUO preserva motivo, httpStatus e mpRequestId nos logs", async t => {
+  const logs = [];
+  t.mock.method(console, "error", (...args) => logs.push(args));
+  const db = await fixture(t);
+
+  t.mock.method(globalThis, "fetch", async () => {
+    return new Response("Service Unavailable", {
+      status: 503,
+      headers: { "x-request-id": "mp-req-503-checkout" }
+    });
+  });
+
+  const req = new Request("https://local.test/api/checkout", {
+    method: "POST",
+    headers: {
+      Origin: "https://local.test",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      items: [{ id: 1, quantity: 1 }],
+      cliente: { nome: "Cliente", whatsapp: "11999999999" },
+      operationKey: "op-checkout-503-log"
+    })
+  });
+
+  const response = await through(production, req, () =>
+    production.checkout.onRequestPost({
+      request: req,
+      env: { DB: db, MP_ACCESS_TOKEN: "fake-token" }
+    })
+  );
+
+  assert.equal(response.status, 502);
+  const ambiguoLog = logs.find(r => r[0] === "Resultado ambíguo ao criar pagamento Pix (checkout)");
+  assert.ok(ambiguoLog, "log de ambíguo do checkout deve ter sido emitido");
+  const payload = ambiguoLog[1];
+  assert.equal(payload.httpStatus, 503);
+  assert.equal(payload.motivo, "HTTP_INDISPONIVEL");
+  assert.equal(payload.mpRequestId, "mp-req-503-checkout");
+  assert.match(payload.requestId, validId);
+});

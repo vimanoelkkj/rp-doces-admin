@@ -1,8 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
-// Passo 6: webhook do Mercado Pago (Payments API). Nunca aplica o payload
+// Mercado Pago Orders webhook. Never applies the received payload directly.
 // recebido diretamente — só usa `data.id` para decidir o que reconsultar
-// fresco em /v1/payments/:id, e delega toda a decisão de transição ao
+// GET /v1/orders/:id supplies authority; the shared transition core decides.
 // helper central `syncPaymentFromMp` (mesmo caminho usado pela
 // reconciliação oportunista do admin e pelo polling público).
 
@@ -13,6 +13,11 @@ import {
   syncPaymentFromMp,
   validateMpWebhookSignature
 } from "../../lib/paymentSync";
+import { requestLogger } from "../../lib/requestContext";
+import { describeWebhookSignatureInput } from "../../lib/mpWebhookSignatureShape";
+
+// Mesmo formato que fetchMpOrder exige; qualquer outro id não tem o que consultar.
+const ORDER_ID_PATTERN = /^ORD[A-Za-z0-9]+$/;
 
 interface Env {
   DB: D1Database;
@@ -46,8 +51,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const url = new URL(request.url);
-  const dataId =
-    url.searchParams.get("data.id") || url.searchParams.get("data_id") || getBodyDataId(body);
+  const queryDataId = url.searchParams.get("data.id");
+  const queryDataIdLegacy = url.searchParams.get("data_id");
+  // O corpo só é consultado sem data.id na query, como antes.
+  const bodyDataId = queryDataId || queryDataIdLegacy ? "" : getBodyDataId(body);
+  const dataId = queryDataId || queryDataIdLegacy || bodyDataId;
 
   const type = String(
     url.searchParams.get("type") || url.searchParams.get("topic") || body?.type || body?.topic || ""
@@ -61,11 +69,35 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const valid = await validateMpWebhookSignature(request, secret, dataId);
   if (!valid) {
+    // Diagnóstico temporário do 401: só a estrutura da entrada, nunca valores.
+    const dataIdSource = queryDataId
+      ? "query-data.id"
+      : queryDataIdLegacy
+        ? "query-data_id"
+        : bodyDataId
+          ? "body"
+          : "none";
+    requestLogger.warnMeta("Webhook do Mercado Pago: assinatura inválida", {
+      httpStatus: 401,
+      webhookSignature: describeWebhookSignatureInput(request, dataId, dataIdSource)
+    });
     return Response.json({ erro: "Assinatura inválida." }, { status: 401 });
   }
 
-  const supportedType = !type || type === "payment" || type === "payments";
+  const supportedType = type === "order";
   if (!dataId || !supportedType) {
+    return ok();
+  }
+
+  // Assinatura já validada acima. O simulador oficial do MP assina `type=order` com um data.id
+  // fictício (ex.: "123456"): sem formato de ORD não há o que consultar e fetchMpOrder lançaria
+  // ORDER_ID_INVALIDO (502). Responde 200 sem GET e sem efeito. O aviso (só status e código fixo,
+  // nunca o valor recebido) evita que um id real fora do formato seja ignorado em silêncio.
+  if (!ORDER_ID_PATTERN.test(dataId)) {
+    requestLogger.warnMeta("Webhook do Mercado Pago ignorado: data.id fora do formato Orders", {
+      httpStatus: 200,
+      code: "ORDER_ID_FORMAT_INVALID"
+    });
     return ok();
   }
 
