@@ -72,7 +72,7 @@ const bundle = await build({
         const root = createRoot(container);
         const user = {id: 1, nome: 'Teste Local', username: 'teste', email: 'teste@example.invalid', papel: 'OWNER'};
         root.render(
-          <MemoryRouter initialEntries={['/admin']}>
+          <MemoryRouter initialEntries={['/admin']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AdminThemeProvider>
               <AdminAuthProvider user={user} logout={() => {}}>
                 <NotificacoesProvider>
