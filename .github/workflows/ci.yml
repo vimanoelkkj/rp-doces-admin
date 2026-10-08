@@ -30,8 +30,14 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ">=24.19.0 <25"
           cache: npm
+
+      - name: Verify Node and npm versions
+        run: |
+          node --version
+          npm --version
+          node -e 'const [major, minor] = process.argv[1].split(".").map(Number); if (!(major > 11 || (major === 11 && minor >= 17))) throw new Error("npm >=11.17.0 is required");' "$(npm --version)"
 
       - run: npm ci
 
@@ -59,8 +65,14 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ">=24.19.0 <25"
           cache: npm
+
+      - name: Verify Node and npm versions
+        run: |
+          node --version
+          npm --version
+          node -e 'const [major, minor] = process.argv[1].split(".").map(Number); if (!(major > 11 || (major === 11 && minor >= 17))) throw new Error("npm >=11.17.0 is required");' "$(npm --version)"
 
       - run: npm ci
 
@@ -92,8 +104,14 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ">=24.19.0 <25"
           cache: npm
+
+      - name: Verify Node and npm versions
+        run: |
+          node --version
+          npm --version
+          node -e 'const [major, minor] = process.argv[1].split(".").map(Number); if (!(major > 11 || (major === 11 && minor >= 17))) throw new Error("npm >=11.17.0 is required");' "$(npm --version)"
 
       - run: npm ci
 
@@ -181,8 +199,15 @@ jobs:
       - if: steps.gate.outputs.superseded == 'false'
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ">=24.19.0 <25"
           cache: npm
+
+      - name: Verify Node and npm versions
+        if: steps.gate.outputs.superseded == 'false'
+        run: |
+          node --version
+          npm --version
+          node -e 'const [major, minor] = process.argv[1].split(".").map(Number); if (!(major > 11 || (major === 11 && minor >= 17))) throw new Error("npm >=11.17.0 is required");' "$(npm --version)"
 
       - if: steps.gate.outputs.superseded == 'false'
         run: npm ci
@@ -372,8 +397,15 @@ jobs:
       - if: steps.gate.outputs.publish == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ">=24.19.0 <25"
           cache: npm
+
+      - name: Verify Node and npm versions
+        if: steps.gate.outputs.publish == 'true'
+        run: |
+          node --version
+          npm --version
+          node -e 'const [major, minor] = process.argv[1].split(".").map(Number); if (!(major > 11 || (major === 11 && minor >= 17))) throw new Error("npm >=11.17.0 is required");' "$(npm --version)"
 
       - if: steps.gate.outputs.publish == 'true'
         run: npm ci

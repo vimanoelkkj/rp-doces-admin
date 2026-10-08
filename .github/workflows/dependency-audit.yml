@@ -5,12 +5,14 @@ on:
     paths:
       - package.json
       - package-lock.json
+      - .npmrc
       - .github/workflows/dependency-audit.yml
   push:
     branches: [main]
     paths:
       - package.json
       - package-lock.json
+      - .npmrc
       - .github/workflows/dependency-audit.yml
   schedule:
     - cron: "0 13 * * 1"
@@ -28,7 +30,13 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ">=24.19.0 <25"
+      - name: Verify Node and npm versions
+        run: |
+          node --version
+          npm --version
+          node -e 'const [major, minor] = process.argv[1].split(".").map(Number); if (!(major > 11 || (major === 11 && minor >= 17))) throw new Error("npm >=11.17.0 is required");' "$(npm --version)"
+
       # Report the full baseline without blocking on existing development issues.
       # Registry/network errors must still fail the job.
       - name: Report all dependency vulnerabilities
