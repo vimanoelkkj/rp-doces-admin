@@ -310,6 +310,19 @@ test(
       assert.match(result.checks.at(-1).detail, /FOREIGN KEY/);
     });
 
+    await t.test("dump que falha por outro motivo não é rotulado como chave estrangeira", () => {
+      const repetida = `INSERT INTO "d1_migrations" ("id","name","applied_at") VALUES(1,'repetida.sql','2026-01-01 00:00:00');\n`;
+      const bad = path.join(work, "backup", "id-repetido.sql");
+      writeFileSync(
+        bad,
+        readFileSync(dump, "utf8").replace(/^PRAGMA[^\n]*\n/, m => m + repetida)
+      );
+      const result = verifyDump(bad);
+      assert.deepEqual(failing(result), ["restauração"]);
+      assert.match(result.checks.at(-1).detail, /UNIQUE constraint failed/);
+      assert.doesNotMatch(result.checks.at(-1).detail, /FOREIGN KEY/);
+    });
+
     await t.test(
       "dump sem triggers e com migration desconhecida é reprovado em vários pontos",
       () => {

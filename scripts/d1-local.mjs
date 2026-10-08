@@ -175,6 +175,14 @@ function assertPathFits(ws) {
   }
 }
 
+// O dump usa PRAGMA defer_foreign_keys: a violação de chave estrangeira só estoura no commit, e o Wrangler 4
+// devolve esse erro apenas como "internal error; reference = ...". Este SELECT, no fim do script e ainda dentro
+// da transação, falha com "integer overflow" se o foreign_key_check achar violação (o D1 local não autoriza
+// tabela TEMP, e RAISE só existe em trigger): a prova vem do foreign_key_check, não do texto da CLI. Nenhuma
+// outra instrução estoura assim: o dump só tem literais.
+const FOREIGN_KEY_GUARD =
+  "SELECT abs(-9223372036854775808) WHERE EXISTS (SELECT 1 FROM pragma_foreign_key_check);";
+
 // Restaura o dump (normalizado) num D1 local que ainda não existe na pasta de trabalho.
 export function restoreDump(ws, dumpPath) {
   if (hasLocalDatabase(ws)) throw new UsageError(`Já existe D1 local em ${ws.state}.`);
@@ -182,12 +190,16 @@ export function restoreDump(ws, dumpPath) {
   const tmp = mkdtempSync(path.join(tmpdir(), "rp-doces-restore-"));
   try {
     const file = path.join(tmp, "restore.sql");
-    writeFileSync(file, normalizeDump(readFileSync(dumpPath, "utf8")));
+    writeFileSync(file, `${normalizeDump(readFileSync(dumpPath, "utf8"))}${FOREIGN_KEY_GUARD}\n`);
     execLocal(ws, { file });
   } catch (error) {
     // Falha no meio da importação: não deixa um D1 pela metade (a pasta não tinha banco antes).
     rmSync(path.join(ws.state, "v3", "d1"), { recursive: true, force: true });
-    throw error;
+    throw /integer overflow/.test(error.message)
+      ? new Error(
+          "FOREIGN KEY constraint failed: o dump deixa linhas sem a linha-pai (foreign_key_check antes do commit)."
+        )
+      : error;
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
