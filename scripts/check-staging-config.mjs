@@ -7,7 +7,8 @@ import { experimental_readRawConfig } from "wrangler";
 export const STAGING_D1_PLACEHOLDER = "STAGING_D1_ID_REPLACE_AFTER_CREATE";
 
 export function readConfigs() {
-  const read = config => experimental_readRawConfig({ config }).rawConfig;
+  // O parser do Wrangler 4 (smol-toml) cria as tabelas sem protótipo; deepEqual estrito compara protótipo.
+  const read = config => structuredClone(experimental_readRawConfig({ config }).rawConfig);
   return {
     production: read("wrangler.toml"),
     productionWorker: read("wrangler.push.toml"),

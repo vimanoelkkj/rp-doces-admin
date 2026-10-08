@@ -3,7 +3,7 @@
 Procedimento para exportar o banco, **provar que o export restaura** e restaurar em ambiente descartável.
 Complementa `docs/ROLLBACK.md` (incidentes) e `docs/architecture/database-migrations.md` (migrations).
 
-> **Estado:** tudo que está marcado como _validado_ foi executado em D1 **local** (Wrangler 3.114.17, banco criado
+> **Estado:** tudo que está marcado como _validado_ foi executado em D1 **local** (Wrangler 4.148.0, banco criado
 > pelas migrations reais do repositório) e é coberto por `tests/d1-backup-restore.test.mjs`. O export do banco **remoto de
 > produção** e qualquer restore em produção **nunca foram executados** por este repositório: estão documentados
 > abaixo e dependem de credencial e de decisão humana.
@@ -95,7 +95,7 @@ node scripts/d1-backup.mjs restore backups/meu.sql --dir C:/tmp/d1-restaurado
 | `constraints`   | CHECK de estoque, CHECK de valor do pagamento, FOREIGN KEY, UNIQUE e um trigger continuam rejeitando.  |
 | `contagem`      | Informativo: linhas por tabela. Migration do repositório ainda não aplicada no backup vira AVISO.      |
 
-Resultado esperado (banco com todas as migrations do repositório): `Resultado: OK`, cerca de 8 s.
+Resultado esperado (banco com todas as migrations do repositório): `Resultado: OK`, cerca de 10 s.
 
 `restore` recusa pasta que já tenha D1 local. Não há opção para sobrescrever: apague a pasta de propósito.
 
@@ -114,7 +114,7 @@ Decisão humana, depois de `docs/ROLLBACK.md` seção C. Nunca importe por cima 
 Nenhum desses passos remotos foi testado. Reconcilie pedidos e pagamentos com o Mercado Pago depois de qualquer
 restore: o banco volta, o dinheiro não.
 
-## Achados do levantamento (versão 3.114.17)
+## Achados do levantamento (versão 4.148.0)
 
 - **O dump cru do Wrangler não restaura neste schema.** Ele lista as tabelas na ordem de criação; `pedidos` foi
   recriada por migration e fica depois das filhas, então `INSERT INTO "pedido_pagamentos"` falha com
@@ -127,7 +127,13 @@ restore: o banco volta, o dinheiro não.
 - **Windows:** os arquivos do D1 local têm nome de 64 caracteres; com o caminho acima de 259 o Wrangler falha com
   `internal error; reference = ...`, sem dizer o motivo. O script avisa; use uma pasta curta (`C:/tmp/d1`).
   Vale também para `wrangler pages dev` se o repositório estiver numa pasta muito funda.
-- O Wrangler instalado avisa que existe a v4. Subir de versão está fora deste escopo.
+- O export grava `INSERT INTO "tabela" ("coluna", ...) VALUES(...)`, com lista de colunas (o 3.114.17 era posicional).
+  `d1_migrations` e `sqlite_sequence` seguem no dump como tabelas comuns; o histórico de migrations é preservado.
+- `_cf_*` (hoje `_cf_METADATA`) são tabelas internas do D1 local: negam leitura (`SQLITE_AUTH`) e o export as omite.
+  `verify` e os testes as ignoram: não são dado nem schema do usuário.
+- O dump usa `PRAGMA defer_foreign_keys`, então a violação de chave estrangeira só estoura no commit, e o Wrangler 4
+  devolve apenas `internal error; reference = ...`. O restore termina o script com um `SELECT` que falha se
+  `foreign_key_check` achar violação; o erro vira `FOREIGN KEY constraint failed`, sem depender do texto da CLI.
 
 ## Manutenção
 
@@ -139,7 +145,7 @@ restore: o banco volta, o dinheiro não.
 - As sondas de `constraints` (em `scripts/d1-verify.mjs`) inserem linhas nas tabelas `produtos`, `pedido_pagamentos`,
   `pedidos`, `pedido_itens` e `usuarios_admin`. Se uma migration futura exigir uma coluna nova nessas tabelas, a sonda
   falha por "outro motivo" e o teste acusa: ajuste o `INSERT` da sonda.
-- `tests/d1-backup-restore.test.mjs` leva cerca de 35 s (aplica todas as migrations com o Wrangler). Roda nas fatias
+- `tests/d1-backup-restore.test.mjs` leva cerca de 1 min (aplica todas as migrations com o Wrangler). Roda nas fatias
   normais do CI.
 - Para agendar backup de produção (CI ou cron) é preciso um token com permissão de exportar e um destino cifrado:
   decisão pendente, nada foi configurado.

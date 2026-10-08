@@ -118,7 +118,8 @@ function checkStructure(ws, markers, add) {
   try {
     [objects, quick, foreignKeys, sequences, ...columns] = execLocal(ws, {
       command: [
-        "SELECT type, name FROM sqlite_master WHERE substr(name, 1, 7) <> 'sqlite_'",
+        // _cf_* são tabelas internas do D1 local (Wrangler 4): negam leitura (SQLITE_AUTH) e o export as omite.
+        "SELECT type, name FROM sqlite_master WHERE substr(name, 1, 7) <> 'sqlite_' AND substr(name, 1, 4) <> '_cf_'",
         "PRAGMA quick_check",
         "PRAGMA foreign_key_check",
         "SELECT name, seq FROM sqlite_sequence",

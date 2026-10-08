@@ -36,8 +36,10 @@ INSERT INTO pedido_pagamento_alocacoes(pagamento_id,pedido_item_id,valor_centavo
 `;
 
 // O histórico (d1_migrations) cresce a cada migration nova: nada abaixo assume quantas existem. O próximo
-// id livre sai do próprio dump, nunca de um número fixo.
-const LINHA_MIGRATION = /^INSERT INTO "?d1_migrations"? VALUES\((\d+),[^\n]*(?:\n|$)/gim;
+// id livre sai do próprio dump, nunca de um número fixo. O export do Wrangler 4 grava os INSERTs com lista de
+// colunas (`INSERT INTO "t" ("id", ...) VALUES(...)`); o do Wrangler 3 era posicional: as duas formas valem.
+const LINHA_MIGRATION =
+  /^INSERT INTO "?d1_migrations"?(?: \([^)]*\))? VALUES\((\d+),[^\n]*(?:\n|$)/gim;
 
 function historicoDoDump(dump) {
   const linhas = [...dump.matchAll(LINHA_MIGRATION)];
@@ -56,7 +58,7 @@ function comMigrationAcrescentada(dump, nome, { sequencia = false } = {}) {
   let out = dump.replace(ultimaLinha, () => inteira + nova);
   if (sequencia) {
     out = out.replace(
-      /(INSERT INTO "sqlite_sequence" VALUES\('d1_migrations',)\d+(\);)/,
+      /(INSERT INTO "sqlite_sequence"(?: \([^)]*\))? VALUES\('d1_migrations',)\d+(\);)/,
       (_, antes, depois) => `${antes}${id}${depois}`
     );
   }
@@ -103,17 +105,17 @@ test("normalizeDump sobe os CREATE TABLE para o topo e preserva o resto", () => 
 });
 
 test("a migration acrescentada ao dump usa o próximo id livre, com qualquer tamanho de histórico", () => {
-  const sintetico = total =>
+  const sintetico = (total, colunas = false) =>
     [
       "PRAGMA defer_foreign_keys=TRUE;",
       "CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE);",
       ...Array.from(
         { length: total },
         (_, i) =>
-          `INSERT INTO "d1_migrations" VALUES(${i + 1},'${String(i + 1).padStart(4, "0")}_m.sql','2026-01-01 00:00:00');`
+          `INSERT INTO "d1_migrations"${colunas ? ' ("id","name","applied_at")' : ""} VALUES(${i + 1},'${String(i + 1).padStart(4, "0")}_m.sql','2026-01-01 00:00:00');`
       ),
       "DELETE FROM sqlite_sequence;",
-      `INSERT INTO "sqlite_sequence" VALUES('d1_migrations',${total});`,
+      `INSERT INTO "sqlite_sequence"${colunas ? ' ("name","seq")' : ""} VALUES('d1_migrations',${total});`,
       ""
     ].join("\n");
   const ids = dump => [...dump.matchAll(LINHA_MIGRATION)].map(m => Number(m[1]));
@@ -143,6 +145,13 @@ test("a migration acrescentada ao dump usa o próximo id livre, com qualquer tam
     /VALUES\('d1_migrations',37\);/,
     "sqlite_sequence acompanha o id"
   );
+  // Export do Wrangler 4: INSERTs com lista de colunas, inclusive o de sqlite_sequence.
+  const comColunas = comMigrationAcrescentada(sintetico(36, true), "0037_nova.sql", {
+    sequencia: true
+  });
+  assert.equal(comColunas.id, 37);
+  assert.match(comColunas.dump, /\("name","seq"\) VALUES\('d1_migrations',37\);/);
+  assert.equal(ids(comColunas.dump).at(-1), 37);
   assert.throws(
     () => comMigrationAcrescentada("CREATE TABLE x (a);\n", "x.sql"),
     /não tem INSERTs de d1_migrations/
@@ -206,6 +215,11 @@ test(
       assert.equal(backupLocal({ dir: source.dir, out: dump }), dump);
       assert.ok(statSync(dump).size > 0, "dump não pode ter 0 bytes");
       assert.match(readFileSync(`${dump}.sha256`, "utf8"), /^[0-9a-f]{64} {2}d1\.sql\n$/);
+      assert.doesNotMatch(
+        readFileSync(dump, "utf8"),
+        /_cf_/,
+        "tabelas internas do D1 local ficam fora do backup"
+      );
       assert.throws(
         () => backupLocal({ dir: source.dir, out: dump }),
         /Já existe/,
@@ -242,15 +256,18 @@ test(
       () => {
         const restored = restoreInto({ dump, dir: path.join(work, "restaurado") });
         const read = (ws, sql) => execLocal(ws, { command: sql });
+        // _cf_* (ex.: _cf_METADATA) são internas do D1 local: negam leitura (SQLITE_AUTH) e não são dado nem schema
+        // do usuário, nem entram no export.
         const tables = read(
           source,
-          "SELECT name FROM sqlite_master WHERE type='table' AND substr(name,1,7)<>'sqlite_' ORDER BY name"
+          "SELECT name FROM sqlite_master WHERE type='table' AND substr(name,1,7)<>'sqlite_' AND substr(name,1,4)<>'_cf_' ORDER BY name"
         )[0].map(row => row.name);
         assert.ok(tables.length >= 20, "origem deveria ter todas as tabelas das migrations");
         const rows = ws =>
           read(ws, tables.map(name => `SELECT * FROM "${name}" ORDER BY rowid`).join(";\n"));
         assert.deepEqual(rows(restored), rows(source), "linhas idênticas em todas as tabelas");
-        const schema = "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name";
+        const schema =
+          "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE substr(name,1,4)<>'_cf_' ORDER BY type, name";
         assert.deepEqual(
           read(restored, schema),
           read(source, schema),

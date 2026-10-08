@@ -3,7 +3,7 @@
 // Nada aqui alcança produção: todo comando roda com --local, --remote/--preview são recusados e as
 // credenciais da Cloudflare são removidas do ambiente do processo filho.
 //
-// Compatível com wrangler 3.114.x (versão do lockfile): `d1 export` não tem --persist-to, então o estado
+// Compatível com wrangler 4.148.x (versão do lockfile): `d1 export` não tem --persist-to, então o estado
 // local é sempre <pasta do wrangler.toml>/.wrangler/state (o mesmo caminho que `wrangler pages dev` usa).
 
 import { spawnSync } from "node:child_process";
