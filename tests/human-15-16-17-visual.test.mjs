@@ -23,6 +23,11 @@ const dom = new JSDOM('<!doctype html><body><div id="root"></div></body>', {
 // O scheduler do React DOM abre MessageChannel; portas abertas seguram o
 // event loop e o processo de teste nunca encerra. Mesmo tratamento do
 // harness de `human-findings-ui.test.mjs`.
+// JSDOM has no scrolling implementation; retain offsets for modal cleanup.
+dom.window.scrollTo = (x, y) => {
+  dom.window.scrollX = x;
+  dom.window.scrollY = y;
+};
 const channels = [];
 const NativeMessageChannel = globalThis.MessageChannel;
 globalThis.MessageChannel = class extends NativeMessageChannel {
@@ -231,18 +236,18 @@ test("HUMAN-12: sem promoção ligada, o bloco de configuração não é renderi
   const desmontar = await montar(ui.mountProduto, false);
   try {
     assert.equal(document.querySelector(".np-promo-box"), null);
-    const desmontar2 = await montar(ui.mountProduto, true);
-    try {
-      assert.ok(document.querySelector(".np-promo-box"), "ligado, os campos aparecem");
-      assert.ok(
-        document.querySelector(".np-promo-hint").textContent.length > 0,
-        "estado de vigência é comunicado"
-      );
-    } finally {
-      await desmontar2();
-    }
   } finally {
     await desmontar();
+  }
+  const desmontar2 = await montar(ui.mountProduto, true);
+  try {
+    assert.ok(document.querySelector(".np-promo-box"), "ligado, os campos aparecem");
+    assert.ok(
+      document.querySelector(".np-promo-hint").textContent.length > 0,
+      "estado de vigência é comunicado"
+    );
+  } finally {
+    await desmontar2();
   }
 });
 

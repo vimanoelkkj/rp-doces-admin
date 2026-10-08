@@ -69,8 +69,8 @@ globalThis.cancelAnimationFrame = cancelRaf;
 dom.window.requestAnimationFrame = raf;
 dom.window.cancelAnimationFrame = cancelRaf;
 
-let mockIsMobile = false;
-let mediaListeners = new Set();
+const mockIsMobile = false;
+const mediaListeners = new Set();
 dom.window.matchMedia = query => ({
   matches: mockIsMobile,
   media: query,
@@ -189,8 +189,8 @@ const flush = async () => {
 };
 
 test("Harness: renderização de itens, totais, controles de quantidade e remoção", async () => {
-  let updatedQuantities = [];
-  let removedItems = [];
+  const updatedQuantities = [];
+  const removedItems = [];
 
   let instance;
   await ui.act(async () => {

@@ -8,6 +8,11 @@ import { app, fixture } from "./helpers/b3.mjs";
 const dom = new JSDOM('<!doctype html><body><div id="root"></div></body>', {
   url: "https://local.test/admin"
 });
+// JSDOM has no scrolling implementation; retain offsets for modal cleanup.
+dom.window.scrollTo = (x, y) => {
+  dom.window.scrollX = x;
+  dom.window.scrollY = y;
+};
 const channels = [];
 const NativeMessageChannel = globalThis.MessageChannel;
 globalThis.MessageChannel = class extends NativeMessageChannel {

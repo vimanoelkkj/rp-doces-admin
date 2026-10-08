@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import test from "node:test";
 import {
-  EXIT,
   checkAdminProtection,
   checkAsset,
   checkFrontendHtml,
@@ -74,8 +73,8 @@ test("Suite de smoke test contra servidor HTTP simulado", async t => {
   let productsResponse = {
     produtos: [{ id: 1, nome: "Bolo de Chocolate", preco_centavos: 1500, categoria: "Bolos" }]
   };
-  let htmlResponse = `<!doctype html><html><head><script type="module" src="/assets/index-abc123.js"></script></head><body><div id="root"></div></body></html>`;
-  let assetResponse = "console.log('bundle');";
+  const htmlResponse = `<!doctype html><html><head><script type="module" src="/assets/index-abc123.js"></script></head><body><div id="root"></div></body></html>`;
+  const assetResponse = "console.log('bundle');";
   let adminStatus = 401;
   let force500 = false;
   let injectLeak = false;
@@ -91,7 +90,7 @@ test("Suite de smoke test contra servidor HTTP simulado", async t => {
       const url = req.url || "/";
 
       if (url === "/") {
-        const body = injectLeak ? htmlResponse + " VAPID_PRIVATE_KEY=secret " : htmlResponse;
+        const body = injectLeak ? `${htmlResponse} VAPID_PRIVATE_KEY=secret ` : htmlResponse;
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(body);
       } else if (url === "/assets/index-abc123.js") {

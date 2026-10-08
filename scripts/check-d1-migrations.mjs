@@ -401,22 +401,23 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
         console.error(`  - ${p}`);
       });
       summary(["### Deploy bloqueado: migrations D1", "", ...result.problems.map(p => `- ${p}`)]);
-      process.exit(EXIT.BLOCKED);
+      process.exitCode = EXIT.BLOCKED;
+    } else {
+      const r = result.report;
+      console.log(
+        `Migrations D1 em dia: ${result.localCount} arquivos, todos aplicados em produção (${r.legacy.length} legadas de 3 dígitos ignoradas; ${result.remoteCount} registros no total).`
+      );
+      console.log(
+        result.schemaChecked
+          ? `Schema conferido para a migration mais recente (${result.latest}).`
+          : `Sem marcadores de schema a conferir em ${result.latest}.`
+      );
+      summary([
+        "### Migrations D1 em dia",
+        "",
+        `${result.localCount} migrations locais aplicadas; schema de \`${result.latest}\` ${result.schemaChecked ? "conferido" : "sem marcadores"}.`
+      ]);
     }
-    const r = result.report;
-    console.log(
-      `Migrations D1 em dia: ${result.localCount} arquivos, todos aplicados em produção (${r.legacy.length} legadas de 3 dígitos ignoradas; ${result.remoteCount} registros no total).`
-    );
-    console.log(
-      result.schemaChecked
-        ? `Schema conferido para a migration mais recente (${result.latest}).`
-        : `Sem marcadores de schema a conferir em ${result.latest}.`
-    );
-    summary([
-      "### Migrations D1 em dia",
-      "",
-      `${result.localCount} migrations locais aplicadas; schema de \`${result.latest}\` ${result.schemaChecked ? "conferido" : "sem marcadores"}.`
-    ]);
   } catch (error) {
     const exitCode = error instanceof CheckError ? error.exitCode : EXIT.BAD_RESPONSE;
     console.error(
@@ -426,6 +427,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
       console.error(`  - ${d}`);
     });
     summary(["### Deploy bloqueado: verificação de migrations D1 falhou", "", error.message]);
-    process.exit(exitCode);
+    process.exitCode = exitCode;
   }
 }

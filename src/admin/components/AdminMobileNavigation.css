@@ -15,13 +15,13 @@
 /* Garante clearance inferior compartilhado para que o conteúdo não termine atrás da bottom navigation fixa */
 @media (max-width: 900px) {
   .admin-layout :is(.admin-main, .adm-main, .loj-main) {
-    padding-bottom: calc(56px + var(--admin-mobile-nav-space)) !important;
+    padding-bottom: calc(56px + var(--admin-mobile-nav-space));
   }
 }
 
 @media (max-width: 600px) {
   .admin-layout :is(.admin-main, .adm-main, .loj-main) {
-    padding-bottom: calc(40px + var(--admin-mobile-nav-space)) !important;
+    padding-bottom: calc(40px + var(--admin-mobile-nav-space));
   }
 }
 
@@ -410,9 +410,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .admin-mobile-bottom-nav *,
+  .admin-mobile-bottom-nav .admin-mobile-nav-item:active .admin-mobile-nav-icon,
   .admin-mobile-sheet-backdrop,
   .admin-mobile-more-sheet {
-    animation: none !important;
-    transition: none !important;
+    animation: none;
+    transition: none;
   }
 }
