@@ -59,10 +59,10 @@ const unprovisioned = () => {
 function workflowContract(w) {
   assert.deepEqual(w.on.push.branches, ["main", "staging"]);
   assert.equal(w.concurrency, undefined);
-  // Freeze the entire existing production job semantically, independent of YAML formatting/comments.
+  // Freeze the reviewed production job, including Node/npm checks, independent of YAML formatting/comments.
   assert.equal(
     createHash("sha256").update(JSON.stringify(w.jobs.deploy)).digest("hex"),
-    "486abd8eff6a4e0b37fbf25577d2929d4019ca6de318a7483162ef6738b930c2"
+    "7d8d81ba7dce1f1c431fba4b2aab3ac6eb5910bd5d19397ece780684d9b4a147"
   );
   assert.deepEqual(w.jobs.tests.strategy.matrix.shard, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   assert.deepEqual(w.jobs["ci-status"].needs, ["checks", "tests", "e2e"]);
@@ -186,6 +186,49 @@ test("staging config parses and isolates every binding", () => {
 });
 test("workflow preserves production and isolates staging deployment", () =>
   workflowContract(workflow));
+test("npm jobs enforce the reviewed toolchain before installation or audit", async t => {
+  const auditDocument = yaml.parseDocument(
+    readFileSync(".github/workflows/dependency-audit.yml", "utf8")
+  );
+  assert.deepEqual(auditDocument.errors, []);
+  const auditWorkflow = auditDocument.toJS();
+  for (const event of ["pull_request", "push"]) {
+    assert.ok(auditWorkflow.on[event].paths.includes(".npmrc"));
+  }
+  const jobs = ["checks", "tests", "e2e", "deploy", "deploy-staging"].map(name => [
+    name,
+    workflow.jobs[name]
+  ]);
+  jobs.push(["audit", auditWorkflow.jobs.audit]);
+  for (const [name, job] of jobs) {
+    await t.test(name, () => {
+      const setupIndex = job.steps.findIndex(step => step.uses === "actions/setup-node@v7");
+      const verifyIndex = job.steps.findIndex(step => step.name === "Verify Node and npm versions");
+      const npmIndex = job.steps.findIndex(
+        step => step.run === "npm ci" || step.name === "Report all dependency vulnerabilities"
+      );
+      assert.ok(setupIndex >= 0 && setupIndex < verifyIndex && verifyIndex < npmIndex);
+      const setup = job.steps[setupIndex];
+      const verification = job.steps[verifyIndex];
+      assert.equal(setup.with["node-version"], ">=24.19.0 <25");
+      assert.equal(verification.if, setup.if);
+      assert.equal(verification.if, job.steps[npmIndex].if);
+      assert.match(verification.run, /^node --version\nnpm --version\n/);
+      const guard = verification.run.match(/node -e '([^']+)' "\$\(npm --version\)"/);
+      assert.ok(guard, "npm guard must check the installed npm version");
+      for (const [version, status] of [
+        ["11.16.99", 1],
+        ["11.17.0", 0],
+        ["12.0.0", 0]
+      ]) {
+        const result = spawnSync(process.execPath, ["-e", guard[1], version], { encoding: "utf8" });
+        assert.equal(result.status, status, `${name}: npm ${version}`);
+        if (status !== 0) assert.match(result.stderr, /npm >=11\.17\.0 is required/);
+      }
+    });
+  }
+});
+
 test("enabled staging fails before any external action when a secret is missing", async t => {
   const dir = mkdtempSync(join(tmpdir(), "rp-staging-gate-"));
   t.after(() => {
