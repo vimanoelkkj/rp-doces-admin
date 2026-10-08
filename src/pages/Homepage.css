@@ -22,6 +22,8 @@
   /* No desktop, o primeiro conteúdo nasce abaixo da wave/fade,
      seguindo a mesma lógica já usada no mobile. */
   padding-top: calc(var(--wave-visual-height) + 40px);
+  /* Anchor targets must land below the fully opaque edge of the existing mask. */
+  scroll-padding-top: calc(var(--wave-visual-height) + 94px);
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   -webkit-mask-image: linear-gradient(
@@ -54,6 +56,24 @@
 
 .homepage-content::-webkit-scrollbar {
   display: none;
+}
+
+/* Keep small Home text readable in light mode without changing shared theme tokens. */
+html[data-theme="light"]
+  .homepage
+  :is(
+    .hero-location,
+    .floating-label,
+    .section-tag,
+    .process-label,
+    .footer-col h4,
+    .footer-col a:hover,
+    .footer-bottom p,
+    .footer-bottom span,
+    .main-nav a:hover,
+    .main-nav a.active
+  ) {
+  color: var(--store-text-muted);
 }
 
 .wave-container {
