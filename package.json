@@ -39,6 +39,14 @@
     "prettier": "3.9.9",
     "typescript": "^5.5.3",
     "vite": "^5.4.0",
-    "wrangler": "^4.148.0"
+    "wrangler": "^4.149.0"
+  },
+  "engines": {
+    "npm": ">=11.17.0"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5 || 0.28.2": false,
+    "workerd@1.20250718.0 || 1.20261006.1": false,
+    "fsevents@2.3.3": false
   }
 }
