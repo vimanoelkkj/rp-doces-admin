@@ -81,7 +81,7 @@ const bundle = await build({
       export function mount(container) {
         const root = createRoot(container);
         root.render(
-          <MemoryRouter initialEntries={['/admin/produtos']}>
+          <MemoryRouter initialEntries={['/admin/produtos']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Routes>
               <Route element={<AdminLayout />}>
                 <Route path="/admin/produtos" element={<main className="admin-main">Produtos</main>} />

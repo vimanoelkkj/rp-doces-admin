@@ -61,6 +61,7 @@ const bundle = await build({
       export {act} from "react";
 
       const noop = () => {};
+      const routerFuture = {v7_startTransition: true, v7_relativeSplatPath: true};
       export function mount(container, component) {
         const root = createRoot(container);
         const element = {
@@ -70,10 +71,10 @@ const bundle = await build({
           novoPedido: <NovoPedidoModal open onClose={noop} />,
           categorias: <CategoriasModal open onClose={noop} />,
           novoProduto: <NovoProdutoModal open onClose={noop} />,
-          adminLogin: <StoreThemeProvider><MemoryRouter><AdminLogin /></MemoryRouter></StoreThemeProvider>,
-          adminPedidos: <MemoryRouter><AdminPedidos /></MemoryRouter>,
+          adminLogin: <StoreThemeProvider><MemoryRouter future={routerFuture}><AdminLogin /></MemoryRouter></StoreThemeProvider>,
+          adminPedidos: <MemoryRouter future={routerFuture}><AdminPedidos /></MemoryRouter>,
           adminProdutos: <AdminProdutos />,
-          checkout: <MemoryRouter><CartProvider><Checkout /></CartProvider></MemoryRouter>,
+          checkout: <MemoryRouter future={routerFuture}><CartProvider><Checkout /></CartProvider></MemoryRouter>,
         }[component];
         root.render(element);
         return root;

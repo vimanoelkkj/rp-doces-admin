@@ -72,7 +72,7 @@ const bundle = await build({
       export function mount(container) {
         const root = createRoot(container);
         root.render(
-          <MemoryRouter initialEntries={["/"]}>
+          <MemoryRouter initialEntries={["/"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Probe />
             <Routing />
           </MemoryRouter>
