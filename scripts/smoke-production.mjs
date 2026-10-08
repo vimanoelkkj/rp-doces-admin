@@ -21,7 +21,7 @@
 
 import { appendFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 export const EXIT = { OK: 0, FAIL: 1 };
 
@@ -481,7 +481,7 @@ export async function main() {
       } else {
         console.error(`[smoke] ✖ ${check.name}: ${check.error || "falhou"}`);
         summaryLines.push(
-          `| ${check.name} | ✖ FALHOU | ${check.error || "HTTP " + check.status} |`
+          `| ${check.name} | ✖ FALHOU | ${check.error || `HTTP ${check.status}`} |`
         );
       }
     }
