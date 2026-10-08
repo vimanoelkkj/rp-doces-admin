@@ -128,8 +128,8 @@ html[data-admin-theme="dark"] .dash-result-grid span {
 html[data-admin-theme="dark"] .dash-result-grid strong {
   color: #faf6f0;
 }
-html[data-admin-theme="dark"] .dash-result-negativo {
-  color: #e08276 !important;
+html[data-admin-theme="dark"] .dash-result-grid .dash-result-negativo {
+  color: #e08276;
 }
 html[data-admin-theme="dark"] .dash-pending-payments .dash-panel-subtitle {
   color: #d9c9be;
@@ -1461,7 +1461,6 @@ html[data-admin-theme="dark"] .admin-login-footer-text {
 html[data-admin-theme="dark"] .desp-title,
 html[data-admin-theme="dark"] .desp-kpi-value,
 html[data-admin-theme="dark"] .desp-card-heading h2,
-html[data-admin-theme="dark"] .desp-table td strong,
 html[data-admin-theme="dark"] .desp-card-mobile > strong {
   color: #faf6f0;
 }
@@ -1469,7 +1468,6 @@ html[data-admin-theme="dark"] .desp-subtitle,
 html[data-admin-theme="dark"] .desp-kpi-label,
 html[data-admin-theme="dark"] .desp-categoria-row > span,
 html[data-admin-theme="dark"] .desp-categoria-row > em,
-html[data-admin-theme="dark"] .desp-ranking li strong,
 html[data-admin-theme="dark"] .desp-empty,
 html[data-admin-theme="dark"] .desp-table th,
 html[data-admin-theme="dark"] .desp-table td,
@@ -1501,9 +1499,6 @@ html[data-admin-theme="dark"] .desp-progress {
 html[data-admin-theme="dark"] .desp-ranking li b {
   background: #3b2a2c;
   color: #e2a79c;
-}
-html[data-admin-theme="dark"] .desp-ranking li span {
-  color: #faf6f0;
 }
 html[data-admin-theme="dark"] .desp-status-dropdown-trigger,
 html[data-admin-theme="dark"] .desp-search,
@@ -1694,5 +1689,14 @@ html[data-admin-theme="dark"] .gasto-status-pill--cancelada {
   color: #e08276;
 }
 html[data-admin-theme="dark"] .gasto-loading {
+  color: #a89b92;
+}
+
+/* Nested expense text follows the general modal text rules. */
+html[data-admin-theme="dark"] .desp-table td strong,
+html[data-admin-theme="dark"] .desp-ranking li span {
+  color: #faf6f0;
+}
+html[data-admin-theme="dark"] .desp-ranking li strong {
   color: #a89b92;
 }

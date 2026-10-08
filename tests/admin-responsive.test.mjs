@@ -501,12 +501,12 @@ test("layout mobile administrativo reserva espaço inferior para a bottom nav de
   );
   assert.match(
     css,
-    /@media\s*\(max-width:\s*900px\)[\s\S]*?\.admin-layout\s+:is\(\.admin-main,\s*\.adm-main,\s*\.loj-main\)[\s\S]*?padding-bottom:\s*calc\(56px\s*\+\s*var\(--admin-mobile-nav-space\)\)\s*!important/,
+    /@media\s*\(max-width:\s*900px\)[\s\S]*?\.admin-layout\s+:is\(\.admin-main,\s*\.adm-main,\s*\.loj-main\)[\s\S]*?padding-bottom:\s*calc\(56px\s*\+\s*var\(--admin-mobile-nav-space\)\)\s*;/,
     "clearance inferior garantido em <= 900px resistente a sobrescritas de páginas específicas"
   );
   assert.match(
     css,
-    /@media\s*\(max-width:\s*600px\)[\s\S]*?\.admin-layout\s+:is\(\.admin-main,\s*\.adm-main,\s*\.loj-main\)[\s\S]*?padding-bottom:\s*calc\(40px\s*\+\s*var\(--admin-mobile-nav-space\)\)\s*!important/,
+    /@media\s*\(max-width:\s*600px\)[\s\S]*?\.admin-layout\s+:is\(\.admin-main,\s*\.adm-main,\s*\.loj-main\)[\s\S]*?padding-bottom:\s*calc\(40px\s*\+\s*var\(--admin-mobile-nav-space\)\)\s*;/,
     "clearance inferior preservado com espaçamento menor em telas <= 600px"
   );
 });

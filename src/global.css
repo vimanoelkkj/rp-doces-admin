@@ -166,8 +166,8 @@ html::-webkit-scrollbar {
 html.menu-open,
 html.menu-open body,
 html.menu-open #root {
-  overflow: hidden !important;
-  height: 100vh !important;
+  overflow: hidden;
+  height: 100vh;
 }
 
 /* ===== THEME TRANSITION (View Transitions API Circular Reveal) ===== */
@@ -200,7 +200,7 @@ html.menu-open #root {
   ::view-transition-group(root),
   ::view-transition-old(root),
   ::view-transition-new(root) {
-    animation: none !important;
+    animation: none;
   }
 }
 

@@ -258,6 +258,11 @@
   flex-shrink: 0;
 }
 
+html[data-admin-theme="dark"] .push-card-icon {
+  background: #2b2220;
+  color: #d8c8c0;
+}
+
 .push-card[data-status="SUBSCRIBED"] .push-card-icon {
   background: #eef7ee;
   color: #2e7d32;
@@ -407,11 +412,6 @@ html[data-admin-theme="dark"] .push-card {
   background: #1f1816;
   border-color: #3d3230;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
-}
-
-html[data-admin-theme="dark"] .push-card-icon {
-  background: #2b2220;
-  color: #d8c8c0;
 }
 
 html[data-admin-theme="dark"] .push-card[data-status="SUBSCRIBED"] .push-card-icon {
