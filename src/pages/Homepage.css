@@ -22,36 +22,43 @@
   /* No desktop, o primeiro conteúdo nasce abaixo da wave/fade,
      seguindo a mesma lógica já usada no mobile. */
   padding-top: calc(var(--wave-visual-height) + 40px);
-  /* Anchor targets must land below the fully opaque edge of the existing mask. */
+  /* Anchor targets must land below the fully opaque edge of the fade. */
   scroll-padding-top: calc(var(--wave-visual-height) + 94px);
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  -webkit-mask-image: linear-gradient(
+}
+
+.homepage::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--wave-visual-height) + 94px);
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
     to bottom,
-    transparent 0,
-    transparent calc(var(--wave-visual-height) - 20px),
-    rgba(0, 0, 0, 0.08) calc(var(--wave-visual-height) - 4px),
-    rgba(0, 0, 0, 0.22) calc(var(--wave-visual-height) + 14px),
-    rgba(0, 0, 0, 0.42) calc(var(--wave-visual-height) + 32px),
-    rgba(0, 0, 0, 0.64) calc(var(--wave-visual-height) + 50px),
-    rgba(0, 0, 0, 0.82) calc(var(--wave-visual-height) + 66px),
-    rgba(0, 0, 0, 0.94) calc(var(--wave-visual-height) + 80px),
-    black calc(var(--wave-visual-height) + 94px),
-    black 100%
+    var(--store-bg) calc(var(--wave-visual-height) - 20px),
+    transparent calc(var(--wave-visual-height) + 94px)
   );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--wave-visual-height) - 20px),
-    rgba(0, 0, 0, 0.08) calc(var(--wave-visual-height) - 4px),
-    rgba(0, 0, 0, 0.22) calc(var(--wave-visual-height) + 14px),
-    rgba(0, 0, 0, 0.42) calc(var(--wave-visual-height) + 32px),
-    rgba(0, 0, 0, 0.64) calc(var(--wave-visual-height) + 50px),
-    rgba(0, 0, 0, 0.82) calc(var(--wave-visual-height) + 66px),
-    rgba(0, 0, 0, 0.94) calc(var(--wave-visual-height) + 80px),
-    black calc(var(--wave-visual-height) + 94px),
-    black 100%
-  );
+}
+
+@supports (background: color-mix(in srgb, black, transparent)) {
+  .homepage::after {
+    background: linear-gradient(
+      to bottom,
+      var(--store-bg) 0,
+      var(--store-bg) calc(var(--wave-visual-height) - 20px),
+      color-mix(in srgb, var(--store-bg) 92%, transparent) calc(var(--wave-visual-height) - 4px),
+      color-mix(in srgb, var(--store-bg) 78%, transparent) calc(var(--wave-visual-height) + 14px),
+      color-mix(in srgb, var(--store-bg) 58%, transparent) calc(var(--wave-visual-height) + 32px),
+      color-mix(in srgb, var(--store-bg) 36%, transparent) calc(var(--wave-visual-height) + 50px),
+      color-mix(in srgb, var(--store-bg) 18%, transparent) calc(var(--wave-visual-height) + 66px),
+      color-mix(in srgb, var(--store-bg) 6%, transparent) calc(var(--wave-visual-height) + 80px),
+      color-mix(in srgb, var(--store-bg) 0%, transparent) 100%
+    );
+  }
 }
 
 .homepage-content::-webkit-scrollbar {
