@@ -76,17 +76,32 @@ export default function Header({ variant }: HeaderProps) {
 
   useEffect(() => {
     if (!menuOpen) return;
+    const menu = menuRef.current;
+    if (!menu) return;
+    const opener = menuButtonRef.current;
+
+    menu.querySelector<HTMLElement>(".mobile-menu-link")?.focus({ preventScroll: true });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         closeMenu();
-        menuButtonRef.current?.focus();
+      } else if (event.key === "Tab") {
+        const controls = menu.querySelectorAll<HTMLButtonElement>("button:not([disabled])");
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (!first || !last) return;
+        const active = document.activeElement;
+        if (!menu.contains(active) || (event.shiftKey ? active === first : active === last)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus({ preventScroll: true });
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, [menuOpen, closeMenu]);
 
@@ -247,7 +262,7 @@ export default function Header({ variant }: HeaderProps) {
             type="button"
             className="theme-toggle-btn"
             onClick={e => {
-              e.currentTarget.blur();
+              if (isAdmin) e.currentTarget.blur();
               toggleTheme(e);
             }}
             aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"}
@@ -317,7 +332,6 @@ export default function Header({ variant }: HeaderProps) {
           <MobileMenuDrawer
             menuOpen={menuOpen}
             menuRef={menuRef}
-            menuButtonRef={menuButtonRef}
             dragOffset={dragOffset}
             isDragging={isDragging}
             onPointerDown={handleDragStart}

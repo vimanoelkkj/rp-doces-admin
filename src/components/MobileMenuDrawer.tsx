@@ -4,7 +4,6 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 export interface MobileMenuDrawerProps {
   menuOpen: boolean;
   menuRef: React.RefObject<HTMLElement>;
-  menuButtonRef: React.RefObject<HTMLButtonElement>;
   dragOffset: number;
   isDragging: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -19,7 +18,6 @@ export interface MobileMenuDrawerProps {
 export default function MobileMenuDrawer({
   menuOpen,
   menuRef,
-  menuButtonRef,
   dragOffset,
   isDragging,
   onPointerDown,
@@ -35,16 +33,16 @@ export default function MobileMenuDrawer({
       <button
         type="button"
         className={`mobile-menu-overlay ${menuOpen ? "mobile-menu-overlay--open" : ""}`}
-        onClick={() => {
-          onClose();
-          menuButtonRef.current?.focus();
-        }}
+        onClick={onClose}
+        tabIndex={-1}
         aria-label="Fechar menu"
       />
       <nav
         ref={menuRef}
         id="mobile-menu-drawer"
         aria-label="Menu principal"
+        aria-hidden={!menuOpen}
+        {...(!menuOpen ? { inert: "" } : {})}
         className={`mobile-menu ${menuOpen ? "mobile-menu--open" : ""} ${isDragging ? "mobile-menu--dragging" : ""}`}
         style={
           menuOpen && dragOffset > 0 ? { transform: `translateY(${dragOffset}px)` } : undefined

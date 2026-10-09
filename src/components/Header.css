@@ -234,8 +234,8 @@ html[data-theme-transitioning] .theme-toggle-btn {
 }
 
 @media (pointer: coarse) {
-  .theme-toggle-btn:focus,
-  .theme-toggle-btn:focus-visible {
+  .theme-toggle-btn:focus:not(:focus-visible),
+  .header--admin .theme-toggle-btn:focus-visible {
     outline: none;
   }
 }
