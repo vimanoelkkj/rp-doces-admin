@@ -125,6 +125,9 @@ html[data-theme="light"]
 .hero-left {
   flex: 1;
   max-width: 628px;
+  /* Piso da medida do texto: 20em do parágrafo de 18px (≈ 37 caracteres por linha). Quando o
+     espaço aperta, quem encolhe é a coluna da imagem, nunca a do texto. */
+  min-width: 22.5rem;
   display: flex;
   flex-direction: column;
   padding-top: 30px;
@@ -213,19 +216,20 @@ html[data-theme="light"]
   align-self: flex-start;
 }
 
+/* A coluna da imagem encolhe quando o texto chega ao piso; elipse e foto seguem as proporções do
+   desenho de 628×560 (e não pixels) para acompanhá-la sem vazar. */
 .hero-right {
   position: relative;
-  flex-shrink: 0;
   width: 628px;
-  height: 560px;
+  aspect-ratio: 628 / 560;
 }
 
 .hero-ellipse {
   position: absolute;
-  width: 480px;
-  height: 480px;
-  top: 40px;
-  left: 40px;
+  width: calc(480 / 628 * 100%);
+  aspect-ratio: 1;
+  top: calc(40 / 560 * 100%);
+  left: calc(40 / 628 * 100%);
   border-radius: 50%;
   background: var(--store-accent-soft);
 }
@@ -233,9 +237,9 @@ html[data-theme="light"]
 .hero-cake-image {
   position: absolute;
   top: 0;
-  left: 64px;
-  width: 500px;
-  height: 560px;
+  left: calc(64 / 628 * 100%);
+  width: calc(500 / 628 * 100%);
+  height: 100%;
   object-fit: cover;
   border-radius: 250px 250px 40px 40px;
   z-index: 1;
@@ -962,6 +966,7 @@ html[data-theme="light"]
   }
   .hero-left {
     max-width: 100%;
+    min-width: 0;
     padding-top: 0;
     order: 0;
   }
@@ -1317,16 +1322,16 @@ html[data-theme="light"]
   }
   .hero-right {
     width: 480px;
-    height: 480px;
+    aspect-ratio: 1;
   }
   .hero-cake-image {
-    width: 420px;
-    height: 480px;
-    left: 30px;
+    width: calc(420 / 480 * 100%);
+    left: calc(30 / 480 * 100%);
   }
   .hero-ellipse {
-    width: 400px;
-    height: 400px;
+    width: calc(400 / 480 * 100%);
+    top: calc(40 / 480 * 100%);
+    left: calc(40 / 480 * 100%);
   }
   .story-section {
     padding: 80px 40px;
