@@ -1,44 +1,54 @@
-# Dependency risk acceptance for v1.0
+<a id="dependency-risk-acceptance-for-v10"></a>
 
-## Scope and baseline
+# Aceitação de risco de dependências para a v1.0
 
-Accepted for v1.0 by the project owner on 2026-10-06, based on the production dependency audit and source inspection performed that day.
+<a id="scope-and-baseline"></a>
 
-- Command: `npm audit --omit=dev`.
-- Result: **2 moderate, 0 high, 0 critical** vulnerabilities.
-- Installed versions match the lockfile: `rp-doces` → `react-router-dom@6.30.6` → `react-router@6.30.6`.
-- The audit counts two affected packages; both point to the two React Router advisories below. The acceptance does not cover future advisories or architecture changes.
+## Escopo e baseline
 
-## External redirect: accepted risk for v1.0
+Aceita para a v1.0 pelo proprietário do projeto em 2026-10-06, com base na auditoria de dependências de produção e na inspeção do código-fonte realizadas naquele dia.
 
-**[GHSA-wrjc-x8rr-h8h6 / CVE-2026-53669](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6)** — moderate severity.
+- Comando: `npm audit --omit=dev`.
+- Resultado: **2 vulnerabilidades moderadas, 0 altas e 0 críticas**.
+- As versões instaladas correspondem ao lockfile: `rp-doces` → `react-router-dom@6.30.6` → `react-router@6.30.6`.
+- A auditoria conta dois pacotes afetados; ambos apontam para os dois avisos de segurança do React Router abaixo. A aceitação não abrange avisos futuros nem mudanças de arquitetura.
 
-Attacker-supplied navigation paths containing backslashes can cause unexpected external redirects. The application uses affected APIs (`Link` and `useNavigate`), but no destination completely controlled by a user was identified in the inspected flows.
+<a id="external-redirect-accepted-risk-for-v10"></a>
 
-Navigation uses constant routes, paths with a fixed `/pedido/` prefix, and constant Home hashes. The dynamic `navigate(notificacao.destino)` in `src/admin/notificacoes/AdminNotificacoes.tsx` receives destinations constructed by `functions/lib/notificacoes.ts`, such as `/admin/pedidos?pedido=<id>` and `/admin/produtos`, rather than user-supplied URLs.
+## Redirect externo: risco aceito para a v1.0
 
-**Decision: acceptable for v1.0 with documented risk.** The vulnerable dependency remains installed. Source inspection did not identify an exploitable input path; this is not a universal proof that exploitation is impossible.
+**[GHSA-wrjc-x8rr-h8h6 / CVE-2026-53669](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6)** — severidade moderada.
 
-Reassess before introducing `returnTo`, free-form URLs, or navigation destinations supplied by users or other untrusted sources.
+Caminhos de navegação fornecidos por um atacante e contendo barras invertidas podem provocar redirects externos inesperados. A aplicação usa APIs afetadas (`Link` e `useNavigate`), mas não foi identificado destino totalmente controlado por um usuário nos fluxos inspecionados.
 
-## SSR hydration constructor injection: currently not applicable
+A navegação usa rotas constantes, caminhos com prefixo fixo `/pedido/` e hashes constantes da Home. O `navigate(notificacao.destino)` dinâmico em `src/admin/notificacoes/AdminNotificacoes.tsx` recebe destinos construídos por `functions/lib/notificacoes.ts`, como `/admin/pedidos?pedido=<id>` e `/admin/produtos`, em vez de URLs fornecidas por usuários.
 
-**[GHSA-337j-9hxr-rhxg / CVE-2026-53666](https://github.com/advisories/GHSA-337j-9hxr-rhxg)** — moderate severity.
+**Decisão: aceitável para a v1.0 com risco documentado.** A dependência vulnerável continua instalada. A inspeção do código não identificou um caminho de entrada explorável; isso não é uma prova universal de impossibilidade de exploração.
 
-The vulnerability depends on SSR/hydration error data allowing attacker input to select client-side constructors. The advisory explicitly excludes Declarative Mode applications.
+Reavalie antes de introduzir `returnTo`, URLs livres ou destinos de navegação fornecidos por usuários ou outras fontes não confiáveis.
 
-The project uses `createRoot` in `src/main.tsx` and `BrowserRouter` in `src/App.tsx`. Production source inspection found no SSR, `hydrateRoot`, `RouterProvider`, or `StaticRouter`.
+<a id="ssr-hydration-constructor-injection-currently-not-applicable"></a>
 
-**Decision: not applicable to the current architecture.** Reassess before adopting SSR, hydration, Framework Mode, or Data Mode with manual SSR/hydration.
+## Injeção de construtor na hidratação SSR: atualmente não aplicável
 
-## Remediation and release policy
+**[GHSA-337j-9hxr-rhxg / CVE-2026-53666](https://github.com/advisories/GHSA-337j-9hxr-rhxg)** — severidade moderada.
 
-Both advisories are fixed starting with React Router **7.18.0**; the audited npm recommendation is **7.18.4**. The installed v6 release remains affected, so dependency remediation requires a **major upgrade to React Router 7**. That migration will be handled separately after v1.0, with routing, checkout, admin navigation, redirects, and order tracking regression checks.
+A vulnerabilidade depende de dados de erro de SSR/hidratação que permitam a entrada de um atacante selecionar construtores no cliente. O aviso de segurança exclui explicitamente aplicações em Declarative Mode.
 
-Do not use `npm audit fix --force` as a remediation shortcut. This acceptance does not authorize dependency changes.
+O projeto usa `createRoot` em `src/main.tsx` e `BrowserRouter` em `src/App.tsx`. A inspeção do código de produção não encontrou SSR, `hydrateRoot`, `RouterProvider` nem `StaticRouter`.
 
-- Production **high/critical** vulnerabilities block release.
-- Production **moderate** vulnerabilities require triage and, when applicable, explicit documented risk acceptance for the release.
-- Recheck the audit for each release; this dated acceptance cannot replace current triage.
+**Decisão: não aplicável à arquitetura atual.** Reavalie antes de adotar SSR, hidratação, Framework Mode ou Data Mode com SSR/hidratação manual.
 
-See the [release checklist](../RELEASE-CHECKLIST.md) for the release gate.
+<a id="remediation-and-release-policy"></a>
+
+## Política de correção e release
+
+Os dois avisos estão corrigidos a partir do React Router **7.18.0**; a recomendação auditada do npm é **7.18.4**. A versão v6 instalada continua afetada, portanto a correção exige uma **atualização de versão major para React Router 7**. Essa migração será tratada separadamente após a v1.0, com verificações de regressão de rotas, checkout, navegação administrativa, redirects e acompanhamento de pedidos.
+
+Não use `npm audit fix --force` como atalho de correção. Esta aceitação não autoriza alterações de dependências.
+
+- Vulnerabilidades **altas/críticas** em produção bloqueiam a release.
+- Vulnerabilidades **moderadas** em produção exigem análise e, quando aplicável, aceitação de risco explícita e documentada para a release.
+- Repita a auditoria a cada release; esta aceitação datada não substitui a análise atual.
+
+Consulte o [checklist de release](../RELEASE-CHECKLIST.md) para os critérios de publicação.

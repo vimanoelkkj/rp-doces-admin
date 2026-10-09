@@ -1,8 +1,12 @@
-# Architecture Overview
+<a id="architecture-overview"></a>
 
-## 1. System Topology
+# Visão geral da arquitetura
 
-The RP Doces application is structured as an edge-native web application deployed on Cloudflare Pages and Pages Functions, utilizing Cloudflare D1 (serverless SQLite) for transactional persistence and Cloudflare R2 for asset storage.
+<a id="1-system-topology"></a>
+
+## 1. Topologia do sistema
+
+A aplicação RP Doces é estruturada como uma aplicação web nativa de edge, publicada no Cloudflare Pages e Pages Functions, com Cloudflare D1 (SQLite serverless) para persistência transacional e Cloudflare R2 para armazenamento de assets.
 
 ```
 +-------------------------------------------------------------------+
@@ -42,54 +46,68 @@ The RP Doces application is structured as an edge-native web application deploye
 
 ---
 
-## 2. Layers and Boundaries
+<a id="2-layers-and-boundaries"></a>
 
-### 2.1 Client Application (`src/`)
+## 2. Camadas e limites
 
-- Single-page application built with React and TypeScript.
-- Communicates with `/api/*` endpoints via JSON payloads.
-- Implements idempotent transaction request patterns by generating client-side operation keys (`operationKey`) and tracking client-side state.
+<a id="21-client-application-src"></a>
 
-### 2.2 Edge Functions & API Endpoints (`functions/api/`)
+### 2.1 Aplicação cliente (`src/`)
 
-- Serverless request handlers running on Cloudflare Workers/Pages Functions runtime.
-- Enforces input validation on incoming parameters before initiating persistence operations.
-- Isolates public checkout flows from administrative management interfaces.
-- Translates incoming webhooks and client actions into atomic transactional batches executed via `env.DB.batch()`.
+- Aplicação de página única construída com React e TypeScript.
+- Comunica-se com endpoints `/api/*` por meio de payloads JSON.
+- Implementa padrões de requisições transacionais idempotentes gerando chaves de operação no cliente (`operationKey`) e acompanhando o estado no cliente.
 
-### 2.3 Domain Logic Layer (`functions/lib/`)
+<a id="22-edge-functions--api-endpoints-functionsapi"></a>
 
-- Encapsulates state transitions, financial calculations, and inventory operations.
-- Pure functions and deterministic domain modules that take database bindings and domain models as inputs.
-- Contains gateway clients and data synchronizers responsible for validating third-party provider responses.
+### 2.2 Functions de edge e endpoints de API (`functions/api/`)
 
-### 2.4 Persistence Layer (`migrations/` and Cloudflare D1)
+- Handlers serverless de requisições executados no runtime do Cloudflare Workers/Pages Functions.
+- Valida os parâmetros recebidos antes de iniciar operações de persistência.
+- Isola os fluxos públicos de checkout das interfaces de gestão administrativa.
+- Converte webhooks recebidos e ações do cliente em batches transacionais atômicos executados por `env.DB.batch()`.
 
-- Relational schema managed via sequential SQL migration scripts (`migrations/*.sql`).
-- Relies on SQLite constraints (`CHECK`, `FOREIGN KEY`, `UNIQUE`) to enforce referential and business invariants at the database engine level.
+<a id="23-domain-logic-layer-functionslib"></a>
 
----
+### 2.3 Camada de lógica de domínio (`functions/lib/`)
 
-## 3. Trust Boundaries and Security Model
+- Encapsula transições de estado, cálculos financeiros e operações de estoque.
+- Funções puras e módulos de domínio determinísticos que recebem bindings de banco e modelos de domínio como entradas.
+- Contém clientes de gateways e sincronizadores de dados responsáveis por validar respostas de provedores externos.
 
-1. **Client Untrusted Boundary**:
-   - The browser is treated as an untrusted environment.
-   - Prices, inventory levels, order totals, and payment status are recalculated and verified authoritatively on the server.
-   - Client-provided amounts are validated against catalog data at the moment of reservation.
+<a id="24-persistence-layer-migrations-and-cloudflare-d1"></a>
 
-2. **Database Integrity Boundary**:
-   - Structural invariants are enforced via SQLite constraints (`CHECK` conditions on inventory levels, `FOREIGN KEY` references on line items, `UNIQUE` constraints on payment and operation keys).
-   - Atomic multi-table updates are executed using `env.DB.batch()`, guaranteeing all-or-nothing execution for the statement batch.
+### 2.4 Camada de persistência (`migrations/` e Cloudflare D1)
 
-3. **External Gateway Boundary**:
-   - Third-party webhook payloads are treated as unverified hints.
-   - Gateway status updates require authoritative query verification against the provider API before applying state mutations to local ledger tables.
+- Schema relacional gerenciado por scripts SQL de migração sequenciais (`migrations/*.sql`).
+- Usa constraints do SQLite (`CHECK`, `FOREIGN KEY`, `UNIQUE`) para garantir invariantes referenciais e de negócio no próprio motor do banco.
 
 ---
 
-## 4. Key Design Invariants and Enforcement Levels
+<a id="3-trust-boundaries-and-security-model"></a>
 
-- **Monetary Precision**: All monetary values are represented and stored as integer cents (`*_centavos` as `INTEGER` in SQLite, `number` in TypeScript within safe integer bounds). Floating-point values for currency are prohibited by architectural convention and code review.
-- **Append-Only Financial Ledger**: Once settled, recorded payment facts are treated as immutable by the application. State reversals, adjustments, and refunds are recorded as additive rows in `pedido_reembolsos` rather than destructive edits to original payments.
-- **Stock Reservation Protection**: Overselling is prevented by structural database constraints (`CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque)`) combined with atomic batch updates in Cloudflare D1.
-- **Idempotent Operations**: Mutations accept an operation key that prevents double-processing under network retries or concurrent submissions via unique database indexing and transactional replay checks.
+## 3. Limites de confiança e modelo de segurança
+
+1. **Limite do cliente não confiável**:
+   - O navegador é tratado como ambiente não confiável.
+   - Preços, níveis de estoque, totais de pedidos e status de pagamento são recalculados e verificados no servidor, que é a fonte de autoridade.
+   - Os valores enviados pelo cliente são validados contra os dados do catálogo no momento da reserva.
+
+2. **Limite de integridade do banco**:
+   - Invariantes estruturais são garantidas por constraints do SQLite (condições `CHECK` sobre níveis de estoque, referências `FOREIGN KEY` nos itens e constraints `UNIQUE` sobre chaves de pagamentos e operações).
+   - Atualizações atômicas de múltiplas tabelas são executadas com `env.DB.batch()`, garantindo execução integral ou nenhuma execução do batch de instruções.
+
+3. **Limite do gateway externo**:
+   - Payloads de webhooks externos são tratados como indícios não verificados.
+   - Atualizações de status do gateway exigem verificação por consulta à API do provedor, como fonte de autoridade, antes de aplicar mutações nas tabelas locais do ledger.
+
+---
+
+<a id="4-key-design-invariants-and-enforcement-levels"></a>
+
+## 4. Invariantes centrais de projeto e níveis de garantia
+
+- **Precisão monetária**: todos os valores monetários são representados e armazenados como centavos inteiros (`*_centavos` como `INTEGER` no SQLite, `number` no TypeScript dentro dos limites seguros de inteiros). Valores de ponto flutuante para moeda são proibidos por convenção arquitetural e revisão de código.
+- **Ledger financeiro append-only**: após a liquidação, os fatos de pagamento registrados são tratados como imutáveis pela aplicação. Reversões de estado, ajustes e reembolsos são registrados como linhas aditivas em `pedido_reembolsos`, em vez de alterações destrutivas dos pagamentos originais.
+- **Proteção da reserva de estoque**: a venda acima do estoque é impedida por constraints estruturais do banco (`CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque)`) combinadas com atualizações atômicas em batch no Cloudflare D1.
+- **Operações idempotentes**: as mutações aceitam uma chave de operação que impede processamento duplicado em novas tentativas de rede ou envios concorrentes, por meio de indexação única no banco e verificações transacionais de replay.

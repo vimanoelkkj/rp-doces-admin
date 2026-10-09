@@ -1,8 +1,12 @@
-# Database Migrations Architecture
+<a id="database-migrations-architecture"></a>
 
-## 1. Engine and Migration Lifecycle
+# Arquitetura de migrações do banco de dados
 
-The persistence layer uses Cloudflare D1, a distributed serverless relational database built on SQLite. Database migrations are stored as sequential SQL files under `migrations/`:
+<a id="1-engine-and-migration-lifecycle"></a>
+
+## 1. Motor e ciclo de vida das migrações
+
+A camada de persistência usa Cloudflare D1, um banco relacional distribuído e serverless baseado em SQLite. As migrações do banco são armazenadas como arquivos SQL sequenciais em `migrations/`:
 
 ```
 migrations/
@@ -11,47 +15,57 @@ migrations/
   ...   (one file per schema change, strictly sequential)
 ```
 
-### 1.1 Sequencing Rules
+<a id="11-sequencing-rules"></a>
 
-- Migration filenames adhere to a 4-digit zero-padded prefix followed by a snake_case descriptive identifier (`XXXX_name.sql`).
-- Numbering is strictly continuous without gaps or duplicates, starting at `0001`. The `migrations/` directory is the source of truth for the current range (`ls migrations`).
-- Migrations are strictly forward-only: historical migrations already applied to deployment environments are never edited, deleted, or reordered. Any subsequent schema evolution or bugfix must be introduced via a new migration.
+### 1.1 Regras de sequenciamento
 
----
-
-## 2. Additive Schema Evolution
-
-Due to the architectural properties of SQLite in serverless edge environments, schema evolution follows an additive design guideline:
-
-1. **Non-Destructive Alterations**:
-   - Prefer `ALTER TABLE ... ADD COLUMN` with a safe `DEFAULT` value or nullable constraint.
-   - Column deprecations are phased:
-     - Phase 1: Add new column; update application code to write to both and read from new.
-     - Phase 2: Backfill historical data if needed.
-     - Phase 3: Cease usage of the obsolete column.
-2. **Deterministic Defaults**:
-   - Numeric flags or status values define explicit default values (e.g., `DEFAULT 0`).
-   - Timestamps utilize standard SQLite expressions (e.g., `CURRENT_TIMESTAMP`).
-3. **Controlled Table Recreations**:
-   - When SQLite limitations require modifying column constraints or primary keys that `ALTER TABLE` cannot accomplish directly, table reconstruction (`table__novo`) is applied with strict foreign key safeguards.
+- Os nomes das migrações seguem um prefixo de quatro dígitos preenchido com zeros, seguido de um identificador descritivo em snake_case (`XXXX_name.sql`).
+- A numeração é estritamente contínua, sem lacunas ou duplicações, começando em `0001`. O diretório `migrations/` é a fonte de verdade para o intervalo atual (`ls migrations`).
+- As migrações são estritamente forward-only: migrações históricas já aplicadas aos ambientes de deploy nunca são editadas, excluídas ou reordenadas. Qualquer evolução posterior do schema ou correção deve ser introduzida por uma nova migração.
 
 ---
 
-## 3. The SQLite Foreign Key Cascade Trap
+<a id="2-additive-schema-evolution"></a>
 
-SQLite enforces referential integrity through foreign keys, but requires deliberate handling during table recreations.
+## 2. Evolução aditiva do schema
 
-### 3.1 The Cascade Problem
+Devido às propriedades arquiteturais do SQLite em ambientes edge serverless, a evolução do schema segue uma orientação de projeto aditivo:
 
-In SQLite, executing a table recreation pattern while foreign keys are active can have destructive side effects:
+1. **Alterações não destrutivas**:
+   - Prefira `ALTER TABLE ... ADD COLUMN` com um valor `DEFAULT` seguro ou uma constraint que permita nulos.
+   - A descontinuação de colunas ocorre em fases:
+     - Fase 1: adicione a nova coluna; atualize o código da aplicação para gravar nas duas e ler da nova.
+     - Fase 2: faça o backfill dos dados históricos, se necessário.
+     - Fase 3: interrompa o uso da coluna obsoleta.
+2. **Valores padrão determinísticos**:
+   - Flags numéricas ou valores de status definem valores padrão explícitos (por exemplo, `DEFAULT 0`).
+   - Timestamps usam expressões padrão do SQLite (por exemplo, `CURRENT_TIMESTAMP`).
+3. **Recriações controladas de tabelas**:
+   - Quando limitações do SQLite exigem modificar constraints de colunas ou chaves primárias que `ALTER TABLE` não consegue alterar diretamente, aplica-se a reconstrução da tabela (`table__novo`) com proteções rigorosas de chaves estrangeiras.
 
-- If a child table has a foreign key referencing a parent table with `ON DELETE CASCADE`:
-- Executing `DROP TABLE parent;` triggers the cascade rule and silently deletes all referenced rows in child tables.
-- Using `PRAGMA defer_foreign_keys = ON;` defers constraint validation until transaction commit, but **does not prevent `DROP TABLE` from executing cascade triggers**.
+---
 
-### 3.2 Safe Table Recreation Procedure
+<a id="3-the-sqlite-foreign-key-cascade-trap"></a>
 
-When modifying a table in SQLite that requires recreation (e.g., changing primary keys or adjusting constraints):
+## 3. A armadilha de cascade das chaves estrangeiras no SQLite
+
+O SQLite garante a integridade referencial por meio de chaves estrangeiras, mas exige tratamento deliberado durante recriações de tabelas.
+
+<a id="31-the-cascade-problem"></a>
+
+### 3.1 O problema do cascade
+
+No SQLite, executar uma recriação de tabela com as chaves estrangeiras ativas pode ter efeitos colaterais destrutivos:
+
+- Se uma tabela filha tem uma chave estrangeira que referencia uma tabela pai com `ON DELETE CASCADE`:
+- Executar `DROP TABLE parent;` aciona a regra de cascade e exclui silenciosamente todas as linhas referenciadas nas tabelas filhas.
+- Usar `PRAGMA defer_foreign_keys = ON;` adia a validação das constraints até o commit da transação, mas **não impede que `DROP TABLE` execute triggers de cascade**.
+
+<a id="32-safe-table-recreation-procedure"></a>
+
+### 3.2 Procedimento seguro de recriação de tabelas
+
+Ao modificar uma tabela no SQLite de forma que exija recriação (por exemplo, mudar chaves primárias ou ajustar constraints):
 
 ```sql
 -- 1. Disable foreign key enforcement during the schema rebuild
@@ -86,13 +100,15 @@ PRAGMA foreign_key_check;
 
 ---
 
-## 4. Verification and Migration Tooling
+<a id="4-verification-and-migration-tooling"></a>
 
-Automated verification protects migrations prior to deployment:
+## 4. Verificação e ferramentas de migração
 
-- **Static Linting (`scripts/check-d1-migrations.mjs`)**:
-  - Validates numeric continuity of migration filenames without gaps.
-  - Verifies schema markers, object declarations, and safe migration patterns against a simulated Cloudflare D1 environment.
-- **In-Memory Test Execution (`tests/check-d1-migrations.test.mjs`)**:
-  - Validates migration scripts against mock D1 REST interfaces and Miniflare instances.
-  - Ensures all DDL executes cleanly without syntax errors, index collisions, or circular dependency failures.
+A verificação automatizada protege as migrações antes do deploy:
+
+- **Lint estático (`scripts/check-d1-migrations.mjs`)**:
+  - Valida a continuidade numérica dos nomes das migrações, sem lacunas.
+  - Verifica marcadores de schema, declarações de objetos e padrões seguros de migração em um ambiente Cloudflare D1 simulado.
+- **Execução de testes em memória (`tests/check-d1-migrations.test.mjs`)**:
+  - Valida os scripts de migração com interfaces REST D1 simuladas e instâncias do Miniflare.
+  - Garante que todo o DDL seja executado sem erros de sintaxe, colisões de índices ou falhas de dependências circulares.

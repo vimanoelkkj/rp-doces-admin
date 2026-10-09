@@ -1,33 +1,43 @@
-# Pix Lifecycle and Stock Reservation
+<a id="pix-lifecycle-and-stock-reservation"></a>
 
-## 1. Stock Concurrency Model
+# Ciclo de vida do Pix e reserva de estoque
 
-The inventory system prevents overselling under concurrent checkout traffic by combining database-level integrity constraints with atomic batch execution.
+<a id="1-stock-concurrency-model"></a>
 
-### 1.1 Schema Invariants
+## 1. Modelo de concorrência do estoque
 
-Stock is tracked with physical inventory and reserved quantities in `produtos`:
+O sistema de estoque impede vendas acima da disponibilidade em checkouts concorrentes, combinando constraints de integridade no banco com execução atômica em batch.
+
+<a id="11-schema-invariants"></a>
+
+### 1.1 Invariantes do schema
+
+O estoque físico e as quantidades reservadas são acompanhados em `produtos`:
 
 ```sql
 ALTER TABLE produtos ADD COLUMN estoque INTEGER NOT NULL DEFAULT 0 CHECK (estoque >= 0);
 ALTER TABLE produtos ADD COLUMN estoque_reservado INTEGER NOT NULL DEFAULT 0 CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque);
 ```
 
-- **Physical Stock (`estoque`)**: Total quantity of units physically present in inventory.
-- **Reserved Stock (`estoque_reservado`)**: Quantity temporarily locked by active, pending orders.
-- **Available Stock**: Calculated dynamically as:
+- **Estoque físico (`estoque`)**: quantidade total de unidades fisicamente presentes no estoque.
+- **Estoque reservado (`estoque_reservado`)**: quantidade temporariamente bloqueada por pedidos ativos e pendentes.
+- **Estoque disponível**: calculado dinamicamente como:
   ```sql
   MAX(0, estoque - estoque_reservado)
   ```
-- **Structural Integrity Constraint**: The SQLite engine enforces `CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque)`. Any database mutation that attempts to increment `estoque_reservado` beyond `estoque` is rejected at the engine level.
+- **Constraint de integridade estrutural**: o motor do SQLite garante `CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque)`. Qualquer mutação que tente incrementar `estoque_reservado` acima de `estoque` é rejeitada pelo próprio motor do banco.
 
 ---
 
-## 2. Stock Reservation Mechanics
+<a id="2-stock-reservation-mechanics"></a>
 
-### 2.1 Checkout Reservation (`functions/api/checkout.ts`)
+## 2. Mecanismos de reserva de estoque
 
-During customer checkout, the reservation is issued within the primary database batch:
+<a id="21-checkout-reservation-functionsapicheckoutts"></a>
+
+### 2.1 Reserva no checkout (`functions/api/checkout.ts`)
+
+Durante o checkout do cliente, a reserva é efetuada dentro do batch principal do banco:
 
 ```sql
 UPDATE produtos
@@ -36,15 +46,17 @@ SET estoque_reservado = estoque_reservado + ?,
 WHERE id = ?;
 ```
 
-- **Constraint Enforcement**: If competing checkouts contest the last remaining inventory, the first transaction to commit reserves the units. The subsequent transaction causes `estoque_reservado > estoque`, triggering an immediate SQLite `CHECK constraint failed` error.
-- **Batch Rollback**: Because the update executes inside `env.DB.batch()`, the constraint failure causes an atomic rollback of the entire batch (preventing order creation, payment insertion, and partial reservations).
-- **Graceful Error Handling**: The application layer catches the constraint error and returns an HTTP `409 Conflict` indicating insufficient stock.
+- **Garantia da constraint**: se checkouts concorrentes disputarem o último estoque disponível, a primeira transação a concluir o commit reserva as unidades. A transação seguinte faz `estoque_reservado > estoque`, provocando imediatamente o erro `CHECK constraint failed` do SQLite.
+- **Rollback do batch**: como a atualização executa dentro de `env.DB.batch()`, a falha da constraint causa rollback atômico de todo o batch, impedindo criação do pedido, inserção de pagamento e reservas parciais.
+- **Tratamento controlado do erro**: a camada da aplicação captura o erro de constraint e retorna HTTP `409 Conflict`, indicando estoque insuficiente.
 
 ---
 
-## 3. Reservation Lifecycle
+<a id="3-reservation-lifecycle"></a>
 
-An order progresses through well-defined reservation states:
+## 3. Ciclo de vida da reserva
+
+Um pedido percorre estados de reserva bem definidos:
 
 ```
 [Customer Checkout]
@@ -65,17 +77,21 @@ estoque_reservado -= qty       |                       |
 Order: PAGO
 ```
 
-### 3.1 Reservation Expiration
+<a id="31-reservation-expiration"></a>
 
-- Checkout reservations set an expiration timestamp (`reserva_expira_em`), typically 15 to 30 minutes in the future.
-- Orders created manually via the administration panel set `reserva_expira_em = NULL`, representing a persistent hold that does not auto-expire.
-- Scheduled or manual reconciliation sweeps identify pending orders whose expiration timestamp has passed, invoking `liberarReservaPedido` (`functions/lib/stock.ts`) to decrement `estoque_reservado` back to available inventory.
+### 3.1 Expiração da reserva
 
-### 3.2 Physical Deduction (`baixarEstoquePedido`)
+- As reservas do checkout definem um timestamp de expiração (`reserva_expira_em`), geralmente de 15 a 30 minutos no futuro.
+- Pedidos criados manualmente no painel administrativo definem `reserva_expira_em = NULL`, representando uma reserva persistente que não expira automaticamente.
+- Varreduras de reconciliação agendadas ou manuais identificam pedidos pendentes cujo timestamp de expiração já passou e chamam `liberarReservaPedido` (`functions/lib/stock.ts`) para decrementar `estoque_reservado`, devolvendo a quantidade à disponibilidade.
 
-- When an order reaches authoritative `PAGO` status, `baixarEstoquePedido` converts the temporary hold into a permanent physical deduction.
-- Each controlled line item in `pedido_itens` is updated to `estoque_estado = 'BAIXADO'`.
-- The corresponding product row is updated:
+<a id="32-physical-deduction-baixarestoquepedido"></a>
+
+### 3.2 Baixa física (`baixarEstoquePedido`)
+
+- Quando um pedido alcança o status `PAGO` confirmado pela fonte de autoridade, `baixarEstoquePedido` converte a reserva temporária em baixa física permanente.
+- Cada item controlado em `pedido_itens` é atualizado para `estoque_estado = 'BAIXADO'`.
+- A linha correspondente do produto é atualizada:
   ```sql
   UPDATE produtos
   SET estoque = estoque - ?,
@@ -84,38 +100,44 @@ Order: PAGO
       atualizado_em = CURRENT_TIMESTAMP
   WHERE id = ?;
   ```
-- This conversion is idempotent: if an order is already marked as `BAIXADO`, repeated calls act as a no-op.
+- Essa conversão é idempotente: se o pedido já está marcado como `BAIXADO`, chamadas repetidas não realizam alterações (no-op).
 
 ---
 
-## 4. Payment Gateway Integration (Mercado Pago)
+<a id="4-payment-gateway-integration-mercado-pago"></a>
 
-The authoritative gateway is **Mercado Pago Orders API** (`/v1/orders`).
-`mp_order_id` identifies ORD and `mp_payment_id` identifies its PAY transaction.
-See [the cutover contract](../MP_ORDERS.md) before enabling this integration.
+## 4. Integração com o gateway de pagamento (Mercado Pago)
 
-### 4.1 In-Memory Reference Verification (`paymentSync`)
+O gateway que fornece a autoridade financeira é a **Mercado Pago Orders API** (`/v1/orders`).
+`mp_order_id` identifica ORD e `mp_payment_id` identifica sua transação PAY.
+Consulte [o contrato de cutover](../MP_ORDERS.md) antes de habilitar essa integração.
 
-Incoming webhooks can be delayed, repeated, or spoofed. After HMAC signature validation, the application implements an in-memory runtime verification pattern:
+<a id="41-in-memory-reference-verification-paymentsync"></a>
 
-1. **Webhook Notification**:
-   - The webhook endpoint (`functions/api/webhooks/mercadopago.ts`) receives an `order` event and extracts the ORD identity (`data.id`).
-   - Webhooks do not directly mutate order or ledger status.
-2. **Authoritative Fetch**:
-   - The worker executes an authenticated `GET /v1/orders/{ORD}` via `fetchMpOrder` (`functions/lib/mp/orders/client.ts`). The existing `fetchMpPayment` facade delegates to this Orders client.
-3. **Runtime WeakSet Attestation**:
-   - When `fetchMpOrder` successfully parses and freezes the snapshot, it registers the object reference in a module-scoped `WeakSet`:
+### 4.1 Verificação de referência em memória (`paymentSync`)
+
+Webhooks recebidos podem estar atrasados, repetidos ou falsificados. Após validar a assinatura HMAC, a aplicação implementa um padrão de verificação em memória no runtime:
+
+1. **Notificação por webhook**:
+   - O endpoint de webhook (`functions/api/webhooks/mercadopago.ts`) recebe um evento `order` e extrai a identidade ORD (`data.id`).
+   - Webhooks não alteram diretamente o status do pedido nem do ledger.
+2. **Consulta à fonte de autoridade**:
+   - O worker executa um `GET /v1/orders/{ORD}` autenticado por `fetchMpOrder` (`functions/lib/mp/orders/client.ts`). A fachada existente `fetchMpPayment` delega a esse cliente Orders.
+3. **Atestação por WeakSet no runtime**:
+   - Quando `fetchMpOrder` interpreta e congela o snapshot com sucesso, registra a referência do objeto em um `WeakSet` no escopo do módulo:
      ```ts
      const verifiedOrders = new WeakSet<VerifiedMpOrder>();
      ```
-   - Downstream reconciliation checks membership via `isVerifiedMpOrder` (also exposed as `isVerifiedMpResponse` for compatibility).
-   - This in-memory barrier ensures within the V8 runtime isolate that only responses produced by direct, authenticated GET calls can trigger payment settlement and stock conversion.
+   - A reconciliação posterior verifica a presença por `isVerifiedMpOrder`, também exposto como `isVerifiedMpResponse` para compatibilidade.
+   - Essa barreira em memória garante, dentro do isolate do runtime V8, que apenas respostas produzidas por chamadas GET diretas e autenticadas possam acionar a liquidação do pagamento e a conversão de estoque.
 
-### 4.2 Handling Gateway Failures (`ENVIO_INCONCLUSIVO`)
+<a id="42-handling-gateway-failures-envioinconclusivo"></a>
 
-When initiating payments or refunds:
+### 4.2 Tratamento de falhas do gateway (`ENVIO_INCONCLUSIVO`)
 
-- **Network Timeouts & 5xx Responses**:
-  - If a network transport failure, socket timeout, or HTTP 5xx error occurs while sending an operation to the payment provider, the operation is set to `fase='ENVIO_INCONCLUSIVO'` in `pedido_operacoes`.
-  - The system **does not** cancel the order or release reserved stock on an inconclusive result.
-  - The hold is preserved until an authoritative webhook arrives or an administrative reconciliation sweep confirms the definitive status with the provider API.
+Ao iniciar pagamentos ou reembolsos:
+
+- **Timeouts de rede e respostas 5xx**:
+  - Se ocorrer falha de transporte, timeout de socket ou erro HTTP 5xx ao enviar uma operação ao provedor de pagamento, a operação é definida como `fase='ENVIO_INCONCLUSIVO'` em `pedido_operacoes`.
+  - O sistema **não** cancela o pedido nem libera o estoque reservado diante de um resultado inconclusivo.
+  - A reserva é preservada até chegar um webhook confirmado pela fonte de autoridade ou uma varredura administrativa de reconciliação confirmar o status definitivo pela API do provedor.

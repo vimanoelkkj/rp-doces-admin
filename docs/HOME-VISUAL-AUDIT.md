@@ -1,43 +1,51 @@
-# On-demand Home visual audit
+<a id="on-demand-home-visual-audit"></a>
 
-Run from the repository root after installing the project's dependencies and Playwright Chromium:
+# Auditoria visual da Home sob demanda
+
+Execute na raiz do repositório após instalar as dependências do projeto e o Chromium do Playwright:
 
 ```sh
 npm run audit:home
 npx playwright show-report playwright-report/home-visual-audit
 ```
 
-The existing Playwright configuration starts local Vite at `http://127.0.0.1:5173`, or reuses a local server. This command forces the local origin even when `BASE_URL` points elsewhere. It selects `@home-visual-audit`; normal `npm run test:e2e` and CI discovery exclude this spec. No workflow changes are needed. `CHROME_PATH` remains supported, but use the same bundled Chromium version for comparisons.
+A configuração existente do Playwright inicia o Vite local em `http://127.0.0.1:5173` ou reutiliza um servidor local. Esse comando força a origem local mesmo quando `BASE_URL` aponta para outro destino. Ele seleciona `@home-visual-audit`; o comando normal `npm run test:e2e` e a descoberta de testes do CI excluem essa spec. Não são necessárias alterações no workflow. `CHROME_PATH` continua disponível, mas use a mesma versão do Chromium fornecida pelo Playwright para comparações.
 
-Run `npm run typecheck:home-audit` to check the spec, fixtures and Playwright configuration with strict TypeScript. The normal frontend/functions typechecks exclude these files, and Playwright transpiles without typechecking. The pinned development-only `@types/node` dependency supplies Node and Playwright types; it adds no production runtime dependency.
+Execute `npm run typecheck:home-audit` para verificar a spec, as fixtures e a configuração do Playwright com TypeScript em modo estrito. Os typechecks normais de frontend/functions excluem esses arquivos, e o Playwright transpila sem checar tipos. A dependência de desenvolvimento `@types/node`, fixada em uma versão exata, fornece os tipos do Node e do Playwright; não adiciona dependência de runtime em produção.
 
-## Coverage and evidence
+<a id="coverage-and-evidence"></a>
 
-The six cases cover desktop (1440×900, mouse), tablet (820×900, touch) and mobile (390×844, mobile/touch emulation), each in light and dark themes, at device scale factor 1. Three additional cases verify missing font faces, isolation with unexpected requests/navigation/WebSockets, and redirect rejection using a disposable loopback server whose redirect target must receive zero requests.
+## Cobertura e evidências
 
-Each case captures ordinary viewport PNGs at explicit positions of `.homepage-content`, covering Hero, Story, Process, gallery, Contact and footer. Taller sections receive multiple positions. Requested and actual scroll positions are recorded; positions near the bottom can clamp to the same actual position. Images are never stitched and locator screenshots never expand the fixed scroller. The existing fade remains visible.
+Os seis casos cobrem desktop (1440×900, mouse), tablet (820×900, touch) e mobile (390×844, emulação mobile/touch), nos temas claro e escuro, com fator de escala do dispositivo 1. Três casos adicionais verificam fontes ausentes, isolamento de requisições/navegações/WebSockets inesperados e rejeição de redirects com um servidor loopback descartável, cujo destino de redirect não pode receber nenhuma requisição.
 
-Playwright's native HTML report contains:
+Cada caso captura PNGs comuns do viewport em posições explícitas de `.homepage-content`, cobrindo Hero, Story, Process, galeria, Contact e footer. Seções mais altas recebem múltiplas posições. As posições de scroll solicitadas e reais são registradas; posições próximas ao final podem ser limitadas à mesma posição real. As imagens nunca são costuradas, e screenshots de locators nunca expandem o scroller fixo. O fade existente permanece visível.
 
-- Named viewport PNG attachments for human review.
-- `reproduction`: Git HEAD and working-tree status, viewport/input profile, theme, Chromium and Node versions, fixture version and asset hashes, scroll positions, measurements and PNG SHA-256 hashes.
-- `network-ledger`: every intercepted HTTP request and WebSocket, with its disposition, also attached on failure.
-- Separate execution and visual-diagnostics steps. Overflow, broken or pending images, unrevealed content and wrong theme fail explicit assertions; unexpected requests and JavaScript errors are execution failures.
+O relatório HTML nativo do Playwright contém:
 
-Artifacts stay in ignored `test-results/home-visual-audit` and `playwright-report/home-visual-audit`. The native JSON report is `test-results/home-visual-audit/results.json`; reproduction and network attachments are available there as base64 bodies. Each run replaces these folders' previous evidence. Copy the report to another ignored directory before rerunning if comparing hashes or retaining evidence. Share only the intended report: working-tree status includes local filenames, although no credentials or file contents are collected.
+- Anexos PNG nomeados dos viewports para revisão humana.
+- `reproduction`: HEAD do Git e estado da árvore de trabalho, viewport/perfil de entrada, tema, versões do Chromium e do Node, versão das fixtures e hashes dos assets, posições de scroll, medições e hashes SHA-256 dos PNGs.
+- `network-ledger`: cada requisição HTTP e WebSocket interceptado, com seu tratamento, anexado também em caso de falha.
+- Etapas separadas de execução e diagnóstico visual. Overflow, imagens quebradas ou pendentes, conteúdo não revelado e tema incorreto falham em assertions explícitas; requisições inesperadas e erros de JavaScript são falhas de execução.
 
-## Isolation and determinism
+Os artefatos ficam nos diretórios ignorados `test-results/home-visual-audit` e `playwright-report/home-visual-audit`. O relatório JSON nativo é `test-results/home-visual-audit/results.json`; os anexos de reprodução e rede estão disponíveis nele como corpos em base64. Cada execução substitui as evidências anteriores dessas pastas. Copie o relatório para outro diretório ignorado antes de executar novamente se quiser comparar hashes ou guardar evidências. Compartilhe apenas o relatório pretendido: o estado da árvore de trabalho inclui nomes de arquivos locais, embora não sejam coletadas credenciais nem conteúdos dos arquivos.
 
-The auto fixture installs routes before navigation and blocks service workers. Only navigation to the local Home is allowed; existing local Vite modules and explicitly listed assets are fetched without following redirects, then fulfilled locally. Redirect responses are aborted because browser redirects after `route.continue()` bypass interception. Catalog/config/gallery are synthetic; the Home's reservation reconciliation POST receives a synthetic success response inside Playwright and never reaches a backend. Other APIs, mutations, external assets and unknown routes are aborted. All WebSockets are closed without connecting to a server; only the expected local HMR socket is classified as mocked. No credentials, remote database, payment services or external network availability are required.
+<a id="isolation-and-determinism"></a>
 
-Google's font stylesheet request is fulfilled locally with bundled licensed fonts. Gallery images reuse two checked-in WebP assets with deterministic product records. Fixture changes require updating `FIXTURE_VERSION` and reviewing evidence. When adding a legitimate new asset or API, extend the narrow route list deliberately; never replace it with a blanket passthrough.
+## Isolamento e determinismo
 
-The audit loads fonts, decodes images, walks the real scroller to finish reveals and waits for stable geometry over consecutive animation frames. Reduced motion, audit-only injected CSS and paused SVG animation remove time-dependent screenshot differences. Production files are not changed. There are no fixed sleep delays, retries or golden-image baselines.
+A fixture automática instala os interceptadores antes da navegação e bloqueia service workers. Só é permitida navegação à Home local; módulos existentes do Vite local e assets explicitamente listados são buscados sem seguir redirects e depois respondidos localmente. Respostas de redirect são abortadas porque redirects do navegador após `route.continue()` ignoram a interceptação. Catálogo/configuração/galeria são sintéticos; o POST de reconciliação de reservas da Home recebe uma resposta sintética de sucesso dentro do Playwright e nunca chega a um backend. Outras APIs, mutações, assets externos e rotas desconhecidas são abortados. Todos os WebSockets são fechados sem conectar a um servidor; apenas o socket HMR local esperado é classificado como simulado. Não são necessárias credenciais, banco remoto, serviços de pagamento nem disponibilidade de rede externa.
 
-## Limits and existing tests
+A requisição à folha de estilos de fontes do Google recebe uma resposta local com fontes licenciadas incluídas nas fixtures. As imagens da galeria reutilizam dois assets WebP versionados com registros determinísticos de produtos. Alterações de fixtures exigem atualizar `FIXTURE_VERSION` e revisar as evidências. Ao adicionar um asset ou API legítima, amplie deliberadamente a lista restrita de rotas; nunca a substitua por encaminhamento irrestrito.
 
-Passing assertions do not approve layout, contrast or aesthetics: inspect the PNG attachments. Rendering and PNG hashes can differ across operating systems, browsers and font rasterizers; compare repeated runs in the same environment first. Synthetic data does not cover every production content length or image aspect ratio. Mobile emulation is not a physical Android device.
+A auditoria carrega fontes, decodifica imagens, percorre o scroller real para concluir os reveals e aguarda geometria estável em frames consecutivos de animação. Movimento reduzido, CSS injetado apenas no navegador de auditoria e animações SVG pausadas eliminam diferenças de screenshot dependentes do tempo. Arquivos de produção não são alterados. Não há esperas fixas, retries nem baselines de imagens de referência.
 
-This static audit deliberately does not measure animation smoothness, physical 60/165 Hz displays, touch hardware or live services. Existing `home-fade`, `home-legibility-anchors`, `home-menu-focus` and `theme-transition` specs remain responsible for behavioral regressions. The original `rp-doces-visual-audit.mjs` is preserved during review; the replacement needs neither its standalone runner nor `sharp`/long-image composition.
+<a id="limits-and-existing-tests"></a>
 
-Maintenance consists of intentional API/asset allowlist updates, synthetic fixtures and reviewing native Playwright evidence. Runtime is six sequential local visual cases plus three negative controls; report the measured duration for the particular browser/machine rather than assuming a CI timing.
+## Limitações e testes existentes
+
+Assertions aprovadas não aprovam layout, contraste nem estética: inspecione os anexos PNG. Renderização e hashes dos PNGs podem variar entre sistemas operacionais, navegadores e rasterizadores de fontes; compare primeiro execuções repetidas no mesmo ambiente. Dados sintéticos não cobrem todos os comprimentos de conteúdo nem proporções de imagens de produção. Emulação mobile não é um dispositivo Android físico.
+
+Esta auditoria estática deliberadamente não mede fluidez de animações, displays físicos de 60/165 Hz, hardware touch nem serviços reais. As specs existentes `home-fade`, `home-legibility-anchors`, `home-menu-focus` e `theme-transition` continuam responsáveis pelas regressões de comportamento. O arquivo original `rp-doces-visual-audit.mjs` é preservado durante a revisão; o substituto não precisa do runner independente nem de `sharp`/composição de imagens longas.
+
+A manutenção consiste em atualizações intencionais da lista de APIs/assets permitidos, fixtures sintéticas e revisão das evidências nativas do Playwright. A execução inclui seis casos visuais locais sequenciais e três controles negativos; informe a duração medida para o navegador e a máquina usados, sem presumir um tempo de CI.

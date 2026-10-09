@@ -420,10 +420,10 @@ O status financeiro do pedido **nunca** é gravado manualmente como uma verdade 
 
 ## 17. Pagamentos, Gateway Mercado Pago e Pix
 
-The Mercado Pago integration uses the **Orders API**, with the existing financial guards preserved:
+A integração com o Mercado Pago usa a **Orders API**, preservando as proteções financeiras existentes:
 
 - **Chave de Idempotência Externa (`X-Idempotency-Key`):** Cada chamada ao Mercado Pago recebe uma chave derivada de forma determinística da `operationKey` da tentativa (`a1:<key>:mp`). Quedas de conexão no envio do POST recuperam a transação já criada no PSP sem gerar duas cobranças.
-- **Authoritative query (B2):** A locally expired charge can become PAGO only through a verified `GET /v1/orders/{ORD}`, with `processed/accredited` and matching identity, reference, amounts and Pix method. The compatibility alias `fetchMpPayment` performs this Orders GET. Webhooks, search and mutation acknowledgments carry no financial authority.
+- **Consulta à fonte de autoridade (B2):** Uma cobrança expirada localmente só pode se tornar PAGO por um `GET /v1/orders/{ORD}` verificado, com `processed/accredited` e correspondência de identidade, referência, valores e método Pix. O alias de compatibilidade `fetchMpPayment` executa esse GET de Orders. Webhooks, buscas e confirmações de mutações não fornecem autoridade financeira.
 - **Tratamento de Respostas Ambíguas:** Falhas de rede, timeouts HTTP (408/429/5xx) durante o envio do Pix nunca inventam status `FALHOU`. A operação permanece em `ENVIO_INCONCLUSIVO`, preservando a reserva e aguardando confirmação do webhook ou do motor de recuperação.
 
 ---
@@ -540,7 +540,7 @@ A estabilidade da plataforma decorre de protocolos rigorosos de engenharia:
 - **B4 (Reserva por Pedido com Múltiplos Pix):** A existência de qualquer cobrança Pix pendente impede a liberação indevida da reserva do pedido.
 - **B-1 (Visibilidade Operacional de Balcão):** Pedidos criados no balcão (`origem = 'MANUAL'`) permanecem visíveis imediatamente na listagem, independentemente de estarem pendentes.
 - **B-2 (Estorno Manual de Pix):** Registro contábil de estorno para pagamentos `PIX_MP` devolvidos por fora pelo lojista.
-- **B-3 (Inconclusive dispatch recovery):** Bounded, read-only `GET /v1/orders` searches use the persisted external reference and creation window. A unique ORD candidate must be re-read through the authoritative GET; multiple candidates remain inconclusive.
+- **B-3 (Recuperação de envio inconclusivo):** Buscas limitadas e somente leitura por `GET /v1/orders` usam a referência externa persistida e a janela de criação. Um candidato ORD único deve ser consultado novamente pelo GET que fornece autoridade; múltiplos candidatos permanecem inconclusivos.
 - **B5 (GETs Idempotentes e Livres de Efeitos Colaterais):** Segregação estrita de responsabilidade HTTP. As rotas `GET /api/admin/pedidos` e `GET /api/admin/pedidos/:id` operam como puramente de leitura. Efeitos colaterais de manutenção financeira e sincronização em background foram movidos para endpoints POST explícitos e idempotentes com proteção `sameOrigin`:
   - `POST /api/admin/pedidos/reconciliar`: Executa em lote a rotina `reconcilePedidosEmBackground` para a lista de comandas.
   - `POST /api/admin/pedidos/:id/reconciliar`: Executa a reconciliação sob demanda da comanda ativa (`reconcileLiveTabPedido`).

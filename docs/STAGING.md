@@ -1,97 +1,113 @@
-# Dedicated staging environment
+<a id="dedicated-staging-environment"></a>
 
-> **NEVER run reset, DROP or DELETE against production resources.**
-> Production is `rp-doces`, `rp-doces-db`, `rp-doces-images` and `rp-doces-push`.
-> This runbook authorizes nothing automatically: provisioning, secrets, migrations,
-> first deployment and any reset are separate manual operations.
+# Ambiente dedicado de staging
 
-## Architecture and isolation
+> **NUNCA execute reset, DROP ou DELETE contra recursos de produção.**
+> Produção usa `rp-doces`, `rp-doces-db`, `rp-doces-images` e `rp-doces-push`.
+> Este runbook não autoriza nada automaticamente: provisionamento, secrets,
+> migrações, primeiro deploy e qualquer reset são operações manuais separadas.
 
-| Resource              | Staging                   | Configuration                          |
-| --------------------- | ------------------------- | -------------------------------------- |
-| Pages                 | `rp-doces-staging`        | `wrangler.staging.toml`                |
-| D1 / `DB`             | `rp-doces-db-staging`     | Pages and active Worker configs        |
-| R2 / `PRODUCT_IMAGES` | `rp-doces-images-staging` | Pages config                           |
-| Queue / `PUSH_QUEUE`  | `rp-doces-push-staging`   | Pages producer, Worker consumer        |
-| Worker                | `rp-doces-push-staging`   | `wrangler.push.staging.toml`           |
-| Inert first bootstrap | `rp-doces-push-staging`   | `wrangler.push.staging.bootstrap.toml` |
+<a id="architecture-and-isolation"></a>
 
-The Worker reuses `workers/push.ts`; the inert bootstrap reuses
-`workers/push-bootstrap.ts`. Delivery policy, CAS, leases, financial operations,
-stock and migrations are identical to production. No schema fork is introduced.
-The consumer retains batch size 1, timeout 1 second, three Queue retries and the
-once-per-minute cron. CI deploys Pages only; Worker updates remain manual.
+## Arquitetura e isolamento
 
-Start with `https://rp-doces-staging.pages.dev`. Confirm the project URL after
-creation; `STAGING_URL` can later select `https://staging.rpdoces.com.br` after its
-DNS, certificate and Pages custom-domain setup are complete. The validator rejects
-production URLs and credentials, paths or query strings in this variable.
+| Recurso                   | Staging                   | Configuração                             |
+| ------------------------- | ------------------------- | ---------------------------------------- |
+| Pages                     | `rp-doces-staging`        | `wrangler.staging.toml`                  |
+| D1 / `DB`                 | `rp-doces-db-staging`     | Configurações de Pages e do Worker ativo |
+| R2 / `PRODUCT_IMAGES`     | `rp-doces-images-staging` | Configuração de Pages                    |
+| Queue / `PUSH_QUEUE`      | `rp-doces-push-staging`   | Produtor em Pages, consumidor no Worker  |
+| Worker                    | `rp-doces-push-staging`   | `wrangler.push.staging.toml`             |
+| Primeiro bootstrap inerte | `rp-doces-push-staging`   | `wrangler.push.staging.bootstrap.toml`   |
 
-The separate Pages project's **production branch is `staging`**. Cloudflare calls
-its stable slot `production`, even though the application environment is staging.
-The deployment verifier therefore uses `env=production` inside the
-`rp-doces-staging` project. It never queries the production project.
-Use Direct Upload, without a Git integration that bypasses the GitHub CI gate.
+O Worker reutiliza `workers/push.ts`; o bootstrap inerte reutiliza
+`workers/push-bootstrap.ts`. Política de entrega, CAS, leases, operações
+financeiras, estoque e migrações são idênticos aos de produção. Não é introduzida
+uma variação do schema. O consumidor mantém batch de tamanho 1, timeout de 1 segundo,
+três retries de Queue e cron de uma vez por minuto. O CI publica apenas Pages;
+atualizações do Worker continuam manuais.
 
-## Prerequisites and GitHub configuration
+Comece com `https://rp-doces-staging.pages.dev`. Confirme a URL do projeto após a
+criação; `STAGING_URL` pode selecionar `https://staging.rpdoces.com.br` depois que
+DNS, certificado e domínio personalizado do Pages estiverem configurados. O
+validador rejeita URLs de produção e credenciais, caminhos ou query strings nessa
+variável.
 
-Use the locked Wrangler **3.114.17**, Node 24, the intended Cloudflare account and
-a clean checkout containing these staging configs. Do not upgrade Wrangler for
-this procedure. Commands below have **not** been executed remotely by this change.
+A **branch de produção do projeto Pages separado é `staging`**. A Cloudflare chama
+seu slot estável de `production`, embora o ambiente da aplicação seja staging.
+Por isso, o verificador de deploy usa `env=production` dentro do projeto
+`rp-doces-staging`. Ele nunca consulta o projeto de produção. Use Direct Upload,
+sem integração Git que ignore o critério de aprovação do CI no GitHub.
 
-Create GitHub Environment `staging`, restricting deployment branches to `staging`.
-Populate all three environment secrets independently:
+<a id="prerequisites-and-github-configuration"></a>
 
-| Environment secret                 | Purpose                                               |
-| ---------------------------------- | ----------------------------------------------------- |
-| `STAGING_CLOUDFLARE_ACCOUNT_ID`    | Account containing the staging resources              |
-| `STAGING_CLOUDFLARE_API_TOKEN`     | Staging Pages publication and deployment verification |
-| `STAGING_CLOUDFLARE_D1_READ_TOKEN` | Separate token with Account / D1 / Read only          |
+## Pré-requisitos e configuração do GitHub
 
-Environment variables:
+Use o Wrangler **3.114.17** fixado no lockfile, Node 24, a conta Cloudflare pretendida
+e um checkout limpo com essas configurações de staging. Não atualize o Wrangler
+para este procedimento. Os comandos abaixo **não** foram executados remotamente
+por esta alteração.
 
-| Variable                 | Value                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------- |
-| `STAGING_DEPLOY_ENABLED` | Initially `false`; explicitly `true` only after provisioning                 |
-| `STAGING_URL`            | Initially `https://rp-doces-staging.pages.dev`; optional default is the same |
+Crie o GitHub Environment `staging`, restringindo as branches de deploy a `staging`.
+Preencha os três secrets do ambiente de forma independente:
 
-GitHub exposes environment-level variables after the job starts. The enable switch
-is deliberately evaluated inside the gated job, not in its job-level `if`.
-Missing or non-`true` switch values skip publication and write a summary.
-`DEPLOY_ENABLED` remains exclusive to the existing production job.
+| Secret do ambiente                 | Finalidade                                             |
+| ---------------------------------- | ------------------------------------------------------ |
+| `STAGING_CLOUDFLARE_ACCOUNT_ID`    | Conta que contém os recursos de staging                |
+| `STAGING_CLOUDFLARE_API_TOKEN`     | Publicação e verificação de deploy do Pages de staging |
+| `STAGING_CLOUDFLARE_D1_READ_TOKEN` | Token separado com apenas Account / D1 / Read          |
 
-Staging references only the three `STAGING_CLOUDFLARE_*` GitHub secrets. Production
-keeps its original generic names. With staging enabled, any missing staging secret
-fails the first gate before HEAD lookup, installation, migration checks or publication;
-there is no fallback to a generic production secret. Define the prefixed secrets
-in Environment `staging`, using independently issued, least-privilege tokens.
-Never put production values under a `STAGING_*` name at any GitHub scope.
+Variáveis do ambiente:
 
-The workflow maps the prefixed GitHub secrets to the generic process environment
-variables required by Wrangler and the unchanged migration checker. Those runtime
-variable names do not reference GitHub production secrets. The staging build step
-explicitly sets the non-secret `VITE_APP_ENV=staging`; production does not set it.
+| Variável                 | Valor                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| `STAGING_DEPLOY_ENABLED` | Inicialmente `false`; explicitamente `true` apenas após provisionamento              |
+| `STAGING_URL`            | Inicialmente `https://rp-doces-staging.pages.dev`; o valor padrão opcional é o mesmo |
 
-Recommended future branch protection: require the aggregated `CI` check for both
-`staging` and `main`; promote changes validated in staging to main when applicable.
-No remote protection changes are made by this task.
+O GitHub expõe variáveis do ambiente após o início do job. A chave de habilitação
+é avaliada deliberadamente dentro do job protegido, não no `if` do job. Valores
+ausentes ou diferentes de `true` pulam a publicação e geram um resumo.
+`DEPLOY_ENABLED` continua exclusivo do job de produção existente.
 
-## Initial provisioning: exact order
+Staging referencia apenas os três secrets GitHub `STAGING_CLOUDFLARE_*`. Produção
+mantém os nomes genéricos originais. Com staging habilitado, qualquer secret de
+staging ausente causa falha na primeira verificação, antes da consulta ao HEAD,
+instalação, verificação de migrações ou publicação; não há fallback para um secret
+genérico de produção. Defina os secrets prefixados no Environment `staging`, usando
+tokens emitidos de forma independente e com privilégio mínimo. Nunca coloque
+valores de produção sob um nome `STAGING_*` em qualquer escopo do GitHub.
 
-Keep `STAGING_DEPLOY_ENABLED=false` throughout provisioning. Every command below
-is a **future manual operation**. Verify account identity before mutation.
+O workflow associa os secrets prefixados do GitHub às variáveis genéricas de
+ambiente de processo exigidas pelo Wrangler e pelo verificador de migrações
+inalterado. Esses nomes de variáveis de runtime não referenciam secrets GitHub de
+produção. A etapa de build de staging define explicitamente a variável não secreta
+`VITE_APP_ENV=staging`; produção não a define.
 
-### 1. Create D1 and insert its actual ID
+Proteção futura recomendada para branches: exigir o check agregado `CI` em
+`staging` e `main`; promover para main as alterações validadas em staging quando
+aplicável. Esta tarefa não altera proteções remotas.
+
+<a id="initial-provisioning-exact-order"></a>
+
+## Provisionamento inicial: ordem exata
+
+Mantenha `STAGING_DEPLOY_ENABLED=false` durante todo o provisionamento. Cada comando
+abaixo é uma **operação manual futura**. Verifique a identidade da conta antes de
+qualquer mutação.
+
+<a id="1-create-d1-and-insert-its-actual-id"></a>
+
+### 1. Criar o D1 e inserir seu ID real
 
 ```sh
 npx wrangler d1 create rp-doces-db-staging --config wrangler.staging.toml
 ```
 
-Copy the returned staging `database_id` into the `[[d1_databases]]` block in **both**
-`wrangler.staging.toml` and `wrangler.push.staging.toml`, replacing
-`STAGING_D1_ID_REPLACE_AFTER_CREATE`. Never copy the production ID. The bootstrap
-has no D1 binding and needs no ID. The placeholder is deliberately not a UUID;
-`--require-provisioned` refuses it before CI can query D1 or publish.
+Copie o `database_id` de staging retornado para o bloco `[[d1_databases]]` de
+**ambos** os arquivos `wrangler.staging.toml` e `wrangler.push.staging.toml`,
+substituindo `STAGING_D1_ID_REPLACE_AFTER_CREATE`. Nunca copie o ID de produção.
+O bootstrap não tem binding D1 e não precisa de ID. O placeholder deliberadamente
+não é um UUID; `--require-provisioned` o rejeita antes de o CI consultar D1 ou publicar.
 
 ```sh
 node scripts/check-staging-config.mjs --require-provisioned
@@ -99,22 +115,26 @@ npx wrangler d1 migrations apply DB --remote --config wrangler.staging.toml
 npx wrangler d1 migrations list DB --remote --config wrangler.staging.toml
 ```
 
-Apply **all** repository migrations, not only the latest. They are the same files
-used by production. CI only checks the remote history/schema; it never applies SQL.
+Aplique **todas** as migrações do repositório, não só a mais recente. São os mesmos
+arquivos usados em produção. O CI apenas verifica o histórico/schema remoto;
+nunca aplica SQL.
 
-Optional initial data must be synthetic, reviewed SQL with fictitious customers,
-test credentials and independent test image files. Never restore a production dump,
-import PII or copy production images automatically. Only after validating isolation:
+Os dados iniciais opcionais devem ser SQL sintético revisado, com clientes
+fictícios, credenciais de teste e arquivos independentes de imagens de teste.
+Nunca restaure um dump de produção, importe PII nem copie imagens de produção
+automaticamente. Apenas após validar o isolamento:
 
 ```sh
 npx wrangler d1 execute DB --remote --config wrangler.staging.toml --file /secure/staging-synthetic-seed.sql
 ```
 
-Prepare that file separately; it is not supplied by this task. Provision a dedicated
-test administrator using the project's existing authentication setup and secure
-password hashes. Do not copy an administrator/session from production.
+Prepare esse arquivo separadamente; ele não é fornecido por esta tarefa.
+Provisione um administrador dedicado de teste usando a configuração existente
+de autenticação e hashes seguros de senha. Não copie administrador/sessão de produção.
 
-### 2. Create the bucket, queue and Pages project
+<a id="2-create-the-bucket-queue-and-pages-project"></a>
+
+### 2. Criar o bucket, a fila e o projeto Pages
 
 ```sh
 npx wrangler r2 bucket create rp-doces-images-staging --config wrangler.staging.toml
@@ -123,61 +143,70 @@ npx wrangler queues info rp-doces-push-staging --config wrangler.staging.toml
 npx wrangler pages project create rp-doces-staging --production-branch staging
 ```
 
-Queue creation must explicitly request **86400 seconds** of retention. Omitting
-that option failed with the current production plan/CLI. Before rollout, zero
-producers/consumers is expected; after rollout verify producer count >= 1 and
-consumer count = 1, with only the staging Pages/Worker attached.
+A criação da Queue deve solicitar explicitamente **86400 segundos** de retenção.
+Omitir essa opção falhou com o plano/CLI de produção atual. Antes da implantação,
+é esperado haver zero produtores/consumidores; depois, verifique quantidade de
+produtores >= 1 e consumidores = 1, com apenas Pages/Worker de staging conectados.
 
-The Pages TOML supplies `PRODUCT_IMAGES` and `PUSH_QUEUE` on publication. Keep the
-bucket private; the existing application image routes serve it. Do not reuse
-`rp-doces-images`. Upload synthetic images through the staging admin only.
+O TOML de Pages fornece `PRODUCT_IMAGES` e `PUSH_QUEUE` na publicação. Mantenha
+o bucket privado; as rotas de imagens existentes da aplicação o servem. Não
+reutilize `rp-doces-images`. Envie imagens sintéticas apenas pelo admin de staging.
 
-### 3. Prepare independent VAPID and sandbox credentials
+<a id="3-prepare-independent-vapid-and-sandbox-credentials"></a>
 
-Generate a new VAPID pair separately and securely, outside this task. It must be
-different from production. Prepare a private JSON file outside the repository with
-exactly `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. Use a suitable
-staging contact URI for the subject. Never print or commit secret values.
+### 3. Preparar VAPID e credenciais sandbox independentes
 
-Prepare a separate private Pages JSON containing:
+Gere um novo par VAPID separadamente e com segurança, fora desta tarefa. Ele deve
+ser diferente do de produção. Prepare um JSON privado fora do repositório com
+exatamente `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. Use uma URI de
+contato apropriada para staging no subject. Nunca imprima nem commite secrets.
 
-- `MP_ACCESS_TOKEN`: credentials explicitly issued for test/sandbox integration.
-- `MP_WEBHOOK_SECRET`: signing secret for this independent test application/webhook.
-- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`: the **same staging pair**
-  provisioned on the staging Worker.
+Prepare um JSON privado separado para Pages contendo:
 
-The diagnostic endpoints inspected use `MP_ACCESS_TOKEN` and ordinary admin auth;
-there is currently no additional diagnostics secret to provision. Never invent or
-copy production credentials. Do not put secrets in `VITE_*`.
+- `MP_ACCESS_TOKEN`: credenciais explicitamente emitidas para integração de teste/sandbox.
+- `MP_WEBHOOK_SECRET`: secret de assinatura desta aplicação/webhook de teste independente.
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`: o **mesmo par de staging**
+  provisionado no Worker de staging.
 
-Configure the test webhook at `<STAGING_URL>/api/webhooks/mercadopago`, starting with
-the Pages domain. Do not point test credentials/webhooks at `rpdoces.com.br`.
-The application uses the Orders API. `mp_order_id` stores ORD and `mp_payment_id`
-stores the PAY transaction. Subscribe to the Mercado Pago **Order** event; only
-GET `/v1/orders/{ORD}` supplies financial authority. Payments API calls have been
-removed from active flows. See [the cutover contract](MP_ORDERS.md) before enabling
-this integration in an environment with legacy payments. Confirm current test
-support for its Pix/refund/webhook flows in the relevant Mercado Pago documentation
-before relying on manual payment simulation. Staging provisioning does not guarantee
-that all external sandbox payment transitions can be simulated. If a sandbox flow
-is unsupported, keep it disabled and use deterministic local mocks/tests; never
-substitute a production token or real payment to bypass a sandbox limitation.
+Os endpoints de diagnóstico inspecionados usam `MP_ACCESS_TOKEN` e a autenticação
+administrativa comum; atualmente não há secret adicional de diagnóstico a
+provisionar. Nunca invente nem copie credenciais de produção. Não coloque secrets
+em `VITE_*`.
 
-The staging Pages TOML alone sets non-secret `MP_TEST_MODE=orders_pix`. Functions
-explicitly select the official simulator payer (`test_user_br@testuser.com`,
-`first_name=APRO`) for checkout, administrative Pix and diagnostics. Production
-configs omit this variable and preserve the real payer; token formats, hostnames
-and `VITE_APP_ENV` never select this server mode. Both `BR` and `BRA` identify Brazil.
-The flag does not provision credentials or guarantee search/refund availability.
-Equal partial refunds use a persisted pre-dispatch REF set and unique difference,
-not amount alone. A 409 idempotency retry retains its key and reconciles via GET.
-Legacy rows remain fail-closed but cannot occupy the Orders sweep batch; production
-cutover still requires draining/reconciling legacy charges and refund intents.
+Configure o webhook de teste em `<STAGING_URL>/api/webhooks/mercadopago`, começando
+pelo domínio Pages. Não aponte credenciais/webhooks de teste para `rpdoces.com.br`.
+A aplicação usa Orders API. `mp_order_id` armazena ORD e `mp_payment_id` armazena
+a transação PAY. Assine o evento **Order** do Mercado Pago; apenas GET
+`/v1/orders/{ORD}` fornece autoridade financeira. Chamadas à Payments API foram
+removidas dos fluxos ativos. Consulte [o contrato de cutover](MP_ORDERS.md) antes
+de habilitar essa integração em um ambiente com pagamentos legados. Confirme o
+suporte atual aos fluxos Pix/reembolso/webhook de teste na documentação pertinente
+do Mercado Pago antes de depender de simulação manual de pagamento. Provisionar
+staging não garante que todas as transições externas de pagamento sandbox possam
+ser simuladas. Se um fluxo sandbox não for suportado, mantenha-o desabilitado e
+use mocks/testes locais determinísticos; nunca substitua por token de produção
+nem pagamento real para contornar uma limitação do sandbox.
 
-### 4. Bootstrap the inert Worker, then activate it
+Só o TOML de Pages de staging define a variável não secreta `MP_TEST_MODE=orders_pix`.
+As Functions selecionam explicitamente o pagador oficial do simulador
+(`test_user_br@testuser.com`, `first_name=APRO`) para checkout, Pix administrativo
+e diagnósticos. As configurações de produção omitem essa variável e preservam o
+pagador real; formatos de token, hostnames e `VITE_APP_ENV` nunca selecionam esse
+modo do servidor. `BR` e `BRA` identificam o Brasil. A flag não provisiona
+credenciais nem garante disponibilidade de busca/reembolso. Reembolsos parciais
+iguais usam um conjunto REF persistido antes do envio e uma diferença única,
+não apenas o valor. Um retry por idempotência após 409 mantém a chave e reconcilia
+por GET. Linhas legadas continuam fail-closed, mas não podem ocupar o batch de
+varredura Orders; o cutover de produção ainda exige concluir/reconciliar cobranças
+legadas e intenções de reembolso.
 
-Wrangler 3.114.17 secret commands may publish a version immediately. During **first
-provisioning only**, use the inert bootstrap with no D1, Queue consumer or cron:
+<a id="4-bootstrap-the-inert-worker-then-activate-it"></a>
+
+### 4. Fazer bootstrap do Worker inerte e depois ativá-lo
+
+Comandos de secrets do Wrangler 3.114.17 podem publicar uma versão imediatamente.
+**Somente no primeiro provisionamento**, use o bootstrap inerte sem D1, consumidor
+de Queue nem cron:
 
 ```sh
 npx wrangler deploy --config wrangler.push.staging.bootstrap.toml
@@ -185,10 +214,11 @@ npx wrangler secret bulk /secure/staging-vapid.json --config wrangler.push.stagi
 npx wrangler secret list --config wrangler.push.staging.bootstrap.toml
 ```
 
-Stop unless the bulk command reports three successes and the names/independent
-source values have been validated. Names alone do not prove a valid key pair.
-Never use this bootstrap config on an already active Worker: it detaches its
-consumer/cron. Do not run sequential secret commands against the active consumer.
+Pare, a menos que o comando bulk reporte três sucessos e que os nomes/valores
+independentes de origem tenham sido validados. Nomes sozinhos não comprovam um par
+de chaves válido. Nunca use essa configuração de bootstrap em um Worker já ativo:
+ela desconecta seu consumidor/cron. Não execute comandos de secrets sequenciais
+contra o consumidor ativo.
 
 ```sh
 npx wrangler deploy --config wrangler.push.staging.toml --keep-vars
@@ -198,14 +228,17 @@ npx wrangler pages secret bulk /secure/staging-pages.json --project-name rp-doce
 npx wrangler pages secret list --project-name rp-doces-staging
 ```
 
-Verify the Worker name, staging D1, queue, cron and all three VAPID secrets. The
-bootstrap must finish before the active consumer is deployed. For later Worker
-code releases, validate isolation and use the active config with `--keep-vars`;
-do not bootstrap again. Pages and Worker releases are separate operations.
+Verifique o nome do Worker, D1 de staging, fila, cron e os três secrets VAPID.
+O bootstrap deve terminar antes do deploy do consumidor ativo. Em releases
+posteriores do código do Worker, valide o isolamento e use a configuração ativa
+com `--keep-vars`; não repita o bootstrap. Releases de Pages e Worker são operações
+separadas.
 
-### 5. Validate schema with a read-only token
+<a id="5-validate-schema-with-a-read-only-token"></a>
 
-In a shell configured with **staging-only** account and read token:
+### 5. Validar o schema com token somente leitura
+
+Em um shell configurado com conta e token de leitura **exclusivos de staging**:
 
 ```powershell
 $env:WRANGLER_TOML = 'wrangler.staging.toml'
@@ -214,109 +247,119 @@ $env:CLOUDFLARE_API_TOKEN = ''
 node scripts/check-d1-migrations.mjs
 ```
 
-For this manual CLI operation, supply the generic process variables
-`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_D1_READ_TOKEN` using the staging credentials
-corresponding to GitHub `STAGING_CLOUDFLARE_ACCOUNT_ID` and
-`STAGING_CLOUDFLARE_D1_READ_TOKEN`. Use your approved secret mechanism; do not paste
-values into shell history. Require a clean history
-and successful latest-schema verification. Existing migration-check CLI text may
-say "production"; the explicit config/ID determines the actual staging target.
+Para essa operação manual da CLI, forneça as variáveis genéricas de processo
+`CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_D1_READ_TOKEN` com as credenciais de staging
+correspondentes a `STAGING_CLOUDFLARE_ACCOUNT_ID` e `STAGING_CLOUDFLARE_D1_READ_TOKEN`
+do GitHub. Use o mecanismo aprovado de secrets; não cole valores no histórico do
+shell. Exija histórico íntegro e verificação bem-sucedida do schema mais recente.
+O texto da CLI de verificação de migrações existente pode dizer "production";
+a configuração/ID explícitos determinam o destino real de staging.
 
-### 6. Enable the first Pages deployment
+<a id="6-enable-the-first-pages-deployment"></a>
 
-Commit the two actual staging D1 IDs through a reviewed PR, merge to `staging`,
-then set Environment `staging` variable `STAGING_DEPLOY_ENABLED=true` and trigger
-a new push to that branch. Re-running a run after enabling the variable is also
-possible if its SHA remains the branch HEAD. Full CI must pass first.
+### 6. Habilitar o primeiro deploy de Pages
 
-The staging job checks credentials and HEAD, installs the locked dependencies,
-validates resource isolation, checks migrations read-only, builds with
-`VITE_APP_ENV=staging`, checks HEAD again, uploads to `rp-doces-staging`, verifies
-the full SHA/success through the Cloudflare API, then runs the read-only smoke suite.
-Superseded/disabled runs do not publish. If HEAD advances during build, verification
-and smoke are skipped unless this run actually uploaded.
+Commite os dois IDs D1 reais de staging por um PR revisado, faça merge para
+`staging`, depois defina a variável `STAGING_DEPLOY_ENABLED=true` no Environment
+`staging` e acione um novo push para essa branch. Também é possível reexecutar um
+run após habilitar a variável se seu SHA continuar sendo o HEAD da branch.
+Todo o CI deve passar primeiro.
 
-**Wrangler Pages 3.114.17 rejects `--config`.** Immediately before upload, the job
-copies `wrangler.staging.toml` to `wrangler.toml` in its disposable checkout. This
-does not modify the committed production config. The supported upload command is:
+O job de staging verifica credenciais e HEAD, instala as dependências fixadas no
+lockfile, valida o isolamento de recursos, verifica migrações somente leitura,
+compila com `VITE_APP_ENV=staging`, verifica o HEAD novamente, envia para
+`rp-doces-staging`, verifica SHA completo/sucesso pela API Cloudflare e depois
+executa a suíte smoke somente leitura. Runs substituídos/desabilitados não
+publicam. Se o HEAD avançar durante o build, verificação e smoke são pulados,
+a menos que esse run tenha realizado o upload.
+
+**Wrangler Pages 3.114.17 rejeita `--config`.** Imediatamente antes do upload,
+o job copia `wrangler.staging.toml` para `wrangler.toml` no checkout descartável.
+Isso não modifica a configuração de produção commitada. O comando de upload
+suportado é:
 
 ```sh
 npx wrangler pages deploy dist --project-name rp-doces-staging --branch staging --commit-hash "$GITHUB_SHA" --commit-dirty=false
 ```
 
-Never run it from the normal production-config checkout manually. Prefer the CI
-job; any exceptional manual release must use a clean, disposable staging checkout,
-stage its config there and pass the same isolation/migration/HEAD/build gates.
-No deployment command in this document was run as part of repository preparation.
+Nunca o execute manualmente no checkout normal com configuração de produção.
+Prefira o job do CI; qualquer release manual excepcional deve usar um checkout
+limpo e descartável de staging, preparar sua configuração ali e passar pelas
+mesmas verificações de isolamento/migrações/HEAD/build. Nenhum comando de deploy
+deste documento foi executado como parte da preparação do repositório.
 
-## Smoke and post-deploy checklist
+<a id="smoke-and-post-deploy-checklist"></a>
+
+## Smoke e checklist pós-deploy
 
 ```powershell
 $env:SMOKE_BASE_URL = 'https://rp-doces-staging.pages.dev'
 node scripts/smoke-production.mjs
 ```
 
-The unchanged script uses GET only: HTML/asset, catalog, store config, unauthenticated
-admin rejection and missing-route behavior. It does not test writes, external
-payments, uploads or push delivery. Require:
+O script inalterado usa apenas GET: HTML/asset, catálogo, configuração da loja,
+rejeição de admin não autenticado e comportamento de rota ausente. Não testa
+gravações, pagamentos externos, uploads nem entrega de push. Exija:
 
-- Correct SHA and project URL in Cloudflare and the GitHub deployment summary.
-- `STAGING` badge visible in authenticated admin; absent from production builds.
-- Isolated D1/R2/Queue bindings and no production endpoints/keys in staging.
-- Queue producer >= 1, consumer = 1; healthy once-per-minute Worker cron.
-- Test admin access and synthetic catalog/image upload work only in staging.
-- Independent VAPID subscription/test notification; inspect sanitized Worker logs.
-- Sandbox payment/webhook tests only where supported; no actual financial charges.
-- No automatic Git integration publication outside this gated workflow.
+- SHA e URL do projeto corretos na Cloudflare e no resumo de deploy do GitHub.
+- Badge `STAGING` visível no admin autenticado; ausente de builds de produção.
+- Bindings D1/R2/Queue isolados e nenhum endpoint/chave de produção em staging.
+- Produtor da Queue >= 1, consumidor = 1; cron saudável do Worker uma vez por minuto.
+- Acesso do admin de teste e upload de catálogo/imagens sintéticas funcionando apenas em staging.
+- Assinatura VAPID/notificação de teste independente; inspeção dos logs sanitizados do Worker.
+- Testes de pagamento/webhook sandbox apenas onde houver suporte; nenhuma cobrança financeira real.
+- Nenhuma publicação automática por integração Git fora desse workflow protegido.
 
-## Safe staging reset
+<a id="safe-staging-reset"></a>
 
-Do not provide generic destructive scripts. Use the Cloudflare dashboard for a
-separately approved, manually reviewed reset of **`rp-doces-db-staging` only**.
-First set `STAGING_DEPLOY_ENABLED=false`, stop the staging consumer/cron and isolate
-staging traffic so Queue messages cannot replay against recreated IDs. Discard
-staging Queue messages or recreate **only** the staging queue before resuming.
-Record the current staging D1 ID and compare it with both configs and the dashboard;
-require a second review that the production ID/name is not selected.
+## Reset seguro de staging
 
-If recreating D1, update both staging IDs, apply all migrations, restore synthetic
-data only, rebuild/validate bindings, redeploy the staging Worker and repeat the
-schema/smoke checklist before re-enabling publication. Existing auth/push subscriptions
-must be re-established. Never delete production D1/R2/Queue/Worker/Pages resources.
+Não forneça scripts destrutivos genéricos. Use o painel da Cloudflare para um
+reset aprovado separadamente e revisado manualmente **apenas de `rp-doces-db-staging`**.
+Primeiro defina `STAGING_DEPLOY_ENABLED=false`, pare o consumidor/cron de staging
+e isole o tráfego para impedir replay de mensagens da Queue contra IDs recriados.
+Descarte mensagens da Queue de staging ou recrie **somente** a fila de staging
+antes de retomar. Registre o ID D1 atual de staging e compare-o com ambas as
+configurações e o painel; exija uma segunda revisão confirmando que o ID/nome de
+produção não foi selecionado.
 
-## Troubleshooting and local validation limits
+Se recriar o D1, atualize ambos os IDs de staging, aplique todas as migrações,
+restaure apenas dados sintéticos, reconstrua/valide bindings, publique novamente
+o Worker de staging e repita o checklist de schema/smoke antes de reabilitar a
+publicação. Assinaturas existentes de autenticação/push devem ser restabelecidas.
+Nunca exclua recursos D1/R2/Queue/Worker/Pages de produção.
 
-- Placeholder rejected: insert the newly created staging D1 UUID into both configs.
-- Deployment skipped: check Environment `staging` switch, branch and current HEAD.
-- Missing credentials: populate all staging environment secrets; do not use repository
-  production secrets as fallback. GitHub plan/environment feature availability is
-  a provisioning prerequisite.
-- Migration guard blocked: manually apply missing staging migrations with its explicit
-  config, then retry. Never add migration application to CI.
-- No badge: staging build must receive `VITE_APP_ENV=staging`; changing a server-side
-  Pages variable after build cannot change the compiled bundle.
-- API verifier cannot find SHA: Pages production branch must be `staging`; check the
-  separate project's stable slot, token permissions and Cloudflare propagation.
-- Custom domain smoke fails: keep `STAGING_URL` on Pages until DNS/TLS are ready.
-- Push missing: verify the independent VAPID pair on both services, active admin,
-  Queue bindings, backlog and Worker cron; do not change delivery invariants.
-- Queue create fails: specify `--message-retention-period-secs 86400` explicitly.
+<a id="troubleshooting-and-local-validation-limits"></a>
 
-Worker `deploy --dry-run` bundles safely without remote publication. Pages deploy
-has **no dry-run** in the installed version. Pages validation is limited to local
-Wrangler config parsing, binding/isolation tests and application compilation;
-resource existence, account permissions and real runtime behavior require the
-future manual rollout. Local validation must use an empty temporary directory
-and isolated Wrangler config home to avoid reading `.dev.vars` or private credentials.
-Vite validation should use a temporary `envDir` if private `.env*` files may exist.
+## Diagnóstico de problemas e limites da validação local
 
-During this change, four existing migration-guard CLI tests aborted during child
-process shutdown on Node 24.19 / Windows with a native `UV_HANDLE_CLOSING`
-assertion (exit 3221226505 instead of the expected blocking code). The isolated
-repeat reproduced it; the guard and those tests were left unchanged. Do not treat
-this local validation as fully green: rerun the unchanged suite on the CI Linux
-runner and investigate the native runtime failure separately.
+- Placeholder rejeitado: insira o UUID do D1 de staging recém-criado em ambas as configurações.
+- Deploy pulado: verifique a chave do Environment `staging`, a branch e o HEAD atual.
+- Credenciais ausentes: preencha todos os secrets do ambiente de staging; não use secrets de produção do repositório como fallback. A disponibilidade do recurso de ambientes no plano GitHub é pré-requisito do provisionamento.
+- Migration guard bloqueado: aplique manualmente as migrações ausentes de staging com sua configuração explícita e tente novamente. Nunca adicione aplicação de migrações ao CI.
+- Badge ausente: o build de staging deve receber `VITE_APP_ENV=staging`; mudar uma variável de Pages no servidor após o build não altera o bundle compilado.
+- Verificador de API não encontra o SHA: a branch de produção de Pages deve ser `staging`; verifique o slot estável do projeto separado, permissões do token e propagação na Cloudflare.
+- Smoke do domínio personalizado falha: mantenha `STAGING_URL` em Pages até DNS/TLS estarem prontos.
+- Push ausente: verifique o par VAPID independente nos dois serviços, admin ativo, bindings da Queue, backlog e cron do Worker; não altere invariantes de entrega.
+- Criação de Queue falha: especifique explicitamente `--message-retention-period-secs 86400`.
 
-References: [Cloudflare Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/),
-[GitHub deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments),
-[Mercado Pago Orders Pix integration](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-orders/payment-integration/websites/pix).
+O `deploy --dry-run` do Worker gera o bundle com segurança, sem publicação remota.
+O deploy de Pages **não tem dry-run** na versão instalada. A validação de Pages
+se limita à interpretação local da configuração Wrangler, testes de bindings/
+isolamento e compilação da aplicação; existência de recursos, permissões da conta
+e comportamento real do runtime exigem a implantação manual futura. A validação
+local deve usar diretório temporário vazio e diretório de configurações do
+Wrangler isolado para evitar ler `.dev.vars` ou credenciais privadas. A validação
+do Vite deve usar `envDir` temporário se puderem existir arquivos `.env*` privados.
+
+Durante essa alteração, quatro testes CLI existentes do migration guard abortaram
+no encerramento de processos filhos em Node 24.19 / Windows com uma assertion nativa
+`UV_HANDLE_CLOSING` (saída 3221226505 em vez do código de bloqueio esperado).
+A repetição isolada reproduziu o problema; o guard e esses testes ficaram
+inalterados. Não considere essa validação local totalmente aprovada: reexecute a
+suíte inalterada no runner Linux do CI e investigue separadamente a falha nativa
+do runtime.
+
+Referências: [Cloudflare Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/),
+[ambientes de deploy do GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments),
+[integração Pix com Mercado Pago Orders](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-orders/payment-integration/websites/pix).
