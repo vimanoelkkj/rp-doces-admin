@@ -114,6 +114,12 @@ for (const theme of ["light", "dark"] as const) {
           ) {
             await openMenu(page);
           }
+          const drawer = page.locator("#mobile-menu-drawer");
+          // CDP touch coordinates need a settled target after a cancelled drag.
+          await drawer.evaluate(async el => {
+            await Promise.all(el.getAnimations().map(animation => animation.finished));
+          });
+          await expect(drawer).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
           const box = await page.locator(".mobile-menu-close").boundingBox();
           if (!box) throw new Error("Close handle must be visible");
           const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -121,15 +127,18 @@ for (const theme of ["light", "dark"] as const) {
             type: "touchStart",
             touchPoints: [point]
           });
+          await expect(drawer).toHaveClass(/mobile-menu--dragging/);
           await session.send("Input.dispatchTouchEvent", {
             type: "touchMove",
             touchPoints: [{ ...point, y: point.y + 140 }]
           });
+          await expect(drawer).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 140)");
           await session.send("Input.dispatchTouchEvent", {
             type: cancelled ? "touchCancel" : "touchEnd",
             touchPoints: []
           });
           if (cancelled) {
+            await expect(drawer).not.toHaveClass(/mobile-menu--dragging/);
             await expect(page.locator(".mobile-menu-btn")).toHaveAttribute("aria-expanded", "true");
             await expect(page.locator("#mobile-menu-drawer")).not.toHaveAttribute("inert");
             await page.keyboard.press("Tab");
