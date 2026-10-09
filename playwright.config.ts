@@ -6,15 +6,32 @@ import { defineConfig } from "@playwright/test";
 //   $env:CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
 const CHROME_PATH = process.env.CHROME_PATH;
 
-const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
+// The audit is opt-in; the regular CI invocation never discovers its spec.
+const HOME_VISUAL_AUDIT = process.argv.some(
+  (arg, index, args) =>
+    arg === "--grep=@home-visual-audit" ||
+    (arg === "--grep" && args[index + 1] === "@home-visual-audit")
+);
+const BASE_URL = HOME_VISUAL_AUDIT
+  ? "http://127.0.0.1:5173"
+  : (process.env.BASE_URL ?? "http://127.0.0.1:5173");
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  testIgnore: HOME_VISUAL_AUDIT ? undefined : "**/home-visual-audit.spec.ts",
   timeout: 90_000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  reporter: process.env.CI ? [["html", { open: "never" }], ["list"]] : "list",
+  reporter: HOME_VISUAL_AUDIT
+    ? [
+        ["list"],
+        ["html", { open: "never", outputFolder: "playwright-report/home-visual-audit" }],
+        ["json", { outputFile: "test-results/home-visual-audit/results.json" }]
+      ]
+    : process.env.CI
+      ? [["html", { open: "never" }], ["list"]]
+      : "list",
 
   use: {
     baseURL: BASE_URL,
