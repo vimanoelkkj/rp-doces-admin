@@ -682,8 +682,10 @@ test("36: pedido anulado não conta no faturamento líquido", async t => {
     // Anulação bloqueia PIX_MP recebido e não estornado; método manual evita
     // esse guard de domínio (irrelevante ao que este teste verifica: que um
     // pedido anulado, qualquer que seja o método, some do faturamento).
-    db.prepare(`UPDATE pedidos SET origem_pedido='MANUAL' WHERE id=1`),
-    db.prepare(`UPDATE pedido_pagamentos SET metodo='DINHEIRO', mp_payment_id=NULL WHERE id=1`),
+    db.prepare(`UPDATE pedidos SET origem_pedido='MANUAL', mp_payment_id=NULL WHERE id=1`),
+    db.prepare(
+      `UPDATE pedido_pagamentos SET metodo='DINHEIRO', mp_order_id=NULL, mp_payment_id=NULL WHERE id=1`
+    ),
     db.prepare(`INSERT INTO pedido_anulacoes(pedido_id,motivo,estoque_acao,criado_por_usuario_id,usuario_nome,
       total_original_centavos,bruto_original_centavos,reembolsado_original_centavos,liquido_original_centavos,
       estoque_snapshot,efetivada) VALUES(1,'teste','MANTER',1,'Teste',10000,10000,0,10000,'[]',1)`)
