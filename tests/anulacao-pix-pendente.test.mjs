@@ -24,10 +24,29 @@ const context = (
   })
 });
 
-const anular = (db, session, devolverEstoque = true) =>
-  app.adminVoid.onRequestPost(
+const anular = async (db, session, devolverEstoque = true) => {
+  const before = await state(db);
+  const calls = globalThis.fetch.mock?.callCount() ?? 0;
+  const response = await app.adminVoid.onRequestPost(
     context(db, session, { devolverEstoque, motivo: "Cancelado pelo cliente" })
   );
+  if (
+    response.status === 409 &&
+    (await response.clone().json()).code === "ANULACAO_EXPOSICAO_PIX_REMOTA"
+  ) {
+    assert.deepEqual(
+      await state(db),
+      before,
+      "contained void must not reconcile, cancel or release stock"
+    );
+    assert.equal(
+      globalThis.fetch.mock?.callCount() ?? 0,
+      calls,
+      "no remote request before refusal"
+    );
+  }
+  return response;
+};
 
 // A. sem Pix -> anulação normal
 test("A. sem Pix -> anulação normal", async t => {
@@ -45,8 +64,8 @@ test("A. sem Pix -> anulação normal", async t => {
   assert.ok(anulacao);
 });
 
-// B. Pix PENDENTE -> MP cancelled -> local CANCELADO -> anulação funciona
-test("B. Pix PENDENTE -> MP cancelled -> local CANCELADO -> anulação funciona", async t => {
+// B. A new void cannot dispatch a remote cancellation.
+test("B. pending Pix: void refuses before remote cancellation", async t => {
   const db = await fixture(t); // possui Pix PENDENTE com mp_payment_id '101'
   const session = await app.auth.createSession(db, 1);
 
@@ -68,19 +87,19 @@ test("B. Pix PENDENTE -> MP cancelled -> local CANCELADO -> anulação funciona"
   });
 
   const response = await anular(db, session);
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.ok, true);
-  assert.equal(putCalled, true);
+  assert.equal(body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
+  assert.equal(putCalled, false);
 
   const s = await state(db);
-  assert.equal(s.pagamentos[0].status, "CANCELADO");
+  assert.equal(s.pagamentos[0].status, "PENDENTE");
   const anulacao = await db.prepare("SELECT * FROM pedido_anulacoes WHERE pedido_id = 1").first();
-  assert.ok(anulacao);
+  assert.equal(anulacao, null);
 });
 
-// C. Pix EXPIRADO local -> MP cancelled -> local converge -> anulação funciona
-test("C. Pix EXPIRADO local -> MP cancelled -> local converge -> anulação funciona", async t => {
+// C. Local expiry does not remove remote exposure.
+test("C. expired Pix: void refuses without remote observation", async t => {
   const db = await fixture(t);
   await db.prepare("UPDATE pedido_pagamentos SET status = 'EXPIRADO' WHERE id = 1").run();
   const session = await app.auth.createSession(db, 1);
@@ -94,18 +113,18 @@ test("C. Pix EXPIRADO local -> MP cancelled -> local converge -> anulação func
   });
 
   const response = await anular(db, session);
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.ok, true);
+  assert.equal(body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 
   const s = await state(db);
-  assert.equal(s.pagamentos[0].status, "CANCELADO");
+  assert.equal(s.pagamentos[0].status, "EXPIRADO");
   const anulacao = await db.prepare("SELECT * FROM pedido_anulacoes WHERE pedido_id = 1").first();
-  assert.ok(anulacao);
+  assert.equal(anulacao, null);
 });
 
-// D. Pix approved durante consulta -> sincroniza PAGO -> anulação recusada
-test("D. Pix approved durante consulta -> sincroniza PAGO -> anulação recusada", async t => {
+// D. Discovery belongs to synchronization, not the suspended void path.
+test("D. remotely approved Pix: void refuses before synchronization", async t => {
   const db = await fixture(t);
   const session = await app.auth.createSession(db, 1);
 
@@ -120,11 +139,11 @@ test("D. Pix approved durante consulta -> sincroniza PAGO -> anulação recusada
   const response = await anular(db, session);
   assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.code, "PIX_JA_PAGO");
-  assert.match(body.error, /recebimento Mercado Pago/i);
+  assert.equal(body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
+  assert.match(body.error, /suspensa por segurança/i);
 
   const s = await state(db);
-  assert.equal(s.pagamentos[0].status, "PAGO");
+  assert.equal(s.pagamentos[0].status, "PENDENTE");
   const anulacoesCount = await db
     .prepare("SELECT COUNT(*) as n FROM pedido_anulacoes WHERE pedido_id = 1")
     .first("n");
@@ -151,14 +170,14 @@ test("E. PUT timeout + GET cancelled -> converge -> anulação funciona", async 
   });
 
   const response = await anular(db, session);
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.ok, true);
+  assert.equal(body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 
   const s = await state(db);
-  assert.equal(s.pagamentos[0].status, "CANCELADO");
+  assert.equal(s.pagamentos[0].status, "PENDENTE");
   const anulacao = await db.prepare("SELECT * FROM pedido_anulacoes WHERE pedido_id = 1").first();
-  assert.ok(anulacao);
+  assert.equal(anulacao, null);
 });
 
 // F. PUT timeout + GET pending -> fail closed -> pedido não anulado
@@ -178,7 +197,7 @@ test("F. PUT timeout + GET pending -> fail closed -> pedido não anulado", async
   const response = await anular(db, session);
   assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.code, "MERCADO_PAGO_INDISPONIVEL");
+  assert.equal(body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 
   const s = await state(db);
   assert.equal(s.pagamentos[0].status, "PENDENTE");
@@ -189,7 +208,7 @@ test("F. PUT timeout + GET pending -> fail closed -> pedido não anulado", async
 });
 
 // G. múltiplos Pix: todos cancelados vs um cancelado e outro inconclusivo
-test("G. múltiplos Pix: todos cancelados -> anula", async t => {
+test("G. múltiplos Pix: todos cancelados remotamente -> recusa sem GET", async t => {
   const db = await fixture(t);
   await db
     .prepare(
@@ -219,13 +238,13 @@ test("G. múltiplos Pix: todos cancelados -> anula", async t => {
   });
 
   const response = await anular(db, session);
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
 
   const s = await state(db);
-  assert.equal(s.pagamentos.find(p => p.id === 1).status, "CANCELADO");
-  assert.equal(s.pagamentos.find(p => p.id === 2).status, "CANCELADO");
+  assert.equal(s.pagamentos.find(p => p.id === 1).status, "PENDENTE");
+  assert.equal(s.pagamentos.find(p => p.id === 2).status, "EXPIRADO");
   const anulacao = await db.prepare("SELECT * FROM pedido_anulacoes WHERE pedido_id = 1").first();
-  assert.ok(anulacao);
+  assert.equal(anulacao, null);
 });
 
 test("G. múltiplos Pix: um cancelado e outro inconclusivo -> NÃO anula", async t => {
@@ -264,11 +283,11 @@ test("G. múltiplos Pix: um cancelado e outro inconclusivo -> NÃO anula", async
 
   const response = await anular(db, session);
   assert.equal(response.status, 409);
-  assert.equal((await response.json()).code, "MERCADO_PAGO_INDISPONIVEL");
+  assert.equal((await response.json()).code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 
   const s = await state(db);
-  // Progresso parcial preservado: Pix 1 foi cancelado e persiste CANCELADO
-  assert.equal(s.pagamentos.find(p => p.id === 1).status, "CANCELADO");
+  // No partial cancellation: both payments retain their initial states.
+  assert.equal(s.pagamentos.find(p => p.id === 1).status, "PENDENTE");
   // Pix 2 continua protegido como PENDENTE
   assert.equal(s.pagamentos.find(p => p.id === 2).status, "PENDENTE");
   // Pedido NÃO foi anulado
@@ -324,17 +343,17 @@ test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery encontra payment a
 
   const response = await anular(db, session);
   assert.equal(response.status, 409);
-  assert.equal((await response.json()).code, "PIX_JA_PAGO");
+  assert.equal((await response.json()).code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 
   const s = await state(db);
-  assert.equal(s.pagamentos[0].status, "PAGO");
+  assert.equal(s.pagamentos[0].status, "PENDENTE");
   const anulacoesCount = await db
     .prepare("SELECT COUNT(*) as n FROM pedido_anulacoes WHERE pedido_id = 1")
     .first("n");
   assert.equal(anulacoesCount, 0);
 });
 
-test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery encontra payment pending -> resolve/cancela antes -> anula", async t => {
+test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery encontra payment pending -> recusa antes de recovery", async t => {
   const db = await fixture(t, { ledger: false });
   await db
     .prepare(
@@ -381,12 +400,12 @@ test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery encontra payment p
   });
 
   const response = await anular(db, session);
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
 
   const s = await state(db);
-  assert.equal(s.pagamentos[0].status, "CANCELADO");
+  assert.equal(s.pagamentos[0].status, "PENDENTE");
   const anulacao = await db.prepare("SELECT * FROM pedido_anulacoes WHERE pedido_id = 1").first();
-  assert.ok(anulacao);
+  assert.equal(anulacao, null);
 });
 
 test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery continua inconclusiva -> NÃO anula", async t => {
@@ -416,7 +435,7 @@ test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery continua inconclus
 
   const response = await anular(db, session);
   assert.equal(response.status, 409);
-  assert.equal((await response.json()).code, "OPERACAO_INCONCLUSIVA");
+  assert.equal((await response.json()).code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 
   const anulacoesCount = await db
     .prepare("SELECT COUNT(*) as n FROM pedido_anulacoes WHERE pedido_id = 1")
@@ -424,8 +443,8 @@ test("H. operação LOCAL_CRIADA/ENVIO_INCONCLUSIVO: recovery continua inconclus
   assert.equal(anulacoesCount, 0);
 });
 
-// I. após resolução de todos os Pix: confirmar que a própria trigger existente permite pedido_anulacoes
-test("I. após resolução de todos os Pix: trigger existente permite pedido_anulacoes", async t => {
+// I. após resolução de todos os Pix: confirmar que a própria trigger aditiva recusa pedido_anulacoes
+test("I. após resolução de todos os Pix: trigger aditiva recusa pedido_anulacoes", async t => {
   const db = await fixture(t);
 
   // 1. Se o pagamento estiver PENDENTE ou EXPIRADO, a trigger original DEVE abortar
@@ -442,11 +461,11 @@ test("I. após resolução de todos os Pix: trigger existente permite pedido_anu
       `
       )
       .run();
-  }, /ANULACAO_MP_PENDENTE/);
+  }, /ANULACAO_EXPOSICAO_PIX_REMOTA/);
 
   // 2. Com status CANCELADO (após resolução), a trigger permite a inserção normalmente
   await db.prepare("UPDATE pedido_pagamentos SET status = 'CANCELADO' WHERE id = 1").run();
-  await assert.doesNotReject(async () => {
+  await assert.rejects(async () => {
     await db
       .prepare(
         `
@@ -458,7 +477,8 @@ test("I. após resolução de todos os Pix: trigger existente permite pedido_anu
     `
       )
       .run();
-  });
+  }, /ANULACAO_EXPOSICAO_PIX_REMOTA/);
+  assert.equal(await db.prepare("SELECT COUNT(*) n FROM pedido_anulacoes").first("n"), 0);
 });
 
 // J. Pix PAGO continua bloqueando anulação direta e exige tratamento financeiro
@@ -469,9 +489,9 @@ test("J. Pix PAGO continua bloqueando anulação direta e exige tratamento finan
   // Bloqueio na API
   const response = await anular(db, session);
   assert.equal(response.status, 409);
-  assert.equal((await response.json()).code, "ANULACAO_MP_RECEBIDO");
+  assert.equal((await response.json()).code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 
-  // Bloqueio direto na trigger D1 (ANULACAO_MP_RECEBIDO)
+  // Direct D1 writes are also refused by the containment trigger.
   await assert.rejects(async () => {
     await db
       .prepare(
@@ -484,5 +504,5 @@ test("J. Pix PAGO continua bloqueando anulação direta e exige tratamento finan
       `
       )
       .run();
-  }, /ANULACAO_MP_RECEBIDO/);
+  }, /ANULACAO_EXPOSICAO_PIX_REMOTA/);
 });

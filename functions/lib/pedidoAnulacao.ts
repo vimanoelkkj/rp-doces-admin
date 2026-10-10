@@ -1,7 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 import { decimalToCents, isBrazilCountryCode } from "./mp/orders/types";
 
-import { BRUTO_PAGO_SQL, REEMBOLSADO_SQL, LIQUIDO_SQL } from "./pedidoFinanceiroSql";
+import {
+  BRUTO_PAGO_SQL,
+  REEMBOLSADO_SQL,
+  LIQUIDO_SQL,
+  exposicaoPixRemotaNoPedidoSql
+} from "./pedidoFinanceiroSql";
+import { pedidoTemCapturaNaoConciliada } from "./financialCoverage";
 import { preparePedidoPhysicalProjection } from "./stock";
 import { getPedidoAnulacao, type PedidoAnulacao } from "./pedidoValido";
 import {
@@ -23,6 +29,10 @@ export const ESTORNO_ANULACAO_ATIVO_MENSAGEM =
   "Este pedido tem um estorno de exclusão em andamento no Mercado Pago. Nenhuma ação financeira é permitida até a exclusão ser concluída ou o estorno ser recusado.";
 
 export const ANULACAO_ERROS: Record<string, string> = {
+  ANULACAO_EXPOSICAO_PIX_REMOTA:
+    "A exclusão de pedidos com histórico Pix do Mercado Pago está suspensa por segurança. A conciliação e os reembolsos continuam disponíveis.",
+  CAPTURA_MP_NAO_CONCILIADA:
+    "Este pedido tem uma captura Pix do Mercado Pago ainda não conciliada. Regularize o pagamento antes de excluir.",
   ANULACAO_MP_RECEBIDO:
     "Há recebimento Mercado Pago ainda não estornado. Trate o pagamento pelo fluxo de estorno existente antes de excluir.",
   ANULACAO_MP_PENDENTE:
@@ -102,6 +112,20 @@ export interface ResolucaoPixAnulacaoResultado {
   mensagem?: string;
 }
 
+async function recusarExposicaoPixParaAnulacao(db: D1Database, pedidoId: number): Promise<void> {
+  if (await pedidoTemCapturaNaoConciliada(db, pedidoId)) {
+    throw new Error("CAPTURA_MP_NAO_CONCILIADA");
+  }
+  if (
+    await db
+      .prepare(`SELECT 1 WHERE ${exposicaoPixRemotaNoPedidoSql("?")}`)
+      .bind(pedidoId, pedidoId, pedidoId)
+      .first()
+  ) {
+    throw new Error("ANULACAO_EXPOSICAO_PIX_REMOTA");
+  }
+}
+
 export async function resolverPixNaoPagosParaAnulacao(
   db: D1Database,
   params: {
@@ -118,6 +142,9 @@ export async function resolverPixNaoPagosParaAnulacao(
   const pedido = await db.prepare(`SELECT id FROM pedidos WHERE id = ?`).bind(pedidoId).first();
   if (!pedido)
     return { ok: false, erro: "PEDIDO_NAO_ENCONTRADO", mensagem: "Pedido não encontrado." };
+
+  // New voids must refuse exposure before any remote cancellation or reconciliation.
+  await recusarExposicaoPixParaAnulacao(db, pedidoId);
 
   const estornoPendente =
     (await db
@@ -588,6 +615,10 @@ export async function anularPedido(
     .bind(params.pedidoId)
     .first();
   if (!pedido) return null;
+
+  // Completed voids retain their replay; direct callers must also refuse exposure.
+  // The additive BEFORE INSERT trigger revalidates this guard inside the batch.
+  await recusarExposicaoPixParaAnulacao(db, params.pedidoId);
 
   // UNIQUE disputa a posse antes de qualquer efeito. Todos os valores e a
   // fotografia física são lidos no próprio batch, nunca de um SELECT anterior.

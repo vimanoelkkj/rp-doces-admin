@@ -45,6 +45,20 @@ export const pedidoSemSaldoLiquidoSql = (pedidoIdSql = "pedidos.id") =>
 export const elegibilidadeOperacionalCobrancaSql = (alias = "pedidos") =>
   `(${alias}.status_pedido <> 'CANCELADO' AND (${alias}.status_comanda = 'ABERTA' OR ${alias}.status_pedido = 'ENTREGUE'))`;
 
+// Conservative void containment: local terminal states cannot exclude an unknown capture.
+// Includes pre-dispatch refusals and fully refunded history; no remote certainty is inferred.
+// Migration 0040 mirrors this predicate; contract tests prevent drift.
+export const exposicaoPixRemotaNoPedidoSql = (pedidoIdSql: string) =>
+  `(EXISTS (SELECT 1 FROM pedido_pagamentos ep
+            WHERE ep.pedido_id = ${pedidoIdSql} AND ep.metodo = 'PIX_MP')
+    OR EXISTS (SELECT 1 FROM pedido_operacoes eo
+               WHERE eo.pedido_id = ${pedidoIdSql}
+                 AND eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN', 'PIX_ADMIN_REGENERACAO'))
+    OR EXISTS (SELECT 1 FROM pedidos el
+               WHERE el.id = ${pedidoIdSql}
+                 AND (el.mp_payment_id IS NOT NULL OR el.mp_qr_code IS NOT NULL
+                   OR el.mp_qr_code_base64 IS NOT NULL OR el.mp_ticket_url IS NOT NULL)))`;
+
 function preparePedidoFinancialProjectionBase(
   db: D1Database,
   pedidoId: number,
