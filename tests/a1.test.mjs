@@ -964,7 +964,7 @@ test("pix ADMIN: mesma key concorrente => uma tentativa; keys distintas => Pix a
   assert.equal((await state(db)).pagamentos.length, 2, "Pix parciais aditivos continuam possíveis");
 });
 
-test("pix ADMIN: regeneração com a mesma key => mesmo sucessor, mesmo depois de ele expirar", async t => {
+test("pix ADMIN: historical regeneration replays the same successor even after expiry and suspension", async t => {
   const db = await fixture(t, { ledger: false });
   const session = await app.auth.createSession(db, 1);
   const mp = mpPost(t);
@@ -973,16 +973,54 @@ test("pix ADMIN: regeneração com a mesma key => mesmo sucessor, mesmo depois d
     await gerarPix(db, session, { valorCentavos: 5000, operationKey: KEY })
   );
   const regenKey = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-  const sucessor = await corpo(
-    await gerarPix(db, session, { substituiId: original.body.pagamentoId, operationKey: regenKey })
-  );
-  assert.equal(sucessor.status, 201);
+  // Completed before the suspension: keep the exact original A1 identity and snapshot.
+  const snapshot = {
+    ...original.body,
+    mpStatus: original.body.status,
+    pagamentoId: 2,
+    mpPaymentId: "PAY999"
+  };
+  await db.batch([
+    db
+      .prepare("UPDATE pedido_pagamentos SET status='CANCELADO' WHERE id=?")
+      .bind(original.body.pagamentoId),
+    db
+      .prepare(
+        `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+           mp_order_id,mp_payment_id,idempotency_key,substitui_pagamento_id)
+         VALUES(2,1,'PIX_MP','ADMIN',5000,'PENDENTE','ORD999','PAY999',?,?)`
+      )
+      .bind(app.operacoes.chavePagamento(regenKey), original.body.pagamentoId),
+    db
+      .prepare(
+        `INSERT INTO pedido_operacoes(operation_key,tipo,escopo,ator_usuario_id,
+           fingerprint_versao,fingerprint,fase,pedido_id,pagamento_id,mp_payment_id,resultado)
+         VALUES(?,'PIX_ADMIN_REGENERACAO','ADMIN',1,? ,?,'CONCLUIDA',1,2,'PAY999',?)`
+      )
+      .bind(
+        regenKey,
+        app.operacoes.FINGERPRINT_VERSAO,
+        app.operacoes.fingerprint({
+          pedidoId: 1,
+          valorCentavos: null,
+          substituiId: original.body.pagamentoId
+        }),
+        JSON.stringify(snapshot)
+      )
+  ]);
+  const sucessor = { body: snapshot };
 
   const retry = await corpo(
     await gerarPix(db, session, { substituiId: original.body.pagamentoId, operationKey: regenKey })
   );
   assert.equal(retry.body.pagamentoId, sucessor.body.pagamentoId);
   assert.equal(retry.body.replay, true);
+  assert.deepEqual(retry.body, {
+    ...original.body,
+    pagamentoId: 2,
+    mpPaymentId: "PAY999",
+    replay: true
+  });
 
   // O sucessor morre depois. O retry da regeneração ANTIGA continua sendo a
   // mesma operação: não vira uma nova regeneração.
@@ -1011,7 +1049,7 @@ test("pix ADMIN: regeneração com a mesma key => mesmo sucessor, mesmo depois d
     mp.mock.calls.filter(
       c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
     ).length,
-    3,
+    2,
     "um POST por intenção legítima, nunca por retry"
   );
 });

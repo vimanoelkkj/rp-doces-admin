@@ -5,6 +5,7 @@ import { recusarPedidoAnulado, getPedidoAnulacao } from "../../../lib/pedidoVali
 import { requireUser, sameOrigin } from "../../../lib/auth";
 import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
 import { getCapacidadeCobravel, getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
+import { pedidoTemCapturaNaoConciliada } from "../../../lib/financialCoverage";
 import { liberarReservaPedido, PIX_MP_PENDENTE_NO_PEDIDO_SQL } from "../../../lib/stock";
 import { listarOperacoesInconclusivasDoPedido } from "../../../lib/operacoes";
 
@@ -107,11 +108,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
       .bind(id)
       .all<PedidoItemRow>();
 
-    const [financeiro, pixAdminPendentes, capacidadeCobravelCentavos] = await Promise.all([
-      getFinanceiroPedido(env.DB, id),
-      getPixAdminPendentesAtivos(env.DB, id),
-      getCapacidadeCobravel(env.DB, id)
-    ]);
+    const [financeiro, pixAdminPendentes, capacidadeCobravelCentavos, capturaMpNaoConciliada] =
+      await Promise.all([
+        getFinanceiroPedido(env.DB, id),
+        getPixAdminPendentesAtivos(env.DB, id),
+        getCapacidadeCobravel(env.DB, id),
+        pedidoTemCapturaNaoConciliada(env.DB, id)
+      ]);
 
     // B-3: cobranças cujo envio ao Mercado Pago ficou inconclusivo. Leitura
     // pura — não inventa estado nem decide nada. Existe para que o caso pare
@@ -167,6 +170,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
       financeiro,
       pixAdminPendentes,
       capacidadeCobravelCentavos,
+      capturaMpNaoConciliada,
       operacoesInconclusivas
     });
   } catch (err) {

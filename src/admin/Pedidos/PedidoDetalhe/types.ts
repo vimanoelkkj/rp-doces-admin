@@ -61,4 +61,6 @@ export interface PedidoDetalheResponse {
   capacidadeCobravelCentavos: number;
   /** B-3: cobranças sem confirmação do Mercado Pago (leitura, nunca decisão). */
   operacoesInconclusivas: OperacaoInconclusiva[];
+  /** Cobrança nova bloqueada enquanto houver captura remota não conciliada; decisão do backend. */
+  capturaMpNaoConciliada: boolean;
 }

@@ -104,6 +104,41 @@ function provedor(t, { postar, remoto = new Map() } = {}) {
 const recuperar = db =>
   app.sync.recuperarOperacoesInconclusivas({ DB: db, MP_ACCESS_TOKEN: "fake" });
 
+// Historical dispatch: A was cancelled remotely, B's POST response was lost.
+// New regeneration is suspended; recovery must still observe this persisted A1 intent.
+async function seedHistoricalRegeneration(db, original, key) {
+  const request = await app.orderTypes.createPixOrderBody(
+    10000,
+    app.operacoes.chavePagamento(key),
+    { email: "000@checkout.rpdoces.com.br", first_name: "Teste" }
+  );
+  const predecessor = await db
+    .prepare("SELECT idempotency_key FROM pedido_pagamentos WHERE id=?")
+    .bind(original.pagamentoId)
+    .first();
+  await app.operacoes
+    .prepareClaimOperacao(db, {
+      key,
+      tipo: "PIX_ADMIN_REGENERACAO",
+      escopo: "ADMIN",
+      atorUsuarioId: 1,
+      fingerprint: app.operacoes.fingerprint({
+        pedidoId: 1,
+        valorCentavos: null,
+        substituiId: original.pagamentoId
+      }),
+      fase: "ENVIO_INCONCLUSIVO",
+      mpIdempotencyKey: await app.orderTypes.orderIdempotencyKey(app.operacoes.chaveMp(key)),
+      mpRequest: JSON.stringify(request),
+      fonte: app.operacoes.fontePagamento(predecessor.idempotency_key)
+    })
+    .run();
+  await db
+    .prepare("UPDATE pedido_operacoes SET erro='AMBIGUO:HTTP_500' WHERE operation_key=?")
+    .bind(key)
+    .run();
+}
+
 /* ───────────────────────── bancadas SITE e ADMIN ───────────────────────── */
 
 async function siteInconclusivo(t, { postar, remoto } = {}) {
@@ -417,7 +452,7 @@ test("9. Pix ADMIN substituído: recuperação do sucessor não mexe no original
   const p = provedor(t, {
     postar: () => {
       posts++;
-      // Primeiro Pix nasce normal; a regeneração fica inconclusiva.
+      // Only the original is dispatched by the current code.
       return posts === 1
         ? mpResponse({
             id: 9500,
@@ -445,8 +480,7 @@ test("9. Pix ADMIN substituído: recuperação do sucessor não mexe no original
     });
 
   const original = await (await gerar({ valorCentavos: 10000, operationKey: uuid("orig") })).json();
-  const regen = await gerar({ substituiId: original.pagamentoId, operationKey: uuid("regen") });
-  assert.equal(regen.status, 502);
+  await seedHistoricalRegeneration(db, original, uuid("regen"));
 
   const opRegen = (
     await db
@@ -471,7 +505,7 @@ test("9. Pix ADMIN substituído: recuperação do sucessor não mexe no original
   assert.equal(suc.mp_payment_id, "PAY9501", "sucessor associado");
   assert.equal(suc.status, "PENDENTE");
   assert.equal(s.pedido.reserva_status, "ATIVA");
-  assert.equal(p.chamadas.post, 2, "um POST por intenção legítima");
+  assert.equal(p.chamadas.post, 1, "recuperação histórica não envia novo POST");
 });
 
 test("10. EXPIRADO -> PAGO continua exigindo autoridade do GET verificado (B2)", async t => {
@@ -1078,7 +1112,7 @@ test("R2: operação ADMIN sem date_of_expiration também fecha após criado_em 
   assert.equal(p.chamadas.post, 1, "nenhum reenvio");
 });
 
-// Pix ADMIN original criado com sucesso e regeneração inconclusiva (500), como no teste 9.
+// Original created normally; historical ambiguous regeneration persisted before suspension.
 async function regeneracaoInconclusiva(t) {
   const db = await fixture(t, { ledger: false });
   const session = await app.auth.createSession(db, 1);
@@ -1113,8 +1147,7 @@ async function regeneracaoInconclusiva(t) {
   const original = await (
     await gerar({ valorCentavos: 10000, operationKey: uuid("reg-a") })
   ).json();
-  const regen = await gerar({ substituiId: original.pagamentoId, operationKey: uuid("reg-b") });
-  assert.equal(regen.status, 502);
+  await seedHistoricalRegeneration(db, original, uuid("reg-b"));
   const operacao = (
     await db
       .prepare("SELECT * FROM pedido_operacoes WHERE tipo = ?")

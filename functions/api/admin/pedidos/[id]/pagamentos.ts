@@ -3,6 +3,7 @@
 import { requestLogger } from "../../../../lib/requestContext";
 import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
 import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../lib/pedidoAnulacao";
+import { CAPTURA_MP_NAO_CONCILIADA_MENSAGEM } from "../../../../lib/financialCoverage";
 
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { registerAdminPayment, type MetodoManual } from "../../../../lib/comandaLedger";
@@ -32,6 +33,7 @@ const MENSAGENS: Record<string, string> = {
   SALDO_INSUFICIENTE_CONCORRENCIA:
     "O saldo mudou antes da confirmação. Atualize e tente novamente.",
   ESTORNO_ANULACAO_ATIVO: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
+  CAPTURA_MP_NAO_CONCILIADA: CAPTURA_MP_NAO_CONCILIADA_MENSAGEM,
   ...OPERACAO_MENSAGENS
 };
 

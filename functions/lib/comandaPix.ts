@@ -1,8 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
 // Administrative Pix generation/regeneration uses the same Orders adapter as
-// checkout. Standalone cancellation remains outside this UI contract; regeneration
-// verifies cancellation of A before creating B and preserves the existing guards.
+// checkout. New regeneration dispatch is suspended: the predecessor claim cannot
+// freeze the order's financial authorization. Historical replay/recovery stay open.
 //
 // external_reference: SITE continua usando `token_publico` do pedido
 // (checkout.ts intocado). ADMIN usa o `idempotency_key` da própria

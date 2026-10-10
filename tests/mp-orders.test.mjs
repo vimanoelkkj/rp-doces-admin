@@ -147,16 +147,19 @@ test("Order webhook: invalid signature has zero effects; duplicate/out-of-order 
 });
 
 for (const cancelHttp of [200, 500])
-  test(`regeneration: cancel HTTP ${cancelHttp}, authoritative A still pending => no B`, async t => {
+  test(`suspended regeneration never reaches cancel HTTP ${cancelHttp} or creates B`, async t => {
     const db = await fixture(t);
     await db.prepare("UPDATE pedido_pagamentos SET origem='ADMIN' WHERE id=1").run();
     let creations = 0;
     let gets = 0;
+    let cancellations = 0;
     t.mock.method(globalThis, "fetch", async (url, init) => {
-      if (String(url).endsWith("/cancel"))
+      if (String(url).endsWith("/cancel")) {
+        cancellations++;
         return cancelHttp === 200
           ? Response.json({ id: "ORD101", status: "canceled" })
           : new Response("unavailable", { status: 500 });
+      }
       if (init.method === "POST") {
         creations++;
         throw new Error("unsafe successor creation");
@@ -178,8 +181,9 @@ for (const cancelHttp of [200, 500])
       }
     );
     assert.equal(result.ok, false);
-    assert.equal(result.erro, "MERCADO_PAGO_INDISPONIVEL");
-    assert.equal(gets, 2);
+    assert.equal(result.erro, "PIX_REGENERACAO_SUSPENSA");
+    assert.equal(gets, 0);
+    assert.equal(cancellations, 0);
     assert.equal(creations, 0);
     assert.equal((await state(db)).pagamentos.length, 1);
   });

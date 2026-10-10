@@ -115,14 +115,20 @@ for (const status of ["cancelled", "expired"])
   }
 
 for (const oldDies of [true, false])
-  test(`D: real regeneration; terminalizing ${oldDies ? "original" : "successor"} retains the other`, async t => {
+  test(`D: historical regeneration; terminalizing ${oldDies ? "original" : "successor"} preserves stock guards`, async t => {
     const db = await fixture(t, { ledger: false });
     const statuses = {};
-    remote(t, statuses);
+    const mp = remote(t, statuses);
     const a = await create(db);
     assert.equal(a.ok, true);
-    const b = await create(db, { substituiId: a.pagamentoId });
-    assert.equal(b.ok, true);
+    // Seed the A/B lineage created before regeneration dispatch was suspended.
+    await second(db, { mpId: "102", substitui: a.pagamentoId });
+    await db
+      .prepare("UPDATE pedido_pagamentos SET status='CANCELADO', mp_status='cancelled' WHERE id=?")
+      .bind(a.pagamentoId)
+      .run();
+    const b = { pagamentoId: 2, mpPaymentId: "PAY102" };
+    const callsBeforeSync = mp.mock.callCount();
     const first = oldDies ? a : b,
       last = oldDies ? b : a;
     statuses[Number(first.mpPaymentId.replace(/^PAY/, ""))] = "cancelled";
@@ -133,6 +139,7 @@ for (const oldDies of [true, false])
       await sync(db, last.pagamentoId, last.mpPaymentId);
     }
     released(await state(db));
+    assert.ok(mp.mock.calls.slice(callsBeforeSync).every(c => c.arguments[1]?.method !== "POST"));
   });
 
 for (const extra of [{ mpId: null }, { deadline: "2000-01-01" }, { substitui: 1 }]) {
@@ -781,7 +788,7 @@ for (const bothFail of [false, true])
   });
 
 for (const replacement of [false, true])
-  test(`creation CAS keeps ${replacement ? "one successor" : "monetary capacity"} under forced concurrency`, async t => {
+  test(`concurrent creation ${replacement ? "suspends regeneration" : "keeps monetary capacity via CAS"}`, async t => {
     const db = await fixture(t, { ledger: false, reserve: "LIBERADA" });
     const mp = remote(t);
     const original = replacement ? await create(db) : null;
@@ -792,15 +799,27 @@ for (const replacement of [false, true])
     };
     const extra = replacement ? { substituiId: original.pagamentoId } : { valorCentavos: 7000 };
     const results = await Promise.allSettled([create(db, extra), create(db, extra)]);
-    assert.equal(results.filter(r => r.status === "fulfilled" && r.value.ok).length, 1);
+    assert.equal(
+      results.filter(r => r.status === "fulfilled" && r.value.ok).length,
+      replacement ? 0 : 1
+    );
+    if (replacement) {
+      assert.ok(
+        results.every(
+          r =>
+            r.status === "fulfilled" &&
+            ["PIX_REGENERACAO_SUSPENSA", "OPERACAO_EM_PROCESSAMENTO"].includes(r.value.erro)
+        )
+      );
+    }
     const posts = mp.mock.calls
       .slice(beforeCalls)
       .filter(
         c => c.arguments[1]?.method === "POST" && !String(c.arguments[0]).endsWith("/cancel")
       ).length;
-    assert.equal(posts, 1);
+    assert.equal(posts, replacement ? 0 : 1);
     reserved(await state(db));
-    assert.equal((await state(db)).pagamentos.length, replacement ? 2 : 1);
+    assert.equal((await state(db)).pagamentos.length, 1);
   });
 
 test("signed webhook reports release failure and its retry recovers CANCELADO", async t => {

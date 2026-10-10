@@ -7,7 +7,8 @@ import { postPagamentoMp } from "../mpPost";
 import {
   chargeableCapacitySql,
   financialChargeSlotKey,
-  liveAdminPixPredicate
+  liveAdminPixPredicate,
+  pedidoTemCapturaNaoConciliada
 } from "../financialCoverage";
 import {
   buscarOperacao,
@@ -142,6 +143,14 @@ export async function createAdminPixCharge(
   }
   if (await temEstornoAnulacaoAtivo(db, params.pedidoId)) {
     return { ok: false, erro: "ESTORNO_ANULACAO_ATIVO" };
+  }
+  // Pagamento do Mercado Pago confirmado e ainda não conciliado: nenhum Pix NOVO (geração ou
+  // regeneração) nasce até um GET verificado conciliar. Recusa aqui, antes de qualquer claim A1 ou
+  // chamada ao Mercado Pago, e depois do replay acima (o retry de uma operação concluída segue
+  // aberto). The generation INSERT also checks capacity atomically. Regeneration
+  // dispatch is suspended after its A1 claim; no remote successor can be created.
+  if (await pedidoTemCapturaNaoConciliada(db, params.pedidoId)) {
+    return { ok: false, erro: "CAPTURA_MP_NAO_CONCILIADA" };
   }
 
   const substituiId = params.substituiId ?? null;
@@ -292,7 +301,7 @@ export async function createAdminPixCharge(
       .bind(item.id, params.pedidoId, item.produto_id, item.quantidade)
   ]);
 
-  // R3 — Fluxo robusto de REGENERAÇÃO administrativa com cancelamento remoto do predecessor A
+  // Regeneration keeps A1 identity/replay, but new claims terminate without dispatch.
   if (substituiId !== null) {
     if (!operationKey || !identidade) {
       return { ok: false, erro: "OPERATION_KEY_INVALIDA" };

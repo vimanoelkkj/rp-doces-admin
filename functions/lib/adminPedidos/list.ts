@@ -2,6 +2,7 @@
 
 import { requireUser } from "../auth";
 import { pedidoValidoSql } from "../pedidoValido";
+import { capturaRemotaNaoConciliadaSql } from "../pedidoFinanceiroSql";
 import { getFinanceirosPorPedidos, type FinanceiroPedido } from "../comandaLedger";
 import { storeDateSql, storeToday } from "../storeDay";
 import type { Env } from "./types";
@@ -64,10 +65,15 @@ const TAB_FILTERS: Record<string, string> = {
 // não um compromisso. Ele entra na listagem no instante em que vira
 // PARCIAL/PAGO, como sempre. Isso não é efeito colateral — é o recorte.
 //
+// Única exceção: Pix que o Mercado Pago já confirmou (ou devolveu) e o ledger
+// ainda não conciliou. Dinheiro recebido não é carrinho: sem isto o pedido
+// ficaria PENDENTE, invisível e com a reserva retida, sem ninguém para agir.
+//
 // Um único predicado alimenta contagem, página e contadores das abas; nunca
 // três cópias que possam divergir e produzir "8 de 12" numa aba vazia.
-const PEDIDOS_OPERACIONAIS_SQL =
-  "(status_pagamento IN ('PARCIAL', 'PAGO') OR origem_pedido = 'MANUAL')";
+const PEDIDOS_OPERACIONAIS_SQL = `(status_pagamento IN ('PARCIAL', 'PAGO') OR origem_pedido = 'MANUAL'
+  OR EXISTS (SELECT 1 FROM pedido_pagamentos pp
+             WHERE pp.pedido_id = pedidos.id AND ${capturaRemotaNaoConciliadaSql("pp")}))`;
 
 export async function listPedidos(context: Parameters<PagesFunction<Env>>[0]): Promise<Response> {
   const { request, env } = context;

@@ -20,6 +20,8 @@ export async function replayPixAdmin(
 
   // Recusa comprovada do Mercado Pago é terminal para esta key.
   if (operacao.fase === "RECUSADA") {
+    if (operacao.erro === "PIX_REGENERACAO_SUSPENSA")
+      return { ok: false, erro: "PIX_REGENERACAO_SUSPENSA" };
     if (operacao.erro === "PIX_SUBSTITUTO_JA_PAGO")
       return { ok: false, erro: "PIX_SUBSTITUTO_JA_PAGO" };
     if (operacao.erro === "PIX_PARA_SUBSTITUIR_INVALIDO")

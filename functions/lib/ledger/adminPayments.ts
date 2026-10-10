@@ -12,7 +12,7 @@ import {
   type ConflitoOperacao,
   type IdentidadeEsperada
 } from "../operacoes";
-import { chargeableCapacitySql } from "../financialCoverage";
+import { chargeableCapacitySql, pedidoTemCapturaNaoConciliada } from "../financialCoverage";
 import { temEstornoAnulacaoAtivo } from "../pedidoAnulacao";
 
 export type MetodoManual = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO";
@@ -32,6 +32,7 @@ export interface RegisterAdminPaymentResult {
     | "OPERATION_KEY_INVALIDA"
     | "OPERACAO_INCOMPLETA"
     | "ESTORNO_ANULACAO_ATIVO"
+    | "CAPTURA_MP_NAO_CONCILIADA"
     | ConflitoOperacao;
 }
 
@@ -123,6 +124,13 @@ export async function registerAdminPayment(
   }
   if (await temEstornoAnulacaoAtivo(db, params.pedidoId)) {
     return { ok: false, erro: "ESTORNO_ANULACAO_ATIVO" };
+  }
+  // O Mercado Pago já confirmou um pagamento deste pedido que o ledger ainda não aceitou: o
+  // dinheiro pode ter entrado, então nenhuma cobrança NOVA nasce até um GET verificado conciliar.
+  // Fica depois do lookup de replay acima (o retry de uma operação concluída segue aberto); a
+  // mesma condição vale dentro do CAS de capacidade, para a captura que chega depois desta leitura.
+  if (await pedidoTemCapturaNaoConciliada(db, params.pedidoId)) {
+    return { ok: false, erro: "CAPTURA_MP_NAO_CONCILIADA" };
   }
 
   const itens = await getItensComSaldo(db, params.pedidoId);

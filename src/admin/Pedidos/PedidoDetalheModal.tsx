@@ -140,6 +140,7 @@ export default function PedidoDetalheModal({
               pedido={detalhe.data.pedido}
               financeiro={detalhe.data.financeiro}
               capacidadeCobravelCentavos={detalhe.data.capacidadeCobravelCentavos}
+              capturaMpNaoConciliada={detalhe.data.capturaMpNaoConciliada}
               pixAdminPendentes={detalhe.data.pixAdminPendentes}
               operacoesInconclusivas={detalhe.data.operacoesInconclusivas}
               anulado={detalhe.anulado}

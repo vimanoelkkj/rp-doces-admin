@@ -1,161 +1,51 @@
 import { mpResponse } from "./helpers/mp-orders.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { app, fixture, state, approvedMp } from "./helpers/b3.mjs";
+import { app, fixture, state } from "./helpers/b3.mjs";
 
 const env = db => ({ DB: db, MP_ACCESS_TOKEN: "fake_mp_token" });
 
-test("R3 - A: A pending -> cancelamento confirmado -> B criado", async t => {
-  const db = await fixture(t, { ledger: false });
-  let putCalled = false;
-  let postCount = 0;
-  t.mock.method(globalThis, "fetch", async (url, options) => {
-    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
-      postCount++;
-      return mpResponse({
-        id: 100 + postCount,
-        status: "pending",
-        date_of_expiration: "2099-01-01T00:00:00Z",
-        point_of_interaction: {
-          transaction_data: { qr_code: "qr-test", qr_code_base64: "b64", ticket_url: "url" }
-        }
-      });
-    }
-    if (String(url).endsWith("/cancel")) {
-      putCalled = true;
-      assert.equal(options.body, undefined);
-      return mpResponse({ id: 101, status: "cancelled" });
-    }
-    return mpResponse({ id: 101, status: putCalled ? "cancelled" : "pending" });
-  });
-
-  const a = await app.pix.createAdminPixCharge(env(db), {
-    pedidoId: 1,
-    usuarioId: 1,
-    valorCentavos: 5000,
-    operationKey: "op-init-a"
-  });
-  assert.equal(a.ok, true);
-
-  const b = await app.pix.createAdminPixCharge(env(db), {
-    pedidoId: 1,
-    usuarioId: 1,
-    valorCentavos: 5000,
-    substituiId: a.pagamentoId,
-    operationKey: "op-regen-b"
-  });
-  assert.equal(b.ok, true);
-  assert.equal(putCalled, true);
-  assert.equal(b.mpPaymentId, "PAY102");
-
-  const s = await state(db);
-  const pagA = s.pagamentos.find(p => p.id === a.pagamentoId);
-  const pagB = s.pagamentos.find(p => p.id === b.pagamentoId);
-  assert.equal(pagA.status, "CANCELADO");
-  assert.equal(pagB.status, "PENDENTE");
-  assert.equal(pagB.substitui_pagamento_id, a.pagamentoId);
-
-  const operacao = await db
-    .prepare("SELECT * FROM pedido_operacoes WHERE operation_key = 'op-regen-b'")
-    .first();
-  assert.equal(operacao.fase, "CONCLUIDA");
-});
-
-test("R3 - B: A approved antes da regeneração -> sincroniza -> B não criado", async t => {
-  const db = await fixture(t, { ledger: false });
-  let postCount = 0;
-  let putCalled = false;
-  let requestBody;
-  t.mock.method(globalThis, "fetch", async (url, options) => {
-    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
-      postCount++;
-      requestBody = JSON.parse(options.body);
-      return mpResponse({ id: 101, status: "pending", date_of_expiration: "2099-01-01" });
-    }
-    if (String(url).endsWith("/cancel")) {
-      putCalled = true;
-      return mpResponse({ id: 101, status: "cancelled" });
-    }
-    return mpResponse(
-      approvedMp({
-        id: 101,
-        date_approved: "2026-09-23T15:00:00Z",
-        transaction_amount: requestBody.total_amount,
-        external_reference: requestBody.external_reference
-      })
+for (const remoteStatus of ["pending", "approved", "cancelled"]) {
+  test(`R3: regeneration is suspended without observing or mutating a ${remoteStatus} predecessor`, async t => {
+    const db = await fixture(t, { ledger: false });
+    t.mock.method(globalThis, "fetch", async () =>
+      mpResponse({ id: 101, status: "pending", date_of_expiration: "2099-01-01" })
     );
+    const a = await app.pix.createAdminPixCharge(env(db), {
+      pedidoId: 1,
+      usuarioId: 1,
+      valorCentavos: 5000,
+      operationKey: "op-init-suspended"
+    });
+    assert.equal(a.ok, true);
+    const before = await state(db);
+    let remoteCalls = 0;
+    t.mock.method(globalThis, "fetch", async () => {
+      remoteCalls++;
+      return mpResponse({ id: 101, status: remoteStatus });
+    });
+
+    const result = await app.pix.createAdminPixCharge(env(db), {
+      pedidoId: 1,
+      usuarioId: 1,
+      valorCentavos: 5000,
+      substituiId: a.pagamentoId,
+      operationKey: "op-regen-suspended"
+    });
+    assert.deepEqual(result, { ok: false, erro: "PIX_REGENERACAO_SUSPENSA" });
+    assert.equal(remoteCalls, 0, "no GET, cancellation or successor POST");
+    const after = await state(db);
+    assert.deepEqual(after.pagamentos, before.pagamentos);
+    assert.deepEqual(after.produtos, before.produtos);
+    assert.deepEqual(after.itens, before.itens);
+    assert.deepEqual(after.pedido, before.pedido);
+    const claim = after.operacoes.find(o => o.operation_key === "op-regen-suspended");
+    assert.equal(claim.fase, "RECUSADA");
+    assert.equal(claim.erro, "PIX_REGENERACAO_SUSPENSA");
+    assert.equal(claim.pagamento_id, a.pagamentoId);
+    assert.equal(claim.mp_payment_id, null);
   });
-
-  const a = await app.pix.createAdminPixCharge(env(db), {
-    pedidoId: 1,
-    usuarioId: 1,
-    valorCentavos: 5000,
-    operationKey: "op-init-b"
-  });
-  assert.equal(a.ok, true);
-
-  const b = await app.pix.createAdminPixCharge(env(db), {
-    pedidoId: 1,
-    usuarioId: 1,
-    valorCentavos: 5000,
-    substituiId: a.pagamentoId,
-    operationKey: "op-regen-b-approved"
-  });
-
-  assert.equal(b.ok, false);
-  assert.equal(b.erro, "PIX_SUBSTITUTO_JA_PAGO");
-  assert.equal(putCalled, false);
-  assert.equal(postCount, 1);
-
-  const s = await state(db);
-  const pagA = s.pagamentos.find(p => p.id === a.pagamentoId);
-  assert.equal(pagA.status, "PAGO");
-  assert.equal(s.pagamentos.length, 1);
-});
-
-test("R3 - C: PUT cancelamento inconclusivo + reconsulta inconclusiva -> ENVIO_INCONCLUSIVO -> B não criado", async t => {
-  const db = await fixture(t, { ledger: false });
-  let postCount = 0;
-  t.mock.method(globalThis, "fetch", async (url, options) => {
-    if (options?.method === "POST" && !String(url).endsWith("/cancel")) {
-      postCount++;
-      return mpResponse({ id: 101, status: "pending", date_of_expiration: "2099-01-01" });
-    }
-    if (String(url).endsWith("/cancel")) {
-      return new Response("Internal Server Error", { status: 500 });
-    }
-    return mpResponse({ id: 101, status: "pending" });
-  });
-
-  const a = await app.pix.createAdminPixCharge(env(db), {
-    pedidoId: 1,
-    usuarioId: 1,
-    valorCentavos: 5000,
-    operationKey: "op-init-c"
-  });
-  assert.equal(a.ok, true);
-
-  const b = await app.pix.createAdminPixCharge(env(db), {
-    pedidoId: 1,
-    usuarioId: 1,
-    valorCentavos: 5000,
-    substituiId: a.pagamentoId,
-    operationKey: "op-regen-c-fail"
-  });
-
-  assert.equal(b.ok, false);
-  assert.equal(b.erro, "MERCADO_PAGO_INDISPONIVEL");
-  assert.equal(postCount, 1);
-
-  const s = await state(db);
-  assert.equal(s.pagamentos.length, 1);
-
-  const operacao = await db
-    .prepare("SELECT * FROM pedido_operacoes WHERE operation_key = 'op-regen-c-fail'")
-    .first();
-  assert.equal(operacao.fase, "ENVIO_INCONCLUSIVO");
-  assert.equal(operacao.expirado_em, null);
-});
+}
 
 test("R3 - D: webhook cancelled de A durante LOCAL_CRIADA -> reserva NÃO liberada", async t => {
   const db = await fixture(t, { ledger: false });
@@ -240,7 +130,7 @@ test("R3 - E: duas regenerações simultâneas com operationKeys diferentes -> s
   assert.equal(mpCalls, callsBefore);
 });
 
-test("R3 - F: cenário TOCTOU: Y valida A como PENDENTE, X conclui regeneração, Y recheck pós-claim detecta A não elegível e NÃO toca no MP", async t => {
+test("R3 - F: a historical successor makes A ineligible without another provider call", async t => {
   const db = await fixture(t, { ledger: false });
   let mpCalls = 0;
   let canceled = false;
@@ -279,14 +169,17 @@ test("R3 - F: cenário TOCTOU: Y valida A como PENDENTE, X conclui regeneração
   });
   assert.equal(a.ok, true);
 
-  const x = await app.pix.createAdminPixCharge(env(db), {
-    pedidoId: 1,
-    usuarioId: 1,
-    valorCentavos: 5000,
-    substituiId: a.pagamentoId,
-    operationKey: "op-x-12345"
-  });
-  assert.equal(x.ok, true);
+  // State left by a completed regeneration before dispatch was suspended.
+  await db.batch([
+    db.prepare("UPDATE pedido_pagamentos SET status='CANCELADO' WHERE id=?").bind(a.pagamentoId),
+    db
+      .prepare(
+        `INSERT INTO pedido_pagamentos(pedido_id,metodo,origem,valor_centavos,status,
+           mp_order_id,mp_payment_id,substitui_pagamento_id,idempotency_key)
+         VALUES(1,'PIX_MP','ADMIN',5000,'PENDENTE','ORD999','PAY999',?,'historical-successor')`
+      )
+      .bind(a.pagamentoId)
+  ]);
 
   const callsAfterX = mpCalls;
 

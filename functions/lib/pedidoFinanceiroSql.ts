@@ -23,6 +23,19 @@ export const STATUS_FINANCEIRO_SQL = `CASE
   ELSE 'PAGO'
 END`;
 
+// Captura remota ainda não conciliada: o Mercado Pago confirma (ou devolveu) o Pix, mas o ledger
+// local não aceitou essa transição — conferência de integridade (INTEGRIDADE_MP:*) ou matriz de
+// transição. `mp_status` é o fato estruturado; `mp_status_detail` só diagnostica. Não é o mesmo
+// predicado de quem retém a reserva nem de quem mostra o detalhe, é uma parte de cada um:
+// PIX_MP_PENDENTE_NO_PEDIDO_SQL (stock.ts) tem este como segundo braço e segura também todo PIX_MP
+// PENDENTE; o bloco PIX_MP_INTEGRIDADE do detalhe (api/admin/pedidos/[id].ts) tem este como
+// primeiro braço e ainda sinaliza PAGO+refunded parcial e REEMBOLSADO reconhecido.
+// O WHERE do índice parcial idx_pedido_pagamentos_captura_nao_conciliada (migration 0039) espelha
+// este predicado: mudar um exige mudar o outro. O parâmetro é o alias de `pedido_pagamentos`.
+export const capturaRemotaNaoConciliadaSql = (pp: string) =>
+  `(${pp}.metodo = 'PIX_MP' AND ${pp}.status NOT IN ('PAGO', 'REEMBOLSADO')
+    AND LOWER(COALESCE(${pp}.mp_status, '')) IN ('approved', 'refunded'))`;
+
 function preparePedidoFinancialProjectionBase(
   db: D1Database,
   pedidoId: number,

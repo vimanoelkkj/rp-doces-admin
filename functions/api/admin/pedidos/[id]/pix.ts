@@ -2,6 +2,7 @@
 
 import { recusarPedidoAnulado } from "../../../../lib/pedidoValido";
 import { ESTORNO_ANULACAO_ATIVO_MENSAGEM } from "../../../../lib/pedidoAnulacao";
+import { CAPTURA_MP_NAO_CONCILIADA_MENSAGEM } from "../../../../lib/financialCoverage";
 
 import { requireUser, sameOrigin } from "../../../../lib/auth";
 import { createAdminPixCharge } from "../../../../lib/comandaPix";
@@ -35,11 +36,14 @@ const MENSAGENS: Record<string, string> = {
     "O Pix informado para substituir não está mais disponível (já foi substituído, pago ou não pertence a este pedido)",
   PIX_SUBSTITUTO_JA_PAGO:
     "O Pix anterior já foi aprovado no Mercado Pago e o pedido foi atualizado.",
+  PIX_REGENERACAO_SUSPENSA:
+    "A regeneração de Pix está temporariamente suspensa por segurança financeira. Confira e concilie os pagamentos existentes antes de cobrar novamente.",
   ESTOQUE_INSUFICIENTE: "Um ou mais itens não possuem estoque suficiente disponível.",
   MERCADO_PAGO_RECUSOU: "O Mercado Pago recusou o pagamento Pix",
   MERCADO_PAGO_INDISPONIVEL:
     "Não foi possível confirmar com o Mercado Pago se o Pix foi criado. Verifique novamente em instantes.",
   ESTORNO_ANULACAO_ATIVO: ESTORNO_ANULACAO_ATIVO_MENSAGEM,
+  CAPTURA_MP_NAO_CONCILIADA: CAPTURA_MP_NAO_CONCILIADA_MENSAGEM,
   ...OPERACAO_MENSAGENS
 };
 
@@ -50,10 +54,12 @@ const STATUS_HTTP: Record<string, number> = {
   CAPACIDADE_INSUFICIENTE: 409,
   PIX_PARA_SUBSTITUIR_INVALIDO: 409,
   PIX_SUBSTITUTO_JA_PAGO: 409,
+  PIX_REGENERACAO_SUSPENSA: 409,
   ESTOQUE_INSUFICIENTE: 409,
   MERCADO_PAGO_RECUSOU: 502,
   MERCADO_PAGO_INDISPONIVEL: 502,
   ESTORNO_ANULACAO_ATIVO: 409,
+  CAPTURA_MP_NAO_CONCILIADA: 409,
   ...OPERACAO_HTTP_STATUS
 };
 

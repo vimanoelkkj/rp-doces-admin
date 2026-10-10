@@ -314,53 +314,74 @@ test("H: late approval cannot consume other reservations; B3 retries after reple
 });
 
 for (const both of [false, true])
-  test(`I/J: real admin regeneration keeps A reconcilable; both approved=${both}`, async t => {
+  test(`I/J: historical admin regeneration keeps A reconcilable after suspension; both approved=${both}`, async t => {
     const db = await fixture(t, { ledger: false });
     const session = await app.auth.createSession(db, 1);
     let remoteId = 200;
-    const canceled = new Set();
+    let postCount = 0;
     t.mock.method(globalThis, "fetch", async (url, options) => {
-      if (String(url).endsWith("/cancel")) {
-        const paymentId =
-          Number(
-            String(url)
-              .replace(/\/cancel$/, "")
-              .split("/")
-              .at(-1)
-              .replace(/^ORD/, "")
-          ) || 201;
-        canceled.add(paymentId);
-        return mpResponse({ id: paymentId, status: "cancelled" });
-      }
-      if (options?.method !== "POST") {
-        const paymentId = Number(String(url).split("/").at(-1).replace(/^ORD/, "")) || 201;
-        return mpResponse({
-          id: paymentId,
-          status: canceled.has(paymentId) ? "cancelled" : "pending",
-          date_of_expiration: "2099-01-01"
-        });
-      }
+      assert.equal(String(url), "https://api.mercadopago.com/v1/orders");
+      assert.equal(options?.method, "POST");
+      postCount++;
       return mpResponse({ id: ++remoteId, status: "pending", date_of_expiration: "2099-01-01" });
     });
-    // operationKey: contrato A1, obrigatório no endpoint. Uma key por chamada,
-    // porque cada chamada aqui é uma intenção distinta (gerar, depois regenerar).
-    let opSeq = 0;
-    const create = async substituiId => {
-      const operationKey = `b2-pix-${++opSeq}`;
+    const create = async () => {
+      const operationKey = "b2-pix-1";
       const r = await app.adminPix.onRequestPost({
         env: env(db),
         params: { id: "1" },
         request: new Request("https://local.test/api/admin/pedidos/1/pix", {
           method: "POST",
           headers: { Cookie: session.cookie.split(";")[0], Origin: "https://local.test" },
-          body: JSON.stringify(substituiId ? { substituiId, operationKey } : { operationKey })
+          body: JSON.stringify({ operationKey })
         })
       });
       assert.equal(r.status, 201);
       return r.json();
     };
     const a = await create();
-    const b = await create(a.pagamentoId);
+    // B was created before regeneration dispatch was suspended. Preserve the
+    // historical slot, A1 identity, request and allocations for verified GETs.
+    const keyB = `charge-slot:pix:1:${a.pagamentoId}:0`;
+    const requestB = await app.orderTypes.createPixOrderBody(10000, keyB, {
+      email: "000@checkout.rpdoces.com.br",
+      first_name: "Teste"
+    });
+    const b = { pagamentoId: 2, mpPaymentId: "PAY202" };
+    await db.batch([
+      db.prepare("UPDATE pedido_pagamentos SET status='CANCELADO' WHERE id=?").bind(a.pagamentoId),
+      db
+        .prepare(
+          `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,
+             mp_order_id,mp_payment_id,mp_status,idempotency_key,substitui_pagamento_id,pix_expira_em)
+           VALUES(2,1,'PIX_MP','ADMIN',10000,'PENDENTE','ORD202','PAY202','pending',?,?,'2099-01-01')`
+        )
+        .bind(keyB, a.pagamentoId),
+      db.prepare(
+        `INSERT INTO pedido_pagamento_alocacoes(pagamento_id,pedido_item_id,valor_centavos)
+         VALUES(2,1,10000)`
+      ),
+      app.operacoes.prepareClaimOperacao(db, {
+        key: "b2-pix-2",
+        tipo: "PIX_ADMIN_REGENERACAO",
+        escopo: "ADMIN",
+        atorUsuarioId: 1,
+        fingerprint: app.operacoes.fingerprint({
+          pedidoId: 1,
+          valorCentavos: null,
+          substituiId: a.pagamentoId
+        }),
+        fase: "CONCLUIDA",
+        mpIdempotencyKey: await app.orderTypes.orderIdempotencyKey(
+          app.operacoes.chaveMp("b2-pix-2")
+        ),
+        mpRequest: JSON.stringify(requestB),
+        fonte: app.operacoes.fontePagamento(keyB)
+      }),
+      db.prepare(
+        "UPDATE pedido_operacoes SET mp_payment_id='PAY202' WHERE operation_key='b2-pix-2'"
+      )
+    ]);
     const before = await state(db);
     assert.equal(before.pagamentos[0].status, "CANCELADO");
     assert.equal(before.pagamentos[1].substitui_pagamento_id, a.pagamentoId);
@@ -380,7 +401,8 @@ for (const both of [false, true])
     const referencias = new Map(
       references.map(p => [Number(p.mp_payment_id.replace(/^PAY/, "")), p.reference])
     );
-    t.mock.method(globalThis, "fetch", async url => {
+    t.mock.method(globalThis, "fetch", async (url, options) => {
+      assert.notEqual(options?.method, "POST", "historical reconciliation never dispatches B");
       const id = Number(String(url).split("/").at(-1).replace(/^ORD/, ""));
       return mpResponse(approvedMp({ id, external_reference: referencias.get(id) }));
     });
@@ -393,6 +415,7 @@ for (const both of [false, true])
     assert.equal(s.produtos[0].estoque, 8);
     assert.deepEqual(s.alocacoes, before.alocacoes);
     assert.equal(s.refunds.length, 0);
+    assert.equal(postCount, 1, "only the original A was created by the current code");
   });
 
 for (const order of [

@@ -11,6 +11,7 @@ interface PedidoPagamentoProps {
   pedido: PedidoRow;
   financeiro: FinanceiroPedido;
   capacidadeCobravelCentavos: number;
+  capturaMpNaoConciliada: boolean;
   pixAdminPendentes: PixAdminPendente[];
   operacoesInconclusivas: OperacaoInconclusiva[];
   anulado: boolean;
@@ -43,6 +44,7 @@ export default function PedidoPagamento({
   pedido,
   financeiro,
   capacidadeCobravelCentavos,
+  capturaMpNaoConciliada,
   pixAdminPendentes,
   operacoesInconclusivas,
   anulado,
@@ -54,7 +56,6 @@ export default function PedidoPagamento({
   pagamentoError,
   pagamentoPendente = false,
   gerando,
-  regenerandoId,
   pixError,
   pixAviso,
   agora,
@@ -71,17 +72,19 @@ export default function PedidoPagamento({
   onLimparPixAviso
 }: PedidoPagamentoProps) {
   const finFormatado = formatarFinanceiro(financeiro);
-  const temDivergenciaFinanceiraMp = operacoesInconclusivas.some(
-    operacao => operacao.tipo === "PIX_MP_INTEGRIDADE"
-  );
+  const temDivergenciaFinanceiraMp =
+    capturaMpNaoConciliada ||
+    operacoesInconclusivas.some(operacao => operacao.tipo === "PIX_MP_INTEGRIDADE");
   const podeRegistrarPagamento = Boolean(
     !anulado &&
+    !capturaMpNaoConciliada &&
     pedido.arquivado === 0 &&
     (capacidadeCobravelCentavos > 0 || pagamentoPendente) &&
     (pedido.status_comanda === "ABERTA" || pedido.status_pedido === "ENTREGUE")
   );
   const podeGerarPix = Boolean(
     !anulado &&
+    !capturaMpNaoConciliada &&
     pedido.arquivado === 0 &&
     capacidadeCobravelCentavos > 0 &&
     (pedido.status_comanda === "ABERTA" || pedido.status_pedido === "ENTREGUE")
@@ -141,14 +144,16 @@ export default function PedidoPagamento({
           reler o que persistiu. A recuperação read-only roda sozinha
           na carga da listagem; este bloco existe para o caso não
           convergir. Nenhum estado é inventado aqui. */}
-      {operacoesInconclusivas.length > 0 && (
+      {(operacoesInconclusivas.length > 0 || capturaMpNaoConciliada) && (
         <div className="pedmodal-pix-aviso" role="alert">
           <span>
             {temDivergenciaFinanceiraMp ? (
               <>
                 ⚠ <strong>Divergência financeira do Mercado Pago:</strong> pagamento ou reembolso
-                remoto não conciliado. Preserve o estoque e encaminhe para intervenção humana antes
-                de gerar outra cobrança.
+                remoto não conciliado.{" "}
+                {capturaMpNaoConciliada
+                  ? "Novas cobranças (pagamento manual, Pix e regeneração) ficam bloqueadas até a conciliação, para não cobrar duas vezes. Confira no Mercado Pago, preserve o estoque e encaminhe para intervenção humana se não conciliar sozinho."
+                  : "Preserve o estoque e encaminhe para intervenção humana antes de gerar outra cobrança."}
               </>
             ) : (
               <>
@@ -330,15 +335,15 @@ export default function PedidoPagamento({
               )
             )}
 
-            {!anulado && pedido.arquivado === 0 && (
-              <button
-                type="button"
-                className="pedmodal-btn-edit"
-                onClick={() => onGerarPix(pix.id)}
-                disabled={regenerandoId === pix.id}
-              >
-                {regenerandoId === pix.id ? "Regenerando..." : "Regenerar Pix"}
-              </button>
+            {!anulado && pedido.arquivado === 0 && !capturaMpNaoConciliada && (
+              <div className="pedmodal-pix-vencido" role="status">
+                <span>Regeneração de Pix temporariamente suspensa por segurança financeira.</span>
+                {!vencido && (
+                  <button type="button" className="pedmodal-btn-edit" onClick={onAtualizarPedido}>
+                    Atualizar pedido
+                  </button>
+                )}
+              </div>
             )}
           </div>
         );

@@ -111,7 +111,7 @@ test("Pix test mode orders_pix preserves nominal order amount and expiration in 
 
 for (const flow of ["checkout", "admin", "diagnostic", "regeneration"])
   for (const testMode of [undefined, "orders_pix"]) {
-    test(`${flow} creation forwards server Pix test mode ${testMode ?? "default"}`, async t => {
+    test(`${flow} ${flow === "regeneration" ? "suspension holds for" : "creation forwards"} server Pix test mode ${testMode ?? "default"}`, async t => {
       const db = await fixture(t, {
         ledger: flow === "regeneration",
         paid: false,
@@ -119,7 +119,7 @@ for (const flow of ["checkout", "admin", "diagnostic", "regeneration"])
       });
       const env = { DB: db, MP_ACCESS_TOKEN: "fake", MP_TEST_MODE: testMode };
       let sent;
-      t.mock.method(globalThis, "fetch", async (url, init) => {
+      const mp = t.mock.method(globalThis, "fetch", async (url, init) => {
         if (String(url).endsWith("/cancel")) {
           return Response.json({ id: "ORD101", status: "canceled" });
         }
@@ -182,7 +182,21 @@ for (const flow of ["checkout", "admin", "diagnostic", "regeneration"])
           valorCentavos: 10000,
           operationKey: "audit-regen-pix"
         });
-        assert.equal(result.ok, true);
+        assert.deepEqual(result, { ok: false, erro: "PIX_REGENERACAO_SUSPENSA" });
+        assert.equal(
+          mp.mock.callCount(),
+          0,
+          "suspension does not consult, cancel or create Orders"
+        );
+        assert.equal(sent, undefined);
+        const operation = await db
+          .prepare("SELECT * FROM pedido_operacoes WHERE operation_key=?")
+          .bind("audit-regen-pix")
+          .first();
+        assert.equal(operation.fase, "RECUSADA");
+        assert.equal(operation.erro, "PIX_REGENERACAO_SUSPENSA");
+        assert.equal(operation.mp_payment_id, null);
+        return;
       } else {
         const session = await app.auth.createSession(db, 1);
         const result = await app.diagnosticoPix.onRequestPost({

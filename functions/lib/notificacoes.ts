@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { pedidoValidoSql } from "./pedidoValido";
+import { capturaRemotaNaoConciliadaSql } from "./pedidoFinanceiroSql";
 
 // HUMAN-14 — notificações internas do admin.
 //
@@ -118,6 +119,51 @@ async function pagamentosConfirmados(db: D1Database): Promise<NotificacaoDerivad
 }
 
 /**
+ * Dinheiro confirmado no Mercado Pago que o ledger ainda não concilia (a conferência de
+ * integridade ou a matriz recusou): o pedido segue sem pagamento e a reserva fica retida. Deriva
+ * do fato estruturado `mp_status`; some sozinha quando o pagamento é conciliado.
+ *
+ * A chave inclui `mp_status`: a devolução depois da captura é outro fato e volta como não lida.
+ * Ordem e idade vêm de `criado_em`, que não muda: o instante da captura no provedor não é
+ * persistido enquanto o ledger a recusa, e `atualizado_em` é regravado a cada repoll. O texto fala
+ * da cobrança local, nunca de valor pago: o valor que o provedor confirmou pode ser outro.
+ */
+async function pagamentosMpNaoConciliados(db: D1Database): Promise<NotificacaoDerivada[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT pp.id, pp.pedido_id, pp.valor_centavos, LOWER(COALESCE(pp.mp_status, '')) AS mp_status,
+              pp.mp_status_detail, pp.criado_em
+       FROM pedido_pagamentos pp
+       WHERE ${pedidoValidoSql("pp.pedido_id")} AND ${capturaRemotaNaoConciliadaSql("pp")}
+       ORDER BY pp.criado_em DESC, pp.id DESC
+       LIMIT ?`
+    )
+    .bind(LIMITE_POR_TIPO)
+    .all<{
+      id: number;
+      pedido_id: number;
+      valor_centavos: number;
+      mp_status: string;
+      mp_status_detail: string | null;
+      criado_em: string;
+    }>();
+
+  return (results || []).map(p => {
+    const [, motivo] = /^INTEGRIDADE_MP:(.+)$/.exec(p.mp_status_detail ?? "") ?? [];
+    return {
+      chave: `pagamento:${p.id}:nao-conciliado:${p.mp_status}`,
+      tipo: "OPERACAO" as const,
+      titulo: "Pagamento do Mercado Pago não conciliado",
+      descricao: `RP-${p.pedido_id} · cobrança Pix de ${reais(p.valor_centavos)} ${
+        p.mp_status === "refunded" ? "devolvida" : "aprovada"
+      } no Mercado Pago, não conciliada${motivo ? ` (${motivo})` : ""} — confira antes de produzir ou cobrar de novo`,
+      em: p.criado_em,
+      destino: `/admin/pedidos?pedido=${p.pedido_id}`
+    };
+  });
+}
+
+/**
  * Estoque no limite. A chave inclui o NÍVEL, então "baixo" e "esgotado" são
  * eventos distintos: marcar "estoque baixo" como lida não esconde o
  * "esgotado" que vier depois. E repor o estoque faz a notificação sumir
@@ -199,17 +245,23 @@ async function eventosDeTeste(db: D1Database): Promise<NotificacaoDerivada[]> {
 
 /** Todos os eventos derivados agora, sem estado de leitura. */
 export async function derivarNotificacoes(db: D1Database): Promise<NotificacaoDerivada[]> {
-  const grupos = await Promise.all([
+  const [naoConciliados, ...grupos] = await Promise.all([
+    pagamentosMpNaoConciliados(db),
     pedidosNovos(db),
     pagamentosConfirmados(db),
     estoqueNoLimite(db),
     operacoesInconclusivas(db),
     eventosDeTeste(db)
   ]);
-  return grupos
-    .flat()
-    .sort((a, b) => Date.parse(b.em || "") - Date.parse(a.em || ""))
-    .slice(0, LIMITE_TOTAL);
+  // Dinheiro recebido e não conciliado nunca sai da lista por antiguidade: vai à frente e o teto
+  // de recência vale só para o restante.
+  return [
+    ...naoConciliados,
+    ...grupos
+      .flat()
+      .sort((a, b) => Date.parse(b.em || "") - Date.parse(a.em || ""))
+      .slice(0, Math.max(0, LIMITE_TOTAL - naoConciliados.length))
+  ];
 }
 
 /**

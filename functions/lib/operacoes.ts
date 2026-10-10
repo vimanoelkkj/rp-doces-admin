@@ -35,7 +35,7 @@ export type {
 // REMOTO_CONHECIDO ..... o `mp_payment_id` é conhecido, mas a gravação local
 //                        posterior pode ter falhado.
 // CONCLUIDA ............ resultado lógico final, replayável.
-// RECUSADA ............. rejeição COMPROVADAMENTE definitiva do provedor.
+// RECUSADA ............. definitive provider refusal or local refusal before dispatch.
 export type OperacaoFase =
   "LOCAL_CRIADA" | "ENVIO_INCONCLUSIVO" | "REMOTO_CONHECIDO" | "CONCLUIDA" | "RECUSADA";
 
