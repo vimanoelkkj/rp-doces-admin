@@ -1,12 +1,17 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { fingerprint } from "./operacoes";
-import { CONFIRMED_REFUNDS_BY_ALLOCATION_CTE, financialLineageCte } from "./financialCoverage";
+import {
+  CAPTURA_MP_NAO_CONCILIADA_MENSAGEM,
+  CONFIRMED_REFUNDS_BY_ALLOCATION_CTE,
+  financialLineageCte,
+  pedidoTemCapturaNaoConciliada
+} from "./financialCoverage";
 
 export type AcaoEstoqueCancelamento = "LIBERAR_RESERVA" | "NAO_REPOR" | "NENHUMA";
 
 export type BloqueioCancelamento = {
-  codigo: "STATUS_PEDIDO_PRONTO" | "PIX_PENDENTE";
+  codigo: "STATUS_PEDIDO_PRONTO" | "PIX_PENDENTE" | "CAPTURA_MP_NAO_CONCILIADA";
   mensagem: string;
 };
 
@@ -246,6 +251,13 @@ export async function getItemCancellationPreview(
       codigo: "PIX_PENDENTE",
       mensagem:
         "Há uma cobrança Pix pendente para esta comanda. O cancelamento só poderá ser executado após ela ser resolvida."
+    });
+  }
+  // Predicado canonico F1. Pix expirado/cancelado sem captura conhecida continua liberado.
+  if (await pedidoTemCapturaNaoConciliada(db, pedidoId)) {
+    bloqueios.push({
+      codigo: "CAPTURA_MP_NAO_CONCILIADA",
+      mensagem: CAPTURA_MP_NAO_CONCILIADA_MENSAGEM
     });
   }
 
