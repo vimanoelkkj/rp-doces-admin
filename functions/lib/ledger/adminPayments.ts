@@ -13,6 +13,7 @@ import {
   type IdentidadeEsperada
 } from "../operacoes";
 import { chargeableCapacitySql, pedidoTemCapturaNaoConciliada } from "../financialCoverage";
+import { elegibilidadeOperacionalCobrancaSql } from "../pedidoFinanceiroSql";
 import { temEstornoAnulacaoAtivo } from "../pedidoAnulacao";
 
 export type MetodoManual = "DINHEIRO" | "CARTAO" | "PIX_EXTERNO";
@@ -119,7 +120,10 @@ export async function registerAdminPayment(
   // estado operacional: o recebimento ainda pode acontecer depois da
   // entrega. A exceção é deliberadamente estreita; CANCELADO e qualquer
   // outro pedido com comanda encerrada continuam bloqueados.
-  if (pedido.status_comanda !== "ABERTA" && pedido.status_pedido !== "ENTREGUE") {
+  if (
+    pedido.status_pedido === "CANCELADO" ||
+    (pedido.status_comanda !== "ABERTA" && pedido.status_pedido !== "ENTREGUE")
+  ) {
     return { ok: false, erro: "COMANDA_ENCERRADA" };
   }
   if (await temEstornoAnulacaoAtivo(db, params.pedidoId)) {
@@ -178,7 +182,11 @@ export async function registerAdminPayment(
            substitui_pagamento_id
          )
          SELECT ?, ?, 'ADMIN', ?, 'PAGO', ?, ?, ?, CURRENT_TIMESTAMP, ?
-         WHERE ? <= ${chargeableCapacitySql()}`
+         WHERE ? <= ${chargeableCapacitySql()}
+           AND EXISTS (
+             SELECT 1 FROM pedidos
+             WHERE id = ? AND ${elegibilidadeOperacionalCobrancaSql("pedidos")}
+           )`
       )
       .bind(
         params.pedidoId,
@@ -189,15 +197,17 @@ export async function registerAdminPayment(
         idempotencyKey,
         primeiroPlaceholderLocal,
         params.valorCentavos,
+        params.pedidoId,
         params.pedidoId
       ),
     ...waterfall.alocacoes.map(a =>
       db
         .prepare(
           `INSERT INTO pedido_pagamento_alocacoes (pagamento_id, pedido_item_id, valor_centavos)
-           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?`
+           SELECT (SELECT id FROM pedido_pagamentos WHERE idempotency_key = ?), ?, ?
+           WHERE EXISTS (SELECT 1 FROM pedido_pagamentos WHERE idempotency_key = ?)`
         )
-        .bind(idempotencyKey, a.itemId, a.valorCentavos)
+        .bind(idempotencyKey, a.itemId, a.valorCentavos, idempotencyKey)
     ),
     ...(placeholdersLocais.results.length > 0
       ? [
@@ -248,24 +258,51 @@ export async function registerAdminPayment(
       : { ok: false, erro: replay.erro };
   };
 
+  // Recusa comprovada na escrita (pagamentoId === 0): os guards atômicos do INSERT
+  // impediram a criação do pagamento. Identifica deterministamente a causa da recusa.
+  const resolverRecusaEscrita = async (): Promise<RegisterAdminPaymentResult> => {
+    const vencedora = await recuperarVencedora();
+    if (vencedora) return vencedora;
+
+    const pedidoAtual = await db
+      .prepare(`SELECT status_comanda, status_pedido FROM pedidos WHERE id = ?`)
+      .bind(params.pedidoId)
+      .first<{ status_comanda: string; status_pedido: string }>();
+
+    if (
+      pedidoAtual &&
+      (pedidoAtual.status_pedido === "CANCELADO" ||
+        (pedidoAtual.status_comanda !== "ABERTA" && pedidoAtual.status_pedido !== "ENTREGUE"))
+    ) {
+      return { ok: false, erro: "COMANDA_ENCERRADA" };
+    }
+
+    if (await pedidoTemCapturaNaoConciliada(db, params.pedidoId)) {
+      return { ok: false, erro: "CAPTURA_MP_NAO_CONCILIADA" };
+    }
+
+    return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
+  };
+
   let batchResults: D1Result[];
   try {
     batchResults = await db.batch(statements);
-  } catch {
-    // Pode ser a condição de saldo (outra requisição consumiu o saldo entre
-    // nossa leitura e o commit) ou a disputa da mesma operation key. Nada
-    // foi gravado (rollback do batch inteiro) — não há nada para compensar.
-    // A releitura por key distingue os dois casos de forma determinística.
-    const vencedora = await recuperarVencedora();
-    if (vencedora) return vencedora;
-    return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
+  } catch (err) {
+    // Disputa da mesma operation key (colisão de UNIQUE no claim ou no pagamento):
+    // recupera deterministamente a operação vencedora (A1 replay).
+    if (operationKey && identidade) {
+      const vencedora = await recuperarVencedora();
+      if (vencedora) return vencedora;
+    }
+    // Qualquer outra exceção no batch é uma falha inesperada (ex.: infraestrutura do D1).
+    // Preserva o erro original sem mascarar como conflito de negócio (devolve HTTP 500).
+    throw err;
   }
 
+  const changes = Number(batchResults[0]?.meta?.changes || 0);
   const pagamentoId = Number(batchResults[0]?.meta?.last_row_id || 0);
-  if (!pagamentoId) {
-    const vencedora = await recuperarVencedora();
-    if (vencedora) return vencedora;
-    return { ok: false, erro: "SALDO_INSUFICIENTE_CONCORRENCIA" };
+  if (changes === 0 || !pagamentoId) {
+    return await resolverRecusaEscrita();
   }
 
   const derivados = await reconcilePersistedAdminFact(

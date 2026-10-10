@@ -36,6 +36,15 @@ export const capturaRemotaNaoConciliadaSql = (pp: string) =>
   `(${pp}.metodo = 'PIX_MP' AND ${pp}.status NOT IN ('PAGO', 'REEMBOLSADO')
     AND LOWER(COALESCE(${pp}.mp_status, '')) IN ('approved', 'refunded'))`;
 
+// Guard atômico de cancelamento: só cancela se não houver saldo líquido retido.
+export const pedidoSemSaldoLiquidoSql = (pedidoIdSql = "pedidos.id") =>
+  `((SELECT ${LIQUIDO_SQL} FROM pedidos p WHERE p.id = ${pedidoIdSql}) <= 0)`;
+
+// Elegibilidade operacional para recebimento manual ou cobrança administrativa:
+// bloqueia pedidos cancelados ou com comanda encerrada, mas preserva liquidação legítima após entrega.
+export const elegibilidadeOperacionalCobrancaSql = (alias = "pedidos") =>
+  `(${alias}.status_pedido <> 'CANCELADO' AND (${alias}.status_comanda = 'ABERTA' OR ${alias}.status_pedido = 'ENTREGUE'))`;
+
 function preparePedidoFinancialProjectionBase(
   db: D1Database,
   pedidoId: number,
