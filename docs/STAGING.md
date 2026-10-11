@@ -43,10 +43,13 @@ sem integração Git que ignore o critério de aprovação do CI no GitHub.
 
 ## Pré-requisitos e configuração do GitHub
 
-Use o Wrangler **3.114.17** fixado no lockfile, Node 24, a conta Cloudflare pretendida
-e um checkout limpo com essas configurações de staging. Não atualize o Wrangler
-para este procedimento. Os comandos abaixo **não** foram executados remotamente
-por esta alteração.
+Use Node **>=24.19.0 <25**, npm **>=11.17.0**, a conta Cloudflare pretendida
+e um checkout limpo com essas configurações de staging. Execute `npm ci` para
+instalar as versões fixadas pelo `package-lock.json`; neste commit, Wrangler
+**4.149.0**. Confira `node --version`, `npm --version` e
+`npx --no-install wrangler --version`. Não atualize dependências neste procedimento.
+Nos comandos abaixo, use `npx --no-install wrangler` para impedir downloads
+automáticos. Os comandos remotos continuam dependendo de autorização específica.
 
 Crie o GitHub Environment `staging`, restringindo as branches de deploy a `staging`.
 Preencha os três secrets do ambiente de forma independente:
@@ -204,7 +207,7 @@ legadas e intenções de reembolso.
 
 ### 4. Fazer bootstrap do Worker inerte e depois ativá-lo
 
-Comandos de secrets do Wrangler 3.114.17 podem publicar uma versão imediatamente.
+Comandos de secrets do Wrangler são mutações remotas e exigem autorização específica.
 **Somente no primeiro provisionamento**, use o bootstrap inerte sem D1, consumidor
 de Queue nem cron:
 
@@ -273,7 +276,7 @@ executa a suíte smoke somente leitura. Runs substituídos/desabilitados não
 publicam. Se o HEAD avançar durante o build, verificação e smoke são pulados,
 a menos que esse run tenha realizado o upload.
 
-**Wrangler Pages 3.114.17 rejeita `--config`.** Imediatamente antes do upload,
+**Wrangler Pages 4.149.0 não oferece `--config`.** Imediatamente antes do upload,
 o job copia `wrangler.staging.toml` para `wrangler.toml` no checkout descartável.
 Isso não modifica a configuração de produção commitada. O comando de upload
 suportado é:

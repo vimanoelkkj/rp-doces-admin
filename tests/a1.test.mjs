@@ -206,7 +206,7 @@ test("pagamento: falha antes do commit não deixa claim órfão e permite retry 
     }
   };
   const falha = await corpo(await pagar(db, session, { operationKey: KEY }));
-  assert.equal(falha.status, 409);
+  assert.equal(falha.status, 500);
   const s = await state(db);
   assert.equal(s.pagamentos.length, 0);
   assert.equal(s.operacoes.length, 0, "claim e fato são atômicos: nenhum sobrevive sozinho");

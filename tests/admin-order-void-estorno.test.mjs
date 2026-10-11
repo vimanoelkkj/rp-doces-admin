@@ -281,14 +281,15 @@ test("5b: GET com intencao INCONCLUSIVO sem refund remoto nunca reenvia o POST d
   assert.deepEqual(await intencaoAnulacao(db), antes);
 });
 
-// 6) CONFIRMADO libera exclusao
-test("6: apos o refund confirmado, a exclusao do pedido passa a ser aceita", async t => {
+// 6) Confirmed refunds remain valid, but remote Pix history prevents a new void.
+test("6: refund confirmado permanece válido, mas histórico Pix impede nova exclusao", async t => {
   const { db, session } = await pedidoComMp(t);
   mockRefundAprovado(t);
   const { status } = await corpo(await postEstorno(db, session));
   assert.equal(status, 200);
   const exclusao = await corpo(await anular(db, session));
-  assert.equal(exclusao.status, 200);
+  assert.equal(exclusao.status, 409);
+  assert.equal(exclusao.body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 });
 
 // 7) RECUSADO mantem exclusao bloqueada
@@ -300,7 +301,7 @@ test("7: refund recusado pelo Mercado Pago mantem a exclusao bloqueada", async t
   assert.equal(posted.body.restanteTotalCentavos, 10000, "recusa nunca move dinheiro");
   const exclusao = await corpo(await anular(db, session));
   assert.equal(exclusao.status, 409);
-  assert.equal(exclusao.body.code, "ANULACAO_MP_RECEBIDO");
+  assert.equal(exclusao.body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 });
 
 // 8) INCONCLUSIVO mantem exclusao bloqueada
@@ -313,7 +314,7 @@ test("8: resposta ambigua do Mercado Pago mantem a exclusao bloqueada", async t 
   assert.equal(posted.body.pernas[0].intencao.status, "INCONCLUSIVO");
   const exclusao = await corpo(await anular(db, session));
   assert.equal(exclusao.status, 409);
-  assert.ok(["ANULACAO_MP_RECEBIDO", "ANULACAO_REFUND_PENDENTE"].includes(exclusao.body.code));
+  assert.equal(exclusao.body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 });
 
 // 9) refund ja confirmado nao e repetido
@@ -546,9 +547,10 @@ test("12b: trava operacional bloqueia pagamento, pix, cancelamento, troca e adic
   assert.equal(troca.status, 409);
   assert.equal((await troca.json()).code, "ESTORNO_ANULACAO_ATIVO");
 
-  // A propria exclusao continua permitida: e a unica saida dessa janela.
+  // Conservative containment keeps the confirmed refund and its existing lock intact.
   const exclusao = await corpo(await anular(db, session));
-  assert.equal(exclusao.status, 200);
+  assert.equal(exclusao.status, 409);
+  assert.equal(exclusao.body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
   assert.equal(
     await app.orderVoid.temEstornoAnulacaoAtivo(db, 1),
     true,
@@ -862,7 +864,8 @@ test("M3 inversa: intenção calculada antes de um refund manual é recusada pel
     [["CONFIRMADO", 7000]]
   );
 
-  // O pagamento está neutralizado (manual + MP): a anulação passa a ser possível.
+  // Even a neutralized payment retains remote Pix history under containment.
   const exclusao = await corpo(await anular(db, session));
-  assert.equal(exclusao.status, 200, JSON.stringify(exclusao.body));
+  assert.equal(exclusao.status, 409, JSON.stringify(exclusao.body));
+  assert.equal(exclusao.body.code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
 });

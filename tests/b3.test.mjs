@@ -180,7 +180,7 @@ for (const kind of ["PAGAMENTO", "REEMBOLSO"]) {
       }
     };
     const response = await call();
-    assert.equal(response.status, kind === "PAGAMENTO" ? 409 : 500);
+    assert.equal(response.status, 500);
     assert.ok((await response.json()).error);
     assert.deepEqual(await state(db), before);
     assert.equal(

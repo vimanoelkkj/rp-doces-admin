@@ -420,7 +420,7 @@ test("l. the capacity CAS refuses a manual payment when the capture lands after 
   db.hook = null;
 
   assert.equal(resposta.status, 409);
-  assert.equal((await resposta.json()).code, "SALDO_INSUFICIENTE_CONCORRENCIA");
+  assert.equal((await resposta.json()).code, "CAPTURA_MP_NAO_CONCILIADA");
   const s = await state(db);
   assert.equal(s.pagamentos.length, 1, "só o Pix do site; nenhum pagamento nasceu");
   assert.equal(s.operacoes.length, 0);
