@@ -81,8 +81,8 @@ export default function CartWidget({
     if (isOpen) {
       const activeEl = document.activeElement as HTMLElement | null;
       lastFocusedElementRef.current = activeEl;
-      // O clique do FAB dá blur() antes de onOpen(), então aqui o elemento
-      // ativo já é o body: a origem foi registrada no onClick do FAB.
+      // A origem no FAB é registrada tanto pelo onClick quanto pelo activeElement
+      // no momento da abertura, garantindo foco devolvido corretamente ao fechar.
       openedByFabRef.current =
         openedByFabRef.current ||
         Boolean(
@@ -205,9 +205,8 @@ export default function CartWidget({
             ref={cartFabRef}
             key="cart-fab"
             className="cart-fab"
-            onClick={e => {
+            onClick={() => {
               openedByFabRef.current = true;
-              e.currentTarget.blur();
               onOpen();
             }}
             aria-label="Abrir carrinho"
@@ -281,8 +280,7 @@ export default function CartWidget({
                   type="button"
                   ref={closeButtonRef}
                   className="cart-close-btn"
-                  onClick={e => {
-                    e.currentTarget.blur();
+                  onClick={() => {
                     onClose();
                   }}
                   aria-label="Fechar"

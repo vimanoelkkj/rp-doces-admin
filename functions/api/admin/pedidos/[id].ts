@@ -375,7 +375,17 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     // Cancelar o pedido não terminaliza cobranças MP. A liberação revalida
     // o líquido e a ausência de Pix pendente dentro da transação física.
     if (novoStatus === "CANCELADO") {
-      await liberarReservaPedido(env.DB, id);
+      // ok:true com liberado:false e legitimo (guards B4 recusaram). ok:false e falha de
+      // infra depois do commit do status: o pedido ja esta CANCELADO, a reserva nao.
+      // Repetir este PATCH conclui a liberacao (o UPDATE acima e idempotente).
+      const liberacao = await liberarReservaPedido(env.DB, id);
+      if (!liberacao.ok) {
+        return jsonError(
+          "Pedido cancelado, mas a reserva de estoque não foi liberada. Repita o cancelamento para concluir a liberação.",
+          500,
+          "LIBERACAO_RESERVA_FALHOU"
+        );
+      }
     }
 
     return Response.json({ ok: true, statusPedido: novoStatus });

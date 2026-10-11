@@ -44,8 +44,7 @@ export const CartItemRow = forwardRef<HTMLDivElement, CartItemRowProps>(function
         <div className="cart-qty-controls">
           <button
             type="button"
-            onClick={e => {
-              e.currentTarget.blur();
+            onClick={() => {
               onUpdateQuantity(item.id, item.quantity - 1);
             }}
             aria-label={`Diminuir quantidade de ${item.name}`}
@@ -64,8 +63,7 @@ export const CartItemRow = forwardRef<HTMLDivElement, CartItemRowProps>(function
           </motion.span>
           <button
             type="button"
-            onClick={e => {
-              e.currentTarget.blur();
+            onClick={() => {
               onUpdateQuantity(item.id, item.quantity + 1);
             }}
             disabled={isAtStockLimit}
