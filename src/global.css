@@ -208,4 +208,8 @@ html.menu-open #root {
   :root {
     --app-header-height: 56px;
   }
+
+  ::view-transition-new(root) {
+    clip-path: none;
+  }
 }
