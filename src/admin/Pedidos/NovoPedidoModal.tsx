@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useId } from "react";
+import { useState, useRef, useEffect, useId, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { novaOperationKey } from "../../lib/operationKey";
 import type { ProdutoAdmin } from "../Produtos/AdminProdutos";
@@ -41,8 +41,55 @@ export default function NovoPedidoModal({ open, onClose, onCreated }: NovoPedido
   // (que, nascendo PAGO, também produziria uma segunda baixa de estoque).
   // Se o operador ALTERA o formulário e envia de novo, isso é uma intenção
   // diferente e recebe uma key nova.
+  const [erroCatalogo, setErroCatalogo] = useState<string | null>(null);
+  const catalogoSeqRef = useRef(0);
+  const catalogoErroRef = useRef<HTMLDivElement>(null);
+  const abertoRef = useRef(open);
+  abertoRef.current = open;
+  const [focoAposRetry, setFocoAposRetry] = useState(false);
   const operationKeyRef = useRef<string | null>(null);
   const assinaturaRef = useRef<string | null>(null);
+
+  // Recarrega só o catálogo (sem tocar no formulário). Usado na abertura e no "Tentar novamente".
+  const carregarCatalogo = useCallback((comFoco = false) => {
+    // Só a leitura mais recente vale: reabrir o modal ou repetir o retry descarta as antigas.
+    const sequencia = ++catalogoSeqRef.current;
+    const atual = () => sequencia === catalogoSeqRef.current;
+    setLoading(true);
+    setErroCatalogo(null);
+    return fetch("/api/admin/produtos")
+      .then(async r => {
+        if (!r.ok) throw new Error("catalogo");
+        const corpo = (await r.json()) as { produtos?: ProdutoAdmin[] };
+        if (!Array.isArray(corpo?.produtos)) throw new Error("catalogo");
+        return corpo.produtos;
+      })
+      .then(lista => {
+        if (atual()) setProdutos(lista);
+      })
+      .catch(() => {
+        if (atual())
+          setErroCatalogo(
+            "Não foi possível carregar os produtos. Verifique a conexão e tente novamente."
+          );
+      })
+      .finally(() => {
+        if (!atual()) return;
+        setLoading(false);
+        // Durante o carregamento o formulario desmonta e leva o foco junto: so o retry
+        // manual devolve o foco, e apenas se o modal ainda estiver aberto.
+        if (comFoco && abertoRef.current) setFocoAposRetry(true);
+      });
+  }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: erroCatalogo decide o alvo do foco (bloco de erro ou primeiro campo)
+  useEffect(() => {
+    if (!focoAposRetry || loading) return;
+    setFocoAposRetry(false);
+    if (!open) return;
+    const alvo = catalogoErroRef.current ?? document.getElementById(`${fieldId}-cliente`);
+    if (alvo?.isConnected) alvo.focus();
+  }, [focoAposRetry, loading, open, fieldId, erroCatalogo]);
 
   // Reseta o formulário e recarrega o catálogo toda vez que o modal abre —
   // sem isso, o state da última venda registrada ficaria vazando pra
@@ -57,20 +104,12 @@ export default function NovoPedidoModal({ open, onClose, onCreated }: NovoPedido
     setObservation("");
     setError(null);
     setSaving(false);
-    setLoading(true);
     // Nova abertura do modal = nova intenção de venda.
     operationKeyRef.current = null;
     assinaturaRef.current = null;
-
-    fetch("/api/admin/produtos")
-      .then(async r => {
-        if (!r.ok) throw new Error("Falha ao carregar produtos");
-        return r.json() as Promise<{ produtos: ProdutoAdmin[] }>;
-      })
-      .then(catalogo => setProdutos(catalogo.produtos))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [open]);
+    setFocoAposRetry(false);
+    void carregarCatalogo();
+  }, [open, carregarCatalogo]);
 
   const produtosSelecionaveis = produtos.filter(
     p => p.ativo === 1 && p.disponivel === 1 && estoqueLivre(p) > 0
@@ -191,6 +230,18 @@ export default function NovoPedidoModal({ open, onClose, onCreated }: NovoPedido
 
         {!loading && (
           <form className="nped-body" onSubmit={handleSubmit}>
+            {erroCatalogo && (
+              <div className="nped-catalogo-erro" role="alert" ref={catalogoErroRef} tabIndex={-1}>
+                <p className="nped-error">{erroCatalogo}</p>
+                <button
+                  type="button"
+                  className="nped-catalogo-retry"
+                  onClick={() => carregarCatalogo(true)}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
             {error && <p className="nped-error">{error}</p>}
 
             {/* Cliente + WhatsApp */}

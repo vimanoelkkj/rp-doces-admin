@@ -1615,3 +1615,79 @@ test("manual intent integration: committed payment, lost response, reload and re
       await reloaded.load();
     });
 });
+
+test("manual payment: unparseable body and network loss show an uncertain-result message and keep the intent", async t => {
+  for (const mode of ["invalid-json", "network"]) {
+    const h = await harness(t);
+    await h.load();
+    await h.call(s => s.abrirRegistroPagamento());
+    await h.call(s => s.registrarPagamento());
+    const first = h.requests.at(-1);
+    if (mode === "network") await h.call(() => first.reject(new TypeError("Failed to fetch")));
+    else
+      await h.call(() =>
+        first.resolve({
+          ok: false,
+          status: 502,
+          json: async () => {
+            throw new SyntaxError("Unexpected token '<'");
+          }
+        })
+      );
+    assert.match(h.state.pagamentoError, /confirmar o resultado do pagamento/, mode);
+    assert.doesNotMatch(h.state.pagamentoError, /Unexpected|SyntaxError|Failed to fetch/, mode);
+    assert.equal(savedIntents()[0].operationKey, first.body.operationKey, mode);
+    await h.call(s => s.registrarPagamento());
+    assert.deepEqual(h.requests.at(-1).body, first.body, `${mode}: same key and payload on retry`);
+  }
+});
+
+test("status: LIBERACAO_RESERVA_FALHOU reloads detail, notifies the list and keeps the message", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => s.alterarStatus("CANCELADO"));
+  const patch = h.requests.at(-1);
+  assert.deepEqual(patch.body, { statusPedido: "CANCELADO" });
+  const before = h.requests.length;
+  await h.reply(
+    patch,
+    {
+      error: "Pedido cancelado, mas a reserva não foi liberada.",
+      code: "LIBERACAO_RESERVA_FALHOU"
+    },
+    500
+  );
+  assert.equal(h.state.statusError, "Pedido cancelado, mas a reserva não foi liberada.");
+  assert.ok(h.requests.length > before, "detail reload requested");
+  assert.match(h.requests.at(-1).url, /\/api\/admin\/pedidos\/1(\/reconciliar)?$/);
+  assert.ok(h.events.includes("status:old"), "list notified");
+});
+
+test("status: other 500 does not reload or notify; network loss gets a friendly message", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.call(s => s.alterarStatus("ENTREGUE"));
+  const before = h.requests.length;
+  await h.reply(h.requests.at(-1), { error: "boom" }, 500);
+  assert.equal(h.state.statusError, "boom");
+  assert.equal(h.requests.length, before);
+  assert.ok(!h.events.includes("status:old"));
+  await h.call(s => s.alterarStatus("ENTREGUE"));
+  await h.call(() => h.requests.at(-1).reject(new TypeError("Failed to fetch")));
+  assert.match(h.state.statusError, /confirmar a alteração de status/);
+});
+
+test("status: internal TypeError after a successful PATCH is not reported as lost network", async t => {
+  const h = await harness(t);
+  await h.load();
+  await h.render({
+    onStatusChanged: () => {
+      throw new TypeError("bug do consumidor");
+    }
+  });
+  await h.call(s => s.alterarStatus("ENTREGUE"));
+  await h.reply(h.requests.at(-1), {});
+  assert.match(h.state.statusError, /Erro inesperado na tela/);
+  assert.doesNotMatch(h.state.statusError, /confirmar a alteração de status/);
+  assert.equal(h.state.data.pedido.status_pedido, "ENTREGUE", "PATCH aplicado permanece refletido");
+});

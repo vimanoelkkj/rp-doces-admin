@@ -442,6 +442,25 @@
   margin: 0;
 }
 
+.nped-catalogo-erro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.nped-catalogo-retry {
+  padding: 6px 14px;
+  border: 1px solid #d9c8c2;
+  border-radius: 999px;
+  background: #fff;
+  color: #634738;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .nped-blocked-notice {
   margin: 0;
   padding: 12px 14px;
