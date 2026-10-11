@@ -312,7 +312,9 @@ test("MP confirmado exige estorno real por pagamento; sem refund implicito", asy
     )
     .run();
   const refunds = (await state(db)).refunds;
-  assert.equal((await anular(db, session)).status, 200);
+  const response = await anular(db, session);
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
   assert.deepEqual((await state(db)).refunds, refunds);
   assert.equal(network, 0);
 });
@@ -325,7 +327,7 @@ for (const status of ["PENDENTE", "EXPIRADO"])
     const before = await state(db);
     const response = await anular(db, session);
     assert.equal(response.status, 409);
-    assert.equal((await response.json()).code, "ANULACAO_MP_PENDENTE");
+    assert.equal((await response.json()).code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
     assert.deepEqual(await state(db), before);
     assert.equal((await db.prepare("SELECT COUNT(*) n FROM pedido_anulacoes").first()).n, 0);
   });

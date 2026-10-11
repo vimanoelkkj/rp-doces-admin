@@ -20,7 +20,7 @@ import {
   type OperacaoRow
 } from "./operacoes";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
-import { financialLineageMembership } from "./financialCoverage";
+import { capturaNaoConciliadaNoPedidoSql, financialLineageMembership } from "./financialCoverage";
 import { preparePedidoPhysicalProjection } from "./stock";
 import { getFinanceiroPedido } from "./comandaLedger";
 import { temEstornoAnulacaoAtivo } from "./pedidoAnulacao";
@@ -81,6 +81,7 @@ type CancellationError =
   | "PREVIEW_OBSOLETO"
   | "ESTOQUE_ACAO_INVALIDA"
   | "PIX_PENDENTE"
+  | "CAPTURA_MP_NAO_CONCILIADA"
   | "CANCELAMENTO_NAO_ENCONTRADO"
   | "CANCELAMENTO_NAO_AGUARDANDO"
   | "PAGAMENTO_ALOCACAO_INVALIDA"
@@ -112,6 +113,25 @@ interface CancellationRow {
 }
 
 const METODOS_MANUAIS = new Set(["DINHEIRO", "CARTAO", "PIX_EXTERNO"]);
+
+// Recusa financeira intencional: primeira instrucao do batch, na mesma transacao do INSERT. Com
+// captura nao conciliada ela forca um erro SQL proprio (json_extract de JSON malformado), que
+// reverte o batch inteiro antes de qualquer escrita. Nenhuma outra instrucao deste batch faz
+// parse de JSON (o snapshot e apenas bindado como texto), logo esta mensagem so existe quando o
+// guard disparou. FK, I/O e falhas transitorias nunca a produzem.
+const CAPTURA_GUARD_ERRO = /malformed JSON/i;
+
+function prepareCapturaGuard(db: D1Database, pedidoId: number): D1PreparedStatement {
+  return db
+    .prepare(
+      `SELECT CASE WHEN ${capturaNaoConciliadaNoPedidoSql("?")} THEN json_extract('{', '$') END`
+    )
+    .bind(pedidoId);
+}
+
+function isCapturaGuardError(error: unknown): boolean {
+  return CAPTURA_GUARD_ERRO.test(error instanceof Error ? error.message : "");
+}
 
 function acaoValida(estado: string, acao: string): acao is AcaoEstoqueCancelamento | "REPOR" {
   if (estado === "RESERVADO") return acao === "LIBERAR_RESERVA";
@@ -322,6 +342,7 @@ function finalizationStatements(
     WHERE ${ownerSql} AND c.pedido_id=${pedidoId} AND pi.id=${itemId}
       AND c.status IN ('SOLICITADO','AGUARDANDO_REEMBOLSO','INCONCLUSIVO')
       AND pi.status_item='ATIVO' AND ${noCoverage}
+      AND NOT ${capturaNaoConciliadaNoPedidoSql("c.pedido_id")}
       AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos px
                       WHERE px.pedido_id=c.pedido_id AND px.metodo='PIX_MP' AND px.status='PENDENTE')
   )`;
@@ -435,6 +456,9 @@ export async function createItemCancellation(
   if (preview.previewFingerprint !== params.previewFingerprint) {
     return { ok: false, erro: "PREVIEW_OBSOLETO", preview };
   }
+  if (preview.bloqueios.some(b => b.codigo === "CAPTURA_MP_NAO_CONCILIADA")) {
+    return { ok: false, erro: "CAPTURA_MP_NAO_CONCILIADA", preview };
+  }
   if (preview.bloqueios.some(b => b.codigo === "PIX_PENDENTE")) {
     return { ok: false, erro: "PIX_PENDENTE", preview };
   }
@@ -464,6 +488,7 @@ export async function createItemCancellation(
                      WHERE t.item_origem_id=pi.id AND t.status<>'FALHOU')
       AND NOT EXISTS(SELECT 1 FROM pedido_pagamentos px
                      WHERE px.pedido_id=p.id AND px.metodo='PIX_MP' AND px.status='PENDENTE')
+      AND NOT ${capturaNaoConciliadaNoPedidoSql("p.id")}
       AND ${guard.sql}`
     )
     .bind(
@@ -488,7 +513,7 @@ export async function createItemCancellation(
     fase: "CONCLUIDA",
     fonte: fonteCancelamentoCriado(params.pedidoId, params.itemId)
   });
-  const statements = [insert, claim];
+  const statements = [prepareCapturaGuard(db, params.pedidoId), insert, claim];
   if (status === "SOLICITADO") {
     statements.push(
       ...finalizationStatements(
@@ -502,10 +527,13 @@ export async function createItemCancellation(
   }
   try {
     const results = await db.batch(statements);
-    if (Number(results[0]?.meta?.changes || 0) !== 1) {
+    if (Number(results[1]?.meta?.changes || 0) !== 1) {
       const atual = await getItemCancellationPreview(db, params.pedidoId, params.itemId).catch(
         () => undefined
       );
+      if (atual?.bloqueios.some(b => b.codigo === "CAPTURA_MP_NAO_CONCILIADA")) {
+        return { ok: false, erro: "CAPTURA_MP_NAO_CONCILIADA", preview: atual };
+      }
       return { ok: false, erro: "PREVIEW_OBSOLETO", preview: atual };
     }
   } catch (error) {
@@ -522,6 +550,14 @@ export async function createItemCancellation(
       .bind(params.pedidoId, params.itemId)
       .first();
     if (competingExchange) return { ok: false, erro: "PREVIEW_OBSOLETO" };
+    // Recusa comprovada pela propria transacao (guard acima): 409. Qualquer outra falha de D1,
+    // inclusive FK, e erro real e propaga; nao ha inferencia por mensagem generica nem releitura.
+    if (isCapturaGuardError(error)) {
+      const atual = await getItemCancellationPreview(db, params.pedidoId, params.itemId).catch(
+        () => undefined
+      );
+      return { ok: false, erro: "CAPTURA_MP_NAO_CONCILIADA", preview: atual };
+    }
     throw error;
   }
   const op = await buscarOperacao(db, parsed.key);

@@ -39,6 +39,36 @@ export interface CancelamentoPreview {
   bloqueios: Array<{ codigo: string; mensagem: string }>;
   cancelamentoExecutavel: boolean;
 }
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+const isStr = (v: unknown) => typeof v === "string";
+const isNum = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+const ACOES = ["LIBERAR_RESERVA", "NAO_REPOR", "NENHUMA"];
+// Todos os campos que a renderizacao do preview consome. Resposta parcial nunca vira estado.
+function previewRenderizavel(p: unknown): p is CancelamentoPreview {
+  if (!isObj(p) || !isStr(p.previewFingerprint) || typeof p.cancelamentoExecutavel !== "boolean")
+    return false;
+  const { item, financeiro, estoque, pagamentos, bloqueios } = p;
+  return (
+    isObj(item) &&
+    isStr(item.nome) &&
+    isNum(item.quantidade) &&
+    isNum(item.valorCentavos) &&
+    isStr(item.estoqueEstado) &&
+    isObj(financeiro) &&
+    isNum(financeiro.valorItemCentavos) &&
+    isNum(financeiro.coberturaConfirmadaCentavos) &&
+    isNum(financeiro.valorNaoPagoCentavos) &&
+    isNum(financeiro.reembolsoNecessarioCentavos) &&
+    isObj(estoque) &&
+    isStr(estoque.estadoAtual) &&
+    isStr(estoque.acaoPadrao) &&
+    ACOES.includes(estoque.acaoPadrao as string) &&
+    Array.isArray(pagamentos) &&
+    pagamentos.every(x => isObj(x) && isStr(x.metodo) && isNum(x.reembolsoPropostoCentavos)) &&
+    Array.isArray(bloqueios) &&
+    bloqueios.every(b => isObj(b) && isStr(b.codigo) && isStr(b.mensagem))
+  );
+}
 export interface Cancelamento {
   id: number;
   status: string;
@@ -133,9 +163,26 @@ export default function CancelamentoItemPreviewModal({
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        if (body.code === "PREVIEW_OBSOLETO" && body.preview) {
+        if (body.code === "PREVIEW_OBSOLETO" && previewRenderizavel(body.preview)) {
           setPreview(body.preview);
           setAcao(body.preview.estoque.acaoPadrao);
+          operationKey.current = novaOperationKey();
+        }
+        if (body.code === "CAPTURA_MP_NAO_CONCILIADA") {
+          let atual: CancelamentoPreview | undefined =
+            previewRenderizavel(body.preview) && !body.preview.cancelamentoExecutavel
+              ? body.preview
+              : undefined;
+          if (!atual) {
+            const novo: unknown = await fetch(
+              `/api/admin/pedidos/${orderId}/itens/${itemId}/cancelamento-preview`
+            )
+              .then(r => (r.ok ? r.json() : undefined))
+              .catch(() => undefined);
+            if (previewRenderizavel(novo)) atual = novo;
+          }
+          // Sem preview confiavel, nunca deixa a acao financeira habilitada.
+          setPreview(atual ?? { ...preview, cancelamentoExecutavel: false });
           operationKey.current = novaOperationKey();
         }
         throw new Error(body.error ?? "Falha ao cancelar item");

@@ -893,3 +893,88 @@ for (const mutation of mutations) {
     await assert.rejects(() => mutation.contract(t, mutated), { code: "ERR_ASSERTION" });
   });
 }
+
+function bloqueado(fingerprint) {
+  const p = preview({ fingerprint });
+  p.cancelamentoExecutavel = false;
+  p.bloqueios = [{ codigo: "CAPTURA_MP_NAO_CONCILIADA", mensagem: "Captura nao conciliada" }];
+  return p;
+}
+const capturaErro = extra =>
+  response({ error: "Captura", code: "CAPTURA_MP_NAO_CONCILIADA", ...extra }, false);
+const confirmDisabled = () => document.querySelector(".cancelpreview-confirm").disabled;
+const blocks = () =>
+  [...document.querySelectorAll(".cancelpreview-block")].map(node => node.textContent);
+
+test("CAPTURA_MP_NAO_CONCILIADA com preview válido atualiza bloqueios e desabilita a ação", async t => {
+  const h = await harness(t);
+  h.post = capturaErro({ preview: bloqueado("preview-2") });
+  await h.submit();
+  assert.equal(confirmDisabled(), true);
+  assert.deepEqual(blocks(), ["Captura nao conciliada"]);
+  assert.equal(h.calls.filter(c => c.url.endsWith("/cancelamento-preview")).length, 1);
+  await h.submit();
+  assert.equal(h.posts().length, 1, "ação bloqueada não reenvia");
+});
+
+test("CAPTURA_MP_NAO_CONCILIADA sem preview busca um novo pelo fluxo existente", async t => {
+  const h = await harness(t);
+  h.post = capturaErro();
+  h.preview = bloqueado("preview-3");
+  await h.submit();
+  assert.equal(h.calls.filter(c => c.url.endsWith("/cancelamento-preview")).length, 2);
+  assert.equal(confirmDisabled(), true);
+  assert.deepEqual(blocks(), ["Captura nao conciliada"]);
+});
+
+test("CAPTURA_MP_NAO_CONCILIADA com preview inválido e refetch falho nunca deixa a ação habilitada", async t => {
+  const h = await harness(t, {
+    route: (call, state) =>
+      call.url.endsWith("/cancelamento-preview") && state.calls.some(c => c.method === "POST")
+        ? response({}, false)
+        : undefined
+  });
+  h.post = capturaErro({ preview: { ...preview(), cancelamentoExecutavel: true } });
+  await h.submit();
+  assert.equal(confirmDisabled(), true);
+});
+
+const parciais = {
+  "sem item": p => delete p.item,
+  "sem financeiro": p => delete p.financeiro,
+  "sem pagamentos": p => delete p.pagamentos,
+  "estoque sem acaoPadrao": p => delete p.estoque.acaoPadrao,
+  "bloqueio sem mensagem": p => (p.bloqueios = [{ codigo: "X" }])
+};
+for (const [nome, quebrar] of Object.entries(parciais)) {
+  for (const onde of ["POST", "refetch"]) {
+    test(`preview parcial (${nome}) no ${onde} mantém modal estável e confirmação desabilitada`, async t => {
+      const h = await harness(t);
+      const ruim = bloqueado("preview-ruim");
+      quebrar(ruim);
+      if (onde === "POST") {
+        h.post = capturaErro({ preview: ruim });
+        h.preview = ruim;
+      } else {
+        h.post = capturaErro();
+        h.preview = ruim;
+      }
+      await h.submit();
+      assert.ok(document.querySelector(".cancelpreview-card"), "modal continua montado");
+      assert.equal(confirmDisabled(), true);
+      assert.equal(document.querySelector(".cancelpreview-error").textContent, "Captura");
+      assert.equal(value("Valor do item"), "R$ 30,03");
+    });
+  }
+}
+
+test("PREVIEW_OBSOLETO com preview parcial não substitui o estado nem derruba o modal", async t => {
+  const h = await harness(t);
+  const ruim = preview({ fingerprint: "preview-2" });
+  delete ruim.financeiro;
+  h.post = response({ error: "Review again", code: "PREVIEW_OBSOLETO", preview: ruim }, false);
+  await h.submit();
+  assert.ok(document.querySelector(".cancelpreview-card"));
+  await h.submit();
+  assert.equal(h.posts()[1].body.previewFingerprint, "preview-1");
+});
