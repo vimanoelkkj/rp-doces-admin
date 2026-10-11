@@ -1412,3 +1412,10 @@ html[data-theme="light"]
   transform: scale(1.1);
   background: var(--store-btn-primary-hover);
 }
+
+@media (max-width: 768px) {
+  .back-to-top {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+  }
+}
