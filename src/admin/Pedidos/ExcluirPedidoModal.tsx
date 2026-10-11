@@ -20,6 +20,12 @@ interface EstadoEstorno {
 }
 
 const POLL_MS = 3000;
+const ESTORNO_INCERTO =
+  "Não foi possível confirmar o resultado do estorno. Confira o estado abaixo antes de tentar de novo; a nova tentativa usa a mesma operação.";
+const ERRO_TELA =
+  "Erro inesperado na tela depois de enviar a solicitação. Atualize a lista e confira o pedido antes de tentar de novo.";
+const EXCLUSAO_INCERTA =
+  "Não foi possível confirmar se o pedido foi excluído. Atualize a lista e confira o pedido antes de tentar de novo.";
 
 function formatarCentavos(valor: number): string {
   return (valor / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -139,12 +145,23 @@ export default function ExcluirPedidoModal({
     setEstornando(true);
     setErroEstorno(null);
     try {
+      // Perda de rede: so isto e "rede". Qualquer outro erro e da propria tela (ERRO_TELA).
       const response = await fetch(`/api/admin/pedidos/${orderId}/anulacao/estorno`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ operationKey: operationKeyRef.current })
-      });
-      const body = await response.json();
+      }).catch(() => null);
+      if (!response) {
+        setErroEstorno(ESTORNO_INCERTO);
+        return;
+      }
+      // Sem JSON (proxy/gateway) o resultado e desconhecido: nao se afirma falha nem se
+      // reenvia. A mesma operationKey permanece para uma nova tentativa explicita.
+      const body = await response.json().catch(() => null);
+      if (body === null) {
+        setErroEstorno(ESTORNO_INCERTO);
+        return;
+      }
       if (!response.ok) {
         setErroEstorno(body?.error ?? "Não foi possível processar o estorno.");
         return;
@@ -152,7 +169,7 @@ export default function ExcluirPedidoModal({
       const lido = lerEstorno(body);
       if (lido) registrarEstorno(lido);
     } catch {
-      setErroEstorno("Falha de rede ao processar o estorno. Tente novamente.");
+      setErroEstorno(ERRO_TELA);
     } finally {
       setEstornando(false);
     }
@@ -169,15 +186,17 @@ export default function ExcluirPedidoModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ devolverEstoque: devolver, motivo })
-      });
-      const body = await response.json();
+      }).catch(() => null);
+      if (!response) throw new Error(EXCLUSAO_INCERTA);
+      const body = await response.json().catch(() => null);
+      if (body === null) throw new Error(EXCLUSAO_INCERTA);
       if (!response.ok) throw new Error(body.error ?? "Não foi possível excluir o pedido.");
       window.dispatchEvent(
         new window.CustomEvent("pedido-anulado", { detail: { pedidoId: orderId } })
       );
       onDeleted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao excluir pedido. Tente novamente.");
+      setError(err instanceof Error && !(err instanceof TypeError) ? err.message : ERRO_TELA);
     } finally {
       savingRef.current = false;
       setSaving(false);

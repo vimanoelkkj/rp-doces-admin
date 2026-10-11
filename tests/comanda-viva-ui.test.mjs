@@ -1363,7 +1363,10 @@ test("pagamento com resposta perdida pode ser retomado após fechar o detalhe co
     await ui.act(async () => button("Registrar pagamento").click());
     await ui.act(async () => button("Confirmar pagamento").click());
     await flush();
-    assert.match(document.querySelector(".pedmodal-status-error").textContent, /response lost/);
+    assert.match(
+      document.querySelector(".pedmodal-status-error").textContent,
+      /Não foi possível confirmar o resultado do pagamento\. A tentativa foi preservada:/
+    );
     await ui.act(async () => button("Cancelar").click());
     await ui.act(async () => button("Retomar pagamento").click());
     assert.equal(document.querySelector('input[aria-label="Valor recebido"]').value, "40,00");

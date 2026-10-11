@@ -17,6 +17,13 @@ import {
 import "./AdicionarItemModal.css";
 import "./CancelamentoItemPreviewModal.css";
 
+const TROCA_INCERTA =
+  "Não foi possível confirmar o resultado da troca. Confira o pedido antes de tentar de novo.";
+const ERRO_TELA =
+  "Erro inesperado na tela ao concluir a operação. Atualize o pedido e confira o resultado antes de tentar de novo.";
+const DEVOLUCAO_INCERTA =
+  "Não foi possível confirmar a devolução. Tente de novo: a mesma operação é reaproveitada, sem duplicar.";
+
 export default function TrocarItemModal({
   orderId,
   item,
@@ -55,8 +62,9 @@ export default function TrocarItemModal({
       reconciliarPedido(orderId)
         .then(() => fetch(`/api/admin/pedidos/${orderId}/itens/${item.id}/trocas`))
         .then(async r => {
-          const b = await r.json();
-          if (!r.ok) throw new Error(b.error);
+          const b = await r.json().catch(() => null);
+          if (!r.ok) throw new Error(b?.error || "Falha ao carregar a troca");
+          if (!b?.troca) throw new Error("Resposta inesperada ao carregar a troca");
           return b;
         })
         .then(b => {
@@ -66,7 +74,7 @@ export default function TrocarItemModal({
           }
         })
         .catch(e => {
-          if (active) setError(e.message);
+          if (active) setError(e instanceof TypeError ? "Falha ao carregar a troca" : e.message);
         })
         .finally(() => {
           if (active) setLoading(false);
@@ -76,8 +84,12 @@ export default function TrocarItemModal({
       };
     }
     fetch("/api/admin/produtos")
-      .then(r => r.json())
-      .then((b: { produtos: ProdutoAdmin[] }) => {
+      .then(async r => {
+        const b = await r.json().catch(() => null);
+        if (!r.ok || !Array.isArray(b?.produtos)) throw new Error("Falha ao carregar produtos");
+        return b as { produtos: ProdutoAdmin[] };
+      })
+      .then(b => {
         if (active) {
           setProducts(b.produtos.filter(p => p.ativo === 1 && p.disponivel === 1));
         }
@@ -118,11 +130,22 @@ export default function TrocarItemModal({
           setError(null);
         }
       })
-      .catch(e => active && setError(e.message));
+      .catch(
+        e => active && setError(e instanceof TypeError ? "Falha ao calcular troca" : e.message)
+      );
     return () => {
       active = false;
     };
   }, [action, item.id, orderId, price, product, quantity]);
+  // O fato financeiro ja foi aplicado quando isto roda: falha ao atualizar a lista nao pode
+  // virar "resultado incerto" nem reabrir a operacao.
+  const notificarMudanca = async (rotulo: string) => {
+    try {
+      await onChanged();
+    } catch (err) {
+      console.error(`Falha ao atualizar apos ${rotulo}`, err);
+    }
+  };
   const confirm = async () => {
     if (!preview || !product || saving) return;
     const signature = JSON.stringify({
@@ -139,6 +162,7 @@ export default function TrocarItemModal({
     setSaving(true);
     setError(null);
     try {
+      // Perda de rede: a requisicao pode ter chegado. Nao e falha definitiva.
       const r = await fetch(`/api/admin/pedidos/${orderId}/itens/${item.id}/trocas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,13 +174,21 @@ export default function TrocarItemModal({
           estoqueAcaoOrigem: action,
           previewFingerprint: preview.previewFingerprint
         })
+      }).catch(() => {
+        throw new Error(TROCA_INCERTA);
       });
-      const b = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(b.error ?? "Falha ao executar troca");
+      // 5xx ou corpo ilegivel (HTML de gateway): a troca pode ter sido aplicada.
+      const b = await r.json().catch(() => null);
+      if (!r.ok) {
+        const incerto = b === null || r.status >= 500;
+        throw new Error(incerto ? TROCA_INCERTA : (b.error ?? "Falha ao executar troca"));
+      }
+      if (!b?.troca) throw new Error(TROCA_INCERTA);
       setExchange(b.troca);
-      await onChanged();
+      // Fato ja aplicado: falha ao atualizar a lista nao pode virar "resultado incerto".
+      await notificarMudanca("troca");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao executar troca");
+      setError(e instanceof Error && !(e instanceof TypeError) ? e.message : ERRO_TELA);
     } finally {
       setSaving(false);
     }
@@ -181,15 +213,21 @@ export default function TrocarItemModal({
           valorCentavos: leg.valorCentavos,
           confirmacao: true
         })
+      }).catch(() => {
+        throw new Error(DEVOLUCAO_INCERTA);
       });
-      const b = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(b.error ?? "Falha ao registrar devolução");
+      const b = await r.json().catch(() => null);
+      if (!r.ok) {
+        const incerto = b === null || r.status >= 500;
+        throw new Error(incerto ? DEVOLUCAO_INCERTA : (b.error ?? "Falha ao registrar devolução"));
+      }
+      if (!b?.troca) throw new Error(DEVOLUCAO_INCERTA);
       if (b.refundStatus === "CONFIRMADO" || !b.refundStatus)
         refundKeys.current.delete(leg.pagamentoAlocacaoId);
       setExchange(b.troca);
-      await onChanged();
+      await notificarMudanca("devolucao");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao registrar devolução");
+      setError(e instanceof Error && !(e instanceof TypeError) ? e.message : ERRO_TELA);
     } finally {
       setSaving(false);
     }
