@@ -11,6 +11,9 @@ import {
   storePaymentIntent
 } from "./manualPaymentIntent";
 
+const RESULTADO_INCERTO =
+  "Não foi possível confirmar o resultado do pagamento. A tentativa foi preservada: confira o pedido e retome com o mesmo valor, sem duplicar.";
+
 interface UsePedidoDetalhePagamentoArgs {
   orderId: number;
   capacidadeCobravelCentavos: number | undefined;
@@ -110,8 +113,15 @@ export function usePedidoDetalhePagamento({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ metodo: metodoPagamento, valorCentavos, operationKey })
     })
+      // Falha de rede: a requisicao pode ter chegado. Mensagem sem erro tecnico do navegador.
+      .catch(() => {
+        throw new Error(RESULTADO_INCERTO);
+      })
       .then(async response => {
-        const body = await response.json();
+        // Resposta sem JSON (proxy/gateway): o servidor pode ter registrado o pagamento.
+        // A tentativa continua pendente e preservada; nunca se afirma falha definitiva.
+        const body = await response.json().catch(() => null);
+        if (body === null) throw new Error(RESULTADO_INCERTO);
         if (!response.ok) {
           if (
             typeof body?.error === "string" &&

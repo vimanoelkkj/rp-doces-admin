@@ -125,7 +125,9 @@ export default function AdminPedidos() {
       const requisicao = fetch(`/api/admin/pedidos?${params.toString()}`)
         .then(async response => {
           if (!response.ok) throw new Error("Falha ao carregar pedidos");
-          return response.json() as Promise<PedidosResponse>;
+          return response.json().catch(() => {
+            throw new Error("Resposta inesperada ao carregar pedidos");
+          }) as Promise<PedidosResponse>;
         })
         .then(result => {
           if (!obsoleto()) pageCacheRef.current.set(page, result);
@@ -169,7 +171,11 @@ export default function AdminPedidos() {
       })
       .catch(err => {
         if (obsoleto()) return;
-        setError(err.message);
+        setError(
+          err instanceof TypeError
+            ? "Não foi possível carregar os pedidos. Verifique a conexão e tente novamente."
+            : err.message
+        );
         setLoading(false);
       });
 
@@ -266,6 +272,7 @@ export default function AdminPedidos() {
           loading={loading}
           error={error}
           onSelectOrder={setSelectedOrderId}
+          onRetry={() => setRefreshKey(k => k + 1)}
         />
         <PedidosPaginacao
           startItem={startItem}
