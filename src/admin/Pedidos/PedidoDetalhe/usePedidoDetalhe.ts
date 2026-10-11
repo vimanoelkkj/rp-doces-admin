@@ -9,6 +9,11 @@ interface UsePedidoDetalheArgs {
   onStatusChanged?: () => void;
 }
 
+const STATUS_INCERTO =
+  "Não foi possível confirmar a alteração de status. Atualize o pedido e confira antes de tentar de novo.";
+const ERRO_TELA_STATUS =
+  "Erro inesperado na tela depois de alterar o status. Atualize o pedido e confira o resultado.";
+
 export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedidoDetalheArgs) {
   const [data, setData] = useState<PedidoDetalheResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -207,9 +212,19 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ statusPedido: novoStatus })
     })
+      // So a falha do fetch e "rede"; um TypeError interno depois disso e erro da tela.
+      .catch(() => {
+        throw new Error(STATUS_INCERTO);
+      })
       .then(async response => {
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
+          // O pedido JA foi cancelado; so a liberacao da reserva falhou. Mostra o estado real
+          // (detalhe e lista) e preserva a mensagem; repetir o cancelamento conclui a liberacao.
+          if (body.code === "LIBERACAO_RESERVA_FALHOU") {
+            void carregarPedido(true);
+            onStatusChangedRef.current?.();
+          }
           throw new Error(body.error ?? "Falha ao alterar status");
         }
         setData(prev =>
@@ -217,7 +232,7 @@ export function usePedidoDetalhe({ orderId, onClose, onStatusChanged }: UsePedid
         );
         onStatusChanged?.();
       })
-      .catch(err => setStatusError(err.message))
+      .catch(err => setStatusError(err instanceof TypeError ? ERRO_TELA_STATUS : err.message))
       .finally(() => setAlterando(false));
   };
 

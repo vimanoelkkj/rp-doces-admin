@@ -669,7 +669,7 @@ test("refund saving disables all legs; confirmed exchange renders history and ca
 });
 
 for (const failure of ["network", "http", "json"]) {
-  test(`products GET ${failure}: current error handling`, async t => {
+  test(`products GET ${failure}: shows the error and never renders products from a failed response`, async t => {
     await harness(t, {
       route: call => {
         if (call.url === "/api/admin/produtos") {
@@ -681,7 +681,7 @@ for (const failure of ["network", "http", "json"]) {
                 throw new Error("invalid JSON");
               }
             };
-          // Products GET deliberately does not check response.ok.
+          // A non-OK response is a failure even if its body happens to carry a product list.
           return response({ produtos: products }, false);
         }
       }
@@ -689,7 +689,7 @@ for (const failure of ["network", "http", "json"]) {
     assert.equal(document.querySelector(".additem-loading"), null);
     assert.equal(
       document.querySelector(".additem-error")?.textContent ?? null,
-      failure === "http" ? null : "Falha ao carregar produtos"
+      "Falha ao carregar produtos"
     );
   });
 }
@@ -725,10 +725,19 @@ for (const endpoint of ["preview", "exchange", "refund"]) {
       if (endpoint !== "refund") await h.select();
       if (endpoint === "exchange") await h.submit();
       if (endpoint === "refund") await h.refund(0);
-      assert.equal(
-        document.querySelector(".additem-error").textContent,
-        failure === "network" ? "offline" : failure === "http" ? "Request rejected" : fallback
-      );
+      // Preview e leitura: falha e definitiva. Troca/devolucao (escrita financeira): perda de rede
+      // e corpo ilegivel sao resultado incerto, nunca "falha".
+      const escrita = endpoint !== "preview";
+      const mensagem = document.querySelector(".additem-error").textContent;
+      if (escrita && failure !== "http") {
+        assert.match(mensagem, /confirmar o resultado d[ae]|confirmar a devolu/);
+        assert.doesNotMatch(mensagem, /^Falha ao/);
+      } else {
+        assert.equal(
+          mensagem,
+          failure === "network" ? "offline" : failure === "http" ? "Request rejected" : fallback
+        );
+      }
       assert.equal(h.changed, 0);
       assert.equal(h.closed, 0);
       if (endpoint === "preview") {
@@ -852,4 +861,108 @@ for (const mutation of mutations) {
     const mutated = await compile(mutation);
     await assert.rejects(() => mutation.contract(t, mutated), { code: "ERR_ASSERTION" });
   });
+}
+
+for (const failure of ["empty-error", "invalid-json", "no-troca", "type-error"]) {
+  test(`existing exchange GET ${failure}: shows a message instead of a blank modal`, async t => {
+    await harness(t, {
+      props: { existingExchangeId: 51 },
+      route: call => {
+        if (call.url.endsWith("/trocas") && call.method === "GET") {
+          if (failure === "type-error") return Promise.reject(new TypeError("Failed to fetch"));
+          if (failure === "invalid-json")
+            return {
+              ok: false,
+              json: async () => {
+                throw new SyntaxError("Unexpected token '<'");
+              }
+            };
+          if (failure === "no-troca") return response({}, true);
+          return response({}, false);
+        }
+      }
+    });
+    const message = document.querySelector(".additem-error")?.textContent ?? "";
+    assert.ok(message.length > 0, "error must not be empty");
+    assert.doesNotMatch(message, /Unexpected|SyntaxError|Failed to fetch/);
+    assert.equal(document.querySelector(".additem-loading"), null);
+  });
+}
+
+test("exchange POST network TypeError: uncertain-result message without browser text", async t => {
+  const h = await harness(t, {
+    route: call => {
+      if (call.method === "POST" && call.url.endsWith("/trocas"))
+        return Promise.reject(new TypeError("Failed to fetch"));
+    }
+  });
+  await h.select();
+  await h.submit();
+  assert.match(
+    document.querySelector(".additem-error").textContent,
+    /confirmar o resultado da troca/
+  );
+  assert.equal(h.changed, 0);
+});
+
+test("exchange applied but list refresh fails: no uncertain-result message, exchange shown", async t => {
+  const h = await harness(t, {
+    props: {
+      onChanged: () => {
+        throw new TypeError("refresh bug");
+      }
+    }
+  });
+  t.mock.method(console, "error", () => {});
+  await h.select();
+  h.post = response({ troca: exchange("CONCLUIDA") });
+  await h.submit();
+  assert.equal(document.querySelector(".additem-error"), null);
+  assert.ok(document.querySelector(".cancelpreview-success"), "exchange result rendered");
+});
+
+for (const endpoint of ["exchange", "refund"]) {
+  for (const modo of ["html-5xx", "json-503", "json-4xx"]) {
+    test(`${endpoint} ${modo}: ambiguous 5xx stays uncertain, 4xx keeps the server message, key and payload preserved`, async t => {
+      let tentativa = 0;
+      const h = await harness(t, {
+        props: endpoint === "refund" ? { existingExchangeId: 51 } : {},
+        route: call => {
+          const alvo =
+            endpoint === "exchange"
+              ? call.method === "POST" && call.url.endsWith("/trocas")
+              : call.url.endsWith("/reembolsos");
+          if (!alvo || tentativa++ > 0) return undefined;
+          if (modo === "html-5xx")
+            return {
+              ok: false,
+              status: 502,
+              json: async () => {
+                throw new SyntaxError("Unexpected token '<'");
+              }
+            };
+          if (modo === "json-503")
+            return { ok: false, status: 503, json: async () => ({ error: "Erro interno" }) };
+          return { ok: false, status: 409, json: async () => ({ error: "Preview obsoleto" }) };
+        }
+      });
+      if (endpoint === "exchange") await h.select();
+      const acao = () => (endpoint === "exchange" ? h.submit() : h.refund(0));
+      await acao();
+      const mensagem = document.querySelector(".additem-error").textContent;
+      if (modo === "json-4xx") assert.equal(mensagem, "Preview obsoleto");
+      else {
+        assert.match(mensagem, /confirmar o resultado d[ae]|confirmar a devolu/);
+        assert.doesNotMatch(mensagem, /^Falha ao|Erro interno|Unexpected/);
+      }
+      await acao();
+      const envios = h.calls.filter(c =>
+        endpoint === "exchange"
+          ? c.method === "POST" && c.url.endsWith("/trocas")
+          : c.url.endsWith("/reembolsos")
+      );
+      assert.equal(envios.length, 2);
+      assert.deepEqual(envios[1].body, envios[0].body, "same operationKey and payload on retry");
+    });
+  }
 }

@@ -11,13 +11,15 @@ interface PedidosTabelaProps {
   loading: boolean;
   error: string | null;
   onSelectOrder: (id: number) => void;
+  onRetry?: () => void;
 }
 
 export default function PedidosTabela({
   pedidos,
   loading,
   error,
-  onSelectOrder
+  onSelectOrder,
+  onRetry
 }: PedidosTabelaProps) {
   return (
     <>
@@ -30,7 +32,16 @@ export default function PedidosTabela({
         <span className="ped-th ped-th-total">Total</span>
       </div>
 
-      {error && <div className="ped-empty-message">{error}</div>}
+      {error && (
+        <div className="ped-empty-message" role="alert">
+          <p>{error}</p>
+          {onRetry && (
+            <button type="button" className="ped-retry-btn" onClick={onRetry} disabled={loading}>
+              Tentar novamente
+            </button>
+          )}
+        </div>
+      )}
       {!error && !loading && pedidos.length === 0 && (
         <div className="ped-empty-message">Nenhum pedido encontrado.</div>
       )}
