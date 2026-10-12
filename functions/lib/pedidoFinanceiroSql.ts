@@ -46,19 +46,45 @@ export const pedidoSemSaldoLiquidoSql = (pedidoIdSql = "pedidos.id") =>
 export const elegibilidadeOperacionalCobrancaSql = (alias = "pedidos") =>
   `(${alias}.status_pedido <> 'CANCELADO' AND (${alias}.status_comanda = 'ABERTA' OR ${alias}.status_pedido = 'ENTREGUE'))`;
 
-// Conservative void containment: local terminal states cannot exclude an unknown capture.
-// Includes pre-dispatch refusals and fully refunded history; no remote certainty is inferred.
-// Migration 0040 mirrors this predicate; contract tests prevent drift.
+// Perna Pix quitada: paga e INTEGRALMENTE estornada, com a mesma prova do trigger
+// `pedido_anulacoes_validar_mp` (migration 0031): estorno MP com mp_refund_id ou manual PIX_MP
+// confirmado; refund de outro método não prova devolução. Qualquer refund pendente ou intenção de
+// refund em andamento/inconclusiva desqualifica a perna. É a ÚNICA isenção da contenção abaixo.
+const pagamentoPixQuitadoSql = (alias: string) =>
+  `(${alias}.metodo = 'PIX_MP' AND ${alias}.status = 'PAGO'
+    AND ${alias}.valor_centavos <= COALESCE((SELECT SUM(rq.valor_centavos) FROM pedido_reembolsos rq
+        WHERE rq.pagamento_id = ${alias}.id AND rq.status = 'REEMBOLSADO' AND rq.metodo = 'PIX_MP'
+          AND (rq.origem = 'MANUAL' OR (rq.origem = 'MERCADO_PAGO' AND rq.mp_refund_id IS NOT NULL))), 0)
+    AND NOT EXISTS (SELECT 1 FROM pedido_reembolsos rp
+                    WHERE rp.pagamento_id = ${alias}.id AND rp.status = 'PENDENTE')
+    AND NOT EXISTS (SELECT 1 FROM pedido_reembolso_pix_mp_intencoes ri
+                    WHERE ri.pagamento_id = ${alias}.id
+                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO')))`;
+
+// Contenção conservadora da anulação: estados terminais locais não excluem uma captura
+// desconhecida. Só uma perna Pix paga e integralmente estornada (e as operações/colunas legadas
+// que a descrevem) deixa de contar como exposição; qualquer outro histórico Pix, cobrança
+// pendente/expirada/cancelada/falha, operação sem perna quitada ou identidade legada sem
+// correspondência continua bloqueando. Migration 0041 espelha este predicado (0040 o tornou
+// absoluto); os testes de contrato impedem divergência.
 export const exposicaoPixRemotaNoPedidoSql = (pedidoIdSql: string) =>
   `(EXISTS (SELECT 1 FROM pedido_pagamentos ep
-            WHERE ep.pedido_id = ${pedidoIdSql} AND ep.metodo = 'PIX_MP')
+            WHERE ep.pedido_id = ${pedidoIdSql} AND ep.metodo = 'PIX_MP'
+              AND NOT ${pagamentoPixQuitadoSql("ep")})
     OR EXISTS (SELECT 1 FROM pedido_operacoes eo
                WHERE eo.pedido_id = ${pedidoIdSql}
-                 AND eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN', 'PIX_ADMIN_REGENERACAO'))
+                 AND eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN', 'PIX_ADMIN_REGENERACAO')
+                 AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos qp
+                                 WHERE qp.id = eo.pagamento_id AND ${pagamentoPixQuitadoSql("qp")}))
     OR EXISTS (SELECT 1 FROM pedidos el
                WHERE el.id = ${pedidoIdSql}
-                 AND (el.mp_payment_id IS NOT NULL OR el.mp_qr_code IS NOT NULL
-                   OR el.mp_qr_code_base64 IS NOT NULL OR el.mp_ticket_url IS NOT NULL)))`;
+                 AND ((el.mp_payment_id IS NOT NULL
+                       AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos lp
+                                       WHERE lp.pedido_id = el.id AND lp.mp_payment_id = el.mp_payment_id
+                                         AND ${pagamentoPixQuitadoSql("lp")}))
+                   OR (el.mp_payment_id IS NULL
+                       AND (el.mp_qr_code IS NOT NULL OR el.mp_qr_code_base64 IS NOT NULL
+                         OR el.mp_ticket_url IS NOT NULL)))))`;
 
 function preparePedidoFinancialProjectionBase(
   db: D1Database,

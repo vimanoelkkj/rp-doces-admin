@@ -288,7 +288,7 @@ test("refund historico permanece e o impacto nos totais usa liquido", async t =>
   });
 });
 
-test("MP confirmado exige estorno real por pagamento; sem refund implicito", async t => {
+test("MP confirmado exige estorno real por pagamento; só o estorno integral confirmado libera", async t => {
   const db = await fixture(t, { paid: true, reserve: "CONVERTIDA" });
   const session = await app.auth.createSession(db, 1);
   let network = 0;
@@ -311,11 +311,12 @@ test("MP confirmado exige estorno real por pagamento; sem refund implicito", asy
       `UPDATE pedido_reembolsos SET origem='MERCADO_PAGO',metodo='PIX_MP',mp_refund_id='refund-real'`
     )
     .run();
+  // Estorno MP integral confirmado (com mp_refund_id): a perna Pix está quitada e a exclusão é
+  // liberada, sem tocar no histórico financeiro e sem nenhuma chamada ao Mercado Pago.
   const refunds = (await state(db)).refunds;
   const response = await anular(db, session);
-  assert.equal(response.status, 409);
-  assert.equal((await response.json()).code, "ANULACAO_EXPOSICAO_PIX_REMOTA");
-  assert.deepEqual((await state(db)).refunds, refunds);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await state(db)).refunds, refunds, "o refund histórico permanece");
   assert.equal(network, 0);
 });
 
