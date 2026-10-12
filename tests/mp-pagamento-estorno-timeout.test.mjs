@@ -54,7 +54,7 @@ const HELPERS = [
       app.mpRefund.postRefundMp("fake", "ORD9001", "PAY9001", "key-1", { amountCentavos: 1500 }),
     respostaValida: () =>
       mpResponse({ id: 555, payment_id: 9001, amount: 15, status: "approved" }, { status: 201 }),
-    ehSucesso: r => r.resultado === "SUCESSO" && r.refund.id === "REF555"
+    ehSucesso: r => r.resultado === "AMBIGUO" && r.motivo === "RESPOSTA_ILEGIVEL"
   },
   {
     nome: "getRefundMp", // sem ramo para status <400 (comportamento preexistente, sem efeito financeiro)
@@ -242,7 +242,7 @@ for (const helper of HELPERS) {
     });
   }
 
-  test(`${helper.nome}: resposta válida segue SUCESSO e o prazo é desarmado`, async t => {
+  test(`${helper.nome}: resposta válida mantém o contrato de correlação e desarma o prazo`, async t => {
     const { resultado, sinal, chamadas } = await executar(t, helper, helper.respostaValida, {
       avancar: false
     });

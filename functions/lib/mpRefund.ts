@@ -18,9 +18,9 @@ import {
 export const MP_REFUND_TIMEOUT_MS = 20_000;
 
 export interface MpRefundCriado {
-  id: string;
-  payment_id: string;
-  amount?: string;
+  id: string | number;
+  payment_id: string | number;
+  amount?: string | number;
   status: string;
 }
 
@@ -28,6 +28,7 @@ export interface MpRefundOptions {
   amountCentavos?: number;
   renderInProcess?: boolean;
   priorRefundIds?: readonly string[];
+  requestBody?: string;
 }
 
 export async function getOrderRefundIds(
@@ -113,9 +114,11 @@ export async function postRefundMp(
         ...(options.amountCentavos === undefined
           ? {}
           : {
-              body: JSON.stringify({
-                transactions: [{ id: paymentId, amount: centsToDecimal(options.amountCentavos) }]
-              })
+              body:
+                options.requestBody ??
+                JSON.stringify({
+                  transactions: [{ id: paymentId, amount: centsToDecimal(options.amountCentavos) }]
+                })
             }),
         signal: controller.signal
       });
@@ -271,6 +274,8 @@ function refundFromOrder(
   priorRefundIds?: readonly string[]
 ): MpRefundCriado | null {
   if (
+    // An aggregate Order has no documented correlation to this local intent.
+    refundId === undefined ||
     order?.id !== orderId ||
     !/^ORD[A-Za-z0-9]+$/.test(orderId) ||
     !/^PAY[A-Za-z0-9]+$/.test(paymentId)

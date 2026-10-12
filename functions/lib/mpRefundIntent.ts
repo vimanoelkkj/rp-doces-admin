@@ -9,6 +9,10 @@ import {
 } from "./mpRefund";
 import { operationalAlert } from "./operationalAlert";
 import {
+  getRefundMp as getPaymentRefundMp,
+  postRefundMp as postPaymentRefundMp
+} from "./mpRefundPayments";
+import {
   buscarOperacao,
   chaveReembolso,
   conflitoOperacao,
@@ -16,7 +20,7 @@ import {
   type IdentidadeEsperada
 } from "./operacoes";
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
-import { centsToDecimal } from "./mp/orders/types";
+import { centsToDecimal, decimalToCents } from "./mp/orders/types";
 
 export type PixMpRefundIntentStatus =
   "PENDENTE" | "PROCESSANDO" | "CONFIRMADO" | "RECUSADO" | "INCONCLUSIVO";
@@ -257,7 +261,8 @@ async function ensureIntent(
           pedido_id,pagamento_id,pedido_item_cancelamento_id,pedido_item_troca_id,
           mp_idempotency_key,mp_request,mp_payment_id,resultado)
         SELECT ?,'REFUND_ADMIN','ADMIN',?,?,?,'LOCAL_CRIADA',pp.pedido_id,pp.id,?,?,?,
-          json_object('transactions',json_array(json_object('id',pp.mp_payment_id,'amount',?))),pp.mp_payment_id,
+          CASE WHEN pp.mp_order_id IS NULL THEN json(?)
+            ELSE json_object('transactions',json_array(json_object('id',pp.mp_payment_id,'amount',?))) END,pp.mp_payment_id,
           json_object('refund_association',json_object('version',1))
         FROM pedido_pagamentos pp WHERE pp.id=? AND pp.pedido_id=? AND pp.metodo='PIX_MP'
           AND pp.status='PAGO' AND pp.mp_payment_id IS NOT NULL`
@@ -270,6 +275,7 @@ async function ensureIntent(
           cancellationId,
           exchangeId,
           key,
+          JSON.stringify({ amount: params.valorCentavos / 100 }),
           amount,
           params.pagamentoId,
           params.pedidoId
@@ -618,16 +624,57 @@ async function processIntent(
   if (row.status === "CONFIRMADO" || row.status === "RECUSADO") return row;
   const pagamento = await db
     .prepare(
-      "SELECT mp_order_id FROM pedido_pagamentos WHERE id=? AND pedido_id=? AND mp_payment_id=?"
+      `SELECT mp_order_id FROM pedido_pagamentos pp
+       WHERE id=? AND pedido_id=? AND mp_payment_id=? AND metodo='PIX_MP' AND status='PAGO'
+         AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos other WHERE other.id<>pp.id
+           AND (other.mp_payment_id=pp.mp_payment_id OR
+             (pp.mp_order_id IS NOT NULL AND other.mp_order_id=pp.mp_order_id)))`
     )
     .bind(row.pagamento_id, row.pedido_id, row.mp_payment_id)
     .first<{ mp_order_id: string | null }>();
+  const payments = pagamento?.mp_order_id === null && /^[1-9]\d*$/.test(row.mp_payment_id);
   if (
-    !pagamento?.mp_order_id ||
-    !/^ORD[A-Za-z0-9]+$/.test(pagamento.mp_order_id) ||
-    !/^PAY[A-Za-z0-9]+$/.test(row.mp_payment_id)
+    !pagamento ||
+    (!payments &&
+      (!pagamento.mp_order_id ||
+        !/^ORD[A-Za-z0-9]+$/.test(pagamento.mp_order_id) ||
+        !/^PAY[A-Za-z0-9]+$/.test(row.mp_payment_id)))
   )
     return markInconclusive(db, row, "ORDER_ID_AUSENTE");
+  let refundRequest: unknown;
+  try {
+    refundRequest = JSON.parse(row.mp_request);
+  } catch {
+    refundRequest = null;
+  }
+  if (payments) {
+    if (
+      !refundRequest ||
+      typeof refundRequest !== "object" ||
+      Array.isArray(refundRequest) ||
+      Object.keys(refundRequest).length !== 1 ||
+      !("amount" in refundRequest) ||
+      typeof refundRequest.amount !== "number" ||
+      refundRequest.amount !== row.valor_centavos / 100
+    )
+      return markInconclusive(db, row, "REFUND_REQUEST_IDENTIDADE_DIVERGENTE");
+    if (row.mp_refund_id && !/^[1-9]\d*$/.test(row.mp_refund_id))
+      return markInconclusive(db, row, "REFUND_IDENTIDADE_DIVERGENTE");
+  } else {
+    const request = refundRequest as { transactions?: { id?: string; amount?: string }[] } | null;
+    if (
+      !request ||
+      Object.keys(request).length !== 1 ||
+      !Array.isArray(request.transactions) ||
+      request.transactions.length !== 1 ||
+      Object.keys(request.transactions[0] ?? {}).length !== 2 ||
+      request.transactions[0]?.id !== row.mp_payment_id ||
+      decimalToCents(request.transactions[0]?.amount) !== row.valor_centavos
+    )
+      return markInconclusive(db, row, "REFUND_REQUEST_IDENTIDADE_DIVERGENTE");
+    if (row.mp_refund_id && !/^REF[A-Za-z0-9]+$/.test(row.mp_refund_id))
+      return markInconclusive(db, row, "REFUND_IDENTIDADE_DIVERGENTE");
+  }
   if (row.mp_refund_id) {
     const refundId = row.mp_refund_id;
     await db
@@ -639,18 +686,48 @@ async function processIntent(
       .bind(row.id)
       .run();
     row = (await byOperation(db, row.operation_key)) ?? row;
-    const remote = await getRefundMp(
-      accessToken,
-      pagamento.mp_order_id,
-      row.mp_payment_id,
-      refundId,
-      row.valor_centavos
-    );
+    const remote = payments
+      ? await getPaymentRefundMp(accessToken, row.mp_payment_id, refundId, row.valor_centavos)
+      : await getRefundMp(
+          accessToken,
+          pagamento.mp_order_id ?? "",
+          row.mp_payment_id,
+          refundId,
+          row.valor_centavos
+        );
     return consumeRemoteResult(db, row, remote, row.ator_usuario_id, true);
   }
   if (row.status === "PROCESSANDO") {
     return dispatchLeaseExpired(row) ? expireDispatchLease(db, row) : row;
   }
+  if (payments) {
+    const claim = await db
+      .prepare(
+        `UPDATE pedido_reembolso_pix_mp_intencoes SET status='PROCESSANDO',
+       tentativas=tentativas+1,ultima_tentativa_em=CURRENT_TIMESTAMP,atualizado_em=CURRENT_TIMESTAMP
+       WHERE id=? AND mp_refund_id IS NULL AND status IN ('PENDENTE','INCONCLUSIVO')
+         AND NOT EXISTS (SELECT 1 FROM pedido_reembolso_pix_mp_intencoes other
+           WHERE other.pagamento_id=pedido_reembolso_pix_mp_intencoes.pagamento_id
+             AND other.id<>pedido_reembolso_pix_mp_intencoes.id AND other.mp_refund_id IS NULL
+             AND (other.status='PROCESSANDO' OR (other.status='INCONCLUSIVO' AND other.tentativas>0)))`
+      )
+      .bind(row.id)
+      .run();
+    if (!claim.meta.changes) return (await byOperation(db, row.operation_key)) ?? row;
+    row = (await byOperation(db, row.operation_key)) ?? row;
+    const remote = await postPaymentRefundMp(
+      accessToken,
+      row.mp_payment_id,
+      row.mp_idempotency_key,
+      {
+        amountCentavos: row.valor_centavos,
+        renderInProcess: true,
+        requestBody: row.mp_request
+      }
+    );
+    return consumeRemoteResult(db, row, remote, row.ator_usuario_id, false);
+  }
+  const orderId = pagamento.mp_order_id ?? "";
   const request = JSON.parse(row.association_metadata ?? "{}") as {
     refund_association?: {
       version?: number;
@@ -664,7 +741,7 @@ async function processIntent(
     baseline?.before_ids !== undefined &&
     (!Array.isArray(baseline.before_ids) ||
       baseline.before_ids.some(id => typeof id !== "string" || !/^REF[A-Za-z0-9]+$/.test(id)) ||
-      baseline.order_id !== pagamento.mp_order_id ||
+      baseline.order_id !== orderId ||
       baseline.payment_id !== row.mp_payment_id)
   ) {
     return markInconclusive(db, row, "REFUND_BASELINE_INVALIDO");
@@ -694,7 +771,7 @@ async function processIntent(
   row = (await byOperation(db, row.operation_key)) ?? row;
   let beforeIds = request.refund_association?.before_ids;
   if (!beforeIds) {
-    const observation = await getOrderRefundIds(accessToken, pagamento.mp_order_id);
+    const observation = await getOrderRefundIds(accessToken, orderId);
     if (observation.resultado !== "SUCESSO")
       return consumeRemoteResult(db, row, observation, row.ator_usuario_id, true);
     const { results: known } = await db
@@ -722,47 +799,31 @@ async function processIntent(
         AND EXISTS (SELECT 1 FROM pedido_reembolso_pix_mp_intencoes i
           WHERE i.operacao_id=pedido_operacoes.id AND i.status='PROCESSANDO' AND i.tentativas=? AND i.mp_refund_id IS NULL)`
       )
-      .bind(
-        JSON.stringify(beforeIds),
-        pagamento.mp_order_id,
-        row.mp_payment_id,
-        row.operacao_id,
-        row.tentativas
-      )
+      .bind(JSON.stringify(beforeIds), orderId, row.mp_payment_id, row.operacao_id, row.tentativas)
       .run();
     if (!saved.meta.changes) return markInconclusive(db, row, "REFUND_BASELINE_CAS_PERDIDO");
     row = (await byOperation(db, row.operation_key)) ?? row;
   }
   const remote = await postRefundMp(
     accessToken,
-    pagamento.mp_order_id,
+    orderId,
     row.mp_payment_id,
     row.mp_idempotency_key,
     {
       amountCentavos: row.valor_centavos,
       renderInProcess: true,
-      priorRefundIds: beforeIds
+      priorRefundIds: beforeIds,
+      requestBody: row.mp_request
     }
   );
   if (remote.resultado === "AMBIGUO" && remote.httpStatus === 409) {
-    const reconciled = await getRefundMp(
-      accessToken,
-      pagamento.mp_order_id,
-      row.mp_payment_id,
-      undefined,
-      row.valor_centavos,
-      beforeIds
-    );
-    if (reconciled.resultado !== "SUCESSO") {
-      if (row.ultimo_erro !== "REFUND_409_IDENTIDADE_INCONCLUSIVA")
-        operationalAlert({
-          code: "MP_REFUND_IDENTITY_INCONCLUSIVE",
-          pedidoId: row.pedido_id,
-          pagamentoId: row.pagamento_id
-        });
-      return markInconclusive(db, row, "REFUND_409_IDENTIDADE_INCONCLUSIVA");
-    }
-    return consumeRemoteResult(db, row, reconciled, row.ator_usuario_id, true);
+    if (row.ultimo_erro !== "REFUND_409_IDENTIDADE_INCONCLUSIVA")
+      operationalAlert({
+        code: "MP_REFUND_IDENTITY_INCONCLUSIVE",
+        pedidoId: row.pedido_id,
+        pagamentoId: row.pagamento_id
+      });
+    return markInconclusive(db, row, "REFUND_409_IDENTIDADE_INCONCLUSIVA");
   }
   if (remote.resultado === "AMBIGUO" && remote.motivo === "RESPOSTA_ILEGIVEL") {
     if (row.ultimo_erro !== `RESPOSTA_ILEGIVEL:${remote.httpStatus ?? "SEM_HTTP"}`)

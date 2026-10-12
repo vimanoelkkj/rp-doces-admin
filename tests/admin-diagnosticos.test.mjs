@@ -318,18 +318,17 @@ function mockMpRefundSucesso(t, refundId = 9001) {
   });
 }
 
-test("OWNER estorna o Pix de diagnóstico com sucesso", async t => {
+test("OWNER envia estorno de diagnóstico, mas resposta Orders agregada permanece inconclusiva", async t => {
   const { db, owner } = await bancada(t);
   const mock = mockMpRefundSucesso(t);
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
     env: pixEnv(db)
   });
-  assert.equal(response.status, 201);
+  assert.equal(response.status, 502);
   const body = await response.json();
-  assert.equal(body.ok, true);
-  assert.equal(body.refundId, "REF9001");
-  assert.equal(body.status, "approved");
+  assert.equal(body.code, "MERCADO_PAGO_INDISPONIVEL");
+  assert.equal(body.refundId, undefined);
   const refundCall = mock.mock.calls.find(c => c.arguments[0].endsWith("/refund"));
   assert.ok(refundCall, "endpoint de refund foi invocado");
   assert.equal(refundCall.arguments[1].method, "POST");
@@ -457,17 +456,17 @@ test("estorno de diagnóstico nunca escreve em pedido_pagamentos nem pedido_reem
   assert.deepEqual(await state(db), antes);
 });
 
-test("Pix diagnóstico de R$ 0,01 válido permite estorno", async t => {
+test("Pix diagnóstico de R$ 0,01 válido envia estorno, mas não confirma agregado sem correlação", async t => {
   const { db, owner } = await bancada(t);
   const mock = mockMpRefundSucesso(t, 9002);
   const response = await app.diagnosticoPixReembolso.onRequestPost({
     request: pixRefundRequest(owner),
     env: pixEnv(db)
   });
-  assert.equal(response.status, 201);
+  assert.equal(response.status, 502);
   const body = await response.json();
-  assert.equal(body.ok, true);
-  assert.equal(body.refundId, "REF9002");
+  assert.equal(body.code, "MERCADO_PAGO_INDISPONIVEL");
+  assert.equal(body.refundId, undefined);
   const urls = mock.mock.calls.map(c => c.arguments[0]);
   assert.ok(urls.some(u => u === "https://api.mercadopago.com/v1/orders/ORD555"));
   assert.ok(urls.some(u => u === "https://api.mercadopago.com/v1/orders/ORD555/refund"));
@@ -588,9 +587,13 @@ test("diagnóstico em MP_TEST_MODE=orders_pix: aceita 50.00 para estorno, mas re
     });
 
     if (amount === "50.00") {
-      assert.equal(response.status, 201, `amount 50.00 deve ser aceito em orders_pix`);
+      assert.equal(
+        response.status,
+        502,
+        `amount 50.00 permite envio, mas não confirma REF agregado`
+      );
       const body = await response.json();
-      assert.equal(body.ok, true);
+      assert.equal(body.code, "MERCADO_PAGO_INDISPONIVEL");
       assert.equal(refundChamado, true);
     } else {
       assert.equal(response.status, 400, `amount ${amount} deve ser rejeitado em orders_pix`);
@@ -647,7 +650,7 @@ test("diagnóstico deriva valor esperado do mp_request persistido em admin_diagn
     }),
     env: pixEnv(db)
   });
-  assert.equal(response.status, 201);
+  assert.equal(response.status, 502);
   assert.equal(refundChamado, true);
 });
 

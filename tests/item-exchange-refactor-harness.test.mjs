@@ -1,4 +1,3 @@
-import { mpResponse, mockRefundProvider } from "./helpers/mp-orders.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -64,8 +63,8 @@ async function scenario(
           index + 1,
           paymentMethod,
           value,
-          paymentMethod === "PIX_MP" ? "PAY9002" : null,
-          paymentMethod === "PIX_MP" ? "ORD9002" : null,
+          paymentMethod === "PIX_MP" ? "9002" : null,
+          null,
           `paid-${index}`
         ),
       db
@@ -698,15 +697,15 @@ test("mixed refund preserves independent allocations and only releases stock aft
   ]);
   assert.equal(first.troca.estoqueOrigemEstado, "RESERVADO");
   const posts = [];
-  mockRefundProvider(t, async (_url, init) => {
+  t.mock.method(globalThis, "fetch", async (_url, init) => {
     posts.push(JSON.parse(init.body));
-    return mpResponse({ id: 7100, payment_id: 9002, amount: 2, status: "approved" });
+    return Response.json({ id: 7100, payment_id: 9002, amount: 2, status: "approved" });
   });
   const second = await app.itemExchange.confirmExchangeRefund(
     s.db,
     refundInput(first.troca, { operationKey: "harness-refund-pix", mpAccessToken: "TEST_TOKEN" })
   );
-  assert.deepEqual(posts, [{ transactions: [{ id: "PAY9002", amount: "2.00" }] }]);
+  assert.deepEqual(posts, [{ amount: 2 }]);
   assert.deepEqual(
     second.troca,
     expectedView(s, {
@@ -718,7 +717,7 @@ test("mixed refund preserves independent allocations and only releases stock aft
           metodo: "PIX_MP",
           valorCentavos: 200,
           origem: "MERCADO_PAGO",
-          mpRefundId: "REF7100"
+          mpRefundId: "7100"
         }
       ]
     })
@@ -735,14 +734,14 @@ for (const remoteStatus of ["approved", "in_process", "timeout"])
       { ok: false, erro: "MERCADO_PAGO_NAO_CONFIGURADO" }
     );
     const calls = [];
-    mockRefundProvider(t, async (_url, init) => {
+    t.mock.method(globalThis, "fetch", async (_url, init) => {
       calls.push({
         method: init.method,
         body: init.body && JSON.parse(init.body),
         key: init.headers["X-Idempotency-Key"]
       });
       if (remoteStatus === "timeout") throw new Error("remote response lost");
-      return mpResponse({ id: 7100, payment_id: 9002, amount: 3, status: remoteStatus });
+      return Response.json({ id: 7100, payment_id: 9002, amount: 3, status: remoteStatus });
     });
     const first = await app.itemExchange.confirmExchangeRefund(s.db, input);
     assert.equal(first.ok, true);
@@ -754,7 +753,7 @@ for (const remoteStatus of ["approved", "in_process", "timeout"])
           ? "INCONCLUSIVO"
           : "PROCESSANDO"
     );
-    assert.deepEqual(calls[0].body, { transactions: [{ id: "PAY9002", amount: "3.00" }] });
+    assert.deepEqual(calls[0].body, { amount: 3 });
     assert.ok(calls[0].key);
     if (remoteStatus === "approved") {
       assert.deepEqual(
@@ -767,7 +766,7 @@ for (const remoteStatus of ["approved", "in_process", "timeout"])
               metodo: "PIX_MP",
               valorCentavos: 300,
               origem: "MERCADO_PAGO",
-              mpRefundId: "REF7100"
+              mpRefundId: "7100"
             }
           ]
         })
@@ -784,9 +783,9 @@ for (const remoteStatus of ["approved", "in_process", "timeout"])
       assert.equal(first.troca.estoqueDestinoEstado, "RESERVADO");
       assert.equal(first.troca.refundsPendentes[0].refundRemoto.operationKey, input.operationKey);
       assert.equal((await s.db.prepare("SELECT COUNT(*) n FROM pedido_reembolsos").first()).n, 0);
-      mockRefundProvider(t, async (_url, init) => {
+      t.mock.method(globalThis, "fetch", async (_url, init) => {
         if (init.method === "POST") assert.equal(init.headers["X-Idempotency-Key"], calls[0].key);
-        return mpResponse({ id: 7100, payment_id: 9002, amount: 3, status: "approved" });
+        return Response.json({ id: 7100, payment_id: 9002, amount: 3, status: "approved" });
       });
       const recovered = await app.itemExchange.confirmExchangeRefund(s.db, input);
       assert.equal(recovered.refundStatus, "CONFIRMADO");
