@@ -45,7 +45,7 @@ function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
-function dataIdFormat(dataId: string): WebhookDataIdFormat {
+export function dataIdFormat(dataId: string): WebhookDataIdFormat {
   if (!dataId) return "empty";
   if (/^ORD[A-Za-z0-9]+$/.test(dataId)) return "order";
   return /^\d+$/.test(dataId) ? "numeric" : "other";
