@@ -41,6 +41,9 @@ export const remoteLabel = (leg: Perna) => {
   if (status === "INCONCLUSIVO") return "Verificar novamente";
   return "Solicitar estorno";
 };
+// Recusa definitiva comprovada pelo backend (status persistido RECUSADO). É o único estado em que uma
+// nova operação financeira, com outra operationKey, pode ser pedida explicitamente.
+export const remoteCanRetryNew = (leg: Perna) => leg.refundRemoto?.status === "RECUSADO";
 export const remoteCanRun = (leg: Perna) => {
   const remote = leg.refundRemoto;
   if (!remote) return true;
