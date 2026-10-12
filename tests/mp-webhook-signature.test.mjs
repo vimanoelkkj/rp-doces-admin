@@ -1009,6 +1009,7 @@ test("resultado: mpStatus distingue MP pending de MP approved com divergência d
     "mpStatus",
     "outcome",
     "pagamentoId",
+    "signatureConfig",
     "statusFinal"
   ]);
 });
@@ -1054,4 +1055,237 @@ test("pagamento ambíguo: o console.error não registra external_reference nem o
   const tudo = JSON.stringify([...logs, ...logs.resultados]);
   assert.ok(!tudo.includes(TOKEN), "token_publico vazou");
   assert.ok(!tudo.includes("external_reference"), "external_reference reapareceu");
+});
+
+// --- Duas configurações de webhook de teste (staging) ---------------------------------------
+// Segredos 100% sintéticos; nenhum valor real. A secundária só vale com MP_TEST_MODE=orders_pix.
+
+const SECRET_B = "segundo-segredo-sintetico-so-para-teste";
+const SECRET_C = "terceiro-segredo-sintetico-desconhecido";
+const STAGING = { MP_TEST_MODE: "orders_pix", MP_WEBHOOK_SECRET_SECONDARY: SECRET_B };
+const assinadaPor = (secret, opcoes = {}) => {
+  const { dataId = "123456", requestId = "req-webhook-1", ts = "1700000000" } = opcoes;
+  return entrega({
+    ...opcoes,
+    dataId,
+    assinatura: `ts=${ts},v1=${assinar({ id: dataId, requestId, ts, secret })}`
+  });
+};
+
+test("duas configurações: primária válida e secundária válida validam, cada uma com seu rótulo", async t => {
+  const db = await fixture(t);
+  const primaria = await resultado(db, t, assinadaPor(SECRET), STAGING);
+  assert.equal(primaria.response.status, 200);
+  assert.equal(primaria.payload.webhookResult.signatureConfig, "PRIMARIA");
+  const secundaria = await resultado(db, t, assinadaPor(SECRET_B), STAGING);
+  assert.equal(secundaria.response.status, 200);
+  assert.deepEqual(await secundaria.response.json(), { ok: true });
+  assert.equal(secundaria.payload.webhookResult.outcome, "IGNORADO_ID_FORA_DO_FORMATO");
+  assert.equal(secundaria.payload.webhookResult.signatureConfig, "SECUNDARIA");
+});
+
+test("duas configurações: chave desconhecida e assinatura inválida continuam 401, sem rótulo", async t => {
+  const db = await fixture(t);
+  for (const request of [
+    assinadaPor(SECRET_C),
+    entrega({ dataId: "123456", valida: false }),
+    entrega({ dataId: "123456", assinatura: null })
+  ]) {
+    const { response, payload } = await resultado(db, t, request, STAGING);
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { erro: "Assinatura inválida." });
+    assert.equal(payload.webhookResult.outcome, "ASSINATURA_INVALIDA");
+    assert.equal(payload.webhookResult.signatureConfig, undefined);
+  }
+});
+
+test("duas configurações: a secundária é ignorada sem MP_TEST_MODE=orders_pix (produção)", async t => {
+  const db = await fixture(t);
+  for (const testMode of [undefined, "", "outro", "ORDERS_PIX"]) {
+    const { response, payload } = await resultado(db, t, assinadaPor(SECRET_B), {
+      MP_TEST_MODE: testMode,
+      MP_WEBHOOK_SECRET_SECONDARY: SECRET_B
+    });
+    assert.equal(response.status, 401, `MP_TEST_MODE=${JSON.stringify(testMode)}`);
+    assert.equal(payload.webhookResult.outcome, "ASSINATURA_INVALIDA");
+  }
+  // A primária segue valendo em qualquer ambiente.
+  const primaria = await resultado(db, t, assinadaPor(SECRET), {
+    MP_WEBHOOK_SECRET_SECONDARY: SECRET_B
+  });
+  assert.equal(primaria.response.status, 200);
+  assert.equal(primaria.payload.webhookResult.signatureConfig, "PRIMARIA");
+});
+
+test("duas configurações: primária ausente responde 503 mesmo com secundária válida", async t => {
+  const db = await fixture(t);
+  for (const primaria of [undefined, "", "   "]) {
+    const { response, payload } = await resultado(db, t, assinadaPor(SECRET_B), {
+      ...STAGING,
+      MP_WEBHOOK_SECRET: primaria
+    });
+    assert.equal(response.status, 503, JSON.stringify(primaria));
+    assert.deepEqual(await response.json(), { erro: "Webhook não configurado." });
+    assert.equal(payload.webhookResult.outcome, "SEM_SEGREDO");
+  }
+});
+
+test("duas configurações: secundária ausente, vazia ou só espaços não valida nada", async t => {
+  const db = await fixture(t);
+  for (const secundaria of [undefined, "", "   ", "\n"]) {
+    const envExtra = { MP_TEST_MODE: "orders_pix", MP_WEBHOOK_SECRET_SECONDARY: secundaria };
+    const { response } = await resultado(db, t, assinadaPor(SECRET_B), envExtra);
+    assert.equal(response.status, 401, JSON.stringify(secundaria));
+    // Uma assinatura feita com string vazia também não passa (nunca vira "chave em branco").
+    const vazio = await resultado(db, t, assinadaPor(""), envExtra);
+    assert.equal(vazio.response.status, 401);
+    const primaria = await resultado(db, t, assinadaPor(SECRET), envExtra);
+    assert.equal(primaria.response.status, 200);
+  }
+});
+
+test("duas configurações: segredos iguais resolvem como PRIMARIA", async t => {
+  const db = await fixture(t);
+  const { response, payload } = await resultado(db, t, assinadaPor(SECRET), {
+    MP_TEST_MODE: "orders_pix",
+    MP_WEBHOOK_SECRET_SECONDARY: SECRET
+  });
+  assert.equal(response.status, 200);
+  assert.equal(payload.webhookResult.signatureConfig, "PRIMARIA");
+});
+
+test("duas configurações: application_id do payload não escolhe nem influencia a chave", async t => {
+  const db = await fixture(t);
+  const APP_PRINCIPAL = "2665069199054992";
+  const APP_TESTAPP = "1404326930519833";
+  const casos = [
+    // application_id declara a outra aplicação, mas só a assinatura decide.
+    [assinadaPor(SECRET, { extraBody: { application_id: APP_TESTAPP } }), 200, "PRIMARIA"],
+    [assinadaPor(SECRET_B, { extraBody: { application_id: APP_PRINCIPAL } }), 200, "SECUNDARIA"],
+    [assinadaPor(SECRET_B, { extraBody: { application_id: APP_TESTAPP } }), 200, "SECUNDARIA"],
+    // Declarar uma aplicação não substitui a assinatura.
+    [assinadaPor(SECRET_C, { extraBody: { application_id: APP_PRINCIPAL } }), 401, undefined],
+    [assinadaPor(SECRET_C, { extraBody: { application_id: APP_TESTAPP } }), 401, undefined],
+    [
+      entrega({
+        dataId: "123456",
+        assinatura: null,
+        extraBody: { application_id: APP_TESTAPP, user_id: "1", live_mode: false }
+      }),
+      401,
+      undefined
+    ]
+  ];
+  for (const [request, status, config] of casos) {
+    const { response, payload } = await resultado(db, t, request, STAGING);
+    assert.equal(response.status, status);
+    assert.equal(payload.webhookResult.signatureConfig, config);
+    assert.ok(!JSON.stringify(payload).includes(APP_PRINCIPAL), "application_id vazou");
+    assert.ok(!JSON.stringify(payload).includes(APP_TESTAPP), "application_id vazou");
+  }
+});
+
+test("duas configurações: logs não expõem segredos, assinaturas, request-id, token nem ids externos", async t => {
+  const db = await fixture(t);
+  const SENT = {
+    requestId: "REQID-SECUNDARIA-SENTINELA",
+    token: "TOKEN-QUERY-SECUNDARIA-SENTINELA",
+    email: "pagador.secundaria@example.com",
+    ref: "EXTREF-SECUNDARIA-SENTINELA",
+    app: "1404326930519833"
+  };
+  const ts = "1700000000";
+  const ID = "ORDSENTINELASEC0001";
+  const proibidosBase = [...Object.values(SENT), SECRET, SECRET_B, SECRET_C, ts, ID];
+  const request = secret =>
+    entrega({
+      dataId: ID,
+      requestId: SENT.requestId,
+      extraQuery: { token: SENT.token },
+      extraBody: {
+        application_id: SENT.app,
+        external_reference: SENT.ref,
+        payer: { email: SENT.email }
+      },
+      assinatura: `ts=${ts},v1=${assinar({ id: ID, requestId: SENT.requestId, ts, secret })}`
+    });
+  t.mock.method(globalThis, "fetch", async () => new Response("", { status: 404 }));
+  for (const secret of [SECRET, SECRET_B, SECRET_C]) {
+    const v1 = assinar({ id: ID, requestId: SENT.requestId, ts, secret });
+    const { logs } = await resultado(db, t, request(secret), STAGING);
+    const texto = JSON.stringify([...logs, ...logs.resultados]);
+    for (const proibido of [...proibidosBase, v1])
+      assert.ok(!texto.includes(proibido), `vazou ${proibido}`);
+  }
+});
+
+test("duas configurações: a validação pela secundária não altera os efeitos nem a idempotência", async t => {
+  const db = await fixture(t);
+  // Mesmo fluxo autoritativo do fixture (ORD101 aprovado): validar pela secundária só muda o rótulo.
+  const primeira = await resultado(db, t, assinadaPor(SECRET_B, { dataId: "ORD101" }), STAGING);
+  assert.equal(primeira.response.status, 200);
+  assert.equal(primeira.payload.webhookResult.outcome, "PROCESSADO");
+  assert.equal(primeira.payload.webhookResult.signatureConfig, "SECUNDARIA");
+  const repetida = await resultado(db, t, assinadaPor(SECRET, { dataId: "ORD101" }), STAGING);
+  assert.equal(repetida.payload.webhookResult.outcome, "PROCESSADO_SEM_TRANSICAO");
+  assert.equal(repetida.payload.webhookResult.signatureConfig, "PRIMARIA");
+  assert.equal(
+    (await db.prepare("SELECT COUNT(*) n FROM pedido_pagamentos").first()).n,
+    1,
+    "nenhum pagamento duplicado"
+  );
+});
+
+test("duas configurações: falha do registro não afeta a resposta da secundária", async t => {
+  const db = await fixture(t);
+  t.mock.method(console, "info", () => {
+    throw new Error("coleta indisponível");
+  });
+  const response = await webhook.onRequestPost({
+    request: assinadaPor(SECRET_B),
+    env: { ...env(db), ...STAGING }
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+});
+
+test("duas configurações: sanitizador e validador por lista", async () => {
+  assert.equal(
+    context.sanitizeOperationalMeta({
+      webhookResult: { outcome: "PROCESSADO", signatureConfig: "SECUNDARIA" }
+    }).webhookResult.signatureConfig,
+    "SECUNDARIA"
+  );
+  for (const hostil of ["2665069199054992", "secreto", "primaria", {}, null, 7])
+    assert.equal(
+      context.sanitizeOperationalMeta({
+        webhookResult: { outcome: "PROCESSADO", signatureConfig: hostil }
+      }).webhookResult.signatureConfig,
+      undefined
+    );
+  const request = assinadaPor(SECRET_B);
+  assert.equal(await sync.validateMpWebhookSignatureAny(request, [], "123456"), null);
+  assert.equal(
+    await sync.validateMpWebhookSignatureAny(
+      request,
+      [
+        { label: "A", secret: SECRET },
+        { label: "B", secret: SECRET_B }
+      ],
+      "123456"
+    ),
+    "B"
+  );
+  assert.equal(
+    await sync.validateMpWebhookSignatureAny(
+      request,
+      [
+        { label: "A", secret: SECRET_B },
+        { label: "B", secret: SECRET_B }
+      ],
+      "123456"
+    ),
+    "A",
+    "primeira candidata vence"
+  );
 });
