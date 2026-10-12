@@ -6,6 +6,7 @@ import { requireUser, sameOrigin } from "../../../lib/auth";
 import { getFinanceiroPedido, hasNetConfirmedPayment } from "../../../lib/comandaLedger";
 import { getCapacidadeCobravel, getPixAdminPendentesAtivos } from "../../../lib/comandaPix";
 import { pedidoTemCapturaNaoConciliada } from "../../../lib/financialCoverage";
+import { bloqueioVisualAnulacao } from "../../../lib/pedidoAnulacao";
 import { liberarReservaPedido, PIX_MP_PENDENTE_NO_PEDIDO_SQL } from "../../../lib/stock";
 import { pedidoSemSaldoLiquidoSql } from "../../../lib/pedidoFinanceiroSql";
 import { listarOperacoesInconclusivasDoPedido } from "../../../lib/operacoes";
@@ -172,6 +173,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
       pixAdminPendentes,
       capacidadeCobravelCentavos,
       capturaMpNaoConciliada,
+      anulacaoBloqueio: await bloqueioVisualAnulacao(env.DB, id),
       operacoesInconclusivas
     });
   } catch (err) {

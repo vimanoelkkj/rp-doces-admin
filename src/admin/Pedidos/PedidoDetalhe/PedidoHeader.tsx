@@ -19,6 +19,8 @@ interface PedidoHeaderProps {
   onAlterarStatus: (status: StatusPedido) => void;
   onArquivar: () => void;
   onExcluir: () => void;
+  /** Mensagem do bloqueio de exclusão decidido pelo servidor; null/ausente = exclusão oferecida. */
+  excluirBloqueio?: string | null;
   onClose: () => void;
 }
 
@@ -39,6 +41,7 @@ export default function PedidoHeader({
   onAlterarStatus,
   onArquivar,
   onExcluir,
+  excluirBloqueio,
   onClose
 }: PedidoHeaderProps) {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
@@ -185,6 +188,8 @@ export default function PedidoHeader({
             <summary aria-label="Mais ações do pedido">⋮</summary>
             <button
               type="button"
+              disabled={Boolean(excluirBloqueio)}
+              title={excluirBloqueio ?? undefined}
               onClick={event => {
                 event.currentTarget.closest("details")?.removeAttribute("open");
                 onExcluir();
@@ -192,6 +197,11 @@ export default function PedidoHeader({
             >
               Excluir pedido
             </button>
+            {excluirBloqueio && (
+              <p className="pedmodal-more-aviso" role="note">
+                {excluirBloqueio}
+              </p>
+            )}
           </details>
         )}
         <button
