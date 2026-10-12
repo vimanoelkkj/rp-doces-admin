@@ -109,6 +109,20 @@ function dispatchLeaseExpired(row: IntentRow): boolean {
   return Date.now() - sqliteUtcMs(startedAt) >= PIX_MP_REFUND_RECOVERY_AFTER_SECONDS * 1000;
 }
 
+// POSTs possivelmente enviados, lidos do marcador persistido; `fallback` só para dado ausente.
+function dispatchExposures(row: IntentRow, fallback: number): number {
+  try {
+    const posts = (
+      JSON.parse(row.association_metadata ?? "{}") as {
+        refund_dispatch?: { posts?: unknown };
+      }
+    ).refund_dispatch?.posts;
+    return typeof posts === "number" && Number.isSafeInteger(posts) && posts > 0 ? posts : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function view(row: IntentRow): PixMpRefundIntentView {
   return {
     id: Number(row.id),
@@ -472,12 +486,16 @@ function refused(status: string): boolean {
   return ["rejected", "cancelled", "canceled", "failed"].includes(status.toLowerCase());
 }
 
+// `exposures` = POSTs possivelmente enviados (incluindo este). Uma recusa 4xx só é definitiva na
+// primeira exposição: depois de um envio ambíguo o provedor pode já ter aplicado o efeito. Falhas
+// antes do POST (ex.: GET de baseline) incrementam `tentativas`, mas não são exposição.
 async function refusePostAttempt(
   db: D1Database,
   row: IntentRow,
-  result: Extract<MpRefundResultado, { resultado: "RECUSA_DEFINITIVA" }>
+  result: Extract<MpRefundResultado, { resultado: "RECUSA_DEFINITIVA" }>,
+  exposures: number
 ): Promise<IntentRow> {
-  if (row.tentativas > 1) {
+  if (exposures > 1) {
     return markInconclusive(db, row, `RECUSA_APOS_ENVIO_AMBIGUO:HTTP_${result.httpStatus}`);
   }
   const error = `HTTP_${result.httpStatus}:${result.mensagem ?? "RECUSADO"}`.slice(0, 500);
@@ -543,14 +561,15 @@ async function consumeRemoteResult(
   row: IntentRow,
   result: MpRefundResultado,
   usuarioId: number | null,
-  cameFromGet: boolean
+  cameFromGet: boolean,
+  exposures: number = row.tentativas
 ): Promise<IntentRow> {
   if (result.resultado === "AMBIGUO") {
     return markInconclusive(db, row, `${result.motivo}:${result.httpStatus ?? "SEM_HTTP"}`);
   }
   if (result.resultado === "RECUSA_DEFINITIVA") {
     if (cameFromGet) return markInconclusive(db, row, `GET_HTTP_${result.httpStatus}`);
-    return refusePostAttempt(db, row, result);
+    return refusePostAttempt(db, row, result, exposures);
   }
   const refund = result.refund;
   try {
@@ -737,6 +756,10 @@ async function processIntent(
     };
   };
   const baseline = request.refund_association;
+  // Exposições anteriores presumidas quando o marcador não existe (linhas anteriores a esta
+  // mudança): um baseline salvo significa que o POST foi alcançado em tentativas anteriores, então
+  // cada uma conta como exposição (conservador); sem baseline, nenhum POST foi alcançado.
+  const priorExposures = baseline?.before_ids !== undefined ? Number(row.tentativas) : 0;
   if (
     baseline?.before_ids !== undefined &&
     (!Array.isArray(baseline.before_ids) ||
@@ -804,6 +827,24 @@ async function processIntent(
     if (!saved.meta.changes) return markInconclusive(db, row, "REFUND_BASELINE_CAS_PERDIDO");
     row = (await byOperation(db, row.operation_key)) ?? row;
   }
+  // Marcador de possível envio, persistido ANTES do POST e sob o mesmo claim (PROCESSANDO, esta
+  // tentativa, sem refund conhecido). Sem ele, nenhum POST sai. Uma queda depois daqui continua
+  // sendo tratada como possível envio; a chave de idempotência nunca muda.
+  const marked = await db
+    .prepare(
+      `UPDATE pedido_operacoes
+    SET resultado=json_set(COALESCE(resultado,'{}'),'$.refund_dispatch',
+      json_object('posts',COALESCE(json_extract(resultado,'$.refund_dispatch.posts'),?)+1))
+    WHERE id=? AND fase NOT IN ('CONCLUIDA','RECUSADA')
+      AND EXISTS (SELECT 1 FROM pedido_reembolso_pix_mp_intencoes i
+        WHERE i.operacao_id=pedido_operacoes.id AND i.status='PROCESSANDO'
+          AND i.tentativas=? AND i.mp_refund_id IS NULL)`
+    )
+    .bind(priorExposures, row.operacao_id, row.tentativas)
+    .run();
+  if (!marked.meta.changes) return markInconclusive(db, row, "REFUND_ENVIO_CAS_PERDIDO");
+  row = (await byOperation(db, row.operation_key)) ?? row;
+  const exposures = dispatchExposures(row, priorExposures + 1);
   const remote = await postRefundMp(
     accessToken,
     orderId,
@@ -833,7 +874,7 @@ async function processIntent(
         pagamentoId: row.pagamento_id
       });
   }
-  return consumeRemoteResult(db, row, remote, row.ator_usuario_id, false);
+  return consumeRemoteResult(db, row, remote, row.ator_usuario_id, false, exposures);
 }
 
 export async function recoverPixMpRefundIntentsForParent(
