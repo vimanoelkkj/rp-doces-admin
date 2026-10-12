@@ -50,6 +50,82 @@ export function logRequestEvent(event: string, status?: number): void {
     });
 }
 
+// Resultado terminal de cada requisição do webhook do Mercado Pago. Enums fechados: nada que
+// venha do cliente entra no log, só um destes valores.
+export const WEBHOOK_OUTCOMES = [
+  "SEM_SEGREDO",
+  "ASSINATURA_INVALIDA",
+  "IGNORADO_TIPO",
+  "IGNORADO_SEM_ID",
+  "IGNORADO_ID_FORA_DO_FORMATO",
+  "IGNORADO_MP_404",
+  "IGNORADO_NAO_ENCONTRADO",
+  "IGNORADO_AMBIGUO",
+  "PROCESSADO",
+  "PROCESSADO_SEM_TRANSICAO",
+  "FALHA_SINCRONIZACAO"
+] as const;
+export type WebhookOutcome = (typeof WEBHOOK_OUTCOMES)[number];
+
+const WEBHOOK_DATA_ID_FORMATS = ["order", "numeric", "other", "empty"] as const;
+const WEBHOOK_LEDGER_STATUS = [
+  "PENDENTE",
+  "PAGO",
+  "CANCELADO",
+  "EXPIRADO",
+  "REEMBOLSADO",
+  "FALHOU"
+] as const;
+
+// Status do Mercado Pago em vocabulário fechado: qualquer outro valor vira "outro".
+const WEBHOOK_MP_STATUS = [
+  "approved",
+  "pending",
+  "in_process",
+  "authorized",
+  "rejected",
+  "cancelled",
+  "expired",
+  "refunded",
+  "outro"
+] as const;
+
+export function webhookMpStatus(raw: unknown): (typeof WEBHOOK_MP_STATUS)[number] {
+  const value = String(raw ?? "").toLowerCase();
+  return WEBHOOK_MP_STATUS.find(item => item === value) ?? "outro";
+}
+
+export interface WebhookResultMeta {
+  readonly outcome: WebhookOutcome;
+  readonly mpStatus?: (typeof WEBHOOK_MP_STATUS)[number];
+  readonly dataIdFormat?: (typeof WEBHOOK_DATA_ID_FORMATS)[number];
+  readonly statusFinal?: (typeof WEBHOOK_LEDGER_STATUS)[number];
+  readonly pagamentoId?: number;
+}
+
+function sanitizeWebhookResult(raw: unknown): WebhookResultMeta | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const input = raw as Record<string, unknown>;
+  const outcome = WEBHOOK_OUTCOMES.find(item => item === input.outcome);
+  if (!outcome) return undefined;
+  const dataIdFormat = WEBHOOK_DATA_ID_FORMATS.find(item => item === input.dataIdFormat);
+  const statusFinal = WEBHOOK_LEDGER_STATUS.find(item => item === input.statusFinal);
+  const mpStatus = WEBHOOK_MP_STATUS.find(item => item === input.mpStatus);
+  const pagamentoId =
+    typeof input.pagamentoId === "number" &&
+    Number.isSafeInteger(input.pagamentoId) &&
+    input.pagamentoId > 0
+      ? input.pagamentoId
+      : undefined;
+  return Object.freeze({
+    outcome,
+    ...(dataIdFormat ? { dataIdFormat } : {}),
+    ...(statusFinal ? { statusFinal } : {}),
+    ...(mpStatus ? { mpStatus } : {}),
+    ...(pagamentoId ? { pagamentoId } : {})
+  });
+}
+
 export interface SafeOperationalMeta {
   readonly httpStatus?: number | null;
   readonly mpRequestId?: string | null;
@@ -59,6 +135,7 @@ export interface SafeOperationalMeta {
   readonly unsupportedPropertyPaths?: readonly string[];
   readonly detailsShape?: MpDetailsShape | null;
   readonly webhookSignature?: WebhookSignatureShape;
+  readonly webhookResult?: WebhookResultMeta;
 }
 
 const ALLOWED_MOTIVOS = new Set([
@@ -92,6 +169,7 @@ export function sanitizeOperationalMeta(raw: unknown): SafeOperationalMeta {
     unsupportedPropertyPaths?: string[];
     detailsShape?: MpDetailsShape | null;
     webhookSignature?: WebhookSignatureShape;
+    webhookResult?: WebhookResultMeta;
   } = {};
 
   if (typeof input.httpStatus === "number" && Number.isInteger(input.httpStatus)) {
@@ -139,6 +217,9 @@ export function sanitizeOperationalMeta(raw: unknown): SafeOperationalMeta {
   const webhookSignature = sanitizeWebhookSignatureShape(input.webhookSignature);
   if (webhookSignature) clean.webhookSignature = webhookSignature;
 
+  const webhookResult = sanitizeWebhookResult(input.webhookResult);
+  if (webhookResult) clean.webhookResult = webhookResult;
+
   return Object.freeze(clean);
 }
 
@@ -153,7 +234,7 @@ function log(level: "error" | "warn", message: string, args: unknown[]): void {
   console[level](message, { requestId: context.requestId, error: sanitizePushError(args.at(-1)) });
 }
 
-function logMeta(level: "error" | "warn", message: string, meta: unknown): void {
+function logMeta(level: "error" | "warn" | "info", message: string, meta: unknown): void {
   const context = getRequestContext();
   const safeMeta = sanitizeOperationalMeta(meta);
   const payload = {
@@ -168,5 +249,7 @@ export const requestLogger = {
   warn: (message: string, ...args: unknown[]) => log("warn", message, args),
   errorMeta: (message: string, meta: SafeOperationalMeta | unknown) =>
     logMeta("error", message, meta),
-  warnMeta: (message: string, meta: SafeOperationalMeta | unknown) => logMeta("warn", message, meta)
+  warnMeta: (message: string, meta: SafeOperationalMeta | unknown) =>
+    logMeta("warn", message, meta),
+  infoMeta: (message: string, meta: SafeOperationalMeta | unknown) => logMeta("info", message, meta)
 };
