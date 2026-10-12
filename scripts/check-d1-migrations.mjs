@@ -84,6 +84,18 @@ export function analyze({ localNames, remoteRows }) {
   return { pending, legacy, unknownCurrent, unrecognized, duplicates, gaps, outOfOrder, applied };
 }
 
+// Normaliza uma definição SQL para comparação: sem comentários, espaços colapsados, sem ';' final
+// e sem diferença de caixa. sqlite_master.sql guarda o texto original do CREATE.
+export function normalizeDefinition(sql) {
+  return String(sql ?? "")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s*;\s*$/, "")
+    .trim()
+    .toLowerCase();
+}
+
 // ---------- marcadores de schema da migration mais recente ----------
 // Só o NOME registrado não prova que o schema existe. Extrai do SQL o estado
 // final esperado (tabelas/índices/triggers criados e colunas adicionadas),
@@ -105,7 +117,15 @@ export function schemaMarkers(sql) {
   for (const m of text.matchAll(pattern)) {
     if (m[1]) {
       const type = m[1].toLowerCase();
-      objects.set(`${type}:${m[2]}`, { type, name: m[2] });
+      const marker = { type, name: m[2] };
+      if (type === "trigger") {
+        // Triggers podem ser recriados com o mesmo nome em migrations diferentes (0040 e 0041):
+        // só o nome não distingue a definição. Guarda o CREATE completo, até o END; do trigger.
+        const rest = text.slice(m.index);
+        const end = /\bEND\s*;/i.exec(rest);
+        if (end) marker.definition = normalizeDefinition(rest.slice(0, end.index + end[0].length));
+      }
+      objects.set(`${type}:${m[2]}`, marker);
     } else if (m[3]) {
       if (!columns.has(m[3])) columns.set(m[3], new Set());
       columns.get(m[3]).add(m[4]);
@@ -301,7 +321,7 @@ export async function checkMigrations({ client, migrationsDir }) {
       statements.push({
         kind: "objects",
         chunk,
-        sql: `SELECT type, name FROM sqlite_master WHERE name IN (${chunk.map(() => "?").join(",")})`,
+        sql: `SELECT type, name, sql FROM sqlite_master WHERE name IN (${chunk.map(() => "?").join(",")})`,
         params: chunk.map(o => o.name)
       });
     }
@@ -318,11 +338,16 @@ export async function checkMigrations({ client, migrationsDir }) {
       schemaChecked = true;
       const results = await client.batch(statements.map(({ sql, params }) => ({ sql, params })));
       const missing = [];
+      const divergent = [];
       statements.forEach((s, i) => {
         if (s.kind === "objects") {
-          const found = new Set(results[i].map(r => `${r.type}:${r.name}`));
-          for (const o of s.chunk)
-            if (!found.has(`${o.type}:${o.name}`)) missing.push(`${o.type} ${o.name}`);
+          const found = new Map(results[i].map(r => [`${r.type}:${r.name}`, r]));
+          for (const o of s.chunk) {
+            const remote = found.get(`${o.type}:${o.name}`);
+            if (!remote) missing.push(`${o.type} ${o.name}`);
+            else if (o.definition && normalizeDefinition(remote.sql) !== o.definition)
+              divergent.push(`${o.type} ${o.name}`);
+          }
         } else {
           const found = new Set(results[i].map(r => r.name));
           for (const col of s.columns)
@@ -332,6 +357,10 @@ export async function checkMigrations({ client, migrationsDir }) {
       if (missing.length)
         problems.push(
           `${latest} consta como aplicada, mas o schema remoto não tem: ${missing.join(", ")}. O registro em d1_migrations não corresponde ao schema.`
+        );
+      if (divergent.length)
+        problems.push(
+          `${latest} consta como aplicada, mas a definição instalada difere da esperada pela migration: ${divergent.join(", ")}. O nome existe, porém o conteúdo é de outra versão (sqlite_master.sql).`
         );
     }
   }

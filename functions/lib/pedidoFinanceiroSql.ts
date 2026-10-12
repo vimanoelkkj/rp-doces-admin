@@ -46,14 +46,23 @@ export const pedidoSemSaldoLiquidoSql = (pedidoIdSql = "pedidos.id") =>
 export const elegibilidadeOperacionalCobrancaSql = (alias = "pedidos") =>
   `(${alias}.status_pedido <> 'CANCELADO' AND (${alias}.status_comanda = 'ABERTA' OR ${alias}.status_pedido = 'ENTREGUE'))`;
 
-// Perna Pix quitada: paga e INTEGRALMENTE estornada, com a mesma prova do trigger
-// `pedido_anulacoes_validar_mp` (migration 0031): estorno MP com mp_refund_id ou manual PIX_MP
-// confirmado; refund de outro método não prova devolução. Qualquer refund pendente ou intenção de
-// refund em andamento/inconclusiva desqualifica a perna. É a ÚNICA isenção da contenção abaixo.
+// Perna Pix quitada: paga e INTEGRALMENTE estornada. Prova: estorno confirmado do PRÓPRIO
+// pagamento e pedido (MP com mp_refund_id, ou manual PIX_MP; refund de outro método não prova
+// devolução), somando EXATAMENTE o valor pago (soma maior é anomalia financeira, não quitação),
+// sem refund pendente nem intenção em andamento/inconclusiva. A identidade remota precisa ser
+// coerente (Orders: ORD+PAY alfanuméricos; Payments histórico: sem ORD e id numérico) e única no
+// ledger. É a ÚNICA isenção da contenção abaixo.
 const pagamentoPixQuitadoSql = (alias: string) =>
   `(${alias}.metodo = 'PIX_MP' AND ${alias}.status = 'PAGO'
-    AND ${alias}.valor_centavos <= COALESCE((SELECT SUM(rq.valor_centavos) FROM pedido_reembolsos rq
-        WHERE rq.pagamento_id = ${alias}.id AND rq.status = 'REEMBOLSADO' AND rq.metodo = 'PIX_MP'
+    AND ((${alias}.mp_order_id GLOB 'ORD?*' AND ${alias}.mp_order_id NOT GLOB '*[^A-Za-z0-9]*'
+          AND ${alias}.mp_payment_id GLOB 'PAY?*' AND ${alias}.mp_payment_id NOT GLOB '*[^A-Za-z0-9]*')
+      OR (${alias}.mp_order_id IS NULL AND ${alias}.mp_payment_id GLOB '[1-9]*'
+          AND ${alias}.mp_payment_id NOT GLOB '*[^0-9]*'))
+    AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos dup
+                    WHERE dup.id <> ${alias}.id AND dup.mp_payment_id = ${alias}.mp_payment_id)
+    AND ${alias}.valor_centavos = COALESCE((SELECT SUM(rq.valor_centavos) FROM pedido_reembolsos rq
+        WHERE rq.pagamento_id = ${alias}.id AND rq.pedido_id = ${alias}.pedido_id
+          AND rq.status = 'REEMBOLSADO' AND rq.metodo = 'PIX_MP'
           AND (rq.origem = 'MANUAL' OR (rq.origem = 'MERCADO_PAGO' AND rq.mp_refund_id IS NOT NULL))), 0)
     AND NOT EXISTS (SELECT 1 FROM pedido_reembolsos rp
                     WHERE rp.pagamento_id = ${alias}.id AND rp.status = 'PENDENTE')
@@ -62,11 +71,12 @@ const pagamentoPixQuitadoSql = (alias: string) =>
                       AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO')))`;
 
 // Contenção conservadora da anulação: estados terminais locais não excluem uma captura
-// desconhecida. Só uma perna Pix paga e integralmente estornada (e as operações/colunas legadas
-// que a descrevem) deixa de contar como exposição; qualquer outro histórico Pix, cobrança
-// pendente/expirada/cancelada/falha, operação sem perna quitada ou identidade legada sem
-// correspondência continua bloqueando. Migration 0041 espelha este predicado (0040 o tornou
-// absoluto); os testes de contrato impedem divergência.
+// desconhecida. Só uma perna Pix quitada (e a operação de checkout/Pix admin CONCLUIDA que a
+// descreve, do mesmo pedido, com o mesmo mp_payment_id) deixa de contar como exposição. Qualquer
+// outro histórico Pix, cobrança pendente/expirada/cancelada/falha, regeneração Pix (sempre),
+// operação não concluída, órfã ou divergente e identidade legada sem correspondência continua
+// bloqueando. Migration 0041 espelha este predicado (0040 o tornou absoluto); os testes de
+// contrato impedem divergência.
 export const exposicaoPixRemotaNoPedidoSql = (pedidoIdSql: string) =>
   `(EXISTS (SELECT 1 FROM pedido_pagamentos ep
             WHERE ep.pedido_id = ${pedidoIdSql} AND ep.metodo = 'PIX_MP'
@@ -74,8 +84,11 @@ export const exposicaoPixRemotaNoPedidoSql = (pedidoIdSql: string) =>
     OR EXISTS (SELECT 1 FROM pedido_operacoes eo
                WHERE eo.pedido_id = ${pedidoIdSql}
                  AND eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN', 'PIX_ADMIN_REGENERACAO')
-                 AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos qp
-                                 WHERE qp.id = eo.pagamento_id AND ${pagamentoPixQuitadoSql("qp")}))
+                 AND NOT (eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN') AND eo.fase = 'CONCLUIDA'
+                          AND EXISTS (SELECT 1 FROM pedido_pagamentos qp
+                                      WHERE qp.id = eo.pagamento_id AND qp.pedido_id = eo.pedido_id
+                                        AND qp.mp_payment_id = eo.mp_payment_id
+                                        AND ${pagamentoPixQuitadoSql("qp")})))
     OR EXISTS (SELECT 1 FROM pedidos el
                WHERE el.id = ${pedidoIdSql}
                  AND ((el.mp_payment_id IS NOT NULL

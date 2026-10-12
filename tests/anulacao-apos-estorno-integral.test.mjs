@@ -298,24 +298,186 @@ test("migration 0041 é aditiva: só recria o trigger de exposição, com o mesm
   assert.doesNotMatch(codigo, /\b(ALTER|DELETE FROM|INSERT INTO|UPDATE\s+\w+\s+SET|DROP TABLE)\b/i);
 });
 
-test("operação de regeneração ligada a pagamento NÃO Pix quitado não é isentada; ligada à perna quitada é", async t => {
+// --- Associação operação ↔ pagamento quitado: pertencimento ao pedido e identidade remota -----
+
+let opSeq = 0;
+const operacaoPix = (
+  db,
+  {
+    tipo = "CHECKOUT_SITE",
+    fase = "CONCLUIDA",
+    pedidoId = 1,
+    pagamentoId = 1,
+    mpPaymentId = "PAY101"
+  } = {}
+) =>
+  db
+    .prepare(
+      `INSERT INTO pedido_operacoes(operation_key,tipo,escopo,fingerprint_versao,fingerprint,fase,pedido_id,pagamento_id,mp_idempotency_key,mp_request,mp_payment_id,ator_usuario_id)
+       VALUES(?,?,'ADMIN',1,'fp',?,?,?,?,'{"external_reference":"ref"}',?,1)`
+    )
+    .bind(
+      `op-assoc-${++opSeq}`,
+      tipo,
+      fase,
+      pedidoId,
+      pagamentoId,
+      `key-assoc-${opSeq}`,
+      mpPaymentId
+    )
+    .run();
+
+async function pedidoDois(db) {
+  await db.batch([
+    db.prepare(
+      `INSERT INTO pedidos(id,token_publico,cliente_nome,cliente_whatsapp,valor_total_centavos,idempotency_key)
+       VALUES(2,'token-dois','Outro','000',100,'pedido-2')`
+    ),
+    db.prepare(
+      `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,mp_order_id,mp_payment_id,idempotency_key,pago_em)
+       VALUES(2,2,'PIX_MP','SITE',100,'PAGO','ORD202','PAY202','pix-pedido-2',CURRENT_TIMESTAMP)`
+    ),
+    db.prepare(
+      `INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,status,mp_refund_id,idempotency_key)
+       VALUES(2,2,'MERCADO_PAGO','PIX_MP',100,'REEMBOLSADO','refund-pedido-2','idem-pedido-2')`
+    )
+  ]);
+}
+
+for (const tipo of ["CHECKOUT_SITE", "PIX_ADMIN"]) {
+  test(`operação ${tipo} CONCLUIDA com a identidade da perna quitada do próprio pedido libera`, async t => {
+    const { db, session } = await pago(t);
+    await reembolso(db, { valor: 10000 });
+    await operacaoPix(db, { tipo });
+    assert.equal((await anular(db, session)).status, 200);
+  });
+}
+
+test("operação que aponta para pagamento quitado de OUTRO pedido continua bloqueando", async t => {
+  const { db, session } = await pago(t);
+  await reembolso(db, { valor: 10000 });
+  await pedidoDois(db);
+  await operacaoPix(db, { pagamentoId: 2, mpPaymentId: "PAY202" });
+  await bloqueado(db, session, EXPOSICAO);
+});
+
+test("operação com mp_payment_id divergente do pagamento quitado continua bloqueando", async t => {
+  const { db, session } = await pago(t);
+  await reembolso(db, { valor: 10000 });
+  await operacaoPix(db, { mpPaymentId: "PAY-OUTRO" });
+  await bloqueado(db, session, EXPOSICAO);
+});
+
+test("operação sem identidade remota registrada (mp_payment_id nulo) continua bloqueando", async t => {
+  const { db, session } = await pago(t);
+  await reembolso(db, { valor: 10000 });
+  await operacaoPix(db, { mpPaymentId: null });
+  await bloqueado(db, session, EXPOSICAO);
+});
+
+for (const fase of ["LOCAL_CRIADA", "ENVIO_INCONCLUSIVO", "REMOTO_CONHECIDO", "RECUSADA"]) {
+  test(`operação com a identidade certa mas fase ${fase} (não concluída) continua bloqueando`, async t => {
+    const { db, session } = await pago(t);
+    await reembolso(db, { valor: 10000 });
+    await operacaoPix(db, { fase });
+    await bloqueado(db, session, EXPOSICAO);
+  });
+}
+
+test("regeneração Pix nunca é isentada, nem apontando para a perna quitada com identidade correta", async t => {
+  const { db, session } = await pago(t);
+  await reembolso(db, { valor: 10000 });
+  await operacaoPix(db, { tipo: "PIX_ADMIN_REGENERACAO" });
+  await bloqueado(db, session, EXPOSICAO);
+});
+
+test("operação ligada a pagamento que não é Pix (DINHEIRO) continua bloqueando", async t => {
   const { db, session } = await pago(t);
   await reembolso(db, { valor: 10000 });
   await db
     .prepare(
-      `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,idempotency_key,pago_em)
-       VALUES(2,1,'DINHEIRO','ADMIN',100,'PAGO','dinheiro-op',CURRENT_TIMESTAMP)`
+      `INSERT INTO pedido_pagamentos(id,pedido_id,metodo,origem,valor_centavos,status,mp_payment_id,idempotency_key,pago_em)
+       VALUES(2,1,'DINHEIRO','ADMIN',100,'PAGO','PAY101-DIN','dinheiro-op',CURRENT_TIMESTAMP)`
     )
     .run();
+  await operacaoPix(db, { pagamentoId: 2, mpPaymentId: "PAY101-DIN" });
+  await bloqueado(db, session, EXPOSICAO);
+});
+
+test("mp_payment_id duplicado em outro pagamento (identidade ambígua) bloqueia", async t => {
+  const { db, session } = await pago(t);
+  await reembolso(db, { valor: 10000 });
+  await pedidoDois(db);
+  await db.prepare(`UPDATE pedido_pagamentos SET mp_payment_id='PAY101' WHERE id=2`).run();
+  await operacaoPix(db);
+  await bloqueado(db, session, EXPOSICAO);
+});
+
+test("identidade da perna incoerente (sem ids, ou mistura Orders/Payments) não conta como quitada", async t => {
+  for (const [orderId, paymentId] of [
+    [null, null],
+    ["ORD101", "9001"],
+    [null, "PAY101"],
+    ["ORD101", null]
+  ]) {
+    const { db, session } = await pago(t);
+    await db
+      .prepare("UPDATE pedido_pagamentos SET mp_order_id=?,mp_payment_id=? WHERE id=1")
+      .bind(orderId, paymentId)
+      .run();
+    await reembolso(db, { valor: 10000 });
+    await bloqueado(db, session, EXPOSICAO);
+  }
+});
+
+test("pagamento histórico Payments (id numérico, sem ORD) integralmente estornado libera", async t => {
+  const { db, session } = await pago(t);
+  await db
+    .prepare("UPDATE pedido_pagamentos SET mp_order_id=NULL,mp_payment_id='9001' WHERE id=1")
+    .run();
+  await db.prepare("UPDATE pedidos SET mp_payment_id='9001' WHERE id=1").run();
+  await reembolso(db, { valor: 10000 });
+  await operacaoPix(db, { mpPaymentId: "9001" });
+  assert.equal((await anular(db, session)).status, 200);
+});
+
+// --- Teto: refunds somando acima do pago são anomalia, não quitação ----------------------------
+
+test("refunds confirmados somando MAIS que o pago são divergência financeira e bloqueiam", async t => {
+  const { db, session } = await pago(t);
+  await reembolso(db, { valor: 10000 });
+  await reembolso(db, { valor: 5000, origem: "MANUAL", refundId: false });
+  await bloqueado(db, session, EXPOSICAO);
+});
+
+test("refund de outro pedido apontando para o pagamento não conta na quitação", async t => {
+  const { db, session } = await pago(t);
+  await pedidoDois(db);
   await db
     .prepare(
-      `INSERT INTO pedido_operacoes(operation_key,tipo,escopo,fingerprint_versao,fingerprint,fase,pedido_id,pagamento_id,mp_idempotency_key,mp_request,ator_usuario_id)
-       VALUES('op-regen','PIX_ADMIN_REGENERACAO','ADMIN',1,'fp','CONCLUIDA',1,2,'key-regen','{"external_reference":"x"}',1)`
+      `INSERT INTO pedido_reembolsos(pedido_id,pagamento_id,origem,metodo,valor_centavos,status,mp_refund_id,idempotency_key)
+       VALUES(2,1,'MERCADO_PAGO','PIX_MP',10000,'REEMBOLSADO','refund-cruzado','idem-cruzado')`
     )
     .run();
   await bloqueado(db, session, EXPOSICAO);
-  await db
-    .prepare(`UPDATE pedido_operacoes SET pagamento_id=1 WHERE operation_key='op-regen'`)
-    .run();
-  assert.equal((await anular(db, session)).status, 200, "operação descrita só pela perna quitada");
+});
+
+test("guard de migrations: o sqlite_master.sql REAL instalado casa com a definição extraída da 0041", async t => {
+  const { readFile } = await import("node:fs/promises");
+  const { schemaMarkers, normalizeDefinition } = await import("../scripts/check-d1-migrations.mjs");
+  const { db } = await pago(t);
+  const instalado = await db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='pedido_anulacoes_bloquear_exposicao_pix_remota'"
+    )
+    .first();
+  const esperado = schemaMarkers(
+    await readFile("migrations/0041_anulacao_exposicao_pix_quitada.sql", "utf8")
+  ).objects.find(o => o.name === "pedido_anulacoes_bloquear_exposicao_pix_remota");
+  assert.ok(esperado.definition, "marcador carrega a definição do trigger");
+  assert.equal(normalizeDefinition(instalado.sql), esperado.definition);
+  const antiga = schemaMarkers(
+    await readFile("migrations/0040_anulacao_captura_nao_conciliada.sql", "utf8")
+  ).objects.find(o => o.name === "pedido_anulacoes_bloquear_exposicao_pix_remota");
+  assert.notEqual(antiga.definition, esperado.definition, "0040 e 0041 são distinguíveis");
 });

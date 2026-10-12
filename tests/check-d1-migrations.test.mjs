@@ -32,7 +32,7 @@ const fullHistory = () => rowsFor([...legacy, ...localNames]);
 
 function fullSchema() {
   return {
-    objects: markers.objects.map(o => ({ type: o.type, name: o.name })),
+    objects: markers.objects.map(o => ({ type: o.type, name: o.name, sql: o.definition })),
     columns: Object.fromEntries(markers.columns.map(c => [c.table, c.columns]))
   };
 }
@@ -346,4 +346,38 @@ test("assertReadOnly recusa qualquer coisa que não seja um único SELECT", () =
   ]) {
     assert.throws(() => assertReadOnly(bad), /só SELECT/);
   }
+});
+
+// Migrations 0040 e 0041 usam o MESMO nome de trigger. O guard precisa comparar a DEFINIÇÃO
+// instalada (sqlite_master.sql), não só nome/tipo.
+test("trigger com o mesmo nome mas definição antiga (0040) não passa como a 0041 aplicada", async () => {
+  const antigo = readFileSync(
+    path.join(realDir, "0040_anulacao_captura_nao_conciliada.sql"),
+    "utf8"
+  );
+  const definicaoAntiga = antigo.match(
+    /CREATE TRIGGER pedido_anulacoes_bloquear_exposicao_pix_remota[\s\S]*?END;/
+  )[0];
+  const state = baseState();
+  state.schema.objects = state.schema.objects.map(o =>
+    o.name === "pedido_anulacoes_bloquear_exposicao_pix_remota" ? { ...o, sql: definicaoAntiga } : o
+  );
+  await withServer(state, async base => {
+    const r = await runCli(base);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /definição/i);
+    assert.match(r.out, /pedido_anulacoes_bloquear_exposicao_pix_remota/);
+    assert.ok(r.out.includes(latest));
+  });
+});
+
+test("trigger com a definição da 0041 (mesmo com espaços/comentários diferentes) passa", async () => {
+  const state = baseState();
+  state.schema.objects = state.schema.objects.map(o =>
+    o.sql ? { ...o, sql: `${o.sql.replace(/\s+/g, "  ")}\n/* instalado */` } : o
+  );
+  await withServer(state, async base => {
+    const r = await runCli(base);
+    assert.equal(r.code, 0, r.out);
+  });
 });
