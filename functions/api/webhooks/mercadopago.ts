@@ -11,13 +11,14 @@ import {
   type MpPaymentResponse,
   resolveWebhookPayment,
   syncPaymentFromMp,
-  validateMpWebhookSignature
+  validateMpWebhookSignatureAny
 } from "../../lib/paymentSync";
 import {
   requestLogger,
   webhookMpStatus,
   type WebhookOutcome,
-  type WebhookResultMeta
+  type WebhookResultMeta,
+  type WebhookSignatureConfig
 } from "../../lib/requestContext";
 import {
   type WebhookDataIdSource,
@@ -32,6 +33,9 @@ interface Env {
   DB: D1Database;
   MP_ACCESS_TOKEN: string;
   MP_WEBHOOK_SECRET?: string;
+  // Só staging (MP_TEST_MODE === "orders_pix"): segunda configuração de webhook de teste.
+  MP_WEBHOOK_SECRET_SECONDARY?: string;
+  MP_TEST_MODE?: string;
 }
 
 interface WebhookBody {
@@ -53,13 +57,23 @@ function ok() {
 function finish(
   response: Response,
   outcome: WebhookOutcome,
-  observed: { request: Request; dataId: string; dataIdSource: WebhookDataIdSource },
+  observed: {
+    request: Request;
+    dataId: string;
+    dataIdSource: WebhookDataIdSource;
+    signatureConfig?: WebhookSignatureConfig;
+  },
   extra: Omit<WebhookResultMeta, "outcome" | "dataIdFormat"> = {}
 ): Response {
   try {
     requestLogger.infoMeta("WEBHOOK_MP_RESULTADO", {
       httpStatus: response.status,
-      webhookResult: { outcome, dataIdFormat: dataIdFormat(observed.dataId), ...extra },
+      webhookResult: {
+        outcome,
+        dataIdFormat: dataIdFormat(observed.dataId),
+        signatureConfig: observed.signatureConfig,
+        ...extra
+      },
       webhookSignature: describeWebhookSignatureInput(
         observed.request,
         observed.dataId,
@@ -99,7 +113,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       : bodyDataId
         ? "body"
         : "none";
-  const observed = { request, dataId, dataIdSource };
+  const observed: {
+    request: Request;
+    dataId: string;
+    dataIdSource: WebhookDataIdSource;
+    signatureConfig?: WebhookSignatureConfig;
+  } = { request, dataId, dataIdSource };
 
   const type = String(
     url.searchParams.get("type") || url.searchParams.get("topic") || body?.type || body?.topic || ""
@@ -115,8 +134,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     );
   }
 
-  const valid = await validateMpWebhookSignature(request, secret, dataId);
-  if (!valid) {
+  // A secundária só existe na staging (MP_TEST_MODE é omitido na produção) e nunca é escolhida por
+  // dado do payload: cada candidata é testada contra a assinatura recebida.
+  const secondary =
+    env.MP_TEST_MODE === "orders_pix" ? String(env.MP_WEBHOOK_SECRET_SECONDARY || "").trim() : "";
+  const candidates: Array<{ label: WebhookSignatureConfig; secret: string }> = [
+    { label: "PRIMARIA", secret },
+    ...(secondary ? [{ label: "SECUNDARIA" as const, secret: secondary }] : [])
+  ];
+  const signatureConfig = await validateMpWebhookSignatureAny(request, candidates, dataId);
+  if (!signatureConfig) {
     // Diagnóstico temporário do 401: só a estrutura da entrada, nunca valores.
     requestLogger.warnMeta("Webhook do Mercado Pago: assinatura inválida", {
       httpStatus: 401,
@@ -129,6 +156,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     );
   }
 
+  observed.signatureConfig = signatureConfig;
   const supportedType = type === "order";
   if (!dataId || !supportedType) {
     return finish(ok(), !supportedType ? "IGNORADO_TIPO" : "IGNORADO_SEM_ID", observed);

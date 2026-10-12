@@ -19,7 +19,11 @@ export { MP_PAYMENT_GET_TIMEOUT_MS, fetchMpPayment } from "./paymentSync/client"
 
 export { syncPaymentFromMp, expireLocalPayment } from "./paymentSync/ledgerSync";
 
-export { resolveWebhookPayment, validateMpWebhookSignature } from "./paymentSync/webhook";
+export {
+  resolveWebhookPayment,
+  validateMpWebhookSignature,
+  validateMpWebhookSignatureAny
+} from "./paymentSync/webhook";
 
 export {
   reconcilePendingPixPayments,

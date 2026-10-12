@@ -167,7 +167,12 @@ contato apropriada para staging no subject. Nunca imprima nem commite secrets.
 Prepare um JSON privado separado para Pages contendo:
 
 - `MP_ACCESS_TOKEN`: credenciais explicitamente emitidas para integração de teste/sandbox.
-- `MP_WEBHOOK_SECRET`: secret de assinatura desta aplicação/webhook de teste independente.
+- `MP_WEBHOOK_SECRET`: secret de assinatura da configuração de webhook de teste **principal**
+  (aplicação RP Doces Staging).
+- `MP_WEBHOOK_SECRET_SECONDARY` (opcional, só staging): secret da segunda configuração de
+  webhook de teste (aplicação TestApp do Seller Test User), cujas notificações automáticas de
+  sandbox também chegam à mesma URL. Só vale com `MP_TEST_MODE=orders_pix`, variável que existe
+  apenas no TOML de staging; a produção a omite e ignora esta secret mesmo se ela for definida.
 - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`: o **mesmo par de staging**
   provisionado no Worker de staging.
 
@@ -292,6 +297,30 @@ mesmas verificações de isolamento/migrações/HEAD/build. Nenhum comando de de
 deste documento foi executado como parte da preparação do repositório.
 
 <a id="smoke-and-post-deploy-checklist"></a>
+
+## Webhooks Mercado Pago: duas configurações e rotação de chaves
+
+O endpoint `/api/webhooks/mercadopago` valida a assinatura HMAC contra `MP_WEBHOOK_SECRET` e,
+somente com `MP_TEST_MODE=orders_pix`, também contra `MP_WEBHOOK_SECRET_SECONDARY`. A chave é
+escolhida **apenas pela assinatura**: `application_id` e demais campos do corpo não são
+autenticados e nunca selecionam chave. Sem a principal o endpoint responde `503`, mesmo com a
+secundária. O evento `WEBHOOK_MP_RESULTADO` registra `signatureConfig` (`PRIMARIA` ou
+`SECUNDARIA`) quando a assinatura validou; nunca o secret, a assinatura ou `application_id`.
+
+Rotação (nunca cole os valores em chat, tickets, capturas ou histórico do shell):
+
+1. Trate como comprometida qualquer chave que já tenha aparecido fora do cofre de secrets.
+2. No painel do Mercado Pago, use **Redefinir** na configuração de webhook de cada aplicação.
+   Nunca cadastre uma chave comprometida como principal ou secundária.
+3. Entre a redefinição e o passo 5 as entregas legítimas respondem `401` e o Mercado Pago as
+   reenvia periodicamente (a cada 15 minutos). Em staging isso é aceitável.
+4. Grave as duas novas chaves como secrets do projeto Pages `rp-doces-staging` (ambiente
+   Production), por arquivo privado fora do repositório ou `wrangler pages secret put`, sem imprimir
+   valores. Confirme só os **nomes** com `wrangler pages secret list --project-name rp-doces-staging`.
+5. Faça um novo deploy de staging (secrets só valem para deployments criados depois deles).
+6. Verifique com o simulador de **cada** aplicação: `200` e `signatureConfig` esperado nos logs
+   (tail em tempo real). Só então crie uma Order real de homologação.
+7. Remova `MP_WEBHOOK_SECRET_SECONDARY` quando a segunda configuração deixar de existir.
 
 ## Smoke e checklist pós-deploy
 
