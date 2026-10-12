@@ -95,8 +95,13 @@ export function webhookMpStatus(raw: unknown): (typeof WEBHOOK_MP_STATUS)[number
   return WEBHOOK_MP_STATUS.find(item => item === value) ?? "outro";
 }
 
+// Qual configuração de segredo validou a assinatura (nunca o segredo nem a assinatura).
+export const WEBHOOK_SIGNATURE_CONFIGS = ["PRIMARIA", "SECUNDARIA"] as const;
+export type WebhookSignatureConfig = (typeof WEBHOOK_SIGNATURE_CONFIGS)[number];
+
 export interface WebhookResultMeta {
   readonly outcome: WebhookOutcome;
+  readonly signatureConfig?: WebhookSignatureConfig;
   readonly mpStatus?: (typeof WEBHOOK_MP_STATUS)[number];
   readonly dataIdFormat?: (typeof WEBHOOK_DATA_ID_FORMATS)[number];
   readonly statusFinal?: (typeof WEBHOOK_LEDGER_STATUS)[number];
@@ -111,6 +116,7 @@ function sanitizeWebhookResult(raw: unknown): WebhookResultMeta | undefined {
   const dataIdFormat = WEBHOOK_DATA_ID_FORMATS.find(item => item === input.dataIdFormat);
   const statusFinal = WEBHOOK_LEDGER_STATUS.find(item => item === input.statusFinal);
   const mpStatus = WEBHOOK_MP_STATUS.find(item => item === input.mpStatus);
+  const signatureConfig = WEBHOOK_SIGNATURE_CONFIGS.find(item => item === input.signatureConfig);
   const pagamentoId =
     typeof input.pagamentoId === "number" &&
     Number.isSafeInteger(input.pagamentoId) &&
@@ -122,6 +128,7 @@ function sanitizeWebhookResult(raw: unknown): WebhookResultMeta | undefined {
     ...(dataIdFormat ? { dataIdFormat } : {}),
     ...(statusFinal ? { statusFinal } : {}),
     ...(mpStatus ? { mpStatus } : {}),
+    ...(signatureConfig ? { signatureConfig } : {}),
     ...(pagamentoId ? { pagamentoId } : {})
   });
 }
