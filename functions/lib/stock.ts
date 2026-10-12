@@ -112,8 +112,7 @@ export function preparePedidoPhysicalProjection(
         END,
         atualizado_em = CURRENT_TIMESTAMP
     WHERE id = ?
-      ${operationGuard}
-      ${confirmation ? `AND (${confirmation.sql})` : ""}
+      ${operationGuard}${confirmation ? `\n      AND (${confirmation.sql})` : ""}
   `
     )
     .bind(pedidoId, ...(operationKey ? [operationKey] : []), ...(confirmation?.args ?? []));
@@ -224,8 +223,7 @@ export async function baixarEstoquePedido(
               AND pi.status_item = 'ATIVO'
               AND pi.estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
               AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql("p.id")}
-          )
-          ${confirmation ? `AND (${confirmation.sql})` : ""}
+          )${confirmation ? `\n          AND (${confirmation.sql})` : ""}
       `
         )
         .bind(
@@ -257,8 +255,7 @@ export async function baixarEstoquePedido(
           AND estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
           AND EXISTS (SELECT 1 FROM pedidos p
                       WHERE p.id = pedido_itens.pedido_id AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql("p.id")})
-          AND EXISTS (SELECT 1 FROM produtos pr WHERE pr.id = pedido_itens.produto_id)
-          ${confirmation ? `AND (${confirmation.sql})` : ""}
+          AND EXISTS (SELECT 1 FROM produtos pr WHERE pr.id = pedido_itens.produto_id)${confirmation ? `\n          AND (${confirmation.sql})` : ""}
       `
         )
         .bind(item.id, pedidoId, item.produto_id, item.quantidade, ...(confirmation?.args ?? []))

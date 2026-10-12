@@ -21,23 +21,24 @@ const error = (code: string, status: number) => json({ ok: false, code }, status
 
 // Publication gates attest DB isolation; runtime flags cannot attest its UUID.
 export const onRequest: PagesFunction<Env> = async ({ request, env, params }) => {
-  if (request.method !== "POST") {
-    const response = error("METODO_NAO_PERMITIDO", 405);
-    response.headers.set("Allow", "POST");
-    return response;
-  }
-  if (
-    env.APP_ENV !== "staging" ||
-    env.MP_TEST_MODE !== "orders_pix" ||
-    new URL(request.url).origin !== "https://staging.rpdoces.com.br" ||
-    !sameOrigin(request)
-  ) {
-    return error("PIX_RECUPERACAO_PROIBIDA", 403);
-  }
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method) && !sameOrigin(request))
+    return json({ error: "Origem inválida" }, 403);
   try {
     const auth = await requireUser(env.DB, request);
-    if ("error" in auth) return error("NAO_AUTENTICADO", 401);
+    if ("error" in auth) return json({ error: "Não autenticado" }, 401);
     if (auth.user.papel !== "OWNER") return error("PIX_RECUPERACAO_PROIBIDA", 403);
+    if (request.method !== "POST") {
+      const response = error("METODO_NAO_PERMITIDO", 405);
+      response.headers.set("Allow", "POST");
+      return response;
+    }
+    if (
+      env.APP_ENV !== "staging" ||
+      env.MP_TEST_MODE !== "orders_pix" ||
+      new URL(request.url).origin !== "https://staging.rpdoces.com.br"
+    ) {
+      return error("PIX_RECUPERACAO_PROIBIDA", 403);
+    }
     const id = typeof params.id === "string" && /^\d+$/.test(params.id) ? Number(params.id) : 0;
     if (!Number.isSafeInteger(id) || id <= 0) return error("ID_INVALIDO", 400);
     let pagamentoId: number;

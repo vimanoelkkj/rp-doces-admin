@@ -83,8 +83,7 @@ function preparePedidoFinancialProjectionBase(
                              THEN CURRENT_TIMESTAMP ELSE p.atualizado_em END
     WHERE p.id = ? AND ${pedidoValidoSql("p.id")}
       ${ledgerGuard}
-      ${operationGuard}
-      ${confirmation ? `AND (${confirmation.sql})` : ""}
+      ${operationGuard}${confirmation ? `\n      AND (${confirmation.sql})` : ""}
     RETURNING status_pagamento
   `
     )
