@@ -8,6 +8,12 @@ export interface SyncPaymentResult {
   ok: boolean;
   status: LedgerStatus | null;
   transicionou: boolean;
+  finalizacaoPendente?: boolean;
+}
+
+export interface SyncPaymentOptions {
+  confirmationOnly: true;
+  expectedPedidoId?: number;
 }
 
 export type ResolveWebhookPaymentResult =

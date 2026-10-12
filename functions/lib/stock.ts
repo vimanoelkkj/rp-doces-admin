@@ -3,6 +3,7 @@
 import { pedidoValidoSql } from "./pedidoValido";
 
 import { preparePedidoFinancialProjection } from "./pedidoFinanceiroSql";
+import type { PaymentConfirmationGuard } from "./paymentSync/confirmationGuard";
 
 // Estado fisico autoritativo por item. Os marcadores de `pedidos` continuam
 // existindo somente como projecao de compatibilidade para leitores antigos.
@@ -63,7 +64,8 @@ export async function pedidoTemEstoquePendente(db: D1Database, pedidoId: number)
 export function preparePedidoPhysicalProjection(
   db: D1Database,
   pedidoId: number,
-  operationKey?: string
+  operationKey?: string,
+  confirmation?: PaymentConfirmationGuard
 ): D1PreparedStatement {
   const ativoControlado = `pi.pedido_id = pedidos.id
     AND pi.status_item IN ('ATIVO', 'TROCA_PENDENTE') AND pi.produto_id IS NOT NULL`;
@@ -110,10 +112,10 @@ export function preparePedidoPhysicalProjection(
         END,
         atualizado_em = CURRENT_TIMESTAMP
     WHERE id = ?
-      ${operationGuard}
+      ${operationGuard}${confirmation ? `\n      AND (${confirmation.sql})` : ""}
   `
     )
-    .bind(pedidoId, ...(operationKey ? [operationKey] : []));
+    .bind(pedidoId, ...(operationKey ? [operationKey] : []), ...(confirmation?.args ?? []));
 }
 
 // Converte somente itens ATIVOS que ainda precisam de baixa. A decisao sobre
@@ -122,7 +124,8 @@ export function preparePedidoPhysicalProjection(
 // BAIXADO desconta apenas estoque; se a baixa vencer, a liberacao vira no-op.
 export async function baixarEstoquePedido(
   db: D1Database,
-  pedidoId: number
+  pedidoId: number,
+  confirmation?: PaymentConfirmationGuard
 ): Promise<BaixaResultado> {
   const pedido = await db
     .prepare(
@@ -170,8 +173,8 @@ export async function baixarEstoquePedido(
     // a partir da autoridade por item. Isso torna um retry capaz de reparar
     // uma projecao interrompida depois da ultima baixa.
     await db.batch([
-      preparePedidoFinancialProjection(db, pedidoId),
-      preparePedidoPhysicalProjection(db, pedidoId)
+      preparePedidoFinancialProjection(db, pedidoId, confirmation),
+      preparePedidoPhysicalProjection(db, pedidoId, undefined, confirmation)
     ]);
     return { ok: true, baixado: false };
   }
@@ -179,7 +182,9 @@ export async function baixarEstoquePedido(
   // Reavalia o liquido no mesmo batch da baixa. Um refund concorrente que
   // vencer primeiro muda a projecao e faz todos os guards fisicos virarem
   // no-op antes de qualquer unidade ser consumida.
-  const statements: D1PreparedStatement[] = [preparePedidoFinancialProjection(db, pedidoId)];
+  const statements: D1PreparedStatement[] = [
+    preparePedidoFinancialProjection(db, pedidoId, confirmation)
+  ];
   const itemResultIndexes: number[] = [];
 
   for (const item of itens) {
@@ -218,7 +223,7 @@ export async function baixarEstoquePedido(
               AND pi.status_item = 'ATIVO'
               AND pi.estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
               AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql("p.id")}
-          )
+          )${confirmation ? `\n          AND (${confirmation.sql})` : ""}
       `
         )
         .bind(
@@ -233,7 +238,8 @@ export async function baixarEstoquePedido(
           item.produto_id,
           item.id,
           pedidoId,
-          item.quantidade
+          item.quantidade,
+          ...(confirmation?.args ?? [])
         )
     );
 
@@ -249,15 +255,15 @@ export async function baixarEstoquePedido(
           AND estoque_estado IN ${ESTADOS_BAIXAVEIS_SQL}
           AND EXISTS (SELECT 1 FROM pedidos p
                       WHERE p.id = pedido_itens.pedido_id AND p.status_pagamento = 'PAGO' AND ${pedidoValidoSql("p.id")})
-          AND EXISTS (SELECT 1 FROM produtos pr WHERE pr.id = pedido_itens.produto_id)
+          AND EXISTS (SELECT 1 FROM produtos pr WHERE pr.id = pedido_itens.produto_id)${confirmation ? `\n          AND (${confirmation.sql})` : ""}
       `
         )
-        .bind(item.id, pedidoId, item.produto_id, item.quantidade)
+        .bind(item.id, pedidoId, item.produto_id, item.quantidade, ...(confirmation?.args ?? []))
     );
     itemResultIndexes.push(statements.length - 1);
   }
 
-  statements.push(preparePedidoPhysicalProjection(db, pedidoId));
+  statements.push(preparePedidoPhysicalProjection(db, pedidoId, undefined, confirmation));
 
   try {
     const resultados = await db.batch(statements);

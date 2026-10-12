@@ -6,6 +6,7 @@
 export type {
   MpMappedStatus,
   SyncPaymentResult,
+  SyncPaymentOptions,
   ResolveWebhookPaymentResult
 } from "./paymentSync/types";
 

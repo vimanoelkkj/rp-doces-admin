@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { pedidoValidoSql } from "./pedidoValido";
+import type { PaymentConfirmationGuard } from "./paymentSync/confirmationGuard";
 
 // Compartilhada por projeção, seleção de divergências e revalidação física.
 // Subqueries independentes evitam multiplicar pagamentos por refunds/alocações.
@@ -62,7 +63,8 @@ export const exposicaoPixRemotaNoPedidoSql = (pedidoIdSql: string) =>
 function preparePedidoFinancialProjectionBase(
   db: D1Database,
   pedidoId: number,
-  operationKey?: string
+  operationKey?: string,
+  confirmation?: PaymentConfirmationGuard
 ): D1PreparedStatement {
   const operationGuard = operationKey
     ? `AND EXISTS (SELECT 1 FROM pedido_operacoes o
@@ -81,18 +83,19 @@ function preparePedidoFinancialProjectionBase(
                              THEN CURRENT_TIMESTAMP ELSE p.atualizado_em END
     WHERE p.id = ? AND ${pedidoValidoSql("p.id")}
       ${ledgerGuard}
-      ${operationGuard}
+      ${operationGuard}${confirmation ? `\n      AND (${confirmation.sql})` : ""}
     RETURNING status_pagamento
   `
     )
-    .bind(pedidoId, ...(operationKey ? [operationKey] : []));
+    .bind(pedidoId, ...(operationKey ? [operationKey] : []), ...(confirmation?.args ?? []));
 }
 
 export function preparePedidoFinancialProjection(
   db: D1Database,
-  pedidoId: number
+  pedidoId: number,
+  confirmation?: PaymentConfirmationGuard
 ): D1PreparedStatement {
-  return preparePedidoFinancialProjectionBase(db, pedidoId);
+  return preparePedidoFinancialProjectionBase(db, pedidoId, undefined, confirmation);
 }
 
 export function preparePedidoFinancialProjectionForItemOperation(

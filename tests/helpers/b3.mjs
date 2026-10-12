@@ -20,6 +20,7 @@ const bundle = await build({
       export * as adminRefund from './functions/api/admin/pedidos/[id]/reembolsos';
       export * as checkout from './functions/api/checkout';
       export * as adminPix from './functions/api/admin/pedidos/[id]/pix';
+      export * as adminPixRecovery from './functions/api/admin/pedidos/[id]/pix/recuperar';
       export * as pix from './functions/lib/comandaPix';
       export * as adminVoid from './functions/api/admin/pedidos/[id]/anulacao';
       export * as adminVoidEstorno from './functions/api/admin/pedidos/[id]/anulacao/estorno';
