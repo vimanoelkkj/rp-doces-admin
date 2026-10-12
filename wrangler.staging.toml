@@ -4,6 +4,7 @@ compatibility_flags = ["nodejs_als"]
 pages_build_output_dir = "dist"
 
 [vars]
+APP_ENV = "staging"
 MP_TEST_MODE = "orders_pix"
 
 [[queues.producers]]
