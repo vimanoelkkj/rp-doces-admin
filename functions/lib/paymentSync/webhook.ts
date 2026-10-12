@@ -134,6 +134,20 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// Valida contra uma lista rotulada de segredos e devolve o rótulo do primeiro que valida (ou null).
+// A escolha NUNCA usa dado do payload (application_id, corpo): só a assinatura decide. O algoritmo
+// HMAC é o de `validateMpWebhookSignature`, sem qualquer variante nova.
+export async function validateMpWebhookSignatureAny<T extends string>(
+  request: Request,
+  candidates: ReadonlyArray<{ label: T; secret: string }>,
+  dataId: string
+): Promise<T | null> {
+  for (const candidate of candidates) {
+    if (await validateMpWebhookSignature(request, candidate.secret, dataId)) return candidate.label;
+  }
+  return null;
+}
+
 // Porta fiel do protocolo HMAC de produção: manifest
 // `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` assinado com
 // HMAC-SHA256 e comparado contra x-signature de forma timing-safe.
