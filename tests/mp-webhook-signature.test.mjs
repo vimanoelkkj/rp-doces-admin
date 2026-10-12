@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHmac } from "node:crypto";
 import { build } from "esbuild";
-import { fixture, state } from "./helpers/b3.mjs";
+import { approvedMp, fixture, state } from "./helpers/b3.mjs";
 
 // Webhook do Mercado Pago Orders.
 // 1) O simulador oficial assina `type=order` com um data.id fictício ("123456"): com assinatura
@@ -94,10 +94,16 @@ function isolar(db, t) {
   return { chamadas, efeitos };
 }
 
+// A linha terminal WEBHOOK_MP_RESULTADO é desviada para `logs.resultados`: as asserções legadas sobre
+// os avisos/erros existentes continuam exatas e os testes de observabilidade a leem à parte.
+const RESULTADO = "WEBHOOK_MP_RESULTADO";
 const silenciar = t => {
   const logs = [];
+  Object.defineProperty(logs, "resultados", { value: [], enumerable: false });
   for (const level of ["debug", "info", "log", "warn", "error"])
-    t.mock.method(console, level, (...args) => logs.push([level, ...args]));
+    t.mock.method(console, level, (...args) =>
+      (args[0] === RESULTADO ? logs.resultados : logs).push([level, ...args])
+    );
   return logs;
 };
 
@@ -789,4 +795,263 @@ test("o data.id do corpo só é consultado sem data.id na query (derivação com
   const response = await webhook.onRequestPost({ request, env: env(db) });
   assert.equal(response.status, 200);
   assert.deepEqual(chamadas, ["https://api.mercadopago.com/v1/orders/ORDTST01ABC"]);
+});
+
+// --- Resultado terminal estruturado (observabilidade) --------------------------------------
+
+const unico = logs => {
+  assert.equal(logs.resultados.length, 1, "exatamente uma linha WEBHOOK_MP_RESULTADO");
+  const [level, mensagem, payload] = logs.resultados[0];
+  assert.equal(level, "info");
+  assert.equal(mensagem, RESULTADO);
+  return payload;
+};
+const resultado = async (db, t, request, envExtra = {}) => {
+  const logs = silenciar(t);
+  const response = await webhook.onRequestPost({ request, env: { ...env(db), ...envExtra } });
+  return { response, payload: unico(logs), logs };
+};
+
+test("resultado: rejeições e saídas silenciosas registram um enum fechado, sem alterar a resposta", async t => {
+  const db = await fixture(t);
+  const casos = [
+    ["SEM_SEGREDO", 503, entrega({ dataId: "ORDTST01ABC" }), { MP_WEBHOOK_SECRET: " " }],
+    ["ASSINATURA_INVALIDA", 401, entrega({ dataId: "ORDTST01ABC", valida: false })],
+    ["IGNORADO_TIPO", 200, entrega({ dataId: "ORDTST01ABC", tipo: "payment" })],
+    ["IGNORADO_SEM_ID", 200, entrega({ dataId: "" })],
+    ["IGNORADO_ID_FORA_DO_FORMATO", 200, entrega({ dataId: "123456" })]
+  ];
+  for (const [outcome, status, request, envExtra] of casos) {
+    const { response, payload } = await resultado(db, t, request, envExtra);
+    assert.equal(response.status, status, outcome);
+    assert.equal(payload.httpStatus, status, outcome);
+    assert.equal(payload.webhookResult.outcome, outcome);
+    assert.ok(payload.webhookSignature, "estrutura da assinatura presente");
+  }
+});
+
+test("resultado: GET 404, pagamento não encontrado e falha de sincronização", async t => {
+  const db = await fixture(t);
+  const caso = async (outcome, status, fetchImpl, dataId = "ORDTST09ZZZ") => {
+    t.mock.method(globalThis, "fetch", fetchImpl);
+    const { response, payload } = await resultado(db, t, entrega({ dataId }));
+    assert.equal(response.status, status, outcome);
+    assert.equal(payload.webhookResult.outcome, outcome);
+    assert.equal(payload.webhookResult.pagamentoId, undefined);
+  };
+  await caso("IGNORADO_MP_404", 200, async () => new Response("", { status: 404 }));
+  await caso("FALHA_SINCRONIZACAO", 502, async () => {
+    throw new Error("rede caiu com ORDTST09ZZZ");
+  });
+});
+
+test("resultado: pagamento não encontrado e identidade ambígua são ignorados com enum próprio", async t => {
+  const db = await fixture(t);
+  // Order verificada no MP, mas sem nenhum pagamento local nem referência conhecida.
+  t.mock.method(globalThis, "fetch", async () =>
+    Response.json(approvedMp({ id: 555, external_reference: "ref-desconhecida" }))
+  );
+  const semPagamento = await resultado(db, t, entrega({ dataId: "ORD555" }));
+  assert.equal(semPagamento.response.status, 200);
+  assert.equal(semPagamento.payload.webhookResult.outcome, "IGNORADO_NAO_ENCONTRADO");
+  assert.equal(semPagamento.payload.webhookResult.pagamentoId, undefined);
+  t.mock.method(globalThis, "fetch", async () => Response.json(approvedMp({ id: 999 })));
+
+  // O mesmo pedido já tem pagamento com outro ORD/PAY: nenhuma linha é escolhida (ambíguo).
+  const ambiguo = await resultado(db, t, entrega({ dataId: "ORD999" }));
+  assert.equal(ambiguo.response.status, 200);
+  assert.equal(ambiguo.payload.webhookResult.outcome, "IGNORADO_AMBIGUO");
+});
+
+test("resultado: PROCESSADO só após sincronizar; repetição vira PROCESSADO_SEM_TRANSICAO", async t => {
+  const db = await fixture(t);
+  // O fixture simula o GET do MP aprovado para ORD101/PAY101 e o pagamento local 1 está PENDENTE.
+  const primeira = await resultado(db, t, entrega({ dataId: "ORD101" }));
+  assert.equal(primeira.response.status, 200);
+  assert.equal(primeira.payload.webhookResult.outcome, "PROCESSADO");
+  assert.equal(primeira.payload.webhookResult.statusFinal, "PAGO");
+  assert.equal(primeira.payload.webhookResult.pagamentoId, 1);
+  assert.equal(
+    (await db.prepare("SELECT status FROM pedido_pagamentos WHERE id=1").first()).status,
+    "PAGO"
+  );
+
+  const repetida = await resultado(db, t, entrega({ dataId: "ORD101" }));
+  assert.equal(repetida.response.status, 200);
+  assert.equal(repetida.payload.webhookResult.outcome, "PROCESSADO_SEM_TRANSICAO");
+  assert.equal(repetida.payload.webhookResult.statusFinal, "PAGO");
+});
+
+test("resultado: o payload não contém nenhum valor recebido nem segredo", async t => {
+  const db = await fixture(t);
+  const SENT = {
+    dataId: "ORDSENTINELAID0001",
+    requestId: "REQID-SENTINELA-0009",
+    token: "TOKEN-QUERY-SENTINELA",
+    email: "pagador.sentinela@example.com",
+    ref: "EXTREF-SENTINELA"
+  };
+  const v1 = assinar({ id: SENT.dataId, requestId: SENT.requestId });
+  const alvos = [
+    entrega({
+      dataId: SENT.dataId,
+      requestId: SENT.requestId,
+      extraQuery: { token: SENT.token },
+      extraBody: { external_reference: SENT.ref, payer: { email: SENT.email } }
+    }),
+    entrega({ dataId: SENT.dataId, requestId: SENT.requestId, valida: false })
+  ];
+  t.mock.method(globalThis, "fetch", async () => new Response("", { status: 404 }));
+  for (const request of alvos) {
+    const { payload } = await resultado(db, t, request);
+    const texto = JSON.stringify(payload);
+    for (const proibido of [...Object.values(SENT), SECRET, v1, "1700000000"])
+      assert.ok(!texto.includes(proibido), `vazou ${proibido}`);
+  }
+});
+
+test("resultado: o sanitizador descarta campos hostis e valores fora do enum", () => {
+  const limpo = context.sanitizeOperationalMeta({
+    webhookResult: {
+      outcome: "PROCESSADO",
+      dataIdFormat: "order",
+      statusFinal: "PAGO",
+      pagamentoId: 7,
+      secret: "S3GREDO",
+      dataId: "ORDX"
+    }
+  });
+  assert.deepEqual(limpo.webhookResult, {
+    outcome: "PROCESSADO",
+    dataIdFormat: "order",
+    statusFinal: "PAGO",
+    pagamentoId: 7
+  });
+  const hostil = context.sanitizeOperationalMeta({
+    webhookResult: {
+      outcome: "PROCESSADO",
+      dataIdFormat: "ORD-SECRETO",
+      statusFinal: "PAGO; DROP",
+      pagamentoId: -1
+    }
+  });
+  assert.deepEqual(hostil.webhookResult, { outcome: "PROCESSADO" });
+  for (const raw of [null, "x", [], { outcome: "QUALQUER-COISA" }, { outcome: { a: 1 } }])
+    assert.equal(context.sanitizeOperationalMeta({ webhookResult: raw }).webhookResult, undefined);
+  for (const pagamentoId of [1.5, "7", 0, Number.MAX_SAFE_INTEGER + 2])
+    assert.equal(
+      context.sanitizeOperationalMeta({ webhookResult: { outcome: "PROCESSADO", pagamentoId } })
+        .webhookResult.pagamentoId,
+      undefined
+    );
+});
+
+test("resultado: falha do registro não altera a resposta do webhook", async t => {
+  const db = await fixture(t);
+  t.mock.method(console, "info", () => {
+    throw new Error("coleta indisponível");
+  });
+  const respostas = [];
+  for (const [request, envExtra] of [
+    [entrega({ dataId: "123456" }), {}],
+    [entrega({ dataId: "ORDTST01ABC", valida: false }), {}],
+    [entrega({ dataId: "ORDTST01ABC" }), { MP_WEBHOOK_SECRET: "" }],
+    [entrega({ dataId: "ORD101" }), {}]
+  ]) {
+    const response = await webhook.onRequestPost({ request, env: { ...env(db), ...envExtra } });
+    respostas.push([response.status, await response.json()]);
+  }
+  assert.deepEqual(respostas, [
+    [200, { ok: true }],
+    [401, { erro: "Assinatura inválida." }],
+    [503, { erro: "Webhook não configurado." }],
+    [200, { ok: true }]
+  ]);
+  assert.equal(
+    (await db.prepare("SELECT status FROM pedido_pagamentos WHERE id=1").first()).status,
+    "PAGO",
+    "a sincronização concluiu mesmo com o registro falhando"
+  );
+});
+
+test("resultado: mpStatus distingue MP pending de MP approved com divergência de integridade (ambos ledger PENDENTE)", async t => {
+  const caso = async (nome, order) => {
+    const db = await fixture(t);
+    t.mock.method(globalThis, "fetch", async () => Response.json(order));
+    const { response, payload } = await resultado(db, t, entrega({ dataId: "ORD101" }));
+    assert.equal(response.status, 200, nome);
+    const pagamento = await db
+      .prepare("SELECT status, mp_status, mp_status_detail FROM pedido_pagamentos WHERE id=1")
+      .first();
+    return { payload: payload.webhookResult, pagamento };
+  };
+
+  const pendente = await caso("pending", approvedMp({ id: 101, status: "pending" }));
+  assert.equal(pendente.payload.outcome, "PROCESSADO_SEM_TRANSICAO");
+  assert.equal(pendente.payload.statusFinal, "PENDENTE");
+  assert.equal(pendente.payload.mpStatus, "pending");
+  assert.equal(pendente.pagamento.status, "PENDENTE");
+
+  const divergente = await caso(
+    "approved + divergência",
+    approvedMp({ id: 101, transaction_amount: 0.01 })
+  );
+  assert.equal(divergente.payload.outcome, "PROCESSADO_SEM_TRANSICAO");
+  assert.equal(divergente.payload.statusFinal, "PENDENTE");
+  assert.equal(divergente.payload.mpStatus, "approved");
+  assert.equal(divergente.pagamento.status, "PENDENTE");
+  assert.match(divergente.pagamento.mp_status_detail, /^INTEGRIDADE_MP:/);
+
+  // Mesmo outcome e mesmo statusFinal: só o mpStatus separa o benigno do financeiramente relevante.
+  assert.notEqual(pendente.payload.mpStatus, divergente.payload.mpStatus);
+  assert.deepEqual(Object.keys(divergente.payload).sort(), [
+    "dataIdFormat",
+    "mpStatus",
+    "outcome",
+    "pagamentoId",
+    "statusFinal"
+  ]);
+});
+
+test("resultado: mpStatus é enum fechado; valor desconhecido vira 'outro' e hostil é descartado", () => {
+  assert.equal(context.webhookMpStatus("APPROVED"), "approved");
+  assert.equal(context.webhookMpStatus("charged_back; DROP TABLE"), "outro");
+  assert.equal(context.webhookMpStatus(undefined), "outro");
+  assert.equal(
+    context.sanitizeOperationalMeta({
+      webhookResult: { outcome: "PROCESSADO", mpStatus: "ORD-SECRETO" }
+    }).webhookResult.mpStatus,
+    undefined
+  );
+  assert.equal(
+    context.sanitizeOperationalMeta({
+      webhookResult: { outcome: "PROCESSADO", mpStatus: "refunded" }
+    }).webhookResult.mpStatus,
+    "refunded"
+  );
+});
+
+test("pagamento ambíguo: o console.error não registra external_reference nem o token_publico", async t => {
+  const TOKEN = "TOKEN-PUBLICO-SENTINELA-0042";
+  const db = await fixture(t);
+  await db.prepare("UPDATE pedidos SET token_publico=? WHERE id=1").bind(TOKEN).run();
+  t.mock.method(globalThis, "fetch", async () =>
+    Response.json(approvedMp({ id: 999, external_reference: TOKEN }))
+  );
+  const { response, payload, logs } = await resultado(db, t, entrega({ dataId: "ORD999" }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.equal(payload.webhookResult.outcome, "IGNORADO_AMBIGUO");
+  assert.equal(payload.webhookResult.mpStatus, "approved");
+
+  const erros = logs.filter(
+    ([level, message]) =>
+      level === "error" &&
+      message === "Webhook do Mercado Pago: pagamento ambíguo, nenhuma linha alterada"
+  );
+  assert.equal(erros.length, 1);
+  assert.deepEqual(erros[0][2], { mp_payment_id: "PAY999" });
+  const tudo = JSON.stringify([...logs, ...logs.resultados]);
+  assert.ok(!tudo.includes(TOKEN), "token_publico vazou");
+  assert.ok(!tudo.includes("external_reference"), "external_reference reapareceu");
 });
