@@ -481,3 +481,147 @@ test("guard de migrations: o sqlite_master.sql REAL instalado casa com a defini�
   ).objects.find(o => o.name === "pedido_anulacoes_bloquear_exposicao_pix_remota");
   assert.notEqual(antiga.definition, esperado.definition, "0040 e 0041 são distinguíveis");
 });
+
+// --- Lógica de três valores do SQLite: identidade incompleta é AUSÊNCIA de prova -------------
+// NOT (NULL) é NULL; sem COALESCE o EXISTS deixava de enxergar a perna e a exclusão passava.
+// Pedido de Pix administrativo não grava pedidos.mp_*, então o braço legado não mascara o defeito.
+
+const IDENTIDADES_INCOMPLETAS = [
+  ["order=NULL, payment=NULL", null, null],
+  ["order='ORD101', payment=NULL", "ORD101", null],
+  ["order=NULL, payment='PAY101'", null, "PAY101"]
+];
+
+async function semColunasLegadas(db) {
+  await db
+    .prepare(
+      "UPDATE pedidos SET mp_payment_id=NULL,mp_qr_code=NULL,mp_qr_code_base64=NULL,mp_ticket_url=NULL WHERE id=1"
+    )
+    .run();
+}
+
+for (const [nome, orderId, paymentId] of IDENTIDADES_INCOMPLETAS) {
+  test(`endpoint: Pix PAGO e estornado com identidade incompleta (${nome}) bloqueia`, async t => {
+    const { db, session } = await pago(t);
+    await semColunasLegadas(db);
+    await db
+      .prepare("UPDATE pedido_pagamentos SET mp_order_id=?,mp_payment_id=? WHERE id=1")
+      .bind(orderId, paymentId)
+      .run();
+    await reembolso(db, { valor: 10000 });
+    await bloqueado(db, session, EXPOSICAO);
+  });
+
+  test(`trigger direto: identidade incompleta (${nome}) recusa a anulação no banco`, async t => {
+    const { db } = await pago(t);
+    await semColunasLegadas(db);
+    await db
+      .prepare("UPDATE pedido_pagamentos SET mp_order_id=?,mp_payment_id=? WHERE id=1")
+      .bind(orderId, paymentId)
+      .run();
+    await reembolso(db, { valor: 10000 });
+    await assert.rejects(db.prepare(INSERT_ANULACAO).run(), /ANULACAO_EXPOSICAO_PIX_REMOTA/);
+    assert.equal(await anulacoes(db), 0);
+  });
+
+  test(`corrida: identidade apagada (${nome}) depois da checagem e antes do batch aborta tudo`, async t => {
+    const { db, session } = await pago(t);
+    await semColunasLegadas(db);
+    await reembolso(db, { valor: 10000 });
+    let disparou = false;
+    db.hook = async (statements, kind) => {
+      if (kind !== "batch" || !statements[0].sql.includes("INSERT INTO pedido_anulacoes"))
+        return statements;
+      disparou = true;
+      await db
+        .prepare("UPDATE pedido_pagamentos SET mp_order_id=?,mp_payment_id=? WHERE id=1")
+        .bind(orderId, paymentId)
+        .run();
+      return statements;
+    };
+    const antes = await state(db);
+    const response = await anular(db, session);
+    db.hook = null;
+    assert.equal(disparou, true, "a identidade mudou depois da checagem da aplicação");
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).code, EXPOSICAO);
+    assert.equal(await anulacoes(db), 0, "o batch inteiro reverteu");
+    assert.equal((await state(db)).produtos?.[0]?.estoque, antes.produtos?.[0]?.estoque);
+  });
+}
+
+test("controle positivo: a mesma perna com ORD/PAY válidos e sem colunas legadas libera", async t => {
+  const { db, session } = await pago(t);
+  await semColunasLegadas(db);
+  await reembolso(db, { valor: 10000 });
+  assert.equal((await anular(db, session)).status, 200);
+});
+
+test("controle positivo: Payments histórico numérico sem colunas legadas libera", async t => {
+  const { db, session } = await pago(t);
+  await semColunasLegadas(db);
+  await db
+    .prepare("UPDATE pedido_pagamentos SET mp_order_id=NULL,mp_payment_id='9001' WHERE id=1")
+    .run();
+  await reembolso(db, { valor: 10000 });
+  assert.equal((await anular(db, session)).status, 200);
+});
+
+test("NULL na prova também não esconde operação nem identidade legada (sem mascarar pelo outro braço)", async t => {
+  // Operação CONCLUIDA com mp_payment_id NULL: igualdade com NULL não pode virar 'sem exposição'.
+  const { db, session } = await pago(t);
+  await semColunasLegadas(db);
+  await reembolso(db, { valor: 10000 });
+  await operacaoPix(db, { mpPaymentId: null });
+  await bloqueado(db, session, EXPOSICAO);
+});
+
+// Matriz exaustiva: o predicado SQL (a mesma string do trigger) contra uma referência em JS.
+// Qualquer NULL que escape como "sem exposição" aparece como divergência.
+test("matriz identidade × soma de estornos: SQL === referência, e NULL nunca vira 'sem exposição'", async t => {
+  const { build } = await import("esbuild");
+  const bundle = await build({
+    stdin: {
+      contents:
+        "export { exposicaoPixRemotaNoPedidoSql } from './functions/lib/pedidoFinanceiroSql';",
+      resolveDir: process.cwd(),
+      loader: "ts"
+    },
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "node"
+  });
+  const { exposicaoPixRemotaNoPedidoSql } = await import(
+    `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
+  );
+  const { db } = await pago(t);
+  await semColunasLegadas(db);
+  const consulta = `SELECT ${exposicaoPixRemotaNoPedidoSql("1")} AS exposto`;
+  const ordens = [null, "ORD101", "ORD-1", "", "ord101", "ORD"];
+  const pagamentos = [null, "PAY101", "9001", "PAY-1", "", "09001", "PAY", "pay101"];
+  const somas = [0, 9999, 10000, 10001];
+  const valido = (ord, pay) =>
+    (/^ORD[A-Za-z0-9]+$/.test(ord ?? "") && /^PAY[A-Za-z0-9]+$/.test(pay ?? "")) ||
+    (ord === null && /^[1-9][0-9]*$/.test(pay ?? ""));
+  let nulos = 0;
+  for (const ord of ordens)
+    for (const pay of pagamentos)
+      for (const soma of somas) {
+        await db.prepare("DELETE FROM pedido_reembolsos").run();
+        await db
+          .prepare("UPDATE pedido_pagamentos SET mp_order_id=?,mp_payment_id=? WHERE id=1")
+          .bind(ord, pay)
+          .run();
+        if (soma) await reembolso(db, { valor: soma });
+        const linha = await db.prepare(consulta).first();
+        if (linha.exposto === null) nulos++;
+        const quitado = valido(ord, pay) && soma === 10000;
+        assert.equal(
+          linha.exposto,
+          quitado ? 0 : 1,
+          `ord=${JSON.stringify(ord)} pay=${JSON.stringify(pay)} soma=${soma}`
+        );
+      }
+  assert.equal(nulos, 0, "o predicado é estritamente booleano");
+});

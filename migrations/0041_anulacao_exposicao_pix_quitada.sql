@@ -30,7 +30,7 @@ BEFORE INSERT ON pedido_anulacoes
 FOR EACH ROW
 WHEN (EXISTS (SELECT 1 FROM pedido_pagamentos ep
             WHERE ep.pedido_id = NEW.pedido_id AND ep.metodo = 'PIX_MP'
-              AND NOT (ep.metodo = 'PIX_MP' AND ep.status = 'PAGO'
+              AND NOT COALESCE((ep.metodo = 'PIX_MP' AND ep.status = 'PAGO'
     AND ((ep.mp_order_id GLOB 'ORD?*' AND ep.mp_order_id NOT GLOB '*[^A-Za-z0-9]*'
           AND ep.mp_payment_id GLOB 'PAY?*' AND ep.mp_payment_id NOT GLOB '*[^A-Za-z0-9]*')
       OR (ep.mp_order_id IS NULL AND ep.mp_payment_id GLOB '[1-9]*'
@@ -45,15 +45,15 @@ WHEN (EXISTS (SELECT 1 FROM pedido_pagamentos ep
                     WHERE rp.pagamento_id = ep.id AND rp.status = 'PENDENTE')
     AND NOT EXISTS (SELECT 1 FROM pedido_reembolso_pix_mp_intencoes ri
                     WHERE ri.pagamento_id = ep.id
-                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO'))))
+                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO'))), 0))
     OR EXISTS (SELECT 1 FROM pedido_operacoes eo
                WHERE eo.pedido_id = NEW.pedido_id
                  AND eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN', 'PIX_ADMIN_REGENERACAO')
-                 AND NOT (eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN') AND eo.fase = 'CONCLUIDA'
+                 AND NOT COALESCE((eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN') AND eo.fase = 'CONCLUIDA'
                           AND EXISTS (SELECT 1 FROM pedido_pagamentos qp
                                       WHERE qp.id = eo.pagamento_id AND qp.pedido_id = eo.pedido_id
                                         AND qp.mp_payment_id = eo.mp_payment_id
-                                        AND (qp.metodo = 'PIX_MP' AND qp.status = 'PAGO'
+                                        AND COALESCE((qp.metodo = 'PIX_MP' AND qp.status = 'PAGO'
     AND ((qp.mp_order_id GLOB 'ORD?*' AND qp.mp_order_id NOT GLOB '*[^A-Za-z0-9]*'
           AND qp.mp_payment_id GLOB 'PAY?*' AND qp.mp_payment_id NOT GLOB '*[^A-Za-z0-9]*')
       OR (qp.mp_order_id IS NULL AND qp.mp_payment_id GLOB '[1-9]*'
@@ -68,13 +68,13 @@ WHEN (EXISTS (SELECT 1 FROM pedido_pagamentos ep
                     WHERE rp.pagamento_id = qp.id AND rp.status = 'PENDENTE')
     AND NOT EXISTS (SELECT 1 FROM pedido_reembolso_pix_mp_intencoes ri
                     WHERE ri.pagamento_id = qp.id
-                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO'))))))
+                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO'))), 0))), 0))
     OR EXISTS (SELECT 1 FROM pedidos el
                WHERE el.id = NEW.pedido_id
                  AND ((el.mp_payment_id IS NOT NULL
                        AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos lp
                                        WHERE lp.pedido_id = el.id AND lp.mp_payment_id = el.mp_payment_id
-                                         AND (lp.metodo = 'PIX_MP' AND lp.status = 'PAGO'
+                                         AND COALESCE((lp.metodo = 'PIX_MP' AND lp.status = 'PAGO'
     AND ((lp.mp_order_id GLOB 'ORD?*' AND lp.mp_order_id NOT GLOB '*[^A-Za-z0-9]*'
           AND lp.mp_payment_id GLOB 'PAY?*' AND lp.mp_payment_id NOT GLOB '*[^A-Za-z0-9]*')
       OR (lp.mp_order_id IS NULL AND lp.mp_payment_id GLOB '[1-9]*'
@@ -89,7 +89,7 @@ WHEN (EXISTS (SELECT 1 FROM pedido_pagamentos ep
                     WHERE rp.pagamento_id = lp.id AND rp.status = 'PENDENTE')
     AND NOT EXISTS (SELECT 1 FROM pedido_reembolso_pix_mp_intencoes ri
                     WHERE ri.pagamento_id = lp.id
-                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO')))))
+                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO'))), 0)))
                    OR (el.mp_payment_id IS NULL
                        AND (el.mp_qr_code IS NOT NULL OR el.mp_qr_code_base64 IS NOT NULL
                          OR el.mp_ticket_url IS NOT NULL)))))

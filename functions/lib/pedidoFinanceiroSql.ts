@@ -52,8 +52,12 @@ export const elegibilidadeOperacionalCobrancaSql = (alias = "pedidos") =>
 // sem refund pendente nem intenção em andamento/inconclusiva. A identidade remota precisa ser
 // coerente (Orders: ORD+PAY alfanuméricos; Payments histórico: sem ORD e id numérico) e única no
 // ledger. É a ÚNICA isenção da contenção abaixo.
+//
+// Lógica de três valores do SQLite: GLOB/= com NULL resultam em NULL, e NOT (NULL) é NULL, o que
+// faria o WHERE descartar a perna em vez de acusar exposição. Por isso a prova é embrulhada em
+// COALESCE(..., 0): identidade incompleta ou qualquer NULL vira 0 (sem prova), nunca "sem exposição".
 const pagamentoPixQuitadoSql = (alias: string) =>
-  `(${alias}.metodo = 'PIX_MP' AND ${alias}.status = 'PAGO'
+  `COALESCE((${alias}.metodo = 'PIX_MP' AND ${alias}.status = 'PAGO'
     AND ((${alias}.mp_order_id GLOB 'ORD?*' AND ${alias}.mp_order_id NOT GLOB '*[^A-Za-z0-9]*'
           AND ${alias}.mp_payment_id GLOB 'PAY?*' AND ${alias}.mp_payment_id NOT GLOB '*[^A-Za-z0-9]*')
       OR (${alias}.mp_order_id IS NULL AND ${alias}.mp_payment_id GLOB '[1-9]*'
@@ -68,7 +72,7 @@ const pagamentoPixQuitadoSql = (alias: string) =>
                     WHERE rp.pagamento_id = ${alias}.id AND rp.status = 'PENDENTE')
     AND NOT EXISTS (SELECT 1 FROM pedido_reembolso_pix_mp_intencoes ri
                     WHERE ri.pagamento_id = ${alias}.id
-                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO')))`;
+                      AND ri.status IN ('PENDENTE', 'PROCESSANDO', 'INCONCLUSIVO'))), 0)`;
 
 // Contenção conservadora da anulação: estados terminais locais não excluem uma captura
 // desconhecida. Só uma perna Pix quitada (e a operação de checkout/Pix admin CONCLUIDA que a
@@ -84,11 +88,11 @@ export const exposicaoPixRemotaNoPedidoSql = (pedidoIdSql: string) =>
     OR EXISTS (SELECT 1 FROM pedido_operacoes eo
                WHERE eo.pedido_id = ${pedidoIdSql}
                  AND eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN', 'PIX_ADMIN_REGENERACAO')
-                 AND NOT (eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN') AND eo.fase = 'CONCLUIDA'
+                 AND NOT COALESCE((eo.tipo IN ('CHECKOUT_SITE', 'PIX_ADMIN') AND eo.fase = 'CONCLUIDA'
                           AND EXISTS (SELECT 1 FROM pedido_pagamentos qp
                                       WHERE qp.id = eo.pagamento_id AND qp.pedido_id = eo.pedido_id
                                         AND qp.mp_payment_id = eo.mp_payment_id
-                                        AND ${pagamentoPixQuitadoSql("qp")})))
+                                        AND ${pagamentoPixQuitadoSql("qp")})), 0))
     OR EXISTS (SELECT 1 FROM pedidos el
                WHERE el.id = ${pedidoIdSql}
                  AND ((el.mp_payment_id IS NOT NULL
