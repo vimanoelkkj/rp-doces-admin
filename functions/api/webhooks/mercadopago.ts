@@ -13,8 +13,17 @@ import {
   syncPaymentFromMp,
   validateMpWebhookSignature
 } from "../../lib/paymentSync";
-import { requestLogger } from "../../lib/requestContext";
-import { describeWebhookSignatureInput } from "../../lib/mpWebhookSignatureShape";
+import {
+  requestLogger,
+  webhookMpStatus,
+  type WebhookOutcome,
+  type WebhookResultMeta
+} from "../../lib/requestContext";
+import {
+  type WebhookDataIdSource,
+  dataIdFormat,
+  describeWebhookSignatureInput
+} from "../../lib/mpWebhookSignatureShape";
 
 // Mesmo formato que fetchMpOrder exige; qualquer outro id não tem o que consultar.
 const ORDER_ID_PATTERN = /^ORD[A-Za-z0-9]+$/;
@@ -37,6 +46,32 @@ function ok() {
   return Response.json({ ok: true });
 }
 
+// Um resultado estruturado por requisição tratada. Só enums fechados e booleanos de estrutura
+// (nunca secret, assinatura, ids recebidos, corpo ou dados do pagador). Nenhuma falha do registro
+// pode alterar a resposta. A ausência desta linha NÃO prova ausência de entrega: só vale como
+// evidência com coleta de logs comprovadamente ativa e contínua.
+function finish(
+  response: Response,
+  outcome: WebhookOutcome,
+  observed: { request: Request; dataId: string; dataIdSource: WebhookDataIdSource },
+  extra: Omit<WebhookResultMeta, "outcome" | "dataIdFormat"> = {}
+): Response {
+  try {
+    requestLogger.infoMeta("WEBHOOK_MP_RESULTADO", {
+      httpStatus: response.status,
+      webhookResult: { outcome, dataIdFormat: dataIdFormat(observed.dataId), ...extra },
+      webhookSignature: describeWebhookSignatureInput(
+        observed.request,
+        observed.dataId,
+        observed.dataIdSource
+      )
+    });
+  } catch {
+    // Observabilidade nunca altera a resposta do webhook.
+  }
+  return response;
+}
+
 function getBodyDataId(body: WebhookBody | null): string {
   const value = body?.data?.id ?? body?.data_id ?? body?.id ?? null;
   return value === null || value === undefined ? "" : String(value);
@@ -57,6 +92,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const bodyDataId = queryDataId || queryDataIdLegacy ? "" : getBodyDataId(body);
   const dataId = queryDataId || queryDataIdLegacy || bodyDataId;
 
+  const dataIdSource: WebhookDataIdSource = queryDataId
+    ? "query-data.id"
+    : queryDataIdLegacy
+      ? "query-data_id"
+      : bodyDataId
+        ? "body"
+        : "none";
+  const observed = { request, dataId, dataIdSource };
+
   const type = String(
     url.searchParams.get("type") || url.searchParams.get("topic") || body?.type || body?.topic || ""
   ).toLowerCase();
@@ -64,29 +108,30 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const secret = String(env.MP_WEBHOOK_SECRET || "").trim();
   if (!secret) {
     console.error("MP_WEBHOOK_SECRET não configurado");
-    return Response.json({ erro: "Webhook não configurado." }, { status: 503 });
+    return finish(
+      Response.json({ erro: "Webhook não configurado." }, { status: 503 }),
+      "SEM_SEGREDO",
+      observed
+    );
   }
 
   const valid = await validateMpWebhookSignature(request, secret, dataId);
   if (!valid) {
     // Diagnóstico temporário do 401: só a estrutura da entrada, nunca valores.
-    const dataIdSource = queryDataId
-      ? "query-data.id"
-      : queryDataIdLegacy
-        ? "query-data_id"
-        : bodyDataId
-          ? "body"
-          : "none";
     requestLogger.warnMeta("Webhook do Mercado Pago: assinatura inválida", {
       httpStatus: 401,
       webhookSignature: describeWebhookSignatureInput(request, dataId, dataIdSource)
     });
-    return Response.json({ erro: "Assinatura inválida." }, { status: 401 });
+    return finish(
+      Response.json({ erro: "Assinatura inválida." }, { status: 401 }),
+      "ASSINATURA_INVALIDA",
+      observed
+    );
   }
 
   const supportedType = type === "order";
   if (!dataId || !supportedType) {
-    return ok();
+    return finish(ok(), !supportedType ? "IGNORADO_TIPO" : "IGNORADO_SEM_ID", observed);
   }
 
   // Assinatura já validada acima. O simulador oficial do MP assina `type=order` com um data.id
@@ -98,7 +143,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       httpStatus: 200,
       code: "ORDER_ID_FORMAT_INVALID"
     });
-    return ok();
+    return finish(ok(), "IGNORADO_ID_FORA_DO_FORMATO", observed);
   }
 
   try {
@@ -107,25 +152,46 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       payment = await fetchMpPayment(env.MP_ACCESS_TOKEN, dataId);
     } catch (err) {
       const status = (err as { status?: number })?.status;
-      if (status === 404) return ok();
+      if (status === 404) return finish(ok(), "IGNORADO_MP_404", observed);
       throw err;
     }
 
     const resolved = await resolveWebhookPayment(env.DB, payment);
-    if (resolved.kind === "not_found") return ok();
+    const mpStatus = webhookMpStatus(payment.status);
+    if (resolved.kind === "not_found")
+      return finish(ok(), "IGNORADO_NAO_ENCONTRADO", observed, { mpStatus });
     if (resolved.kind === "ambiguous") {
+      // Sem external_reference: para pedido do site ele é o token_publico.
       console.error("Webhook do Mercado Pago: pagamento ambíguo, nenhuma linha alterada", {
-        mp_payment_id: String(payment.id),
-        external_reference: payment.external_reference || null
+        mp_payment_id: String(payment.id)
       });
-      return ok();
+      return finish(ok(), "IGNORADO_AMBIGUO", observed, { mpStatus });
     }
 
-    await syncPaymentFromMp(env.DB, resolved.pagamentoId, payment, env);
+    const sincronizado = await syncPaymentFromMp(env.DB, resolved.pagamentoId, payment, env);
 
-    return ok();
+    // PROCESSADO só depois de a sincronização concluir; a transição efetiva é distinguida de
+    // "sincronizou sem transição" (já PAGO, recusada pela matriz ou divergência de integridade).
+    return finish(
+      ok(),
+      !sincronizado.ok
+        ? "IGNORADO_NAO_ENCONTRADO"
+        : sincronizado.transicionou
+          ? "PROCESSADO"
+          : "PROCESSADO_SEM_TRANSICAO",
+      observed,
+      {
+        mpStatus,
+        pagamentoId: resolved.pagamentoId,
+        ...(sincronizado.status ? { statusFinal: sincronizado.status } : {})
+      }
+    );
   } catch (err) {
     console.error("Erro ao sincronizar webhook do Mercado Pago", err);
-    return Response.json({ erro: "Falha ao sincronizar pagamento." }, { status: 502 });
+    return finish(
+      Response.json({ erro: "Falha ao sincronizar pagamento." }, { status: 502 }),
+      "FALHA_SINCRONIZACAO",
+      observed
+    );
   }
 };
