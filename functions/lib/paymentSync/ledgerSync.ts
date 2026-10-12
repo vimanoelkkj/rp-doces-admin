@@ -2,7 +2,15 @@
 
 import { operationalAlert } from "../operationalAlert";
 import { isBrazilCountryCode, orderExternalReference } from "../mp/orders/types";
-import type { MpMappedStatus, SyncPaymentResult } from "./types";
+import type { MpMappedStatus, SyncPaymentResult, SyncPaymentOptions } from "./types";
+import {
+  operationSnapshotGuard,
+  PAYMENT_OPERATION_TYPES_SQL,
+  type PaymentOperationSnapshot,
+  type PaymentConfirmationGuard
+} from "./confirmationGuard";
+import { pedidoValidoSql } from "../pedidoValido";
+import { pedidoTemEstoquePendente } from "../stock";
 import { mapMpStatus } from "./status";
 import { type MpPaymentResponse, isVerifiedMpResponse } from "./client";
 import type { LedgerStatus } from "../comandaLedger";
@@ -41,9 +49,14 @@ function isTransitionAllowed(
 async function finalizePayment(
   db: D1Database,
   pagamentoId: number,
-  pedidoId: number
+  pedidoId: number,
+  novoStatus: MpMappedStatus | null,
+  confirmation?: PaymentConfirmationGuard,
+  confirmationOnly = false
 ): Promise<void> {
-  await reconcilePedidoAfterFinancialChange(db, pedidoId);
+  await reconcilePedidoAfterFinancialChange(db, pedidoId, confirmation, confirmationOnly);
+  // An approval caller must never finish a terminal state won by another caller.
+  if (novoStatus === "PAGO" || confirmationOnly) return;
   const atual = await db
     .prepare(`SELECT metodo, status FROM pedido_pagamentos WHERE id = ?`)
     .bind(pagamentoId)
@@ -70,6 +83,37 @@ interface PagamentoRow {
   mp_order_id: string | null;
   mp_payment_id: string | null;
   external_reference: string | null;
+  metodo: string;
+}
+
+function paymentSnapshotGuard(
+  atual: PagamentoRow,
+  operations: PaymentOperationSnapshot[],
+  restricted: boolean
+): PaymentConfirmationGuard {
+  const operation = operationSnapshotGuard(atual.id, operations);
+  return {
+    sql: `EXISTS (SELECT 1 FROM pedido_pagamentos cp JOIN pedidos p ON p.id = cp.pedido_id
+      WHERE cp.id = ? AND cp.pedido_id = ? AND cp.metodo = 'PIX_MP'
+        AND cp.valor_centavos = ? AND cp.origem = ? AND cp.idempotency_key IS ?
+        AND cp.mp_order_id = ? AND cp.mp_payment_id = ? AND p.token_publico = ?
+        AND LOWER(COALESCE(cp.mp_status, '')) <> 'refunded'
+        ${restricted ? `AND ${pedidoValidoSql("p.id")} AND cp.status IN ('PENDENTE','EXPIRADO','PAGO')` : ""}
+        AND NOT EXISTS (SELECT 1 FROM pedido_pagamentos outro WHERE outro.metodo = 'PIX_MP'
+          AND outro.id <> cp.id AND (outro.mp_payment_id = cp.mp_payment_id OR outro.mp_order_id = cp.mp_order_id)))
+      AND (${operation.sql})`,
+    args: [
+      atual.id,
+      atual.pedido_id,
+      atual.valor_centavos,
+      atual.origem,
+      atual.idempotency_key,
+      atual.mp_order_id,
+      atual.mp_payment_id,
+      atual.token_publico,
+      ...operation.args
+    ]
+  };
 }
 
 function decimalParaCentavos(valor: number | string | null | undefined): number | null {
@@ -137,8 +181,12 @@ async function applyLedgerTransition(
   pagamentoId: number,
   novoStatus: MpMappedStatus | null,
   mp?: MpPaymentResponse,
-  env?: PushEnv
+  env?: PushEnv,
+  options?: SyncPaymentOptions
 ): Promise<SyncPaymentResult> {
+  const restricted = options?.confirmationOnly === true;
+  if (restricted && (!mp || novoStatus !== "PAGO"))
+    return { ok: false, status: null, transicionou: false };
   if (mp) {
     if (!isVerifiedMpResponse(mp)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
     const { results: vinculados } = await db
@@ -161,11 +209,8 @@ async function applyLedgerTransition(
   const atual = await db
     .prepare(
       `SELECT pp.id, pp.pedido_id, pp.status, pp.mp_status, pp.mp_status_detail,
-                     pp.origem, pp.valor_centavos,
-                     pp.idempotency_key, p.token_publico, pp.mp_order_id, pp.mp_payment_id,
-                     (SELECT json_extract(o.mp_request, '$.external_reference') FROM pedido_operacoes o
-                      WHERE o.pagamento_id = pp.id AND o.tipo IN ('CHECKOUT_SITE','PIX_ADMIN','PIX_ADMIN_REGENERACAO')
-                      ORDER BY o.id ASC LIMIT 1) AS external_reference
+                     pp.origem, pp.valor_centavos, pp.metodo,
+                     pp.idempotency_key, p.token_publico, pp.mp_order_id, pp.mp_payment_id
               FROM pedido_pagamentos pp
               JOIN pedidos p ON p.id = pp.pedido_id
               WHERE pp.id = ?`
@@ -173,9 +218,92 @@ async function applyLedgerTransition(
     .bind(pagamentoId)
     .first<PagamentoRow>();
   if (!atual) return { ok: false, status: null, transicionou: false };
+  const { results: operations } = await db
+    .prepare(
+      `SELECT id,pedido_id,tipo,escopo,fase,mp_request,mp_payment_id,
+        json_extract(mp_request, '$.external_reference') AS external_reference FROM pedido_operacoes
+     WHERE pagamento_id = ? AND tipo IN ${PAYMENT_OPERATION_TYPES_SQL} ORDER BY id LIMIT 2`
+    )
+    .bind(pagamentoId)
+    .all<PaymentOperationSnapshot>();
+  atual.external_reference = operations[0]?.external_reference ?? null;
+  if (
+    restricted &&
+    (atual.metodo !== "PIX_MP" ||
+      atual.origem !== "SITE" ||
+      String(atual.mp_status ?? "").toLowerCase() === "refunded" ||
+      !["PENDENTE", "EXPIRADO", "PAGO"].includes(atual.status) ||
+      operations.length !== 1 ||
+      operations[0].tipo !== "CHECKOUT_SITE" ||
+      operations[0].escopo !== "SITE" ||
+      !["REMOTO_CONHECIDO", "CONCLUIDA"].includes(operations[0].fase) ||
+      operations[0].pedido_id !== atual.pedido_id ||
+      !atual.external_reference ||
+      operations[0].mp_payment_id !== atual.mp_payment_id ||
+      !["BR", "BRA"].includes(mp?.country_code ?? "") ||
+      mp?.order_status_detail !== "accredited" ||
+      mp?.transaction_status_detail !== "accredited")
+  ) {
+    return { ok: false, status: atual.status, transicionou: false };
+  }
+  if (
+    restricted &&
+    mp &&
+    [mp.paid_amount, mp.order_paid_amount].some(
+      value =>
+        value !== null && value !== undefined && decimalParaCentavos(value) !== atual.valor_centavos
+    )
+  ) {
+    return { ok: false, status: atual.status, transicionou: false };
+  }
   if (atual.external_reference === null && atual.origem === "ADMIN" && atual.idempotency_key) {
     atual.external_reference = await orderExternalReference(atual.idempotency_key);
   }
+  const approvalGuard =
+    novoStatus === "PAGO" ? paymentSnapshotGuard(atual, operations, restricted) : undefined;
+  const physicalGuard = approvalGuard
+    ? {
+        sql: `${approvalGuard.sql} AND EXISTS (SELECT 1 FROM pedido_pagamentos cp WHERE cp.id = ? AND cp.status = 'PAGO')`,
+        args: [...approvalGuard.args, pagamentoId]
+      }
+    : undefined;
+  const finalize = () =>
+    finalizePayment(db, pagamentoId, atual.pedido_id, novoStatus, physicalGuard, restricted);
+  const restrictedResult = async (transicionou: boolean): Promise<SyncPaymentResult> => {
+    if (!physicalGuard) throw new Error("CONFIRMACAO_SEM_GUARD");
+    const check = () =>
+      db
+        .prepare(`SELECT 1 AS ok WHERE ${physicalGuard.sql}`)
+        .bind(...physicalGuard.args)
+        .first();
+    if (!(await check())) {
+      const pos = await db
+        .prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
+        .bind(pagamentoId)
+        .first<{ status: LedgerStatus }>();
+      return { ok: false, status: pos?.status ?? null, transicionou };
+    }
+    let pending = false;
+    try {
+      await finalize();
+    } catch {
+      pending = true;
+    }
+    const eligible = await check();
+    const status = await db
+      .prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
+      .bind(pagamentoId)
+      .first<{ status: LedgerStatus }>();
+    if (!eligible)
+      return { ok: false, status: status?.status ?? null, transicionou, finalizacaoPendente: true };
+    const pedido = await db
+      .prepare(`SELECT status_pagamento FROM pedidos WHERE id = ?`)
+      .bind(atual.pedido_id)
+      .first<{ status_pagamento: string }>();
+    pending ||=
+      pedido?.status_pagamento !== "PAGO" || (await pedidoTemEstoquePendente(db, atual.pedido_id));
+    return { ok: true, status: "PAGO", transicionou, finalizacaoPendente: pending };
+  };
   // A known legacy Payments resource has no readable Orders identity. The
   // cutover must not turn inability to query it into evidence of non-payment.
   if (
@@ -236,7 +364,7 @@ async function applyLedgerTransition(
     return { ok: true, status: atual.status, transicionou: false };
   }
   if (mp && mpStatusAtual === "refunded" && atual.status === "REEMBOLSADO") {
-    await finalizePayment(db, pagamentoId, atual.pedido_id);
+    await finalize();
     return { ok: true, status: atual.status, transicionou: false };
   }
   if (
@@ -250,14 +378,25 @@ async function applyLedgerTransition(
   }
 
   const diagnostico =
-    mp && novoStatus === "PAGO" && atual.status !== "PAGO"
-      ? diagnosticoIntegridadeMp(atual, mp)
+    mp && novoStatus === "PAGO"
+      ? (diagnosticoIntegridadeMp(atual, mp) ??
+        (operations.length > 1 ||
+        operations.some(
+          o =>
+            o.pedido_id !== atual.pedido_id ||
+            (o.mp_payment_id !== null && o.mp_payment_id !== atual.mp_payment_id)
+        )
+          ? "INTEGRIDADE_MP:OPERACAO_DIVERGENTE"
+          : null))
       : null;
 
-  if (mp && !resolucaoSemCaptura && !resolucaoReembolsada) {
+  if (restricted && diagnostico) return { ok: false, status: atual.status, transicionou: false };
+
+  if (mp && !restricted && !resolucaoSemCaptura && !resolucaoReembolsada) {
     await db
       .prepare(
-        `UPDATE pedido_pagamentos SET mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`
+        `UPDATE pedido_pagamentos SET mp_status = ?, mp_status_detail = ?, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?
+         ${novoStatus === "PAGO" ? "AND LOWER(COALESCE(mp_status, '')) <> 'refunded'" : ""}`
       )
       .bind(mp.status, diagnostico ?? mp.status_detail ?? null, pagamentoId)
       .run();
@@ -278,7 +417,8 @@ async function applyLedgerTransition(
     !isTransitionAllowed(atual.status, novoStatus, mp) ||
     atual.status === novoStatus
   ) {
-    await finalizePayment(db, pagamentoId, atual.pedido_id);
+    if (restricted) return restrictedResult(false);
+    await finalize();
     const pos = await db
       .prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
       .bind(pagamentoId)
@@ -292,23 +432,21 @@ async function applyLedgerTransition(
     mp && (novoStatus === "PAGO" || novoStatus === "CANCELADO" || novoStatus === "REEMBOLSADO")
       ? "status IN ('PENDENTE', 'EXPIRADO')"
       : "status = 'PENDENTE'";
-  const integridadeGuard =
-    mp && novoStatus === "PAGO"
-      ? `AND valor_centavos = ? AND origem = ? AND idempotency_key IS ?
-       AND EXISTS (SELECT 1 FROM pedidos p WHERE p.id = pedido_pagamentos.pedido_id AND p.token_publico = ?)`
-      : "";
+  const integridadeGuard = approvalGuard ? `AND (${approvalGuard.sql})` : "";
   const expiracaoIntegridadeGuard =
     !mp && novoStatus === "EXPIRADO"
       ? "AND LOWER(COALESCE(mp_status, '')) NOT IN ('approved', 'refunded')"
       : "";
   const resolucaoIntegridadeSet =
-    resolucaoSemCaptura || resolucaoReembolsada ? ", mp_status = ?, mp_status_detail = ?" : "";
+    restricted || resolucaoSemCaptura || resolucaoReembolsada
+      ? ", mp_status = ?, mp_status_detail = ?"
+      : "";
   const resolucaoIntegridadeGuard = resolucaoSemCaptura
     ? "AND LOWER(COALESCE(mp_status, '')) = 'approved'"
     : "";
   // Record the existing notification intent in the same guarded financial write.
   // No outbox insert/Queue failure can undo payment or lose this recovery source.
-  const pushIntentSet = novoStatus === "PAGO" && env ? "push_pedido_pago = 1," : "";
+  const pushIntentSet = novoStatus === "PAGO" && env && !restricted ? "push_pedido_pago = 1," : "";
   const result = await db
     .prepare(
       `UPDATE pedido_pagamentos
@@ -329,19 +467,19 @@ async function applyLedgerTransition(
       novoStatus,
       mp?.date_approved ?? null,
       novoStatus,
-      ...(mp !== undefined && (resolucaoSemCaptura || resolucaoReembolsada)
+      ...(mp !== undefined && (restricted || resolucaoSemCaptura || resolucaoReembolsada)
         ? [
             mp.status,
-            resolucaoSemCaptura
-              ? "INTEGRIDADE_MP:RESOLVIDA_SEM_CAPTURA"
-              : "INTEGRIDADE_MP:REFUNDED_RECONHECIDO"
+            restricted
+              ? (mp.status_detail ?? null)
+              : resolucaoSemCaptura
+                ? "INTEGRIDADE_MP:RESOLVIDA_SEM_CAPTURA"
+                : "INTEGRIDADE_MP:REFUNDED_RECONHECIDO"
           ]
         : []),
       pagamentoId,
       ...(mp ? [String(mp.id), mp.order_id, String(mp.id)] : []),
-      ...(integridadeGuard
-        ? [atual.valor_centavos, atual.origem, atual.idempotency_key, atual.token_publico]
-        : [])
+      ...(approvalGuard?.args ?? [])
     )
     .run();
 
@@ -349,7 +487,8 @@ async function applyLedgerTransition(
   if (!aplicou) {
     // Estado já era o mesmo (no-op) ou perdeu a corrida do CAS para outro
     // chamador concorrente — recarrega o estado real antes de responder.
-    await finalizePayment(db, pagamentoId, atual.pedido_id);
+    if (restricted) return restrictedResult(false);
+    await finalize();
     const pos = await db
       .prepare(`SELECT status FROM pedido_pagamentos WHERE id = ?`)
       .bind(pagamentoId)
@@ -358,7 +497,8 @@ async function applyLedgerTransition(
   }
 
   const transicionou = atual.status !== novoStatus;
-  await finalizePayment(db, pagamentoId, atual.pedido_id);
+  if (restricted) return restrictedResult(transicionou);
+  await finalize();
   if (transicionou && integridadeRemotaPendente)
     operationalAlert({
       code: "FINANCIAL_INTEGRITY_RESOLVED",
@@ -379,10 +519,11 @@ export async function syncPaymentFromMp(
   db: D1Database,
   pagamentoId: number,
   mp: MpPaymentResponse,
-  env?: PushEnv
+  env?: PushEnv,
+  options?: SyncPaymentOptions
 ): Promise<SyncPaymentResult> {
   if (!isVerifiedMpResponse(mp)) throw new Error("RESPOSTA_MP_NAO_VERIFICADA");
-  return applyLedgerTransition(db, pagamentoId, mapMpStatus(mp.status), mp, env);
+  return applyLedgerTransition(db, pagamentoId, mapMpStatus(mp.status), mp, env, options);
 }
 
 // Caminho local de expiração (pix_expira_em vencido), sem nenhum dado do

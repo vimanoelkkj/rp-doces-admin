@@ -2,6 +2,7 @@
 
 import type { LedgerMetodo, StatusFinanceiroAgregado } from "./types";
 import { preparePedidoFinancialProjection } from "../pedidoFinanceiroSql";
+import type { PaymentConfirmationGuard } from "../paymentSync/confirmationGuard";
 
 // Passo 4c-2: pedidos.status_pagamento converge para uma projeção agregada
 // (PENDENTE/PARCIAL/PAGO) derivada do ledger, em vez de espelhar o status
@@ -53,11 +54,12 @@ export async function getNetPaidCentavos(db: D1Database, pedidoId: number): Prom
 // senão um pedido totalmente reembolsado continuaria marcado PAGO.
 export async function recalculatePedidoStatusPagamento(
   db: D1Database,
-  pedidoId: number
+  pedidoId: number,
+  confirmation?: PaymentConfirmationGuard
 ): Promise<StatusFinanceiroAgregado | null> {
   // Calculado no instante da escrita, nunca sobre um snapshot carregado em JS.
   // null significa pedido ausente ou legado sem ledger; não materializa aqui.
-  const row = await preparePedidoFinancialProjection(db, pedidoId).first<{
+  const row = await preparePedidoFinancialProjection(db, pedidoId, confirmation).first<{
     status_pagamento: StatusFinanceiroAgregado;
   }>();
   return row?.status_pagamento ?? null;

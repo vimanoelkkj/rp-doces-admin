@@ -9,6 +9,7 @@ import type { StatusFinanceiroAgregado } from "./ledger/types";
 import { baixarEstoquePedido, itemEstoquePendenteSql, type BaixaResultado } from "./stock";
 import { STATUS_FINANCEIRO_SQL } from "./pedidoFinanceiroSql";
 import { reconcileExchangeCharges } from "./itemExchange";
+import type { PaymentConfirmationGuard } from "./paymentSync/confirmationGuard";
 
 export type PedidoReconcileResult =
   | { ok: false; motivo: "PEDIDO_NAO_ENCONTRADO" | "LEGADO_SEM_LEDGER" | "PEDIDO_ANULADO" }
@@ -18,17 +19,21 @@ export type PedidoReconcileResult =
 // não libera reservas nem altera status operacional. Pode repetir sem evento MP.
 export async function reconcilePedidoAfterFinancialChange(
   db: D1Database,
-  pedidoId: number
+  pedidoId: number,
+  confirmation?: PaymentConfirmationGuard,
+  confirmationOnly = false
 ): Promise<PedidoReconcileResult> {
   if (await getPedidoAnulacao(db, pedidoId)) return { ok: false, motivo: "PEDIDO_ANULADO" };
-  const agregado = await recalculatePedidoStatusPagamento(db, pedidoId);
+  const agregado = await recalculatePedidoStatusPagamento(db, pedidoId, confirmation);
   if (agregado === null) {
     const pedido = await db.prepare(`SELECT id FROM pedidos WHERE id = ?`).bind(pedidoId).first();
     return { ok: false, motivo: pedido ? "LEGADO_SEM_LEDGER" : "PEDIDO_NAO_ENCONTRADO" };
   }
 
   const estoque: BaixaResultado =
-    agregado === "PAGO" ? await baixarEstoquePedido(db, pedidoId) : { ok: true, baixado: false };
+    agregado === "PAGO"
+      ? await baixarEstoquePedido(db, pedidoId, confirmation)
+      : { ok: true, baixado: false };
   if (!estoque.ok) {
     operationalAlert({ code: "PAID_ORDER_STOCK_INCONSISTENT", pedidoId });
     requestLogger.error(
@@ -46,7 +51,7 @@ export async function reconcilePedidoAfterFinancialChange(
   // não cria fato financeiro nenhum — só espelha o saldo já reconciliado
   // acima. Falha aqui não pode mascarar o resultado financeiro já apurado.
   try {
-    await reconcileExchangeCharges(db, pedidoId);
+    if (!confirmationOnly) await reconcileExchangeCharges(db, pedidoId);
   } catch (err) {
     requestLogger.error("Reconciliação financeira com pendência de troca", pedidoId, err);
   }
