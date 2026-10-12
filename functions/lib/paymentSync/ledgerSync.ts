@@ -201,6 +201,7 @@ async function applyLedgerTransition(
       vinculados[0].mp_order_id !== mp.order_id ||
       vinculados[0].mp_payment_id !== mp.id
     ) {
+      if (restricted) return { ok: false, status: null, transicionou: false };
       throw new Error("IDENTIDADE_PAGAMENTO_MP_AMBIGUA_OU_DIVERGENTE");
     }
   } else if (novoStatus !== "EXPIRADO") {
@@ -229,7 +230,8 @@ async function applyLedgerTransition(
   atual.external_reference = operations[0]?.external_reference ?? null;
   if (
     restricted &&
-    (atual.metodo !== "PIX_MP" ||
+    ((options?.expectedPedidoId !== undefined && atual.pedido_id !== options.expectedPedidoId) ||
+      atual.metodo !== "PIX_MP" ||
       atual.origem !== "SITE" ||
       String(atual.mp_status ?? "").toLowerCase() === "refunded" ||
       !["PENDENTE", "EXPIRADO", "PAGO"].includes(atual.status) ||

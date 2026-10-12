@@ -13,6 +13,7 @@ export interface SyncPaymentResult {
 
 export interface SyncPaymentOptions {
   confirmationOnly: true;
+  expectedPedidoId?: number;
 }
 
 export type ResolveWebhookPaymentResult =
