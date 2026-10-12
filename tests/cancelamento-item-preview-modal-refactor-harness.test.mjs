@@ -550,7 +550,7 @@ for (const status of ["PENDENTE", "PROCESSANDO", "INCONCLUSIVO", "RECUSADO", und
     else assert.equal(h.refunds()[0].body.operationKey, h.refunds()[1].body.operationKey);
   });
 }
-test("persisted remote keys and labels govern eligibility, including terminal refusal", async t => {
+test("persisted remote keys and labels govern eligibility; terminal refusal only offers an explicit new attempt", async t => {
   const h = await harness(t, { props: { existingCancellationId: 51 } });
   for (const [status, label, runnable] of [
     ["PENDENTE", "Aguardando envio", true],
@@ -567,7 +567,10 @@ test("persisted remote keys and labels govern eligibility, including terminal re
     await h.update({ existingCancellationId: h.props.existingCancellationId + 1 });
     const row = document.querySelectorAll(".cancelpreview-refund-leg")[1];
     assert.match(row.textContent, new RegExp(label));
-    assert.equal(Boolean(row.querySelector("button")), runnable);
+    // RECUSADO deixou de ser beco sem saída: oferece APENAS a ação separada "Nova tentativa".
+    assert.equal(Boolean(row.querySelector("button")), runnable || status === "RECUSADO");
+    if (status === "RECUSADO")
+      assert.equal(row.querySelector("button").textContent, "Nova tentativa");
     if (runnable) {
       await h.refund(1);
       assert.equal(h.refunds().at(-1).body.operationKey, "persisted-key");
@@ -977,4 +980,121 @@ test("PREVIEW_OBSOLETO com preview parcial não substitui o estado nem derruba o
   assert.ok(document.querySelector(".cancelpreview-card"));
   await h.submit();
   assert.equal(h.posts()[1].body.previewFingerprint, "preview-1");
+});
+
+// --- Nova tentativa explícita após refund definitivamente recusado ---------------------------
+
+const botoes = () => [...document.querySelectorAll(".cancelpreview-refund-leg button")];
+const novaTentativa = () => botoes().find(node => node.textContent === "Nova tentativa");
+
+async function comPernaRemota(t, refundRemoto, opcoes = {}) {
+  const h = await harness(t, { props: { existingCancellationId: 51 }, ...opcoes });
+  h.cancellation.pernasPendentes[1].refundRemoto = {
+    status: "PENDENTE",
+    tentativas: 1,
+    mpRefundId: null,
+    ultimoErro: null,
+    operationKey: "chave-recusada",
+    atualizadoEm: "2026-01-01 00:00:00",
+    podeVerificar: true,
+    ...refundRemoto
+  };
+  await h.update({ existingCancellationId: 52 });
+  return h;
+}
+
+test("RECUSADO definitivo oferece 'Nova tentativa' separada; sem o clique nada é enviado", async t => {
+  const h = await comPernaRemota(t, { status: "RECUSADO", podeVerificar: false });
+  const linha = document.querySelectorAll(".cancelpreview-refund-leg")[1];
+  assert.match(linha.textContent, /Recusado pelo provedor/);
+  assert.ok(novaTentativa(), "ação Nova tentativa visível");
+  assert.equal(
+    botoes().some(node => node.textContent === "Solicitar estorno"),
+    false,
+    "o botão 'Solicitar estorno' não aparece sobre uma recusa"
+  );
+  assert.equal(h.refunds().length, 0, "exibir a ação não envia nada");
+});
+
+test("'Nova tentativa' gera UMA chave nova, preserva a recusada e reutiliza a nova se a resposta se perder", async t => {
+  let falhar = true;
+  const h = await comPernaRemota(
+    t,
+    { status: "RECUSADO", podeVerificar: false },
+    {
+      route: call => {
+        if (call.url.endsWith("/reembolsos") && falhar)
+          return Promise.reject(new TypeError("Failed to fetch"));
+      }
+    }
+  );
+  await h.click(novaTentativa());
+  const primeira = h.refunds()[0].body;
+  assert.notEqual(primeira.operationKey, "chave-recusada", "a chave recusada nunca é reutilizada");
+  assert.deepEqual(
+    { ...primeira, operationKey: undefined },
+    {
+      operationKey: undefined,
+      pagamentoId: legs[1].pagamentoId,
+      pagamentoAlocacaoId: legs[1].pagamentoAlocacaoId,
+      valorCentavos: legs[1].valorCentavos,
+      confirmacao: true
+    }
+  );
+  // A resposta se perdeu: a leitura ainda mostra a intenção recusada. O novo clique repete a MESMA
+  // chave nova (replay), não gera uma terceira.
+  assert.ok(novaTentativa());
+  falhar = false;
+  await h.click(novaTentativa());
+  assert.equal(h.refunds()[1].body.operationKey, primeira.operationKey);
+  assert.equal(
+    h.refunds().filter(call => call.body.operationKey === "chave-recusada").length,
+    0,
+    "a intenção recusada original permanece intocada"
+  );
+});
+
+test("depois que a nova intenção existe, a tela usa a chave dela, nunca outra nova", async t => {
+  const h = await comPernaRemota(t, { status: "RECUSADO", podeVerificar: false });
+  await h.click(novaTentativa());
+  const chaveNova = h.refunds()[0].body.operationKey;
+  h.cancellation.pernasPendentes[1].refundRemoto = {
+    status: "INCONCLUSIVO",
+    tentativas: 1,
+    mpRefundId: null,
+    ultimoErro: "TIMEOUT:SEM_HTTP",
+    operationKey: chaveNova,
+    atualizadoEm: "2026-01-01 00:00:00",
+    podeVerificar: true
+  };
+  await h.update({ existingCancellationId: 53 });
+  assert.equal(novaTentativa(), undefined, "INCONCLUSIVO nunca oferece Nova tentativa");
+  await h.refund(1);
+  assert.equal(h.refunds().at(-1).body.operationKey, chaveNova);
+});
+
+for (const status of ["PENDENTE", "PROCESSANDO", "INCONCLUSIVO", "CONFIRMADO"]) {
+  test(`${status} nunca oferece 'Nova tentativa' nem gera chave nova`, async t => {
+    const h = await comPernaRemota(t, {
+      status,
+      podeVerificar: true,
+      operationKey: "chave-existente"
+    });
+    assert.equal(novaTentativa(), undefined);
+    if (status !== "CONFIRMADO") {
+      await h.refund(1);
+      await h.refund(1);
+      assert.deepEqual(
+        h.refunds().map(call => call.body.operationKey),
+        ["chave-existente", "chave-existente"]
+      );
+    }
+  });
+}
+
+test("sem intenção remota, 'Solicitar estorno' continua sendo o clique inicial separado", async t => {
+  const h = await harness(t, { props: { existingCancellationId: 51 } });
+  assert.equal(novaTentativa(), undefined);
+  assert.ok(botoes().some(node => node.textContent === "Solicitar estorno"));
+  assert.equal(h.refunds().length, 0, "nada é enviado antes do clique");
 });

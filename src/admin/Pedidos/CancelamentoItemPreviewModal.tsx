@@ -5,7 +5,7 @@ import { useAdminModal } from "../components/useAdminModal";
 import { reconciliarPedido } from "./reconciliarPedido";
 import CancelamentoItemPreviewSection from "./CancelamentoItemPreviewSection";
 import CancelamentoItemResultSection from "./CancelamentoItemResultSection";
-import type { Perna } from "./cancelamentoItemHelpers";
+import { remoteCanRetryNew, type Perna } from "./cancelamentoItemHelpers";
 import "./CancelamentoItemPreviewModal.css";
 
 interface PreviewPagamento {
@@ -115,6 +115,8 @@ export default function CancelamentoItemPreviewModal({
   const [acaoDropdownOpen, setAcaoDropdownOpen] = useState(false);
   const operationKey = useRef(novaOperationKey());
   const refundKeys = useRef(new Map<number, string>());
+  // operationKey da NOVA tentativa, indexada pela operationKey da intenção recusada que a motivou.
+  const novasTentativas = useRef(new Map<string, string>());
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -195,12 +197,22 @@ export default function CancelamentoItemPreviewModal({
       setSaving(false);
     }
   };
-  const refund = async (leg: Perna) => {
+  const refund = async (leg: Perna, novaTentativa = false) => {
     if (!cancelamento || saving) return;
-    let key = leg.refundRemoto?.operationKey ?? refundKeys.current.get(leg.pagamentoAlocacaoId);
-    if (!key) {
-      key = novaOperationKey();
-      refundKeys.current.set(leg.pagamentoAlocacaoId, key);
+    let key: string | undefined;
+    if (novaTentativa) {
+      // Só após recusa definitiva e por pedido explícito. A chave é gerada uma vez por intenção
+      // recusada e reutilizada se a resposta se perder (replay); a recusada nunca é reutilizada.
+      if (!remoteCanRetryNew(leg) || !leg.refundRemoto) return;
+      const recusada = leg.refundRemoto.operationKey;
+      key = novasTentativas.current.get(recusada) ?? novaOperationKey();
+      novasTentativas.current.set(recusada, key);
+    } else {
+      key = leg.refundRemoto?.operationKey ?? refundKeys.current.get(leg.pagamentoAlocacaoId);
+      if (!key) {
+        key = novaOperationKey();
+        refundKeys.current.set(leg.pagamentoAlocacaoId, key);
+      }
     }
     setSaving(true);
     setError(null);

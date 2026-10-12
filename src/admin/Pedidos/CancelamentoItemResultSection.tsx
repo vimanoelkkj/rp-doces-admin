@@ -2,6 +2,7 @@ import type { Cancelamento } from "./CancelamentoItemPreviewModal";
 import {
   dinheiro,
   METODOS,
+  remoteCanRetryNew,
   remoteCanRun,
   remoteLabel,
   statusLabel,
@@ -11,7 +12,7 @@ import {
 interface Props {
   cancelamento: Cancelamento;
   saving: boolean;
-  refund: (leg: Perna) => Promise<void>;
+  refund: (leg: Perna, novaTentativa?: boolean) => Promise<void>;
   onClose: () => void;
 }
 
@@ -89,6 +90,11 @@ export default function CancelamentoItemResultSection({
                 </button>
               ) : (
                 <span>{remoteLabel(leg)}</span>
+              )}
+              {remoteCanRetryNew(leg) && (
+                <button type="button" onClick={() => void refund(leg, true)} disabled={saving}>
+                  Nova tentativa
+                </button>
               )}
             </div>
           )}
