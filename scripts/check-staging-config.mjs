@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { experimental_readRawConfig } from "wrangler";
 
+export const STAGING_D1_ID = "a63daa6e-c268-409a-a143-f23b4c469ca7";
 export const STAGING_D1_PLACEHOLDER = "STAGING_D1_ID_REPLACE_AFTER_CREATE";
 
 export function readConfigs() {
@@ -21,6 +22,7 @@ export function readConfigs() {
 // Local config only. No credentials, D1 requests or provisioning.
 export function validateStaging(configs, { requireProvisioned = false, url } = {}) {
   const { production, productionWorker, pages, worker, bootstrap } = configs;
+  assert.equal(pages.vars?.APP_ENV, "staging");
   assert.equal(pages.vars?.MP_TEST_MODE, "orders_pix");
   for (const config of [production, productionWorker]) {
     assert.equal(config.vars?.MP_TEST_MODE, undefined, "Production must not enable Pix test mode");
@@ -72,7 +74,7 @@ export function validateStaging(configs, { requireProvisioned = false, url } = {
     );
     assert.ok(
       (!requireProvisioned && db.database_id === STAGING_D1_PLACEHOLDER) ||
-        /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(db.database_id),
+        db.database_id === STAGING_D1_ID,
       "Provision staging D1 and replace its placeholder before deploying"
     );
   }
@@ -117,5 +119,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(process.env.GITHUB_OUTPUT, `database_id=${databaseId}\n`);
   }
-  console.log("Staging resource isolation verified.");
+  console.log("Local staging configuration verified; published bindings not checked here.");
 }

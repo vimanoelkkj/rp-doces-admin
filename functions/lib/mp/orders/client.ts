@@ -17,6 +17,7 @@ export interface OrderPaymentSnapshot {
   readonly transaction_status_detail: string | null;
   readonly external_reference: string | null;
   readonly total_amount: string | null;
+  readonly order_paid_amount: string | null;
   readonly transaction_amount: string | null;
   readonly paid_amount: string | null;
   readonly payment_method_id: string | null;
@@ -100,6 +101,7 @@ export function orderPaymentSnapshot(order: MpOrder): OrderPaymentSnapshot {
     external_reference:
       typeof order.external_reference === "string" ? order.external_reference : null,
     total_amount: typeof order.total_amount === "string" ? order.total_amount : null,
+    order_paid_amount: typeof order.paid_amount === "string" ? order.paid_amount : null,
     transaction_amount: typeof transaction.amount === "string" ? transaction.amount : null,
     paid_amount: typeof transaction.paid_amount === "string" ? transaction.paid_amount : null,
     payment_method_id: method?.id ?? null,

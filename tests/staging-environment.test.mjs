@@ -13,6 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   readConfigs,
   validateStaging,
+  STAGING_D1_ID,
   STAGING_D1_PLACEHOLDER
 } from "../scripts/check-staging-config.mjs";
 import { main as checkMigrations, assertReadOnly } from "../scripts/check-d1-migrations.mjs";
@@ -45,7 +46,8 @@ const workflow = document.toJS();
 const uuid = "11111111-2222-4333-8444-555555555555";
 const provisioned = () => {
   const copy = structuredClone(configs);
-  for (const config of [copy.pages, copy.worker]) config.d1_databases[0].database_id = uuid;
+  for (const config of [copy.pages, copy.worker])
+    config.d1_databases[0].database_id = STAGING_D1_ID;
   return copy;
 };
 const unprovisioned = () => {
@@ -178,7 +180,7 @@ test("staging config parses and isolates every binding", () => {
   assert.equal(validateStaging(configs), databaseId);
   assert.equal(validateStaging(configs, { requireProvisioned: true }), databaseId);
   assert.notEqual(uuid, databaseId);
-  assert.equal(validateStaging(provisioned(), { requireProvisioned: true }), uuid);
+  assert.equal(validateStaging(provisioned(), { requireProvisioned: true }), STAGING_D1_ID);
   assert.equal(validateStaging(unprovisioned()), STAGING_D1_PLACEHOLDER);
   assert.throws(() => validateStaging(unprovisioned(), { requireProvisioned: true }), {
     name: "AssertionError"
@@ -311,7 +313,7 @@ test("real migration guard queries only the explicit staging D1 and only reads",
   });
   writeFileSync(join(dir, "0001_init.sql"), "SELECT 1;");
   const toml = join(dir, "wrangler.staging.toml");
-  writeFileSync(toml, `[[d1_databases]]\ndatabase_id = "${uuid}"\n`);
+  writeFileSync(toml, `[[d1_databases]]\ndatabase_id = "${STAGING_D1_ID}"\n`);
   const requests = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
     requests.push(String(url));
@@ -340,7 +342,7 @@ test("real migration guard queries only the explicit staging D1 and only reads",
     for (const url of requests)
       assert.equal(
         url,
-        `https://cloudflare.example.invalid/accounts/synthetic-account/d1/database/${uuid}/query`
+        `https://cloudflare.example.invalid/accounts/synthetic-account/d1/database/${STAGING_D1_ID}/query`
       );
   };
   await contract(env);
