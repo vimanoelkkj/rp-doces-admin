@@ -3,6 +3,7 @@ export interface MpOrder {
   type?: string;
   external_reference?: string | null;
   total_amount?: string | null;
+  paid_amount?: string | null;
   status: string;
   status_detail?: string | null;
   country_code?: string | null;

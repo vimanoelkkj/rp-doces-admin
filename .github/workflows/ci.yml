@@ -419,6 +419,10 @@ jobs:
         if: steps.gate.outputs.publish == 'true'
         run: node scripts/check-staging-config.mjs --require-provisioned
 
+      - name: Verify remote staging D1 configuration before publication
+        if: steps.gate.outputs.publish == 'true'
+        run: node scripts/check-staging-deployment.mjs
+
       - name: Verificar migrations D1 (somente leitura)
         if: steps.gate.outputs.publish == 'true'
         env:
@@ -534,6 +538,12 @@ jobs:
             exit 1
           fi
           echo "Deployment de staging do commit $short confirmado (deploy:success)."
+
+      - name: Verify active staging SHA and current remote D1 configuration
+        if: steps.publish.outputs.deployed == 'true'
+        env:
+          STAGING_PUBLISHED_SHA: ${{ github.sha }}
+        run: node scripts/check-staging-deployment.mjs
 
       - name: Smoke test pós-deploy (somente leitura)
         if: steps.publish.outputs.deployed == 'true'
