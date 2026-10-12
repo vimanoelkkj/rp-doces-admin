@@ -303,34 +303,37 @@ async function refundScenario(t) {
   return { db, params };
 }
 
-test("two distinct equal refunds materialize REFA and REFB on their own intents", async t => {
+test("aggregate REF novelty cannot materialize either of two equal local intents", async t => {
   const { db, params } = await refundScenario(t);
   const refunds = [];
+  const keys = new Set();
   t.mock.method(globalThis, "fetch", async (_url, init) => {
-    if (init?.method === "POST")
+    if (init?.method === "POST" && !keys.has(init.headers["X-Idempotency-Key"])) {
+      keys.add(init.headers["X-Idempotency-Key"]);
       refunds.push({
         id: refunds.length ? "REFB" : "REFA",
         transaction_id: "PAY101",
         amount: "5.00",
         status: "processed"
       });
+    }
     return Response.json({ id: "ORD101", status: "processed", transactions: { refunds } });
   });
   const a = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(1));
   const b = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(2));
-  assert.equal(a.intencao.status, "CONFIRMADO");
-  assert.equal(a.intencao.mpRefundId, "REFA");
-  assert.equal(b.intencao.status, "CONFIRMADO");
-  assert.equal(b.intencao.mpRefundId, "REFB");
+  assert.equal(a.intencao.status, "INCONCLUSIVO");
+  assert.equal(a.intencao.mpRefundId, null);
+  assert.equal(b.intencao.status, "PENDENTE");
+  assert.equal(b.intencao.mpRefundId, null);
   assert.deepEqual(
     (await db.prepare("SELECT mp_refund_id FROM pedido_reembolsos ORDER BY id").all()).results,
-    [{ mp_refund_id: "REFA" }, { mp_refund_id: "REFB" }]
+    []
   );
   for (const id of [1, 2]) {
     const replay = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(id));
-    assert.equal(replay.intencao.mpRefundId, id === 1 ? "REFA" : "REFB");
+    assert.equal(replay.intencao.mpRefundId, null);
   }
-  assert.equal(refunds.length, 2);
+  assert.equal(refunds.length, 1);
 });
 
 test("known pending REFA recovery cannot capture a later equal REFB", async t => {
@@ -346,9 +349,25 @@ test("known pending REFA recovery cannot capture a later equal REFB", async t =>
     return Response.json(refundOrder(refunds));
   });
   const a = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(1));
-  assert.equal(a.intencao.status, "PROCESSANDO");
+  assert.equal(a.intencao.status, "INCONCLUSIVO");
+  // Characterize recovery of an already persisted identity, never infer it from this POST.
+  await db
+    .prepare(
+      "UPDATE pedido_reembolso_pix_mp_intencoes SET status='PROCESSANDO',mp_refund_id='REFA' WHERE id=?"
+    )
+    .bind(a.intencao.id)
+    .run();
   const b = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(2));
-  assert.equal(b.intencao.mpRefundId, "REFB");
+  assert.equal(b.intencao.status, "INCONCLUSIVO");
+  assert.equal(b.intencao.mpRefundId, null);
+  await db
+    .prepare(
+      "UPDATE pedido_reembolso_pix_mp_intencoes SET status='PROCESSANDO',mp_refund_id='REFB' WHERE id=?"
+    )
+    .bind(b.intencao.id)
+    .run();
+  const recoveredB = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(2));
+  assert.equal(recoveredB.intencao.mpRefundId, "REFB");
   refunds[0].status = "processed";
   const recovered = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(1));
   assert.equal(recovered.intencao.mpRefundId, "REFA");
@@ -383,7 +402,7 @@ test("incomplete baseline cannot authorize refund dispatch", async t => {
 });
 
 for (const enoughEvidence of [true, false])
-  test(`lost response then same-key 409 reconciles only with evidence=${enoughEvidence}`, async t => {
+  test(`lost response then same-key 409 stays inconclusive with new REF=${enoughEvidence}`, async t => {
     const { db, params } = await refundScenario(t);
     const refunds = [],
       keys = [];
@@ -410,19 +429,16 @@ for (const enoughEvidence of [true, false])
     assert.equal(first.intencao.status, "INCONCLUSIVO");
     assert.match(first.intencao.ultimoErro, /TIMEOUT/);
     const second = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params(1));
-    assert.equal(second.intencao.status, enoughEvidence ? "CONFIRMADO" : "INCONCLUSIVO");
-    assert.equal(second.intencao.mpRefundId, enoughEvidence ? "REFA" : null);
+    assert.equal(second.intencao.status, "INCONCLUSIVO");
+    assert.equal(second.intencao.mpRefundId, null);
     assert.equal(keys.length, 2);
     assert.equal(new Set(keys).size, 1);
     assert.equal(
       (await db.prepare("SELECT COUNT(*) AS n FROM pedido_reembolso_pix_mp_intencoes").first()).n,
       1
     );
-    assert.equal(
-      (await db.prepare("SELECT COUNT(*) AS n FROM pedido_reembolsos").first()).n,
-      enoughEvidence ? 1 : 0
-    );
-    assert.equal(second.intencao.podeVerificar, !enoughEvidence);
+    assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM pedido_reembolsos").first()).n, 0);
+    assert.equal(second.intencao.podeVerificar, true);
   });
 
 test("two new equal remote REFs remain ambiguous and emit a bounded operational alert", async t => {

@@ -790,7 +790,7 @@ test("refund total/partial: ORD endpoint, PAY, decimal amount, stable intent and
   });
   assert.equal(
     (await app.mpRefund.postRefundMp("fake", "ORD101", "PAY101", "intent")).resultado,
-    "SUCESSO"
+    "AMBIGUO"
   );
   assert.equal(calls[0][1].body, undefined);
   for (let i = 0; i < 2; i++)
@@ -800,7 +800,7 @@ test("refund total/partial: ORD endpoint, PAY, decimal amount, stable intent and
           amountCentavos: 101
         })
       ).resultado,
-      "SUCESSO"
+      "AMBIGUO"
     );
   assert.equal(calls[1][0], "https://api.mercadopago.com/v1/orders/ORD101/refund");
   assert.deepEqual(JSON.parse(calls[1][1].body), {
@@ -916,6 +916,33 @@ const mutations = [
     m => assert.equal(m.isVerifiedMpOrder(m.orderPaymentSnapshot(wire())), false)
   ],
   [
+    "unknown REF gains authority from novelty",
+    "../../mpRefund.ts",
+    "refundId === undefined ||\n    order?.id",
+    "false ||\n    order?.id",
+    async m => {
+      const previous = globalThis.fetch;
+      globalThis.fetch = async () =>
+        Response.json({
+          id: "ORD101",
+          status: "processed",
+          transactions: {
+            refunds: [
+              { id: "REFexternal", transaction_id: "PAY101", amount: "1.01", status: "processed" }
+            ]
+          }
+        });
+      try {
+        assert.equal(
+          (await m.getRefundMp("fake", "ORD101", "PAY101", undefined, 101, [])).resultado,
+          "AMBIGUO"
+        );
+      } finally {
+        globalThis.fetch = previous;
+      }
+    }
+  ],
+  [
     "multiple refunds choose the first",
     "../../mpRefund.ts",
     "candidates.length !== 1",
@@ -929,14 +956,13 @@ const mutations = [
           transactions: {
             refunds: [
               { id: "REF1", transaction_id: "PAY101", amount: "1.01", status: "processed" },
-              { id: "REF2", transaction_id: "PAY101", amount: "1.01", status: "processed" }
+              { id: "REF1", transaction_id: "PAY101", amount: "1.01", status: "processed" }
             ]
           }
         });
       try {
         assert.equal(
-          (await m.postRefundMp("fake", "ORD101", "PAY101", "intent", { amountCentavos: 101 }))
-            .resultado,
+          (await m.getRefundMp("fake", "ORD101", "PAY101", "REF1", 101)).resultado,
           "AMBIGUO"
         );
       } finally {
@@ -993,13 +1019,20 @@ for (const [name, file, anchor, replacement, check] of mutations)
     await assert.rejects(async () => check(module, t), { name: "AssertionError" });
   });
 
-test("active functions contain no residual Payments endpoint", async () => {
+test("Payments endpoints are confined to historical refund compatibility", async () => {
   const inspect = async directory => {
     for (const file of await readdir(directory, { withFileTypes: true })) {
       const path = `${directory}/${file.name}`;
       if (file.isDirectory()) await inspect(path);
-      else if (file.isFile() && file.name.endsWith(".ts"))
-        assert.doesNotMatch(await readFile(path, "utf8"), /\/v1\/payments|payments\/search/, path);
+      else if (file.isFile() && file.name.endsWith(".ts")) {
+        const source = await readFile(path, "utf8");
+        if (path === "functions/lib/mpRefundPayments.ts") {
+          const endpoints = source.match(/https:\/\/api\.mercadopago\.com\/v1\/payments[^`]+/g);
+          assert.equal(endpoints.length, 2);
+          for (const endpoint of endpoints) assert.match(endpoint, /\/refunds/);
+          assert.doesNotMatch(source, /payments\/search/);
+        } else assert.doesNotMatch(source, /\/v1\/payments|payments\/search/, path);
+      }
     }
   };
   await inspect("functions");
@@ -1015,9 +1048,7 @@ test("unknown refund status cannot acquire a legacy confirmation label", async t
       }
     })
   );
-  const result = await app.mpRefund.postRefundMp("fake", "ORD101", "PAY101", "intent", {
-    amountCentavos: 100
-  });
+  const result = await app.mpRefund.getRefundMp("fake", "ORD101", "PAY101", "REF1", 100);
   assert.equal(result.resultado, "SUCESSO");
   assert.equal(result.refund.status, "unknown:approved");
 });
