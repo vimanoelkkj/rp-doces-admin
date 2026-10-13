@@ -49,6 +49,7 @@ export default function PedidoDetalheModal({
           onAlterarStatus={detalhe.alterarStatus}
           onArquivar={detalhe.clicarArquivar}
           onExcluir={() => detalhe.setConfirmarExclusao(true)}
+          excluirBloqueio={detalhe.data?.anulacaoBloqueio?.mensagem ?? null}
           onClose={onClose}
         />
 

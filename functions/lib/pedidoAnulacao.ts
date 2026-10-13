@@ -30,7 +30,7 @@ export const ESTORNO_ANULACAO_ATIVO_MENSAGEM =
 
 export const ANULACAO_ERROS: Record<string, string> = {
   ANULACAO_EXPOSICAO_PIX_REMOTA:
-    "A exclusão de pedidos com histórico Pix do Mercado Pago está suspensa por segurança. A conciliação e os reembolsos continuam disponíveis.",
+    "A exclusão de pedidos com histórico Pix do Mercado Pago ainda não quitado (cobrança pendente, cancelada, com falha ou sem estorno integral confirmado) está suspensa por segurança. A conciliação e os reembolsos continuam disponíveis.",
   CAPTURA_MP_NAO_CONCILIADA:
     "Este pedido tem uma captura Pix do Mercado Pago ainda não conciliada. Regularize o pagamento antes de excluir.",
   ANULACAO_MP_RECEBIDO:
@@ -104,6 +104,33 @@ export async function temEstornoAnulacaoAtivo(db: D1Database, pedidoId: number):
     .bind(pedidoId)
     .first();
   return !!row;
+}
+
+// Leitura para a tela: o botão "Excluir pedido" só deve ser oferecido quando o servidor não vai
+// recusar de forma que o modal de exclusão não resolve. Enquanto houver dinheiro Pix a devolver ou
+// um estorno de exclusão em andamento, o modal continua útil (o estorno é um clique separado do
+// operador), então a ação segue habilitada. Nunca decide nada: a recusa real é do servidor/banco.
+export async function bloqueioVisualAnulacao(
+  db: D1Database,
+  pedidoId: number
+): Promise<{ codigo: string; mensagem: string } | null> {
+  if (await pedidoTemCapturaNaoConciliada(db, pedidoId)) {
+    return {
+      codigo: "CAPTURA_MP_NAO_CONCILIADA",
+      mensagem: ANULACAO_ERROS.CAPTURA_MP_NAO_CONCILIADA
+    };
+  }
+  const exposto = await db
+    .prepare(`SELECT 1 WHERE ${exposicaoPixRemotaNoPedidoSql("?")}`)
+    .bind(pedidoId, pedidoId, pedidoId)
+    .first();
+  if (!exposto) return null;
+  if ((await listarPagamentosMpReembolsaveis(db, pedidoId)).length > 0) return null;
+  if (await temEstornoAnulacaoAtivo(db, pedidoId)) return null;
+  return {
+    codigo: "ANULACAO_EXPOSICAO_PIX_REMOTA",
+    mensagem: ANULACAO_ERROS.ANULACAO_EXPOSICAO_PIX_REMOTA
+  };
 }
 
 export interface ResolucaoPixAnulacaoResultado {

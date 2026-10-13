@@ -377,6 +377,33 @@ html[data-admin-theme="dark"] .excluir-pedido-danger:hover {
   box-shadow: 0 5px 15px rgba(43, 29, 26, 0.13);
 }
 
+.pedmodal-more button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.pedmodal-more-aviso {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 54px);
+  z-index: 2;
+  width: 260px;
+  margin: 0;
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #634738;
+  border: 1px solid #eadfd3;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 5px 15px rgba(43, 29, 26, 0.13);
+}
+
+html[data-admin-theme="dark"] .pedmodal-more-aviso {
+  background: #2b2220;
+  color: #d9c8c2;
+  border-color: #3d3230;
+}
+
 html[data-admin-theme="dark"] .pedmodal-more button {
   background: #2b2220;
   color: #e08276;
@@ -384,7 +411,8 @@ html[data-admin-theme="dark"] .pedmodal-more button {
 }
 
 @media (max-width: 520px) {
-  .pedmodal-more button {
+  .pedmodal-more button,
+  .pedmodal-more-aviso {
     left: 0;
     right: auto;
   }

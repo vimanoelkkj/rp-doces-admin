@@ -63,4 +63,6 @@ export interface PedidoDetalheResponse {
   operacoesInconclusivas: OperacaoInconclusiva[];
   /** Cobrança nova bloqueada enquanto houver captura remota não conciliada; decisão do backend. */
   capturaMpNaoConciliada: boolean;
+  /** Exclusão que o servidor recusaria sem que o modal resolva; null quando a ação é oferecida. */
+  anulacaoBloqueio?: { codigo: string; mensagem: string } | null;
 }
