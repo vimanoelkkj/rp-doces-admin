@@ -866,8 +866,11 @@ async function processIntent(
       });
     return markInconclusive(db, row, "REFUND_409_IDENTIDADE_INCONCLUSIVA");
   }
-  if (remote.resultado === "AMBIGUO" && remote.motivo === "RESPOSTA_ILEGIVEL") {
-    if (row.ultimo_erro !== `RESPOSTA_ILEGIVEL:${remote.httpStatus ?? "SEM_HTTP"}`)
+  if (
+    remote.resultado === "AMBIGUO" &&
+    ["RESPOSTA_ILEGIVEL", "IDENTIDADE_NAO_COMPROVADA"].includes(remote.motivo)
+  ) {
+    if (row.ultimo_erro !== `${remote.motivo}:${remote.httpStatus ?? "SEM_HTTP"}`)
       operationalAlert({
         code: "MP_REFUND_IDENTITY_INCONCLUSIVE",
         pedidoId: row.pedido_id,

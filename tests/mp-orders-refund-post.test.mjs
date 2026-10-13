@@ -18,7 +18,7 @@ const direct = (refunds = [refund()]) => ({
   transactions: { refunds }
 });
 
-test("first direct HTTP 201 binds its sole REF; GET without that identity remains ambiguous", async t => {
+test("readable direct HTTP 201 does not prove identity; GET requires a previously known REF", async t => {
   t.mock.method(globalThis, "fetch", async () => Response.json(direct(), { status: 201 }));
   assert.deepEqual(
     await app.mpRefund.postRefundMp("fake", "ORD101", "PAY101", "first-key", {
@@ -26,8 +26,9 @@ test("first direct HTTP 201 binds its sole REF; GET without that identity remain
       priorRefundIds: []
     }),
     {
-      resultado: "SUCESSO",
-      refund: { id: "REFfirst", payment_id: "PAY101", amount: "100.00", status: "approved" }
+      resultado: "AMBIGUO",
+      motivo: "IDENTIDADE_NAO_COMPROVADA",
+      httpStatus: 201
     }
   );
   assert.equal(
@@ -129,7 +130,55 @@ function provider(t, respond) {
   return calls;
 }
 
-test("real estorno route: 201 confirms exactly once; concurrent same-key replay preserves money and stock", async t => {
+test("P2: valid-looking 201 with empty baseline and external sole REF cannot bind an intent, including replay", async t => {
+  const { db } = await scenario(t);
+  const before = await state(db);
+  const params = {
+    pedidoId: 1,
+    pagamentoId: 1,
+    usuarioId: 1,
+    operationKey: "p2-external-refund",
+    fingerprint: "p2-external-refund",
+    valorCentavos: 10000,
+    accessToken: "fake"
+  };
+  let observedBaseline;
+  const calls = provider(t, async (_order, init) => {
+    const operation = await db
+      .prepare("SELECT resultado FROM pedido_operacoes WHERE operation_key=?")
+      .bind(params.operationKey)
+      .first();
+    observedBaseline = JSON.parse(operation.resultado).refund_association.before_ids;
+    return Response.json(
+      direct([refund({ id: "REFexternal", reference_id: init.headers["X-Idempotency-Key"] })]),
+      { status: 201 }
+    );
+  });
+  const first = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params);
+  assert.deepEqual(observedBaseline, []);
+  assert.equal(first.intencao.status, "INCONCLUSIVO");
+  assert.equal(first.intencao.mpRefundId, null);
+  assert.equal(first.intencao.ultimoErro, "IDENTIDADE_NAO_COMPROVADA:201");
+  const replay = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params);
+  assert.equal(replay.intencao.status, "INCONCLUSIVO");
+  assert.equal(replay.intencao.mpRefundId, null);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].key, calls[1].key);
+  assert.equal(calls[0].body, calls[1].body);
+  const after = await state(db);
+  for (const key of ["pedido", "pagamentos", "refunds", "alocacoes", "produtos", "itens"])
+    assert.deepEqual(after[key], before[key], `${key}: no financial or stock effect`);
+  assert.deepEqual(
+    (
+      await db
+        .prepare("SELECT status,mp_refund_id,valor_centavos FROM pedido_reembolso_pix_mp_intencoes")
+        .all()
+    ).results,
+    [{ status: "INCONCLUSIVO", mp_refund_id: null, valor_centavos: 10000 }]
+  );
+});
+
+test("real estorno route: concurrent same-key 201 cannot account money or bind a REF; replay preserves identity", async t => {
   const { db, post } = await scenario(t);
   const before = await state(db);
   const gate = barrier(2);
@@ -146,29 +195,33 @@ test("real estorno route: 201 confirms exactly once; concurrent same-key replay 
   const calls = provider(t, () => Response.json(direct(), { status: 201 }));
   const responses = await Promise.all([post(), post()]);
   db.hook = null;
-  assert.ok(responses.every(r => [200, 202].includes(r.status)));
-  assert.equal((await post()).status, 200);
+  assert.ok(responses.every(r => r.status === 202));
   assert.equal(calls.length, 1);
+  assert.equal((await post()).status, 202);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].key, calls[1].key);
+  assert.equal(calls[0].body, calls[1].body);
   assert.deepEqual(JSON.parse(calls[0].body), {
     transactions: [{ id: "PAY101", amount: "100.00" }]
   });
   const after = await state(db);
-  assert.equal(after.refunds.length, 1);
-  assert.equal(after.refunds[0].mp_refund_id, "REFfirst");
-  assert.equal(after.refunds[0].valor_centavos, 10000);
-  assert.equal(after.refunds[0].status, "REEMBOLSADO");
+  assert.deepEqual(after.refunds, before.refunds);
   assert.deepEqual(after.pagamentos, before.pagamentos);
   assert.deepEqual(after.produtos, before.produtos);
   assert.deepEqual(after.alocacoes, before.alocacoes);
   const intents = (
     await db
-      .prepare("SELECT status,mp_refund_id,tentativas FROM pedido_reembolso_pix_mp_intencoes")
+      .prepare(
+        "SELECT status,mp_refund_id,tentativas,valor_centavos FROM pedido_reembolso_pix_mp_intencoes"
+      )
       .all()
   ).results;
-  assert.deepEqual(intents, [{ status: "CONFIRMADO", mp_refund_id: "REFfirst", tentativas: 1 }]);
+  assert.deepEqual(intents, [
+    { status: "INCONCLUSIVO", mp_refund_id: null, tentativas: 2, valor_centavos: 10000 }
+  ]);
 });
 
-test("timeout after remote effect: same body/key retry can bind direct 201 without a second refund", async t => {
+test("timeout after remote effect: same body/key 201 replay still cannot prove REF identity", async t => {
   const { db, post } = await scenario(t);
   t.mock.timers.enable({ apis: ["setTimeout"] });
   let effects = 0;
@@ -191,16 +244,21 @@ test("timeout after remote effect: same body/key retry can bind direct 201 witho
       .ultimo_erro,
     /TIMEOUT/
   );
-  assert.equal((await post()).status, 200);
-  assert.equal((await post()).status, 200);
+  assert.equal((await post()).status, 202);
   assert.equal(calls.length, 2);
   assert.equal(calls[0].key, calls[1].key);
   assert.equal(calls[0].body, calls[1].body);
   assert.equal(effects, 1);
-  assert.equal((await state(db)).refunds.length, 1);
+  assert.equal((await state(db)).refunds.length, 0);
+  assert.deepEqual(
+    await db
+      .prepare("SELECT status,mp_refund_id,ultimo_erro FROM pedido_reembolso_pix_mp_intencoes")
+      .first(),
+    { status: "INCONCLUSIVO", mp_refund_id: null, ultimo_erro: "IDENTIDADE_NAO_COMPROVADA:201" }
+  );
 });
 
-test("pending direct REF is persisted; recovery selects that exact identity from general GET history", async t => {
+test("pending POST cannot bind REF; a previously known identity fixture still recovers by exact GET", async t => {
   const { db, post } = await scenario(t);
   let posts = 0;
   let gets = 0;
@@ -218,8 +276,15 @@ test("pending direct REF is persisted; recovery selects that exact identity from
   assert.equal(
     (await db.prepare("SELECT mp_refund_id FROM pedido_reembolso_pix_mp_intencoes").first())
       .mp_refund_id,
-    "REFfirst"
+    null
   );
+  // Separate trusted-identity fixture: this write models existing recovery,
+  // not evidence inferred from the uncorrelated POST response above.
+  await db
+    .prepare(
+      "UPDATE pedido_reembolso_pix_mp_intencoes SET status='PROCESSANDO',mp_refund_id='REFfirst',mp_status='pending'"
+    )
+    .run();
   assert.equal((await post()).status, 200);
   assert.equal((await post()).status, 200);
   assert.equal(posts, 1);
@@ -227,7 +292,7 @@ test("pending direct REF is persisted; recovery selects that exact identity from
   assert.equal((await state(db)).refunds[0].mp_refund_id, "REFfirst");
 });
 
-test("same operation key with different financial identity conflicts after direct confirmation", async t => {
+test("same operation key with different financial identity conflicts while direct POST is inconclusive", async t => {
   const { db } = await scenario(t);
   const calls = provider(t, () => Response.json(direct(), { status: 201 }));
   const params = {
@@ -241,7 +306,7 @@ test("same operation key with different financial identity conflicts after direc
   };
   assert.equal(
     (await app.mpRefundIntent.reconcilePixMpRefundIntent(db, params)).intencao.status,
-    "CONFIRMADO"
+    "INCONCLUSIVO"
   );
   const before = await state(db);
   const incompatible = await app.mpRefundIntent.reconcilePixMpRefundIntent(db, {
@@ -254,8 +319,9 @@ test("same operation key with different financial identity conflicts after direc
   assert.equal(calls.length, 1);
 });
 
-test("multiple local payments: only direct identity confirms its leg; ambiguous 201 reserves the other", async t => {
+test("multiple local payments: singular and aggregate 201 both remain inconclusive with reserved capacity", async t => {
   const { db, post } = await scenario(t, { secondPayment: true });
+  const before = await state(db);
   const calls = provider(t, order =>
     Response.json(
       order === "ORD101"
@@ -276,10 +342,8 @@ test("multiple local payments: only direct identity confirms its leg; ambiguous 
   assert.equal(calls.length, 2);
   assert.notEqual(calls[0].key, calls[1].key);
   const after = await state(db);
-  assert.deepEqual(
-    after.refunds.map(r => [r.pagamento_id, r.mp_refund_id, r.valor_centavos]),
-    [[1, "REFfirst", 10000]]
-  );
+  for (const key of ["pagamentos", "refunds", "alocacoes", "produtos", "itens"])
+    assert.deepEqual(after[key], before[key]);
   assert.deepEqual(
     (
       await db
@@ -289,7 +353,7 @@ test("multiple local payments: only direct identity confirms its leg; ambiguous 
         .all()
     ).results,
     [
-      { pagamento_id: 1, status: "CONFIRMADO", mp_refund_id: "REFfirst" },
+      { pagamento_id: 1, status: "INCONCLUSIVO", mp_refund_id: null },
       { pagamento_id: 2, status: "INCONCLUSIVO", mp_refund_id: null }
     ]
   );

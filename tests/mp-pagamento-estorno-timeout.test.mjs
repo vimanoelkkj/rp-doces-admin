@@ -66,7 +66,7 @@ const HELPERS = [
         },
         { status: 201 }
       ),
-    ehSucesso: r => r.resultado === "SUCESSO" && r.refund.id === "REF555"
+    ehSucesso: r => r.resultado === "AMBIGUO" && r.motivo === "IDENTIDADE_NAO_COMPROVADA"
   },
   {
     nome: "getRefundMp", // sem ramo para status <400 (comportamento preexistente, sem efeito financeiro)
