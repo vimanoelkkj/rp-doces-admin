@@ -273,3 +273,48 @@ test("ORD-only local lookup failure never reaches Mercado Pago or leaks an excep
     [["DIAGNOSTIC_ORDER_LOOKUP_FAILED"]]
   );
 });
+
+test("ORD-only observes all refund identities without associating or materializing them", async t => {
+  const { run } = await setup(t);
+  const refunds = [
+    { id: "REFfirst", transaction_id: PAY, amount: "50.00", status: "processed" },
+    { id: "REFexternal", transaction_id: "PAYother", amount: "50.00", status: "pending" }
+  ];
+  const remote = provider(t, () => {
+    const order = wireOrder();
+    order.transactions.refunds = refunds.map(refund => ({
+      ...refund,
+      reference_id: "private-reference",
+      secret: "never-expose",
+      e2e_id: "private-e2e"
+    }));
+    return Response.json(order);
+  });
+  const response = await run();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.refunds, refunds);
+  assert.equal(remote.mock.callCount(), 1);
+});
+
+for (const invalid of [
+  null,
+  {},
+  [{ id: "not-a-refund", transaction_id: PAY, amount: "50.00", status: "processed" }],
+  [{ id: "REF1", transaction_id: "invalid", amount: "50.00", status: "processed" }],
+  [{ id: "REF1", transaction_id: PAY, amount: "private-value", status: "processed" }],
+  [{ id: "REF1", transaction_id: PAY, amount: "50.00", status: { secret: "private" } }]
+]) {
+  test(`ORD-only rejects malformed refund data: ${JSON.stringify(invalid)}`, async t => {
+    const { run } = await setup(t);
+    t.mock.method(console, "error", () => {});
+    provider(t, () => {
+      const order = wireOrder();
+      order.transactions.refunds = invalid;
+      return Response.json(order);
+    });
+    const response = await run();
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { code: "DIAGNOSTIC_ORDER_LOOKUP_FAILED" });
+  });
+}
