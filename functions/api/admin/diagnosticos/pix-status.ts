@@ -2,15 +2,19 @@
 
 // Admin > Loja > Diagnósticos permanentes — status do "Pix real de diagnóstico".
 //
-// Consulta apenas: reaproveita `fetchMpPayment`/`mapMpStatus` de
-// `paymentSync.ts` (mesmo GET autoritativo usado pelo webhook, pela
-// reconciliação B3 e pelo polling público) — nunca chama
+// Consulta apenas: ORD:PAY reaproveita `fetchMpPayment`/`mapMpStatus`;
+// ORD sozinho observa a ordem e os refunds, sem conceder autoridade financeira.
+// Nunca chama
 // `syncPaymentFromMp`, que grava em `pedido_pagamentos`. Este diagnóstico
 // não tem pagamento local para sincronizar; ISOLAMENTO: zero escrita no
 // banco, exatamente como o endpoint que cria o Pix de diagnóstico.
 
-import { fetchMpOrder } from "../../../lib/mp/orders/client";
-import { decimalToCents } from "../../../lib/mp/orders/types";
+import {
+  MP_ORDERS_URL,
+  MP_ORDER_GET_TIMEOUT_MS,
+  orderPaymentSnapshot
+} from "../../../lib/mp/orders/client";
+import { decimalToCents, type MpOrder } from "../../../lib/mp/orders/types";
 import { requireUser, sha256 } from "../../../lib/auth";
 import { fetchMpPayment, mapMpStatus } from "../../../lib/paymentSync";
 import { parseDiagnosticPaymentId } from "../../../lib/mp/orders/diagnosticId";
@@ -33,6 +37,8 @@ function isOwner(papel: string) {
 // Isolation is verified by the publication gates, not by introspecting env.DB.
 // No runtime D1 UUID API exists. These checks do not attest the binding identity.
 async function readLinkedOrder(request: Request, env: Env, orderId: string): Promise<Response> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const json = (body: unknown, status = 200) =>
     Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
   if (
@@ -52,7 +58,16 @@ async function readLinkedOrder(request: Request, env: Env, orderId: string): Pro
       .first();
     if (!linked) return json({ code: "DIAGNOSTIC_ORDER_NOT_LINKED" }, 404);
     if (!env.MP_ACCESS_TOKEN) return json({ code: "MERCADO_PAGO_NAO_CONFIGURADO" }, 503);
-    const order = await fetchMpOrder(env.MP_ACCESS_TOKEN, orderId);
+    timer = setTimeout(() => controller.abort(), MP_ORDER_GET_TIMEOUT_MS);
+    const response = await fetch(`${MP_ORDERS_URL}/${encodeURIComponent(orderId)}`, {
+      headers: { Authorization: `Bearer ${env.MP_ACCESS_TOKEN}` },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("RESPOSTA_ORDER_INVALIDA");
+    const raw = (await response.json()) as MpOrder;
+    if (raw?.id !== orderId) throw new Error("RESPOSTA_ORDER_INVALIDA");
+    // Diagnostic observation only: this snapshot grants no financial authority.
+    const order = orderPaymentSnapshot(raw);
     const status = (value: unknown) => {
       if (value == null) return null;
       if (typeof value !== "string" || !/^[a-z_]{1,64}$/.test(value))
@@ -64,8 +79,29 @@ async function readLinkedOrder(request: Request, env: Env, orderId: string): Pro
       if (decimalToCents(value) === null) throw new Error("RESPOSTA_ORDER_INVALIDA");
       return value;
     };
+    const remoteRefunds = raw.transactions?.refunds;
+    if (remoteRefunds !== undefined && !Array.isArray(remoteRefunds))
+      throw new Error("RESPOSTA_ORDER_INVALIDA");
+    const refunds = remoteRefunds?.map(refund => {
+      if (
+        typeof refund?.id !== "string" ||
+        !/^REF[A-Za-z0-9]{1,128}$/.test(refund.id) ||
+        typeof refund.transaction_id !== "string" ||
+        !/^PAY[A-Za-z0-9]{1,128}$/.test(refund.transaction_id) ||
+        decimalToCents(refund.amount) === null ||
+        typeof refund.status !== "string"
+      )
+        throw new Error("RESPOSTA_ORDER_INVALIDA");
+      return {
+        id: refund.id,
+        transaction_id: refund.transaction_id,
+        amount: refund.amount,
+        status: status(refund.status)
+      };
+    });
     return json({
       ok: true,
+      ...(refunds === undefined ? {} : { refunds }),
       order: {
         id: order.order_id,
         status: status(order.order_status),
@@ -92,6 +128,8 @@ async function readLinkedOrder(request: Request, env: Env, orderId: string): Pro
     // Never log a provider payload, exception or credential from this lookup.
     console.error("DIAGNOSTIC_ORDER_LOOKUP_FAILED");
     return json({ code: "DIAGNOSTIC_ORDER_LOOKUP_FAILED" }, 502);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
