@@ -74,7 +74,12 @@ export async function getOrderRefundIds(
 }
 
 export type MotivoAmbiguoRefund =
-  "TRANSPORTE" | "TIMEOUT" | "HTTP_INDISPONIVEL" | "HTTP_INDETERMINADO" | "RESPOSTA_ILEGIVEL";
+  | "TRANSPORTE"
+  | "TIMEOUT"
+  | "HTTP_INDISPONIVEL"
+  | "HTTP_INDETERMINADO"
+  | "RESPOSTA_ILEGIVEL"
+  | "IDENTIDADE_NAO_COMPROVADA";
 
 export type MpRefundResultado =
   | { resultado: "SUCESSO"; refund: MpRefundCriado }
@@ -152,14 +157,14 @@ export async function postRefundMp(
       return { resultado: "RECUSA_DEFINITIVA", httpStatus: response.status, mensagem, detalhe };
     }
 
-    let refund: MpRefundCriado | null = null;
+    let readable = false;
     try {
-      refund = refundFromOrder(
+      readable = refundFromPost(
         (await response.json()) as MpOrder,
+        response.status,
         orderId,
         paymentId,
         options.amountCentavos,
-        undefined,
         options.priorRefundIds
       );
     } catch {
@@ -168,23 +173,13 @@ export async function postRefundMp(
       if (controller.signal.aborted) {
         return { resultado: "AMBIGUO", motivo: "TIMEOUT", httpStatus: response.status };
       }
-      refund = null;
     }
-    // 2xx sem `id` utilizável é ambíguo, não sucesso: o recurso pode existir
-    // do outro lado e nós não conseguimos nomeá-lo.
-    if (!refund) {
-      return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
-    }
-    if (
-      options.amountCentavos !== undefined &&
-      (String(refund.payment_id) !== paymentId ||
-        decimalToCents(refund.amount) !== options.amountCentavos ||
-        typeof refund.status !== "string" ||
-        refund.status.trim() === "")
-    ) {
-      return { resultado: "AMBIGUO", motivo: "RESPOSTA_ILEGIVEL", httpStatus: response.status };
-    }
-    return { resultado: "SUCESSO", refund };
+    // The response shape does not prove REF-to-operation identity, including replay.
+    return {
+      resultado: "AMBIGUO",
+      motivo: readable ? "IDENTIDADE_NAO_COMPROVADA" : "RESPOSTA_ILEGIVEL",
+      httpStatus: response.status
+    };
   } finally {
     clearTimeout(prazo);
   }
@@ -261,6 +256,34 @@ export async function getRefundMp(
   } finally {
     clearTimeout(prazo);
   }
+}
+
+// Validate wire shape only. Neither the example nor the SDK/OpenAPI guarantees
+// that this REF belongs to our operation; no candidate identity leaves the parser.
+function refundFromPost(
+  order: MpOrder,
+  httpStatus: number,
+  orderId: string,
+  paymentId: string,
+  amount?: number,
+  priorRefundIds?: readonly string[]
+): boolean {
+  const refunds = order?.transactions?.refunds;
+  if (
+    httpStatus !== 201 ||
+    !["processed", "refunded"].includes(order?.status) ||
+    !["refunded", "partially_refunded"].includes(order?.status_detail ?? "") ||
+    !order?.transactions ||
+    Array.isArray(order.transactions) ||
+    order.transactions.payments !== undefined ||
+    !Array.isArray(refunds) ||
+    refunds.length !== 1 ||
+    typeof refunds[0]?.id !== "string" ||
+    !refunds[0].status?.trim() ||
+    (decimalToCents(refunds[0].amount) ?? 0) <= 0
+  )
+    return false;
+  return refundFromOrder(order, orderId, paymentId, amount, refunds[0].id, priorRefundIds) !== null;
 }
 
 // A known REF identity is required on recovery. Never select a different refund
