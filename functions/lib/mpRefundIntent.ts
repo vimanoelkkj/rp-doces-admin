@@ -315,7 +315,13 @@ async function ensureIntent(
     ]);
   } catch (error) {
     const winnerForKey = await byOperation(db, params.operationKey);
-    if (winnerForKey) return winnerForKey;
+    if (winnerForKey) {
+      const winnerOperation = await buscarOperacao(db, params.operationKey);
+      if (!winnerOperation) throw error;
+      const conflict = conflitoOperacao(winnerOperation, identity);
+      if (conflict) return { ok: false, erro: conflict };
+      return winnerForKey;
+    }
     const winnerForLeg = await activeByLeg(db, params);
     if (winnerForLeg) {
       if (
