@@ -154,12 +154,12 @@ export async function postRefundMp(
 
     let refund: MpRefundCriado | null = null;
     try {
-      refund = refundFromOrder(
+      refund = refundFromPost(
         (await response.json()) as MpOrder,
+        response.status,
         orderId,
         paymentId,
         options.amountCentavos,
-        undefined,
         options.priorRefundIds
       );
     } catch {
@@ -261,6 +261,35 @@ export async function getRefundMp(
   } finally {
     clearTimeout(prazo);
   }
+}
+
+// The documented 201 POST result names the refund produced by this request.
+// Require the entire result to be singular; baseline/amount/PAY never select an
+// entry from an aggregate. A general GET still requires an already known REF.
+function refundFromPost(
+  order: MpOrder,
+  httpStatus: number,
+  orderId: string,
+  paymentId: string,
+  amount?: number,
+  priorRefundIds?: readonly string[]
+): MpRefundCriado | null {
+  const refunds = order?.transactions?.refunds;
+  if (
+    httpStatus !== 201 ||
+    !["processed", "refunded"].includes(order?.status) ||
+    !["refunded", "partially_refunded"].includes(order?.status_detail ?? "") ||
+    !order?.transactions ||
+    Array.isArray(order.transactions) ||
+    order.transactions.payments !== undefined ||
+    !Array.isArray(refunds) ||
+    refunds.length !== 1 ||
+    typeof refunds[0]?.id !== "string" ||
+    !refunds[0].status?.trim() ||
+    (decimalToCents(refunds[0].amount) ?? 0) <= 0
+  )
+    return null;
+  return refundFromOrder(order, orderId, paymentId, amount, refunds[0].id, priorRefundIds);
 }
 
 // A known REF identity is required on recovery. Never select a different refund
