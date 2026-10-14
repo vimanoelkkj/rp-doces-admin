@@ -49,6 +49,8 @@ export function useHomeHashScroll({ menuOpen, closeMenu }: UseHomeHashScrollOpti
 
   // Handle smooth scroll on direct hash change / landing on Home
   useEffect(() => {
+    // This CTA owns its photo-first scroll, including traversal back to its history entry.
+    if (location.hash === "#sobre" && window.history.state?.homeStoryCta === true) return;
     if (location.pathname === "/" && location.hash) {
       const targetHash = location.hash;
       const prefersReduced =

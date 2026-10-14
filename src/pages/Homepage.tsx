@@ -1,5 +1,6 @@
 import Header from "../components/Header";
-import { useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import Footer from "../components/Footer";
 import { useScrollReveal } from "../hooks/useScrollReveal";
 import { useCatalogProducts } from "../hooks/useCatalogProducts";
@@ -14,12 +15,55 @@ import UltimoPedidoLink from "../components/UltimoPedidoLink";
 import "./Homepage.css";
 
 export default function Homepage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const scrollContainerRef = useRef<HTMLElement>(null);
   const { products } = useCatalogProducts();
   const storeConfig = useStoreConfig();
   const galleryProducts = products.filter(product => product.image).slice(0, 5);
   const storyRef = useScrollReveal<HTMLElement>();
   const instaRef = useScrollReveal<HTMLElement>();
+
+  const scrollToStory = useCallback(() => {
+    const scroller = scrollContainerRef.current;
+    const story = storyRef.current;
+    if (!scroller || !story) return;
+    const mobile = window.matchMedia("(max-width: 768px)").matches;
+    const wave = scroller.parentElement?.querySelector(".wave-container");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // On mobile, keep the Hero behind the opaque fade edge; the photo enters its gradient.
+    const clearance =
+      mobile && wave
+        ? wave.getBoundingClientRect().height - 20
+        : parseFloat(getComputedStyle(scroller).scrollPaddingTop);
+    // Layout offsets avoid the reveal transform shifting the final destination.
+    scroller.scrollTo({
+      top: story.offsetTop - clearance,
+      behavior: reducedMotion ? "instant" : "smooth"
+    });
+  }, [storyRef]);
+
+  useEffect(() => {
+    if (
+      navigationType === "POP" &&
+      location.hash === "#sobre" &&
+      window.history.state?.homeStoryCta === true
+    ) {
+      scrollToStory();
+    }
+  }, [location.hash, navigationType, scrollToStory]);
+
+  const handleLearnMore = () => {
+    scrollToStory();
+    if (window.location.hash === "#sobre") return;
+    navigate(
+      { pathname: location.pathname, search: location.search, hash: "#sobre" },
+      { state: location.state }
+    );
+    // Tag only this new entry, preserving the Router's usr, key and idx metadata.
+    window.history.replaceState({ ...window.history.state, homeStoryCta: true }, "");
+  };
 
   return (
     <div className="homepage">
@@ -45,9 +89,9 @@ export default function Homepage() {
             </p>
 
             <div className="hero-actions">
-              <a href="#sobre" className="btn-primary hero-cta">
+              <button type="button" className="btn-primary hero-cta" onClick={handleLearnMore}>
                 Saiba mais <span className="arrow-bounce">&nbsp;↓</span>
-              </a>
+              </button>
               <UltimoPedidoLink />
             </div>
 

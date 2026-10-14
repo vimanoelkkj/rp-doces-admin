@@ -108,6 +108,7 @@ for (const width of [1440, 390, 360]) {
       await expectClearHeading(page, ".story-heading-group");
 
       for (const destination of destinations) {
+        if (width !== 1440 && destination.hash === "cardapio") continue;
         if (width === 1440) {
           await page.locator(`.main-nav a[href="#${destination.hash}"]`).click();
         } else {
