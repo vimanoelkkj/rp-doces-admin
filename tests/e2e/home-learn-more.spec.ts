@@ -13,7 +13,17 @@ for (const width of [360, 390, 412]) {
         });
         const page = await context.newPage();
         try {
-          await page.addInitScript(value => localStorage.setItem("store-theme", value), theme);
+          await page.addInitScript(value => {
+            localStorage.setItem("store-theme", value);
+            history.replaceState(
+              {
+                usr: { source: "cta-test", nested: { preserved: true } },
+                key: "home-test",
+                idx: 0
+              },
+              ""
+            );
+          }, theme);
           await page.route(
             url => url.pathname.startsWith("/api/"),
             route =>
@@ -31,11 +41,25 @@ for (const width of [360, 390, 412]) {
           await expect(story).not.toHaveClass(/revealed/);
           await expect(story).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 40)");
           const initialOffset = await story.evaluate(el => (el as HTMLElement).offsetTop);
+          const initialHistory = await page.evaluate(() => ({
+            length: history.length,
+            state: history.state
+          }));
           await page.evaluate(() => {
             const scroller = document.querySelector<HTMLElement>(".homepage-content");
             const cta = document.querySelector(".hero-cta");
             if (!scroller || !cta) throw new Error("Home scroller and CTA must be present");
             const samples: number[] = [];
+            const originalScrollIntoView = Element.prototype.scrollIntoView;
+            (
+              window as typeof window & { storyScrollIntoViewCalls: number }
+            ).storyScrollIntoViewCalls = 0;
+            Element.prototype.scrollIntoView = function (...args) {
+              if (this.id === "sobre")
+                (window as typeof window & { storyScrollIntoViewCalls: number })
+                  .storyScrollIntoViewCalls++;
+              return originalScrollIntoView.apply(this, args);
+            };
             (window as typeof window & { ctaScrollSamples: number[] }).ctaScrollSamples = samples;
             cta.addEventListener("click", () => {
               samples.push(scroller.scrollTop);
@@ -50,6 +74,14 @@ for (const width of [360, 390, 412]) {
 
           await page.locator(".hero-cta").tap();
           await expect(page).toHaveURL(/#sobre$/);
+          const destinationHistory = await page.evaluate(() => ({
+            length: history.length,
+            state: history.state
+          }));
+          expect(destinationHistory.length).toBe(initialHistory.length + 1);
+          expect(destinationHistory.state.usr).toEqual(initialHistory.state.usr);
+          expect(destinationHistory.state.idx).toBe(initialHistory.state.idx + 1);
+          expect(destinationHistory.state.key).not.toBe(initialHistory.state.key);
           await page.waitForTimeout(1400);
           await expect(story).toHaveClass(/revealed/);
           await expect(story).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
@@ -124,6 +156,37 @@ for (const width of [360, 390, 412]) {
               .evaluate(el => el.getBoundingClientRect().top);
             expect(Math.abs(repeatedTop - firstTop)).toBeLessThanOrEqual(1);
           }
+          expect(
+            await page.evaluate(() => ({ length: history.length, state: history.state }))
+          ).toEqual(destinationHistory);
+          await page.evaluate(() => history.back());
+          await expect(page).toHaveURL(/\/$/);
+          expect(await page.evaluate(() => history.state)).toEqual(initialHistory.state);
+          await page.evaluate(() => history.forward());
+          await expect(page).toHaveURL(/#sobre$/);
+          await page.waitForTimeout(1400);
+          expect(
+            await page.evaluate(() => ({ length: history.length, state: history.state }))
+          ).toEqual(destinationHistory);
+          expect(
+            Math.abs((await scroller.evaluate(el => el.scrollTop)) - firstScroll)
+          ).toBeLessThanOrEqual(1);
+          for (const [selector, firstTop] of [
+            [".story-image-wrapper", result.photoTop],
+            [".story-heading-group", result.heading]
+          ] as const) {
+            const forwardTop = await page
+              .locator(selector)
+              .evaluate(el => el.getBoundingClientRect().top);
+            expect(Math.abs(forwardTop - firstTop)).toBeLessThanOrEqual(1);
+          }
+          expect(
+            await page.evaluate(
+              () =>
+                (window as typeof window & { storyScrollIntoViewCalls: number })
+                  .storyScrollIntoViewCalls
+            )
+          ).toBe(0);
 
           await page.getByRole("button", { name: "Abrir menu", exact: true }).tap();
           await expect(

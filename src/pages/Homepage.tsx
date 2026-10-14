@@ -1,5 +1,6 @@
 import Header from "../components/Header";
-import { useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import Footer from "../components/Footer";
 import { useScrollReveal } from "../hooks/useScrollReveal";
 import { useCatalogProducts } from "../hooks/useCatalogProducts";
@@ -14,6 +15,9 @@ import UltimoPedidoLink from "../components/UltimoPedidoLink";
 import "./Homepage.css";
 
 export default function Homepage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const scrollContainerRef = useRef<HTMLElement>(null);
   const { products } = useCatalogProducts();
   const storeConfig = useStoreConfig();
@@ -21,7 +25,7 @@ export default function Homepage() {
   const storyRef = useScrollReveal<HTMLElement>();
   const instaRef = useScrollReveal<HTMLElement>();
 
-  const handleLearnMore = () => {
+  const scrollToStory = useCallback(() => {
     const scroller = scrollContainerRef.current;
     const story = storyRef.current;
     if (!scroller || !story) return;
@@ -38,7 +42,27 @@ export default function Homepage() {
       top: story.offsetTop - clearance,
       behavior: reducedMotion ? "instant" : "smooth"
     });
-    window.history.pushState(null, "", "#sobre");
+  }, [storyRef]);
+
+  useEffect(() => {
+    if (
+      navigationType === "POP" &&
+      location.hash === "#sobre" &&
+      window.history.state?.homeStoryCta === true
+    ) {
+      scrollToStory();
+    }
+  }, [location.hash, navigationType, scrollToStory]);
+
+  const handleLearnMore = () => {
+    scrollToStory();
+    if (window.location.hash === "#sobre") return;
+    navigate(
+      { pathname: location.pathname, search: location.search, hash: "#sobre" },
+      { state: location.state }
+    );
+    // Tag only this new entry, preserving the Router's usr, key and idx metadata.
+    window.history.replaceState({ ...window.history.state, homeStoryCta: true }, "");
   };
 
   return (
