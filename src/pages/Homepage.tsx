@@ -21,6 +21,26 @@ export default function Homepage() {
   const storyRef = useScrollReveal<HTMLElement>();
   const instaRef = useScrollReveal<HTMLElement>();
 
+  const handleLearnMore = () => {
+    const scroller = scrollContainerRef.current;
+    const story = storyRef.current;
+    if (!scroller || !story) return;
+    const mobile = window.matchMedia("(max-width: 768px)").matches;
+    const wave = scroller.parentElement?.querySelector(".wave-container");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // On mobile, keep the Hero behind the opaque fade edge; the photo enters its gradient.
+    const clearance =
+      mobile && wave
+        ? wave.getBoundingClientRect().height - 20
+        : parseFloat(getComputedStyle(scroller).scrollPaddingTop);
+    // Layout offsets avoid the reveal transform shifting the final destination.
+    scroller.scrollTo({
+      top: story.offsetTop - clearance,
+      behavior: reducedMotion ? "instant" : "smooth"
+    });
+    window.history.pushState(null, "", "#sobre");
+  };
+
   return (
     <div className="homepage">
       {/* ===== WAVE DECORATION ===== */}
@@ -45,9 +65,9 @@ export default function Homepage() {
             </p>
 
             <div className="hero-actions">
-              <a href="#sobre" className="btn-primary hero-cta">
+              <button type="button" className="btn-primary hero-cta" onClick={handleLearnMore}>
                 Saiba mais <span className="arrow-bounce">&nbsp;↓</span>
-              </a>
+              </button>
               <UltimoPedidoLink />
             </div>
 

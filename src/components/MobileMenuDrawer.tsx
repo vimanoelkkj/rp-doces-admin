@@ -70,52 +70,6 @@ export default function MobileMenuDrawer({
         </button>
 
         <div className="mobile-menu-links">
-          <button
-            type="button"
-            className="mobile-menu-link"
-            onClick={() => onNavigate("#cardapio")}
-          >
-            <span className="mobile-menu-link-content">
-              <span className="mobile-menu-link-icon-wrap" aria-hidden="true">
-                <svg
-                  aria-hidden="true"
-                  className="mobile-menu-link-icon"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M5 11l1.5 9h11l1.5-9H5z" />
-                  <path d="M4 11c0-2.2 1.8-4 4-4 1 0 2 .5 2.8 1.2.7-.7 1.8-1.2 2.8-1.2 2.2 0 4 1.8 4 4" />
-                  <circle cx="12" cy="4.5" r="1.5" fill="currentColor" stroke="none" />
-                  <path d="M9 14v4M12 14v4M15 14v4" strokeWidth="1.5" />
-                </svg>
-              </span>
-              <span className="mobile-menu-link-text">
-                Cardápio
-                <svg
-                  className="mobile-menu-underline"
-                  width="42"
-                  height="6"
-                  viewBox="0 0 42 6"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M1.5 3.5C10 1.5 24 4.8 40.5 2.2"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </span>
-            </span>
-          </button>
-
           <button type="button" className="mobile-menu-link" onClick={() => onNavigate("#sobre")}>
             <span className="mobile-menu-link-content">
               <span className="mobile-menu-link-icon-wrap" aria-hidden="true">

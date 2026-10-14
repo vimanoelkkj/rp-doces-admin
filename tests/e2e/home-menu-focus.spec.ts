@@ -157,7 +157,7 @@ for (const theme of ["light", "dark"] as const) {
     }) => {
       await openMenu(page);
       await page.keyboard.press("Enter");
-      await expect(page).toHaveURL(/#cardapio$/);
+      await expect(page).toHaveURL(/#sobre$/);
       await expectClosed(page);
       await expect
         .poll(() => page.locator(".homepage-content").evaluate(el => el.scrollTop))

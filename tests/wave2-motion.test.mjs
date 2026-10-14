@@ -295,9 +295,13 @@ test("Header mobile: abrir menu adiciona classes abertas e clique em link fecha"
   const cardapioBtn = Array.from(document.querySelectorAll(".mobile-menu-links button")).find(b =>
     b.textContent.includes("Cardápio")
   );
-  assert.ok(cardapioBtn, "Botão do Cardápio deve existir");
+  assert.equal(cardapioBtn, undefined, "Cardápio must not appear in the mobile menu");
+  const sobreBtn = Array.from(document.querySelectorAll(".mobile-menu-links button")).find(b =>
+    b.textContent.includes("Sobre")
+  );
+  assert.ok(sobreBtn, "Sobre button must exist");
   await ui.act(async () => {
-    cardapioBtn.click();
+    sobreBtn.click();
   });
   await flush();
 
