@@ -326,3 +326,81 @@ test.describe("transição de tema (desktop)", () => {
     await runTransition(page, testInfo, "dark", "light");
   });
 });
+
+test.describe("transição de tema (mobile)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem("store-theme", "light");
+      } catch {
+        /* ignore */
+      }
+    });
+    await page.goto(PAGE_PATH);
+    await page.locator(SELECTORS.firstCard).first().waitFor({ state: "visible", timeout: 20000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(800);
+  });
+
+  test("mobile transiciona com opacidade e sem travamento de clip-path", async ({ page }) => {
+    const supported = await page.evaluate(() => typeof document.startViewTransition === "function");
+    expect(supported, "Chrome sem View Transitions API").toBe(true);
+
+    const toggle = page.locator(SELECTORS.themeButton);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+    // Instala observador que captura o clip-path computado do pseudo-elemento ::view-transition-new(root)
+    // exatamente durante a transição (enquanto data-theme-transitioning está ativo)
+    await page.evaluate(() => {
+      const w = window as typeof window & { __capturedMobileClips: string[] };
+      w.__capturedMobileClips = [];
+      const checkClip = () => {
+        if (document.documentElement.hasAttribute("data-theme-transitioning")) {
+          const comp = getComputedStyle(
+            document.documentElement,
+            "::view-transition-new(root)"
+          ).clipPath;
+          if (comp) w.__capturedMobileClips.push(comp);
+          requestAnimationFrame(checkClip);
+        }
+      };
+      const observer = new MutationObserver(() => {
+        if (document.documentElement.getAttribute("data-theme-transitioning") === "true") {
+          requestAnimationFrame(checkClip);
+        }
+      });
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme-transitioning"]
+      });
+    });
+
+    await toggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme-transitioning", "true", {
+      timeout: 5000
+    });
+
+    // Lê as amostras computadas durante a transição
+    const clips = await page.evaluate(() => {
+      const w = window as typeof window & { __capturedMobileClips: string[] };
+      return w.__capturedMobileClips;
+    });
+
+    expect(clips.length, "Deve ter capturado frames durante a transição mobile").toBeGreaterThan(0);
+    for (const clip of clips) {
+      expect(clip, "clip-path computado durante o fade mobile deve ser 'none'").toBe("none");
+      expect(clip).not.toContain("circle(0px");
+    }
+
+    // Transição de volta: dark -> light
+    await toggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme-transitioning", "true", {
+      timeout: 5000
+    });
+  });
+});

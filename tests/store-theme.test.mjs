@@ -168,4 +168,12 @@ test("StoreTheme: View Transition otimiza mobile com opacity/transform e preserv
   assert.match(contextCode, /pseudoElement:\s*"::view-transition-new\(root\)"/);
   assert.doesNotMatch(contextCode, /::view-transition-old\(root\)/);
   assert.doesNotMatch(contextCode, /::view-transition-group\(root\)/);
+
+  // 10. No mobile (max-width: 768px), ::view-transition-new(root) reseta clip-path para none,
+  // permitindo o fade de opacidade sem mascarar o novo tema com o círculo de 0px do desktop
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*768px\)[\s\S]*?::view-transition-new\(root\)\s*\{\s*clip-path:\s*none;\s*\}/,
+    "global.css deve definir clip-path: none para ::view-transition-new(root) sob max-width: 768px"
+  );
 });
