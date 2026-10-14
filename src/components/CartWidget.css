@@ -47,13 +47,6 @@
   outline-offset: 2px;
 }
 
-@media (pointer: coarse) {
-  .cart-fab:focus,
-  .cart-fab:focus-visible {
-    outline: none;
-  }
-}
-
 .cart-fab-badge {
   position: absolute;
   top: -4px;
@@ -173,15 +166,6 @@
   outline-offset: 2px;
 }
 
-@media (pointer: coarse) {
-  .cart-close-btn:focus,
-  .cart-close-btn:focus-visible,
-  .cart-back-btn:focus,
-  .cart-back-btn:focus-visible {
-    outline: none;
-  }
-}
-
 .cart-modal-items {
   flex: 1;
   overflow-y: auto;
@@ -253,13 +237,6 @@
 }
 .cart-qty-controls button:focus:not(:focus-visible) {
   outline: none;
-}
-
-@media (pointer: coarse) {
-  .cart-qty-controls button:focus,
-  .cart-qty-controls button:focus-visible {
-    outline: none;
-  }
 }
 
 .cart-qty-controls button:disabled {
@@ -350,13 +327,6 @@
 
 .cart-checkout-btn:focus:not(:focus-visible) {
   outline: none;
-}
-
-@media (pointer: coarse) {
-  .cart-checkout-btn:focus,
-  .cart-checkout-btn:focus-visible {
-    outline: none;
-  }
 }
 
 .cart-continue-btn {

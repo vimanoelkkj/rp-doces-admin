@@ -554,8 +554,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.dash-result-negativo {
-  color: #b85c59 !important;
+.dash-result-grid .dash-result-negativo {
+  color: #b85c59;
 }
 
 /* ── Pending payments ── */

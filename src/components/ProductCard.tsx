@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import "./ProductCard.css";
 import type { Product } from "../types/product";
@@ -20,16 +20,21 @@ export default function ProductCard({
   onOpenDetails
 }: ProductCardProps) {
   const [justAdded, setJustAdded] = useState(false);
+  const justAddedRef = useRef(false);
   const shouldReduceMotion = useReducedMotion();
 
   const restante = remainingAvailability(product.disponibilidade, quantityInCart);
   const esgotado = restante <= 0;
 
   const handleAdd = () => {
-    if (justAdded || esgotado) return;
+    if (justAddedRef.current || justAdded || esgotado) return;
+    justAddedRef.current = true;
     onAddToCart?.();
     setJustAdded(true);
-    setTimeout(() => setJustAdded(false), 1200);
+    setTimeout(() => {
+      justAddedRef.current = false;
+      setJustAdded(false);
+    }, 1200);
   };
 
   return (
@@ -83,11 +88,11 @@ export default function ProductCard({
           <motion.button
             className={`add-button${justAdded ? " add-button--added" : ""}${esgotado ? " add-button--esgotado" : ""}`}
             aria-label={esgotado ? `${product.name} esgotado` : `Adicionar ${product.name}`}
-            onClick={e => {
-              e.currentTarget.blur();
+            onClick={() => {
               handleAdd();
             }}
-            disabled={esgotado || justAdded}
+            disabled={esgotado}
+            aria-disabled={esgotado || justAdded ? "true" : undefined}
             whileHover={shouldReduceMotion || esgotado || justAdded ? undefined : { scale: 1.12 }}
             whileTap={shouldReduceMotion || esgotado || justAdded ? undefined : { scale: 0.92 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}

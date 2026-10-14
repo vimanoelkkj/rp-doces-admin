@@ -163,8 +163,9 @@
   border-color: #634738;
 }
 
-.nadm-input--error {
-  border-color: #d32f2f !important;
+:root .nadm-field input.nadm-input--error[type],
+:root .nadm-field input.nadm-input--error[type]:focus {
+  border-color: #d32f2f;
 }
 
 .nadm-error-text {

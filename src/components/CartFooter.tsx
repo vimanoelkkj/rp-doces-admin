@@ -20,8 +20,7 @@ export default function CartFooter({ totalPrice, onCheckout, onClose }: CartFoot
       <button
         type="button"
         className="cart-checkout-btn"
-        onClick={e => {
-          e.currentTarget.blur();
+        onClick={() => {
           onCheckout();
         }}
       >
@@ -30,8 +29,7 @@ export default function CartFooter({ totalPrice, onCheckout, onClose }: CartFoot
       <button
         type="button"
         className="cart-continue-btn"
-        onClick={e => {
-          e.currentTarget.blur();
+        onClick={() => {
           onClose();
         }}
       >
