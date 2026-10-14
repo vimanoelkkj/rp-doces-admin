@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { DEFAULT_STORE_CONFIG, fetchStoreConfig, formatStoreWhatsapp } from "../api/storeConfig";
+import HomeHashLink from "./HomeHashLink";
 import "./Footer.css";
 
 interface FooterProps {
@@ -50,9 +51,9 @@ export default function Footer({ watermarkOnly = false }: FooterProps) {
 
         <div className="footer-col">
           <h4>Explorar</h4>
-          <a href="#cardapio">Cardápio</a>
-          <a href="#sobre">Nossa História</a>
-          <a href="#onde-estamos">Onde estamos</a>
+          <HomeHashLink hash="#cardapio">Cardápio</HomeHashLink>
+          <HomeHashLink hash="#sobre">Nossa História</HomeHashLink>
+          <HomeHashLink hash="#onde-estamos">Onde estamos</HomeHashLink>
         </div>
 
         <div className="footer-col">

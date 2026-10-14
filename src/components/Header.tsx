@@ -14,7 +14,8 @@ import {
   IconBell
 } from "./icons/AdminNavigationIcons";
 import { useDrawerDrag } from "./useDrawerDrag";
-import { useHomeHashScroll } from "./useHomeHashScroll";
+import { useHomeHashNavigate } from "./useHomeHashScroll";
+import HomeHashLink from "./HomeHashLink";
 import MobileMenuDrawer from "./MobileMenuDrawer";
 import "./Header.css";
 
@@ -69,10 +70,12 @@ export default function Header({ variant }: HeaderProps) {
 
   closeMenuRef.current = closeMenu;
 
-  const { handleStorefrontNav } = useHomeHashScroll({
-    menuOpen,
-    closeMenu
-  });
+  const goToHomeSection = useHomeHashNavigate();
+
+  const handleDrawerNavigate = (hash: string) => {
+    closeMenu();
+    goToHomeSection(hash);
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -195,34 +198,18 @@ export default function Header({ variant }: HeaderProps) {
           </nav>
         ) : (
           <nav className="main-nav" aria-label="Navegação principal">
-            <a
-              href={location.pathname === "/" ? "#cardapio" : "/#cardapio"}
-              className="nav-link"
-              onClick={e => handleStorefrontNav("#cardapio", e)}
-            >
+            <HomeHashLink hash="#cardapio" className="nav-link">
               Cardápio
-            </a>
-            <a
-              href={location.pathname === "/" ? "#sobre" : "/#sobre"}
-              className="nav-link"
-              onClick={e => handleStorefrontNav("#sobre", e)}
-            >
+            </HomeHashLink>
+            <HomeHashLink hash="#sobre" className="nav-link">
               Sobre
-            </a>
-            <a
-              href={location.pathname === "/" ? "#onde-estamos" : "/#onde-estamos"}
-              className="nav-link"
-              onClick={e => handleStorefrontNav("#onde-estamos", e)}
-            >
+            </HomeHashLink>
+            <HomeHashLink hash="#onde-estamos" className="nav-link">
               Onde estamos
-            </a>
-            <a
-              href={location.pathname === "/" ? "#contato" : "/#contato"}
-              className="nav-link"
-              onClick={e => handleStorefrontNav("#contato", e)}
-            >
+            </HomeHashLink>
+            <HomeHashLink hash="#contato" className="nav-link">
               Contato
-            </a>
+            </HomeHashLink>
           </nav>
         )}
 
@@ -340,7 +327,7 @@ export default function Header({ variant }: HeaderProps) {
             onPointerCancel={event => finishDrag(event, true)}
             onDragHandleClick={handleDragHandleClick}
             onClose={closeMenu}
-            onNavigate={handleStorefrontNav}
+            onNavigate={handleDrawerNavigate}
           />,
           document.body
         )}

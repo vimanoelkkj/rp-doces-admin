@@ -12,6 +12,7 @@ import HomeWave from "../components/HomeWave";
 import ProcessSection from "../components/ProcessSection";
 import TrustCards from "../components/TrustCards";
 import UltimoPedidoLink from "../components/UltimoPedidoLink";
+import { useHomeHashScroll } from "../components/useHomeHashScroll";
 import "./Homepage.css";
 
 export default function Homepage() {
@@ -24,6 +25,7 @@ export default function Homepage() {
   const galleryProducts = products.filter(product => product.image).slice(0, 5);
   const storyRef = useScrollReveal<HTMLElement>();
   const instaRef = useScrollReveal<HTMLElement>();
+  useHomeHashScroll(scrollContainerRef);
 
   const scrollToStory = useCallback(() => {
     const scroller = scrollContainerRef.current;
