@@ -1,825 +1,746 @@
-# R&P Doces — Manual de Engenharia e Documentação Técnica Oficial
+# R&P Doces — Documentação técnica oficial
 
-Versão preparada: **1.0.0**, ainda sem publicação formal. Notas em [CHANGELOG.md](CHANGELOG.md) e procedimento em
-[RELEASE-CHECKLIST.md](docs/RELEASE-CHECKLIST.md). A tag planejada é `v1.0.0`; o deployment é identificado pelo SHA.
+A R&P Doces reúne uma loja pública de confeitaria e um painel administrativo para catálogo,
+pedidos, comandas de balcão, pagamentos, estoque e despesas. O objetivo é permitir a compra por Pix
+sem cadastro de cliente e manter os fatos financeiros e a movimentação física rastreáveis na operação.
 
-> **Fonte Única de Verdade:** Este `README.md` é a documentação técnica oficial, definitiva e viva da plataforma R&P Doces (storefront de e-commerce e painel administrativo). Em caso de qualquer divergência pontual entre textos legados, anotações de conversas ou comentários em arquivos antigos, as implementações de código, os schemas e as migrations do `HEAD` atual prevalecem de forma autoritativa.
+**Base desta auditoria:** branch `main`, commit
+`ca36fec167160e828873543a7dfce96cc06a43e2`, consultado em `origin/main` em 26/10/2026.
+As descrições abaixo foram confrontadas com código, migrations, lockfile e workflows desse commit.
+O código e a configuração versionada prevalecem sobre textos anteriores. A auditoria local não
+comprova o estado dos recursos, secrets ou deployments remotos.
 
----
+O pacote declara versão **1.0.0**. Isso não comprova publicação de release ou criação de tag;
+consulte [CHANGELOG.md](CHANGELOG.md) e o [checklist de release](docs/RELEASE-CHECKLIST.md).
 
-## 1. Visão Geral e Objetivos do Projeto
+## 1. Funcionalidades e escopo
 
-A **R&P Doces** é uma confeitaria artesanal com operação híbrida: e-commerce público voltado para clientes finais e painel de retaguarda (PDV/ERP) voltado para operação interna no balcão e gestão do negócio.
+| Área                | Implementação existente                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loja pública        | Home institucional, cardápio por categoria, busca, detalhes de peso/ingredientes/alergênicos, destaques, novidades e promoções com vigência.            |
+| Sacola              | Persistência em `localStorage`, ajuste de quantidades ao reconciliar com o catálogo e acesso ao último pedido.                                          |
+| Checkout            | Nome, WhatsApp brasileiro e recado; preços calculados no servidor, reserva de produtos e Pix dinâmico Mercado Pago. O pedido usa retirada.              |
+| Acompanhamento      | QR Code, copia e cola, contagem regressiva e consultas periódicas; detalhe público por token aleatório, sem login de cliente.                           |
+| Administração       | Login, dashboard, produtos/categorias, comandas, despesas itemizadas, configurações da loja, equipe e notificações.                                     |
+| Comandas            | Criação manual, pagamentos múltiplos, cobrança/regeneração de Pix, adição, cancelamento e troca de itens, histórico, arquivamento e anulação auditável. |
+| Imagens de produtos | Upload autenticado para R2; leitura pública pela API, com validação do nome do objeto.                                                                  |
+| Notificações        | Central interna consultada periodicamente; Web Push de pedido pago com outbox D1, Queue e Worker de entrega/recuperação.                                |
+| Interface           | Header contextual, temas claro/escuro compartilhados, layout responsivo e PWA administrativa com fallback offline.                                      |
 
-### Objetivos Centrais da Plataforma
+Há funcionalidades parciais e dependências operacionais; veja [limitações](#13-limitações-e-pendências).
+Atualizações de pedidos e alertas usam polling, sem canal WebSocket/SSE implementado.
+Registrar cartão ou Pix externo no balcão é lançar um recebimento informado pelo operador:
+não há integração com adquirente de cartão, TEF ou terminal físico.
 
-1. **Atendimento Público Sem Atrito:** Catálogo em tempo real com controle rigoroso de disponibilidade física, sacola persistida no cliente, checkout Pix dinâmico e acompanhamento transparente do pedido sem necessidade de cadastro burocrático inicial.
-2. **Operação de Balcão e Comandas em Tempo Real:** Criação imediata de pedidos balcão com geração de cobrança Pix na maquininha/tela, pagamentos múltiplos (dinheiro, cartão, Pix externo), cancelamento com devolução atômica de itens e controle auditável de anulações.
-3. **Integridade Financeira e Contábil:** Eliminação de reconciliações manuais por meio de um ledger contábil em partidas dobradas, preservação imutável de fatos financeiros, idempotência estrita em todas as operações de escrita (`operationKey`) e concorrência resolvida via constraints no banco relacional.
-4. **Reserva Física Confiável (Anti-Overselling):** Estoque livre calculado dinamicamente, reserva em duas fases (local + prazo do gateway) e conversão em baixa física somente no momento da confirmação financeira.
-5. **Aparência e Identidade Visual Únicas:** Design editorial acolhedor para a confeitaria, com animações suaves de onda, máscaras de gradiente na rolagem, tema escuro nativo (_warm dark chocolate_) e componentes unificados entre a loja e o painel de administração.
+## 2. Stack e versões verificadas
 
----
+As versões exatas abaixo vêm de `package-lock.json` e coincidiram com `npm ls --depth=0`
+no ambiente da auditoria. Os intervalos em `package.json` podem ser mais amplos; use `npm ci`.
 
-## 2. Princípios de Engenharia e Regras de Ouro
+| Componente          | Versão resolvida      | Responsabilidade                                               |
+| ------------------- | --------------------- | -------------------------------------------------------------- |
+| React / React DOM   | 18.3.1 / 18.3.1       | SPA renderizada por `createRoot`                               |
+| React Router DOM    | 6.30.6                | `BrowserRouter`, rotas declarativas e carregamento sob demanda |
+| Motion              | 14.0.0                | Animações da interface                                         |
+| TypeScript          | 5.9.3                 | Tipos do frontend, Functions, regras compartilhadas e Worker   |
+| Vite / plugin React | 5.4.21 / 4.7.0        | Servidor de UI e build de `dist/`                              |
+| Workers Types       | 4.20260702.1          | Tipos de D1, R2, Queues e runtime Cloudflare                   |
+| Wrangler            | 3.114.17              | Desenvolvimento Pages, D1 e ferramentas de implantação         |
+| `@mmmike/web-push`  | 1.3.0                 | Transporte Web Push com VAPID                                  |
+| JSDOM               | 30.1.1                | Testes de componentes e comportamento DOM                      |
+| Playwright Test     | 1.63.0                | E2E com Chromium no CI                                         |
+| Biome / Prettier    | 2.5.15 / 3.9.9        | Lint e formatação                                              |
+| Miniflare / esbuild | 3.20250718.3 / 0.21.5 | Dependências transitivas utilizadas pela bancada de testes     |
 
-1. **O Figma/CSS Manda no Pixel, o Backend Manda nos Dados:**
-   - A interface do usuário obedece rigorosamente às diretrizes visuais e semânticas definidas nos arquivos CSS e no design system da confeitaria.
-   - Nenhuma tela cliente possui autoridade para inventar estados financeiros, forçar baixas de estoque ou decretar expiração de cobranças. O backend Cloudflare D1 é a autoridade máxima de domínio.
-2. **Modularização por Domínio e Fachadas Públicas Estritas:**
-   - A inteligência de negócio é segregada em subsistemas coesos (`functions/lib/ledger/`, `functions/lib/pix/`, `functions/lib/paymentSync/`, `functions/lib/adminPedidos/`).
-   - Cada subsistema expõe seu contrato exclusivamente através de uma **fachada pública** (`comandaLedger.ts`, `comandaPix.ts`, `paymentSync.ts`).
-   - Consumidores externos (rotas HTTP, testes, scripts) **nunca** importam arquivos internos de um subsistema diretamente, impedindo dependências circulares ocultas e blindando a arquitetura.
-3. **Fatos Financeiros Imutáveis no Ledger:**
-   - Pagamentos confirmados nunca são alterados para representar estornos; estornos são gravados como fatos adicionais em `pedido_reembolsos`.
-   - O saldo e a situação de um pedido são calculados como uma **projeção líquida** (`bruto - reembolsos`) diretamente em SQL transacional atômico.
-4. **Idempotência de Ponta a Ponta (A1):**
-   - Nenhuma escrita financeira ou mutação operacional de pedido é executada sem uma `operationKey` gerada pelo cliente antes do envio.
-   - Retries de rede, telas remontadas, quedas de conexão ou recarregamentos de página reaproveitam a mesma chave e retornam o mesmo resultado original, sem duplicar cobranças, pedidos ou baixas físicas.
-5. **Zero Migrations Destrutivas:**
-   - Migrations do banco relacional D1 são puramente aditivas e sequenciais (`migrations/NNNN_*.sql`, numeração contínua a partir de `0001`). Nunca se aplica `DROP TABLE` em entidades que sustentam histórico em produção.
+O frontend usa CSS próprio, variáveis semânticas, SVGs e ícones definidos no projeto.
+Não há Tailwind CSS, Lucide React ou biblioteca de componentes declarados nas dependências.
+O backend utiliza Cloudflare Pages Functions, D1 (SQLite), R2 e Queues, além de um Worker separado.
+O gateway integrado é a Payments API do Mercado Pago (`/v1/payments` e seus refunds).
 
----
+### Requisitos
 
-## 3. Stack Tecnológica Oficial
+- **Node.js 24, a partir de 24.15.0**, para acompanhar o CI e satisfazer o requisito do JSDOM
+  travado no lockfile. Node 18/20 não atende à stack de testes atual. O pacote raiz não define `engines`.
+- npm com suporte ao lockfile v3. A auditoria usou Node **24.22.1** e npm **11.19.1**;
+  o CI seleciona Node 24 e não fixa uma versão independente de npm.
+- Git; para operações remotas, conta Cloudflare e permissões dos recursos correspondentes.
+- No Windows, a suíte de staging também exige Git for Windows com Bash no layout esperado a partir
+  de `git --exec-path`. Uma distribuição reduzida de Git sem `bin/bash.exe` causa `ENOENT` nos
+  subcasos que executam o gate shell de staging; isso ocorreu no ambiente desta auditoria.
+- Chromium do Playwright para E2E, ou `CHROME_PATH` apontando para um Chrome instalado.
 
-A stack da plataforma foi estritamente verificada contra as dependências do código real:
+## 3. Arquitetura e pontos de entrada
 
-### Frontend
+```mermaid
+flowchart TD
+    UI[SPA React: loja e administração] --> API[Pages Functions /api]
+    API --> D1[(D1: domínio, sessões e outbox)]
+    API --> R2[(R2: imagens)]
+    API --> MP[Mercado Pago Payments API]
+    MP --> WH[Webhook assinado]
+    WH --> API
+    API --> Q[Queue PUSH_QUEUE]
+    Q --> W[Worker push.ts]
+    W --> D1
+    W --> PUSH[Serviços Web Push]
+    CRON[Cron a cada minuto] --> W
+```
 
-- **React 18:** Biblioteca base para a Single Page Application (`react@18.3.1`, `react-dom@18.3.1`).
-- **TypeScript 5:** Tipagem estática em toda a camada cliente (`typescript@5.5.3`).
-- **Vite 5:** Bundler de alta performance e servidor de desenvolvimento local (`vite@5.4.0`, `@vitejs/plugin-react@4.3.1`).
-- **React Router DOM v6:** Roteamento declarativo com suporte a rotas aninhadas e resoluções contextuais (`react-router-dom@6.26.0`).
-- **Motion (Framer Motion 13):** Animações fluidas de caminhos SVG para as ondas orgânicas da casca e transições de página (`motion@13.4.3`).
-- **CSS Nativo Modular:** Variáveis CSS semânticas (`:root`, `[data-theme="dark"]`, `[data-admin-theme="dark"]`), grid e flexbox modernos. **Não** utiliza TailwindCSS, Bootstrap ou bibliotecas de componentes externas como Material UI/Chakra.
-- **PWA (Progressive Web App):** Service Worker dedicado para o painel admin (`public/sw-admin.js`, `public/admin-manifest.webmanifest`, `public/admin-offline.html`).
+`index.html` e `src/main.tsx` iniciam a SPA; `src/App.tsx` monta os providers e as árvores de rotas.
+Não há SSR. As rotas administrativas são carregadas sob demanda, fora do `PageTransition` público.
+`public/_redirects` fornece o fallback de navegação da SPA no Pages.
 
-### Backend (Serverless Edge)
+`functions/_middleware.ts` cria contexto de requisição, logs correlacionados e `X-Request-Id`.
+`functions/api/admin/_middleware.ts` aplica `Cache-Control: no-store`; **a autenticação é feita nos
+handlers por `requireUser`**, e as mutações verificam origem. Não existe
+`functions/api/_middleware.ts` fazendo autenticação global.
 
-- **Cloudflare Pages Functions:** Endpoints HTTP serverless executados no edge global da Cloudflare (`functions/api/**`).
-- **TypeScript nativo no backend:** Tipagem de contextos e bindings via `@cloudflare/workers-types@4.20260702.1`.
-- **Cloudflare D1 (SQLite Engine):** Banco de dados relacional distribuído, com suporte a transações atômicas com `db.batch()` e constraints nativas de integridade.
-- **Cloudflare R2 Storage:** Armazenamento de objetos S3-compatível para fotos de produtos enviadas pelo lojista, servidas através de streaming autenticado em `functions/api/images/[key].ts`.
-- **Wrangler 3:** CLI oficial da Cloudflare para execução de migrações, bindings locais e simulação de ambiente; versão resolvida no `package-lock.json`.
+Os handlers delegam regras a `functions/lib/`. D1 guarda fatos e projeções; o navegador não determina
+preços, aprovação financeira, expiração autoritativa ou baixa de estoque. `db.batch()` delimita
+transações locais. Chamadas a Mercado Pago, R2 e Queue ficam fora da transação D1 e exigem
+idempotência, compensação ou recuperação, conforme o fluxo.
 
-### Gateway de Pagamento
-
-- **Mercado Pago Payments API:** Utiliza exclusivamente o endpoint de pagamentos diretos (`/v1/payments`) com Pix dinâmico, verificação criptográfica de Webhooks via HMAC-SHA256 e polling síncrono. Deliberadamente **não** utiliza a Orders API legada.
-
-### Notificações
-
-- **Web Push Protocol:** Notificações push push-to-device usando chaves VAPID geradas e criptografia AES-GCM via `@mmmike/web-push@1.3.0`.
-
-### Infraestrutura de Testes
-
-- **Node.js Native Test Runner:** Execução direta com `node --test` através de scripts orquestradores em JavaScript ES Modules (`scripts/run-tests.mjs`).
-- **JSDOM:** Simulação de árvore DOM para componentes React com listeners e portais; versão resolvida no `package-lock.json`.
-- **Miniflare & esbuild:** Subida de D1 e bindings locais descartáveis em memória durante testes de concorrência e idempotência.
-
----
-
-## 4. Arquitetura Geral do Sistema
-
-O sistema é construído como uma aplicação unificada que compartilha infraestrutura, tipos de domínio e componentes visuais entre o storefront público e a retaguarda administrativa:
+### Estrutura de diretórios
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                        R&P DOCES ECOSYSTEM                             │
-├───────────────────────────────────┬────────────────────────────────────┤
-│         STOREFRONT (Público)      │         ADMIN DASHBOARD (Privado)  │
-│  - Home, Cardápio, Sacola         │  - Painel de Gestão & Indicadores  │
-│  - Checkout Pix & Polling         │  - Comandas Balcão, Pix Maquininha │
-│  - Acompanhamento de Pedido       │  - Gestão de Catálogo, Despesas    │
-├───────────────────────────────────┴────────────────────────────────────┤
-│                       UNIFIED APPLICATION SHELL                        │
-│  - Header Único com Navegação Contextual (`Header.tsx`)                │
-│  - StorefrontFrame com Onda Orgânica SVG e Fade via `mask-image`       │
-│  - StoreThemeContext (Sincronização `data-theme` / `data-admin-theme`) │
-├────────────────────────────────────────────────────────────────────────┤
-│                   CLOUDFLARE PAGES FUNCTIONS (API)                     │
-│  - Storefront API: /api/checkout, /api/produtos, /api/pedido, etc.     │
-│  - Admin API: /api/admin/pedidos, /api/admin/produtos, etc.            │
-│  - Gateway Webhooks: /api/webhooks/mercadopago (HMAC SHA-256)          │
-├────────────────────────────────────────────────────────────────────────┤
-│                     CORE DOMAIN SUBSYSTEMS (lib/)                      │
-│  - ledger/ (Razão contábil, waterfall, projeção líquida)               │
-│  - pix/ (Cobrança Pix admin, regeneração, substituições)               │
-│  - paymentSync/ (Convergência com PSP, sweeps, resgate incerto B3)     │
-│  - adminPedidos/ (Comandas balcão, validações, concorrência A1)        │
-│  - stock.ts (Reservas físicas, conversão em baixa, devoluções)         │
-├────────────────────────────────────────────────────────────────────────┤
-│                           STORAGE & STORAGE                            │
-│  - Cloudflare D1 (SQLite, migrations aditivas sequenciais)             │
-│  - Cloudflare R2 (Buckets de Imagens de Alta Resolução)                │
-└────────────────────────────────────────────────────────────────────────┘
+rp-doces-admin/
+├── src/
+│   ├── main.tsx, App.tsx, global.css
+│   ├── api/                  # Mapeamento de catálogo e configuração HTTP
+│   ├── pages/                # Loja e telas de checkout/acompanhamento
+│   ├── components/           # Header, frame, ondas, sacola e componentes visuais
+│   ├── context/              # CartContext e StoreThemeContext
+│   ├── hooks/, lib/, types/  # Polling, operação do checkout e contratos da UI
+│   └── admin/
+│       ├── auth/, theme/, components/, pwa/, notificacoes/
+│       ├── Dashboard/, Produtos/, Pedidos/
+│       └── Despesas/, Loja/, Administradores/, Login/
+├── functions/
+│   ├── _middleware.ts        # Correlação de requisições
+│   ├── api/                  # Rotas públicas, auth, webhook e admin
+│   ├── lib/                  # Domínio, persistência, segurança e integrações
+│   └── types/                # Declarações auxiliares do runtime
+├── shared/                   # Promoção, WhatsApp, detalhes, despesas e anulação
+├── workers/                  # push.ts e bootstrap inerte
+├── migrations/               # 0001 a 0037, em ordem
+├── seed/products.sql         # Catálogo local; não cria administrador
+├── public/                   # Assets, headers, redirects, manifesto e sw-admin.js
+├── tests/                    # *.test.mjs, helpers, fixtures e e2e/
+├── scripts/                  # Runners, migrations, staging, backup e smoke
+├── docs/                     # Runbooks e documentação complementar
+├── .github/workflows/        # CI/deploy Pages e auditoria de dependências
+├── wrangler.toml             # Pages de produção: DB, PRODUCT_IMAGES, PUSH_QUEUE
+├── wrangler.staging.toml     # Pages de staging isolado
+├── wrangler.push*.toml       # Worker ativo/bootstrap, produção e staging
+├── package.json, package-lock.json
+└── vite.config.ts, tsconfig*.json, playwright.config.ts, biome.json
 ```
 
----
-
-## 5. Estrutura de Diretórios e Mapa de Entrypoints
-
-```text
-rp-doces/
-├── public/                       # Arquivos estáticos servidos diretamente
-│   ├── _headers                  # Configurações de segurança e cache HTTP
-│   ├── _redirects                # Regras de SPA fallback para o Cloudflare Pages
-│   ├── favicon.svg               # Identidade visual da confeitaria
-│   ├── admin-manifest.webmanifest# Manifesto PWA do painel administrativo
-│   ├── admin-offline.html        # Página de fallback offline do Service Worker
-│   ├── sw-admin.js               # Service worker do painel admin
-│   ├── icons/                    # Ícones de aplicação (Apple Touch, PWA badges)
-│   └── images/                   # Fotografias em formato WebP otimizado
-│
-├── src/                          # Código-fonte da aplicação React
-│   ├── main.tsx                  # Ponto de entrada do bootstrap da UI
-│   ├── App.tsx                   # Roteamento central e divisão Storefront/Admin
-│   ├── global.css                # Tokens de design, fontes e estilos globais
-│   │
-│   ├── components/               # Componentes compartilhados
-│   │   ├── Header.tsx            # Header global unificado
-│   │   ├── Header.css            # Estilos do Header e do Drawer Mobile
-│   │   ├── StorefrontFrame.tsx   # Casca unificada com onda animada e mask-image
-│   │   ├── StorefrontFrame.css   # Regras de layout, scroll container e gradiente
-│   │   └── PageTransition.tsx    # Transições de rota animadas
-│   │
-│   ├── context/                  # Contextos globais do React
-│   │   ├── StoreThemeContext.tsx # Sincronizador autoritativo de temas claro/escuro
-│   │   └── CartContext.tsx       # Gerenciador da sacola com persistência local
-│   │
-│   ├── pages/                    # Páginas públicas do Storefront
-│   │   ├── Homepage.tsx          # Página inicial institucional
-│   │   ├── Cardapio.tsx          # Vitrine de produtos com filtros e busca
-│   │   ├── Checkout.tsx          # Revisão de itens e submissão do pedido
-│   │   ├── AguardandoPagamento.tsx# Tela de QR Code Pix e polling dinâmico
-│   │   ├── PedidoConfirmado.tsx  # Tela de sucesso com timeline de preparo
-│   │   ├── PagamentoNaoAprovado.tsx# Tela de recusa ou expiração de pagamento
-│   │   ├── AcompanharPedido.tsx  # Consulta pública de status via token
-│   │   ├── PreparandoPedido.tsx  # Tela cheia de carregamento e montagem
-│   │   ├── GerandoPagamento.tsx  # Tela cheia de comunicação inicial com gateway
-│   │   └── ProcessandoPagamento.tsx# Tela cheia de transição pós-pagamento
-│   │
-│   └── admin/                    # Módulo do Painel Administrativo
-│       ├── components/           # Componentes e casca administrativa
-│       │   ├── AdminLayout.tsx   # Casca do admin com StorefrontFrame e auth
-│       │   ├── AdminWave.tsx     # Onda estática para a tela de login
-│       │   ├── AdminSidebar.css  # Regras legadas e estilos estruturais
-│       │   ├── PortalDropdown.tsx# Dropdown flutuante portado fora de modais
-│       │   └── useAdminModal.ts  # Hook com scroll lock e detecção de backdrop
-│       ├── auth/                 # Contexto de autenticação administrativa
-│       ├── theme/                # AdminThemeContext (pass-through para StoreTheme)
-│       ├── notificacoes/         # Central de notificações internas e unread badge
-│       ├── pwa/                  # Registrador do Service Worker PWA
-│       ├── Dashboard/            # Indicadores operacionais, KPIs e caixa do dia
-│       ├── Produtos/             # Catálogo, upload R2 e modal de criação/edição
-│       ├── Pedidos/              # Listagem de comandas e orquestrador PedidoDetalhe
-│       ├── Despesas/             # Livro de saídas e gestão de custos
-│       ├── Loja/                 # Configurações de horário, taxa e WhatsApp
-│       └── Administradores/      # Gestão de credenciais da equipe
-│
-├── functions/                    # Cloudflare Pages Functions (Edge Backend)
-│   ├── api/                      # Endpoints HTTP da API
-│   │   ├── _middleware.ts        # Interceptor de segurança das rotas /api/admin/*
-│   │   ├── checkout.ts           # Criação pública de pedido e reserva de estoque
-│   │   ├── produtos.ts           # Catálogo público enriquecido com estoque livre
-│   │   ├── pedido.ts             # Consulta pública de pedido por token
-│   │   ├── pedido-status.ts      # Polling leve para clientes aguardando Pix
-│   │   ├── webhooks/             # Receptor de eventos do Mercado Pago
-│   │   └── admin/                # Endpoints de retaguarda protegidos por sessão
-│   │
-│   └── lib/                      # Lógica de negócio e subsistemas de domínio
-│       ├── comandaLedger.ts      # Fachada pública do subsistema contábil
-│       ├── ledger/               # Módulos internos do motor contábil
-│       ├── comandaPix.ts         # Fachada pública do subsistema Pix admin
-│       ├── pix/                  # Módulos internos de geração/regeneração Pix
-│       ├── paymentSync.ts        # Fachada pública da sincronização com PSP
-│       ├── paymentSync/          # Módulos internos de webhooks, sweeps e resgate
-│       ├── adminPedidos/         # Módulos internos da orquestração de comandas
-│       ├── stock.ts              # Regras físicas de estoque e reservas
-│       ├── pedidoReconcile.ts    # Ponte entre fatos financeiros e baixa física
-│       ├── pushNotifier.ts       # Claims, envio e retry de eventos Web Push
-│       └── pushTransport.ts      # Transporte Web Push VAPID
-│
-├── migrations/                   # Migrations sequenciais do Cloudflare D1
-│   ├── 0001_products.sql         # Criação de produtos e constraint de reserva
-│   └── ... (0002 em diante)      # Evolução aditiva do schema
-│
-├── seed/                         # Dados de inicialização para testes locais
-│   └── products.sql              # Catálogo semente de desenvolvimento
-│
-├── scripts/                      # Utilitários de execução e orquestração
-│   ├── run-tests.mjs             # Test runner que executa testes sequencialmente
-│   └── run-tests-cached.mjs      # Test runner com hash de cache de dependências
-│
-└── tests/                        # Bateria de testes automatizados com node:test
-    ├── helpers/                  # Subida de D1 simulado e fixtures Miniflare
-    └── *.test.mjs                # Testes de domínio e UI descobertos pelo runner
-```
-
----
-
-## 6. Storefront (E-commerce Público)
-
-O storefront da R&P Doces foi projetado para oferecer uma experiência de compra leve, bonita e direta:
-
-- **Homepage (`/`):** Apresentação visual da confeitaria com seção hero, história, diferenciais, destaques do cardápio, depoimentos e rodapé institucional.
-- **Cardápio (`/cardapio`):** Listagem de produtos filtrável por categorias com busca em tempo real. Itens com estoque esgotado são exibidos com selo explicativo e botão de compra desabilitado. O catálogo só consome e exibe a quantidade **disponível para venda** (`estoque - estoque_reservado`).
-- **Carrinho e Sacola:** Gerenciados pelo `CartContext` com persistência automática em `localStorage`. Mudanças dinâmicas de catálogo ajustam automaticamente quantidades excedentes no carrinho para impedir que o cliente tente finalizar itens que acabaram de esgotar.
-- **Checkout (`/checkout`):** Validação de itens, dados do comprador (nome, WhatsApp, recado para embalagem), cálculo de taxa de entrega e envio com emissão de `operationKey` única.
-- **Acompanhamento (`/pedido/:token`):** Acesso aberto via `token_publico` aleatório único gerado no momento do pedido. Mostra o status em tempo real (`NOVO`, `PREPARANDO`, `PRONTO`, `ENTREGUE`), lista de itens e situação financeira, sem exigir autenticação.
-
----
-
-## 7. Header Global e Shell Unificado da Aplicação
-
-Anteriormente, o sistema contava com headers divergentes entre a loja e o painel de administração. O repositório foi padronizado em torno de uma **fonte única de verdade**:
-
-### Componente `Header.tsx`
-
-- **Componente Único:** Atende **100% das páginas** do projeto que possuem cabeçalho.
-- **Detecção Contextual:** A prop `variant="storefront" | "admin"` define o conjunto de navegação. Caso omitida, o Header inspeciona automaticamente `location.pathname` (rotas que começam com `/admin` ativam a variante administrativa).
-- **Navegação do Storefront:** Links de navegação para âncoras da página inicial (`#cardapio`, `#sobre`, `#onde-estamos`, `#contato`) com rolagem suave inter-rotas (se clicado a partir de outra página, navega para a Home antes de rolar suavemente). Exibe também a contagem da sacola e o seletor de tema.
-- **Navegação do Admin:** Links operacionais (_Dashboard_, _Produtos_, _Pedidos_, _Despesas_, _Loja_, _Administradores_, _Notificações_ com badge de não lidas sincronizado), avatar do operador logado e ação de logout imediata.
-
-### Casca Unificada `StorefrontFrame.tsx`
-
-- **Onda Orgânica com Framer Motion:** Desenhos vetoriais dinâmicos (`wave-primary` e `wave-secondary`) posicionados fixamente no topo a `z-index: 4`. Respeita a preferência do usuário por redução de movimento (`prefers-reduced-motion`).
-- **Degradê de Máscara (`mask-image`):** O container de rolagem (`.storefront-frame__scroll`) utiliza `-webkit-mask-image` e `mask-image` com gradiente linear suave para fazer o conteúdo surgir e desaparecer gradualmente logo abaixo da onda.
-- **Compartilhamento Integral:** Tanto a vitrine pública quanto o painel administrativo (`AdminLayout.tsx`) utilizam o `<StorefrontFrame>` com o mesmo efeito de onda e fade, garantindo elegância e coesão visual em toda a plataforma.
-
-### Exceções Sem Header (Telas Cheias)
-
-As seguintes páginas são telas de transição pura ou isolamento operacional e não recebem o cabeçalho:
-
-- Telas de loading do checkout: `PreparandoPedido`, `GerandoPagamento`, `ProcessandoPagamento`.
-- Tela de acesso: `AdminLogin` (possui sua própria onda de fundo via `AdminWave.tsx`).
-
----
-
-## 8. Responsividade e Experiência Mobile
-
-A plataforma adota design responsivo rigoroso sem quebra de leiautes em dispositivos compactos:
-
-- **Drawer Mobile com Handle em Onda:** O menu lateral mobile do Header utiliza **CSS puro com transições e `pointer-events`**, eliminando travamentos de animações complexas. A barra reta genérica foi substituída pelo SVG ondulado rosa da confeitaria dentro do botão `.mobile-menu-close`, atuando como a própria alça acessível de arraste (_drag-to-close_).
-- **Clearance Inferior Estrutural do Admin Mobile (`--admin-mobile-nav-space`):** O layout administrativo reserva `88px` de padding inferior no container principal (`.admin-main`) para acomodar com folga a barra de navegação móvel fixa (`AdminMobileNav`). Regras genéricas de estilo entre telas foram isoladas para garantir que o último card ou formulário (ex.: `/admin/produtos`, `/admin/pedidos`) possa ser completamente rolado acima da barra.
-- **Navegação em Telas Médias:** O ponto de quebra para recolhimento da barra administrativa é estabelecido em `960px`, impedindo o estouro dos múltiplos botões do painel em tablets ou janelas compactas.
-- **Visualização de Comandas:** Em telas abaixo de `600px`, as tabelas de pedidos do Dashboard e da página de Pedidos deixam de exigir rolagem horizontal; cada linha se reconfigura automaticamente em um cartão vertical empilhado (_card grid_), com ações acessíveis ao toque.
-- **Safe Area Insets:** Margens inferiores consideram `env(safe-area-inset-bottom)` em aparelhos modernos (iOS/Android).
-
----
-
-## 9. Sistema de Temas, Dark Mode e View Transitions API
-
-A aplicação oferece alternância instantânea entre modo claro e escuro:
-
-- **Sincronização Bidirecional Contínua:** O contexto único [StoreThemeContext.tsx](src/context/StoreThemeContext.tsx) gerencia o estado e sincroniza simultaneamente:
-  - O atributo `data-theme` em `document.documentElement`.
-  - O atributo `data-admin-theme` em `document.documentElement`.
-  - As chaves `store-theme` e `admin-theme` em `localStorage`.
-- **Pass-through Transparente:** O `AdminThemeContext.tsx` atua como uma fachada transparente que delega chamadas diretamente ao `StoreThemeContext`. Alterar o tema no admin altera a loja, e vice-versa.
-- **Sincronização Dinâmica da Status Bar (PWA / Mobile):**
-  - O `<meta name="theme-color">` é atualizado em tempo real para sincronizar a barra de status do navegador móvel com a cor exata do header: `#eddcc6` (modo claro) e `#271f1b` (modo escuro).
-  - Um script inline no `<head>` do `index.html` aplica o tema antes do primeiro paint, prevenindo flash de tela branca (FOUC).
-  - Um `MutationObserver` no `StoreThemeContext` monitora mutações em `data-theme`/`data-admin-theme`, garantindo consistência mesmo em transições de rotas ou limpezas de PWA.
-- **View Transitions API Diferenciada por Dispositivo:**
-  - **Desktop / Telas Maiores:** Revelação circular radial (`clip-path: circle(...)`) a partir da posição exata do botão clicado com 480ms de duração e curva `cubic-bezier(0.4, 0, 0.2, 1)`.
-  - **Mobile ($\le 768\text{px}$):** Otimizado especificamente para alta taxa de atualização (telas 90Hz/120Hz). Utiliza crossfade acelerado por GPU com `opacity: [0, 1]` em 260ms e curva `cubic-bezier(0.2, 0.8, 0.2, 1)`. O `clip-path` pesado foi desativado no mobile para eliminar quedas de frames.
-  - **Zero Ghosting e Alinhamento 1:1:** O snapshot mobile opera sem transformação de escala (`scale`), garantindo alinhamento pixel-a-pixel perfeito entre o tema anterior e o novo, sem halos esbranquiçados, bordas duplas em cards ou piscadas nos cantos da tela.
-  - **Bypass de Acessibilidade:** Suporte integral a `prefers-reduced-motion: reduce`, aplicando a troca de tema instantânea sem animações.
-- **Paleta de Cores do Tema Escuro:**
-  - Fundo principal: `#161210` e `#1a1412` (castanho chocolate nobre, evitando o preto puro `#000000`).
-  - Ondas: `var(--store-wave-primary)` ajustada para `#271f1b` e secundária para `#3b2c26`.
-  - Textos: `#faf4ee` (títulos) e `#f4e9df` (corpo) para legibilidade sem fadiga visual.
-  - Acentos: `#d38b80` (rosa confeitaria suave) e variações de foco `#e09a8e`.
-
----
-
-## 10. Catálogo, Carrinho e Sacola
-
-- **Catálogo Dinâmico:** Consome `GET /api/produtos`. Retorna produtos com preços em centavos, categoria identificada por slug e nome, fotos do bucket R2 ou seed estático, além da quantidade disponível calculada no servidor.
-- **Regras de Vigência Promocional (`shared/promocao.ts`):** O preço promocional possui 5 estados automáticos:
-  - `SEM_PROMOCAO`: Preço normal.
-  - `DESLIGADA`: Promoção inativa.
-  - `AGENDADA_FUTURA`: Início programado em instante ISO UTC futuro.
-  - `VIGENTE`: Ativa e dentro do período (ou sem agendamento obrigatório).
-  - `EXPIRADA`: Período encerrado.
-    _A expiração é decorrente do próprio dado no instante da leitura — dispensando rotinas de cron para ligar ou desligar promoções._
-- **Reconciliação da Sacola:** Quando um item tem seu estoque reduzido ou esgotado por compras de terceiros, a função `reconcileCartWithCatalog` diminui a quantidade no carrinho para o limite disponível ou remove o item zerado, exibindo um alerta amigável ao cliente.
-
----
-
-## 11. Checkout e Fluxo de Pagamento Pix
-
-O checkout é a porta de entrada para a compra pública:
-
-1. **Submissão do Formulário:** Ao clicar em "Finalizar Pedido", `Checkout.tsx` gera uma `operationKey` única (UUID v4) associada a essa intenção de compra.
-2. **Envio para `POST /api/checkout`:** O backend valida estoque livre, preços vigentes de cada item e integridade do payload no mesmo batch atômico.
-3. **Reserva Imediata:** O estoque reservado é incrementado atomicamente antes do contato com o provedor externo.
-4. **Chamada ao Mercado Pago Payments API:** Um pagamento Pix com expiração inicial é criado no gateway.
-5. **Gravação do Pedido e Ledger:** O pedido nasce como `PENDENTE`, acompanhado de sua linha correspondente em `pedido_pagamentos`.
-6. **Acompanhamento no Frontend:** O cliente é redirecionado para `AguardandoPagamento.tsx`, onde visualiza o QR Code Pix e a chave Copia e Cola, com contador regressivo e polling automático para detecção instantânea do pagamento.
-
----
-
-## 12. Acompanhamento de Pedido e Telas de Processamento
-
-- **Acompanhamento Dinâmico (`/pedido/:token`):** Página pública que exibe a timeline de evolução do pedido:
-  - `NOVO`: Pedido recebido e aguardando confirmação.
-  - `PREPARANDO`: Na bancada de produção da confeitaria.
-  - `PRONTO`: Pronto para retirada no balcão ou despacho.
-  - `ENTREGUE`: Pedido finalizado com sucesso.
-  - `CANCELADO`: Cancelado pelo lojista ou cliente.
-- **Telas de Processamento Estético:** Transições animadas dedicadas (`PreparandoPedido`, `GerandoPagamento`, `ProcessandoPagamento`) com tempos mínimos garantidos para fornecer retorno visual suave e encantador sem saltos abruptos de tela.
-
----
-
-## 13. Painel Administrativo (Admin)
-
-Área de retaguarda autenticada com recursos de gestão completa:
-
-- **Autenticação de Equipe:** Sessões persistidas via cookies `HttpOnly` com token criptográfico de alta entropia. Interceptor `_middleware.ts` valida as credenciais em todas as rotas `/api/admin/*`.
-- **Dashboard (`/admin`):** Indicadores em tempo real: faturamento do dia, total recebido, contas a receber (comandas abertas), pedidos aguardando preparo e ranking dos doces mais vendidos no período selecionado.
-- **Gestão de Produtos (`/admin/produtos`):** Catálogo administrativo com filtros, reordenação, badges de estoque, ativação/desativação de itens, controle de promoções e envio de fotos para o Cloudflare R2.
-- **Gestão de Comandas (`/admin/pedidos`):** Central de pedidos com abas por status operacionais, busca instantânea por cliente ou código, criação de pedidos de balcão e gaveta de detalhes completos.
-- **Gestão de Despesas (`/admin/despesas`):** Lançamento de custos operacionais (ingredientes, embalagens, utilidades) com controle de status e cálculo de lucro líquido real.
-- **Configurações da Loja (`/admin/loja`):** Edição de horário de funcionamento, taxa de entrega padrão e chave Pix da loja.
-- **Gestão de Administradores (`/admin/administradores`):** Criação e revogação de acessos para atendentes e mestres da confeitaria.
-
----
-
-## 14. Gestão de Produtos e Categorias
-
-- **Catálogo Relacional:** Tabela `produtos` associada à tabela `categorias` via chave estrangeira.
-- **Upload e Otimização para Cloudflare R2:** Ao anexar uma imagem no modal de produto (`NovoProdutoModal.tsx`), o arquivo é enviado para `POST /api/admin/produtos/:id/imagem`, validado contra tipos MIME permitidos (`image/jpeg`, `image/png`, `image/webp`), armazenado no bucket R2 com chave única `product-{id}-{uuid}.webp` e servido sob demanda em `/api/images/:key`.
-- **Proteção do Estoque Reservado:** Na edição de um produto, o lojista visualiza tanto o estoque total quanto o desdobramento entre **reservado** e **livre**, recebendo avisos visuais caso tente definir o estoque abaixo do volume já reservado para pedidos em andamento.
-
----
-
-## 15. Motor de Estoque e Reserva Atômica
-
-O controle de estoque da R&P Doces impede o problema de _overselling_ (vender itens além da capacidade física real) através de garantias relacionais:
-
-### Fórmula de Disponibilidade
-
-$$\text{Estoque Disponível (Livre)} = \max(0, \text{estoque} - \text{estoque\_reservado})$$
-
-### Ciclo de Vida da Reserva
-
-1. **Reserva na Criação (Ativa):**
-   - No checkout público ou no pedido balcão, a reserva nasce com `reserva_status = 'ATIVA'`.
-   - O banco impõe a constraint SQLite: `CHECK (estoque_reservado >= 0 AND estoque_reservado <= estoque)`. Se duas compras simultâneas disputarem a última unidade de um bolo, uma das transações é abortada pelo banco relacional, garantindo integridade absoluta sem travamentos manuais lentos.
-2. **Conversão em Baixa Física (PAGO):**
-   - Assim que o pagamento integral é confirmado (no ledger), a rotina `baixarEstoquePedido` decrementa o `estoque` físico e reduz o `estoque_reservado` no mesmo batch, marcando `estoque_baixado_em = datetime('now')` e atualizando os itens para o estado `BAIXADO`.
-3. **Liberação por Cancelamento ou Expiração (LIBERADA):**
-   - Se o Pix expira ou o pedido é cancelado sem pagamento, `liberarReservaPedido` devolve o saldo de `estoque_reservado` ao estoque livre e marca a reserva como `LIBERADA`.
-4. **Política de Reserva de Balcão (MANUAL):**
-   - Pedidos manuais de balcão nascem com reserva `ATIVA` sem prazo de validade (`reserva_expira_em = NULL`). O doce prometido ao cliente na loja física nunca é liberado sozinho por tempo; sua liberação exige cancelamento explícito do operador ou baixa por pagamento.
-
----
-
-## 16. Ledger Financeiro e Razão Contábil
-
-A plataforma utiliza um modelo contábil de partidas financeiras para eliminar qualquer ambiguidade sobre valores:
-
-```text
-┌────────────────────────────────────────────────────────┐
-│                        PEDIDO                          │
-│  - Total do Pedido: R$ 50,00                           │
-│  - Projeção de Status: PENDENTE | PARCIAL | PAGO       │
-└──────────────────────────┬─────────────────────────────┘
-                           │ 1:N
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│                   PEDIDO_PAGAMENTOS                    │
-│  - Pagamento 1: R$ 50,00 (PIX_MP, PAGO)                │
-└──────────────────────────┬─────────────────────────────┘
-                           │ 1:N
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│              PEDIDO_PAGAMENTO_ALOCACOES                │
-│  - Item 1 (Bolo): R$ 30,00                             │
-│  - Item 2 (Doce): R$ 20,00                             │
-└────────────────────────────────────────────────────────┘
-```
-
-### Principais Entidades
-
-- **`pedido_pagamentos`:** Registra cada tentativa individual de pagamento (Pix Mercado Pago, Dinheiro, Cartão, Pix Externo).
-- **`pedido_pagamento_alocacoes`:** Distribui o valor recebido especificamente entre os itens do pedido via algoritmo waterfall (cascata).
-- **`pedido_reembolsos`:** Registra fatos independentes de estorno, apontando para o pagamento de origem.
-
-### Status Financeiro Agregado (Projeção Pura)
-
-O status financeiro do pedido **nunca** é gravado manualmente como uma verdade isolada; ele é derivado via query SQL com base no valor líquido confirmado:
-
-- $\text{Líquido Confirmado} \le 0 \implies \mathbf{PENDENTE}$
-- $0 < \text{Líquido Confirmado} < \text{Total do Pedido} \implies \mathbf{PARCIAL}$
-- $\text{Líquido Confirmado} \ge \text{Total do Pedido} \implies \mathbf{PAGO}$
-
----
-
-## 17. Pagamentos, Gateway Mercado Pago e Pix
-
-A integração com o Mercado Pago segue a **Payments API** oficial com resiliência de nível bancário:
-
-- **Chave de Idempotência Externa (`X-Idempotency-Key`):** Cada chamada ao Mercado Pago recebe uma chave derivada de forma determinística da `operationKey` da tentativa (`a1:<key>:mp`). Quedas de conexão no envio do POST recuperam a transação já criada no PSP sem gerar duas cobranças.
-- **Consulta Autoritativa (Protocolo B2):** Uma cobrança expirada localmente **só pode virar PAGO** se o backend obtiver uma resposta `approved` comprovada via chamada GET direta e verificada contra a API do Mercado Pago (`fetchMpPayment`). Webhooks isolados ou relógios descalibrados não possuem autoridade para aprovar transações expiradas.
-- **Tratamento de Respostas Ambíguas:** Falhas de rede, timeouts HTTP (408/429/5xx) durante o envio do Pix nunca inventam status `FALHOU`. A operação permanece em `ENVIO_INCONCLUSIVO`, preservando a reserva e aguardando confirmação do webhook ou do motor de recuperação.
-
----
-
-## 18. Pagamentos Manuais no Balcão
-
-Para o atendimento presencial na loja física, o operador pode registrar pagamentos em dinheiro, cartão ou Pix recebido em chave externa:
-
-- **Lançamento Atômico:** Registrado via `POST /api/admin/pedidos/:id/pagamentos`.
-- **Alocação por Cascata (Waterfall):** O montante recebido consome primeiramente os itens ainda descobertos, preservando a rastreabilidade contábil.
-- **Substituição de Cobranças Provisórias:** O registro de um pagamento manual em dinheiro ou cartão cancela automaticamente cobranças provisórias locais não-fiscais (`substitui_pagamento_id`), mantendo a comanda limpa e organizada.
-
----
-
-## 19. Reembolsos e Estornos
-
-- **Natureza Aditiva:** Estornos não apagam nem sobrescrevem linhas da tabela `pedido_pagamentos`. O estorno cria uma linha correspondente em `pedido_reembolsos`.
-- **Cálculo Líquido:** O teto máximo reembolsável de qualquer pagamento é rigorosamente calculado como:
-  $$\text{Reembolsável} = \text{Valor Bruto Pago} - \sum \text{Reembolsos Confirmados Anteriores}$$
-- **Estorno Manual de Pix (`PIX_MP`):** Caso o cliente pague via Pix e o operador realize a devolução bancária diretamente pela conta da empresa, o lojista registra o estorno manual no painel, reduzindo o líquido do pedido para permitir o cancelamento legal.
-
----
-
-## 20. Ciclo de Vida do Pedido: Cancelamento, Arquivamento e Anulação Auditável
-
-O sistema distingue claramente quatro ações que outrora eram confundidas:
-
-```text
-┌───────────────────────┬─────────────────────────────────────────────────────────────────┐
-│ Ação                  │ Comportamento e Efeito no Sistema                               │
-├───────────────────────┼─────────────────────────────────────────────────────────────────┤
-│ Cancelamento          │ Cancela comanda com saldo zerado. Libera reservas ativas.        │
-│ Arquivamento          │ Oculta pedidos concluídos/cancelados da visualização principal. │
-│ Reembolso             │ Devolve valores financeiros sem alterar itens ou repor estoque. │
-│ Anulação Auditável    │ Invalida o pedido por erro grave com escolha auditável de estoque.│
-└───────────────────────┴─────────────────────────────────────────────────────────────────┘
-```
-
-### Anulação Auditável (`POST /api/admin/pedidos/:id/anulacao`)
-
-Criada para situações de erro operacional grave (ex.: pedido lançado em duplicidade ou cancelado antes de qualquer entrega):
-
-- **Garantia de Imutabilidade:** Insere registro em `pedido_anulacoes` e ativa gatilhos relacionais no banco que bloqueiam permanentemente qualquer mutação futura naquele pedido ou em seus itens.
-- **Tratamento de Estoque Controlado:** O operador escolhe expressamente se deseja devolver os itens ao estoque livre (`devolverEstoque: true`) ou descartá-los por perda física.
-- **Proteção do Mercado Pago:** A anulação é terminantemente recusada caso existam cobranças Pix pendentes ou pagamentos `PAGO` sem cobertura integral de estorno verificado.
-
----
-
-## 21. Subsistemas Modulares do Backend (`functions/lib/`)
-
-Seguindo o padrão de arquitetura modular, a camada de lógica foi segregada em 4 subsistemas centrais no backend e 1 no frontend:
-
-### 21.1. `ledger/` (Motor Contábil)
-
-- **Fachada:** `functions/lib/comandaLedger.ts`
-- **Módulos:**
-  - `types.ts`: Tipagens contábeis, enums e contratos de transição.
-  - `allocations.ts`: Algoritmos waterfall de alocação de recebimentos por item.
-  - `projection.ts`: Projeções SQL de saldo e agregação financeira.
-  - `adminPayments.ts`: Lançamento e validação de pagamentos presenciais.
-  - `adminRefunds.ts`: Lançamento de estornos com checagem de teto líquido.
-  - `legacy.ts`: Compatibilidade com comandas anteriores ao ledger.
-
-### 21.2. `pix/` (Gateway Pix Administrativo)
-
-- **Fachada:** `functions/lib/comandaPix.ts`
-- **Módulos:**
-  - `types.ts`: Contratos de requisição Pix no balcão.
-  - `queries.ts`: Cálculo de capacidade cobrável em aberto.
-  - `adminCharge.ts`: Emissão atômica de QR Code Pix administrativo.
-  - `adminRegenerate.ts`: Substituição de QR Code Pix expirado por nova cobrança ativa.
-  - `replay.ts`: Replay idempotente de cobranças já emitidas.
-
-### 21.3. `paymentSync/` (Sincronização e Reconciliação)
-
-- **Fachada:** `functions/lib/paymentSync.ts`
-- **Módulos:**
-  - `types.ts`: Mapeamentos de payloads do provedor.
-  - `status.ts`: Normalizador de status entre Mercado Pago e o domínio local.
-  - `client.ts`: Cliente HTTP com timeout determinístico de 5 segundos.
-  - `webhook.ts`: Validador de assinatura criptográfica HMAC-SHA256.
-  - `ledgerSync.ts`: Execução de transições de status no banco relacional.
-  - `sweeps.ts`: Varreduras periódicas de expiração e liberação de reservas órfãs.
-  - `inconclusiveRecovery.ts`: Protocolo B3 para resgate de transações incertas.
-
-### 21.4. `adminPedidos/` (Orquestração do Balcão)
-
-- **Consumidores:** `functions/api/admin/pedidos.ts`
-- **Módulos:**
-  - `list.ts`: Listagem paginada enriquecida com projeções contábeis em lote.
-  - `manualValidation.ts`: Validação de catálogo, quantidade e dados do comprador.
-  - `manualCreation.ts`: Criação atômica no banco D1 com reserva física simultânea.
-  - `manualReplay.ts`: Replay de comandas manuais enviadas repetidamente.
-
-### 21.5. Frontend Admin: `PedidoDetalhe/`
-
-- **Orquestrador:** `src/admin/Pedidos/PedidoDetalheModal.tsx`
-- **Componentes Especializados:**
-  - `PedidoHeader.tsx`: Cabeçalho com status operacional e ações rápidas.
-  - `PedidoItens.tsx`: Tabela de itens, cancelamentos parciais e trocas.
-  - `PedidoPagamento.tsx`: Balanço financeiro, emissão de Pix e reembolsos.
-  - `usePedidoDetalhe.ts`: Hook de ciclo de vida, polling e mutações atômicas.
-
----
-
-## 22. Protocolos de Reconciliação e Resiliência
-
-A estabilidade da plataforma decorre de protocolos rigorosos de engenharia:
-
-- **A1 (Idempotência Integral):** Nenhuma requisição de escrita pode ser processada duas vezes se reenviada com a mesma `operationKey`.
-- **B1 (Contenção de Edição Destrutiva):** O endpoint `PUT /api/admin/pedidos/:id/itens` foi intencionalmente bloqueado com `409 Conflict`, eliminando mutações destrutivas silenciosas em pedidos já gravados.
-- **B2 (Aprovação Autoritativa Pós-Expiração):** Transição de `EXPIRADO` para `PAGO` autorizada somente mediante consulta GET direta verificada contra os servidores do Mercado Pago.
-- **B3 (Reconciliação Financeira Repetível):** Reconciliação convergente que projeta o líquido em SQL e executa baixa de estoque somente se o agregado fechou como `PAGO`.
-- **B4 (Reserva por Pedido com Múltiplos Pix):** A existência de qualquer cobrança Pix pendente impede a liberação indevida da reserva do pedido.
-- **B-1 (Visibilidade Operacional de Balcão):** Pedidos criados no balcão (`origem = 'MANUAL'`) permanecem visíveis imediatamente na listagem, independentemente de estarem pendentes.
-- **B-2 (Estorno Manual de Pix):** Registro contábil de estorno para pagamentos `PIX_MP` devolvidos por fora pelo lojista.
-- **B-3 (Recuperação de Envio Inconclusivo):** Varredura de busca via `GET /v1/payments/search` no Mercado Pago para descobrir cobranças criadas cujo retorno HTTP se perdeu por timeout.
-- **B5 (GETs Idempotentes e Livres de Efeitos Colaterais):** Segregação estrita de responsabilidade HTTP. As rotas `GET /api/admin/pedidos` e `GET /api/admin/pedidos/:id` operam como puramente de leitura. Efeitos colaterais de manutenção financeira e sincronização em background foram movidos para endpoints POST explícitos e idempotentes com proteção `sameOrigin`:
-  - `POST /api/admin/pedidos/reconciliar`: Executa em lote a rotina `reconcilePedidosEmBackground` para a lista de comandas.
-  - `POST /api/admin/pedidos/:id/reconciliar`: Executa a reconciliação sob demanda da comanda ativa (`reconcileLiveTabPedido`).
-  - No frontend, o hook `usePedidoDetalhe.ts` dispara o POST de reconciliação em modo _best-effort_ antes do GET no carregamento inicial, nas chamadas explícitas e no polling silencioso, preservando a recuperação contínua sem violar a semântica HTTP.
-
----
-
-## 23. Idempotência e Identidade de Operações (`operationKey`)
-
-Toda escrita crítica no sistema requer uma chave de operação:
-
-1. **Geração no Cliente:** Antes de despachar a requisição, o frontend cria um UUID v4 e envia a `operationKey` com o payload. O backend calcula `fingerprint(payload)` (`functions/lib/operacaoIdentity.ts`): uma identidade determinística/canônica versionada, no formato `1:<JSON canônico>`. A canonicalização ordena recursivamente as chaves dos objetos, omite propriedades `undefined` e preserva a ordem dos arrays. Não é hash, assinatura, HMAC, autenticação nem proteção criptográfica contra adulteração.
-2. **Tabela `pedido_operacoes`:** O banco grava a chave em uma coluna `UNIQUE`. Se duas chamadas simultâneas chegarem com a mesma chave:
-   - A primeira adquire a operação e realiza os lançamentos no mesmo `db.batch()`.
-   - A segunda falha no `UNIQUE` e executa um **replay idempotente da resposta original**, devolvendo exatamente os mesmos dados da primeira sem criar registros duplicados.
-3. **Detecção de Conflito:** `conflitoOperacao` verifica tipo, escopo/ator e versão/conteúdo do fingerprint, nessa ordem. Reutilizar a mesma `operationKey` com identidade incompatível retorna `409 Conflict`; uma identidade compatível permite replay. A deduplicação é pela chave, não pelo fingerprint: payloads iguais com chaves distintas representam operações distintas.
-
----
-
-## 24. Webhooks e Comunicação com Gateways
-
-- **Endpoint de Recepção:** `POST /api/webhooks/mercadopago`.
-- **Validação Criptográfica HMAC-SHA256:**
-  - O header `x-signature` é lido como `ts=<timestamp>,v1=<assinatura>`; sem `ts` ou sem `v1` a requisição é inválida.
-  - O texto assinado (_manifest_) é `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, com `data.id` em minúsculas, vindo da query (`data.id` ou `data_id`) ou, na falta dela, do corpo JSON. Os trechos `id:` e `request-id:` só entram quando o valor existe; `ts:` sempre entra. O corpo da requisição não faz parte do hash.
-  - O HMAC-SHA256 do _manifest_, calculado com `MP_WEBHOOK_SECRET` como chave, é comparado em tempo constante (_timing-safe equal_) com `v1`.
-  - Requisições com assinatura inválida são rejeitadas com `401 Unauthorized`. Sem `MP_WEBHOOK_SECRET` configurado o endpoint responde `503` e não processa nada.
-  - Depois da assinatura, só eventos `payment`/`payments` (ou sem tipo) são processados; os demais respondem `200` sem efeito.
-- **Nunca Confia no Payload:** O webhook do Mercado Pago serve apenas como um sinalizador de evento. O backend nunca extrai o status diretamente do corpo do webhook; ele realiza uma chamada segura para `fetchMpPayment` para obter o dado oficial e imutável antes de atualizar o ledger.
-
-### Checklist de produção (go-live) do Mercado Pago
-
-Os dois primeiros itens são exigidos pelo código. Os passos no painel do Mercado Pago são **operacionais e devem ser verificados no ambiente real** (nomes de menu e telas podem variar): o checkout não envia `notification_url` ao criar o Pix, então a entrega do webhook depende do cadastro no painel.
-
-- [ ] `MP_ACCESS_TOKEN` configurado como secret do projeto no Cloudflare Pages (produção).
-- [ ] `MP_WEBHOOK_SECRET` configurado como secret no mesmo ambiente (sem ele o webhook responde `503`).
-- [ ] URL pública do webhook registrada no painel do Mercado Pago: `https://<domínio>/api/webhooks/mercadopago` _(verificar no painel)_.
-- [ ] Evento de pagamentos habilitado _(verificar no painel)_.
-- [ ] Chave de assinatura exibida no painel idêntica ao valor de `MP_WEBHOOK_SECRET` _(verificar no painel)_.
-- [ ] Pix real de baixo valor criado e pago.
-- [ ] Notificação recebida e respondida com `200` _(verificar no histórico de notificações do painel e nos logs da função)_.
-- [ ] Pedido convergiu para `PAGO` após a notificação (acompanhamento do cliente e comanda no admin).
-
-Sem o webhook o sistema ainda converge pelo polling da tela do cliente e pela reconciliação do admin, porém com atraso; por isso a verificação acima deve ser feita antes de abrir a loja ao público.
-
----
-
-## 25. Sistema de Notificações Operacionais e Web Push
-
-- **Central de Notificações Interna:** Exibe alertas em tempo real para os atendentes: novos pedidos aguardando preparo, pagamentos confirmados no Pix, estoque baixo ou esgotado e falhas operacionais que exijam atenção.
-- **Badge Dinâmico Unificado:** O número de notificações não lidas é consumido pelo `Header.tsx` a partir de `NotificacoesContext.tsx` e atualizado automaticamente sem necessidade de recarregar a página.
-- **Web Push (PWA):** Integração com a API de notificações do navegador via chaves VAPID (`functions/lib/pushNotifier.ts` e `functions/lib/pushTransport.ts`). Dispara notificações no desktop ou celular do operador quando um novo pedido com pagamento confirmado ingressa no sistema. Claims com lease renovável permitem recuperação de eventos abandonados; a entrega é at-least-once, com possibilidade de duplicidade rara.
-
----
-
-## 26. Infraestrutura Cloudflare (Pages, D1, R2)
-
-O arquivo `wrangler.toml` define os bindings do ecossistema Cloudflare:
-
-```toml
-name = "rp-doces"
-compatibility_date = "2024-09-23"
-pages_build_output_dir = "dist"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "rp-doces-db"
-database_id = "c2e15599-3d68-4801-9a1c-96a84977dd7c"
-
-[[r2_buckets]]
-binding = "PRODUCT_IMAGES"
-bucket_name = "rp-doces-images"
-```
-
-- **`DB` (Cloudflare D1):** Instância relacional que armazena pedidos, itens, ledger contábil, histórico, produtos e sessões.
-- **`PRODUCT_IMAGES` (Cloudflare R2):** Bucket dedicado ao armazenamento das fotos em alta resolução do catálogo.
-
----
-
-## 27. Migrations do Banco de Dados
-
-O banco de dados D1 evolui estritamente através das migrações sequenciais em `migrations/`:
-
-```text
-0001_products.sql                              # Tabela base de produtos com constraint CHECK de reserva
-0002_orders.sql                                # Schema inicial de pedidos
-0003_admin_products.sql                        # Campos administrativos de produtos
-0004_admin_auth.sql                            # Tabela de administradores e sessões seguras
-0005_categorias_e_produtos.sql                 # Categorias com emojis e normalização de slugs
-0006_pedidos_producao.sql                      # Alinhamento de colunas de pedidos com produção
-0007_pedido_itens_auditoria.sql                # Auditoria de itens e marcações de baixa
-0008_ledger_pagamentos.sql                     # Criação do razão: pedido_pagamentos e alocações
-0009_reembolsos.sql                            # Tabela de estornos: pedido_reembolsos
-0010_pedido_pagamentos_mp_payment_id_index.sql # Índice para resolução rápida do webhook
-0011_pedidos_reserva_ativa_index.sql           # Índice para varreduras de expiração de reservas
-0012_operacoes_idempotencia.sql                # Tabela pedido_operacoes (Chave de Idempotência A1)
-0013_pedidos_compat_colunas_legadas.sql        # Compatibilidade com colunas históricas
-0014_notificacao_leituras.sql                  # Controle de notificações lidas por operador
-0015_admin_diagnostico_eventos.sql             # Eventos e testes de diagnóstico operacional
-0016_pedido_itens_estado_estoque.sql           # Estados detalhados de estoque por item
-0017_pedido_operacoes_item_adicao.sql          # Adição controlada de itens em comanda aberta
-0018_item_cancelamento_preview.sql             # Visualização prévia de cancelamento de item
-0019_comanda_viva_item_trocas.sql              # Troca de itens em comanda viva
-0020_pedido_reembolso_pix_mp_intencoes.sql     # Rastreabilidade de estorno para Pix Mercado Pago
-0021_cobertura_financeira_linhagem_trocas.sql  # Linhagem de trocas e cobertura contábil
-0022_pedido_anulacoes.sql                      # Tabela e triggers de anulação auditável de pedidos
-0023_pedido_reembolso_pix_mp_intencoes_anulacao.sql# Estornos vinculados a anulações
-0024_pix_mp_refund_excl_mutua_assimetrica.sql  # Exclusão mútua em concorrência de refund Pix
-0025_configuracoes_loja.sql                    # Parâmetros operacionais e horários da loja
-0026_despesas_itemizadas.sql                   # Tabela de custos operacionais e fornecedores
-0027_checkout_rate_limits.sql                  # Proteção anti-abuso e rate limit no checkout
-0028_operacao_expiracao.sql                    # Expiração controlada de operações órfãs
-0029_operacao_regeneracao_ativa.sql            # Regeneração ativa de cobranças em voo
-0030_admin_push_subscriptions.sql              # Inscrições de navegadores para Web Push VAPID
-0031_pix_mp_refund_capacity_guards.sql         # Capacidade de refund Pix MP nunca excede o valor pago
-0032_admin_last_active_owner_guard.sql         # Guarda no banco: sempre existe ao menos 1 OWNER ativo
-0033_produto_detalhes.sql                      # Detalhes do produto no cardápio (peso, ingredientes, alergênicos)
-0034_produto_novo.sql                          # Flag de novidade (`novo`) em produtos
-0035_push_event_claim_lease.sql                # Lease de claim de eventos de push (entrega at-least-once)
-```
-
-> A lista acima é ilustrativa: a fonte da verdade é o diretório `migrations/` (`ls migrations`).
->
-> **Regra de Ouro das Migrações:** Nunca edite um arquivo `.sql` já aplicado em produção. Correções e novos campos devem ser implementados exclusivamente via uma nova migration numerada de forma estritamente sequencial.
-
----
-
-## 28. Desenvolvimento Local e Variáveis de Ambiente
-
-### Pré-requisitos
-
-- Node.js versão 18 ou 20 LTS.
-- npm versão 9 ou superior.
-
-### Variáveis de Ambiente Locais (`.dev.vars`)
-
-Para executar localmente com suporte ao gateway e notificações, crie o arquivo `.dev.vars` na raiz (o arquivo é ignorado no Git por conter segredos):
-
-```bash
-# Mercado Pago (obrigatório para testar Pix)
-MP_ACCESS_TOKEN="APP_USR-seu-access-token"
-MP_WEBHOOK_SECRET="seu-webhook-secret"
-
-# Web Push VAPID (opcional em desenvolvimento local)
-VAPID_PUBLIC_KEY="sua-chave-publica-vapid"
-VAPID_PRIVATE_KEY="sua-chave-privada-vapid"
-VAPID_SUBJECT="mailto:contato@rpdoces.com.br"
-```
-
-### Inicialização do Ambiente
-
-```bash
-# 1. Instalar dependências
-npm install
-
-# 2. Aplicar migrações no banco local do Wrangler
+### Módulos principais
+
+| Módulo                                                                                         | Responsabilidade                                                                                                |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/context/CartContext.tsx` e `cartReconciliation.ts`                                        | Sacola persistente e ajuste ao catálogo disponível.                                                             |
+| `src/context/StoreThemeContext.tsx`                                                            | Sincronização de `data-theme`, `data-admin-theme` e preferências persistidas. `AdminThemeContext` delega a ele. |
+| `src/components/Header.tsx`, `StorefrontFrame.tsx`, `StorefrontWave.tsx`                       | Navegação contextual, container de rolagem, onda e máscara de gradiente compartilhados.                         |
+| `src/admin/Pedidos/PedidoDetalhe/`                                                             | Componentes e hooks de detalhes, itens, pagamentos, Pix e intenções de pagamento manual.                        |
+| `functions/lib/comandaLedger.ts` → `ledger/`                                                   | Fachada de pagamentos, estornos, alocações waterfall, projeções e compatibilidade legada.                       |
+| `functions/lib/comandaPix.ts` → `pix/`                                                         | Fachada de emissão, replay e regeneração de cobrança administrativa.                                            |
+| `functions/lib/paymentSync.ts` → `paymentSync/`                                                | Cliente verificado, resolução de webhook, transições, sweeps e recuperação de envio inconclusivo.               |
+| `functions/lib/adminPedidos/`                                                                  | Validação, criação, replay, listagem e manutenção de comandas manuais.                                          |
+| `functions/lib/operacoes.ts`, `operacaoIdentity.ts`                                            | Identidade canônica, claim e fases das operações idempotentes.                                                  |
+| `functions/lib/stock.ts`, `pedidoReconcile.ts`, `pedidoFinanceiroSql.ts`                       | Estado físico por item, convergência financeira/física e projeções SQL.                                         |
+| `functions/lib/itemCancellation*.ts`, `itemExchange*.ts`, `financialCoverage.ts`               | Cancelamentos, trocas e cobertura financeira pela linhagem de itens.                                            |
+| `functions/lib/mpPost.ts`, `mpSearch.ts`, `mpRefund.ts`, `mpRefundIntent.ts`                   | Criação/busca de Pix e intenção persistente de estorno remoto.                                                  |
+| `functions/lib/pedidoAnulacao.ts`, `pedidoValido.ts`                                           | Anulação auditável, bloqueios e filtro de pedidos válidos.                                                      |
+| `functions/lib/despesas*.ts`, `dashboardAnalytics.ts`, `resultadoFinanceiro.ts`, `storeDay.ts` | Despesas, indicadores, resultado estimado e recortes de data da loja.                                           |
+| `functions/lib/pushOutbox.ts`, `pushNotifier.ts`, `pushTransport.ts`                           | Intenção/outbox, claims, destinatários, retry e transporte de push.                                             |
+| `workers/push.ts`                                                                              | Consumidor Queue e recuperação agendada; não é uma rota Pages.                                                  |
+
+As fachadas mantêm os contratos dos subsistemas; preserve essas fronteiras ao evoluir consumidores.
+O ledger modela recebimentos, alocações e reembolsos: não há plano de contas com lançamentos
+de débito/crédito que caracterize uma contabilidade completa de partidas dobradas.
+
+## 4. Preparação e desenvolvimento local
+
+```sh
+git clone https://github.com/vimanoelkkj/rp-doces-admin.git
+cd rp-doces-admin
+git switch main
+npm ci
 npm run db:migrate:local
-
-# 3. Popular o catálogo com dados de teste
+# Opcional, em banco local de desenvolvimento:
 npm run db:seed:local
-
-# 4. Compilar e subir o servidor completo com Pages Functions e D1 local
 npm run build
 npm run pages:dev
-# A aplicação estará disponível em: http://127.0.0.1:8788
 ```
 
----
+O Pages local serve `dist/` e Functions normalmente em `http://127.0.0.1:8788`.
+`--local` nos scripts de banco utiliza o estado do Wrangler em `.wrangler/`; não aplica migrations
+nem seed no D1 remoto. O seed não deve ser usado para repopular um ambiente com dados reais.
+Após alterar a UI, gere novamente `dist/` para o Pages local.
 
-## 29. Scripts npm e Ciclo de Vida
+`npm run dev` inicia **somente Vite**, normalmente na porta 5173. `vite.config.ts` não configura
+proxy de `/api`; portanto Vite isolado não fornece D1, autenticação ou checkout.
+`npm run preview` também serve somente os arquivos compilados. Os E2E usam Vite e fixtures/mocks
+conforme cada teste, sem comprovar a integração remota de pagamento.
 
-| Comando                    | Descrição                                                                 |
-| :------------------------- | :------------------------------------------------------------------------ |
-| `npm run dev`              | Inicia o servidor Vite para desenvolvimento rápido da interface SPA.      |
-| `npm run build`            | Valida tipos do frontend e Functions e gera a pasta de produção `dist/`.  |
-| `npm run typecheck`        | Checa frontend e Functions sem gerar arquivos.                            |
-| `npm test`                 | Executa os testes descobertos em `tests/*.test.mjs` pelo runner oficial.  |
-| `npm run test:cached`      | Executa testes ignorando suítes cujos arquivos fonte não foram alterados. |
-| `npm run preview`          | Previsualiza a pasta `dist/` estaticamente.                               |
-| `npm run pages:dev`        | Roda o emulador do Cloudflare Pages com banco D1 local e Functions.       |
-| `npm run db:migrate:local` | Aplica todas as migrações pendentes no banco D1 local.                    |
-| `npm run db:seed:local`    | Popula o banco local com o catálogo inicial de doces e bolos.             |
+Vite compila a UI, não empacota a API em `dist/`. Wrangler/Pages processa o diretório `functions/`
+ao executar/publicar Pages; `workers/push.ts` tem configuração e implantação próprias.
 
----
+No PowerShell com restrição a scripts `.ps1`, use `npm.cmd` e `npx.cmd` no lugar de `npm` e `npx`.
+Não é necessário alterar a política de execução da máquina.
 
-## 30. Compilação, Build e TypeScript
+### Bindings e variáveis
 
-O comando `npm run build` executa:
+Não existe arquivo de exemplo de ambiente versionado. Crie `.dev.vars` na raiz para os valores
+locais; ele está no `.gitignore`. Nunca copie credenciais de produção para fixtures ou frontend.
 
-```bash
-npm run typecheck && vite build
+```dotenv
+MP_ACCESS_TOKEN="<token-de-teste-do-ambiente>"
+MP_WEBHOOK_SECRET="<segredo-de-assinatura-do-ambiente>"
+VAPID_PUBLIC_KEY="<chave-publica-vapid>"
+VAPID_PRIVATE_KEY="<chave-privada-vapid>"
+VAPID_SUBJECT="mailto:<contato-do-ambiente>"
 ```
 
-- **Escopo do `tsconfig.json` Principal:** O arquivo `tsconfig.json` cobre primordialmente o frontend SPA (`src/` e `vite.config.ts`).
-- **Verificação do Backend (`functions/**`):** `npm run typecheck:functions` executa `tsc --noEmit -p tsconfig.functions.json`; `npm run typecheck` e `npm run build` incluem essa checagem.
+| Nome                                                     | Uso e escopo                                                                                                                                                                               |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DB`                                                     | Binding D1 obrigatório para a API e para o Worker de push.                                                                                                                                 |
+| `PRODUCT_IMAGES`                                         | Binding R2 para upload e leitura de imagens de produtos no Pages.                                                                                                                          |
+| `PUSH_QUEUE`                                             | Binding produtor no Pages; o consumidor é configurado separadamente no Worker.                                                                                                             |
+| `MP_ACCESS_TOKEN`                                        | Secret backend para criar, consultar, cancelar e estornar Pix.                                                                                                                             |
+| `MP_WEBHOOK_SECRET`                                      | Secret backend da assinatura; sem ele o webhook responde 503.                                                                                                                              |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Configuração de push no Pages e no Worker. Configure ambos: secrets de um não são herdados pelo outro. O código tem fallback de subject, mas os runbooks exigem os três valores validados. |
+| `VITE_APP_ENV`                                           | Variável pública de build; `staging` habilita o indicador visual do ambiente. Não colocar secrets em variáveis `VITE_*`.                                                                   |
+| `BASE_URL`, `CHROME_PATH`, `CI`                          | Configuração do Playwright; URL padrão `http://127.0.0.1:5173`, Chrome opcional e modo CI.                                                                                                 |
+| `SMOKE_BASE_URL` / `PRODUCTION_URL`                      | URL do script de smoke; sem configuração, ele consulta `https://rpdoces.com.br`.                                                                                                           |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`          | Operações remotas do Wrangler/CI; não são credenciais da aplicação cliente.                                                                                                                |
+| `CLOUDFLARE_D1_READ_TOKEN`                               | Token separado, somente D1 Read, usado pelo migration guard remoto.                                                                                                                        |
+| `WRANGLER_TOML`, `D1_DATABASE_ID`                        | Seleção de configuração/banco pelo migration guard; padrão vem de `wrangler.toml`.                                                                                                         |
 
----
+Sem credencial Mercado Pago, o catálogo pode ser desenvolvido localmente, mas o Pix não é validado
+ponta a ponta. D1/R2 locais não isolam chamadas externas feitas com um token real. O produtor Queue
+do Pages local não equivale ao consumidor e cron remotos; use os testes de outbox ou staging isolado
+para validar esse conjunto. Não presuma que iniciar `pages:dev` inicia também `workers/push.ts`.
 
-## 31. Estrutura e Execução de Testes Automatizados
+### Primeiro administrador local
 
-A plataforma possui testes automatizados de domínio e UI, descobertos pelo runner a partir dos arquivos atuais em `tests/`:
+As migrations criam `usuarios_admin`, mas não cadastram usuário inicial. O seed contém somente
+produtos; não há endpoint público de cadastro nem script de bootstrap administrativo.
+Em um banco local novo, gere o hash com `hashPassword` de `functions/lib/auth.ts` e insira o primeiro
+usuário ativo com papel `OWNER`. Não use senha em texto puro na coluna `senha_hash`.
 
-- **Runner Oficial:** `scripts/run-tests.mjs` descobre os arquivos `tests/*.test.mjs` no diretório principal de testes. Playwright executa os E2E em `tests/e2e/` separadamente.
-- **Testes de Concorrência e Rollback:** Utilizam simuladores D1 em memória através de Miniflare, testando corridas entre webhooks e aprovações manuais com travas e barreiras determinísticas.
-- **Testes de Interface (UI):** Utilizam JSDOM para renderizar componentes modais, verificar bloqueios de scroll e simular cliques em backdrops de fechamento.
-- **Execução:**
-  ```bash
-  npm test
-  ```
+Este exemplo PowerShell usa a implementação real para gerar o hash; a senha é lida sem eco e
+passada por stdin, fora dos argumentos do processo:
 
----
+```powershell
+$senhaLocal = Read-Host 'Senha local (mínimo 8 caracteres, letra e número)' -AsSecureString
+[System.Net.NetworkCredential]::new('', $senhaLocal).Password | node --input-type=module -e "import { build } from 'esbuild'; const b = await build({ entryPoints: ['functions/lib/auth.ts'], bundle: true, platform: 'node', format: 'esm', write: false }); const m = await import('data:text/javascript;base64,' + Buffer.from(b.outputFiles[0].text).toString('base64')); let s = ''; for await (const c of process.stdin) s += c; s = s.replace(/\r?\n$/, ''); const e = m.validatePassword(s); if (e) throw new Error(e); console.log(await m.hashPassword(s));"
+Remove-Variable senhaLocal
+```
 
-## 32. Segurança e Vetores de Proteção
+Em arquivo SQL privado fora do repositório, substitua os marcadores por identidade local e hash
+gerado (formato `pbkdf2_sha256$100000$<salt-hex>$<hash-hex>`):
 
-- **Cookies HttpOnly:** Sessões administrativas utilizam cookies com flags `HttpOnly; Secure; SameSite=Lax`, impedindo o roubo de tokens via JavaScript malicioso (XSS).
-- **Proteção Same-Origin:** Endpoints de mutação do painel exigem cabeçalhos de mesma origem para repelir ataques de CSRF (Cross-Site Request Forgery).
-- **Mitigação de Timing Attack e Enumeração de Usuários (PBKDF2 Dummy):** O endpoint de login administrativo (`POST /api/auth/login`) executa verificação de senha em tempo equivalente para qualquer cenário. Quando o usuário não existe ou está inativo, a rotina realiza uma checagem contra um hash PBKDF2 dummy estático e válido (`pbkdf2_sha256` com 100.000 iterações), eliminando vazamento de enumeração de contas por medição de latência de resposta.
-- **Hardening na Alteração da Própria Senha:** O endpoint de atualização de credenciais (`POST /api/admin/administradores/:id/senha`) exige expressamente a senha atual (`senha_atual`) do operador autenticado e valida sua correspondência antes de aplicar a nova senha com salt criptográfico.
-- **Validação Rigorosa de Assinatura:** Eventos de gateway só são aceitos quando acompanhados da assinatura criptográfica HMAC SHA-256 válida.
-- **Constraints a Nível de Banco de Dados:** A integridade de estoque e a exclusão mútua de operações contam com travas relacionais em SQLite (`UNIQUE`, `CHECK`), blindando a plataforma contra inconsistências mesmo em cenários de alta concorrência.
-- **Segregação Estrita de Efeitos Colaterais em GETs:** Endpoints de consulta (`GET /api/admin/pedidos` e `GET /api/admin/pedidos/:id`) operam exclusivamente como leitura pura, delegando mutações de recuperação a rotas POST dedicadas (`/reconciliar`).
+```sql
+INSERT INTO usuarios_admin (nome, username, email, senha_hash, papel, ativo)
+VALUES ('<nome-local>', '<usuario-local>', '<email-local>', '<hash-gerado>', 'OWNER', 1);
+```
 
----
+```powershell
+# Caminho do arquivo SQL privado preparado acima; exclusivamente D1 local:
+npx.cmd wrangler d1 execute rp-doces-db --local --file "$env:TEMP/rp-doces-admin-local.sql"
+```
 
-## 33. Convenções de Código e Padrões de Commit
+Remova o arquivo privado após o uso e acesse `/admin/login`. A criação dos próximos usuários é
+feita pelo OWNER autenticado. O provisionamento inicial remoto exige procedimento operacional
+controlado; não é automatizado pelo repositório.
 
-1. **Padrão de Mensagem de Commit:**
-   - Todo commit deve adotar o prefixo `rp-doces: <mensagem descritiva em português>`.
-   - Exemplo: `rp-doces: unifica header, wave e fade entre storefront e admin`.
-   - **Sem co-authorship:** Não utilizar trailers como `Co-Authored-By`.
-2. **Atômico e Funcional:** Cada commit deve representar uma unidade funcional completa. O projeto precisa compilar (`npm run build`) e passar nos testes após cada commit.
-3. **Formatação de Código:** Utiliza Prettier com as configurações especificadas em `.prettierrc`.
+## 5. Comandos e validação de desenvolvimento
 
----
+| Comando                                                       | Efeito                                                                                  |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `npm ci`                                                      | Instala as versões travadas, sem atualizar o lockfile.                                  |
+| `npm run dev`                                                 | Servidor Vite da UI.                                                                    |
+| `npm run typecheck:frontend`                                  | `tsc --noEmit`, usando `tsconfig.json`.                                                 |
+| `npm run typecheck:functions`                                 | `tsc --noEmit -p tsconfig.functions.json`; inclui Functions, `shared/` e `workers/`.    |
+| `npm run typecheck`                                           | Executa as duas checagens de tipos.                                                     |
+| `npm run build`                                               | `npm run typecheck && vite build`; gera `dist/`.                                        |
+| `npm run lint`                                                | `biome check .`; não corrige arquivos automaticamente.                                  |
+| `npm test`                                                    | Descobre `tests/*.test.mjs` e executa arquivos sequencialmente; para na primeira falha. |
+| `npm test -- --keep-going`                                    | Executa todos os arquivos e agrega falhas.                                              |
+| `npm test -- --verify-shards=10`                              | Confere cobertura das dez fatias, sem executar os casos.                                |
+| `npm test -- --shard=1/10 --keep-going`                       | Executa uma fatia determinística, como no CI.                                           |
+| `npm run test:cached`                                         | Runner com cache por dependências; não substitui a execução integral antes de release.  |
+| `npx playwright install chromium`                             | Instala o navegador necessário aos E2E locais.                                          |
+| `npm run test:e2e`                                            | E2E de `tests/e2e/`; o config inicia/reutiliza Vite.                                    |
+| `npm run preview`                                             | Preview estático de `dist/`.                                                            |
+| `npm run pages:dev`                                           | Emulador Pages, Functions e bindings locais sobre `dist/`.                              |
+| `npm run db:migrate:local`                                    | Aplica migrations pendentes em `rp-doces-db --local`.                                   |
+| `npm run db:seed:local`                                       | Executa `seed/products.sql` no D1 local.                                                |
+| `npm run db:migrations:check`                                 | Consulta o D1 remoto via API REST com token Read; não aplica migrations.                |
+| `node scripts/check-staging-config.mjs`                       | Valida referências e isolamento da configuração de staging.                             |
+| `node scripts/check-staging-config.mjs --require-provisioned` | Também recusa placeholder de D1 ainda não provisionado.                                 |
+| `npm run smoke:prod`                                          | Smoke HTTP de leitura; aponta para produção por padrão. Não o trate como teste local.   |
 
-## 34. Decisões Arquiteturais Relevantes
+O runner Node usa bancadas Miniflare/D1 descartáveis, fixtures e bundles esbuild para testar
+concorrência, rollback, idempotência, pagamentos, estoque, segurança, UI e push. Em 26/10/2026,
+o runner descobriu **111 arquivos** `*.test.mjs`; o número de casos evolui com o código.
+Playwright cobre navegação, temas, foco, layout e comportamento mobile separadamente.
 
-1. **Adoção da Payments API em Detrimento da Orders API:**
-   - A Payments API do Mercado Pago oferece maior controle sobre cada tentativa de pagamento individual (`PIX_MP`), expiração explícita por cobrança e suporte à identificação de pagamentos aditivos, alinhando-se perfeitamente ao ledger de comandas.
-2. **Fatos Financeiros em Partidas Dobradas:**
-   - Nenhuma linha de pagamento confirmada é alterada ou cancelada retrospectivamente. Estornos geram fatos contábeis próprios, mantendo a trilha de auditoria limpa.
-3. **Header Único com Degradação Elegante:**
-   - O mesmo componente de cabeçalho atende à loja e ao painel de administração, evitando divergências de layout e sincronizando o estado de temas e responsividade de ponta a ponta.
-4. **View Transitions com Especialização por Dispositivo:**
-   - Animação radial por `clip-path` preservada no desktop, enquanto o mobile adota crossfade puro por `opacity` via GPU sem transformações de escala, garantindo fluidez máxima em 90/120Hz sem ghosting ou piscadas visuais.
+Prettier é configurado em `.prettierrc`; Biome em `biome.json`, com formatter desativado.
+Não existe script npm de formatação. O lint está em adoção incremental e é **não bloqueante no CI**.
 
----
+## 6. Rotas e contratos HTTP
 
-## 35. Limitações Conhecidas e Dívidas Técnicas Reais
+Os caminhos seguem a estrutura de arquivos de Pages Functions. IDs dinâmicos são representados
+por `:id` nas tabelas. A API retorna JSON, geralmente `{ error: mensagem, code?: codigo }` em falhas;
+o webhook usa `{ erro: mensagem }`. Não há envelope uniforme em todas as rotas.
 
-1. **Overpayment (Pagamentos Excedentes):**
-   - Caso um cliente gere dois códigos Pix e pague ambos, o ledger preserva corretamente o montante total recebido, mas a interface visual ainda não possui um módulo dedicado para converter o excedente em crédito de loja.
-2. **Edição Destrutiva de Itens Bloqueada (B1):**
-   - A rota `PUT /api/admin/pedidos/:id/itens` permanece bloqueada com código `409` por segurança. A manipulação de itens em comandas vivas deve ser feita exclusivamente através das rotas de cancelamento de item com reposição e troca de item.
-3. **Riscos de Dependências para v1.0:**
-   - As moderadas atuais do React Router têm [triagem e aceitação documentadas](docs/architecture/dependency-risk-acceptance.md). A migração para v7 será tratada separadamente após a v1.0; high/critical de produção bloqueiam release.
+### Rotas públicas e autenticação
 
----
+| Método e caminho                                                    | Contrato e efeitos                                                                                                                                                          |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/produtos`                                                 | `{ produtos: [...] }`, itens `disponivel = 1`, categoria, preços, promoção, estoque total/reservado e detalhes. A UI calcula disponibilidade livre no mapper. Leitura pura. |
+| `GET /api/config`                                                   | `{ config: ... }` com dias, horários, local/endereço, Maps, disponibilidade informativa de entrega e WhatsApp.                                                              |
+| `PUT /api/config`                                                   | Atualiza configuração; exige sessão e mesma origem, apesar do caminho fora de `/api/admin`.                                                                                 |
+| `POST /api/checkout`                                                | Cria a operação de compra/Pix, exige mesma origem e `operationKey`.                                                                                                         |
+| `GET /api/pedido?token=...`                                         | Detalhes e itens não cancelados de um pedido válido. Token autoriza a consulta; `no-store`.                                                                                 |
+| `GET /api/pedido-status?token=...`                                  | Consulta o estado persistido; não sincroniza com Mercado Pago.                                                                                                              |
+| `POST /api/pedido-status?token=...`                                 | Recuperação explícita: consulta MP com throttle por tentativa, reconcilia e trata expiração; exige mesma origem.                                                            |
+| `POST /api/reservas/reconciliar`                                    | Sem payload: liberação local limitada de reservas vencidas do site; mesma origem e rate limit. Não consulta MP.                                                             |
+| `GET /api/images/:key`                                              | Streaming público R2 de chave permitida; cache de um ano e `immutable`; 404 para chave/objeto inválido.                                                                     |
+| `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Sessão administrativa; mutações exigem mesma origem. Login recebe `username` e `senha`.                                                                                     |
+| `POST /api/webhooks/mercadopago`                                    | HMAC obrigatório, reconsulta MP e aplica transição verificada.                                                                                                              |
 
-## 36. Estado Atual do Sistema (Checklist de Componentes)
+Exemplo de corpo do checkout (dados fictícios):
 
-| Módulo / Funcionalidade               | Situação | Observações                                                                        |
-| :------------------------------------ | :------: | :--------------------------------------------------------------------------------- |
-| **Storefront Institucional**          |    ✅    | Home, Cardápio, Sobre, Contato e Rodapé funcionando perfeitamente.                 |
-| **Carrinho & Sacola**                 |    ✅    | Persistência em `localStorage` com auto-reconciliação de estoque.                  |
-| **Checkout Pix**                      |    ✅    | Emissão com idempotência A1, QR Code dinâmico e cópia-e-cola.                      |
-| **Acompanhamento de Pedido**          |    ✅    | Acesso público por token com atualização de status em tempo real.                  |
-| **Header Unificado**                  |    ✅    | Fonte única de verdade para loja e admin, com drawer mobile CSS e handle ondulado. |
-| **Wave e Fade Animados**              |    ✅    | Efeito visual presente na loja e no painel admin via `StorefrontFrame`.            |
-| **Tema Dark Chocolate**               |    ✅    | Sincronização simultânea de `data-theme` e `data-admin-theme`.                     |
-| **View Transitions (Mobile/Desktop)** |    ✅    | Revelação radial no desktop e crossfade GPU 260ms fluido em 90/120Hz no mobile.    |
-| **Dashboard Administrativo**          |    ✅    | Indicadores financeiros do dia, comandas em aberto e ranking de vendas.            |
-| **Catálogo Administrativo**           |    ✅    | CRUD de produtos, categorias com emojis, upload R2 e clearance inferior mobile.    |
-| **Gestão de Comandas (Admin)**        |    ✅    | Criação manual, pagamentos múltiplos, geração de Pix, anulação e histórico.        |
-| **Reconciliação Segregada (POST)**    |    ✅    | Rotas POST dedicadas para sincronização; GETs 100% puros e sem efeitos colaterais. |
-| **Segurança & Anti-Enumeração**       |    ✅    | Verificação de senha timing-safe via dummy PBKDF2 e proteção na troca de senha.    |
-| **Livro de Despesas**                 |    ✅    | Lançamento e controle de custos operacionais com cálculo de lucro líquido.         |
-| **Anulação Auditável**                |    ✅    | Cancelamento definitivo de comandas com proteção relacional imutável.              |
-| **Web Push Notifications**            |    ✅    | Notificações no navegador para alertas operacionais e novos pedidos pagos.         |
-| **Ledger Contábil**                   |    ✅    | Partidas financeiras, waterfall de alocações e projeção líquida em SQL.            |
-| **Reserva Atômica de Estoque**        |    ✅    | Constraints `CHECK` no SQLite impedindo qualquer venda excedente.                  |
-| **Testes e CI**                       |    ✅    | Testes de concorrência, domínio e UI; resultado conferido por SHA no CI.           |
+```json
+{
+  "items": [{ "id": 1, "quantity": 2 }],
+  "cliente": { "nome": "Cliente de teste", "whatsapp": "(11) 99999-9999" },
+  "recado": "Mensagem para embalagem",
+  "operationKey": "<uuid-da-intencao>"
+}
+```
+
+O sucesso retorna `pedidoId`, `tokenPublico`, `paymentId`, `status` remoto, `qrCode`,
+`qrCodeBase64`, `ticketUrl`, `expiresAt` e `totalCentavos`. QR/URL podem ser nulos.
+Limites do checkout: até 50 entradas, quantidade inteira de 1 a 50 por entrada, nome até 200
+caracteres, WhatsApp validado e recado limitado a 200 caracteres. Valores/preços não vêm do cliente.
+
+### API administrativa
+
+Todas as famílias abaixo verificam sessão nos handlers; mutações verificam mesma origem.
+As regras OWNER/ADMIN são aplicadas adicionalmente onde cabíveis.
+Na tabela, os caminhos abreviados representam sufixos da família indicada, mantendo `/api/admin`.
+
+| Família                                                                                          | Métodos e responsabilidade                                                                                                                               |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/admin/dashboard`                                                                           | GET de indicadores e séries do período.                                                                                                                  |
+| `/api/admin/produtos`, `/produtos/:id`, `/produtos/:id/imagem`                                   | GET/POST de catálogo, PUT de produto, POST multipart (`image`)/DELETE de foto.                                                                           |
+| `/api/admin/categorias`                                                                          | GET/POST de categorias.                                                                                                                                  |
+| `/api/admin/pedidos`, `/pedidos/:id`                                                             | GET listagem/detalhe, POST de pedido manual, PATCH de status, nome e arquivamento conforme contrato.                                                     |
+| `/api/admin/pedidos/reconciliar`, `/pedidos/:id/reconciliar`                                     | POST explícito de manutenção/convergência; GETs de pedidos permanecem leitura.                                                                           |
+| `/api/admin/pedidos/:id/pagamentos`, `/pix`, `/reembolsos`                                       | POST de pagamento manual, criação/regeneração Pix e registro de estorno manual.                                                                          |
+| `/api/admin/pedidos/:id/itens`                                                                   | POST adiciona item; PUT de substituição integral permanece bloqueado com 409.                                                                            |
+| `/api/admin/pedidos/:id/itens/:itemId/cancelamento-preview`, `/troca-preview`                    | GET da simulação financeira/física antes da operação.                                                                                                    |
+| `/api/admin/pedidos/:id/itens/:itemId/cancelamentos`, `/trocas`                                  | GET do estado e POST de execução auditável.                                                                                                              |
+| `/api/admin/pedidos/:id/cancelamentos/:cancelamentoId/reembolsos`, `/trocas/:trocaId/reembolsos` | POST de estorno vinculado à linhagem do item.                                                                                                            |
+| `/api/admin/pedidos/:id/anulacao`, `/anulacao/estorno`, `/historico`                             | POST anula; GET/POST consulta/processa estorno preparatório; GET histórico.                                                                              |
+| `/api/admin/despesas`, `/despesas/:id`, `/despesas/:id/cancelar`                                 | GET/POST, GET/PUT/PATCH e POST de cancelamento lógico.                                                                                                   |
+| `/api/admin/administradores`, `/administradores/:id`                                             | GET/POST e PUT. OWNER gerencia equipe; ADMIN tem acesso limitado à própria conta. A troca de senha está no PUT, não em `/senha`.                         |
+| `/api/admin/notificacoes`                                                                        | GET da central e POST de leitura.                                                                                                                        |
+| `/api/admin/push/vapid-key`, `/subscribe`, `/unsubscribe`, `/test`, `/retry`                     | GET da chave pública e POSTs de inscrição, remoção, teste e recuperação.                                                                                 |
+| `/api/admin/diagnosticos/*`                                                                      | `pix`, `pix-reembolso`, `pedido-teste` (POST) e `pix-status` (GET), com restrições OWNER. Podem produzir efeitos reais quando usados com recursos reais. |
+
+O contrato completo de cada payload está nos tipos e validações do handler correspondente.
+Erros relevantes incluem 400 (entrada), 401 (sessão/assinatura), 403 (origem/permissão), 404,
+409 (conflito de domínio/idempotência), 429 (limite), 500 e 502/503 (integração/configuração).
+Replays não eliminam a possibilidade de falhas transitórias: o cliente deve preservar a intenção
+e sua chave, consultar o estado e apresentar a mensagem/código devolvidos.
+
+## 7. Banco D1 e migrations
+
+### Modelo de domínio
+
+| Grupo               | Entidades e papel                                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Catálogo            | `produtos`, `categorias`: preços, promoções, detalhes, ordenação e contadores de estoque.                                                                                      |
+| Pedido              | `pedidos`, `pedido_itens`: identificação pública, cliente, status, snapshots de item/preço e estado físico por item. Colunas globais/legadas são mantidas por compatibilidade. |
+| Recebimentos        | `pedido_pagamentos`, `pedido_pagamento_alocacoes`: tentativas/recebimentos e distribuição do valor entre itens.                                                                |
+| Devoluções          | `pedido_reembolsos`, `pedido_reembolso_alocacoes`, `pedido_reembolso_pix_mp_intencoes`: fatos de estorno, cobertura e estado da comunicação remota.                            |
+| Comanda viva        | `pedido_item_cancelamentos`, `pedido_item_trocas`, `pedido_item_troca_reembolso_alocacoes`: cancelamento/troca e linhagem financeira.                                          |
+| Operações/anulações | `pedido_operacoes`, `pedido_anulacoes`: deduplicação, fases, resultado e bloqueio auditável.                                                                                   |
+| Administração       | `usuarios_admin`, `admin_sessoes`, `auth_rate_limits`, `checkout_rate_limits`.                                                                                                 |
+| Operação            | `configuracoes_loja`, `notificacao_leituras`, `admin_diagnostico_eventos`, `despesas`, `despesa_itens`.                                                                        |
+| Push                | `admin_push_subscriptions`, `push_eventos` e marcadores de intenção em `pedido_pagamentos`.                                                                                    |
+
+Dinheiro de domínio é armazenado em centavos inteiros. Quantidades fracionárias das despesas usam
+`quantidade_milesimos`; totais de itens/despesas são calculados pelo servidor. Despesas canceladas
+não podem ser reativadas e ficam fora do resultado estimado. Não movimentam estoque de produtos.
+
+### Evolução do schema
+
+Existem **37 migrations**, de `0001_products.sql` a `0037_push_paid_intent.sql`.
+Os arquivos completos e sua ordem são a referência; os grupos abaixo facilitam a navegação:
+
+| Faixa     | Mudança                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------- |
+| 0001–0007 | Produtos, pedidos/itens, administração, categorias e alinhamento com modelo histórico.        |
+| 0008–0013 | Ledger, reembolsos, índices, operações idempotentes e colunas legadas de compatibilidade.     |
+| 0014–0019 | Leituras de notificação, diagnósticos, estoque por item, adição, cancelamento e trocas.       |
+| 0020–0024 | Intenções de refund Pix, cobertura por linhagem, anulação e exclusão mútua de estornos.       |
+| 0025–0029 | Configuração da loja, despesas, rate limit público, expiração e regeneração ativa.            |
+| 0030–0034 | Inscrições/eventos push, guards de capacidade de estorno, último OWNER, detalhes e novidades. |
+| 0035      | `0035_push_event_claim_lease.sql`: lease renovável dos eventos push.                          |
+| 0036      | `0036_push_event_exclusion.sql`: exclusão de destinatário preservada na recuperação.          |
+| 0037      | `0037_push_paid_intent.sql`: intenção durável de push no pagamento e cópia do autor excluído. |
+
+As migrations históricas **não são exclusivamente aditivas**: há reconstruções com
+create/copy/drop/rename, inclusive de tabelas com dependentes. Não edite migrations já aplicadas
+nem execute partes avulsas para "corrigir" o histórico. Evolua por novo arquivo numerado e teste
+a aplicação integral, preservação de dados e integridade de FKs/triggers.
+
+```sh
+# Somente banco local:
+npm run db:migrate:local
+```
+
+O procedimento remoto é manual e separado da publicação: backup verificado, conferência da conta
+e banco, aplicação das migrations pendentes com Wrangler e migration guard de leitura antes do
+deploy. O comando de produção previsto nos runbooks é
+`npx wrangler d1 migrations apply rp-doces-db --remote`; ele **altera o banco real** e não faz parte
+do início local nem da auditoria deste README.
+
+O guard `scripts/check-d1-migrations.mjs` compara `d1_migrations`, nomes/ordem/lacunas e marcadores
+do schema mais recente. Falha fechada quando não consegue confirmar o estado. Não aplica migrations
+e não é um validador universal de todos os dados financeiros.
+Veja [migrations](docs/architecture/database-migrations.md),
+[backup/restore](docs/BACKUP-RESTORE.md) e [rollback](docs/ROLLBACK.md).
+
+## 8. Pedidos, pagamentos, Pix e estoque
+
+### Preços e promoções
+
+`shared/promocao.ts` concentra a regra usada pelo backend e pela exibição da UI. Os estados reais
+são `DESLIGADA`, `SEM_PRECO`, `FUTURA`, `VIGENTE` e `EXPIRADA`. A vigência é resolvida no instante
+da leitura, sem cron para ativar/desativar promoções. Datas novas usam ISO com timezone; o parser
+também trata timestamps históricos de SQLite como UTC. O checkout recalcula o preço autoritativo
+e o congela nos itens do pedido; uma atualização posterior do catálogo não reprecifica esse fato.
+
+### Checkout público
+
+1. O cliente cria uma `operationKey` para a finalização e a preserva nos retries.
+2. O handler valida origem, corpo, identidade de replay, rate limit e catálogo/preços vigentes.
+   Antes de uma compra nova, tenta liberar reservas locais vencidas, sem bloquear a compra se essa
+   manutenção falhar. Horário de atendimento não é um bloqueio de checkout implementado.
+3. Um único batch grava pedido, itens, pagamento `PIX_MP/PENDENTE`, alocações, reserva e claim
+   `LOCAL_CRIADA`, incluindo o corpo original de criação remota. Isso ocorre **antes** do POST ao MP.
+4. O MP recebe `X-Idempotency-Key` determinística (`a1:<operationKey>:mp`), valor em reais,
+   `payment_method_id=pix`, expiração de 30 minutos e `external_reference=token_publico`.
+   Como o checkout não coleta e-mail, o backend cria e-mail sintético a partir do WhatsApp.
+5. Com resposta utilizável, salva identidade/QR/expiração e fases da operação. A reserva nasce
+   estimada em 31 minutos e é alinhada ao vencimento remoto mais um minuto de folga.
+6. A UI acompanha o estado por polling e POST explícito de recuperação; o contador visual não
+   aprova pagamento nem libera estoque sozinho.
+
+Timeout, transporte, HTTP 408/429/5xx ou sucesso ilegível são **ambíguos**: a operação permanece
+`ENVIO_INCONCLUSIVO`, sem inventar falha nem criar novo pedido. O checkout pode responder 502 com
+`pedidoId` e `tokenPublico` para acompanhamento. Recusa definitiva comprovada marca a tentativa
+como falha e tenta liberar a reserva sob os guards de concorrência.
+
+### Reconciliação e protocolos de domínio
+
+- **A1:** chave e identidade da operação; claim/replay transacional e conflito de payload/escopo/ator.
+- **B1:** substituição integral de itens bloqueada; alterações usam adição, cancelamento e troca auditáveis.
+- **B2:** confirmação vem de GET verificado ao MP; inclusive para um Pix localmente expirado.
+- **B3:** reconciliação financeira e baixa física repetíveis para convergir após falha parcial.
+- **B4:** liberação de reserva verifica pagamentos pendentes, fatos remotos incertos e regeneração ativa;
+  a origem MANUAL não expira sua reserva por relógio.
+- **B5:** compatibilidade com schema/colunas históricas de produção, sem usar essas colunas como
+  fonte para a composição multi-item atual.
+
+Os nomes históricos não são uniformes entre documentos e testes: `B-1` também identifica a
+visibilidade imediata de pedidos MANUAL, `B-2` o registro de estorno manual de Pix e `B-3` a busca
+de envio inconclusivo em `/v1/payments/search`. O README anterior também chamava de B5 a separação
+de GETs de leitura e POSTs de reconciliação, enquanto `tests/b5-cutover.test.mjs` cobre o cutover de
+compatibilidade. Use a responsabilidade e o módulo correspondente para identificar cada regra.
+
+Os sweeps financeiros são limitados e acionados pelos fluxos de reconciliação; não há cron
+financeiro autônomo declarado nos configs. O cron de `workers/push.ts` é específico de notificações.
+Sem webhook, polling ou manutenção administrativa, não se deve prometer convergência imediata.
+GET de pagamento e busca no MP têm prazo de cinco segundos; POST de pagamento/cancelamento e
+operações de refund usam vinte segundos, incluindo leitura do corpo. Sweeps de pagamentos e
+recuperação inconclusiva selecionam até quatro candidatos; liberação local de reservas, até dez.
+
+### Estoque físico
+
+Disponibilidade livre é `max(0, estoque - estoque_reservado)`.
+`produtos` impõe `estoque >= 0` e `0 <= estoque_reservado <= estoque`.
+Atualizações em batch fazem uma disputa pela última unidade abortar integralmente quando violam
+o CHECK, sem deixar pedido/reserva parcial daquele batch.
+
+A fonte física por item é `pedido_itens.estoque_estado`:
+`NAO_APLICAVEL`, `SEM_RESERVA`, `RESERVADO`, `LIBERADO`, `BAIXADO` ou `REPOSTO`.
+`pedidos.reserva_status` e os timestamps globais são projeções de compatibilidade.
+Na confirmação financeira, `baixarEstoquePedido` converte os itens aplicáveis em baixa física,
+diminuindo estoque/reserva atomicamente dentro do batch de estoque.
+Cancelamento/expiração libera reserva sob os guards; reposição após baixa é ação distinta e auditada.
+
+Pagamento aprovado depois da liberação pode encontrar estoque insuficiente: o recebimento continua
+válido, mas `estoquePendente` sinaliza necessidade de resolução operacional. Não existe transação
+distribuída que torne recebimento remoto e disponibilidade física um único commit.
+
+### Ledger, pagamentos presenciais e resultado
+
+Métodos existentes: `PIX_MP`, `PIX_EXTERNO`, `CARTAO`, `DINHEIRO` e `A_COMBINAR`.
+O último é provisório; não comprova recebimento. Alocações waterfall distribuem cobertura entre
+itens. O backend recalcula projeções a partir dos fatos, inclusive na linhagem de trocas.
+
+O líquido agregado é `max(0, soma(PAGO) - soma(REEMBOLSADO))` e determina
+`PENDENTE` (líquido zero), `PARCIAL` (menor que total) ou `PAGO` (cobre total).
+A projeção é **persistida** em `pedidos.status_pagamento` por SQL; não é apenas um cálculo de UI.
+O pagamento já contabilizado como `PAGO` não vira um estorno por edição dessa linha:
+o reembolso é fato adicional. Há suporte explícito a pedidos legados sem ledger.
+
+Reservas de comanda MANUAL não têm expiração automática. A criação pode incluir recebimento
+presencial; outros recebimentos são lançados em `/pagamentos`. Substituição de tentativa provisória
+é explícita por `substitui_pagamento_id`, sujeita aos guards, não uma garantia de cancelamento
+automático de todo Pix existente ao registrar dinheiro/cartão.
+
+Dashboard e despesas calculam **lucro estimado** a partir do faturamento líquido e despesas ativas.
+Não equivalem a apuração contábil/fiscal completa nem calculam CMV por ficha técnica.
+
+### Estornos, cancelamentos, trocas e anulação
+
+| Ação                   | Efeito e restrições                                                                                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Estorno manual         | Registra devolução informada pelo operador; não transfere dinheiro via MP. O teto considera o pago menos reembolsos confirmados. A rota genérica é bloqueada para comanda MANUAL aberta, que exige vínculo ao item.                       |
+| Refund Pix remoto      | Cancelamento/troca/anulação usam intenção persistente e `/v1/payments/:id/refunds`, com chave estável, consulta de recuperação e guards de capacidade/exclusão mútua. Resultado ambíguo permanece recuperável, sem duplicar o fato local. |
+| Cancelamento de pedido | Valida saldo e estado, libera reservas elegíveis; não substitui o estorno de valor já recebido.                                                                                                                                           |
+| Cancelamento de item   | Usa preview e operação vinculada ao item, preservando cobertura e escolha de tratamento físico.                                                                                                                                           |
+| Troca de item          | Mantém origem/destino e ajustes financeiros/físicos rastreáveis; uma troca pendente não é edição destrutiva do item original.                                                                                                             |
+| Arquivamento           | Oculta da listagem principal sem apagar histórico; sujeito aos estados permitidos pelo handler.                                                                                                                                           |
+| Anulação               | Registro imutável em `pedido_anulacoes`; bloqueia mutações posteriores por guards e triggers. Exige resolver pendências Pix/estorno e permite escolha explícita de devolução ou perda física.                                             |
+
+O status operacional é separado do financeiro: `NOVO`, `PREPARANDO`, `PRONTO`, `ENTREGUE` e
+`CANCELADO`; `status_comanda` usa `ABERTA`/`ENCERRADA`. Triggers encerram a comanda ao atingir estado
+terminal. Pedido anulado é filtrado das consultas públicas/operacionais conforme `pedidoValidoSql`.
+Veja [ledger](docs/architecture/financial-ledger.md) e [Pix/estoque](docs/architecture/pix-and-stock.md).
+
+## 9. Segurança e integridade
+
+- Senhas: PBKDF2-SHA256, salt aleatório de 16 bytes, 100.000 iterações e comparação sem saída
+  antecipada dos bytes. Login inexistente/inativo executa verificação dummy para reduzir enumeração
+  por tempo; isso não é garantia de latência idêntica de todas as respostas.
+- Sessão: token aleatório de 32 bytes; somente SHA-256 do token fica no D1. Cookie
+  `rp_admin_session`, `HttpOnly; Secure; SameSite=Strict`, validade de sete dias.
+  Criação condicional à conta ativa e hash vigente protege corrida com redefinição de senha.
+- Mudança de senha/desativação revoga sessões; alteração da própria senha exige a senha atual.
+  OWNER controla a equipe; guards de banco impedem remover/desativar/rebaixar o último OWNER ativo.
+- `sameOrigin` compara `Origin`, ou `Referer` quando necessário, com a origem da requisição.
+  Uma mutação sem ambos é recusada. Webhook usa assinatura em vez desse mecanismo.
+- Login: limite por IP/usuário (cinco falhas) e por IP (vinte), janela/bloqueio de 15 minutos.
+  Checkout: seis novas tentativas por IP/minuto; replay é resolvido antes da contagem.
+  Reconciliação pública de reservas: doze chamadas por IP/minuto; 429 com `Retry-After`.
+- Valores, catálogo, permissão, identidade remota, método Pix, moeda BRL, referência e montante são
+  verificados no backend. Aprovação MP divergente não deve virar recebimento válido.
+- D1 combina `CHECK`, FKs, índices `UNIQUE`, triggers e updates condicionais/CAS.
+  São garantias locais; falhas entre etapas externas e projeções são tratadas por recuperação.
+- `public/_headers` define CSP, bloqueio de iframe, `nosniff`, política de referer e outras políticas
+  para assets Pages. Não presuma que todos esses headers estáticos são automaticamente aplicados
+  a respostas dinâmicas de Functions; confira o handler/middleware correspondente.
+- Token público de pedido funciona como credencial de acesso àquela consulta: evite divulgá-lo
+  em logs, capturas ou URLs compartilhadas indevidamente. Não há cadastro/autorização por cliente.
+
+### Identidade e idempotência
+
+As escritas críticas de pedido/pagamento/itens usam `operationKey`; isso não se aplica a toda
+mutação do projeto (por exemplo, CRUD de catálogo/configuração e marcação de leitura).
+`pedido_operacoes` registra chave única, tipo, escopo, ator, fingerprint, fase e resultado.
+
+`fingerprint` é `1:<JSON canônico>`: ordena chaves de objetos recursivamente, omite `undefined` e
+preserva ordem de arrays. **Não é hash, HMAC, assinatura ou autenticação.** Chave repetida com
+identidade incompatível resulta em 409; identidade compatível permite replay/recuperação conforme
+a fase. Payloads iguais com chaves distintas continuam sendo operações distintas.
+
+As identidades derivadas e constraints garantem deduplicação local; a chave determinística enviada
+ao MP cobre retries da mesma intenção remota. Não gere outra chave só porque a rede caiu.
+
+### Webhook Mercado Pago
+
+`POST /api/webhooks/mercadopago` exige `MP_WEBHOOK_SECRET` (ausente: 503) e `x-signature`
+com `ts` e `v1` (inválida: 401). O manifest assinado é
+`id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, com ID em minúsculas; os trechos ID/request-id
+só entram se presentes. O ID vem da query `data.id`/`data_id`, ou dos campos suportados no corpo.
+O corpo inteiro não entra no HMAC-SHA256. O validador não implementa janela de idade do timestamp;
+replays financeiros são contidos pelas regras de identidade/transição.
+
+Após assinatura, processa tipos `payment`/`payments` ou sem tipo; outros são reconhecidos sem efeito.
+O status vem de GET ao MP, não do payload. Associação usa ID remoto e referências; ambiguidade
+não escolhe arbitrariamente um pagamento. Falha de sincronização pode responder 502.
+
+O checkout não envia `notification_url`: cadastre a URL HTTPS
+`https://<dominio-do-ambiente>/api/webhooks/mercadopago` e eventos de pagamentos no provedor,
+conferindo token e segredo do mesmo ambiente. A configuração no painel e um teste de compra,
+notificação e convergência precisam de validação operacional; não foram executados nesta auditoria.
+
+## 10. R2, interface e PWA
+
+Upload de produto usa multipart no campo `image`, sessão, mesma origem e limite de **5 MiB**.
+Aceita JPEG, PNG e WebP, conferindo MIME declarado e assinatura binária.
+Chaves são `product-<id>-<uuid>.jpg|png|webp`: não há conversão automática para WebP no backend.
+Se a gravação da referência D1 falha, tenta apagar o objeto novo; ao substituir/remover imagem,
+tenta limpar o objeto anterior. R2 e D1 não formam uma transação atômica, e falhas de limpeza
+best-effort podem deixar objetos órfãos. A leitura da foto é pública, não autenticada.
+
+Header e frame são compartilhados entre loja e admin. O menu mobile possui controle de foco,
+fechamento por interação e navegação inferior administrativa com espaço reservado/safe area.
+O tema sincroniza atributos e `localStorage`; `index.html` aplica preferência antes da montagem.
+View Transitions usa revelação radial no desktop e crossfade no mobile quando suportada,
+respeitando movimento reduzido e fallback. Isso descreve implementação, sem prometer desempenho
+garantido em toda tela de 90/120 Hz. O login usa a apresentação própria em `src/admin/Login/`;
+não existe `AdminWave.tsx` no estado auditado.
+
+O service worker `public/sw-admin.js` não intercepta `/api/*`, não enfileira mutações offline e
+não fornece um PDV offline. Em falha de navegação, oferece a página estática de indisponibilidade.
+Ele também recebe push e abre/foca a comanda correspondente. HTTPS/permissão e suporte do navegador
+são necessários para Web Push; instalação PWA sozinha não garante entrega.
+
+## 11. Push durável e implantação separada do Worker
+
+Na transição Pix notificável ou na criação manual já paga, a intenção de push é gravada junto
+ao fato financeiro (`push_pedido_pago`, `push_exclude_usuario_id`, migration 0037).
+Depois, o fluxo tenta registrar `push_eventos` e publicar apenas
+`{ pedidoId, evento: "PEDIDO_PAGO" }` em `PUSH_QUEUE`, sem aguardar transporte Web Push.
+Falha no envio à Queue ou na criação inicial da outbox pode ser recuperada a partir da intenção.
+
+D1 é a autoridade da entrega. O consumidor adquire claim com lease renovável de 120 segundos e
+token de fencing; eventos enviados e claims ativos não são reenviados por mensagem duplicada.
+A exclusão do autor de pedido manual é persistida e preservada pela recuperação (migration 0036).
+O cron de um minuto reconstrói até cinco eventos ausentes e processa até cinco eventos elegíveis;
+falhas respeitam backoff de 30 segundos e teto de três tentativas no D1.
+Queue tem até três retries próprios para falhas de infraestrutura, sem substituir a política D1.
+
+A entrega é **at-least-once**, podendo duplicar se o serviço remoto aceitar e o processo cair antes
+da confirmação local. Não promete entrega exatamente uma vez nem push para todo evento da central.
+Marcadores antigos não são preenchidos apenas por encontrar um pedido agregado `PAGO`.
+
+`wrangler.push.toml` define `workers/push.ts`, consumidor com batch de uma mensagem, timeout de
+um segundo, cron `* * * * *`, binding DB e `workers_dev = false`.
+O **CI publica somente Pages**. Worker, Queue e secrets precisam ser provisionados/atualizados
+separadamente. O bootstrap inerte em `workers/push-bootstrap.ts` existe para cadastrar os secrets
+antes de ativar consumidor e cron.
+
+Na primeira implantação, a ordem do runbook é: migrations incluindo 0036/0037 → Queue → Worker
+bootstrap → upload conjunto e validação dos três secrets VAPID → Worker ativo com `--keep-vars`
+→ conferir DB/consumer/cron → liberar Pages com produtor. Não execute `secret put` sequencial no
+consumidor ativo como substituto desse procedimento. O Wrangler travado usa `secret bulk`;
+não há suporte à opção nova `deploy --secrets-file` nesse procedimento.
+Detalhes e comandos em [push outbox](docs/architecture/push-outbox.md).
+
+## 12. Build, CI e implantação
+
+`wrangler.toml` define Pages `rp-doces`, saída `dist`, `compatibility_date = "2024-09-23"`,
+flag `nodejs_als`, D1 `rp-doces-db`, R2 `rp-doces-images` e Queue `rp-doces-push`.
+Os IDs ficam na configuração; secrets são cadastrados fora do Git.
+
+### Fluxo de produção versionado
+
+`.github/workflows/ci.yml` roda em PR, push de `main`/`staging`, agendamento diário às 03h de Brasília
+e disparo manual. Usa Ubuntu 24.04 e Node 24. O check agregado `CI` exige sucesso de tipos/build,
+dez fatias dos testes Node e E2E Playwright. Lint não bloqueia.
+
+O job `deploy` publica Pages somente em **push na `main`**, após `CI` verde e com
+`DEPLOY_ENABLED == 'true'`. Usa environment `production`, secrets `CLOUDFLARE_ACCOUNT_ID`,
+`CLOUDFLARE_API_TOKEN` e token separado `CLOUDFLARE_D1_READ_TOKEN` no guard.
+Verifica se o SHA ainda é HEAD remoto antes de prosseguir e imediatamente antes da publicação,
+valida migrations somente por leitura, compila e executa `wrangler pages deploy dist` com projeto,
+branch e SHA explícitos. Confirma o deployment pela API Cloudflare e faz smoke de leitura.
+O sucesso de `CI` isoladamente não comprova sucesso do job de deploy.
+
+Migrations, criação de recursos e deploy do Worker não são executados automaticamente por esse job.
+Configure Direct Upload e evite uma integração Git de Pages que publique por fora desses gates,
+conforme [produção](docs/PRODUCTION-CHECKLIST.md) e [release](docs/RELEASE-CHECKLIST.md).
+
+O workflow separado `dependency-audit.yml` relata vulnerabilidades do lockfile e bloqueia
+high/critical nas dependências de produção. A aceitação de risco em
+[dependency-risk-acceptance.md](docs/architecture/dependency-risk-acceptance.md) é um registro
+datado, não uma auditoria atualizada automaticamente nem aceitação de achados futuros.
+
+### Staging
+
+Há projeto Pages, D1, R2, Queue e Worker dedicados, todos com sufixo `-staging`.
+A branch de produção do **projeto de staging** é `staging`; o slot chamado `production` pela API
+Cloudflare nesse projeto não é o projeto real de produção.
+
+Os configs Pages/Worker de staging ainda contêm `STAGING_D1_ID_REPLACE_AFTER_CREATE`.
+O validador com `--require-provisioned` deve falhar até o provisionamento/substituição corretos.
+O código versionado não comprova que os recursos já existam remotamente.
+
+O job usa environment `staging`, `STAGING_DEPLOY_ENABLED`, `STAGING_URL` e os três secrets
+`STAGING_CLOUDFLARE_ACCOUNT_ID`, `STAGING_CLOUDFLARE_API_TOKEN` e
+`STAGING_CLOUDFLARE_D1_READ_TOKEN`, sem fallback para secrets de produção.
+O build define `VITE_APP_ENV=staging`. Como Pages no Wrangler 3 rejeita `--config`, o job copia o
+config de staging para `wrangler.toml` **no checkout isolado do CI**, antes de publicar.
+Não faça essa substituição em um checkout de trabalho com alterações preexistentes.
+Veja a sequência completa em [STAGING.md](docs/STAGING.md).
+
+### Backup, restore e rollback
+
+`scripts/d1-backup.mjs` oferece `backup`, `verify`, `restore` e `normalize`, exclusivamente locais.
+Recusa modos remotos e remove variáveis de credenciais Cloudflare dos subprocessos.
+`verify` restaura em D1 local descartável e confere histórico, schema, sequências, FKs e constraints.
+O dump pode conter dados pessoais, hashes e sessões: mantenha-o fora do Git e protegido.
+
+Export/restore de produção e formato do dump remoto não foram comprovados por esta auditoria.
+Rollback de código não desfaz pagamentos externos nem é uma reversão automática do schema.
+Preserve dados e reconcilie fatos financeiros depois de recuperação; siga
+[BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md) e [ROLLBACK.md](docs/ROLLBACK.md).
+
+## 13. Limitações e pendências
+
+| Item                         | Situação no commit auditado                                                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entrega e taxa de frete      | Checkout não coleta endereço nem calcula frete; usa retirada. Configuração de disponibilidade de entrega é informativa. Não há chave Pix da loja editável nesse contrato.             |
+| Horário de funcionamento     | Exibido/configurável; não impede automaticamente novos checkouts fora do horário.                                                                                                     |
+| Imagens da Home no admin     | `ImagensPaginaInicialPanel.tsx` mantém estado local, botão Escolher sem ação e referências antigas a JPG. Não salva imagens da Home; assets reais estão em `public/images/`.          |
+| Excedente financeiro         | Pagamentos excedentes podem ser preservados no ledger; não há carteira/crédito de loja dedicada.                                                                                      |
+| Edição integral de itens     | PUT retorna 409; usar os fluxos implementados de adição, cancelamento e troca.                                                                                                        |
+| Aprovação tardia sem estoque | Pode haver pedido pago com `estoquePendente`; exige tratamento operacional, não aprovação/baixa inventada na UI.                                                                      |
+| Estoque de insumos/CMV       | Despesas não implementam ficha técnica, estoque de ingredientes ou baixa automática por receita. Lucro é estimado.                                                                    |
+| Offline                      | PWA oferece fallback, não operação transacional offline.                                                                                                                              |
+| Tempo de convergência        | Reconciliação financeira depende de gatilhos HTTP/webhook; cron existente é de push.                                                                                                  |
+| Push                         | Depende de Worker/secrets/Queue fora do deploy Pages; há possibilidade de duplicidade e teto de tentativas. Lotes de recuperação de cinco podem exigir ajuste para backlog maior.     |
+| Staging                      | Configuração preparada com placeholder D1; provisionamento remoto não demonstrado.                                                                                                    |
+| Bootstrap de equipe          | Primeiro OWNER exige inserção controlada; não existe assistente/script de cadastro inicial.                                                                                           |
+| Dependências/lint            | React Router permanece em v6; há triagem de risco datada. Lint tem baseline e não bloqueia CI. Não foi feito novo `npm audit` de rede nesta auditoria.                                |
+| Documentos complementares    | `docs/architecture/overview.md` ainda cita Tailwind/Lucide sem correspondência nas dependências. Use este README e o código para resolver essa divergência; o arquivo foi preservado. |
+| Evidência operacional        | Não foram consultados secrets, recursos Cloudflare, painel MP, status de release/tag ou deploys remotos. Testes locais não comprovam produção.                                        |
+
+Outra divergência a verificar no ambiente publicado: `index.html` contém script inline de tema,
+mas a CSP estática permite `script-src 'self'` sem nonce/hash para ele. Essa combinação pode bloquear
+a aplicação antecipada do tema no Pages. Os arquivos foram preservados nesta auditoria documental.
+
+## 14. Referências e manutenção
+
+- [Visão arquitetural complementar](docs/architecture/overview.md) — contém a divergência de stack indicada acima.
+- [Ledger financeiro](docs/architecture/financial-ledger.md).
+- [Pix e estoque](docs/architecture/pix-and-stock.md).
+- [Migrations D1](docs/architecture/database-migrations.md).
+- [Outbox e implantação do push](docs/architecture/push-outbox.md).
+- [Estratégia de testes](docs/architecture/testing-strategy.md).
+- [Aceitação datada de risco de dependências](docs/architecture/dependency-risk-acceptance.md).
+- [Checklist de produção](docs/PRODUCTION-CHECKLIST.md).
+- [Checklist de release](docs/RELEASE-CHECKLIST.md).
+- [Staging](docs/STAGING.md).
+- [Backup e restore](docs/BACKUP-RESTORE.md).
+- [Rollback](docs/ROLLBACK.md).
+- [Changelog](CHANGELOG.md).
+
+Ao alterar contratos, configurações, regras de domínio ou scripts, atualize esta documentação junto
+da implementação e valide caminhos/comandos. Registre separadamente o que foi inspecionado,
+executado localmente e verificado no ambiente remoto. Não trate checklists preenchíveis, planos,
+comentários antigos ou resultados de outra revisão como evidência da versão atual.
