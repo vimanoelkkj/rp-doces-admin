@@ -1,4 +1,4 @@
-# R&P Doces — Backup e restore do D1
+# R&P Doces — Cópia de segurança e restauração do D1
 
 Procedimento para exportar o banco, **provar que o export restaura** e restaurar em ambiente descartável.
 Complementa `docs/ROLLBACK.md` (incidentes) e `docs/architecture/database-migrations.md` (migrations).
@@ -32,7 +32,7 @@ Complementa `docs/ROLLBACK.md` (incidentes) e `docs/architecture/database-migrat
 Time Travel continua sendo o primeiro recurso para desfazer algo no banco. O export SQL serve para cópia fora da
 plataforma, auditoria e restore em um banco novo.
 
-## 1. Backup do banco local (validado)
+## 1. Cópia de segurança do banco local (validado)
 
 ```bash
 # D1 local do repositório (o mesmo de `npm run pages:dev`); roda a verificação no final
@@ -44,7 +44,7 @@ node scripts/d1-backup.mjs backup --dir <pasta-com-.wrangler/state> --out backup
 Gera `backups/d1-local-AAAAMMDD-HHMMSS.sql` e `.sql.sha256`. Não sobrescreve arquivo existente. Use `--no-verify`
 para pular a verificação (não recomendado).
 
-## 2. Backup do banco de produção (NÃO executado aqui)
+## 2. Cópia de segurança do banco de produção (NÃO executado aqui)
 
 Exige credencial da Cloudflare e é uma operação sobre o banco real. Só leitura, mas a Cloudflare documenta que o
 export remoto pode afetar a disponibilidade do banco enquanto roda: confira a página "Import and export data" do D1

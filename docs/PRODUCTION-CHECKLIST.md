@@ -1,4 +1,4 @@
-# R&P Doces — Checklist de produção
+# R&P Doces — Lista de verificação de produção
 
 Estado que a produção precisa ter para a loja operar com segurança: na abertura (go-live) e em revisões
 periódicas. Para publicar uma versão, use o [checklist de release](RELEASE-CHECKLIST.md). Em incidente, o
@@ -12,7 +12,7 @@ periódicas. Para publicar uma versão, use o [checklist de release](RELEASE-CHE
 - Comandos `wrangler ... --remote` e `wrangler pages ...` precisam de login ou token da Cloudflare. Nunca cole token
   em chat, issue ou commit: cite só o nome da variável.
 
-## 1. Secrets e bindings
+## 1. Segredos e vínculos
 
 | Onde                                  | Nome                                                             | Uso                                                                                      |
 | ------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -48,12 +48,12 @@ periódicas. Para publicar uma versão, use o [checklist de release](RELEASE-CHE
 
 - [ ] **[MANUAL]** O binding `PRODUCT_IMAGES` aponta para o bucket `rp-doces-images` no projeto Pages (produção).
 - [ ] **[MANUAL]** Uma imagem do catálogo abre (200 e `image/*`): o comando está no checklist pós-recuperação do
-      [ROLLBACK](ROLLBACK.md#checklist-pós-recuperação) (item R2).
+      [ROLLBACK](ROLLBACK.md#lista-de-verificação-pós-recuperação) (item R2).
 - [ ] **[MANUAL]** Decisão registrada sobre backup do R2: o repositório só cobre o D1 ([lacunas](#16-lacunas-conhecidas)).
 
 ## 4. Mercado Pago
 
-- [ ] **[MANUAL]** Todos os itens do [checklist de go-live do Mercado Pago](../README.md#checklist-de-produção-go-live-do-mercado-pago)
+- [ ] **[MANUAL]** Todos os itens da [verificação de entrada em produção do Mercado Pago](../README.md#webhook-mercado-pago)
       do README: URL `https://rpdoces.com.br/api/webhooks/mercadopago`, evento de pagamentos, chave de assinatura igual a
       `MP_WEBHOOK_SECRET`, Pix real de baixo valor, notificação respondida com `200`, pedido em `PAGO`. Sem
       `MP_WEBHOOK_SECRET` o webhook responde `503` e nada é processado.
@@ -62,7 +62,7 @@ periódicas. Para publicar uma versão, use o [checklist de release](RELEASE-CHE
 - [ ] **[MANUAL]** O webhook está cadastrado mesmo que o sistema convirja sem ele: o polling do cliente e a
       reconciliação do admin só cobrem o atraso (README §24).
 
-## 5. VAPID e push
+## 5. VAPID e notificações push
 
 - [ ] **[MANUAL]** `VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` presentes (seção 1). Sem a pública,
       `GET /api/admin/push/vapid-key` responde `503` ("Chave VAPID pública não configurada no servidor") e nenhum
@@ -83,7 +83,7 @@ periódicas. Para publicar uma versão, use o [checklist de release](RELEASE-CHE
 - [ ] **[MANUAL]** O admin é aberto na mesma origem que serve `/api/*`: as mutações exigem `sameOrigin` (o `Origin` ou o
       `Referer` precisa ser a origem da requisição).
 
-## 7. Migrations aplicadas e verificadas
+## 7. Migrações aplicadas e verificadas
 
 - [ ] **[AUTO]** Migration Guard (`scripts/check-d1-migrations.mjs`, job `deploy`, só `SELECT`): reprova com migration
       pendente, lacuna, desconhecida, duplicada, fora de ordem ou schema da última migration ausente (exit 1 a 4).
@@ -95,7 +95,7 @@ periódicas. Para publicar uma versão, use o [checklist de release](RELEASE-CHE
 - Regras: migrations são aplicadas à mão, antes do deploy, e nunca se edita uma já aplicada
   ([database-migrations](architecture/database-migrations.md), [ROLLBACK](ROLLBACK.md) regra 5).
 
-## 8. Backup recente
+## 8. Cópia de segurança recente
 
 Hoje não há agendamento e o export remoto nunca foi executado por este repositório ([BACKUP-RESTORE](BACKUP-RESTORE.md)).
 
@@ -106,7 +106,7 @@ Hoje não há agendamento e o export remoto nunca foi executado por este reposit
 - [ ] **[MANUAL]** O arquivo está fora do repositório, em local restrito e cifrado: tem dados pessoais e hashes de senha.
 - [ ] **[MANUAL]** Bookmark atual do Time Travel anotado (seção 2). Retenção: 30 dias no plano pago, 7 no gratuito.
 
-## 9. Restore testado
+## 9. Restauração testada
 
 - [ ] **[AUTO]** `tests/d1-backup-restore.test.mjs` roda nas fatias do CI: backup, restore e verificação em D1 local, com
       as migrations reais.
@@ -116,7 +116,7 @@ Hoje não há agendamento e o export remoto nunca foi executado por este reposit
       ([BACKUP-RESTORE §4](BACKUP-RESTORE.md#4-restaurar-em-produção-não-automatizado-não-executado)). Ele nunca foi
       executado.
 
-## 10. Rollback conhecido
+## 10. Procedimento de reversão conhecido
 
 - [ ] **[MANUAL]** Quem opera sabe pausar o deploy (`DEPLOY_ENABLED=false`), achar o SHA no ar e o último deployment
       saudável e restaurar pelo painel ([ROLLBACK](ROLLBACK.md), seções 1 a 5).
@@ -124,7 +124,7 @@ Hoje não há agendamento e o export remoto nunca foi executado por este reposit
       `npx wrangler pages deployment list --project-name rp-doces --environment production`.
 - Registro honesto: o rollback do Pages nunca foi executado em produção.
 
-## 11. Smoke pós-deploy
+## 11. Testes básicos após a implantação
 
 - [ ] **[AUTO]** O job `deploy` roda `scripts/smoke-production.mjs` depois de confirmar o SHA, só com `GET`: `/` (HTML),
       asset principal (JS ou CSS), `/api/produtos` e `/api/config` com contrato válido, `/api/admin/pedidos` sem sessão

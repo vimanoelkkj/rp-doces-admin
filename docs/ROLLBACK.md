@@ -1,4 +1,4 @@
-# R&P Doces — Rollback e recuperação
+# R&P Doces — Reversão e recuperação
 
 Guia para o operador durante um incidente em produção. Leia "Regras" e "Mapa" antes de agir.
 
@@ -66,7 +66,7 @@ Arquivo: `.github/workflows/ci.yml`.
 
 ---
 
-## 1. Pausar novos deployments (não restaura nada)
+## 1. Pausar novas implantações (não restaura nada)
 
 Painel: GitHub > repositório `vimanoelkkj/rp-doces-admin` > Settings > Secrets and variables > Actions >
 Variables > `DEPLOY_ENABLED` > valor `false`.
@@ -111,7 +111,7 @@ curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
 Compare com a `main`: `git fetch origin && git rev-parse origin/main`. Se forem diferentes, a produção
 não está na `main` (por rollback, deploy pausado, falha ou deploy em andamento).
 
-## 3. Localizar o último deployment saudável
+## 3. Localizar a última implantação saudável
 
 1. Liste os deployments de produção (comando da seção 2). Candidatos: linhas com Status de sucesso
    (não "Idle", não falha).
@@ -186,7 +186,7 @@ Notas:
 4. Se a validação falhar, escolha: outro deployment saudável mais antigo (volte à seção 3) ou, se o problema é o
    banco, a seção C.
 
-## 7. Reativar os deployments com segurança
+## 7. Reativar as implantações com segurança
 
 Só depois de:
 
@@ -220,7 +220,7 @@ A `main` deve continuar a receber commits por PR; nunca reescreva o histórico.
 
 ## Cenários
 
-### A. Deploy com problema visual ou funcional (banco intacto)
+### A. Implantação com problema visual ou funcional (banco intacto)
 
 1. Seção 1 (pausar). 2. Seção 2 (SHA atual) e 3 (alvo). 3. Seção 4: `git diff ALVO..origin/main -- migrations/`
    vazio ou só aditivo e compatível. 4. Seção 5 (rollback pelo painel). 5. Seção 6. 6. Correção por revert via PR e
@@ -229,7 +229,7 @@ A `main` deve continuar a receber commits por PR; nunca reescreva o histórico.
 Se o problema é só de frontend e a correção é rápida, prefira um PR de correção (o pipeline é seguro) em vez
 de rollback, mantendo a pausa até o CI ficar verde.
 
-### B. O deploy falhou depois do upload
+### B. A implantação falhou depois do envio
 
 Não reexecute às cegas.
 
@@ -250,7 +250,7 @@ Não reexecute às cegas.
      reexecute.
 4. Se o site ficou inconsistente (deployment parcial), trate como cenário A.
 
-### C. Migration incompatível (código e schema não combinam)
+### C. Migração incompatível (código e schema não combinam)
 
 **Não restaure o banco nem execute SQL corretivo sem avaliação específica.** Pedidos, pagamentos e reembolsos
 são dados financeiros.
@@ -337,7 +337,7 @@ Ao operar:
 
 ---
 
-## Checklist pós-recuperação
+## Lista de verificação pós-recuperação
 
 Somente leitura. **Não** gere Pix real, reembolso, pedido de teste nem "Diagnósticos" que gravem eventos.
 

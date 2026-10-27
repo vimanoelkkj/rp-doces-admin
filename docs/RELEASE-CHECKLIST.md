@@ -1,4 +1,4 @@
-# R&P Doces — Checklist de release
+# R&P Doces — Lista de verificação de publicação
 
 Procedimento para publicar uma versão na produção (Cloudflare Pages). Estado esperado da produção:
 [PRODUCTION-CHECKLIST](PRODUCTION-CHECKLIST.md). Incidente e rollback: [ROLLBACK](ROLLBACK.md). Backup do banco:
@@ -44,7 +44,7 @@ O CI repete tudo; rodar antes evita um ciclo de falha.
       [aceitação de risco do React Router](architecture/dependency-risk-acceptance.md) e seus critérios de reavaliação.
 - [ ] **[MANUAL]** `git diff --check` e revisão do diff: sem tokens, `.dev.vars`, dumps nem `backups/`.
 
-## 3. Migrations
+## 3. Migrações
 
 Só se `git diff --name-only origin/main..HEAD -- migrations/` listar arquivos. Sem migration nova, marque N/A.
 
@@ -85,7 +85,7 @@ O deployment continua identificado pelo **SHA** (`wrangler pages deploy --commit
 - [ ] **[MANUAL, após autorização de publicação]** Criar a tag anotada `v1.0.0` no SHA publicado, depois do smoke verde:
       `git tag -a v1.0.0 <sha> -m "R&P Doces v1.0.0"` e `git push origin v1.0.0`. Não executar durante a preparação.
 
-## 5. Deploy
+## 5. Implantação
 
 - [ ] **[AUTO]** Push na `main` dispara o CI e depois o `deploy`. Acompanhe em GitHub > Actions > CI ou com
       `gh run list --repo vimanoelkkj/rp-doces-admin --workflow CI --branch main --limit 3`.
@@ -104,10 +104,10 @@ O deployment continua identificado pelo **SHA** (`wrangler pages deploy --commit
       `npx wrangler pages deployment list --project-name rp-doces --environment production`. A linha mais recente tem
       Source igual a `git rev-parse --short=7 HEAD` e sucesso; ignore as linhas "Idle". O site não expõe o SHA.
 
-## 7. Smoke pós-deploy
+## 7. Testes básicos após a implantação
 
 - [ ] **[AUTO]** Passo "Smoke test pós-deploy (somente leitura)" verde. O que ele cobre:
-      [PRODUCTION-CHECKLIST](PRODUCTION-CHECKLIST.md#11-smoke-pós-deploy).
+      [PRODUCTION-CHECKLIST](PRODUCTION-CHECKLIST.md#11-testes-básicos-após-a-implantação).
 - [ ] **[MANUAL]** Para repetir fora do pipeline: `npm run smoke:prod` termina com exit 0.
 
 ## 8. Validação manual curta
@@ -121,17 +121,17 @@ Cerca de 10 minutos, só leitura:
 
 Valide também conforme o que o release tocou:
 
-| O release mexeu em                      | Valide também                                                                                                                                                                                                                                                              |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Checkout, Pix, ledger, estoque, webhook | Um pedido existente `PAGO` continua `PAGO`; os reembolsos continuam listados com os mesmos valores; o estoque do admin bate com o cardápio. Se mudou a integração com o Mercado Pago, o [checklist de go-live](../README.md#checklist-de-produção-go-live-do-mercado-pago) |
-| Imagens ou R2                           | Uma imagem do catálogo abre (200, `image/*`): comando no checklist pós-recuperação do [ROLLBACK](ROLLBACK.md#checklist-pós-recuperação)                                                                                                                                    |
-| Push ou notificações                    | [PRODUCTION-CHECKLIST](PRODUCTION-CHECKLIST.md#5-vapid-e-push)                                                                                                                                                                                                             |
-| Login, papéis, admin                    | Login; `/api/admin/pedidos` sem sessão = `401` (o smoke cobre); OWNER x ADMIN                                                                                                                                                                                              |
-| Migrations                              | `npm run db:migrations:check` e as telas que leem as tabelas alteradas                                                                                                                                                                                                     |
+| O release mexeu em                      | Valide também                                                                                                                                                                                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checkout, Pix, ledger, estoque, webhook | Um pedido existente `PAGO` continua `PAGO`; os reembolsos continuam listados com os mesmos valores; o estoque do admin bate com o cardápio. Se mudou a integração com o Mercado Pago, o [checklist de go-live](../README.md#webhook-mercado-pago) |
+| Imagens ou R2                           | Uma imagem do catálogo abre (200, `image/*`): comando no checklist pós-recuperação do [ROLLBACK](ROLLBACK.md#lista-de-verificação-pós-recuperação)                                                                                                |
+| Push ou notificações                    | [PRODUCTION-CHECKLIST](PRODUCTION-CHECKLIST.md#5-vapid-e-notificações-push)                                                                                                                                                                       |
+| Login, papéis, admin                    | Login; `/api/admin/pedidos` sem sessão = `401` (o smoke cobre); OWNER x ADMIN                                                                                                                                                                     |
+| Migrations                              | `npm run db:migrations:check` e as telas que leem as tabelas alteradas                                                                                                                                                                            |
 
-A versão completa, só leitura, é o [checklist pós-recuperação](ROLLBACK.md#checklist-pós-recuperação) do ROLLBACK.
+A versão completa, só leitura, é o [checklist pós-recuperação](ROLLBACK.md#lista-de-verificação-pós-recuperação) do ROLLBACK.
 
-## 9. Rollback, se necessário
+## 9. Reversão, se necessário
 
 Quando: o smoke ou a validação manual falhou, ou há erro em pedido ou pagamento. Não improvise: [ROLLBACK](ROLLBACK.md).
 
@@ -144,25 +144,25 @@ Quando: o smoke ou a validação manual falhou, ou há erro em pedido ou pagamen
 
 - [ ] **[MANUAL]** Registre alvo, motivo e resultado nas notas da release.
 
-## 10. Release notes
+## 10. Notas da versão
 
 Fonte das mudanças: [CHANGELOG.md](../CHANGELOG.md). Registro operacional: comentário no PR ou na issue da release;
 GitHub Release somente após autorização de publicação.
 Modelo:
 
 ```text
-Release v1.0.0 — <sha7>
+Versão v1.0.0 — <sha7>
 - Publicado em AAAA-MM-DD HH:MM (BRT) por <nome> · Execução: <link do Actions>
 - Mudanças (git log --oneline <sha-anterior>..<sha>):
   - ...
-- Migrations: nenhuma | 00NN_nome.sql (aplicada em AAAA-MM-DD, antes do deploy)
+- Migrações: nenhuma | 00NN_nome.sql (aplicada em AAAA-MM-DD, antes do deploy)
 - Backup antes do schema: bookmark Time Travel <id> · export <arquivo> (verify OK) | N/A
 - Validações: CI verde (<link>) · smoke automático OK · validação manual curta OK
 - Riscos e observações: ...
-- Rollback: alvo <sha-anterior-saudável> (compatível com o schema: sim | não)
+- Reversão: alvo <sha-anterior-saudável> (compatível com o schema: sim | não)
 ```
 
-## 11. Bloqueadores de release
+## 11. Bloqueadores de publicação
 
 Não publique, ou pare, se qualquer item for verdadeiro:
 

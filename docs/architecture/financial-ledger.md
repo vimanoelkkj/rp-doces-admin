@@ -1,27 +1,27 @@
-# Financial Ledger Architecture
+# Arquitetura do registro financeiro
 
-## 1. Principles and Invariants
+## 1. Princípios e invariantes
 
-The financial domain in RP Doces operates on ledger principles: historical payment receipts and disbursements are recorded as discrete facts. Financial positions are derived dynamically rather than updated over historical records.
+O domínio financeiro da R&P Doces segue os princípios de um registro financeiro (ledger): recebimentos e desembolsos históricos são registrados como fatos individuais. As posições financeiras são derivadas dinamicamente, em vez de sobrescrever registros históricos.
 
-### 1.1 Integer Cents (`*_centavos`)
+### 1.1 Centavos inteiros (`*_centavos`)
 
-All monetary values in the codebase, database schema, APIs, and client-side calculations are represented as integer cents (`INTEGER` in SQLite, `number` in TypeScript constrained to integer domain):
+Todos os valores monetários do código, schema do banco, APIs e cálculos no cliente são representados em centavos inteiros (`INTEGER` no SQLite e `number` no TypeScript restrito ao domínio inteiro):
 
 ```sql
 valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0)
 ```
 
-- **Database Level**: Schema definitions enforce `INTEGER NOT NULL` and `CHECK (valor_centavos > 0)`.
-- **Application Level**: Floating-point types (`REAL`, `FLOAT`) are avoided by convention. TypeScript interfaces represent currency in integer cents.
-- **Presentation Level**: Display formatting (converting integer cents to BRL currency strings) occurs strictly at the UI boundary using `Intl.NumberFormat`.
-- **Rounding Rule**: Intermediate calculations requiring division (such as itemized discounts or partial allocations) apply explicit integer rounding rules (`Math.round` or floor/ceil cascades) to ensure cent conservation.
+- **Banco de dados**: as definições do schema impõem `INTEGER NOT NULL` e `CHECK (valor_centavos > 0)`.
+- **Aplicação**: tipos de ponto flutuante (`REAL`, `FLOAT`) são evitados por convenção. As interfaces TypeScript representam moeda em centavos inteiros.
+- **Apresentação**: a formatação de exibição (conversão de centavos inteiros para textos monetários em BRL) ocorre exclusivamente na fronteira da interface, usando `Intl.NumberFormat`.
+- **Regra de arredondamento**: cálculos intermediários que exigem divisão (como descontos por item ou alocações parciais) aplicam regras explícitas de arredondamento inteiro (`Math.round` ou cascatas de floor/ceil) para garantir a conservação dos centavos.
 
 ---
 
-## 2. Ledger Schema Structure
+## 2. Estrutura do schema financeiro
 
-The financial state of an order is distributed across dedicated ledger tables:
+O estado financeiro de um pedido é distribuído entre tabelas dedicadas:
 
 ```
 +--------------------------+
@@ -63,28 +63,28 @@ The financial state of an order is distributed across dedicated ledger tables:
 +------------------------------+
 ```
 
-### 2.1 Immutability and Lifecycle of Payments (`pedido_pagamentos`)
+### 2.1 Imutabilidade e ciclo de vida dos pagamentos (`pedido_pagamentos`)
 
-- **Lifecycle Transitions**: Rows in `pedido_pagamentos` are created with `status = 'PENDENTE'` and advance through their lifecycle (`PAGO`, `CANCELADO`, `EXPIRADO`, `FALHOU`).
-- **Accounting Immutability**: By application convention, once a payment row reaches a settled state (`PAGO`), its incoming monetary amount (`valor_centavos`) is never reduced or edited in place.
-- **Refund Segregation**: Monetary reductions, cancellations, and customer reimbursements do not overwrite the original payment row; they are written as discrete, additive entries in `pedido_reembolsos`.
+- **Transições do ciclo de vida**: linhas de `pedido_pagamentos` são criadas com `status = 'PENDENTE'` e avançam pelo ciclo (`PAGO`, `CANCELADO`, `EXPIRADO`, `FALHOU`).
+- **Imutabilidade contábil**: por convenção da aplicação, quando uma linha de pagamento chega ao estado liquidado (`PAGO`), seu valor recebido (`valor_centavos`) nunca é reduzido nem editado diretamente.
+- **Separação dos reembolsos**: reduções monetárias, cancelamentos e devoluções a clientes não sobrescrevem a linha original de pagamento; são gravados como registros individuais e aditivos em `pedido_reembolsos`.
 
-### 2.2 Additive Refunds (`pedido_reembolsos`)
+### 2.2 Reembolsos aditivos (`pedido_reembolsos`)
 
-- Refunds represent discrete outbound financial events tied directly to a specific parent payment.
-- Attributes include `pedido_id`, `pagamento_id`, `valor_centavos`, `origem` (`'MERCADO_PAGO'` | `'MANUAL'`), `status` (`'PENDENTE'` | `'REEMBOLSADO'` | `'FALHOU'`), and a unique `idempotency_key`.
-- Multiple partial refunds can reference the same payment up to the total received amount.
+- Reembolsos representam eventos financeiros individuais de saída, ligados diretamente a um pagamento de origem específico.
+- Os atributos incluem `pedido_id`, `pagamento_id`, `valor_centavos`, `origem` (`'MERCADO_PAGO'` | `'MANUAL'`), `status` (`'PENDENTE'` | `'REEMBOLSADO'` | `'FALHOU'`) e uma `idempotency_key` única.
+- Vários reembolsos parciais podem referenciar o mesmo pagamento, até o limite total recebido.
 
-### 2.3 Proportional Payment Allocation (`pedido_pagamento_alocacoes`)
+### 2.3 Alocação proporcional de pagamentos (`pedido_pagamento_alocacoes`)
 
-- When an order containing multiple items is paid, the payment is mapped to individual items via `pedido_pagamento_alocacoes`.
-- This allocation records the exact distribution of settled funds across line items, enabling item-level cancellation, substitution, and refund tracking without ambiguous revenue attribution.
+- Quando um pedido com vários itens é pago, o pagamento é associado aos itens individuais por `pedido_pagamento_alocacoes`.
+- Essa alocação registra a distribuição exata dos valores liquidados entre os itens, permitindo rastrear cancelamentos, substituições e reembolsos por item sem ambiguidade na atribuição da receita.
 
 ---
 
-## 3. Dynamic Aggregation Model
+## 3. Modelo de agregação dinâmica
 
-To avoid data anomalies resulting from mutable balance columns, net order balance and settlement status are projected dynamically from ledger rows:
+Para evitar anomalias de dados decorrentes de colunas de saldo mutáveis, o saldo líquido e o status de liquidação do pedido são projetados dinamicamente a partir dos registros financeiros:
 
 ```sql
 SELECT
@@ -102,28 +102,28 @@ WHERE p.id = ?
 GROUP BY p.id;
 ```
 
-- An order is settled when `saldo_liquido_centavos >= p.valor_total_centavos`.
-- Overpayments or partial balances are surfaced transparently from the difference between aggregate credits and debits.
+- Um pedido está liquidado quando `saldo_liquido_centavos >= p.valor_total_centavos`.
+- Pagamentos excedentes ou saldos parciais são expostos de forma transparente pela diferença entre créditos e débitos agregados.
 
 ---
 
-## 4. Idempotency Protocol (A1 Pattern)
+## 4. Protocolo de idempotência (padrão A1)
 
-Financial mutations (order creation, payment registration, refund requests) avoid duplicate writes under retries and network duplication via the A1 idempotency pattern.
+Mutações financeiras (criação de pedido, registro de pagamento e solicitação de reembolso) evitam gravações duplicadas em novas tentativas e duplicações de rede por meio do padrão de idempotência A1.
 
-### 4.1 Client Key Generation (`src/lib/operationKey.ts`)
+### 4.1 Geração da chave no cliente (`src/lib/operationKey.ts`)
 
-1. The client generates an `operationKey` (UUID v4 or stable formatted string matching `^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$`) prior to the first network transmission.
-2. The request transmits both `operationKey` and the payload to the API endpoint.
-3. The server computes `fingerprint(payload)` from `functions/lib/operacaoIdentity.ts`. Its format is `<version>:<canonical JSON>`, currently `1:<canonical JSON>` (`FINGERPRINT_VERSAO = 1`). The private `canonical` helper recursively sorts object keys, omits object properties whose value is `undefined`, and preserves array order. Other values follow `JSON.stringify` semantics, including `null` and `undefined` in arrays.
+1. O cliente gera uma `operationKey` (UUID v4 ou texto estável no formato `^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$`) antes da primeira transmissão de rede.
+2. A requisição envia `operationKey` e o corpo de dados ao endpoint da API.
+3. O servidor calcula `fingerprint(payload)` de `functions/lib/operacaoIdentity.ts`. O formato é `<version>:<canonical JSON>`, atualmente `1:<canonical JSON>` (`FINGERPRINT_VERSAO = 1`). A função auxiliar privada `canonical` ordena recursivamente as chaves dos objetos, omite propriedades cujo valor é `undefined` e preserva a ordem dos arrays. Os demais valores seguem a semântica de `JSON.stringify`, incluindo `null` e `undefined` em arrays.
 
-Each caller selects the fields passed to `fingerprint(payload)`; the helper does not select fields or automatically include the entire request. For example, checkout includes sorted item ID/quantity pairs, `nome`, `whatsapp`, and `recado`, but excludes server-resolved prices. The operation key and type/scope/actor checks are separate from this payload identity.
+Cada ponto de chamada seleciona os campos passados a `fingerprint(payload)`; a função auxiliar não seleciona campos nem inclui automaticamente a requisição inteira. Por exemplo, o checkout inclui pares ordenados de ID/quantidade dos itens, `nome`, `whatsapp` e `recado`, mas exclui preços resolvidos pelo servidor. A chave de operação e as verificações de tipo/escopo/ator são separadas dessa identidade dos dados.
 
-The fingerprint is a deterministic, canonical, versioned payload identity used to detect incompatible reuse of the same operation key. It is not a hash, signature, HMAC, authentication mechanism, or cryptographic protection against tampering. Deduplication uses the operation key: identical payloads with different keys remain distinct operations.
+O fingerprint é uma identidade determinística, canônica e versionada dos dados, usada para detectar reutilização incompatível da mesma chave de operação. Não é hash, assinatura, HMAC, mecanismo de autenticação nem proteção criptográfica contra adulteração. A deduplicação usa a chave de operação: dados idênticos com chaves diferentes continuam sendo operações distintas.
 
-### 4.2 Server-Side Execution and Replay Handling (`pedido_operacoes`)
+### 4.2 Execução no servidor e tratamento de reexecução (`pedido_operacoes`)
 
-The database maintains an authoritative operation ledger (`migrations/0012_operacoes_idempotencia.sql`):
+O banco mantém um registro autoritativo de operações (`migrations/0012_operacoes_idempotencia.sql`):
 
 ```sql
 CREATE TABLE pedido_operacoes (
@@ -150,14 +150,14 @@ CREATE TABLE pedido_operacoes (
 CREATE UNIQUE INDEX uq_pedido_operacoes_key ON pedido_operacoes(operation_key);
 ```
 
-### 4.3 Atomic Batch Claim Protocol
+### 4.3 Protocolo de aquisição atômica em lote
 
-1. **Atomic Ingestion**: The creation of local business records (e.g., `pedidos`, `pedido_pagamentos`) and the operation claim (`pedido_operacoes` with `fase='LOCAL_CRIADA'`) are executed together in a single `env.DB.batch()` transaction.
-2. **Race Resolution**:
-   - If two identical requests race, one batch succeeds and claims the unique index `uq_pedido_operacoes_key`.
-   - The competing request fails with a unique constraint violation on `operation_key`, triggering an automatic rollback of its entire batch.
-3. **Replay Flow**:
-   - On conflict, the handler fetches the existing operation via `buscarOperacao`.
-   - `conflitoOperacao` checks compatibility in order: type (`OPERACAO_CONFLITO_TIPO`), scope and actor (`OPERACAO_CONFLITO_ESCOPO`), then fingerprint version and exact string (`OPERACAO_CONFLITO_PAYLOAD`).
-   - If all checks match, the server safely replays the outcome (e.g., via `replayCheckout`).
-   - Incompatible reuse returns HTTP `409 Conflict`, blocking conflicting mutation attempts. A different fingerprint version is also a payload conflict, never an equivalent payload.
+1. **Registro atômico**: a criação dos registros locais de negócio (por exemplo, `pedidos` e `pedido_pagamentos`) e a aquisição da operação (`pedido_operacoes` com `fase='LOCAL_CRIADA'`) são executadas juntas em uma única transação `env.DB.batch()`.
+2. **Resolução de concorrência**:
+   - Se duas requisições idênticas disputam a operação, um lote tem sucesso e adquire o índice único `uq_pedido_operacoes_key`.
+   - A requisição concorrente falha por violação de unicidade em `operation_key`, provocando rollback automático de todo o seu lote.
+3. **Fluxo de reexecução**:
+   - Em caso de conflito, o handler busca a operação existente por `buscarOperacao`.
+   - `conflitoOperacao` verifica a compatibilidade nesta ordem: tipo (`OPERACAO_CONFLITO_TIPO`), escopo e ator (`OPERACAO_CONFLITO_ESCOPO`), depois versão e texto exato do fingerprint (`OPERACAO_CONFLITO_PAYLOAD`).
+   - Se todas as verificações coincidirem, o servidor retorna com segurança o resultado anterior (por exemplo, via `replayCheckout`).
+   - Reutilização incompatível retorna HTTP `409 Conflict`, bloqueando tentativas de mutação conflitantes. Uma versão diferente do fingerprint também é um conflito de dados, nunca um corpo equivalente.

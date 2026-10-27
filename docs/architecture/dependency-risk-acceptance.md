@@ -1,44 +1,44 @@
-# Dependency risk acceptance for v1.0
+# Aceitação de risco de dependências para a v1.0
 
-## Scope and baseline
+## Escopo e situação de referência
 
-Accepted for v1.0 by the project owner on 2026-10-06, based on the production dependency audit and source inspection performed that day.
+Aceitação para a v1.0 pelo responsável pelo projeto em 06/10/2026, com base na auditoria de dependências de produção e na inspeção do código-fonte realizadas naquele dia.
 
-- Command: `npm audit --omit=dev`.
-- Result: **2 moderate, 0 high, 0 critical** vulnerabilities.
-- Installed versions match the lockfile: `rp-doces` → `react-router-dom@6.30.6` → `react-router@6.30.6`.
-- The audit counts two affected packages; both point to the two React Router advisories below. The acceptance does not cover future advisories or architecture changes.
+- Comando: `npm audit --omit=dev`.
+- Resultado: **2 vulnerabilidades moderadas, 0 altas e 0 críticas**.
+- As versões instaladas coincidem com o arquivo de trava de dependências: `rp-doces` → `react-router-dom@6.30.6` → `react-router@6.30.6`.
+- A auditoria contabiliza dois pacotes afetados; ambos apontam para os dois avisos de segurança do React Router abaixo. A aceitação não cobre avisos futuros nem mudanças de arquitetura.
 
-## External redirect: accepted risk for v1.0
+## Redirecionamento externo: risco aceito para a v1.0
 
-**[GHSA-wrjc-x8rr-h8h6 / CVE-2026-53669](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6)** — moderate severity.
+**[GHSA-wrjc-x8rr-h8h6 / CVE-2026-53669](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6)** — severidade moderada.
 
-Attacker-supplied navigation paths containing backslashes can cause unexpected external redirects. The application uses affected APIs (`Link` and `useNavigate`), but no destination completely controlled by a user was identified in the inspected flows.
+Caminhos de navegação fornecidos por um atacante e contendo barras invertidas podem causar redirecionamentos externos inesperados. A aplicação usa APIs afetadas (`Link` e `useNavigate`), mas não foi identificado nenhum destino totalmente controlado pelo usuário nos fluxos inspecionados.
 
-Navigation uses constant routes, paths with a fixed `/pedido/` prefix, and constant Home hashes. The dynamic `navigate(notificacao.destino)` in `src/admin/notificacoes/AdminNotificacoes.tsx` receives destinations constructed by `functions/lib/notificacoes.ts`, such as `/admin/pedidos?pedido=<id>` and `/admin/produtos`, rather than user-supplied URLs.
+A navegação usa rotas constantes, caminhos com prefixo fixo `/pedido/` e âncoras constantes da página inicial. A chamada dinâmica `navigate(notificacao.destino)` em `src/admin/notificacoes/AdminNotificacoes.tsx` recebe destinos construídos por `functions/lib/notificacoes.ts`, como `/admin/pedidos?pedido=<id>` e `/admin/produtos`, em vez de URLs fornecidas pelo usuário.
 
-**Decision: acceptable for v1.0 with documented risk.** The vulnerable dependency remains installed. Source inspection did not identify an exploitable input path; this is not a universal proof that exploitation is impossible.
+**Decisão: aceitável para a v1.0, com risco documentado.** A dependência vulnerável continua instalada. A inspeção do código não identificou um caminho de entrada explorável; isso não é uma prova universal de que a exploração seja impossível.
 
-Reassess before introducing `returnTo`, free-form URLs, or navigation destinations supplied by users or other untrusted sources.
+Reavalie antes de introduzir `returnTo`, URLs livres ou destinos de navegação fornecidos por usuários ou outras fontes não confiáveis.
 
-## SSR hydration constructor injection: currently not applicable
+## Injeção de construtor na hidratação SSR: atualmente não aplicável
 
-**[GHSA-337j-9hxr-rhxg / CVE-2026-53666](https://github.com/advisories/GHSA-337j-9hxr-rhxg)** — moderate severity.
+**[GHSA-337j-9hxr-rhxg / CVE-2026-53666](https://github.com/advisories/GHSA-337j-9hxr-rhxg)** — severidade moderada.
 
-The vulnerability depends on SSR/hydration error data allowing attacker input to select client-side constructors. The advisory explicitly excludes Declarative Mode applications.
+A vulnerabilidade depende de dados de erro de SSR/hidratação que permitam à entrada de um atacante selecionar construtores no cliente. O aviso exclui explicitamente aplicações no modo declarativo (Declarative Mode).
 
-The project uses `createRoot` in `src/main.tsx` and `BrowserRouter` in `src/App.tsx`. Production source inspection found no SSR, `hydrateRoot`, `RouterProvider`, or `StaticRouter`.
+O projeto usa `createRoot` em `src/main.tsx` e `BrowserRouter` em `src/App.tsx`. A inspeção do código de produção não encontrou SSR, `hydrateRoot`, `RouterProvider` ou `StaticRouter`.
 
-**Decision: not applicable to the current architecture.** Reassess before adopting SSR, hydration, Framework Mode, or Data Mode with manual SSR/hydration.
+**Decisão: não aplicável à arquitetura atual.** Reavalie antes de adotar SSR, hidratação, modo de framework (Framework Mode) ou modo de dados (Data Mode) com SSR/hidratação manual.
 
-## Remediation and release policy
+## Correção e política de publicação
 
-Both advisories are fixed starting with React Router **7.18.0**; the audited npm recommendation is **7.18.4**. The installed v6 release remains affected, so dependency remediation requires a **major upgrade to React Router 7**. That migration will be handled separately after v1.0, with routing, checkout, admin navigation, redirects, and order tracking regression checks.
+Ambos os avisos são corrigidos a partir do React Router **7.18.0**; a recomendação do npm registrada na auditoria é **7.18.4**. A versão v6 instalada continua afetada, portanto a correção exige uma **atualização de versão principal para o React Router 7**. Essa migração será tratada separadamente após a v1.0, com verificações de regressão em roteamento, checkout, navegação administrativa, redirecionamentos e acompanhamento de pedidos.
 
-Do not use `npm audit fix --force` as a remediation shortcut. This acceptance does not authorize dependency changes.
+Não use `npm audit fix --force` como atalho para a correção. Esta aceitação não autoriza alterações de dependências.
 
-- Production **high/critical** vulnerabilities block release.
-- Production **moderate** vulnerabilities require triage and, when applicable, explicit documented risk acceptance for the release.
-- Recheck the audit for each release; this dated acceptance cannot replace current triage.
+- Vulnerabilidades **altas/críticas** de produção bloqueiam a publicação.
+- Vulnerabilidades **moderadas** de produção exigem triagem e, quando aplicável, aceitação explícita e documentada do risco para a versão.
+- Refaça a auditoria a cada publicação; esta aceitação datada não substitui a triagem atual.
 
-See the [release checklist](../RELEASE-CHECKLIST.md) for the release gate.
+Veja o [checklist de publicação](../RELEASE-CHECKLIST.md) para os critérios de liberação.
