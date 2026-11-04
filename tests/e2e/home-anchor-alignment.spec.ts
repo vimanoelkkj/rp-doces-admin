@@ -37,6 +37,34 @@ async function expectStable(page: Page, hash: string) {
 test.describe("Anchor alignment (desktop)", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
+  test("deep link waits for a late font stylesheet before measuring the destination", async ({ page }) => {
+    await mockStorefrontApi(page);
+    await recordScrollCalls(page);
+    let releaseStylesheet!: () => void;
+    const stylesheetReady = new Promise<void>(resolve => {
+      releaseStylesheet = resolve;
+    });
+    await page.route("https://fonts.googleapis.com/**", async route => {
+      await stylesheetReady;
+      // A late imported stylesheet changes layout, as the real font swap does.
+      await route.fulfill({ contentType: "text/css", body: ".hero { padding-bottom: 104px; }" });
+    });
+    try {
+      await page.goto("/#contato", { waitUntil: "domcontentloaded" });
+      await page.locator(".hero").waitFor({ state: "attached" });
+      // Exceed the former 1500ms page-load cutoff before releasing the stylesheet.
+      await page.waitForTimeout(1800);
+      expect(await takeNavigationScrolls(page)).toHaveLength(0);
+    } finally {
+      releaseStylesheet();
+    }
+    await page.waitForLoadState("load");
+    await waitForScrollSettled(page);
+    await expectAnchorAligned(page, "contato");
+    await expectStable(page, "contato");
+    expect(await takeNavigationScrolls(page)).toHaveLength(1);
+  });
+
   for (const { hash, label } of sections) {
     test(`Header link to #${hash} rests on the scroll-padding edge`, async ({ page }) => {
       await openHome(page);

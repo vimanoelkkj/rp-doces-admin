@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { createPath, useLocation, useNavigate } from "react-router-dom";
 
-// Longest wait for the page load and for webfonts, so a stalled request cannot hold a scroll back.
+// Bound the wait for fonts once the page's stylesheets have loaded.
 const LAYOUT_WAIT_LIMIT_MS = 1500;
 
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -16,7 +16,9 @@ const within = (promise: Promise<unknown>, ms: number) =>
 // for the load, for a painted frame and then for the fonts in flight; the offsets measured
 // afterwards do not move again.
 async function layoutSettled() {
-  if (document.readyState !== "complete") await within(documentLoaded(), LAYOUT_WAIT_LIMIT_MS);
+  // A pending font stylesheet can still report fonts.status === "loaded" for the fallback fonts.
+  // Do not measure that provisional layout, even when the stylesheet takes longer than 1500ms.
+  if (document.readyState !== "complete") await documentLoaded();
   await nextFrame();
   await nextFrame();
   const fonts = document.fonts;
