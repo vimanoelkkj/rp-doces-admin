@@ -12,3 +12,6 @@
 
 /admin-manifest.webmanifest
   Cache-Control: no-cache
+
+/store-manifest.webmanifest
+  Cache-Control: no-cache

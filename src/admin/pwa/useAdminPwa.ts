@@ -36,15 +36,15 @@ export function useAdminPwa() {
     if (typeof window === "undefined") return;
     if (!isAdminRoute) return;
 
-    // 1. Injeta o manifesto dinamicamente no <head>
+    // 1. Seleciona o manifesto administrativo, separado do PWA da loja.
     let manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     if (!manifestLink) {
       manifestLink = document.createElement("link");
       manifestLink.rel = "manifest";
-      manifestLink.href = "/admin-manifest.webmanifest";
-      manifestLink.setAttribute("data-admin-pwa", "true");
       document.head.appendChild(manifestLink);
     }
+    manifestLink.href = "/admin-manifest.webmanifest";
+    manifestLink.setAttribute("data-admin-pwa", "true");
 
     // 2. Injeta apple-touch-icon para dispositivos iOS
     let appleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
@@ -122,7 +122,8 @@ export function useAdminPwa() {
       const injectedManifest = document.querySelector(
         'link[data-admin-pwa="true"][rel="manifest"]'
       );
-      injectedManifest?.remove();
+      injectedManifest?.setAttribute("href", "/store-manifest.webmanifest");
+      injectedManifest?.removeAttribute("data-admin-pwa");
 
       const injectedAppleIcon = document.querySelector(
         'link[data-admin-pwa="true"][rel="apple-touch-icon"]'
